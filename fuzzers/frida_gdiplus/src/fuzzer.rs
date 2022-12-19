@@ -108,9 +108,9 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+                let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_ptr_mut().unwrap(),
+                    frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ));
 
@@ -228,9 +228,9 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage, cmplog));
 
                 // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+                let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_ptr_mut().unwrap(),
+                    frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ));
 
@@ -361,9 +361,9 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+                let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_ptr_mut().unwrap(),
+                    frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ));
 

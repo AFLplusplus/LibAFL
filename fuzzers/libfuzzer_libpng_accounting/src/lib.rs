@@ -133,8 +133,9 @@ pub fn libafl_main() {
 
     let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-        let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+        let edges_observer = HitcountsMapObserver::new(unsafe {
+            StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
+        });
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -221,7 +222,7 @@ pub fn libafl_main() {
         // Call LLVMFUzzerInitialize() if present.
         let args: Vec<String> = env::args().collect();
         if libfuzzer_initialize(&args) == -1 {
-            println!("Warning: LLVMFuzzerInitialize failed with -1")
+            println!("Warning: LLVMFuzzerInitialize failed with -1");
         }
 
         // In case the corpus is empty (on first run), reset

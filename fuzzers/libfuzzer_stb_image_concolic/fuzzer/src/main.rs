@@ -49,8 +49,7 @@ use libafl::{
     Error,
 };
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, EDGES_MAP,
-    MAX_EDGES_NUM,
+    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, std_edges_map_observer
 };
 
 #[derive(Debug, Parser)]
@@ -106,8 +105,7 @@ fn fuzz(
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = StdMapObserver::new("edges", edges);
+    let edges_observer = unsafe { std_edges_map_observer("edges") };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");

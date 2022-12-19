@@ -14,7 +14,6 @@ use libafl::{
     inputs::BytesInput,
     monitors::MultiMonitor,
     mutators::{havoc_mutations, StdScheduledMutator},
-    observers::StdMapObserver,
     schedulers::RandScheduler,
     stages::StdMutationalStage,
     state::StdState,
@@ -46,9 +45,8 @@ fn main() {
             Some(parent_cpu_id.id as u32),
         )
         .unwrap();
-        let trace_bits =
-            unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
-        let observer = StdMapObserver::new("trace", trace_bits);
+        let observer =
+            unsafe { StdMapObserver::from_mut_ptr("trace", helper.trace_bits, helper.map_size) };
 
         let input = BytesInput::new(b"22".to_vec());
         let rand = StdRand::new();

@@ -11,7 +11,6 @@ use libafl::{
     inputs::BytesInput,
     monitors::tui::TuiMonitor,
     mutators::{havoc_mutations, StdScheduledMutator},
-    observers::StdMapObserver,
     schedulers::RandScheduler,
     stages::StdMutationalStage,
     state::StdState,
@@ -26,8 +25,8 @@ fn main() {
 
     // nyx stuff
     let mut helper = NyxHelper::new(share_dir, cpu_id, true, parallel_mode, None).unwrap();
-    let trace_bits = unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
-    let observer = StdMapObserver::new("trace", trace_bits);
+    let observer =
+        unsafe { StdMapObserver::from_mut_ptr("trace", helper.trace_buts, helper.map_size) };
 
     let input = BytesInput::new(b"22".to_vec());
     let rand = StdRand::new();

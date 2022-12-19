@@ -22,7 +22,7 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error,
 };
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
 const TARGET_SIZE: usize = 4;
 
@@ -69,11 +69,10 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
     let reachability_observer =
-        unsafe { StdMapObserver::new_from_ptr("png.c", __libafl_target_list, TARGET_SIZE) };
+        unsafe { StdMapObserver::from_mut_ptr("png.c", __libafl_target_list, TARGET_SIZE) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&edges_observer);

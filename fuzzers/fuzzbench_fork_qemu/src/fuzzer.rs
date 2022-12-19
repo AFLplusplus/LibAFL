@@ -230,8 +230,13 @@ fn fuzz(
     };
 
     // Create an observation channel using the coverage map
-    let edges_observer =
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE>::new("edges", edges));
+    let edges_observer = unsafe {
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE>::from_mut_ptr(
+            "edges",
+            edges.as_mut_ptr(),
+            EDGES_MAP_SIZE,
+        ))
+    };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");

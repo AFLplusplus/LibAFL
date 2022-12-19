@@ -33,7 +33,7 @@ pub fn main() -> Result<(), Error> {
 
     // Create an observation channel using the signals map
     let observer =
-        unsafe { StdMapObserver::new_from_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
+        unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
 
     let factory = MapEqualityFactory::new_from_observer(&observer);
 

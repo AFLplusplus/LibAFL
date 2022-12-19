@@ -110,11 +110,9 @@ pub fn fuzz() {
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
-            HitcountsMapObserver::new(VariableMapObserver::new(
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                edges::EDGES_MAP.as_mut_ptr,
-                edges::EDGES_MAP.len(),
-                MAX_EDGES_NUM,
+                edges::edges_map_mut_slice(),
                 edges_counter,
             ))
         };

@@ -42,7 +42,7 @@ use libafl::{
 };
 use libafl_targets::{
     CmpLogObserver, __sanitizer_cov_trace_cmp1, __sanitizer_cov_trace_cmp2,
-    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, EDGES_MAP_PTR, MAX_EDGES_NUM,
+    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, std_edges_map_observer,
 };
 
 /// Set up our coverage map.
@@ -216,13 +216,7 @@ pub fn LLVMFuzzerRunDriver(
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges_observer = unsafe {
-            HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
-                "edges",
-                EDGES_MAP_PTR,
-                MAX_EDGES_NUM,
-            ))
-        };
+        let edges_observer = unsafe { HitcountsMapObserver::new(std_edges_map_observer("edges")) };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");

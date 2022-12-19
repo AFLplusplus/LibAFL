@@ -185,7 +185,7 @@ pub struct CmpLogObserver {
     name: String,
 }
 
-impl<'a, S> CmpObserver<CmpLogMap, S> for CmpLogObserver
+impl<S> CmpObserver<CmpLogMap, S> for CmpLogObserver
 where
     S: UsesInput + HasMetadata,
 {
@@ -206,7 +206,7 @@ where
     }
 }
 
-impl<'a, S> Observer<S> for CmpLogObserver
+impl<S> Observer<S> for CmpLogObserver
 where
     S: UsesInput + HasMetadata,
     Self: CmpObserver<CmpLogMap, S>,
@@ -235,7 +235,7 @@ where
     }
 }
 
-impl<'a> Named for CmpLogObserver {
+impl Named for CmpLogObserver {
     fn name(&self) -> &str {
         &self.name
     }
