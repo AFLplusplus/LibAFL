@@ -63,8 +63,7 @@ let mut helper = NyxHelper::new(share_dir, cpu_id, true, parallel_mode, None).un
 Then, fetch `trace_bits`, create an observer and the `NyxExecutor`:
 
 ```rust,ignore
-let trace_bits = unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
-let observer = StdMapObserver::new("trace", trace_bits);
+let observer = unsafe { StdMapObserver::from_mut_ptr("trace", helper.trace_bits, helper.map_size) };
 let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
 ```
 
@@ -99,9 +98,7 @@ let mut helper = NyxHelper::new(
 Then you can fetch the trace_bits and create an observer and `NyxExecutor`
 
 ```rust,ignore
-let trace_bits =
-    unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
-let observer = StdMapObserver::new("trace", trace_bits);
+let observer = unsafe { StdMapObserver::from_mut_ptr("trace", helper.trace_bits, helper.map_size) }
 let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
 ```
 

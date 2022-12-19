@@ -64,7 +64,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", signals_clone.as_mut_slice());
+    let observer = unsafe { StdMapObserver::new("signals", signals_clone.as_mut_slice()) };
     // Create a stacktrace observer to add the observers tuple
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks

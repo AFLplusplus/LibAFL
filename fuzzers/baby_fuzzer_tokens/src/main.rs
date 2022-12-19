@@ -65,7 +65,8 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", add_of_mut!(SIGNALS), SIGNALS.len());
+    let observer =
+        unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
