@@ -1,6 +1,9 @@
 //! In-memory fuzzer with `QEMU`-based binary-only instrumentation
 //!
-use core::fmt::{self, Debug, Formatter};
+use core::{
+    fmt::{self, Debug, Formatter},
+    ptr::addr_of_mut,
+};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
@@ -33,9 +36,7 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
 };
 pub use libafl_qemu::emu::Emulator;
-use libafl_qemu::{
-    cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks,
-};
+use libafl_qemu::{edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
 use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
@@ -150,8 +151,8 @@ where
             let edges_observer = unsafe {
                 HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                     "edges",
-                    edges::edges_map_mut_slice(),
-                    edges_counter,
+                    edges_map_mut_slice(),
+                    addr_of_mut!(edges::MAX_EDGES_NUM),
                 ))
             };
 
