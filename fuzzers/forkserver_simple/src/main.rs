@@ -103,7 +103,8 @@ pub fn main() {
     let shmem_buf = shmem.as_mut_slice();
 
     // Create an observation channel using the signals map
-    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf));
+    let edges_observer =
+        unsafe { HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf)) };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
