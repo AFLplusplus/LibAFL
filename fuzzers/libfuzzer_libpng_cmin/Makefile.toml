@@ -1,11 +1,11 @@
 # Variables
 [env]
 FUZZER_NAME='fuzzer_libpng'
+PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 LIBAFL_CC = '${CARGO_TARGET_DIR}/release/libafl_cc'
 LIBAFL_CXX = '${CARGO_TARGET_DIR}/release/libafl_cxx'
 FUZZER = '${CARGO_TARGET_DIR}/release/${FUZZER_NAME}'
-PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -102,7 +102,7 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
 command = "${CARGO_TARGET_DIR}/release/libafl_cxx"
-args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
+args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz", "-lz3"]
 dependencies = [ "lib", "cxx", "cc" ]
 
 # Crashing Harness
@@ -113,7 +113,7 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_crash_unix]
 command = "${CARGO_TARGET_DIR}/release/libafl_cxx"
-args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}_crash", "-lm", "-lz"]
+args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}_crash", "-lm", "-lz", "-lz3"]
 dependencies = [ "crash_lib", "crash_cxx", "crash_cc" ]
 
 # Run the fuzzer

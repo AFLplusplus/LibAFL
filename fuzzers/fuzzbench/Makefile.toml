@@ -1,7 +1,7 @@
 [env]
+PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 FUZZER_NAME="fuzzer"
-PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
 script_runner="@shell"

@@ -1,11 +1,11 @@
 # Variables
 [env]
 FUZZER_NAME='fuzzer_libpng'
+PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 LIBAFL_CC = '${CARGO_TARGET_DIR}/release/libafl_cc'
 LIBAFL_CXX = '${CARGO_TARGET_DIR}/release/libafl_cxx'
 FUZZER = '${CARGO_TARGET_DIR}/release/${FUZZER_NAME}'
-PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
 script_runner="@shell"
