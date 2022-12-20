@@ -23,7 +23,6 @@ fn build_dep_check(tools: &[&str]) {
 }
 
 fn main() {
-
     if !cfg!(target_os = "linux") {
         println!("cargo:warning=Only linux host is supported for now.")
     }
