@@ -1,5 +1,5 @@
 use std::{
-    fs::File,
+    fs::{read_link, File},
     io::{BufRead, BufReader, Seek, SeekFrom},
     os::fd::FromRawFd,
 };
@@ -8,8 +8,10 @@ use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{
     bolts::{tuples::Named, AsIter, HasLen},
     executors::ExitKind,
+    impl_serdeany,
     inputs::UsesInput,
     observers::{hash_slice, MapObserver, Observer},
+    state::HasNamedMetadata,
     Error,
 };
 use nix::{fcntl::OFlag, sys::stat::Mode, NixPath};
@@ -50,42 +52,81 @@ pub unsafe fn initialize_coverage_file<P: ?Sized + NixPath>(dir: &P) -> Result<(
         ))
     })?;
     __libafl_set_coverage_file_fd(fd);
+    println!(
+        "cov: {} => {}",
+        fd,
+        read_link(format!("/proc/self/fd/{}", fd))?
+            .to_str()
+            .unwrap()
+    );
     COVERAGE_FILE = Some(File::from_raw_fd(fd));
     Ok(())
 }
 
-fn get_coverage_file() -> Result<File, Error> {
+fn get_coverage_file() -> Result<&'static mut File, Error> {
     unsafe {
-        loop {
-            let file = COVERAGE_FILE
-                .as_mut()
-                .expect("Must initialise the coverage file before this point!");
-            file.seek(SeekFrom::Start(0))?; // reseek to the beginning
-            return Ok(file.try_clone()?);
-        }
+        let file = COVERAGE_FILE
+            .as_mut()
+            .expect("Must initialise the coverage file before this point!");
+        file.seek(SeekFrom::Start(0))?; // reseek to the beginning
+        file.sync_all()?;
+        return Ok(file);
     }
 }
 
+#[derive(Debug, Deserialize, Serialize, Default)]
+pub struct VerilatorMappingMetadata {
+    mapping: HashMap<Vec<u8>, usize>,
+}
+
+impl_serdeany!(VerilatorMappingMetadata);
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct VerilatorMapObserver {
-    mapping: HashMap<Vec<u8>, usize>,
     map: Vec<usize>,
     name: String,
+    forking: bool,
 }
 
 impl VerilatorMapObserver {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, forking: bool) -> Self {
         unsafe {
             initialize_coverage_file("/tmp").unwrap(); // ensure it is initialised by this point
         }
         Self {
             name,
-            mapping: Default::default(),
             map: Default::default(),
+            forking,
         }
     }
 
-    fn process_verilator_coverage(&mut self) -> Result<(), Error> {
+    fn get_verilator_metadata<'a, S: HasNamedMetadata>(
+        &self,
+        state: &'a mut S,
+    ) -> &'a mut VerilatorMappingMetadata {
+        if state
+            .named_metadata()
+            .contains::<VerilatorMappingMetadata>(&self.name)
+        {
+            state
+                .named_metadata_mut()
+                .get_mut::<VerilatorMappingMetadata>(&self.name)
+                .unwrap()
+        } else {
+            state
+                .named_metadata_mut()
+                .insert(VerilatorMappingMetadata::default(), &self.name);
+            state
+                .named_metadata_mut()
+                .get_mut::<VerilatorMappingMetadata>(&self.name)
+                .unwrap()
+        }
+    }
+
+    fn process_verilator_coverage(
+        &mut self,
+        mapping: &mut HashMap<Vec<u8>, usize>,
+    ) -> Result<(), Error> {
         for line in BufReader::new(get_coverage_file()?).split(b'\n') {
             let line = line?;
             if line[0] == b'C' {
@@ -101,7 +142,7 @@ impl VerilatorMapObserver {
                 let count = std::str::from_utf8(count)
                     .map_err(|_| Error::illegal_state("Couldn't parse the coverage count value!"))?
                     .parse()?;
-                match self.mapping.entry(name) {
+                match mapping.entry(name) {
                     Entry::Occupied(e) => {
                         let idx = *e.get();
                         self.map[idx] = count;
@@ -183,31 +224,32 @@ impl MapObserver for VerilatorMapObserver {
 
 impl<S> Observer<S> for VerilatorMapObserver
 where
-    S: UsesInput,
+    S: UsesInput + HasNamedMetadata,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        unsafe {
-            __libafl_reset_verilator_coverage();
+        if !self.forking {
+            unsafe {
+                __libafl_reset_verilator_coverage();
+            }
         }
         self.reset_map()
     }
 
     fn post_exec(
         &mut self,
-        _state: &mut S,
+        state: &mut S,
         _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        unsafe {
-            __libafl_process_verilator_coverage();
+        if !self.forking {
+            unsafe {
+                __libafl_process_verilator_coverage();
+            }
         }
-        self.process_verilator_coverage()?;
-        println!("post-exec: {}", self.count_bytes());
+        let metadata = self.get_verilator_metadata(state);
+        self.process_verilator_coverage(&mut metadata.mapping)?;
+        println!("{}", self.count_bytes());
         Ok(())
-    }
-
-    fn pre_exec_child(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
-        self.pre_exec(state, input)
     }
 
     fn post_exec_child(
@@ -216,8 +258,10 @@ where
         _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        println!("post-exec-child");
-        self.process_verilator_coverage()
+        unsafe {
+            __libafl_process_verilator_coverage();
+        }
+        Ok(())
     }
 }
 
@@ -234,7 +278,12 @@ impl<'it> AsIter<'it> for VerilatorMapObserver {
 mod test {
     use std::io::Write;
 
-    use libafl::{inputs::NopInput, state::NopState};
+    use libafl::{
+        corpus::InMemoryCorpus,
+        inputs::NopInput,
+        prelude::{tuple_list, StdRand},
+        state::{NopState, StdState},
+    };
 
     use super::*;
 
@@ -243,14 +292,21 @@ mod test {
 
     #[test]
     fn can_read_coverage() -> Result<(), Error> {
-        let mut state = NopState::<NopInput>::default();
+        let mut state = StdState::new(
+            StdRand::default(),
+            InMemoryCorpus::new(),
+            InMemoryCorpus::new(),
+            &mut tuple_list!(),
+            &mut tuple_list!(),
+        )?;
+        let mut mapping = HashMap::new();
         let input = NopInput;
-        let mut obs = VerilatorMapObserver::new("test-observer".to_string());
+        let mut obs = VerilatorMapObserver::new("test-observer".to_string(), false);
         let mut cov_file = get_coverage_file()?;
         cov_file.write_all(include_bytes!("../test-files/coverage.dat"))?;
 
         obs.pre_exec(&mut state, &input)?;
-        obs.process_verilator_coverage()?; // post-exec invokes verilator, which we don't want :)
+        obs.process_verilator_coverage(&mut mapping)?; // post-exec invokes verilator, which we don't want :)
         println!("obs: {:?}", obs);
 
         assert_eq!(*obs.get(0), 1);
@@ -259,7 +315,7 @@ mod test {
         cov_file.write_all(include_bytes!("../test-files/coverage2.dat"))?;
 
         obs.pre_exec(&mut state, &input)?;
-        obs.process_verilator_coverage()?;
+        obs.process_verilator_coverage(&mut mapping)?;
         println!("obs: {:?}", obs);
 
         assert_eq!(*obs.get(0), 2);

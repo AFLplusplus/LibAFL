@@ -31,7 +31,7 @@ void __libafl_process_verilator_coverage() {
 }
 
 void __libafl_reset_verilator_coverage() {
-  __libafl_verilator_context->coveragep()->zero();
+  __libafl_verilator_context->coveragep()->clear();
 }
 
 }

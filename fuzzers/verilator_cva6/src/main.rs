@@ -190,7 +190,7 @@ fn main() -> Result<(), Error> {
 
     let mut mgr = SimpleEventManager::printing();
 
-    let cov_observer = VerilatorMapObserver::new("verilated-edges".to_string());
+    let cov_observer = VerilatorMapObserver::new("verilated-edges".to_string(), true);
 
     let time_observer = TimeObserver::new("time");
 
@@ -316,7 +316,7 @@ fn main() -> Result<(), Error> {
         unsafe {
             __libafl_ariane_finalize();
         }
-        reader.read_to_string(&mut line).unwrap(); // clean out the remaining data
+        reader.read_to_string(&mut line).ok(); // clean out the remaining data
 
         ExitKind::Ok
     };
