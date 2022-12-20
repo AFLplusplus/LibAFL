@@ -232,7 +232,8 @@ fn main() {
         .arg("+define+WT_DCACHE")
         .arg(root_dir.join("src/util/sram.sv"))
         .arg("+incdir+src/axi_node")
-        .arg("--no-threads") // ariane requires multiple threads :(
+        // ariane is very slow without multiple threads, but coverage breaks without it :(
+        .arg("--no-threads")
         .args(["--unroll-count", "256"])
         .arg("-Werror-PINMISSING")
         .arg("-Werror-IMPLICIT")
@@ -258,7 +259,7 @@ fn main() {
         .arg("-Wall")
         .arg("--cc")
         .arg("--vpi")
-        .arg("--timing") // TODO verify that this is the correct option
+        .arg("--no-timing")
         .arg(format!(
             "+incdir+{}/src/common_cells/include",
             root_dir.to_str().unwrap()
@@ -281,7 +282,8 @@ fn main() {
         .cpp(true)
         .include(format!("{riscv_path}/include"))
         // .flag("-std=c++11")
-        .flag("-fcoroutines")
+        // .flag("-fcoroutines")
+        .define("VL_NO_LEGACY", None)
         .opt_level(3)
         .include(root_dir.join("tb/dpi"));
     if let Some(root) = std::env::var_os("VERILATOR_ROOT") {
@@ -291,8 +293,8 @@ fn main() {
             .include(&include)
             .file(include.join("verilated.cpp"))
             .file(include.join("verilated_vpi.cpp"))
-            .file(include.join("verilated_threads.cpp"))
-            .file(include.join("verilated_timing.cpp"));
+            // .file(include.join("verilated_timing.cpp"))
+            .file(include.join("verilated_threads.cpp"));
         // build.define("VL_THREADED", None);
         include.push("vltstd");
         build.include(&include);

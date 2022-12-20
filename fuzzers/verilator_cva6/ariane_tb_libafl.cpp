@@ -33,67 +33,32 @@
 
 #include <fesvr/dtm.h>
 
-#include "interop.h"
 #include "harness.h"
-#define _GNU_SOURCE
-#include <dlfcn.h>
-
-static bool write_interception_enabled = false;
-static bool ariane_initialised = false;
-static int ariane_read_fd;
-static size_t (*real_write)(int, const void *, size_t) = nullptr;
-
-extern "C" {
-  int __libafl_get_coverage_file_fd();
-
-  // intercept writes to stdout to detect for initialisation
-  ssize_t write(int fd, const void *buf, size_t count) {
-    if (real_write == nullptr) {
-      real_write =
-          (size_t(*)(int, const void *, size_t))dlsym(RTLD_NEXT, "write");
-    }
-    if (write_interception_enabled) {
-      if (memcmp(ARIANE_READY, buf, sizeof(ARIANE_READY)) == 0) {
-        ariane_initialised = true;
-        write_interception_enabled = false;
-        ariane_read_fd = fd - 1;
-        std::cout << "Ariane is ready! (notified by fd " << fd << ")" << std::endl;
-        return count;
-      }
-    }
-    return (*real_write)(fd, buf, count);
-  }
-}
 
 // This software is heavily based on Rocket Chip
 // Checkout this awesome project:
 // https://github.com/freechipsproject/rocket-chip/
 
-// This is a 64-bit integer to reduce wrap over issues and
-// allow modulus.  You can also use a double, if you wish.
-static vluint64_t main_time = 0;
-
+VerilatedContext *__libafl_verilator_context;
 extern dtm_t* dtm;
-
-// Called by $time in Verilog converts to double, to match what SystemC does
-double sc_time_stamp () {
-  return main_time;
-}
 
 static Variane_testharness *top = nullptr;
 static char executable_name[] = "ariane_harness";
 static char jtag_option[] = "+jtag_rbb_enable=0";
 
 extern "C" void __libafl_ariane_start(const char *input_file) {
+  __libafl_verilator_context = new VerilatedContext;
   char *argv[3] = { executable_name, jtag_option, (char *) input_file };
   char *htif_argv[2] = { executable_name, (char *) input_file };
 
-  Verilated::commandArgs(3, argv);
+  __libafl_verilator_context->threads(1);
+  __libafl_verilator_context->traceEverOn(false);
+  __libafl_verilator_context->commandArgs(3, argv);
 
   dtm = new dtm_t(2, htif_argv);
 
   if (top != nullptr) abort();
-  top = new Variane_testharness;
+  top = new Variane_testharness{__libafl_verilator_context, "CVA6"};
 
   for (int i = 0; i < 10; i++) {
     top->rst_ni = 0;
@@ -102,44 +67,32 @@ extern "C" void __libafl_ariane_start(const char *input_file) {
     top->eval();
     top->clk_i = 1;
     top->eval();
-    main_time++;
+    __libafl_verilator_context->timeInc(1);
   }
   top->rst_ni = 1;
-
-  write_interception_enabled = true;
-  while (!ariane_initialised) {
-    top->clk_i = 0;
-    top->eval();
-
-    top->clk_i = 1;
-    top->eval();
-    // toggle RTC
-    if (main_time % 2 == 0) {
-      top->rtc_i ^= 1;
-    }
-    main_time++;
-  }
-  write_interception_enabled = false;
 }
 
-extern "C" int __libafl_ariane_test_one_input(int input_fd) {
-  dup2(input_fd, ariane_read_fd); // overwrite stdin for predictable fd in fesvr
+extern "C" void __libafl_ariane_tick() {
+  top->clk_i = 0;
+  top->eval();
 
-  while (!dtm->done()) {
-    top->clk_i = 0;
-    top->eval();
-
-    top->clk_i = 1;
-    top->eval();
-    // toggle RTC
-    if (main_time % 2 == 0) {
-      top->rtc_i ^= 1;
-    }
-    main_time++;
+  top->clk_i = 1;
+  top->eval();
+  // toggle RTC
+  if (__libafl_verilator_context->time() % 2 == 0) {
+    top->rtc_i ^= 1;
   }
+  __libafl_verilator_context->timeInc(1);
+}
 
-  auto exit_code = dtm->exit_code();
+extern "C" void __libafl_ariane_terminate() {
+  dtm->stop();
+}
+
+extern "C" bool __libafl_ariane_terminated() {
+  return dtm->done();
+}
+
+extern "C" void __libafl_ariane_finalize() {
   top->final();
-  Verilated::quiesce();
-  return exit_code;
 }

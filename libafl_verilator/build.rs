@@ -33,12 +33,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         test_compiler
             .file(path.join("verilated_cov.cpp"))
             .file(path.join("verilated.cpp"))
+            .file("wrapper/test-context.cpp")
+            .include(&path)
+            .define("VL_NO_LEGACY", None)
             .cpp(true)
             .compile("afl-verilator-test");
     }
 
     compiler
         .file("wrapper/wrapper.cpp")
+        .define("VL_NO_LEGACY", None)
         .cpp(true)
         .compile("afl-verilator-wrapper");
 

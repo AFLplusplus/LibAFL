@@ -27,6 +27,10 @@ use wrapper::*;
 
 static mut COVERAGE_FILE: Option<File> = None;
 
+pub unsafe fn reset_coverage_file() {
+    COVERAGE_FILE = None;
+}
+
 pub unsafe fn initialize_coverage_file<P: ?Sized + NixPath>(dir: &P) -> Result<(), Error> {
     if COVERAGE_FILE.is_some() {
         return Err(Error::unsupported(
@@ -197,7 +201,9 @@ where
         unsafe {
             __libafl_process_verilator_coverage();
         }
-        self.process_verilator_coverage()
+        self.process_verilator_coverage()?;
+        println!("post-exec: {}", self.count_bytes());
+        Ok(())
     }
 
     fn pre_exec_child(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
@@ -206,11 +212,12 @@ where
 
     fn post_exec_child(
         &mut self,
-        state: &mut S,
-        input: &S::Input,
-        exit_kind: &ExitKind,
+        _state: &mut S,
+        _input: &S::Input,
+        _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        self.post_exec(state, input, exit_kind)
+        println!("post-exec-child");
+        self.process_verilator_coverage()
     }
 }
 
