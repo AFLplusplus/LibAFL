@@ -68,7 +68,7 @@ fn main() {
     )
     .unwrap();
 
-    println!("?: {}", runtime_dir.join("target").join("release").join("libSymRuntime.so").exists())
+    println!("?: {}", runtime_dir.join("target").join("release").join("libSymRuntime.so").exists());
 
     if !runtime_dir.join("libSymRuntime.so").exists() {
         println!("cargo:warning=Runtime not found. Build it first.");
