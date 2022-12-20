@@ -49,16 +49,22 @@ fn main() {
 
     let symcc_dir = clone_and_build_symcc(&out_path);
 
-    let runtime_dir = std::env::var("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            std::env::current_dir()
-                .unwrap()
-                .join("..")
-                .join("runtime")
-                .join("target")
-        })
-        .join(std::env::var("PROFILE").unwrap());
+    let runtime_dir = std::env::current_dir()
+        .unwrap()
+        .join("..")
+        .join("runtime");
+
+    // Build the runtime
+    std::process::Command::new("cargo")
+        .current_dir(&runtime_dir)
+        .arg("-Z")
+        .arg("unstable-options")
+        .arg("build")
+        .arg("--release")
+        .arg("--out-dir")
+        .arg(&runtime_dir)
+        .status()
+        .expect("Failed to build runtime");
 
     if !runtime_dir.join("libSymRuntime.so").exists() {
         println!("cargo:warning=Runtime not found. Build it first.");
