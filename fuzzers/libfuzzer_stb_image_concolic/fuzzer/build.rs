@@ -54,6 +54,7 @@ fn main() {
     // Build the runtime
     std::process::Command::new("cargo")
         .current_dir(&runtime_dir)
+        .env_remove("CARGO_TARGET_DIR")
         .arg("build")
         .arg("--release")
         .status()
