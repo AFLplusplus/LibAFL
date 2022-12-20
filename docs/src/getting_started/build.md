@@ -6,7 +6,7 @@ LibAFL, as most of the Rust projects, can be built using `cargo` from the root d
 $ cargo build --release
 ```
 
-Note that the `--release` flag is optional for development, but you needed to add it to fuzzing at a decent speed.
+Note that the `--release` flag is optional for development, but you need to add it to do fuzzing at a decent speed.
 Slowdowns of 10x or more are not uncommon for Debug builds.
 
 The LibAFL repository is composed of multiple crates.
