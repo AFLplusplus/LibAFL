@@ -146,6 +146,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     );
 
     // Initialize ASAN, call this before any ASAN crashes can occur (directly after initializing executor e.g.)
+    #[cfg(windows)]
     unsafe {
         libafl_targets::setup_asan_callback(&executor, &restarting_mgr, &fuzzer);
     }
