@@ -49,10 +49,7 @@ fn main() {
 
     let symcc_dir = clone_and_build_symcc(&out_path);
 
-    let runtime_dir = std::env::current_dir()
-        .unwrap()
-        .join("..")
-        .join("runtime");
+    let runtime_dir = std::env::current_dir().unwrap().join("..").join("runtime");
 
     // Build the runtime
     std::process::Command::new("cargo")
