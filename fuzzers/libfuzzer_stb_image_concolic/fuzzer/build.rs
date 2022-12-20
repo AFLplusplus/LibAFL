@@ -54,14 +54,18 @@ fn main() {
     // Build the runtime
     std::process::Command::new("cargo")
         .current_dir(&runtime_dir)
-        .arg("-Z")
-        .arg("unstable-options")
         .arg("build")
         .arg("--release")
-        .arg("--out-dir")
-        .arg(&runtime_dir)
         .status()
         .expect("Failed to build runtime");
+
+    std::fs::copy(
+        &runtime_dir
+            .join("target")
+            .join("release")
+            .join("libSymRuntime.so"),
+        &runtime_dir,
+    );
 
     if !runtime_dir.join("libSymRuntime.so").exists() {
         println!("cargo:warning=Runtime not found. Build it first.");
