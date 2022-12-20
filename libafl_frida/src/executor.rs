@@ -173,15 +173,14 @@ where
             }
         }
 
-        // Disable exclude on windows for now
-        // See https://github.com/AFLplusplus/LibAFL/issues/830
-        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-        for range in ranges.gaps(&(0..usize::MAX)) {
-            println!("excluding range: {:x}-{:x}", range.start, range.end);
-            stalker.exclude(&MemoryRange::new(
-                NativePointer(range.start as *mut c_void),
-                range.end - range.start,
-            ));
+        if !helper.options().disable_excludes {
+            for range in ranges.gaps(&(0..usize::MAX)) {
+                println!("excluding range: {:x}-{:x}", range.start, range.end);
+                stalker.exclude(&MemoryRange::new(
+                    NativePointer(range.start as *mut c_void),
+                    range.end - range.start,
+                ));
+            }
         }
 
         #[cfg(windows)]
