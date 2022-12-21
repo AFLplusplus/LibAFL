@@ -61,8 +61,6 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
-    - name: set mold linker as default linker
-      uses: rui314/setup-mold@v1
     - name: Install and cache deps
       uses: awalsh128/cache-apt-pkgs-action@v1.1.0
       with:
@@ -152,8 +150,6 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
-    - name: set mold linker as default linker
-      uses: rui314/setup-mold@v1
     - name: Install deps
       run: sudo apt-get install -y llvm llvm-dev clang ninja-build python3-dev python3-pip python3-venv
     - name: Install maturin
@@ -173,9 +169,6 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
-    - name: set mold linker as default linker
-      if: runner.os == 'Linux' # mold only support linux until now
-      uses: rui314/setup-mold@v1
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Add no_std toolchain

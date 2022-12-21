@@ -172,12 +172,15 @@ where
                 break;
             }
         }
-        for range in ranges.gaps(&(0..usize::MAX)) {
-            println!("excluding range: {:x}-{:x}", range.start, range.end);
-            stalker.exclude(&MemoryRange::new(
-                NativePointer(range.start as *mut c_void),
-                range.end - range.start,
-            ));
+
+        if !helper.options().disable_excludes {
+            for range in ranges.gaps(&(0..usize::MAX)) {
+                println!("excluding range: {:x}-{:x}", range.start, range.end);
+                stalker.exclude(&MemoryRange::new(
+                    NativePointer(range.start as *mut c_void),
+                    range.end - range.start,
+                ));
+            }
         }
 
         #[cfg(windows)]

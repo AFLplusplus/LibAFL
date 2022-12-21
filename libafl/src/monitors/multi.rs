@@ -56,13 +56,13 @@ where
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec_pretty()
         );
         (self.print_fn)(global_fmt);
 
         let client = self.client_stats_mut_for(sender_id);
         let cur_time = current_time();
-        let exec_sec = client.execs_per_sec(cur_time);
+        let exec_sec = client.execs_per_sec_pretty(cur_time);
 
         let pad = " ".repeat(head.len());
         let mut fmt = format!(

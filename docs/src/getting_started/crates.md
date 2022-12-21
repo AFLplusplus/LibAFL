@@ -10,7 +10,7 @@ libafl = { version = "*" }
 
 ## Crate List
 
-For LibAFL, each crate has its self-contained purpose, and the user may not need to use all of them in its project.
+For LibAFL, each crate has its self-contained purpose, and the user may not need to use all of them in their project.
 Following the naming convention of the folders in the project's root, they are:
 
 ### [`libafl`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl)
@@ -52,13 +52,13 @@ To enable and disable features at compile-time, the features are enabled and dis
 Currently, the supported flags are:
 
 - `pcguard_edges` defines the SanitizerCoverage trace-pc-guard hooks to track the executed edges in a map.
-- `pcguard_hitcounts defines the SanitizerCoverage trace-pc-guard hooks to track the executed edges with the hitcounts (like AFL) in a map.
+- `pcguard_hitcounts` defines the SanitizerCoverage trace-pc-guard hooks to track the executed edges with the hitcounts (like AFL) in a map.
 - `libfuzzer` exposes a compatibility layer with libFuzzer style harnesses.
 - `value_profile` defines the SanitizerCoverage trace-cmp hooks to track the matching bits of each comparison in a map.
 
 ### libafl_cc
 
-This is a library that provides utils wrap compilers and create source-level fuzzers.
+This is a library that provides utils to wrap compilers and create source-level fuzzers.
 
 At the moment, only the Clang compiler is supported.
 To understand it deeper, look through the tutorials and examples.

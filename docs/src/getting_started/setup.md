@@ -11,15 +11,15 @@ The first step is to download LibAFL and all dependencies that are not automatic
 > previous command. Additionally, PowerShell-specific examples will use `>`
 > rather than `$`.
 
-While you technically do not need to install LibAFL, but can use the version from crates.io directly, we do recommend to download or clone the GitHub version.
+While technically you do not need to install LibAFL, but can use the version from crates.io directly, we do recommend to download or clone the GitHub version.
 This gets you the example fuzzers, additional utilities, and latest patches.
 The easiest way to do this is to use `git`.
 
 ```sh
-$ git clone git@github.com:AFLplusplus/LibAFL.git
+$ git clone https://github.com/AFLplusplus/LibAFL.git
 ```
 
-You can alternatively, on a UNIX-like machine, download a compressed archive and extract it with:
+Alternatively, on a UNIX-like machine, you can download a compressed archive and extract it with:
 
 ```sh
 wget https://github.com/AFLplusplus/LibAFL/archive/main.tar.gz
@@ -31,7 +31,7 @@ $ ls LibAFL-main # this is the extracted folder
 ## Clang installation
 
 One of the external dependencies of LibAFL is the Clang C/C++ compiler.
-While most of the code is in pure Rust, we still need a C compiler because stable Rust still does not support features that some parts of LibAFL may need, such as weak linking, and LLVM builtins linking.
+While most of the code is written in pure Rust, we still need a C compiler because stable Rust still does not support features that some parts of LibAFL may need, such as weak linking, and LLVM builtins linking.
 For these parts, we use C to expose the missing functionalities to our Rust codebase.
 
 In addition, if you want to perform source-level fuzz testing of C/C++ applications,
