@@ -53,10 +53,11 @@ use wrapper::*;
 
 const MAX_CYCLES: usize = 1 << 12;
 
+// create a temporary file which will be deleted on process death or close
 fn create_input_file() -> Result<(RawFd, File), Error> {
     let input_fd = nix::fcntl::open(
         "/tmp",
-        OFlag::O_TMPFILE | OFlag::O_RDWR | OFlag::O_EXCL,
+        OFlag::O_TMPFILE | OFlag::O_RDWR,
         Mode::S_IRUSR | Mode::S_IWUSR,
     )
     .map_err(|errno| {
@@ -119,6 +120,7 @@ fn main() -> Result<(), Error> {
     let broker_port = opt.broker_port;
     let cores = opt.cores;
 
+    // identify the region in the base executable we are executing "interesting" instructions in
     let elf = Elf::parse(BASE_EXECUTABLE).unwrap();
     let sym = elf
         .syms
@@ -135,9 +137,11 @@ fn main() -> Result<(), Error> {
     elf_input.write_all(BASE_EXECUTABLE).unwrap();
 
     println!("Initialising CVA6, this may take some time...");
+    // this starts CVA6 with the base executable we just wrote
     unsafe {
         __libafl_ariane_start(input_filename.as_ptr());
     }
+    // make the trace file for the target a non-blocking pipe
     let trace_file = {
         let mut readdir = std::fs::read_dir("/proc/self/fd").unwrap();
         loop {
@@ -158,17 +162,22 @@ fn main() -> Result<(), Error> {
             }
         }
     };
+
     let mut reader = BufReader::new(trace_file);
     let mut line = String::new();
     let mut nops = 0;
+
+    // pump the CPU of instructions until we hit the signal region, which is a large sequence of
+    // nops. This ensures we fully load the executable. See cva6-base.c for details.
     'pumploop: loop {
         loop {
             match reader.read_line(&mut line) {
                 Err(e) if e.kind() != ErrorKind::WouldBlock => {
+                    // the model has not written to the trace yet; keep pumping!
                     panic!("Illegal error encountered while processing: {}", e);
                 }
                 Ok(_) => {
-                    // in usermode: c.nop or nop, might change by compiler
+                    // in machine mode: c.nop or nop, might change by compiler
                     if line.contains("0x8000")
                         && (line.trim_end().ends_with("DASM(00000001)")
                             || line.trim_end().contains("DASM(00000013)"))
@@ -202,6 +211,10 @@ fn main() -> Result<(), Error> {
     // iterate over all memory spaces in the program to identify the location of the input buffer
     let mem = File::open("/proc/self/maps")?;
     const NEEDLE: [u8; 4] = [0xde, 0xad, 0xbe, 0xef];
+
+    // when we write to this input buffer in the future, we write directly into the design's memory
+    // this is definitely unintended, but the alternative (dtm-based writes) take roughly the same
+    // amount of time as just initialising the design from scratch :(
     let input_buffer = {
         let mut lines = BufReader::new(mem).lines();
         'searchloop: loop {
@@ -252,6 +265,7 @@ fn main() -> Result<(), Error> {
     );
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+        // observe the verilator coverage
         let cov_observer = VerilatorMapObserver::new("verilated-edges".to_string(), true)?;
 
         let time_observer = TimeObserver::new("time");
@@ -267,7 +281,8 @@ fn main() -> Result<(), Error> {
             TimeFeedback::new_with_observer(&time_observer)
         );
 
-        let mut objective = (); // no feedback at this time :(
+        // no objective feedback at this time :(
+        let mut objective = ();
 
         let mut state = if let Some(existing) = state {
             existing
@@ -286,7 +301,8 @@ fn main() -> Result<(), Error> {
                 &mut objective,
             )?
         };
-        state.set_max_size(1 << 9); // see cva6-base.c for details
+        // stay well within our input buffer's size bound
+        state.set_max_size(1 << 9);
 
         let mutator = StdScheduledMutator::new(havoc_mutations());
         let power = StdPowerMutationalStage::new(mutator, &cov_observer);
@@ -321,6 +337,8 @@ fn main() -> Result<(), Error> {
 
             let mut entered_execution_zone = false;
             let mut in_execution_zone = false;
+            // pump instructions for MAX_CYCLES cycles, or as long as we remain within our intended
+            // execution region
             'pumploop: for _ in 0..MAX_CYCLES {
                 loop {
                     match reader.read_line(&mut line) {
@@ -330,6 +348,7 @@ fn main() -> Result<(), Error> {
                         Ok(_) => {
                             let trimmed = line.trim();
                             let mut split = trimmed.split_ascii_whitespace().skip(1);
+                            // because of the fork, the trace file is not guaranteed to be particularly clean
                             if let Some(pc) = split.next().and_then(|pc| pc.strip_prefix("0x")) {
                                 let pc = usize::from_str_radix(pc, 16).unwrap();
 
@@ -338,7 +357,7 @@ fn main() -> Result<(), Error> {
                                 {
                                     entered_execution_zone = true;
                                     in_execution_zone = true;
-                                } else if entered_execution_zone {
+                                } else {
                                     in_execution_zone = false;
                                 }
                             }
@@ -389,6 +408,7 @@ fn main() -> Result<(), Error> {
 
         let shmem = StdShMemProvider::new()?;
 
+        // fork executor so that we start at the point we left off at when we pumped the model
         let mut executor = InProcessForkExecutor::new(
             &mut harness,
             tuple_list!(cov_observer, time_observer),

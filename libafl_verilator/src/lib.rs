@@ -26,28 +26,30 @@
     clippy::module_name_repetitions,
     clippy::unreadable_literal
 )]
-#![cfg_attr(not(test), warn(
-missing_debug_implementations,
-missing_docs,
-//trivial_casts,
-trivial_numeric_casts,
-unused_extern_crates,
-unused_import_braces,
-unused_qualifications,
-//unused_results
-))]
-#![cfg_attr(test, deny(
-missing_debug_implementations,
-missing_docs,
-//trivial_casts,
-trivial_numeric_casts,
-unused_extern_crates,
-unused_import_braces,
-unused_qualifications,
-unused_must_use,
-missing_docs,
-//unused_results
-))]
+#![cfg_attr(
+    not(test),
+    warn(
+        missing_debug_implementations,
+        missing_docs,
+        trivial_numeric_casts,
+        unused_extern_crates,
+        unused_import_braces,
+        unused_qualifications,
+    )
+)]
+#![cfg_attr(
+    test,
+    deny(
+        missing_debug_implementations,
+        missing_docs,
+        trivial_numeric_casts,
+        unused_extern_crates,
+        unused_import_braces,
+        unused_qualifications,
+        unused_must_use,
+        missing_docs,
+    )
+)]
 #![cfg_attr(
     test,
     deny(
