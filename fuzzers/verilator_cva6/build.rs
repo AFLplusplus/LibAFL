@@ -1,8 +1,8 @@
 use std::{
-    fs::{read_dir, File},
+    fs::read_dir,
     io::{stderr, Write},
     path::PathBuf,
-    process::{Command, Stdio},
+    process::Command,
 };
 
 const ARIANE_PKG: [&'static str; 13] = [

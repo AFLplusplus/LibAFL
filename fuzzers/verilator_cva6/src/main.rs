@@ -252,7 +252,7 @@ fn main() -> Result<(), Error> {
     );
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
-        let cov_observer = VerilatorMapObserver::new("verilated-edges".to_string(), true);
+        let cov_observer = VerilatorMapObserver::new("verilated-edges".to_string(), true)?;
 
         let time_observer = TimeObserver::new("time");
 

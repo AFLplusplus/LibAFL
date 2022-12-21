@@ -12,6 +12,12 @@ You must have a valid RISC-V installation with both [riscv-gnu-toolchain] (as we
 
 If you wish to build a verilated hardware fuzzer yourself, here are a few things to pay particular focus to.
 
+### Objective Feedback
+
+**There is no objective feedback present in this fuzzer at this time.** Objective feedback in hardware fuzzing is an
+open and ongoing research question. Differential fuzzing is certainly possible and supported by CVA6 when using the
+`SPIKE_TANDEM` build option, but this would exceed the scope of this rather basic demo.
+
 ### Host OS Interactions
 
 Our particular target uses interactions with the host OS to load the base executable via the debug transport module.
