@@ -343,8 +343,6 @@ fn main() {
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
 
-    // sadly, the ariane team did not emit the lib with a lib prefix, and we cannot set the name
-    // without thoroughly breaking other things
     println!(
         "cargo:rustc-link-search={}",
         std::env::var("OUT_DIR").unwrap()

@@ -210,6 +210,7 @@ fn main() -> Result<(), Error> {
 
     // iterate over all memory spaces in the program to identify the location of the input buffer
     let mem = File::open("/proc/self/maps")?;
+    // sequence which uniquely identifies the input buffer
     const NEEDLE: [u8; 4] = [0xde, 0xad, 0xbe, 0xef];
 
     // when we write to this input buffer in the future, we write directly into the design's memory
