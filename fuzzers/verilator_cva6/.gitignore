@@ -1,1 +1,3 @@
 *.dasm
+cva6/
+riscv-tests/

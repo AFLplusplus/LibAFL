@@ -23,50 +23,43 @@ const ARIANE_PKG: [&'static str; 13] = [
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=cva6");
     println!("cargo:rerun-if-changed=ariane_tb_libafl.cpp");
     println!("cargo:rerun-if-changed=cva6-base.c");
     println!("cargo:rerun-if-changed=harness.h");
     println!("cargo:rerun-if-changed=interop.h");
-    println!("cargo:rerun-if-changed=riscv-tests");
 
     let riscv_path = std::env::var("RISCV").expect("Path to RISCV root must be defined.");
 
     let mut root_dir = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    let patch_file = root_dir.join("syscalls.c.patch");
     root_dir.push("riscv-tests");
 
-    let patch_target = root_dir.join("benchmarks/common/syscalls.c");
-    // apply patch if possible
-    if patch_target.metadata().unwrap().modified().unwrap()
-        < patch_file.metadata().unwrap().modified().unwrap()
-        || Command::new("git")
-            .arg("diff")
-            .arg("--exit-code")
-            .arg(&patch_target)
-            .current_dir(&root_dir)
-            .status()
-            .unwrap()
-            .success()
-    {
+    if !root_dir.exists() {
         assert!(Command::new("git")
-            .arg("checkout")
-            .arg(&patch_target)
-            .current_dir(&root_dir)
+            .arg("clone")
+            .arg("https://github.com/riscv/riscv-tests.git")
+            .arg(root_dir.as_os_str())
             .status()
             .unwrap()
-            .success());
-        assert!(Command::new("git")
-            .arg("apply")
-            .stdin(Stdio::from(File::open(patch_file).unwrap()))
-            .current_dir(&root_dir)
-            .status()
-            .unwrap()
-            .success());
+            .success())
     }
+    println!("cargo:rerun-if-changed=riscv-tests");
 
     root_dir.pop();
     root_dir.push("cva6");
+
+    if !root_dir.exists() {
+        assert!(Command::new("git")
+            .arg("clone")
+            .arg("--recursive")
+            .arg("--branch")
+            .arg("v4.2.0")
+            .arg("https://github.com/openhwgroup/cva6.git")
+            .arg(root_dir.as_os_str())
+            .status()
+            .unwrap()
+            .success())
+    }
+    println!("cargo:rerun-if-changed=cva6");
 
     // code derived from the Makefile for cva6 -- this WILL need to be changed if using a different version
     let mut verilator = if let Some(root) = std::env::var_os("VERILATOR_ROOT") {
