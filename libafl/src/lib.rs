@@ -404,7 +404,7 @@ impl From<TryFromSliceError> for Error {
 #[cfg(windows)]
 impl From<windows::core::Error> for Error {
     fn from(err: windows::core::Error) -> Self {
-        Self::unknown(format!("Windows API error: {:?}", err))
+        Self::unknown(format!("Windows API error: {err:?}"))
     }
 }
 
