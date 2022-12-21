@@ -2,22 +2,27 @@ use std::{
     ffi::CString,
     fs::File,
     io::{BufRead, BufReader, ErrorKind, Read, Write},
+    net::SocketAddr,
     os::fd::{FromRawFd, RawFd},
+    path::PathBuf,
 };
 
+use clap::{self, Parser};
 use goblin::elf::Elf;
 use libafl::{
     bolts::{current_nanos, AsSlice},
     corpus::{Corpus, InMemoryCorpus},
-    events::SimpleEventManager,
+    events::EventConfig,
     executors::{ExitKind, InProcessForkExecutor},
     feedback_or,
     feedbacks::{MaxMapFeedback, TimeFeedback},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::{MultiMonitor, OnDiskTOMLMonitor},
     mutators::StdScheduledMutator,
     prelude::{
-        havoc_mutations, tuple_list, ShMemProvider, StdRand, StdShMemProvider, TimeObserver,
+        havoc_mutations, tuple_list, Cores, Launcher, ShMemProvider, StdRand, StdShMemProvider,
+        TimeObserver,
     },
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
@@ -27,7 +32,11 @@ use libafl::{
     Error, Fuzzer, StdFuzzer,
 };
 use libafl_verilator::VerilatorMapObserver;
+use mimalloc::MiMalloc;
 use nix::{fcntl::OFlag, sys::stat::Mode};
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 const BASE_EXECUTABLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/base-executable"));
 
@@ -42,7 +51,7 @@ mod wrapper {
 
 use wrapper::*;
 
-const MAX_CYCLES: usize = 1 << 14;
+const MAX_CYCLES: usize = 1 << 12;
 
 fn create_input_file() -> Result<(RawFd, File), Error> {
     let input_fd = nix::fcntl::open(
@@ -62,7 +71,54 @@ fn create_input_file() -> Result<(RawFd, File), Error> {
     Ok((input_fd, input_file))
 }
 
+/// The commandline args this fuzzer accepts
+#[derive(Debug, Parser)]
+#[command(
+    name = "libfuzzer_libpng_launcher",
+    about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
+    author = "Addison Crump <research@addisoncrump.info>"
+)]
+struct Opt {
+    #[arg(
+    short,
+    long,
+    value_parser = Cores::from_cmdline,
+    help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+    name = "CORES"
+    )]
+    cores: Cores,
+
+    #[arg(
+        short = 'p',
+        long,
+        help = "Choose the broker TCP port, default is 1337",
+        name = "PORT",
+        default_value = "1337"
+    )]
+    broker_port: u16,
+
+    #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
+    remote_broker_addr: Option<SocketAddr>,
+
+    #[arg(short, long, help = "Set an initial corpus directory", name = "INPUT")]
+    input: Vec<PathBuf>,
+
+    #[arg(
+        short,
+        long,
+        help = "Set the output directory, default is ./out",
+        name = "OUTPUT",
+        default_value = "./out"
+    )]
+    output: PathBuf,
+}
+
 fn main() -> Result<(), Error> {
+    let opt = Opt::parse();
+
+    let broker_port = opt.broker_port;
+    let cores = opt.cores;
+
     let elf = Elf::parse(BASE_EXECUTABLE).unwrap();
     let sym = elf
         .syms
@@ -188,157 +244,193 @@ fn main() -> Result<(), Error> {
     };
     println!("Initialised CVA6, ready to fuzz!");
 
-    let mut mgr = SimpleEventManager::printing();
+    let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let cov_observer = VerilatorMapObserver::new("verilated-edges".to_string(), true);
-
-    let time_observer = TimeObserver::new("time");
-
-    let cov_feedback = MaxMapFeedback::new_tracking(&cov_observer, true, false);
-
-    let calibration = CalibrationStage::new(&cov_feedback);
-
-    let mut feedback = feedback_or!(
-        // New maximization map feedback linked to the edges observer and the feedback state
-        cov_feedback,
-        // Time feedback, this one does not need a feedback state
-        TimeFeedback::new_with_observer(&time_observer)
+    let monitor = OnDiskTOMLMonitor::new(
+        "./fuzzer_stats.toml",
+        MultiMonitor::new(|s| println!("{}", s)),
     );
 
-    let mut objective = (); // no feedback at this time :(
+    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+        let cov_observer = VerilatorMapObserver::new("verilated-edges".to_string(), true);
 
-    let mut state = StdState::new(
-        // RNG
-        StdRand::with_seed(current_nanos()),
-        // Corpus that will be evolved, we keep it in memory for performance
-        InMemoryCorpus::new(),
-        // Corpus in which we store solutions, but none are actually collected here
-        InMemoryCorpus::new(),
-        // States of the feedbacks.
-        // The feedbacks can report the data that should persist in the State.
-        &mut feedback,
-        // Same for objective feedbacks
-        &mut objective,
-    )?;
-    state.set_max_size(1 << 11); // see cva6-base.c for details
+        let time_observer = TimeObserver::new("time");
 
-    let mutator = StdScheduledMutator::new(havoc_mutations());
-    let power = StdPowerMutationalStage::new(mutator, &cov_observer);
+        let cov_feedback = MaxMapFeedback::new_tracking(&cov_observer, true, false);
 
-    let mut stages = tuple_list!(calibration, power);
+        let calibration = CalibrationStage::new(&cov_feedback);
 
-    // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        PowerSchedule::FAST,
-    ));
-
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-    let mut harness = |input: &BytesInput| {
-        let target = input.target_bytes();
-        let buf = target.as_slice();
-
-        let mut actual = Vec::with_capacity(
-            (buf.len() / core::mem::size_of::<u16>() + 8) * core::mem::size_of::<u16>(),
+        let mut feedback = feedback_or!(
+            // New maximization map feedback linked to the edges observer and the feedback state
+            cov_feedback,
+            // Time feedback, this one does not need a feedback state
+            TimeFeedback::new_with_observer(&time_observer)
         );
-        actual.extend_from_slice(buf);
-        if actual.len() % core::mem::size_of::<u16>() != 0 {
-            actual.push(0); // align to smallest instruction width
-        }
-        for _ in 0..7 {
-            // provide many c.rets just in case of an incomplete long instruction
-            actual.extend_from_slice(&0x8082u16.to_le_bytes()); // c.ret
-        }
 
-        input_buffer[..actual.len()].copy_from_slice(&actual);
+        let mut objective = (); // no feedback at this time :(
 
-        let mut entered_execution_zone = false;
-        let mut in_execution_zone = false;
-        'pumploop: for _ in 0..MAX_CYCLES {
-            loop {
-                match reader.read_line(&mut line) {
-                    Err(e) if e.kind() != ErrorKind::WouldBlock => {
-                        panic!("Encountered IO error while processing: {}", e);
-                    }
-                    Ok(_) => {
-                        let trimmed = line.trim();
-                        let mut split = trimmed.split_ascii_whitespace().skip(1);
-                        if let Some(pc) = split.next().and_then(|pc| pc.strip_prefix("0x")) {
-                            let pc = usize::from_str_radix(pc, 16).unwrap();
+        let mut state = if let Some(existing) = state {
+            existing
+        } else {
+            StdState::new(
+                // RNG
+                StdRand::with_seed(current_nanos()),
+                // Corpus that will be evolved, we keep it in memory for performance
+                InMemoryCorpus::new(),
+                // Corpus in which we store solutions, but none are actually collected here
+                InMemoryCorpus::new(),
+                // States of the feedbacks.
+                // The feedbacks can report the data that should persist in the State.
+                &mut feedback,
+                // Same for objective feedbacks
+                &mut objective,
+            )?
+        };
+        state.set_max_size(1 << 9); // see cva6-base.c for details
 
-                            if pc > target_address as usize
-                                && pc < (target_address as usize + actual.len())
-                            {
-                                entered_execution_zone = true;
-                                in_execution_zone = true;
-                            } else if entered_execution_zone {
-                                in_execution_zone = false;
+        let mutator = StdScheduledMutator::new(havoc_mutations());
+        let power = StdPowerMutationalStage::new(mutator, &cov_observer);
+
+        let mut stages = tuple_list!(calibration, power);
+
+        // A minimization+queue policy to get testcasess from the corpus
+        let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
+            PowerSchedule::FAST,
+        ));
+
+        // A fuzzer with feedbacks and a corpus scheduler
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
+        let mut harness = |input: &BytesInput| {
+            let target = input.target_bytes();
+            let buf = target.as_slice();
+
+            let mut actual = Vec::with_capacity(
+                (buf.len() / core::mem::size_of::<u16>() + 8) * core::mem::size_of::<u16>(),
+            );
+            actual.extend_from_slice(buf);
+            if actual.len() % core::mem::size_of::<u16>() != 0 {
+                actual.push(0); // align to smallest instruction width
+            }
+            for _ in 0..7 {
+                // provide many c.rets just in case of an incomplete long instruction
+                actual.extend_from_slice(&0x8082u16.to_le_bytes()); // c.ret
+            }
+
+            input_buffer[..actual.len()].copy_from_slice(&actual);
+
+            let mut entered_execution_zone = false;
+            let mut in_execution_zone = false;
+            'pumploop: for _ in 0..MAX_CYCLES {
+                loop {
+                    match reader.read_line(&mut line) {
+                        Err(e) if e.kind() != ErrorKind::WouldBlock => {
+                            panic!("Encountered IO error while processing: {}", e);
+                        }
+                        Ok(_) => {
+                            let trimmed = line.trim();
+                            let mut split = trimmed.split_ascii_whitespace().skip(1);
+                            if let Some(pc) = split.next().and_then(|pc| pc.strip_prefix("0x")) {
+                                let pc = usize::from_str_radix(pc, 16).unwrap();
+
+                                if pc > target_address as usize
+                                    && pc < (target_address as usize + actual.len())
+                                {
+                                    entered_execution_zone = true;
+                                    in_execution_zone = true;
+                                } else if entered_execution_zone {
+                                    in_execution_zone = false;
+                                }
                             }
-                        }
 
-                        line.clear();
-                    }
-                    _ => {
-                        if entered_execution_zone && !in_execution_zone {
-                            break 'pumploop;
+                            line.clear();
                         }
-                        break;
+                        _ => {
+                            if entered_execution_zone && !in_execution_zone {
+                                break 'pumploop;
+                            }
+                            break;
+                        }
                     }
+                }
+                unsafe {
+                    __libafl_ariane_tick();
+                }
+            }
+
+            unsafe {
+                __libafl_ariane_terminate();
+            }
+            while unsafe { !__libafl_ariane_terminated() } {
+                loop {
+                    match reader.read_line(&mut line) {
+                        Err(e) if e.kind() != ErrorKind::WouldBlock => {
+                            panic!("Encountered IO error while processing: {}", e);
+                        }
+                        Ok(_) => {
+                            line.clear();
+                        }
+                        _ => {
+                            break;
+                        }
+                    }
+                }
+                unsafe {
+                    __libafl_ariane_tick();
                 }
             }
             unsafe {
-                __libafl_ariane_tick();
+                __libafl_ariane_finalize();
             }
+            reader.read_to_string(&mut line).ok(); // clean out the remaining data
+
+            ExitKind::Ok
+        };
+
+        let shmem = StdShMemProvider::new()?;
+
+        let mut executor = InProcessForkExecutor::new(
+            &mut harness,
+            tuple_list!(cov_observer, time_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+            shmem,
+        )?;
+
+        if state.corpus().is_empty() {
+            let mut generator = RandBytesGenerator::new(32);
+            state.generate_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut generator,
+                &mut mgr,
+                4,
+            )?;
+            println!("Generated {} initial inputs", state.corpus().count());
         }
 
-        unsafe {
-            __libafl_ariane_terminate();
-        }
-        while unsafe { !__libafl_ariane_terminated() } {
-            loop {
-                match reader.read_line(&mut line) {
-                    Err(e) if e.kind() != ErrorKind::WouldBlock => {
-                        panic!("Encountered IO error while processing: {}", e);
-                    }
-                    Ok(_) => {
-                        line.clear();
-                    }
-                    _ => {
-                        break;
-                    }
-                }
-            }
-            unsafe {
-                __libafl_ariane_tick();
-            }
-        }
-        unsafe {
-            __libafl_ariane_finalize();
-        }
-        reader.read_to_string(&mut line).ok(); // clean out the remaining data
+        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
-        ExitKind::Ok
+        Ok(())
     };
 
-    let shmem = StdShMemProvider::new()?;
-
-    let mut executor = InProcessForkExecutor::new(
-        &mut harness,
-        tuple_list!(cov_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        shmem,
-    )?;
-
-    if state.corpus().is_empty() {
-        let mut generator = RandBytesGenerator::new(32);
-        state.generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 4)?;
-        println!("Generated {} initial inputs", state.corpus().count());
+    match Launcher::builder()
+        .shmem_provider(shmem_provider)
+        .configuration(EventConfig::AlwaysUnique) // different coverage mappings
+        .monitor(monitor)
+        .run_client(&mut run_client)
+        .cores(&cores)
+        .broker_port(broker_port)
+        .remote_broker_addr(opt.remote_broker_addr)
+        .stdout_file(Some("/dev/null"))
+        .build()
+        .launch()
+    {
+        Ok(()) => (),
+        Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
+        Err(err) => panic!("Failed to run launcher: {:?}", err),
     }
-
-    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
     Ok(())
 }

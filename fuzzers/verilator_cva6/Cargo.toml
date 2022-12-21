@@ -11,10 +11,12 @@ bindgen = "0.63"
 cc = "1.0"
 
 [dependencies]
+clap = { version = "4.0", features = ["derive"] }
 goblin = "0.6"
 libafl = { path = "../../libafl" }
 libafl_verilator = { path = "../../libafl_verilator" }
 memchr = "2.5"
+mimalloc = { version = "*", default-features = false }
 nix = "0.26"
 
 [profile.release]
