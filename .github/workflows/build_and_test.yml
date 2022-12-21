@@ -203,8 +203,6 @@ jobs:
         submodules: true # recursively checkout submodules
         fetch-depth: 0 # to diff with origin/main
     - uses: Swatinem/rust-cache@v2
-    - name: tmp
-      run: cd fuzzers/libfuzzer_stb_image_concolic/fuzzer && cargo clippy
     - name: Build and run example fuzzers (Linux)
       if: runner.os == 'Linux'
       run: RUN_ON_CI=1 ./scripts/test_all_fuzzers.sh

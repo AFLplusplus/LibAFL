@@ -24,7 +24,8 @@ fn build_dep_check(tools: &[&str]) {
 
 fn main() {
     if !cfg!(target_os = "linux") {
-        println!("cargo:warning=Only linux host is supported for now.")
+        println!("cargo:warning=Only linux host is supported for now.");
+        exit(0);
     }
 
     let out_path = PathBuf::from(&env::var_os("OUT_DIR").unwrap());
@@ -72,15 +73,6 @@ fn main() {
         &runtime_dir.join("libSymRuntime.so"),
     )
     .unwrap();
-
-    println!(
-        "?: {}",
-        runtime_dir
-            .join("target")
-            .join("release")
-            .join("libSymRuntime.so")
-            .exists()
-    );
 
     if !runtime_dir.join("libSymRuntime.so").exists() {
         println!("cargo:warning=Runtime not found. Build it first.");
