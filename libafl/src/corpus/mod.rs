@@ -18,10 +18,10 @@ pub use cached::CachedOnDiskCorpus;
 
 #[cfg(feature = "cmin")]
 pub mod minimizer;
-use core::cell::RefCell;
-
 #[cfg(feature = "cmin")]
 pub use minimizer::*;
+
+use core::{fmt::Display, cell::RefCell};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -39,7 +39,13 @@ use crate::{
     Serialize, Deserialize
 )]
 #[repr(transparent)]
-pub struct CorpusId(usize);
+pub struct CorpusId(pub(crate) usize);
+
+impl Display for CorpusId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CorpusId({})", self.0)
+    }
+}
 
 impl From<usize> for CorpusId {
     fn from(id: usize) -> Self {

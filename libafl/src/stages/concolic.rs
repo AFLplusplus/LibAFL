@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 
 use super::{Stage, TracingStage};
 use crate::{
-    corpus::Corpus,
+    corpus::{CorpusId, Corpus},
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
@@ -45,7 +45,7 @@ where
         executor: &mut E,
         state: &mut TE::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         self.inner
             .perform(fuzzer, executor, state, manager, corpus_idx)?;
@@ -361,7 +361,7 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         start_timer!(state);
         let testcase = state.corpus().get(corpus_idx)?.clone();

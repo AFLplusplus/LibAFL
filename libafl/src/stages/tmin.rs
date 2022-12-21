@@ -13,7 +13,7 @@ use ahash::AHasher;
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::{tuples::Named, HasLen},
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, CorpusId, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverName},
@@ -65,7 +65,7 @@ where
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-        base_corpus_idx: usize,
+        base_corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let orig_max_size = state.max_size();
         // basically copy-pasted from mutational.rs
@@ -207,7 +207,7 @@ where
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         self.perform_minification(fuzzer, executor, state, manager, corpus_idx)?;
 

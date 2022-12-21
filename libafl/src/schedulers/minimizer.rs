@@ -163,7 +163,7 @@ where
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut CS::State) -> Result<usize, Error> {
+    fn next(&self, state: &mut CS::State) -> Result<CorpusId, Error> {
         self.cull(state)?;
         let mut idx = self.base.next(state)?;
         while {

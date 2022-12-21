@@ -7,7 +7,7 @@ use std::{fs, fs::File, io::Write, path::PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus,
+    corpus::{CorpusId, Corpus},
     inputs::UsesInput,
     stages::Stage,
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions, UsesState},
@@ -54,7 +54,7 @@ where
         _executor: &mut E,
         state: &mut Z::State,
         _manager: &mut EM,
-        _corpus_idx: usize,
+        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let meta = state
             .metadata()

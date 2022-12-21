@@ -11,6 +11,12 @@ use crate::{
 };
 
 #[cfg(not(feature = "corpus_btreemap"))]
+#[derive(
+    Debug,
+    Clone,
+    Serialize, Deserialize
+)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct TestcaseStorageItem<I> where
     I: Input, {
     pub testcase: RefCell<Testcase<I>>,
@@ -86,7 +92,7 @@ where
     }
     
     #[cfg(not(feature = "corpus_btreemap"))]
-    pub fn remove(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
+    pub fn remove(&self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
         if let Some(item) = self.map.remove(&idx) {
             if let Some(prev) = item.prev {
                 self.map.get(&prev).unwrap().next = item.next;
@@ -100,30 +106,30 @@ where
                 // last elem
                 self.last_idx = item.prev;
             }
-            Some(item)
+            Some(item.testcase)
         } else {
             None
         }
     }
 
     #[cfg(feature = "corpus_btreemap")]
-    pub fn remove(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
+    pub fn remove(&self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
         self.map.remove(&idx)
     }
 
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn get(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
-        self.map.get(&idx)
+        self.map.get(&idx).as_ref().map(|x| &x.testcase)
     }
 
     #[cfg(feature = "corpus_btreemap")]
     pub fn get(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
-        self.map.get(&idx).map(|x| x.testcase)
+        self.map.get(&idx)
     }
 
     #[cfg(not(feature = "corpus_btreemap"))]
     fn next(&self, idx: CorpusId) -> Option<CorpusId> {
-        if let Some(item) = self.map.get(idx) {
+        if let Some(item) = self.map.get(&idx) {
             item.next
         } else {
             None
@@ -147,7 +153,7 @@ where
 
     #[cfg(not(feature = "corpus_btreemap"))]
     fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
-        if let Some(item) = self.map.get(idx) {
+        if let Some(item) = self.map.get(&idx) {
             item.prev
         } else {
             None
@@ -192,7 +198,12 @@ where
     /// Create new
     pub fn new() -> Self {
         Self {
-            ..Default::default()
+            map: TestcaseStorageMap::default(),
+            progressive_idx: 0,
+            #[cfg(not(feature = "corpus_btreemap"))]
+            first_idx: None,
+            #[cfg(not(feature = "corpus_btreemap"))]
+            last_idx: None,
         }
     }
 }
@@ -227,7 +238,7 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error> {
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         Ok(self.entries.insert(RefCell::new(testcase)))
     }
 

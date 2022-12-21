@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::AsSlice,
-    corpus::Corpus,
+    corpus::{CorpusId, Corpus},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec, UsesInput},
@@ -95,7 +95,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         if state
             .metadata()
