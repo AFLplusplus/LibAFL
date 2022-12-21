@@ -10,7 +10,7 @@ libafl = { version = "*" }
 
 ## Crate List
 
-For LibAFL, each crate has its self-contained purpose, and the user may not need to use all of them in his project.
+For LibAFL, each crate has its self-contained purpose, and the user may not need to use all of them in their project.
 Following the naming convention of the folders in the project's root, they are:
 
 ### [`libafl`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl)
