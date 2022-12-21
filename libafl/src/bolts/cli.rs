@@ -236,6 +236,13 @@ pub struct FuzzerOptions {
     #[arg(long, help_heading = "Frida Options")]
     pub drcov: bool,
 
+    /// disable stalker.exclude() if true
+    /// It's better to disable this on windows or your harness uses c++ exception handling
+    /// See https://github.com/AFLplusplus/LibAFL/issues/830
+    #[cfg(feature = "frida_cli")]
+    #[arg(long, help_heading = "Frida Options")]
+    pub disable_excludes: bool,
+
     /// locations which will not be instrumented for ASAN or coverage purposes (ex: mod_name@0x12345)
     #[cfg(feature = "frida_cli")]
     #[arg(short = 'D', long, help_heading = "Frida Options", value_parser = parse_instrumentation_location)]
