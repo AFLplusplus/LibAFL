@@ -9,4 +9,4 @@ Examples can be found under `./fuzzer`.
 | baby_fuzzer_nautilus | [nautilus](https://www.ndss-symposium.org/wp-content/uploads/2019/02/ndss2019_04A-3_Aschermann_paper.pdf) is a **coverage guided, grammar based** fuzzer|
 |baby_fuzzer_tokens| basic **token level** fuzzer with token level mutations|
 |baby_fuzzer_with_forkexecutor| example for **InProcessForkExecutor**|
-|baby_no_std|a minimalistic example how to create a libafl based fuzzer that works on **`no_std`** environments like TEEs, Kernels or on barew metal|
+|baby_no_std|a minimalistic example how to create a libafl based fuzzer that works on **`no_std`** environments like TEEs, Kernels or on bare metal|

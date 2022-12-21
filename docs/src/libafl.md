@@ -5,7 +5,7 @@
 *by Andrea Fioraldi and Dominik Maier*
 
 Welcome to LibAFL, the Advanced Fuzzing Library.
-This book shall be a gentle introduction into the library.
+This book shall be a gentle introduction to the library.
 
 This version of the LibAFL book is coupled with the release 1.0 beta of the library.
 
