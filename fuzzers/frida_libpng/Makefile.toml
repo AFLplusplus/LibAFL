@@ -69,7 +69,7 @@ windows_alias = "fuzzer_windows"
 script_runner="@shell"
 script='''
 cargo build --release
-cp ${CARGO_TARGET_DIR}/release$/${FUZZER_NAME} .
+cp ${CARGO_TARGET_DIR}/release/${FUZZER_NAME} .
 '''
 
 [tasks.fuzzer_windows]
