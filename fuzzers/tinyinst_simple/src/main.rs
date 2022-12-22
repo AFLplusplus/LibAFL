@@ -22,9 +22,9 @@ static mut COVERAGE: Vec<u64> = vec![];
 
 fn main() {
     // Tinyinst things
-    let tinyinst_args = vec!["-instrument_module".to_string(), ".\test\test.exe".to_string()];
+    let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
 
-    let args = vec![".\\test\\test.exe".to_string(), "-f".to_string(), "@@".to_string()];
+    let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
 
     let observer = ListObserver::new("cov", unsafe { &mut COVERAGE });
     let mut feedback = ListFeedback::new_with_observer(&observer);
@@ -49,6 +49,8 @@ fn main() {
         TinyInstExecutorBuilder::new()
             .tinyinst_args(tinyinst_args)
             .program_args(args)
+            // .use_shmem()
+            .persistent("test.exe".to_string(), "fuzz".to_string(), 1, 10000)
             .timeout(std::time::Duration::new(5, 0))
             .build(&mut COVERAGE, tuple_list!(observer))
             .unwrap()

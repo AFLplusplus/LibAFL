@@ -19,7 +19,6 @@ pub struct TinyInstExecutor<'a, S, OT> {
     observers: OT,
     phantom: PhantomData<S>,
     cur_input: InputFile,
-    use_stdin: bool,
 }
 
 impl<'a, S, OT> std::fmt::Debug for TinyInstExecutor<'a, S, OT> {
@@ -45,9 +44,7 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        if !self.use_stdin {
-            self.cur_input.write_buf(input.target_bytes().as_slice())?;
-        }
+        self.cur_input.write_buf(input.target_bytes().as_slice())?;
 
         #[allow(unused_assignments)]
         let mut status = RunResult::OK;
@@ -101,9 +98,21 @@ impl TinyInstExecutorBuilder {
             self.tinyinst_args.push(modname)
         }
         self
-    } 
+    }
 
-    pub fn persistent(mut self, target_module: String, target_method: String, nargs: usize, iterations: usize) -> Self {
+    pub fn use_shmem(mut self) -> Self {
+        self.tinyinst_args.push("-delivery".to_string());
+        self.tinyinst_args.push("shmem".to_string());
+        self
+    }
+
+    pub fn persistent(
+        mut self,
+        target_module: String,
+        target_method: String,
+        nargs: usize,
+        iterations: usize,
+    ) -> Self {
         self.tinyinst_args.push("-target_module".to_string());
         self.tinyinst_args.push(target_module);
 
@@ -143,21 +152,24 @@ impl TinyInstExecutorBuilder {
         coverage: &'a mut Vec<u64>,
         observers: OT,
     ) -> Result<TinyInstExecutor<'a, S, OT>, Error> {
-        let mut use_stdin = true;
+        let mut has_input = false;
         let program_args = self
             .program_args
             .clone()
             .into_iter()
             .map(|arg| {
                 if arg == "@@" {
-                    println!("Not using stdin");
-                    use_stdin = false;
+                    has_input = true;
                     INPUTFILE_STD.to_string()
                 } else {
                     arg
                 }
             })
             .collect();
+        if !has_input {
+            return Err(Error::unknown(format!("No input file or shmem provided")));
+        }
+        println!("tinyinst args: {:#?}", &self.tinyinst_args);
 
         let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
         let tinyinst = unsafe {
@@ -175,7 +187,6 @@ impl TinyInstExecutorBuilder {
             observers: observers,
             phantom: PhantomData,
             cur_input,
-            use_stdin,
         })
     }
 }
