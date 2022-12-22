@@ -1,6 +1,6 @@
 [tasks.build_test]
 command = "cl"
-args = ["./test/test.c", "-o", "./test/test.exe"]
+args = ["./test/test.cpp", "-o", "./test/test.exe"]
 
 [tasks.run]
 dependencies = ["build_test"]

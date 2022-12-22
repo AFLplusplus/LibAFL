@@ -17,14 +17,14 @@ use libafl::{
     state::StdState,
     Fuzzer, StdFuzzer,
 };
-use libafl_tinyinst::executor::TinyInstExecutor;
+use libafl_tinyinst::executor::TinyInstExecutorBuilder;
 static mut COVERAGE: Vec<u64> = vec![];
 
 fn main() {
     // Tinyinst things
-    let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
+    let tinyinst_args = vec!["-instrument_module".to_string(), ".\test\test.exe".to_string()];
 
-    let args = vec![".\\test\\test.exe".to_string(), "@@".to_string()];
+    let args = vec![".\\test\\test.exe".to_string(), "-f".to_string(), "@@".to_string()];
 
     let observer = ListObserver::new("cov", unsafe { &mut COVERAGE });
     let mut feedback = ListFeedback::new_with_observer(&observer);
@@ -46,13 +46,12 @@ fn main() {
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = unsafe {
-        TinyInstExecutor::new(
-            &mut COVERAGE,
-            tinyinst_args,
-            args,
-            5000,
-            tuple_list!(observer),
-        )
+        TinyInstExecutorBuilder::new()
+            .tinyinst_args(tinyinst_args)
+            .program_args(args)
+            .timeout(std::time::Duration::new(5, 0))
+            .build(&mut COVERAGE, tuple_list!(observer))
+            .unwrap()
     };
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));

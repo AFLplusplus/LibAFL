@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libafl = { version = "0.8.1", path = "../../libafl", features = ["tui"] }
+libafl = { version = "0.8.1", path = "../../libafl", features = ["introspection"] }
 libafl_tinyinst = { version = "0.8.1", path = "../../libafl_tinyinst" }
 [profile.release]
 codegen-units = 1

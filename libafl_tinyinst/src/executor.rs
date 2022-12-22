@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use std::time::Duration;
 
 use libafl::{
     bolts::fs::{InputFile, INPUTFILE_STD},
@@ -14,7 +15,7 @@ use tinyinst_rs::tinyinst::{litecov::RunResult, TinyInst};
 pub struct TinyInstExecutor<'a, S, OT> {
     tinyinst: TinyInst,
     coverage: &'a mut Vec<u64>,
-    timeout: u32,
+    timeout: Duration,
     observers: OT,
     phantom: PhantomData<S>,
     cur_input: InputFile,
@@ -66,22 +67,86 @@ where
     }
 }
 
-impl<'a, S, OT> TinyInstExecutor<'a, S, OT>
-where
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-{
-    ///  # Safety
-    pub unsafe fn new(
-        coverage: &'a mut Vec<u64>,
-        tinyinst_args: Vec<String>,
-        program_args: Vec<String>,
-        timeout: u32,
-        observers: OT,
-    ) -> Self {
-        let mut use_stdin = true;
+#[derive(Debug)]
+pub struct TinyInstExecutorBuilder {
+    tinyinst_args: Vec<String>,
+    program_args: Vec<String>,
+    timeout: Duration,
+}
 
-        let program_args = program_args
+impl TinyInstExecutorBuilder {
+    pub fn new() -> TinyInstExecutorBuilder {
+        Self {
+            tinyinst_args: vec![],
+            program_args: vec![],
+            timeout: Duration::new(3, 0),
+        }
+    }
+
+    pub fn tinyinst_arg(mut self, arg: String) -> Self {
+        self.tinyinst_args.push(arg);
+        self
+    }
+
+    pub fn tinyinst_args(mut self, args: Vec<String>) -> Self {
+        for arg in args {
+            self.tinyinst_args.push(arg);
+        }
+        self
+    }
+
+    pub fn instrument_module(mut self, module: Vec<String>) -> Self {
+        for modname in module {
+            self.tinyinst_args.push("-instrument_module".to_string());
+            self.tinyinst_args.push(modname)
+        }
+        self
+    } 
+
+    pub fn persistent(mut self, target_module: String, target_method: String, nargs: usize, iterations: usize) -> Self {
+        self.tinyinst_args.push("-target_module".to_string());
+        self.tinyinst_args.push(target_module);
+
+        self.tinyinst_args.push("-target_method".to_string());
+        self.tinyinst_args.push(target_method);
+
+        self.tinyinst_args.push("-nargs".to_string());
+        self.tinyinst_args.push(nargs.to_string());
+
+        self.tinyinst_args.push("-iterations".to_string());
+        self.tinyinst_args.push(iterations.to_string());
+
+        self.tinyinst_args.push("-persist".to_string());
+        self.tinyinst_args.push("-loop".to_string());
+        self
+    }
+
+    pub fn program_arg(mut self, arg: String) -> Self {
+        self.program_args.push(arg);
+        self
+    }
+
+    pub fn program_args(mut self, args: Vec<String>) -> Self {
+        for arg in args {
+            self.program_args.push(arg);
+        }
+        self
+    }
+
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
+    pub fn build<'a, OT, S>(
+        &mut self,
+        coverage: &'a mut Vec<u64>,
+        observers: OT,
+    ) -> Result<TinyInstExecutor<'a, S, OT>, Error> {
+        let mut use_stdin = true;
+        let program_args = self
+            .program_args
+            .clone()
             .into_iter()
             .map(|arg| {
                 if arg == "@@" {
@@ -95,18 +160,23 @@ where
             .collect();
 
         let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
-        println!("post init");
-        let tinyinst = TinyInst::new(tinyinst_args, program_args, timeout);
+        let tinyinst = unsafe {
+            TinyInst::new(
+                self.tinyinst_args.clone(),
+                program_args,
+                self.timeout.as_millis() as u32,
+            )
+        };
 
-        Self {
-            tinyinst,
-            coverage,
-            timeout,
-            observers,
+        Ok(TinyInstExecutor {
+            tinyinst: tinyinst,
+            coverage: coverage,
+            timeout: self.timeout,
+            observers: observers,
             phantom: PhantomData,
             cur_input,
             use_stdin,
-        }
+        })
     }
 }
 
