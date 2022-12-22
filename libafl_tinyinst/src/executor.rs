@@ -6,7 +6,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    bolts::{{AsSlice, AsMutSlice}, shmem::ShMemProvider},
+    bolts::{{AsSlice, AsMutSlice}, shmem::{ShMemProvider, ShMem, ShMemId}},
     state::{State, UsesState},
     Error,
 };
@@ -19,7 +19,7 @@ pub struct TinyInstExecutor<'a, S, OT> {
     observers: OT,
     phantom: PhantomData<S>,
     cur_input: InputFile,
-    uses_shmem_testcase: bool
+    shmem_id: Option<ShMemId>,
 }
 
 impl<'a, S, OT> std::fmt::Debug for TinyInstExecutor<'a, S, OT> {
@@ -45,7 +45,17 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.cur_input.write_buf(input.target_bytes().as_slice())?;
+        match self.shmem_id {
+            Some(id) => {
+                // use shmem to pass testcase
+                // TODO: write bytes into the shmem map
+                self.cur_input.write_buf(input.target_bytes().as_slice())?;
+            }
+            None => {
+                self.cur_input.write_buf(input.target_bytes().as_slice())?;
+            }
+        }
+
 
         #[allow(unused_assignments)]
         let mut status = RunResult::OK;
@@ -186,19 +196,20 @@ where SP: ShMemProvider,
 
         let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
 
-        let mut uses_shmem_testcase = false;
-        match &mut self.shmem_provider {
+        let shmem_id = match &mut self.shmem_provider {
             Some(provider) => {
                 // setup shared memory
                 let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
+                // TODO: Replace .cur_input with shmem.id()
+                println!("{:#?}", shmem.id());
                 // shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
             
                 let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
                 shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
 
-                uses_shmem_testcase = true;
+                Some(shmem.id())
             },
-            None => (),
+            None => None,
         };
 
         let tinyinst = unsafe {
@@ -216,7 +227,7 @@ where SP: ShMemProvider,
             observers: observers,
             phantom: PhantomData,
             cur_input,
-            uses_shmem_testcase,
+            shmem_id,
         })
     }
 }
