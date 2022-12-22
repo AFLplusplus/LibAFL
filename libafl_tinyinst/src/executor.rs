@@ -6,7 +6,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    prelude::AsSlice,
+    bolts::{{AsSlice, AsMutSlice}, shmem::ShMemProvider},
     state::{State, UsesState},
     Error,
 };
@@ -19,6 +19,7 @@ pub struct TinyInstExecutor<'a, S, OT> {
     observers: OT,
     phantom: PhantomData<S>,
     cur_input: InputFile,
+    uses_shmem_testcase: bool
 }
 
 impl<'a, S, OT> std::fmt::Debug for TinyInstExecutor<'a, S, OT> {
@@ -65,18 +66,25 @@ where
 }
 
 #[derive(Debug)]
-pub struct TinyInstExecutorBuilder {
+pub struct TinyInstExecutorBuilder<'a, SP> {
     tinyinst_args: Vec<String>,
     program_args: Vec<String>,
     timeout: Duration,
+    shmem_provider: Option<&'a mut SP>
 }
 
-impl TinyInstExecutorBuilder {
-    pub fn new() -> TinyInstExecutorBuilder {
+const MAX_FILE: usize = 1024 * 1024;
+const SHMEM_FUZZ_HDR_SIZE: usize = 4;
+
+impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
+where SP: ShMemProvider,
+{
+    pub fn new() -> TinyInstExecutorBuilder<'a, SP> {
         Self {
             tinyinst_args: vec![],
             program_args: vec![],
             timeout: Duration::new(3, 0),
+            shmem_provider: None,
         }
     }
 
@@ -147,7 +155,12 @@ impl TinyInstExecutorBuilder {
         self
     }
 
-    pub fn build<'a, OT, S>(
+    pub fn shmem_provider(mut self, shmem_provider: &'a mut SP) -> Self {
+        self.shmem_provider = Some(shmem_provider);
+        self
+    }
+
+    pub fn build<OT, S>(
         &mut self,
         coverage: &'a mut Vec<u64>,
         observers: OT,
@@ -172,6 +185,22 @@ impl TinyInstExecutorBuilder {
         println!("tinyinst args: {:#?}", &self.tinyinst_args);
 
         let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
+
+        let mut uses_shmem_testcase = false;
+        match &mut self.shmem_provider {
+            Some(provider) => {
+                // setup shared memory
+                let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
+                // shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
+            
+                let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
+                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
+
+                uses_shmem_testcase = true;
+            },
+            None => (),
+        };
+
         let tinyinst = unsafe {
             TinyInst::new(
                 self.tinyinst_args.clone(),
@@ -187,6 +216,7 @@ impl TinyInstExecutorBuilder {
             observers: observers,
             phantom: PhantomData,
             cur_input,
+            uses_shmem_testcase,
         })
     }
 }

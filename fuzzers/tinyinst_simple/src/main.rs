@@ -4,6 +4,7 @@ use libafl::{
     bolts::{
         rands::{RandomSeed, StdRand},
         tuples::tuple_list,
+        shmem::{ShMemProvider, ShMem, Win32ShMemProvider},
     },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
@@ -29,6 +30,7 @@ fn main() {
     let observer = ListObserver::new("cov", unsafe { &mut COVERAGE });
     let mut feedback = ListFeedback::new_with_observer(&observer);
 
+    let mut shmem_provider = Win32ShMemProvider::new().unwrap();
     let input = BytesInput::new(b"bad".to_vec());
     let rand = StdRand::new();
     let mut corpus = CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap();
@@ -49,7 +51,7 @@ fn main() {
         TinyInstExecutorBuilder::new()
             .tinyinst_args(tinyinst_args)
             .program_args(args)
-            // .use_shmem()
+            .shmem_provider(&mut shmem_provider)
             .persistent("test.exe".to_string(), "fuzz".to_string(), 1, 10000)
             .timeout(std::time::Duration::new(5, 0))
             .build(&mut COVERAGE, tuple_list!(observer))
