@@ -6,6 +6,7 @@ use alloc::{
     vec::Vec,
 };
 use core::marker::PhantomData;
+use hashbrown::HashMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -29,9 +30,9 @@ pub struct WeightedScheduleMetadata {
     /// The fuzzer execution spent in the current cycles
     runs_in_current_cycle: usize,
     /// Alias table for weighted queue entry selection
-    alias_table: Vec<usize>,
+    alias_table: HashMap<CorpusId, usize>,
     /// Probability for which queue entry is selected
-    alias_probability: Vec<f64>,
+    alias_probability: HashMap<CorpusId, f64>,
 }
 
 impl Default for WeightedScheduleMetadata {
@@ -64,23 +65,23 @@ impl WeightedScheduleMetadata {
 
     /// The getter for `alias_table`
     #[must_use]
-    pub fn alias_table(&self) -> &[usize] {
+    pub fn alias_table(&self) -> &HashMap<CorpusId, usize> {
         &self.alias_table
     }
 
     /// The setter for `alias_table`
-    pub fn set_alias_table(&mut self, table: Vec<usize>) {
+    pub fn set_alias_table(&mut self, table: HashMap<CorpusId, usize>) {
         self.alias_table = table;
     }
 
     /// The getter for `alias_probability`
     #[must_use]
-    pub fn alias_probability(&self) -> &[f64] {
+    pub fn alias_probability(&self) -> &HashMap<CorpusId, f64> {
         &self.alias_probability
     }
 
     /// The setter for `alias_probability`
-    pub fn set_alias_probability(&mut self, probability: Vec<f64>) {
+    pub fn set_alias_probability(&mut self, probability: HashMap<CorpusId, f64>) {
         self.alias_probability = probability;
     }
 }
@@ -137,13 +138,13 @@ where
     pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> {
         let n = state.corpus().count();
 
-        let mut alias_table: Vec<usize> = vec![0; n];
-        let mut alias_probability: Vec<f64> = vec![0.0; n];
-        let mut weights: Vec<f64> = vec![0.0; n];
+        let mut alias_table: HashMap::default();
+        let mut alias_probability: HashMap::default();
+        let mut weights: HashMap::default();
 
-        let mut p_arr: Vec<f64> = vec![0.0; n];
-        let mut s_arr: Vec<usize> = vec![0; n];
-        let mut l_arr: Vec<usize> = vec![0; n];
+        let mut p_arr: HashMap::default();
+        let mut s_arr: HashMap::default();
+        let mut l_arr: HashMap::default();
 
         let mut sum: f64 = 0.0;
 
