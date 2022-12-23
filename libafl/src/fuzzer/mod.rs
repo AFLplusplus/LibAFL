@@ -13,7 +13,7 @@ use crate::monitors::PerfFeature;
 use crate::state::NopState;
 use crate::{
     bolts::current_time,
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, CorpusId, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -83,7 +83,7 @@ pub trait ExecutionProcessor<OT>: UsesState {
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<usize>), Error>
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>;
 }
@@ -100,7 +100,7 @@ pub trait EvaluatorObservers<OT>: UsesState + Sized {
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<usize>), Error>
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
         EM: EventFirer<State = Self::State>;
@@ -120,7 +120,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
-    ) -> Result<(ExecuteInputResult, Option<usize>), Error> {
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_events(state, executor, manager, input, true)
     }
 
@@ -134,7 +134,7 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<usize>), Error>;
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 
     /// Runs the input and triggers observers and feedback.
     /// Adds an input, to the corpus even if it's not considered `interesting` by the `feedback`.
@@ -146,7 +146,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
-    ) -> Result<usize, Error>;
+    ) -> Result<CorpusId, Error>;
 }
 
 /// The main fuzzer trait.
@@ -172,7 +172,7 @@ where
         executor: &mut E,
         state: &mut EM::State,
         manager: &mut EM,
-    ) -> Result<usize, Error>;
+    ) -> Result<CorpusId, Error>;
 
     /// Fuzz forever (or until stopped)
     fn fuzz_loop(
@@ -181,7 +181,7 @@ where
         executor: &mut E,
         state: &mut EM::State,
         manager: &mut EM,
-    ) -> Result<usize, Error> {
+    ) -> Result<CorpusId, Error> {
         let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
@@ -206,19 +206,19 @@ where
         state: &mut EM::State,
         manager: &mut EM,
         iters: u64,
-    ) -> Result<usize, Error> {
+    ) -> Result<CorpusId, Error> {
         if iters == 0 {
             return Err(Error::illegal_argument(
                 "Cannot fuzz for 0 iterations!".to_string(),
             ));
         }
 
-        let mut ret = 0;
+        let mut ret = None;
         let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
-            ret = self.fuzz_one(stages, executor, state, manager)?;
+            ret = Some(self.fuzz_one(stages, executor, state, manager)?);
             last = manager.maybe_report_progress(state, last, monitor_timeout)?;
         }
 
@@ -227,7 +227,7 @@ where
         // But as the state may grow to a few megabytes,
         // for now we won' and the user has to do it (unless we find a way to do this on `Drop`).
 
-        Ok(ret)
+        Ok(ret.unwrap())
     }
 }
 
@@ -338,7 +338,7 @@ where
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<usize>), Error>
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>,
     {
@@ -451,7 +451,7 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<usize>), Error>
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
         EM: EventFirer<State = Self::State>,
@@ -481,7 +481,7 @@ where
         manager: &mut EM,
         input: <CS::State as UsesInput>::Input,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<usize>), Error> {
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
     }
 
@@ -492,7 +492,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <CS::State as UsesInput>::Input,
-    ) -> Result<usize, Error> {
+    ) -> Result<CorpusId, Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
@@ -543,7 +543,7 @@ where
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-    ) -> Result<usize, Error> {
+    ) -> Result<CorpusId, Error> {
         // Init timer for scheduler
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().start_timer();
@@ -717,7 +717,7 @@ where
         _executor: &mut E,
         _state: &mut EM::State,
         _manager: &mut EM,
-    ) -> Result<usize, Error> {
+    ) -> Result<CorpusId, Error> {
         unimplemented!()
     }
 }
@@ -804,7 +804,7 @@ pub mod pybind {
                     py_mgr,
                     BytesInput::new(input),
                 )
-                .expect("Failed to add input")
+                .expect("Failed to add input").0
         }
 
         fn fuzz_loop(

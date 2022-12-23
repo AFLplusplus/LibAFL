@@ -18,7 +18,7 @@ pub use mutational::StdMutationalPushStage;
 use crate::{
     bolts::current_time,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
-    executors::ExitKind,
+    executors::ExitKind,corpus::CorpusId,
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
@@ -100,7 +100,7 @@ where
     pub errored: bool,
 
     /// The corpus index we're currently working on
-    pub current_corpus_idx: Option<usize>,
+    pub current_corpus_idx: Option<CorpusId>,
 
     /// The input we just ran
     pub current_input: Option<<CS::State as UsesInput>::Input>, // Todo: Get rid of copy
@@ -196,7 +196,7 @@ where
     fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, OT, Z>;
 
     /// Set the current corpus index this stage works on
-    fn set_current_corpus_idx(&mut self, corpus_idx: usize) {
+    fn set_current_corpus_idx(&mut self, corpus_idx: CorpusId) {
         self.push_stage_helper_mut().current_corpus_idx = Some(corpus_idx);
     }
 

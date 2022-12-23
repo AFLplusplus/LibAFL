@@ -44,7 +44,7 @@ pub struct CorpusId(pub(crate) usize);
 
 impl fmt::Display for CorpusId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CorpusId({})", self.0)
+        write!(f, "{}", self.0)
     }
 }
 

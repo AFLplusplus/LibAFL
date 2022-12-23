@@ -33,7 +33,7 @@ where
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
-            let id = state.corpus().current().map(|id| state.corpus().next(id)).unwrap_or_else(|| state.corpus().first().unwrap());
+            let id = state.corpus().current().map(|id| state.corpus().next(id)).unwrap_or_else(|| state.corpus().first()).unwrap();
             *state.corpus_mut().current_mut() = Some(id);
             Ok(id)
         }

@@ -31,7 +31,7 @@ const MAX_GENERALIZED_LEN: usize = 8192;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct GeneralizedIndexesMetadata {
     /// The set of indexes
-    pub indexes: HashSet<usize>,
+    pub indexes: HashSet<CorpusId>,
 }
 
 crate::impl_serdeany!(GeneralizedIndexesMetadata);
