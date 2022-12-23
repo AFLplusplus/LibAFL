@@ -158,17 +158,23 @@ extern "C" {
 }
 
 /// Current time (fixed fallback for `no_std`)
-#[cfg(not(feature = "std"))]
+#[inline]
+#[cfg(all(not(feature = "std"), not(any(doctest, test))))]
+#[must_use]
+pub fn current_time() -> time::Duration {
+    let millis = unsafe { external_current_millis() };
+    time::Duration::from_millis(millis)
+}
+
+/// Current time (fixed fallback for `no_std`)
+/// 
+/// On Windows, `external_current_millis` get optimized out at link-time
+/// for `no_std` tests. So, instead, we return a constant (for tests).
+#[cfg(all(not(feature = "std"), any(doctest, test)))]
 #[inline]
 #[must_use]
 pub fn current_time() -> time::Duration {
-    // On Windows, `external_current_millis` get optimized out at link-time
-    // for no_std tests. Instead, we just return a constant (for tests)
-    #[cfg(any(doctest, test))]
-    let millis = 1000;
-    #[cfg(not(any(doctest, test)))]
-    let millis = unsafe { external_current_millis() };
-    time::Duration::from_millis(millis)
+    time::Duration::from_millis(1000)
 }
 
 /// Given a u64 number, return a hashed number using this mixing function
