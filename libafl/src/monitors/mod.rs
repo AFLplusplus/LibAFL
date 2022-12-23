@@ -489,7 +489,7 @@ where
         Self {
             print_fn,
             start_time: current_time(),
-            print_user_monitor: print_user_monitor,
+            print_user_monitor,
             client_stats: vec![],
         }
     }
