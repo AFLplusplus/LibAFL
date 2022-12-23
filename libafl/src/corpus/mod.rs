@@ -81,7 +81,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     ) -> Result<Testcase<Self::Input>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<Self::Input>>, Error>;
+    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<Self::Input>, Error>;
 
     /// Get by id
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
@@ -108,7 +108,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
         CorpusIdIterator { corpus: self, cur: self.first() }
     }
 
-    fn random_index<R>(&'a self, rnd: &mut R) -> CorpusId where R: Rand {
+    fn random_index<R>(&self, rand: &mut R) -> CorpusId where R: Rand {
         let nth = rand.below(self.count() as u64) as usize;
         self.indexes().nth(nth).expect("Failed to get a random CorpusId")
     }

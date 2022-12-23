@@ -1,7 +1,7 @@
 //! In-memory corpus, keeps all test cases in memory at all times
 
 use core::cell::RefCell;
-
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use crate::{bolts::rands::Rand,
@@ -67,7 +67,7 @@ where
 {
     fn insert_key(&mut self, id: &CorpusId) {
         if let Err(idx) = self.keys.binary_search(id) {
-            self.keys.insert(idx, id);
+            self.keys.insert(idx, *id);
         }
     }
 
@@ -105,6 +105,24 @@ where
         self.insert_key(&idx);
         self.map.insert(idx, testcase);
         idx
+    }
+    
+    #[cfg(not(feature = "corpus_btreemap"))]
+    pub fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
+        if let Some(entry) = self.map.get_mut(&idx) {
+            Some(entry.testcase.replace(testcase))
+        } else {
+            None
+        }
+    }
+    
+    #[cfg(feature = "corpus_btreemap")]
+    pub fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
+        if let Some(entry) = self.map.get_mut(&idx) {
+            Some(entry.replace(testcase))
+        } else {
+            None
+        }
     }
     
     #[cfg(not(feature = "corpus_btreemap"))]
@@ -266,24 +284,20 @@ where
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        if let Some(entry) = self.storage.map.get_mut(&idx) {
-            Ok(entry.replace(testcase))
-        } else {
-            Err(Error::key_not_found(format!("Index {idx} not found")))
-        }
+        self.storage.replace(idx, testcase).ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<I>>, Error> {
-        Ok(self.storage.remove(&idx).map(|x| x.take()))
+    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
+        self.storage.remove(idx).map(|x| x.take()).ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
     /// Get by id
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         self.storage
-            .get(&idx)
+            .get(idx)
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
@@ -320,7 +334,7 @@ where
     }
     
     // TODO propagate to others corpuses
-    fn random_index<R>(&'a self, rnd: &mut R) -> CorpusId where R: Rand {
+    fn random_index<R>(&self, rand: &mut R) -> CorpusId where R: Rand {
         let nth = rand.below(self.storage.keys.len() as u64) as usize;
         self.storage.keys[nth]
     }

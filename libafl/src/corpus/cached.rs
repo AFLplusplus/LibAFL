@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use crate::{bolts::rands::Rand,
     corpus::{
         ondisk::{OnDiskCorpus, OnDiskMetadataFormat},
         Corpus, Testcase, CorpusId,
@@ -24,7 +24,7 @@ where
     I: Input,
 {
     inner: OnDiskCorpus<I>,
-    cached_indexes: RefCell<VecDeque<usize>>,
+    cached_indexes: RefCell<VecDeque<CorpusId>>,
     cache_max_len: usize,
 }
 
@@ -60,11 +60,9 @@ where
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
         let testcase = self.inner.remove(idx)?;
-        if testcase.is_some() {
-            self.cached_indexes.borrow_mut().retain(|e| *e != idx);
-        }
+        self.cached_indexes.borrow_mut().retain(|e| *e != idx);
         Ok(testcase)
     }
 
@@ -122,6 +120,11 @@ where
     #[inline]
     fn last(&self) -> Option<CorpusId> {
         self.inner.last()
+    }
+    
+         #[inline]
+    fn random_index<R>(&self, rand: &mut R) -> CorpusId where R: Rand {
+        self.inner.random_index(rand)
     }
 }
 

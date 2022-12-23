@@ -11,7 +11,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::serdeany::SerdeAnyMap,
+    bolts::{rands::Rand, serdeany::SerdeAnyMap},
     corpus::{Corpus, CorpusId, Testcase, InMemoryCorpus},
     inputs::{Input, UsesInput},
     state::HasMetadata,
@@ -72,22 +72,23 @@ where
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        self.save_testcase(&mut testcase)?;
-        self.inner.add(testcase)
+        let idx = self.inner.add(testcase)?;
+        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), &idx)?;
+        Ok(idx)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, idx: CorpusId, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        self.save_testcase(&mut testcase)?;
         let entry = self.inner.replace(idx, testcase)?;
         self.remove_testcase(&entry)?;
+        self.save_testcase(&mut  self.get(idx).unwrap().borrow_mut(), &idx)?;
         Ok(entry)
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
         let entry = self.inner.remove(idx)?;
         self.remove_testcase(&entry)?;
         Ok(entry)
@@ -130,6 +131,11 @@ where
     fn last(&self) -> Option<CorpusId> {
         self.inner.last()
     }
+    
+     #[inline]
+    fn random_index<R>(&self, rand: &mut R) -> CorpusId where R: Rand {
+        self.inner.random_index(rand)
+    }
 }
 
 impl<I> OnDiskCorpus<I>
@@ -145,8 +151,7 @@ where
         fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus<I>, Error> {
             fs::create_dir_all(&dir_path)?;
             Ok(OnDiskCorpus {
-                entries: vec![],
-                current: None,
+                inner: InMemoryCorpus::new(),
                 dir_path,
                 meta_format: None,
             })
@@ -162,21 +167,20 @@ where
     ) -> Result<Self, Error> {
         fs::create_dir_all(&dir_path)?;
         Ok(Self {
-            entries: vec![],
-            current: None,
+            inner: InMemoryCorpus::new(),
             dir_path,
             meta_format,
         })
     }
 
-    fn save_testcase(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn save_testcase(&mut self, testcase: &mut Testcase<I>, idx: &CorpusId) -> Result<(), Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             let file_orig = testcase
                 .input()
                 .as_ref()
                 .unwrap()
-                .generate_name(self.entries.len());
+                .generate_name(idx.0);
             let mut file = file_orig.clone();
 
             let mut ctr = 2;
