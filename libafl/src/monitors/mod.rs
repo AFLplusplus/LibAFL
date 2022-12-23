@@ -16,6 +16,7 @@ pub use prometheus::PrometheusMonitor;
 #[cfg(feature = "std")]
 pub mod disk;
 use alloc::{fmt::Debug, string::String, vec::Vec};
+use core::fmt::Write;
 use core::{fmt, time::Duration};
 
 #[cfg(feature = "std")]
@@ -386,6 +387,7 @@ where
 {
     print_fn: F,
     start_time: Duration,
+    print_user_monitor: bool,
     client_stats: Vec<ClientStats>,
 }
 
@@ -421,7 +423,7 @@ where
     }
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
-        let fmt = format!(
+        let mut fmt = format!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id,
@@ -432,6 +434,14 @@ where
             self.total_execs(),
             self.execs_per_sec_pretty()
         );
+
+        if self.print_user_monitor {
+            let client = self.client_stats_mut_for(sender_id);
+            for (key, val) in &client.user_monitor {
+                write!(fmt, " , {key}: {val}").unwrap();
+            }
+        }
+
         (self.print_fn)(fmt);
 
         // Only print perf monitor if the feature is enabled
@@ -459,6 +469,7 @@ where
         Self {
             print_fn,
             start_time: current_time(),
+            print_user_monitor: false,
             client_stats: vec![],
         }
     }
@@ -468,6 +479,17 @@ where
         Self {
             print_fn,
             start_time,
+            print_user_monitor: false,
+            client_stats: vec![],
+        }
+    }
+
+    /// Creates the monitor that also prints the user monitor
+    pub fn with_user_monitor(print_fn: F, print_user_monitor: bool) -> Self {
+        Self {
+            print_fn,
+            start_time: current_time(),
+            print_user_monitor: print_user_monitor,
             client_stats: vec![],
         }
     }
