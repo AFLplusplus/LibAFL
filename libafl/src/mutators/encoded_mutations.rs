@@ -8,7 +8,7 @@ use crate::{
         rands::Rand,
         tuples::{tuple_list, tuple_list_type},
     },
-    corpus::Corpus,
+    corpus::{CorpusId, Corpus},
     inputs::{EncodedInput, UsesInput},
     mutators::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
@@ -321,7 +321,7 @@ where
 
         // We don't want to use the testcase we're already using for splicing
         let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let idx = CorpusId::from(state.rand_mut().below(count as u64));
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
@@ -398,7 +398,7 @@ where
 
         // We don't want to use the testcase we're already using for splicing
         let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let idx = CorpusId::from( state.rand_mut().below(count as u64));
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);

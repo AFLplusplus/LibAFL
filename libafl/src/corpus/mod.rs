@@ -21,10 +21,11 @@ pub mod minimizer;
 #[cfg(feature = "cmin")]
 pub use minimizer::*;
 
-use core::{fmt::Display, cell::RefCell};
+use core::{fmt, cell::RefCell};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+bolts::rands::Rand,
     inputs::{Input, UsesInput},
     Error,
 };
@@ -41,7 +42,7 @@ use crate::{
 #[repr(transparent)]
 pub struct CorpusId(pub(crate) usize);
 
-impl Display for CorpusId {
+impl fmt::Display for CorpusId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "CorpusId({})", self.0)
     }
@@ -50,6 +51,12 @@ impl Display for CorpusId {
 impl From<usize> for CorpusId {
     fn from(id: usize) -> Self {
         Self(id)
+    }
+}
+
+impl From<u64> for CorpusId {
+    fn from(id: u64) -> Self {
+        Self(id as usize)
     }
 }
 
@@ -99,6 +106,11 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     
     fn indexes<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
         CorpusIdIterator { corpus: self, cur: self.first() }
+    }
+
+    fn random_index<R>(&'a self, rnd: &mut R) -> CorpusId where R: Rand {
+        let nth = rand.below(self.count() as u64) as usize;
+        self.indexes().nth(nth).expect("Failed to get a random CorpusId")
     }
 }
 

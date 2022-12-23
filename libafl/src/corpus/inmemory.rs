@@ -4,7 +4,7 @@ use core::cell::RefCell;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use crate::{bolts::rands::Rand,
     corpus::{Corpus, CorpusId, Testcase},
     inputs::{Input, UsesInput},
     Error,
@@ -42,6 +42,8 @@ where
 {
     /// The map in which testcases are stored
     pub map: TestcaseStorageMap<I>,
+    /// The keys in order (use `Vec::binary_search`)
+    pub keys: Vec<CorpusId>,
     /// The progressive idx
     progressive_idx: usize,
     /// First inserted idx
@@ -63,6 +65,18 @@ impl<I> TestcaseStorage<I>
 where
     I: Input,
 {
+    fn insert_key(&mut self, id: &CorpusId) {
+        if let Err(idx) = self.keys.binary_search(id) {
+            self.keys.insert(idx, id);
+        }
+    }
+
+    fn remove_key(&mut self, id: &CorpusId) {
+        if let Ok(idx) = self.keys.binary_search(id) {
+            self.keys.remove(idx);
+        }
+    }
+
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
@@ -78,6 +92,7 @@ where
             self.first_idx = Some(idx);
         }
         self.last_idx = Some(idx);
+        self.insert_key(&idx);
         self.map.insert(idx, TestcaseStorageItem { testcase, prev, next: None });
         idx
     }
@@ -87,6 +102,7 @@ where
     pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
         let idx = CorpusId::from(self.progressive_idx);
         self.progressive_idx += 1;
+        self.insert_key(&idx);
         self.map.insert(idx, testcase);
         idx
     }
@@ -94,6 +110,7 @@ where
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn remove(&self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
         if let Some(item) = self.map.remove(&idx) {
+            self.remove_key(&idx);
             if let Some(prev) = item.prev {
                 self.map.get(&prev).unwrap().next = item.next;
             } else {
@@ -114,6 +131,7 @@ where
 
     #[cfg(feature = "corpus_btreemap")]
     pub fn remove(&self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
+        self.remove_key(&idx);
         self.map.remove(&idx)
     }
 
@@ -138,6 +156,7 @@ where
 
     #[cfg(feature = "corpus_btreemap")]
     fn next(&self, idx: CorpusId) -> Option<CorpusId> {
+        // TODO see if using self.keys is faster
         let mut range = self.map.range(core::ops::Bound::Included(idx), core::ops::Bound::Unbounded);
         if let Some((this_id, _)) = range.next() {
             if idx != this_id {
@@ -162,6 +181,7 @@ where
 
     #[cfg(feature = "corpus_btreemap")]
     fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
+        // TODO see if using self.keys is faster
         let mut range = self.map.range(core::ops::Bound::Unbounded, core::ops::Bound::Included(idx));
         if let Some((this_id, _)) = range.next_back() {
             if idx != this_id {
@@ -199,6 +219,7 @@ where
     pub fn new() -> Self {
         Self {
             map: TestcaseStorageMap::default(),
+            keys: vec![],
             progressive_idx: 0,
             #[cfg(not(feature = "corpus_btreemap"))]
             first_idx: None,
@@ -215,7 +236,7 @@ pub struct InMemoryCorpus<I>
 where
     I: Input,
 {
-    entries: TestcaseStorage<I>,
+    storage: TestcaseStorage<I>,
     current: Option<CorpusId>,
 }
 
@@ -233,19 +254,19 @@ where
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {
-        self.entries.map.len()
+        self.storage.map.len()
     }
 
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        Ok(self.entries.insert(RefCell::new(testcase)))
+        Ok(self.storage.insert(RefCell::new(testcase)))
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        if let Some(entry) = self.entries.map.get_mut(&idx) {
+        if let Some(entry) = self.storage.map.get_mut(&idx) {
             Ok(entry.replace(testcase))
         } else {
             Err(Error::key_not_found(format!("Index {idx} not found")))
@@ -255,14 +276,13 @@ where
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
     fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<I>>, Error> {
-        Ok(self.entries.map.remove(&idx).map(|x| x.take()))
+        Ok(self.storage.remove(&idx).map(|x| x.take()))
     }
 
     /// Get by id
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        self.entries
-            .map
+        self.storage
             .get(&idx)
             .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
@@ -298,6 +318,12 @@ where
     fn last(&self) -> Option<CorpusId> {
         self.storage.last()
     }
+    
+    // TODO propagate to others corpuses
+    fn random_index<R>(&'a self, rnd: &mut R) -> CorpusId where R: Rand {
+        let nth = rand.below(self.storage.keys.len() as u64) as usize;
+        self.storage.keys[nth]
+    }
 }
 
 impl<I> InMemoryCorpus<I>
@@ -309,7 +335,7 @@ where
     #[must_use]
     pub fn new() -> Self {
         Self {
-            entries: TestcaseStorage::new(),
+            storage: TestcaseStorage::new(),
             current: None,
         }
     }

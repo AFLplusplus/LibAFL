@@ -24,6 +24,7 @@ pub use nautilus::*;
 
 use crate::{
     bolts::tuples::{HasConstLen, Named},
+    corpus::CorpusId,
     inputs::UsesInput,
     Error,
 };
@@ -61,7 +62,7 @@ where
         &mut self,
         _state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>,
+        _corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -85,7 +86,7 @@ where
         &mut self,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error>;
 
     /// Gets the [`Mutator`] at the given index and runs the `mutate` function on it.
@@ -103,7 +104,7 @@ where
         index: usize,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error>;
 }
 
@@ -124,7 +125,7 @@ where
         &mut self,
         _state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>,
+        _corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -144,7 +145,7 @@ where
         _index: usize,
         _state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>,
+        _corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -174,7 +175,7 @@ where
         &mut self,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         self.0.post_exec(state, stage_idx, corpus_idx)?;
         self.1.post_exec_all(state, stage_idx, corpus_idx)
@@ -199,7 +200,7 @@ where
         index: usize,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         if index == 0 {
             self.0.post_exec(state, stage_idx, corpus_idx)
@@ -263,7 +264,7 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             stage_idx: i32,
-            corpus_idx: Option<usize>,
+            corpus_idx: Option<CorpusId>,
         ) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
@@ -348,7 +349,7 @@ pub mod pybind {
             corpus_idx: Option<usize>,
         ) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, m, {
-                m.post_exec(state, stage_idx, corpus_idx)
+                m.post_exec(state, stage_idx, CorpusId::from(corpus_idx))
             })
         }
     }

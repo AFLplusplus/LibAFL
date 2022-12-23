@@ -15,7 +15,7 @@ use crate::{
         tuples::{tuple_list, tuple_list_type, NamedTuple},
         AsMutSlice, AsSlice,
     },
-    corpus::Corpus,
+    corpus::{CorpusId, Corpus},
     inputs::UsesInput,
     mutators::{MutationResult, Mutator, MutatorsTuple},
     state::{HasCorpus, HasMetadata, HasRand, State},
@@ -321,7 +321,7 @@ where
         &mut self,
         state: &mut S,
         _stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         if let Some(idx) = corpus_idx {
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();

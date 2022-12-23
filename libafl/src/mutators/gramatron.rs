@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
-    corpus::Corpus,
+    corpus::{CorpusId, Corpus},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal, UsesInput},
     mutators::{MutationResult, Mutator},
@@ -111,7 +111,7 @@ where
         }
 
         let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let idx = CorpusId::from(state.rand_mut().below(count as u64));
 
         let insert_at = state.rand_mut().below(input.terminals().len() as u64) as usize;
 
