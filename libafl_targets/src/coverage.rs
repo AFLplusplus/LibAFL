@@ -54,11 +54,11 @@ pub fn autotokens() -> Result<Tokens, Error> {
 /// The size of the map for edges.
 #[no_mangle]
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE;
-pub use __afl_map_size as EDGES_MAP_PTR_SIZE;
+pub use __afl_map_size as EDGES_MAP_PTR_NUM;
 use libafl::{bolts::ownedref::OwnedMutSlice, observers::StdMapObserver};
 
 /// Gets the edges map from the `EDGES_MAP_PTR` raw pointer.
-/// Assumes a `len` of `EDGES_MAP_PTR_SIZE`.
+/// Assumes a `len` of `EDGES_MAP_PTR_NUM`.
 ///
 /// # Safety
 ///
@@ -71,16 +71,27 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 
 /// Gets a new [`StdMapObserver`] from the current [`edges_map_mut_slice`].
 /// This is roughly equivalent to running:
-/// 
+///
 /// ```rust
-/// StdMapObserver::from_mut_ptr("edges", EDGES_MAP, MAX_EDGES_NUM)) 
+/// use libafl::observers::StdMapObserver;
+/// use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
+///
+/// #[cfg(not(feature = "pointer_maps"))]
+/// let observer = unsafe {
+///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
+/// };
 /// ```
-/// 
+///
 /// or, for the `pointer_maps` feature:
-/// 
+///
 /// ```rust
-/// #[cfg(feature = "pointer_maps"]
-/// StdMapObserver::from_mut_ptr("edges", EDGES_MAP, MAX_EDGES_NUM)) 
+/// use libafl::observers::StdMapObserver;
+/// use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
+///
+/// #[cfg(feature = "pointer_maps")]
+/// let observer = unsafe {
+///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP_PTR, EDGES_MAP_PTR_NUM)
+/// };
 /// ```
 ///
 /// # Safety
@@ -116,7 +127,7 @@ pub fn edges_max_num() -> usize {
         } else {
             #[cfg(feature = "pointer_maps")]
             {
-                EDGES_MAP_PTR_SIZE
+                EDGES_MAP_PTR_NUM
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
@@ -142,7 +153,7 @@ mod swap {
     };
     use serde::{Deserialize, Serialize};
 
-    use super::{EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE};
+    use super::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
 
     /// Observer to be used with `DiffExecutor`s when executing a differential target that shares
     /// the AFL map in order to swap out the maps (and thus allow for map observing the two targets
@@ -222,7 +233,7 @@ mod swap {
             let slice = self.first_map.as_mut_slice();
             unsafe {
                 EDGES_MAP_PTR = slice.as_mut_ptr();
-                EDGES_MAP_PTR_SIZE = slice.len();
+                EDGES_MAP_PTR_NUM = slice.len();
             }
             Ok(())
         }
@@ -231,7 +242,7 @@ mod swap {
             let slice = self.second_map.as_mut_slice();
             unsafe {
                 EDGES_MAP_PTR = slice.as_mut_ptr();
-                EDGES_MAP_PTR_SIZE = slice.len();
+                EDGES_MAP_PTR_NUM = slice.len();
             }
             Ok(())
         }
