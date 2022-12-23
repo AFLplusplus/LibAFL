@@ -151,7 +151,7 @@ pub fn current_time() -> time::Duration {
 //
 // Define your own `external_current_millis()` function via `extern "C"`
 // which is linked into the binary and called from here.
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(feature = "std"), not(any(doctest, test))))]
 extern "C" {
     //#[no_mangle]
     fn external_current_millis() -> u64;
