@@ -110,3 +110,12 @@ pub use windows_asan::*;
 pub mod forkserver;
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 pub use forkserver::*;
+
+#[cfg(all(any(doctest, test), not(feature = "std")))]
+/// Provide custom time in `no_std` tests.
+/// This copies `libafl`'s [`external_current_millis`] stub,
+/// since the Windows linker doesn't find the symbol without the additional help
+#[no_mangle]
+pub extern "C" fn external_current_millis() -> u64 {
+    1000
+}

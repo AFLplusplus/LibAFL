@@ -103,7 +103,7 @@ where
     StdMapObserver::from_mut_slice(name, edges_map_mut_slice())
 }
 
-/// Gets the current edges map ptr
+/// Gets the current edges map pt
 /// It will usually take `EDGES_MAP`, but `EDGES_MAP_PTR`,
 /// if built with the `pointer_maps` feature.
 #[must_use]
