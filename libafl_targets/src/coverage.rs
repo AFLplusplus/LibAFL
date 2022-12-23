@@ -114,8 +114,6 @@ where
     // See https://stackoverflow.com/questions/43712979/how-to-export-a-symbol-from-a-rust-executable
     #[cfg(all(any(doctest, test), not(feature = "std")))]
     let _funcs: &[*const extern "C" fn() -> u64] = &[external_current_millis as _];
-    #[cfg(windows)]
-    std::mem::forget(_funcs);
 
     StdMapObserver::from_mut_slice(name, edges_map_mut_slice())
 }
