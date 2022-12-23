@@ -804,7 +804,8 @@ pub mod pybind {
                     py_mgr,
                     BytesInput::new(input),
                 )
-                .expect("Failed to add input").0
+                .expect("Failed to add input")
+                .0
         }
 
         fn fuzz_loop(

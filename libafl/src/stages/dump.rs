@@ -7,7 +7,7 @@ use std::{fs, fs::File, io::Write, path::PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{CorpusId, Corpus},
+    corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     stages::Stage,
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions, UsesState},
@@ -56,14 +56,18 @@ where
         _manager: &mut EM,
         _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let (mut corpus_idx, mut solutions_idx) = if let Some(meta) = state
-            .metadata()
-            .get::<DumpToDiskMetadata>() {
-            (meta.last_corpus.map(|x| state.corpus().next(x)).flatten(), meta.last_solution.map(|x| state.solutions().next(x)).flatten())
-        } else {
-            (state.corpus().first(), state.solutions().first())
-        };
-        
+        let (mut corpus_idx, mut solutions_idx) =
+            if let Some(meta) = state.metadata().get::<DumpToDiskMetadata>() {
+                (
+                    meta.last_corpus.map(|x| state.corpus().next(x)).flatten(),
+                    meta.last_solution
+                        .map(|x| state.solutions().next(x))
+                        .flatten(),
+                )
+            } else {
+                (state.corpus().first(), state.solutions().first())
+            };
+
         while let Some(i) = corpus_idx {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
             let input = testcase.load_input()?;
@@ -72,7 +76,7 @@ where
             let fname = self.corpus_dir.join(format!("id_{i}"));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
-            
+
             corpus_idx = state.corpus().next(i);
         }
 

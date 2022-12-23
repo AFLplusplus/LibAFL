@@ -18,27 +18,16 @@ pub use cached::CachedOnDiskCorpus;
 
 #[cfg(feature = "cmin")]
 pub mod minimizer;
+use core::{cell::RefCell, fmt};
+
 #[cfg(feature = "cmin")]
 pub use minimizer::*;
-
-use core::{fmt, cell::RefCell};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-bolts::rands::Rand,
-    inputs::{Input, UsesInput},
-    Error,
-};
+use crate::{bolts::rands::Rand, inputs::UsesInput, Error};
 
 /// An abstraction for the index that identify a testcase in the corpus
-#[derive(
-    Debug,
-    Clone, Copy,
-    PartialEq, Eq,
-    Hash,
-    PartialOrd, Ord,
-    Serialize, Deserialize
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct CorpusId(pub(crate) usize);
 
@@ -91,10 +80,10 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
 
     /// Current testcase scheduled (mutable)
     fn current_mut(&mut self) -> &mut Option<CorpusId>;
-    
+
     /// Get the next corpus id
     fn next(&self, idx: CorpusId) -> Option<CorpusId>;
-    
+
     /// Get the prev corpus id
     fn prev(&self, idx: CorpusId) -> Option<CorpusId>;
 
@@ -103,23 +92,37 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
 
     /// Get the last inserted corpus id
     fn last(&self) -> Option<CorpusId>;
-    
+
     fn indexes<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
-        CorpusIdIterator { corpus: self, cur: self.first() }
+        CorpusIdIterator {
+            corpus: self,
+            cur: self.first(),
+        }
     }
 
-    fn random_index<R>(&self, rand: &mut R) -> CorpusId where R: Rand {
+    fn random_index<R>(&self, rand: &mut R) -> CorpusId
+    where
+        R: Rand,
+    {
         let nth = rand.below(self.count() as u64) as usize;
-        self.indexes().nth(nth).expect("Failed to get a random CorpusId")
+        self.indexes()
+            .nth(nth)
+            .expect("Failed to get a random CorpusId")
     }
 }
 
-pub struct CorpusIdIterator<'a, C> where C: Corpus {
+pub struct CorpusIdIterator<'a, C>
+where
+    C: Corpus,
+{
     corpus: &'a C,
-    cur: Option<CorpusId>
+    cur: Option<CorpusId>,
 }
 
-impl<'a, C> Iterator for CorpusIdIterator<'a, C> where C: Corpus {
+impl<'a, C> Iterator for CorpusIdIterator<'a, C>
+where
+    C: Corpus,
+{
     type Item = CorpusId;
 
     fn next(&mut self) -> Option<Self::Item> {

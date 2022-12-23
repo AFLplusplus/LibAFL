@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
-    corpus::{CorpusId, Corpus},
+    corpus::{Corpus, CorpusId},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal, UsesInput},
     mutators::{MutationResult, Mutator},

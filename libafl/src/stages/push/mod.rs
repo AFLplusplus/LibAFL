@@ -17,8 +17,9 @@ pub use mutational::StdMutationalPushStage;
 
 use crate::{
     bolts::current_time,
+    corpus::CorpusId,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
-    executors::ExitKind,corpus::CorpusId,
+    executors::ExitKind,
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,

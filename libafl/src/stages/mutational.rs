@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::rands::Rand,
-    corpus::{CorpusId, Corpus},
+    corpus::{Corpus, CorpusId},
     fuzzer::Evaluator,
     mark_feature_time,
     mutators::Mutator,

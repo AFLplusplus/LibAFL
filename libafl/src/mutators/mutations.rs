@@ -8,7 +8,7 @@ use core::{
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
-    corpus::{CorpusId, Corpus},
+    corpus::{Corpus, CorpusId},
     inputs::{HasBytesVec, UsesInput},
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMaxSize, HasRand},

@@ -6,10 +6,11 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::rands::Rand,
+use crate::{
+    bolts::rands::Rand,
     corpus::{
         ondisk::{OnDiskCorpus, OnDiskMetadataFormat},
-        Corpus, Testcase, CorpusId,
+        Corpus, CorpusId, Testcase,
     },
     inputs::{Input, UsesInput},
     Error,
@@ -121,9 +122,12 @@ where
     fn last(&self) -> Option<CorpusId> {
         self.inner.last()
     }
-    
-         #[inline]
-    fn random_index<R>(&self, rand: &mut R) -> CorpusId where R: Rand {
+
+    #[inline]
+    fn random_index<R>(&self, rand: &mut R) -> CorpusId
+    where
+        R: Rand,
+    {
         self.inner.random_index(rand)
     }
 }

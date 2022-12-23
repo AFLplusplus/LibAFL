@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::{Rand, StdRand},
-    corpus::{CorpusId, Corpus},
+    corpus::{Corpus, CorpusId},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,

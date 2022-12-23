@@ -203,7 +203,9 @@ where
         } else {
             let id = match state.corpus().current() {
                 Some(cur) => {
-                    if *cur + 1 >= state.corpus().count() {
+                    if let Some(next) = state.corpus().next(*cur) {
+                        next
+                    } else {
                         let psmeta = state
                             .metadata_mut()
                             .get_mut::<SchedulerMetadata>()
@@ -211,12 +213,10 @@ where
                                 Error::key_not_found("SchedulerMetadata not found".to_string())
                             })?;
                         psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
-                        0
-                    } else {
-                        *cur + 1
+                        state.corpus().first().unwrap()
                     }
                 }
-                None => 0,
+                None => state.corpus().first().unwrap(),
             };
             *state.corpus_mut().current_mut() = Some(id);
 

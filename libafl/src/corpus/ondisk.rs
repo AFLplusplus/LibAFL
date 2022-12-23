@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{rands::Rand, serdeany::SerdeAnyMap},
-    corpus::{Corpus, CorpusId, Testcase, InMemoryCorpus},
+    corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
     state::HasMetadata,
     Error,
@@ -82,7 +82,7 @@ where
     fn replace(&mut self, idx: CorpusId, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         let entry = self.inner.replace(idx, testcase)?;
         self.remove_testcase(&entry)?;
-        self.save_testcase(&mut  self.get(idx).unwrap().borrow_mut(), &idx)?;
+        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), &idx)?;
         Ok(entry)
     }
 
@@ -131,9 +131,12 @@ where
     fn last(&self) -> Option<CorpusId> {
         self.inner.last()
     }
-    
-     #[inline]
-    fn random_index<R>(&self, rand: &mut R) -> CorpusId where R: Rand {
+
+    #[inline]
+    fn random_index<R>(&self, rand: &mut R) -> CorpusId
+    where
+        R: Rand,
+    {
         self.inner.random_index(rand)
     }
 }
@@ -176,11 +179,7 @@ where
     fn save_testcase(&mut self, testcase: &mut Testcase<I>, idx: &CorpusId) -> Result<(), Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            let file_orig = testcase
-                .input()
-                .as_ref()
-                .unwrap()
-                .generate_name(idx.0);
+            let file_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);
             let mut file = file_orig.clone();
 
             let mut ctr = 2;

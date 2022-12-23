@@ -15,7 +15,7 @@ use crate::{
         tuples::{tuple_list, tuple_list_type, NamedTuple},
         AsMutSlice, AsSlice,
     },
-    corpus::{CorpusId, Corpus},
+    corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     mutators::{MutationResult, Mutator, MutatorsTuple},
     state::{HasCorpus, HasMetadata, HasRand, State},

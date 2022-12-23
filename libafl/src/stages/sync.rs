@@ -10,9 +10,10 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    corpus::CorpusId,
     fuzzer::Evaluator,
     inputs::{Input, UsesInput},
-    stages::Stage,corpus::CorpusId,
+    stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };

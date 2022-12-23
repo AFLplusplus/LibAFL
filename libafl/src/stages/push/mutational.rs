@@ -12,7 +12,7 @@ use super::{PushStage, PushStageHelper, PushStageSharedState};
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::rands::Rand,
-    corpus::{CorpusId, Corpus},
+    corpus::{Corpus, CorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     inputs::UsesInput,
@@ -175,7 +175,7 @@ where
 
         start_timer!(state);
         self.mutator
-            .post_exec(state, self.stage_idx, Some(self.testcases_done))?;
+            .post_exec(state, self.stage_idx, self.current_corpus_idx)?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
         self.testcases_done += 1;
 

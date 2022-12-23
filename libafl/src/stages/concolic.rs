@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 
 use super::{Stage, TracingStage};
 use crate::{
-    corpus::{CorpusId, Corpus},
+    corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},

@@ -18,11 +18,11 @@ pub mod push;
 pub mod tracing;
 pub use tracing::{ShadowTracingStage, TracingStage};
 
-//pub mod calibrate;
-//pub use calibrate::CalibrationStage;
+pub mod calibrate;
+pub use calibrate::CalibrationStage;
 
-//pub mod power;
-//pub use power::{PowerMutationalStage, StdPowerMutationalStage};
+pub mod power;
+pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 
 pub mod generalization;
 pub use generalization::GeneralizationStage;
@@ -54,12 +54,12 @@ pub use dump::*;
 
 use self::push::PushStage;
 use crate::{
+    corpus::CorpusId,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    corpus::CorpusId,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasRand, UsesState},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };

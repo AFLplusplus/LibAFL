@@ -1,27 +1,27 @@
 //! In-memory corpus, keeps all test cases in memory at all times
 
-use core::cell::RefCell;
 use alloc::vec::Vec;
+use core::cell::RefCell;
+
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::rands::Rand,
+use crate::{
+    bolts::rands::Rand,
     corpus::{Corpus, CorpusId, Testcase},
     inputs::{Input, UsesInput},
     Error,
 };
 
 #[cfg(not(feature = "corpus_btreemap"))]
-#[derive(
-    Debug,
-    Clone,
-    Serialize, Deserialize
-)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct TestcaseStorageItem<I> where
-    I: Input, {
+pub struct TestcaseStorageItem<I>
+where
+    I: Input,
+{
     pub testcase: RefCell<Testcase<I>>,
     pub prev: Option<CorpusId>,
-    pub next: Option<CorpusId>
+    pub next: Option<CorpusId>,
 }
 
 #[cfg(not(feature = "corpus_btreemap"))]
@@ -93,7 +93,14 @@ where
         }
         self.last_idx = Some(idx);
         self.insert_key(&idx);
-        self.map.insert(idx, TestcaseStorageItem { testcase, prev, next: None });
+        self.map.insert(
+            idx,
+            TestcaseStorageItem {
+                testcase,
+                prev,
+                next: None,
+            },
+        );
         idx
     }
 
@@ -106,7 +113,7 @@ where
         self.map.insert(idx, testcase);
         idx
     }
-    
+
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
         if let Some(entry) = self.map.get_mut(&idx) {
@@ -115,7 +122,7 @@ where
             None
         }
     }
-    
+
     #[cfg(feature = "corpus_btreemap")]
     pub fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
         if let Some(entry) = self.map.get_mut(&idx) {
@@ -124,7 +131,7 @@ where
             None
         }
     }
-    
+
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn remove(&self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
         if let Some(item) = self.map.remove(&idx) {
@@ -175,7 +182,9 @@ where
     #[cfg(feature = "corpus_btreemap")]
     fn next(&self, idx: CorpusId) -> Option<CorpusId> {
         // TODO see if using self.keys is faster
-        let mut range = self.map.range(core::ops::Bound::Included(idx), core::ops::Bound::Unbounded);
+        let mut range = self
+            .map
+            .range(core::ops::Bound::Included(idx), core::ops::Bound::Unbounded);
         if let Some((this_id, _)) = range.next() {
             if idx != this_id {
                 return None;
@@ -200,7 +209,9 @@ where
     #[cfg(feature = "corpus_btreemap")]
     fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
         // TODO see if using self.keys is faster
-        let mut range = self.map.range(core::ops::Bound::Unbounded, core::ops::Bound::Included(idx));
+        let mut range = self
+            .map
+            .range(core::ops::Bound::Unbounded, core::ops::Bound::Included(idx));
         if let Some((this_id, _)) = range.next_back() {
             if idx != this_id {
                 return None;
@@ -284,13 +295,18 @@ where
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        self.storage.replace(idx, testcase).ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+        self.storage
+            .replace(idx, testcase)
+            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
     fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
-        self.storage.remove(idx).map(|x| x.take()).ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+        self.storage
+            .remove(idx)
+            .map(|x| x.take())
+            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
     /// Get by id
@@ -312,7 +328,7 @@ where
     fn current_mut(&mut self) -> &mut Option<CorpusId> {
         &mut self.current
     }
-    
+
     #[inline]
     fn next(&self, idx: CorpusId) -> Option<CorpusId> {
         self.storage.next(idx)
@@ -332,9 +348,12 @@ where
     fn last(&self) -> Option<CorpusId> {
         self.storage.last()
     }
-    
+
     // TODO propagate to others corpuses
-    fn random_index<R>(&self, rand: &mut R) -> CorpusId where R: Rand {
+    fn random_index<R>(&self, rand: &mut R) -> CorpusId
+    where
+        R: Rand,
+    {
         let nth = rand.below(self.storage.keys.len() as u64) as usize;
         self.storage.keys[nth]
     }

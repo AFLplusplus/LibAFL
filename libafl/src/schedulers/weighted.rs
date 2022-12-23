@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
     inputs::UsesInput,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
@@ -230,7 +230,7 @@ where
     S: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata(SchedulerMetadata::new(self.strat));
         }
@@ -271,7 +271,7 @@ where
     fn on_replace(
         &self,
         state: &mut S,
-        idx: usize,
+        idx: CorpusId,
         _testcase: &Testcase<S::Input>,
     ) -> Result<(), Error> {
         // Recreate the alias table
@@ -281,7 +281,7 @@ where
     fn on_remove(
         &self,
         state: &mut S,
-        _idx: usize,
+        _idx: CorpusId,
         _testcase: &Option<Testcase<S::Input>>,
     ) -> Result<(), Error> {
         // Recreate the alias table
@@ -290,12 +290,13 @@ where
     }
 
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
             let corpus_counts = state.corpus().count();
-            let s = state.rand_mut().below(corpus_counts as u64) as usize;
+            let s = state.corpus().random_index(state.rand_mut());
+            
             // Choose a random value between 0.000000000 and 1.000000000
             let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
 
@@ -308,6 +309,7 @@ where
 
             let current_cycles = wsmeta.runs_in_current_cycle();
 
+            // TODO deal with corpus_counts decreasing due to removals
             if current_cycles >= corpus_counts {
                 wsmeta.set_runs_current_cycle(0);
             } else {

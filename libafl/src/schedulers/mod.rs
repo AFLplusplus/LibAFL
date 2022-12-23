@@ -1,7 +1,7 @@
 //! Schedule the access to the Corpus.
 
-use core::marker::PhantomData;
 use alloc::borrow::ToOwned;
+use core::marker::PhantomData;
 
 pub mod testcase_score;
 pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
@@ -14,7 +14,6 @@ pub use minimizer::{
     IndexesLenTimeMinimizerScheduler, LenTimeMinimizerScheduler, MinimizerScheduler,
 };
 
-/*
 pub mod powersched;
 pub use powersched::PowerQueueScheduler;
 
@@ -23,16 +22,15 @@ pub use probabilistic_sampling::ProbabilitySamplingScheduler;
 
 pub mod accounting;
 pub use accounting::CoverageAccountingScheduler;
-
+/*
 pub mod weighted;
 pub use weighted::{StdWeightedScheduler, WeightedScheduler};
-
+*/
 pub mod tuneable;
 pub use tuneable::*;
-*/
+
 use crate::{
-    bolts::rands::Rand,
-    corpus::{Corpus, Testcase, CorpusId},
+    corpus::{Corpus, CorpusId, Testcase},
     inputs::UsesInput,
     state::{HasCorpus, HasRand, UsesState},
     Error,
@@ -92,8 +90,7 @@ where
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
-            let len = state.corpus().count();
-            let id = CorpusId::from(state.rand_mut().below(len as u64) as usize);
+            let id = state.corpus().random_index(state.rand_mut());
             *state.corpus_mut().current_mut() = Some(id);
             Ok(id)
         }

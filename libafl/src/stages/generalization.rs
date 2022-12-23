@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::AsSlice,
-    corpus::{CorpusId, Corpus},
+    corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec, UsesInput},

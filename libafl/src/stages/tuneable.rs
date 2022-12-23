@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
+    corpus::CorpusId,
     impl_serdeany,
-    mutators::Mutator,corpus::CorpusId,
+    mutators::Mutator,
     stages::{mutational::DEFAULT_MUTATIONAL_MAX_ITERATIONS, MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
     Error, Evaluator,

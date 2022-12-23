@@ -5,7 +5,7 @@ use core::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    corpus::{CorpusId, Corpus},
+    corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
