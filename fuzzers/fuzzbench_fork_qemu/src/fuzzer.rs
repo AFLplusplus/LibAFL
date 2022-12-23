@@ -195,13 +195,16 @@ fn fuzz(
     let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = SimpleMonitor::with_user_monitor(|s| {
-        #[cfg(unix)]
-        writeln!(&mut stdout_cpy, "{}", s).unwrap();
-        #[cfg(windows)]
-        println!("{}", s);
-        writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
-    }, true);
+    let monitor = SimpleMonitor::with_user_monitor(
+        |s| {
+            #[cfg(unix)]
+            writeln!(&mut stdout_cpy, "{}", s).unwrap();
+            #[cfg(windows)]
+            println!("{}", s);
+            writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
+        },
+        true,
+    );
 
     let mut shmem_provider = StdShMemProvider::new()?;
 

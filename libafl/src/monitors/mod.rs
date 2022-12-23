@@ -993,6 +993,7 @@ pub mod pybind {
                 inner: SimpleMonitor {
                     print_fn: Box::new(closure),
                     start_time: self.inner.start_time,
+                    print_user_monitor: false,
                     client_stats: self.inner.client_stats.clone(),
                 },
                 print_fn: self.print_fn.clone(),
