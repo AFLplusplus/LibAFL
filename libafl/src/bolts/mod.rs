@@ -167,7 +167,7 @@ pub fn current_time() -> time::Duration {
 }
 
 /// Current time (fixed fallback for `no_std`)
-/// 
+///
 /// On Windows, `external_current_millis` get optimized out at link-time
 /// for `no_std` tests. So, instead, we return a constant (for tests).
 #[cfg(all(not(feature = "std"), any(doctest, test)))]
