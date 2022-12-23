@@ -162,6 +162,11 @@ extern "C" {
 #[inline]
 #[must_use]
 pub fn current_time() -> time::Duration {
+    // On Windows, `external_current_millis` get optimized out at link-time
+    // for no_std tests. Instead, we just return a constant (for tests)
+    #[cfg(any(doctest, test))]
+    let millis = 1000;
+    #[cfg(not(any(doctest, test)))]
     let millis = unsafe { external_current_millis() };
     time::Duration::from_millis(millis)
 }

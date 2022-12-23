@@ -38,16 +38,6 @@ extern "C" {
 pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
 pub use __afl_area_ptr as EDGES_MAP_PTR;
 
-#[cfg(all(any(doctest, test), not(feature = "std")))]
-/// Provide custom time in `no_std` tests.
-/// This copies `libafl`'s [`external_current_millis`] stub,
-/// since the Windows linker doesn't find the symbol without the additional help
-#[no_mangle]
-#[inline(never)]
-pub extern "C" fn external_current_millis() -> u64 {
-    1000
-}
-
 /// Return Tokens from the compile-time token section
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 pub fn autotokens() -> Result<Tokens, Error> {
@@ -110,11 +100,6 @@ pub unsafe fn std_edges_map_observer<'a, S>(name: S) -> StdMapObserver<'a, u8, f
 where
     S: Into<String>,
 {
-    // On Windows, these get optimized out.
-    // See https://stackoverflow.com/questions/43712979/how-to-export-a-symbol-from-a-rust-executable
-    #[cfg(all(any(doctest, test), not(feature = "std")))]
-    let _funcs: &[*const extern "C" fn() -> u64] = &[external_current_millis as _];
-
     StdMapObserver::from_mut_slice(name, edges_map_mut_slice())
 }
 
