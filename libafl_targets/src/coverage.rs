@@ -72,7 +72,7 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 /// Gets a new [`StdMapObserver`] from the current [`edges_map_mut_slice`].
 /// This is roughly equivalent to running:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use libafl::observers::StdMapObserver;
 /// use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
 ///
@@ -84,7 +84,7 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 ///
 /// or, for the `pointer_maps` feature:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use libafl::observers::StdMapObserver;
 /// use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
 ///
