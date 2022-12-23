@@ -70,6 +70,18 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 }
 
 /// Gets a new [`StdMapObserver`] from the current [`edges_map_mut_slice`].
+/// This is roughly equivalent to running:
+/// 
+/// ```rust
+/// StdMapObserver::from_mut_ptr("edges", EDGES_MAP, MAX_EDGES_NUM)) 
+/// ```
+/// 
+/// or, for the `pointer_maps` feature:
+/// 
+/// ```rust
+/// #[cfg(feature = "pointer_maps"]
+/// StdMapObserver::from_mut_ptr("edges", EDGES_MAP, MAX_EDGES_NUM)) 
+/// ```
 ///
 /// # Safety
 /// This will dereference [`edges_map_mut_ptr`] and crash if it is not a valid address.
@@ -82,7 +94,7 @@ where
 
 /// Gets the current edges map ptr
 /// It will usually take `EDGES_MAP`, but `EDGES_MAP_PTR`,
-/// if built with the `ptr_maps` feature.
+/// if built with the `pointer_maps` feature.
 #[must_use]
 pub fn edges_map_mut_ptr() -> *mut u8 {
     unsafe {
