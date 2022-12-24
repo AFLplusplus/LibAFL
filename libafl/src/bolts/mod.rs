@@ -151,30 +151,19 @@ pub fn current_time() -> time::Duration {
 //
 // Define your own `external_current_millis()` function via `extern "C"`
 // which is linked into the binary and called from here.
-#[cfg(all(not(feature = "std"), not(any(doctest, test))))]
+#[cfg(not(feature = "std"))]
 extern "C" {
     //#[no_mangle]
     fn external_current_millis() -> u64;
 }
 
 /// Current time (fixed fallback for `no_std`)
+#[cfg(not(feature = "std"))]
 #[inline]
-#[cfg(all(not(feature = "std"), not(any(doctest, test))))]
 #[must_use]
 pub fn current_time() -> time::Duration {
     let millis = unsafe { external_current_millis() };
     time::Duration::from_millis(millis)
-}
-
-/// Current time (fixed fallback for `no_std`)
-///
-/// On Windows, `external_current_millis` get optimized out at link-time
-/// for `no_std` tests. So, instead, we return a constant (for tests).
-#[cfg(all(not(feature = "std"), any(doctest, test)))]
-#[inline]
-#[must_use]
-pub fn current_time() -> time::Duration {
-    time::Duration::from_millis(1000)
 }
 
 /// Given a u64 number, return a hashed number using this mixing function
