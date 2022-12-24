@@ -26,16 +26,16 @@ fn main() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
     let broker_port = 7777;
 
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     let cores = Cores::all().expect("unable to get all core id");
     let parent_cpu_id = cores.ids.first().expect("unable to get first core id");
 
     // region: fuzzer start function
-    let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id: usize| {
+    let mut run_client = |state: Option<_>, mut restarting_mgr, core_id: usize| {
         // nyx shared dir, created by nyx-fuzz/packer/packer/nyx_packer.py
         let share_dir = Path::new("/tmp/nyx_libxml2/");
-        let cpu_id = _core_id as u32;
+        let cpu_id = core_id.try_into().unwrap();
         let parallel_mode = true;
         // nyx stuff
         let mut helper = NyxHelper::new(
@@ -43,12 +43,11 @@ fn main() {
             cpu_id,
             true,
             parallel_mode,
-            Some(parent_cpu_id.id as u32),
+            Some(parent_cpu_id.id.try_into().unwrap()),
         )
         .unwrap();
-        let trace_bits =
-            unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
-        let observer = StdMapObserver::new("trace", trace_bits);
+        let observer =
+            unsafe { StdMapObserver::from_mut_ptr("trace", helper.trace_bits, helper.map_size) };
 
         let input = BytesInput::new(b"22".to_vec());
         let rand = StdRand::new();

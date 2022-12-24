@@ -26,7 +26,7 @@ fn main() {
 
     let args = vec![".\\test\\test.exe".to_string(), "@@".to_string()];
 
-    let observer = ListObserver::new("cov", unsafe { &mut COVERAGE });
+    let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
     let mut feedback = ListFeedback::new_with_observer(&observer);
 
     let input = BytesInput::new(b"bad".to_vec());

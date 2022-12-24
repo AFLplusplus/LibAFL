@@ -53,12 +53,12 @@ Combined with any `Runtime` you'd like to use, you can initialize the `FridaInst
 
 ## Running the Fuzzer
 
-After setting up the `FridaInstrumentationHelper`. You can obtain the pointer to the coverage map by calling `map_ptr_mut()`.
+After setting up the `FridaInstrumentationHelper`. You can obtain the pointer to the coverage map by calling `map_mut_ptr()`.
 
 ```rust,ignore
-        let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+        let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
             "edges",
-            frida_helper.map_ptr_mut().unwrap(),
+            frida_helper.map_mut_ptr().unwrap(),
             MAP_SIZE,
         ));
 ```

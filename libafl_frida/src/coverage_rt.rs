@@ -82,7 +82,7 @@ impl CoverageRuntime {
     }
 
     /// Retrieve the coverage map pointer
-    pub fn map_ptr_mut(&mut self) -> *mut u8 {
+    pub fn map_mut_ptr(&mut self) -> *mut u8 {
         self.0.borrow_mut().map.as_mut_ptr()
     }
 

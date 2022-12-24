@@ -16,20 +16,16 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::{
-        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-        token_mutations::Tokens,
-    },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+    observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, StdState},
     Error,
 };
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
-
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 #[no_mangle]
 pub fn libafl_main() {
     println!(
@@ -65,8 +61,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+    let edges_observer = unsafe { HitcountsMapObserver::new(std_edges_map_observer("edges")) };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");

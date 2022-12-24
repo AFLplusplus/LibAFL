@@ -38,7 +38,7 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-use libafl_targets::{edges_map_from_ptr, libfuzzer_initialize, libfuzzer_test_one_input};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
     Ok(Duration::from_millis(time.parse()?))
@@ -125,13 +125,11 @@ pub fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges = unsafe { edges_map_from_ptr() };
-        let edges_observer =
-            HitcountsMapObserver::new(StdMapObserver::new_from_ownedref("edges", edges));
+        let edges_observer = unsafe { HitcountsMapObserver::new(std_edges_map_observer("edges")) };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
