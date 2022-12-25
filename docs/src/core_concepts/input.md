@@ -12,4 +12,4 @@ In case of a grammar fuzzer for instance, the Input is generally an Abstract Syn
 
 In the Rust code, an [`Input`](https://docs.rs/libafl/*/libafl/inputs/trait.Input.html) is a trait that can be implemented only by structures that are serializable and have only owned data as fields.
 
-While most fuzzers use a normal `BytesInput`, more advanced ones use inputs that include special inputs for grammar fuzzing ([GramatronInput](https://docs.rs/libafl/*/libafl/inputs/gramatron/struct.GramatronInput.html) or `NautilusInput` on nightly), as well as the token-level [EncodedInput](https://docs.rs/libafl/*/libafl/inputs/encoded/struct.EncodedInput.html).
+While most fuzzers use a normal `BytesInput`, more advanced ones use inputs that include special inputs for grammar fuzzing ([GramatronInput](https://docs.rs/libafl/*/libafl/inputs/gramatron/struct.GramatronInput.html) or `NautilusInput` on Rust nightly), as well as the token-level [EncodedInput](https://docs.rs/libafl/*/libafl/inputs/encoded/struct.EncodedInput.html).
