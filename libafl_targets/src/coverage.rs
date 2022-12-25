@@ -1,5 +1,7 @@
 //! Coverage maps as static mut array
 
+use alloc::string::String;
+
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
 
@@ -44,7 +46,7 @@ pub fn autotokens() -> Result<Tokens, Error> {
             Ok(Tokens::default())
         } else {
             // we can safely unwrap
-            Tokens::from_ptrs(__token_start, __token_stop)
+            Tokens::from_mut_ptrs(__token_start, __token_stop)
         }
     }
 }
@@ -52,19 +54,68 @@ pub fn autotokens() -> Result<Tokens, Error> {
 /// The size of the map for edges.
 #[no_mangle]
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE;
-pub use __afl_map_size as EDGES_MAP_PTR_SIZE;
-use libafl::bolts::ownedref::OwnedSliceMut;
+pub use __afl_map_size as EDGES_MAP_PTR_NUM;
+use libafl::{bolts::ownedref::OwnedMutSlice, observers::StdMapObserver};
 
 /// Gets the edges map from the `EDGES_MAP_PTR` raw pointer.
+/// Assumes a `len` of `EDGES_MAP_PTR_NUM`.
 ///
 /// # Safety
 ///
-/// This function will crash if `EDGES_MAP_PTR` is not a valid pointer.
-/// The `EDGES_MAP_PTR_SIZE` needs to be smaller than, or equal to the size of the map.
+/// This function will crash if `edges_map_mut_ptr` is not a valid pointer.
+/// The [`edges_max_num`] needs to be smaller than, or equal to the size of the map.
 #[must_use]
-pub unsafe fn edges_map_from_ptr<'a>() -> OwnedSliceMut<'a, u8> {
-    debug_assert!(!EDGES_MAP_PTR.is_null());
-    OwnedSliceMut::from_raw_parts_mut(EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE)
+pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
+    OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), edges_max_num())
+}
+
+/// Gets a new [`StdMapObserver`] from the current [`edges_map_mut_slice`].
+/// This is roughly equivalent to running:
+///
+/// ```rust,ignore
+/// use libafl::observers::StdMapObserver;
+/// use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
+///
+/// #[cfg(not(feature = "pointer_maps"))]
+/// let observer = unsafe {
+///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
+/// };
+/// ```
+///
+/// or, for the `pointer_maps` feature:
+///
+/// ```rust,ignore
+/// use libafl::observers::StdMapObserver;
+/// use libafl_targets::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
+///
+/// #[cfg(feature = "pointer_maps")]
+/// let observer = unsafe {
+///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP_PTR, EDGES_MAP_PTR_NUM)
+/// };
+/// ```
+///
+/// # Safety
+/// This will dereference [`edges_map_mut_ptr`] and crash if it is not a valid address.
+pub unsafe fn std_edges_map_observer<'a, S>(name: S) -> StdMapObserver<'a, u8, false>
+where
+    S: Into<String>,
+{
+    StdMapObserver::from_mut_slice(name, edges_map_mut_slice())
+}
+
+/// Gets the current edges map pt
+/// It will usually take `EDGES_MAP`, but `EDGES_MAP_PTR`,
+/// if built with the `pointer_maps` feature.
+#[must_use]
+pub fn edges_map_mut_ptr() -> *mut u8 {
+    unsafe {
+        if cfg!(feature = "pointer_maps") {
+            assert!(!EDGES_MAP_PTR.is_null());
+            EDGES_MAP_PTR
+        } else {
+            EDGES_MAP.as_mut_ptr()
+        }
+    }
 }
 
 /// Gets the current maximum number of edges tracked.
@@ -76,7 +127,7 @@ pub fn edges_max_num() -> usize {
         } else {
             #[cfg(feature = "pointer_maps")]
             {
-                EDGES_MAP_PTR_SIZE
+                EDGES_MAP_PTR_NUM
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
@@ -95,14 +146,14 @@ mod swap {
     use core::fmt::Debug;
 
     use libafl::{
-        bolts::{ownedref::OwnedSliceMut, tuples::Named, AsMutSlice},
+        bolts::{ownedref::OwnedMutSlice, tuples::Named, AsMutSlice},
         inputs::UsesInput,
         observers::{DifferentialObserver, Observer, ObserversTuple, StdMapObserver},
         Error,
     };
     use serde::{Deserialize, Serialize};
 
-    use super::{EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE};
+    use super::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
 
     /// Observer to be used with `DiffExecutor`s when executing a differential target that shares
     /// the AFL map in order to swap out the maps (and thus allow for map observing the two targets
@@ -110,8 +161,8 @@ mod swap {
     #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Debug, Serialize, Deserialize)]
     pub struct DifferentialAFLMapSwapObserver<'a, 'b> {
-        first_map: OwnedSliceMut<'a, u8>,
-        second_map: OwnedSliceMut<'b, u8>,
+        first_map: OwnedMutSlice<'a, u8>,
+        second_map: OwnedMutSlice<'b, u8>,
         first_name: String,
         second_name: String,
         name: String,
@@ -129,24 +180,24 @@ mod swap {
                 name: format!("differential_{}_{}", first.name(), second.name()),
                 first_map: unsafe {
                     let slice = first.map_mut().as_mut_slice();
-                    OwnedSliceMut::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
+                    OwnedMutSlice::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
                 },
                 second_map: unsafe {
                     let slice = second.map_mut().as_mut_slice();
-                    OwnedSliceMut::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
+                    OwnedMutSlice::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
                 },
             }
         }
 
         /// Get the first map
         #[must_use]
-        pub fn first_map(&self) -> &OwnedSliceMut<'a, u8> {
+        pub fn first_map(&self) -> &OwnedMutSlice<'a, u8> {
             &self.first_map
         }
 
         /// Get the second map
         #[must_use]
-        pub fn second_map(&self) -> &OwnedSliceMut<'b, u8> {
+        pub fn second_map(&self) -> &OwnedMutSlice<'b, u8> {
             &self.second_map
         }
 
@@ -182,7 +233,7 @@ mod swap {
             let slice = self.first_map.as_mut_slice();
             unsafe {
                 EDGES_MAP_PTR = slice.as_mut_ptr();
-                EDGES_MAP_PTR_SIZE = slice.len();
+                EDGES_MAP_PTR_NUM = slice.len();
             }
             Ok(())
         }
@@ -191,7 +242,7 @@ mod swap {
             let slice = self.second_map.as_mut_slice();
             unsafe {
                 EDGES_MAP_PTR = slice.as_mut_ptr();
-                EDGES_MAP_PTR_SIZE = slice.len();
+                EDGES_MAP_PTR_NUM = slice.len();
             }
             Ok(())
         }

@@ -731,7 +731,7 @@ pub mod pybind {
     use pyo3::prelude::*;
 
     use crate::{
-        bolts::ownedref::OwnedPtrMut,
+        bolts::ownedref::OwnedMutPtr,
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
         feedbacks::pybind::PythonFeedback,
@@ -756,13 +756,13 @@ pub mod pybind {
     #[derive(Debug)]
     pub struct PythonStdFuzzerWrapper {
         /// Rust wrapped StdFuzzer object
-        pub inner: OwnedPtrMut<PythonStdFuzzer>,
+        pub inner: OwnedMutPtr<PythonStdFuzzer>,
     }
 
     impl PythonStdFuzzerWrapper {
         pub fn wrap(r: &mut PythonStdFuzzer) -> Self {
             Self {
-                inner: OwnedPtrMut::Ptr(r),
+                inner: OwnedMutPtr::Ptr(r),
             }
         }
 
@@ -781,7 +781,7 @@ pub mod pybind {
         #[new]
         fn new(py_feedback: PythonFeedback, py_objective: PythonFeedback) -> Self {
             Self {
-                inner: OwnedPtrMut::Owned(Box::new(StdFuzzer::new(
+                inner: OwnedMutPtr::Owned(Box::new(StdFuzzer::new(
                     QueueScheduler::new(),
                     py_feedback,
                     py_objective,

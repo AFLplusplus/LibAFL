@@ -27,13 +27,13 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-use libafl_targets::{CmpLogObserver, CMPLOG_MAP, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{std_edges_map_observer, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -143,14 +143,13 @@ where
                               mut mgr: LlmpRestartingEventManager<_, _>,
                               _core_id| {
             // Create an observation channel using the coverage map
-            let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-            let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+            let edges_observer =
+                HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
 
-            let cmplog = unsafe { &mut CMPLOG_MAP };
-            let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+            let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR

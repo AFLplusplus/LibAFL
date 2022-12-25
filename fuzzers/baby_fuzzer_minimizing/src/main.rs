@@ -33,7 +33,7 @@ pub fn main() -> Result<(), Error> {
 
     // Create an observation channel using the signals map
     let observer =
-        unsafe { StdMapObserver::new_from_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
+        unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
 
     let factory = MapEqualityFactory::new_from_observer(&observer);
 
@@ -44,7 +44,7 @@ pub fn main() -> Result<(), Error> {
     let mut objective = CrashFeedback::new();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
 
     let mut mgr = SimpleEventManager::new(mon);
 
@@ -116,7 +116,7 @@ pub fn main() -> Result<(), Error> {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
 
     let mut mgr = SimpleEventManager::new(mon);
 

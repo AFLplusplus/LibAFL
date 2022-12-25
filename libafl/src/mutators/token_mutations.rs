@@ -106,7 +106,10 @@ impl Tokens {
     /// The caller must ensure that the region between `token_start` and `token_stop`
     /// is a valid region, containing autotokens in the exepcted format.
     #[cfg(any(target_os = "linux", target_vendor = "apple"))]
-    pub unsafe fn from_ptrs(token_start: *const u8, token_stop: *const u8) -> Result<Self, Error> {
+    pub unsafe fn from_mut_ptrs(
+        token_start: *const u8,
+        token_stop: *const u8,
+    ) -> Result<Self, Error> {
         let mut ret = Self::default();
         if token_start.is_null() || token_stop.is_null() {
             return Ok(Self::new());

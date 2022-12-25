@@ -32,10 +32,11 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 // bindings to the functions defined in the target
 mod bindings {
+    #![allow(non_snake_case)]
     #![allow(non_camel_case_types)]
     #![allow(non_upper_case_globals)]
     #![allow(unused)]
-
+    #![allow(clippy::unreadable_literal)]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
@@ -45,23 +46,26 @@ use bindings::{inspect_first, inspect_second};
 mod multimap {
     pub use libafl::observers::{HitcountsIterableMapObserver, MultiMapObserver};
 
-    pub static mut FIRST_EDGES: &'static mut [u8] = &mut [];
-    pub static mut SECOND_EDGES: &'static mut [u8] = &mut [];
-    pub static mut COMBINED_EDGES: [&'static mut [u8]; 2] = [&mut [], &mut []];
+    pub static mut FIRST_EDGES: &mut [u8] = &mut [];
+    pub static mut SECOND_EDGES: &mut [u8] = &mut [];
+    pub static mut COMBINED_EDGES: [&mut [u8]; 2] = [&mut [], &mut []];
 }
 #[cfg(feature = "multimap")]
-use multimap::*;
+use multimap::{
+    HitcountsIterableMapObserver, MultiMapObserver, COMBINED_EDGES, FIRST_EDGES, SECOND_EDGES,
+};
 
 #[cfg(not(feature = "multimap"))]
 mod slicemap {
     pub use libafl::observers::HitcountsMapObserver;
 
-    pub static mut EDGES: &'static mut [u8] = &mut [];
+    pub static mut EDGES: &mut [u8] = &mut [];
 }
 #[cfg(not(feature = "multimap"))]
-use slicemap::*;
+use slicemap::{HitcountsMapObserver, EDGES};
 
 #[allow(clippy::similar_names)]
+#[allow(clippy::too_many_lines)]
 pub fn main() {
     // The closure that we want to fuzz
     let mut first_harness = |input: &BytesInput| {
@@ -94,8 +98,8 @@ pub fn main() {
         }
 
         // create the base maps used to observe the different executors from two independent maps
-        let mut first_map_observer = StdMapObserver::new("first-edges", unsafe { FIRST_EDGES });
-        let mut second_map_observer = StdMapObserver::new("second-edges", unsafe { SECOND_EDGES });
+        let mut first_map_observer = unsafe { StdMapObserver::new("first-edges", FIRST_EDGES) };
+        let mut second_map_observer = unsafe { StdMapObserver::new("second-edges", SECOND_EDGES) };
 
         // create a map swapper so that we can replace the coverage map pointer (requires feature pointer_maps!)
         let map_swapper =
@@ -104,10 +108,13 @@ pub fn main() {
         // create a combined map observer, e.g. for calibration
         // we use MultiMapObserver::differential to indicate that we want to use the observer in
         // differential mode
-        let map_observer = HitcountsIterableMapObserver::new(MultiMapObserver::differential(
-            "combined-edges",
-            unsafe { &mut COMBINED_EDGES },
-        ));
+        let map_observer = unsafe {
+            HitcountsIterableMapObserver::new(MultiMapObserver::differential(
+                "combined-edges",
+                &mut COMBINED_EDGES,
+            ))
+        };
+
         (
             first_map_observer,
             second_map_observer,
@@ -124,10 +131,16 @@ pub fn main() {
         }
 
         // create the base maps used to observe the different executors by splitting a slice
-        let mut first_map_observer =
-            StdMapObserver::new("first-edges", unsafe { &mut EDGES[..MAX_EDGES_NUM] });
-        let mut second_map_observer =
-            StdMapObserver::new("second-edges", unsafe { &mut EDGES[MAX_EDGES_NUM..] });
+        let mut first_map_observer = unsafe {
+            StdMapObserver::from_mut_ptr("first-edges", EDGES.as_mut_ptr(), MAX_EDGES_NUM)
+        };
+        let mut second_map_observer = unsafe {
+            StdMapObserver::from_mut_ptr(
+                "second-edges",
+                EDGES.as_mut_ptr().add(MAX_EDGES_NUM),
+                MAX_EDGES_NUM,
+            )
+        };
 
         // create a map swapper so that we can replace the coverage map pointer (requires feature pointer_maps!)
         let map_swapper =
@@ -136,10 +149,14 @@ pub fn main() {
         // create a combined map observer, e.g. for calibration
         // we use StdMapObserver::differential to indicate that we want to use the observer in
         // differential mode
-        let map_observer =
-            HitcountsMapObserver::new(StdMapObserver::differential("combined-edges", unsafe {
-                EDGES
-            }));
+        let map_observer = unsafe {
+            HitcountsMapObserver::new(StdMapObserver::differential_from_mut_ptr(
+                "combined-edges",
+                EDGES.as_mut_ptr(),
+                MAX_EDGES_NUM * 2,
+            ))
+        };
+
         (
             first_map_observer,
             second_map_observer,
@@ -174,7 +191,7 @@ pub fn main() {
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
     #[cfg(not(feature = "tui"))]
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
     #[cfg(feature = "tui")]
     let mon = TuiMonitor::new(String::from("Baby Fuzzer"), false);
 

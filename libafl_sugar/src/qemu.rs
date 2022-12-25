@@ -1,6 +1,9 @@
 //! In-memory fuzzer with `QEMU`-based binary-only instrumentation
 //!
-use core::fmt::{self, Debug, Formatter};
+use core::{
+    fmt::{self, Debug, Formatter},
+    ptr::addr_of_mut,
+};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
@@ -33,10 +36,8 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
 };
 pub use libafl_qemu::emu::Emulator;
-use libafl_qemu::{
-    cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks,
-};
-use libafl_targets::CmpLogObserver;
+use libafl_qemu::{edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
+use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -147,17 +148,19 @@ where
                               mut mgr: LlmpRestartingEventManager<_, _>,
                               _core_id| {
             // Create an observation channel using the coverage map
-            let edges = unsafe { &mut edges::EDGES_MAP };
-            let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
-            let edges_observer =
-                HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
+            let edges_observer = unsafe {
+                HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                    "edges",
+                    edges_map_mut_slice(),
+                    addr_of_mut!(edges::MAX_EDGES_NUM),
+                ))
+            };
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
 
             // Keep tracks of CMPs
-            let cmplog = unsafe { &mut cmplog::CMPLOG_MAP };
-            let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+            let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR

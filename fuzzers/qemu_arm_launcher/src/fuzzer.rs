@@ -1,6 +1,6 @@
 //! A libfuzzer-like fuzzer using qemu for binary-only coverage
 //!
-use core::time::Duration;
+use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
@@ -31,8 +31,7 @@ use libafl::{
 use libafl_qemu::{
     drcov::QemuDrCovHelper,
     //asan::QemuAsanHelper,
-    edges,
-    edges::QemuEdgeCoverageHelper,
+    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
     emu::Emulator,
     MmapPerms,
@@ -109,10 +108,13 @@ pub fn fuzz() {
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges = unsafe { &mut edges::EDGES_MAP };
-        let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
-        let edges_observer =
-            HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
+        let edges_observer = unsafe {
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                "edges",
+                edges_map_mut_slice(),
+                addr_of_mut!(MAX_EDGES_NUM),
+            ))
+        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -215,7 +217,7 @@ pub fn fuzz() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     // The stats reporter for the broker
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     // Build and run a Launcher
     match Launcher::builder()

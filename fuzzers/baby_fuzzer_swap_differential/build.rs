@@ -27,9 +27,7 @@ fn main() -> anyhow::Result<()> {
             })
             .join("release/libafl_cc");
         println!("cargo:rerun-if-changed={}", compiler.to_str().unwrap());
-        if !compiler.try_exists().unwrap_or(false) {
-            println!("cargo:warning=Can't find libafl_cc; assuming that we're building it.");
-        } else {
+        if compiler.try_exists().unwrap_or(false) {
             cc::Build::new()
                 .compiler(compiler)
                 .file("first.c")
@@ -38,6 +36,8 @@ fn main() -> anyhow::Result<()> {
                 .compile("diff-target");
 
             println!("cargo:rustc-link-lib=diff-target");
+        } else {
+            println!("cargo:warning=Can't find libafl_cc; assuming that we're building it.");
         }
     }
 
