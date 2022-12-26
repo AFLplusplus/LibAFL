@@ -1,6 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use core::{cell::RefCell, time::Duration};
+use core::{cell::RefCell, ptr::addr_of_mut, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -45,11 +45,11 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    //asan::{init_with_asan, QemuAsanHelper},
-    cmplog,
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
-    edges,
+    //asan::{init_with_asan, QemuAsanHelper},
+    edges::edges_map_mut_slice,
     edges::QemuEdgeCoverageHelper,
+    edges::MAX_EDGES_NUM,
     elf::EasyElf,
     emu::Emulator,
     filter_qemu_args,
@@ -226,7 +226,7 @@ fn fuzz(
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{}", s).unwrap();
         #[cfg(windows)]
-        println!("{}", s);
+        println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
     });
 
@@ -241,22 +241,25 @@ fn fuzz(
                 return Ok(());
             }
             _ => {
-                panic!("Failed to setup the restarter: {}", err);
+                panic!("Failed to setup the restarter: {err}");
             }
         },
     };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut edges::EDGES_MAP };
-    let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
-    let edges_observer =
-        HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
+    let edges_observer = unsafe {
+        HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+            "edges",
+            edges_map_mut_slice(),
+            addr_of_mut!(MAX_EDGES_NUM),
+        ))
+    };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
-    let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut cmplog::CMPLOG_MAP }, true);
+    let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 

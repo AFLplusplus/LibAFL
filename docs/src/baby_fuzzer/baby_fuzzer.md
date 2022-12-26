@@ -105,8 +105,8 @@ fn main(){
 
 ## Generating and running some tests
 
-One of the main components that a LibAFL-based fuzzer uses is the State, a container of the data that is evolved during the fuzzing process.
-Includes all State, such as the Corpus of inputs, the current RNG state, and potential Metadata for the testcases and run.
+One of the main components that a LibAFL-based fuzzer uses is the State, a container of the data that will evolve during the fuzzing process.
+It includes all state, such as the Corpus of inputs, the current RNG state, and potential Metadata for the testcases and run.
 In our `main` we create a basic State instance like the following:
 
 ```rust,ignore
@@ -129,8 +129,8 @@ let mut state = StdState::new(
 
   To avoid type annotation error, you can use `InMemoryCorpus::<BytesInput>::new()` to replace `InMemoryCorpus::new()`. If not, type annotation will be automatically inferred when adding `executor`.
 
-- third parameter is another corpus that stores the "solution" testcases for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory, so we can inspect it.
-- last two parameters are feedback and objective, we will discuss them later.
+- The third parameter is another Corpus that stores the "solution" testcases for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory, so we can inspect it.
+- The last two parameters are feedback and objective, we will discuss them later.
 
 Another required component is the **EventManager**. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a `Monitor` instance.
 
@@ -225,7 +225,7 @@ Now we want to turn our simple fuzzer into a feedback-based one and increase the
 **Observer** can record the information about properties of a fuzzing run and then feeds the fuzzer. We use the `StdMapObserver`, the default observer that uses a map to keep track of covered elements. In our fuzzer, each condition is mapped to an entry of such map.
 
 We represent such map as a `static mut` variable.
-As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions by `singals_set` in our harness:
+As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions by `signals_set` in our harness:
 
 ```rust
 extern crate libafl;
@@ -287,7 +287,7 @@ Now that the fuzzer can observe which condition is satisfied, we need a way to r
 
 We use `MaxMapFeedback`, a feedback that implements a novelty search over the map of the MapObserver. Basically, if there is a value in the observer's map that is greater than the maximum value registered so far for the same entry, it rates the input as interesting and updates its state.
 
-**Objective Feedback** is another kind of Feedback which decide if an input is a "solution". It will save input to solutions(`./crashes` in our case) other than corpus when the input is rated interesting. We use `CrashFeedback` to tell the fuzzer that if an input causes the program to crash it is a solution for us.
+**Objective Feedback** is another kind of Feedback which decides if an input is a "solution". It will save input to solutions(`./crashes` in our case) rather than corpus when the input is rated interesting. We use `CrashFeedback` to tell the fuzzer that if an input causes the program to crash it is a solution for us.
 
 We need to update our State creation including the feedback state and the Fuzzer including the feedback and the objective:
 
@@ -356,7 +356,7 @@ fuzzer
 
 `fuzz_loop` will request a testcase for each iteration to the fuzzer using the scheduler and then it will invoke the stage.
 
-After adding this code, we have a proper fuzzer, that can run a find the input that panics the function in less than a second.
+After adding this code, we have a proper fuzzer, that can run and find the input that panics the function in less than a second.
 
 ```text
 $ cargo run

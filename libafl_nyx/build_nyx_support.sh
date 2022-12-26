@@ -20,7 +20,7 @@ fi
 if [ ! -e ./packer/.git ]; then
     rm -rf ./packer
     git clone https://github.com/syheliel/packer.git || exit 1
-    pushd QEMU-Nyx
+    pushd packer
     git reset --hard 86b159bafc0b2ba8feeaa8761a45b6201d34084f
     popd
 fi

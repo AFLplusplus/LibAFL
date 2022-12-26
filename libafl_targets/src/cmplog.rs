@@ -6,7 +6,7 @@ use alloc::string::{String, ToString};
 use core::fmt::{self, Debug, Formatter};
 
 use libafl::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named},
+    bolts::{ownedref::OwnedMutPtr, tuples::Named},
     executors::ExitKind,
     inputs::UsesInput,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
@@ -178,14 +178,14 @@ pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 
 /// A [`CmpObserver`] observer for `CmpLog`
 #[derive(Debug)]
-pub struct CmpLogObserver<'a> {
-    map: OwnedRefMut<'a, CmpLogMap>,
-    size: Option<OwnedRefMut<'a, usize>>,
+pub struct CmpLogObserver {
+    map: OwnedMutPtr<CmpLogMap>,
+    size: Option<OwnedMutPtr<usize>>,
     add_meta: bool,
     name: String,
 }
 
-impl<'a, S> CmpObserver<CmpLogMap, S> for CmpLogObserver<'a>
+impl<S> CmpObserver<CmpLogMap, S> for CmpLogObserver
 where
     S: UsesInput + HasMetadata,
 {
@@ -206,7 +206,7 @@ where
     }
 }
 
-impl<'a, S> Observer<S> for CmpLogObserver<'a>
+impl<S> Observer<S> for CmpLogObserver
 where
     S: UsesInput + HasMetadata,
     Self: CmpObserver<CmpLogMap, S>,
@@ -235,22 +235,31 @@ where
     }
 }
 
-impl<'a> Named for CmpLogObserver<'a> {
+impl Named for CmpLogObserver {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<'a> CmpLogObserver<'a> {
-    /// Creates a new [`CmpLogObserver`] with the given name.
+impl CmpLogObserver {
+    /// Creates a new [`CmpLogObserver`] with the given map and name.
+    ///
+    /// # Safety
+    /// Will keep a ptr to the map. The map may not move in memory!
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut CmpLogMap, add_meta: bool) -> Self {
+    pub unsafe fn with_map_ptr(name: &'static str, map: *mut CmpLogMap, add_meta: bool) -> Self {
         Self {
             name: name.to_string(),
             size: None,
             add_meta,
-            map: OwnedRefMut::Ref(map),
+            map: OwnedMutPtr::Ptr(map),
         }
+    }
+
+    /// Creates a new [`CmpLogObserver`] with the given name from the default [`CMPLOG_MAP`]
+    #[must_use]
+    pub fn new(name: &'static str, add_meta: bool) -> Self {
+        unsafe { Self::with_map_ptr(name, libafl_cmplog_map_ptr, add_meta) }
     }
 
     // TODO with_size

@@ -38,7 +38,7 @@ use libafl::{
             serialization_format::{DEFAULT_ENV_NAME, DEFAULT_SIZE},
             ConcolicObserver,
         },
-        StdMapObserver, TimeObserver,
+        TimeObserver,
     },
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{
@@ -49,8 +49,7 @@ use libafl::{
     Error,
 };
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
-    MAX_EDGES_NUM,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
 
 #[derive(Debug, Parser)]
@@ -88,7 +87,7 @@ fn fuzz(
     concolic: bool,
 ) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
@@ -99,21 +98,19 @@ fn fuzz(
                     return Ok(());
                 }
                 _ => {
-                    panic!("Failed to setup the restarter: {}", err);
+                    panic!("Failed to setup the restarter: {err}");
                 }
             },
         };
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = StdMapObserver::new("edges", edges);
+    let edges_observer = unsafe { std_edges_map_observer("edges") };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let cmplog = unsafe { &mut CMPLOG_MAP };
-    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+    let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

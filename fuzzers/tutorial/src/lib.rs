@@ -16,13 +16,13 @@ use libafl::{
     fuzzer::StdFuzzer,
     inputs::HasTargetBytes,
     monitors::MultiMonitor,
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{powersched::PowerSchedule, PowerQueueScheduler},
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
     state::{HasCorpus, StdState},
     Error, Fuzzer,
 };
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
 mod input;
 use input::*;
@@ -64,7 +64,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     };
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
@@ -75,14 +75,13 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
                     return Ok(());
                 }
                 _ => {
-                    panic!("Failed to setup the restarter: {}", err);
+                    panic!("Failed to setup the restarter: {err}");
                 }
             },
         };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");

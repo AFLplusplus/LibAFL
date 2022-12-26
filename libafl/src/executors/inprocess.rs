@@ -446,11 +446,6 @@ impl InProcessExecutorHandlerData {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
 
-    #[cfg(all(unix, feature = "std"))]
-    fn current_input<'a, I>(&self) -> &'a I {
-        unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
-    }
-
     #[cfg(any(unix, feature = "std"))]
     fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
@@ -527,6 +522,70 @@ pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
     unsafe { (GLOBAL_STATE.current_input_ptr as *const I).as_ref() }
 }
 
+use crate::{
+    corpus::{Corpus, Testcase},
+    events::Event,
+    state::HasMetadata,
+};
+
+#[inline]
+#[allow(clippy::too_many_arguments)]
+/// Save state if it is an objective
+pub fn run_observers_and_save_state<E, EM, OF, Z>(
+    executor: &mut E,
+    state: &mut E::State,
+    input: &<E::State as UsesInput>::Input,
+    fuzzer: &mut Z,
+    event_mgr: &mut EM,
+    exitkind: ExitKind,
+) where
+    E: HasObservers,
+    EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+    OF: Feedback<E::State>,
+    E::State: HasSolutions + HasClientPerfMonitor,
+    Z: HasObjective<Objective = OF, State = E::State>,
+{
+    let observers = executor.observers_mut();
+
+    observers
+        .post_exec_all(state, input, &exitkind)
+        .expect("Observers post_exec_all failed");
+
+    let interesting = fuzzer
+        .objective_mut()
+        .is_interesting(state, event_mgr, input, observers, &exitkind)
+        .expect("In run_observers_and_save_state objective failure.");
+
+    if interesting {
+        let mut new_testcase = Testcase::new(input.clone());
+        new_testcase.add_metadata(exitkind);
+        fuzzer
+            .objective_mut()
+            .append_metadata(state, &mut new_testcase)
+            .expect("Failed adding metadata");
+        state
+            .solutions_mut()
+            .add(new_testcase)
+            .expect("In run_observers_and_save_state solutions failure.");
+        event_mgr
+            .fire(
+                state,
+                Event::Objective {
+                    objective_size: state.solutions().count(),
+                },
+            )
+            .expect("Could not save state in run_observers_and_save_state");
+    }
+
+    event_mgr.on_restart(state).unwrap();
+
+    #[cfg(feature = "std")]
+    println!("Waiting for broker...");
+    event_mgr.await_restart_safe();
+    #[cfg(feature = "std")]
+    println!("Bye!");
+}
+
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
@@ -545,17 +604,15 @@ mod unix_signal_handler {
     use crate::inputs::Input;
     use crate::{
         bolts::os::unix_signals::{ucontext_t, Handler, Signal},
-        corpus::{Corpus, Testcase},
-        events::{Event, EventFirer, EventRestarter},
+        events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        observers::ObserversTuple,
-        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
+        state::{HasClientPerfMonitor, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -624,51 +681,19 @@ mod unix_signal_handler {
             if data.is_valid() {
                 // We are fuzzing!
                 let executor = data.executor_mut::<E>();
-                let observers = executor.observers_mut();
                 let state = data.state_mut::<E::State>();
-                let input = data.current_input::<<E::State as UsesInput>::Input>();
+                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
-                observers
-                    .post_exec_all(state, input, &ExitKind::Crash)
-                    .expect("Observers post_exec_all failed");
-
-                let interesting = fuzzer
-                    .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
-                    .expect("In timeout handler objective failure.");
-
-                if interesting {
-                    let mut new_testcase = Testcase::new(input.clone());
-                    new_testcase.add_metadata(ExitKind::Timeout);
-                    fuzzer
-                        .objective_mut()
-                        .append_metadata(state, &mut new_testcase)
-                        .expect("Failed adding metadata");
-                    state
-                        .solutions_mut()
-                        .add(new_testcase)
-                        .expect("In timeout handler solutions failure.");
-                    event_mgr
-                        .fire(
-                            state,
-                            Event::Objective {
-                                objective_size: state.solutions().count(),
-                            },
-                        )
-                        .expect("Could not send timeouting input");
-                }
-
-                event_mgr.on_restart(state).unwrap();
-
-                #[cfg(feature = "std")]
-                println!("Waiting for broker...");
-                event_mgr.await_restart_safe();
-                #[cfg(feature = "std")]
-                println!("Bye!");
-
-                event_mgr.await_restart_safe();
+                run_observers_and_save_state::<E, EM, OF, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
 
                 unsafe {
                     libc::_exit(128 + 6);
@@ -697,11 +722,9 @@ mod unix_signal_handler {
         }
 
         let executor = data.executor_mut::<E>();
-        let observers = executor.observers_mut();
         let state = data.state_mut::<E::State>();
-        let fuzzer = data.fuzzer_mut::<Z>();
         let event_mgr = data.event_mgr_mut::<EM>();
-
+        let fuzzer = data.fuzzer_mut::<Z>();
         let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
         #[cfg(feature = "std")]
@@ -709,43 +732,14 @@ mod unix_signal_handler {
         #[cfg(feature = "std")]
         let _res = stdout().flush();
 
-        observers
-            .post_exec_all(state, input, &ExitKind::Timeout)
-            .expect("Observers post_exec_all failed");
-
-        let interesting = fuzzer
-            .objective_mut()
-            .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
-            .expect("In timeout handler objective failure.");
-
-        if interesting {
-            let mut new_testcase = Testcase::new(input.clone());
-            new_testcase.add_metadata(ExitKind::Timeout);
-            fuzzer
-                .objective_mut()
-                .append_metadata(state, &mut new_testcase)
-                .expect("Failed adding metadata");
-            state
-                .solutions_mut()
-                .add(new_testcase)
-                .expect("In timeout handler solutions failure.");
-            event_mgr
-                .fire(
-                    state,
-                    Event::Objective {
-                        objective_size: state.solutions().count(),
-                    },
-                )
-                .expect("Could not send timeouting input");
-        }
-
-        event_mgr.on_restart(state).unwrap();
-
-        #[cfg(feature = "std")]
-        println!("Waiting for broker...");
-        event_mgr.await_restart_safe();
-        #[cfg(feature = "std")]
-        println!("Bye!");
+        run_observers_and_save_state::<E, EM, OF, Z>(
+            executor,
+            state,
+            input,
+            fuzzer,
+            event_mgr,
+            ExitKind::Timeout,
+        );
 
         event_mgr.await_restart_safe();
 
@@ -778,16 +772,10 @@ mod unix_signal_handler {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor
             executor.post_run_reset();
-            let observers = executor.observers_mut();
             let state = data.state_mut::<E::State>();
-            let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
-
+            let fuzzer = data.fuzzer_mut::<Z>();
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
-
-            observers
-                .post_exec_all(state, input, &ExitKind::Crash)
-                .expect("Observers post_exec_all failed");
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
@@ -801,40 +789,14 @@ mod unix_signal_handler {
                 writer.flush().unwrap();
             }
 
-            let interesting = fuzzer
-                .objective_mut()
-                .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
-                .expect("In crash handler objective failure.");
-
-            if interesting {
-                let new_input = input.clone();
-                let mut new_testcase = Testcase::new(new_input);
-                new_testcase.add_metadata(ExitKind::Crash);
-                fuzzer
-                    .objective_mut()
-                    .append_metadata(state, &mut new_testcase)
-                    .expect("Failed adding metadata");
-                state
-                    .solutions_mut()
-                    .add(new_testcase)
-                    .expect("In crash handler solutions failure.");
-                event_mgr
-                    .fire(
-                        state,
-                        Event::Objective {
-                            objective_size: state.solutions().count(),
-                        },
-                    )
-                    .expect("Could not send crashing input");
-            }
-
-            event_mgr.on_restart(state).unwrap();
-
-            #[cfg(feature = "std")]
-            eprintln!("Waiting for broker...");
-            event_mgr.await_restart_safe();
-            #[cfg(feature = "std")]
-            eprintln!("Bye!");
+            run_observers_and_save_state::<E, EM, OF, Z>(
+                executor,
+                state,
+                input,
+                fuzzer,
+                event_mgr,
+                ExitKind::Crash,
+            );
         } else {
             #[cfg(feature = "std")]
             {
@@ -889,14 +851,15 @@ pub mod windows_asan_handler {
     };
 
     use crate::{
-        corpus::{Corpus, Testcase},
-        events::{Event, EventFirer, EventRestarter},
-        executors::{inprocess::GLOBAL_STATE, Executor, ExitKind, HasObservers},
+        events::{EventFirer, EventRestarter},
+        executors::{
+            inprocess::{run_observers_and_save_state, GLOBAL_STATE},
+            Executor, ExitKind, HasObservers,
+        },
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        observers::ObserversTuple,
-        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
+        state::{HasClientPerfMonitor, HasSolutions},
     };
 
     /// # Safety
@@ -957,7 +920,6 @@ pub mod windows_asan_handler {
             let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
-            let observers = executor.observers_mut();
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
@@ -972,44 +934,14 @@ pub mod windows_asan_handler {
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
-            observers
-                .post_exec_all(state, input, &ExitKind::Crash)
-                .expect("Observers post_exec_all failed");
-
-            let interesting = fuzzer
-                .objective_mut()
-                .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
-                .expect("In crash handler objective failure.");
-
-            if interesting {
-                let new_input = input.clone();
-                let mut new_testcase = Testcase::new(new_input);
-                new_testcase.add_metadata(ExitKind::Crash);
-                fuzzer
-                    .objective_mut()
-                    .append_metadata(state, &mut new_testcase)
-                    .expect("Failed adding metadata");
-                state
-                    .solutions_mut()
-                    .add(new_testcase)
-                    .expect("In crash handler solutions failure.");
-                event_mgr
-                    .fire(
-                        state,
-                        Event::Objective {
-                            objective_size: state.solutions().count(),
-                        },
-                    )
-                    .expect("Could not send crashing input");
-            }
-
-            event_mgr.on_restart(state).unwrap();
-
-            #[cfg(feature = "std")]
-            eprintln!("Waiting for broker...");
-            event_mgr.await_restart_safe();
-            #[cfg(feature = "std")]
-            eprintln!("Bye!");
+            run_observers_and_save_state::<E, EM, OF, Z>(
+                executor,
+                state,
+                input,
+                fuzzer,
+                event_mgr,
+                ExitKind::Crash,
+            );
         }
         // Don't need to exit, Asan will exit for us
         // ExitProcess(1);
@@ -1041,17 +973,15 @@ mod windows_exception_handler {
         bolts::os::windows_exceptions::{
             ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
         },
-        corpus::{Corpus, Testcase},
-        events::{Event, EventFirer, EventRestarter},
+        events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        observers::ObserversTuple,
-        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
+        state::{HasClientPerfMonitor, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -1115,52 +1045,20 @@ mod windows_exception_handler {
             if data.is_valid() {
                 // We are fuzzing!
                 let executor = data.executor_mut::<E>();
-                let observers = executor.observers_mut();
                 let state = data.state_mut::<E::State>();
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-                observers
-                    .post_exec_all(state, input, &ExitKind::Crash)
-                    .expect("Observers post_exec_all failed");
-
-                let interesting = fuzzer
-                    .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
-                    .expect("In timeout handler objective failure.");
-
-                if interesting {
-                    let mut new_testcase = Testcase::new(input.clone());
-                    new_testcase.add_metadata(ExitKind::Timeout);
-                    fuzzer
-                        .objective_mut()
-                        .append_metadata(state, &mut new_testcase)
-                        .expect("Failed adding metadata");
-                    state
-                        .solutions_mut()
-                        .add(new_testcase)
-                        .expect("In timeout handler solutions failure.");
-                    event_mgr
-                        .fire(
-                            state,
-                            Event::Objective {
-                                objective_size: state.solutions().count(),
-                            },
-                        )
-                        .expect("Could not send timeouting input");
-                }
-
-                event_mgr.on_restart(state).unwrap();
-
-                #[cfg(feature = "std")]
-                println!("Waiting for broker...");
-                event_mgr.await_restart_safe();
-                #[cfg(feature = "std")]
-                println!("Bye!");
-
-                event_mgr.await_restart_safe();
+                run_observers_and_save_state::<E, EM, OF, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
 
                 unsafe {
                     ExitProcess(1);
@@ -1197,7 +1095,6 @@ mod windows_exception_handler {
             let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
-            let observers = executor.observers_mut();
 
             if data.timeout_input_ptr.is_null() {
                 #[cfg(feature = "std")]
@@ -1213,45 +1110,15 @@ mod windows_exception_handler {
                     .unwrap();
                 data.timeout_input_ptr = ptr::null_mut();
 
-                observers
-                    .post_exec_all(state, input, &ExitKind::Timeout)
-                    .expect("Observers post_exec_all failed");
+                run_observers_and_save_state::<E, EM, OF, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Timeout,
+                );
 
-                let interesting = fuzzer
-                    .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
-                    .expect("In timeout handler objective failure.");
-
-                if interesting {
-                    let mut new_testcase = Testcase::new(input.clone());
-                    new_testcase.add_metadata(ExitKind::Timeout);
-                    fuzzer
-                        .objective_mut()
-                        .append_metadata(state, &mut new_testcase)
-                        .expect("Failed adding metadata");
-                    state
-                        .solutions_mut()
-                        .add(new_testcase)
-                        .expect("In timeout handler solutions failure.");
-                    event_mgr
-                        .fire(
-                            state,
-                            Event::Objective {
-                                objective_size: state.solutions().count(),
-                            },
-                        )
-                        .expect("Could not send timeouting input");
-                }
-
-                event_mgr.on_restart(state).unwrap();
-
-                #[cfg(feature = "std")]
-                eprintln!("Waiting for broker...");
-                event_mgr.await_restart_safe();
-                #[cfg(feature = "std")]
-                eprintln!("Bye!");
-
-                event_mgr.await_restart_safe();
                 compiler_fence(Ordering::SeqCst);
 
                 ExitProcess(1);
@@ -1348,7 +1215,6 @@ mod windows_exception_handler {
             let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
-            let observers = executor.observers_mut();
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
@@ -1363,44 +1229,14 @@ mod windows_exception_handler {
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
-            observers
-                .post_exec_all(state, input, &ExitKind::Crash)
-                .expect("Observers post_exec_all failed");
-
-            let interesting = fuzzer
-                .objective_mut()
-                .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
-                .expect("In crash handler objective failure.");
-
-            if interesting {
-                let new_input = input.clone();
-                let mut new_testcase = Testcase::new(new_input);
-                new_testcase.add_metadata(ExitKind::Crash);
-                fuzzer
-                    .objective_mut()
-                    .append_metadata(state, &mut new_testcase)
-                    .expect("Failed adding metadata");
-                state
-                    .solutions_mut()
-                    .add(new_testcase)
-                    .expect("In crash handler solutions failure.");
-                event_mgr
-                    .fire(
-                        state,
-                        Event::Objective {
-                            objective_size: state.solutions().count(),
-                        },
-                    )
-                    .expect("Could not send crashing input");
-            }
-
-            event_mgr.on_restart(state).unwrap();
-
-            #[cfg(feature = "std")]
-            eprintln!("Waiting for broker...");
-            event_mgr.await_restart_safe();
-            #[cfg(feature = "std")]
-            eprintln!("Bye!");
+            run_observers_and_save_state::<E, EM, OF, Z>(
+                executor,
+                state,
+                input,
+                fuzzer,
+                event_mgr,
+                ExitKind::Crash,
+            );
         }
         ExitProcess(1);
     }
