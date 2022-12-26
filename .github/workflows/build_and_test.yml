@@ -176,7 +176,7 @@ jobs:
     - name: Install python
       # Removing macOS things already installed in CI against failed linking
       if: runner.os == 'macOS'
-      run: rm /usr/local/bin/2to3 /usr/local/bin/idle3 /usr/local/bin/pydoc3 /usr/local/bin/python3 /usr/local/bin/python3-config; brew install --force-bottle --overwrite python
+      run: rm /usr/local/bin/2to3 /usr/local/bin/2to3-3.11 /usr/local/bin/idle3 /usr/local/bin/pydoc3 /usr/local/bin/python3 /usr/local/bin/python3-config; brew install --force-bottle --overwrite python
     - uses: lyricwulf/abc@v1
       with: 
         # todo: remove afl++-clang when nyx support samcov_pcguard
