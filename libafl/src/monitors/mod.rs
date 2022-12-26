@@ -438,7 +438,7 @@ where
         if self.print_user_monitor {
             let client = self.client_stats_mut_for(sender_id);
             for (key, val) in &client.user_monitor {
-                write!(fmt, " , {key}: {val}").unwrap();
+                write!(fmt, ", {key}: {val}").unwrap();
             }
         }
 
