@@ -225,7 +225,7 @@ fn fuzz(
 
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
-        println!("{}", s);
+        println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
     });
 
@@ -243,7 +243,8 @@ fn fuzz(
     let shmem_buf = shmem.as_mut_slice();
 
     // Create an observation channel using the hitcounts map of AFL++
-    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf));
+    let edges_observer =
+        unsafe { HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf)) };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");

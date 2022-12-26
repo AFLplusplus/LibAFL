@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
-        ownedref::{OwnedRefMut, OwnedSliceMut},
+        ownedref::{OwnedMutPtr, OwnedMutSlice},
         tuples::Named,
         AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen,
     },
@@ -192,7 +192,7 @@ pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool>
 where
     T: Default + Copy + 'static + Serialize,
 {
-    map: OwnedSliceMut<'a, T>,
+    map: OwnedMutSlice<'a, T>,
     initial: T,
     name: String,
 }
@@ -444,14 +444,29 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
+    ///
+    /// # Safety
+    /// Will get a pointer to the map and dereference it at any point in time.
+    /// The map must not move in memory!
     #[must_use]
-    fn maybe_differential<S>(name: S, map: &'a mut [T]) -> Self
+    unsafe fn maybe_differential<S>(name: S, map: &'a mut [T]) -> Self
     where
         S: Into<String>,
     {
-        Self {
-            map: OwnedSliceMut::from(map),
+        let len = map.len();
+        let ptr = map.as_mut_ptr();
+        Self::maybe_differential_from_mut_ptr(name, ptr, len)
+    }
+
+    /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`]
+    #[must_use]
+    fn maybe_differential_from_mut_slice<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
+    where
+        S: Into<String>,
+    {
+        StdMapObserver {
             name: name.into(),
+            map,
             initial: T::default(),
         }
     }
@@ -463,18 +478,18 @@ where
         S: Into<String>,
     {
         Self {
-            map: OwnedSliceMut::from(map),
+            map: OwnedMutSlice::from(map),
             name: name.into(),
             initial: T::default(),
         }
     }
 
-    /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map.
+    /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`] map.
     ///
     /// # Safety
     /// Will dereference the owned slice with up to len elements.
     #[must_use]
-    fn maybe_differential_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
+    fn maybe_differential_from_ownedref<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
         S: Into<String>,
     {
@@ -489,24 +504,23 @@ where
     ///
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
-    unsafe fn maybe_differential_from_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
+    unsafe fn maybe_differential_from_mut_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
     where
         S: Into<String>,
     {
-        StdMapObserver {
-            map: OwnedSliceMut::from_raw_parts_mut(map_ptr, len),
-            name: name.into(),
-            initial: T::default(),
-        }
+        Self::maybe_differential_from_mut_slice(
+            name,
+            OwnedMutSlice::from_raw_parts_mut(map_ptr, len),
+        )
     }
 
     /// Gets the backing for this map
-    pub fn map(&self) -> &OwnedSliceMut<'a, T> {
+    pub fn map(&self) -> &OwnedMutSlice<'a, T> {
         &self.map
     }
 
     /// Gets the backing for this map mutably
-    pub fn map_mut(&mut self) -> &mut OwnedSliceMut<'a, T> {
+    pub fn map_mut(&mut self) -> &mut OwnedMutSlice<'a, T> {
         &mut self.map
     }
 }
@@ -516,12 +530,24 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
+    ///
+    /// # Safety
+    /// The observer will keep a pointer to the map.
+    /// Hence, the map may never move in memory.
     #[must_use]
-    pub fn new<S>(name: S, map: &'a mut [T]) -> Self
+    pub unsafe fn new<S>(name: S, map: &'a mut [T]) -> Self
     where
         S: Into<String>,
     {
         Self::maybe_differential(name, map)
+    }
+
+    /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`]
+    pub fn from_mut_slice<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential_from_mut_slice(name, map)
     }
 
     /// Creates a new [`MapObserver`] with an owned map
@@ -533,12 +559,12 @@ where
         Self::maybe_differential_owned(name, map)
     }
 
-    /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map.
+    /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`] map.
     ///
     /// # Note
     /// Will dereference the owned slice with up to len elements.
     #[must_use]
-    pub fn new_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
+    pub fn from_ownedref<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
         S: Into<String>,
     {
@@ -549,11 +575,11 @@ where
     ///
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
-    pub unsafe fn new_from_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
+    pub unsafe fn from_mut_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
     where
         S: Into<String>,
     {
-        Self::maybe_differential_from_ptr(name, map_ptr, len)
+        Self::maybe_differential_from_mut_ptr(name, map_ptr, len)
     }
 }
 
@@ -562,8 +588,12 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`] in differential mode
+    ///
+    /// # Safety
+    /// Will get a pointer to the map and dereference it at any point in time.
+    /// The map must not move in memory!
     #[must_use]
-    pub fn differential<S>(name: S, map: &'a mut [T]) -> Self
+    pub unsafe fn differential<S>(name: S, map: &'a mut [T]) -> Self
     where
         S: Into<String>,
     {
@@ -579,12 +609,12 @@ where
         Self::maybe_differential_owned(name, map)
     }
 
-    /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map in differential mode.
+    /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`] map in differential mode.
     ///
     /// # Note
     /// Will dereference the owned slice with up to len elements.
     #[must_use]
-    pub fn differential_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
+    pub fn differential_from_ownedref<S>(name: S, map: OwnedMutSlice<'a, T>) -> Self
     where
         S: Into<String>,
     {
@@ -595,11 +625,11 @@ where
     ///
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
-    pub unsafe fn differential_from_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
+    pub unsafe fn differential_from_mut_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
     where
         S: Into<String>,
     {
-        Self::maybe_differential_from_ptr(name, map_ptr, len)
+        Self::maybe_differential_from_mut_ptr(name, map_ptr, len)
     }
 }
 
@@ -628,7 +658,7 @@ pub struct ConstMapObserver<'a, T, const N: usize>
 where
     T: Default + Copy + 'static + Serialize,
 {
-    map: OwnedSliceMut<'a, T>,
+    map: OwnedMutSlice<'a, T>,
     initial: T,
     name: String,
 }
@@ -853,11 +883,15 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
+    ///
+    /// # Safety
+    /// Will get a pointer to the map and dereference it at any point in time.
+    /// The map must not move in memory!
     #[must_use]
     pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
         assert!(map.len() >= N);
         Self {
-            map: OwnedSliceMut::from(map),
+            map: OwnedMutSlice::from(map),
             name: name.to_string(),
             initial: T::default(),
         }
@@ -869,7 +903,7 @@ where
         assert!(map.len() >= N);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::from(map),
+            map: OwnedMutSlice::from(map),
             name: name.to_string(),
             initial,
         }
@@ -879,9 +913,9 @@ where
     ///
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
-    pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T) -> Self {
+    pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: *mut T) -> Self {
         ConstMapObserver {
-            map: OwnedSliceMut::from_raw_parts_mut(map_ptr, N),
+            map: OwnedMutSlice::from_raw_parts_mut(map_ptr, N),
             name: name.to_string(),
             initial: T::default(),
         }
@@ -896,8 +930,8 @@ pub struct VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + Serialize,
 {
-    map: OwnedSliceMut<'a, T>,
-    size: OwnedRefMut<'a, usize>,
+    map: OwnedMutSlice<'a, T>,
+    size: OwnedMutPtr<usize>,
     initial: T,
     name: String,
 }
@@ -1126,12 +1160,20 @@ impl<'a, T> VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
-    /// Creates a new [`MapObserver`]
-    pub fn new(name: &'static str, map: &'a mut [T], size: &'a mut usize) -> Self {
-        Self {
-            map: OwnedSliceMut::from(map),
-            size: OwnedRefMut::Ref(size),
+    /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`]
+    ///
+    /// # Safety
+    /// The observer will dereference the owned slice, as well as the `map_ptr`.
+    /// Dereferences `map_ptr` with up to `max_len` elements of size.
+    pub unsafe fn from_mut_slice(
+        name: &'static str,
+        map_slice: OwnedMutSlice<'a, T>,
+        size: *mut usize,
+    ) -> Self {
+        VariableMapObserver {
             name: name.into(),
+            map: map_slice,
+            size: OwnedMutPtr::Ptr(size),
             initial: T::default(),
         }
     }
@@ -1139,19 +1181,19 @@ where
     /// Creates a new [`MapObserver`] from a raw pointer
     ///
     /// # Safety
+    /// The observer will dereference the `size` ptr, as well as the `map_ptr`.
     /// Dereferences `map_ptr` with up to `max_len` elements of size.
-    pub unsafe fn new_from_ptr(
+    pub unsafe fn from_mut_ptr(
         name: &'static str,
         map_ptr: *mut T,
         max_len: usize,
-        size: &'a mut usize,
+        size: *mut usize,
     ) -> Self {
-        VariableMapObserver {
-            map: OwnedSliceMut::from_raw_parts_mut(map_ptr, max_len),
-            size: OwnedRefMut::Ref(size),
-            name: name.into(),
-            initial: T::default(),
-        }
+        Self::from_mut_slice(
+            name,
+            OwnedMutSlice::from_raw_parts_mut(map_ptr, max_len),
+            size,
+        )
     }
 }
 
@@ -1618,7 +1660,7 @@ pub struct MultiMapObserver<'a, T, const DIFFERENTIAL: bool>
 where
     T: Default + Copy + 'static + Serialize + Debug,
 {
-    maps: Vec<OwnedSliceMut<'a, T>>,
+    maps: Vec<OwnedMutSlice<'a, T>>,
     intervals: IntervalTree<usize, usize>,
     len: usize,
     initial: T,
@@ -1782,7 +1824,7 @@ where
                 idx += l;
                 builder.push(r);
                 v += 1;
-                OwnedSliceMut::from(x)
+                OwnedMutSlice::from(x)
             })
             .collect();
         Self {
@@ -1831,7 +1873,7 @@ where
                 idx += l;
                 builder.push(r);
                 v += 1;
-                OwnedSliceMut::from(x)
+                OwnedMutSlice::from(x)
             })
             .collect();
         Self {
@@ -1851,7 +1893,7 @@ where
     'a: 'it,
 {
     type Item = T;
-    type IntoIter = Flatten<Iter<'it, OwnedSliceMut<'a, T>>>;
+    type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'a, T>>>;
 
     fn as_iter(&'it self) -> Self::IntoIter {
         self.maps.iter().flatten()
@@ -1864,7 +1906,7 @@ where
     'a: 'it,
 {
     type Item = T;
-    type IntoIter = Flatten<IterMut<'it, OwnedSliceMut<'a, T>>>;
+    type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'a, T>>>;
 
     fn as_iter_mut(&'it mut self) -> Self::IntoIter {
         self.maps.iter_mut().flatten()
@@ -1877,7 +1919,7 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Item = <Iter<'it, T> as Iterator>::Item;
-    type IntoIter = Flatten<Iter<'it, OwnedSliceMut<'a, T>>>;
+    type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'a, T>>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.maps.iter().flatten()
@@ -1890,7 +1932,7 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Item = <IterMut<'it, T> as Iterator>::Item;
-    type IntoIter = Flatten<IterMut<'it, OwnedSliceMut<'a, T>>>;
+    type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'a, T>>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.maps.iter_mut().flatten()
@@ -2195,7 +2237,7 @@ pub mod pybind {
                 #[new]
                 fn new(name: String, ptr: usize, size: usize) -> Self {
                     Self {
-                        inner: unsafe { StdMapObserver::new_from_ptr(name, ptr as *mut $datatype, size) }
+                        inner: unsafe { StdMapObserver::from_mut_ptr(name, ptr as *mut $datatype, size) }
                     }
                 }
 
