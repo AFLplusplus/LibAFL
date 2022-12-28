@@ -92,7 +92,7 @@ where
     Z: Evaluator<E, EM, State = E::State>,
 {
     #[inline]
-    #[allow(clippy::let_and_return, clippy::too_many_lines)]
+    #[allow(clippy::let_and_return, clippy::too_many_lines, clippy::cast_precision_loss)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -219,7 +219,6 @@ where
             i += 1;
         }
 
-        #[allow(clippy::cast_precision_loss)]
         if !unstable_entries.is_empty() {
             // If we see new stable entries executing this new corpus entries, then merge with the existing one
             if state.has_metadata::<UnstableEntriesMetadata>() {

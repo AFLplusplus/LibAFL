@@ -98,12 +98,13 @@ impl SchedulerMetadata {
         self.bitmap_size = val;
     }
 
-    /// The sum of log(bitmap_size)
+    #[must_use]
+    /// The sum of log(`bitmap_size`)
     pub fn bitmap_size_log(&self) -> f64 {
         self.bitmap_size_log
     }
 
-    /// Setts the sum of log(bitmap_size)
+    /// Setts the sum of log(`bitmap_size`)
     pub fn set_bitmap_size_log(&mut self, val: f64) {
         self.bitmap_size_log = val;
     }
