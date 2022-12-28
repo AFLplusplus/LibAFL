@@ -165,7 +165,7 @@ where
 
     /// Set the `fuzz_level`
     #[inline]
-    pub fn set_fuzz_leve(&mut self, fuzz_level: usize) {
+    pub fn set_fuzz_level(&mut self, fuzz_level: usize) {
         self.fuzz_level = fuzz_level;
     }
 

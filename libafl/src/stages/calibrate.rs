@@ -261,13 +261,14 @@ where
             psmeta.set_exec_time(psmeta.exec_time() + total_time);
             psmeta.set_cycles(psmeta.cycles() + (iter as u64));
             psmeta.set_bitmap_size(psmeta.bitmap_size() + bitmap_size);
+            psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() + libm::log2(bitmap_size as f64));
             psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
             let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
             let fuzz_level = testcase.fuzz_level();
 
             testcase.set_exec_time(total_time / (iter as u32));
-            testcase.set_fuzz_leve(fuzz_level + 1);
+            testcase.set_fuzz_level(fuzz_level + 1);
             // println!("time: {:#?}", testcase.exec_time());
 
             let data = testcase
