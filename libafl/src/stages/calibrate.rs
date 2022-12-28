@@ -92,7 +92,11 @@ where
     Z: Evaluator<E, EM, State = E::State>,
 {
     #[inline]
-    #[allow(clippy::let_and_return, clippy::too_many_lines, clippy::cast_precision_loss)]
+    #[allow(
+        clippy::let_and_return,
+        clippy::too_many_lines,
+        clippy::cast_precision_loss
+    )]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
