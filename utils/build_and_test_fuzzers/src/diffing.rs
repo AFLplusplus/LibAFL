@@ -61,7 +61,6 @@ pub fn get_diffing_crates(diffing_files: &HashSet<PathBuf>) -> HashSet<PathBuf> 
                     crates.insert(manifest);
                 } else if let Some(dir2) = dir1.parent() {
                     let manifest = dir2.join("Cargo.toml");
-                    eprintln!("{:#?}", manifest);
                     if manifest.is_file()
                         && cargo_toml::Manifest::from_path(&manifest)
                             .expect("cannot read manifest")

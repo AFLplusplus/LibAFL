@@ -46,7 +46,6 @@ do
     fi
 
     cd "$fuzzer" || exit 1
-    start=$(date +%s)
     # Clippy checks
     if [ "$1" != "--no-fmt" ]; then
         
@@ -71,8 +70,6 @@ do
         cargo build || exit 1
         echo "[+] Done building $fuzzer"
     fi
-    end=$(date +%s)
-    time_record[$fuzzer]=$((end-start))
     du -sh "$CARGO_TARGET_DIR"
     # Save disk space
     cargo clean -p "$(basename "$fuzzer")"
@@ -86,9 +83,4 @@ do
     du -sh "$CARGO_TARGET_DIR"
     cd "$libafl" || exit 1
     echo ""
-done
-
-# print time for each fuzzer
-for key in "${!time_record[@]}"; do
-    echo "dir: $key, time: ${time_record[$key]}";
 done
