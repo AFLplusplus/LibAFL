@@ -10,5 +10,5 @@ keywords = ["ci"]
 categories = ["development-tools::testing"]
 
 [dependencies]
-cargo_toml = "=0.13"
+cargo_toml = "0.14"
 walkdir = "2"
