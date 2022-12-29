@@ -2,7 +2,6 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR/.." || exit 1
-export RUST_BACKTRACE=full
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
 if [[ -z "${RUN_ON_CI}" ]]; then
