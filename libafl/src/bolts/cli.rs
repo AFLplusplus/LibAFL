@@ -282,7 +282,7 @@ pub struct FuzzerOptions {
     pub cores: Cores,
 
     /// port on which the broker should listen
-    #[arg(short = 'p', long, default_value = "31337", value_name = "PORT")]
+    #[arg(short = 'p', long, default_value = "1337", value_name = "PORT")]
     pub broker_port: u16,
 
     /// ip:port where a remote broker is already listening
