@@ -37,9 +37,6 @@ do
     export CARGO_PROFILE_"$profile"_INCREMENTAL=true
 done
 
-# record time of each fuzzer
-declare -A time_record || (echo "declare -A not avaliable, please update your bash version to 4";exit 1)
-
 # shellcheck disable=SC2116
 for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do

@@ -16,8 +16,7 @@ pub use prometheus::PrometheusMonitor;
 #[cfg(feature = "std")]
 pub mod disk;
 use alloc::{fmt::Debug, string::String, vec::Vec};
-use core::fmt::Write;
-use core::{fmt, time::Duration};
+use core::{fmt, fmt::Write, time::Duration};
 
 #[cfg(feature = "std")]
 pub use disk::{OnDiskJSONMonitor, OnDiskTOMLMonitor};
