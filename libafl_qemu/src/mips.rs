@@ -4,52 +4,48 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::mips::*;
 
-/// Registers for the ARM instruction set.
+/// Registers for the MIPS instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Regs {
     R0 = 0,
-    R1 = 1,
-    R2 = 2,
-    R3 = 3,
-    R4 = 4,
-    R5 = 5,
-    R6 = 6,
-    R7 = 7,
-    R8 = 8,
-    R9 = 9,
-    R10 = 10,
-    R11 = 11,
-    R12 = 12,
-    R13 = 13,
-    R14 = 14,
-    R15 = 15,
-    R16 = 16,
-    R17 = 17,
-    R18 = 18,
-    R19 = 19,
-    R20 = 20,
-    R21 = 21,
-    R22 = 22,
-    R23 = 23,
-    R24 = 24,
-    R25 = 25,
-    R26 = 26,
-    R27 = 27,
-    R28 = 28,
-    R29 = 29,
-    R30 = 30,
-    R31 = 31,
+    At = 1,
+    V0 = 2,
+    V1 = 3,
+    A0 = 4,
+    A1 = 5,
+    A2 = 6,
+    A3 = 7,
+    T0 = 8,
+    T1 = 9,
+    T2 = 10,
+    T3 = 11,
+    T4 = 12,
+    T5 = 13,
+    T6 = 14,
+    T7 = 15,
+    S0 = 16,
+    S1 = 17,
+    S2 = 18,
+    S3 = 19,
+    S4 = 20,
+    S5 = 21,
+    S6 = 22,
+    S7 = 23,
+    T8 = 24,
+    T9 = 25,
+    K0 = 26,
+    K1 = 27,
+    Gp = 28,
+    Sp = 29,
+    Fp = 30,
+    Ra = 31,
 }
 
 /// alias registers
 #[allow(non_upper_case_globals)]
 impl Regs {
     pub const Zero: Regs = Regs::R0;
-    pub const Gp: Regs = Regs::R28;
-    pub const Sp: Regs = Regs::R29;
-    pub const Fp: Regs = Regs::R30;
-    pub const Ra: Regs = Regs::R31;
 }
 
 #[cfg(feature = "python")]
