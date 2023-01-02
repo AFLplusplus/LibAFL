@@ -45,7 +45,7 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper, CMPLOG_MAP_PTR},
+    cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
     edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
     elf::EasyElf,
     emu::Emulator,
@@ -195,13 +195,16 @@ fn fuzz(
     let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = SimpleMonitor::new(|s| {
-        #[cfg(unix)]
-        writeln!(&mut stdout_cpy, "{}", s).unwrap();
-        #[cfg(windows)]
-        println!("{}", s);
-        writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
-    });
+    let monitor = SimpleMonitor::with_user_monitor(
+        |s| {
+            #[cfg(unix)]
+            writeln!(&mut stdout_cpy, "{s}").unwrap();
+            #[cfg(windows)]
+            println!("{s}");
+            writeln!(log.borrow_mut(), "{:?} {s}", current_time()).unwrap();
+        },
+        true,
+    );
 
     let mut shmem_provider = StdShMemProvider::new()?;
 
@@ -213,7 +216,10 @@ fn fuzz(
         .new_shmem(core::mem::size_of::<CmpLogMap>())
         .unwrap();
     let cmplog = cmp_shmem.as_mut_slice();
-    unsafe { CMPLOG_MAP_PTR = cmplog.as_mut_ptr() as *mut CmpLogMap };
+
+    // Beginning of a page should be properly aligned.
+    #[allow(clippy::cast_ptr_alignment)]
+    let cmplog_map_ptr = cmplog.as_mut_ptr().cast::<libafl_qemu::cmplog::CmpLogMap>();
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
@@ -224,21 +230,24 @@ fn fuzz(
                 return Ok(());
             }
             _ => {
-                panic!("Failed to setup the restarter: {}", err);
+                panic!("Failed to setup the restarter: {err}");
             }
         },
     };
 
     // Create an observation channel using the coverage map
-    let edges_observer =
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE>::new("edges", edges));
+    let edges_observer = unsafe {
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE>::from_mut_ptr(
+            "edges",
+            edges.as_mut_ptr(),
+        ))
+    };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
-    let cmplog_observer =
-        CmpLogObserver::new("cmplog", unsafe { CMPLOG_MAP_PTR.as_mut().unwrap() }, true);
+    let cmplog_observer = unsafe { CmpLogObserver::with_map_ptr("cmplog", cmplog_map_ptr, true) };
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 

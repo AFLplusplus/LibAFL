@@ -160,3 +160,26 @@ Now, `Corpus` cannot be accidentally implemented for another type other than tha
 is fixed to the associated type for `UsesInput`.
 
 A more complex example of migration can be found in the "Reasons for this change" section of this document.
+
+## Observer Changes
+
+Additionally, we changed the observers API, as the API in 0.8 led to undefined behavior.
+At the same time, we used the change to simplify the common case: creating an `StdMapObserver`
+from libafl_target's `EDGES_MAP`.
+In the future, instead of using:
+
+```rust,ignore
+let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
+let edges_observer = StdMapObserver::new("edges", edges);
+```
+
+creating the edges observer is as simple as using the new `std_edges_map_observer` function.
+
+```rust,ignore
+let edges_observer = unsafe { std_edges_map_observer("edges") };
+```
+
+Alternatively, `StdMapObserver::new` will still work, but now the whole method is marked as `unsafe`.
+The reason is that the caller has to make sure `EDGES_MAP` (or other maps) are not moved or freed in memory,
+for the lifetime of the lifetime of the `MapObserver`.
+This means that the buffer should either be `static` or `Pin`.

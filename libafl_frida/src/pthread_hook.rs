@@ -165,7 +165,7 @@ where
     };
 
     // Allow because we're sure this isn't from a different code generation unit.
-    #[allow(clippy::fn_address_comparisons)]
+    #[allow(clippy::fn_address_comparisons, clippy::fn_null_check)]
     if !(prev as *const libc::c_void).is_null() && prev != pthread_introspection_hook {
         PREVIOUS_HOOK.set(prev);
     }

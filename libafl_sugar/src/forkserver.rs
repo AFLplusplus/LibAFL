@@ -123,7 +123,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {
-                HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new_from_ptr(
+                HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::from_mut_ptr(
                     "shared_mem",
                     shmem_map.as_mut_ptr(),
                 ))

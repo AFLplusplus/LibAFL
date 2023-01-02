@@ -321,7 +321,7 @@ where
         let favored = entry.has_metadata::<IsFavoredMetadata>();
 
         let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
-        let avg_bitmap_size = psmeta.bitmap_size() / psmeta.bitmap_entries();
+        let avg_bitmap_size = psmeta.bitmap_size_log() / psmeta.bitmap_entries() as f64;
 
         let q_bitmap_size = tcmeta.bitmap_size() as f64;
 
@@ -342,7 +342,7 @@ where
         }
 
         weight *= avg_exec_us / q_exec_us;
-        weight *= libm::log2(q_bitmap_size) / (avg_bitmap_size as f64);
+        weight *= libm::log2(q_bitmap_size).max(1.0) / avg_bitmap_size;
 
         let tc_ref = match entry.metadata().get::<MapIndexesMetadata>() {
             Some(meta) => meta.refcnt() as f64,

@@ -1,6 +1,6 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of kernels
 //!
-use core::time::Duration;
+use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
@@ -22,15 +22,17 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{TimeObserver, VariableMapObserver},
+    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
     Error,
 };
 use libafl_qemu::{
-    edges, edges::QemuEdgeCoverageHelper, elf::EasyElf, emu::Emulator, GuestPhysAddr, QemuExecutor,
-    QemuHooks, Regs,
+    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
+    elf::EasyElf,
+    emu::Emulator,
+    GuestPhysAddr, QemuExecutor, QemuHooks, Regs,
 };
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
@@ -138,9 +140,13 @@ pub fn fuzz() {
         };
 
         // Create an observation channel using the coverage map
-        let edges = unsafe { &mut edges::EDGES_MAP };
-        let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
-        let edges_observer = VariableMapObserver::new("edges", edges, edges_counter);
+        let edges_observer = unsafe {
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                "edges",
+                edges_map_mut_slice(),
+                addr_of_mut!(MAX_EDGES_NUM),
+            ))
+        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -222,9 +228,9 @@ pub fn fuzz() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     // The stats reporter for the broker
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    // let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    // let monitor = SimpleMonitor::new(|s| println!("{s}"));
     // let mut mgr = SimpleEventManager::new(monitor);
     // run_client(None, mgr, 0);
 
