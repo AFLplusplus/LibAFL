@@ -290,10 +290,10 @@ where
 
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
     fn next(&self, state: &mut S) -> Result<CorpusId, Error> {
-        if state.corpus().count() == 0 {
+        let corpus_counts = state.corpus().count();
+        if corpus_counts == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
-            let corpus_counts = state.corpus().count();
             let s = random_corpus_id!(state.corpus(), state.rand_mut());
 
             // Choose a random value between 0.000000000 and 1.000000000

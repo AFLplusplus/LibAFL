@@ -140,7 +140,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(cur) = self.cur {
             self.cur = self.corpus.next(cur);
-            self.cur
+            Some(cur)
         } else {
             None
         }
@@ -154,7 +154,7 @@ where
     fn next_back(&mut self) -> Option<Self::Item> {
         if let Some(cur_back) = self.cur_back {
             self.cur_back = self.corpus.prev(cur_back);
-            self.cur_back
+            Some(cur_back)
         } else {
             None
         }
