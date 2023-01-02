@@ -37,8 +37,8 @@ where
                 .corpus()
                 .current()
                 .map(|id| state.corpus().next(id))
-                .unwrap_or_else(|| state.corpus().first())
-                .unwrap();
+                .flatten()
+                .unwrap_or_else(|| state.corpus().first().unwrap());
             *state.corpus_mut().current_mut() = Some(id);
             Ok(id)
         }
