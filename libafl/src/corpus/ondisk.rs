@@ -11,7 +11,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{rands::Rand, serdeany::SerdeAnyMap},
+    bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
     state::HasMetadata,
@@ -133,11 +133,8 @@ where
     }
 
     #[inline]
-    fn random_index<R>(&self, rand: &mut R) -> CorpusId
-    where
-        R: Rand,
-    {
-        self.inner.random_index(rand)
+    fn random_index(&self, next_random: u64) -> CorpusId {
+        self.inner.random_index(next_random)
     }
 }
 
@@ -176,7 +173,7 @@ where
         })
     }
 
-    fn save_testcase(&mut self, testcase: &mut Testcase<I>, idx: &CorpusId) -> Result<(), Error> {
+    fn save_testcase(&self, testcase: &mut Testcase<I>, idx: &CorpusId) -> Result<(), Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             let file_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);
@@ -237,7 +234,7 @@ where
         Ok(())
     }
 
-    fn remove_testcase(&mut self, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn remove_testcase(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         if let Some(filename) = testcase.filename() {
             fs::remove_file(filename)?;
         }

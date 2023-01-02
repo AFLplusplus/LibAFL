@@ -6,7 +6,6 @@ use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, CorpusId, Testcase},
     inputs::{Input, UsesInput},
     Error,
@@ -350,11 +349,8 @@ where
     }
 
     // TODO propagate to others corpuses
-    fn random_index<R>(&self, rand: &mut R) -> CorpusId
-    where
-        R: Rand,
-    {
-        let nth = rand.below(self.storage.keys.len() as u64) as usize;
+    fn random_index(&self, next_random: u64) -> CorpusId {
+        let nth = (next_random as usize) % self.storage.keys.len();
         self.storage.keys[nth]
     }
 }

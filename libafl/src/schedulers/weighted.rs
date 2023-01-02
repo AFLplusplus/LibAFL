@@ -1,25 +1,24 @@
 //! The queue corpus scheduler with weighted queue item selection from aflpp (`https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32`)
 //! This queue corpus scheduler needs calibration stage.
 
-use alloc::{
-    string::{String, ToString},
-};
+use alloc::string::{String, ToString};
 use core::marker::PhantomData;
-use hashbrown::HashMap;
 
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
     inputs::UsesInput,
+    random_corpus_id,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         Scheduler,
     },
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
-    Error, 
+    Error,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -136,7 +135,7 @@ where
     )]
     pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> {
         let n = state.corpus().count();
-    
+
         let mut alias_table: HashMap<CorpusId, CorpusId> = HashMap::default();
         let mut alias_probability: HashMap<CorpusId, f64> = HashMap::default();
         let mut weights: HashMap<CorpusId, f64> = HashMap::default();
@@ -295,8 +294,8 @@ where
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
             let corpus_counts = state.corpus().count();
-            let s = state.corpus().random_index(state.rand_mut());
-            
+            let s = random_corpus_id!(state.corpus(), state.rand_mut());
+
             // Choose a random value between 0.000000000 and 1.000000000
             let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
 

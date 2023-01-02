@@ -24,7 +24,7 @@ use core::{cell::RefCell, fmt};
 pub use minimizer::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::rands::Rand, inputs::UsesInput, Error};
+use crate::{inputs::UsesInput, Error};
 
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -47,6 +47,14 @@ impl From<u64> for CorpusId {
     fn from(id: u64) -> Self {
         Self(id as usize)
     }
+}
+
+#[macro_export]
+macro_rules! random_corpus_id {
+    ($corpus:expr, $rand:expr) => {{
+        let rand_num = $rand.next();
+        $corpus.random_index(rand_num)
+    }};
 }
 
 /// Corpus with all current testcases
@@ -101,11 +109,8 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
         }
     }
 
-    fn random_index<R>(&self, rand: &mut R) -> CorpusId
-    where
-        R: Rand,
-    {
-        let nth = rand.below(self.count() as u64) as usize;
+    fn random_index(&self, next_random: u64) -> CorpusId {
+        let nth = (next_random as usize) % self.count();
         self.indexes()
             .nth(nth)
             .expect("Failed to get a random CorpusId")

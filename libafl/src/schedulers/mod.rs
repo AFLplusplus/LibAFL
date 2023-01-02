@@ -30,8 +30,10 @@ pub mod tuneable;
 pub use tuneable::*;
 
 use crate::{
+    bolts::rands::Rand,
     corpus::{Corpus, CorpusId, Testcase},
     inputs::UsesInput,
+    random_corpus_id,
     state::{HasCorpus, HasRand, UsesState},
     Error,
 };
@@ -90,7 +92,7 @@ where
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
-            let id = state.corpus().random_index(state.rand_mut());
+            let id = random_corpus_id!(state.corpus(), state.rand_mut());
             *state.corpus_mut().current_mut() = Some(id);
             Ok(id)
         }

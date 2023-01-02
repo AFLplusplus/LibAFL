@@ -7,7 +7,6 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::rands::Rand,
     corpus::{
         ondisk::{OnDiskCorpus, OnDiskMetadataFormat},
         Corpus, CorpusId, Testcase,
@@ -124,11 +123,8 @@ where
     }
 
     #[inline]
-    fn random_index<R>(&self, rand: &mut R) -> CorpusId
-    where
-        R: Rand,
-    {
-        self.inner.random_index(rand)
+    fn random_index(&self, next_random: u64) -> CorpusId {
+        self.inner.random_index(next_random)
     }
 }
 
