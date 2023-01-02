@@ -55,7 +55,7 @@ where
     fn mutator_mut(&mut self) -> &mut M;
 
     /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut CS::State, corpus_idx: usize) -> Result<usize, Error>;
+    fn iterations(&self, state: &mut CS::State, corpus_idx: CorpusId) -> Result<usize, Error>;
 
     /// Runs this (mutational) stage for new objectives
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
@@ -262,7 +262,7 @@ where
     }
 
     /// Gets the number of iterations from a fixed number of runs
-    fn iterations(&self, _state: &mut CS::State, _corpus_idx: usize) -> Result<usize, Error> {
+    fn iterations(&self, _state: &mut CS::State, _corpus_idx: CorpusId) -> Result<usize, Error> {
         Ok(self.runs)
     }
 }

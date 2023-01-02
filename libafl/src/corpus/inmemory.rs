@@ -133,17 +133,17 @@ where
     }
 
     #[cfg(not(feature = "corpus_btreemap"))]
-    pub fn remove(&self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
+    pub fn remove(&mut self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
         if let Some(item) = self.map.remove(&idx) {
             self.remove_key(&idx);
             if let Some(prev) = item.prev {
-                self.map.get(&prev).unwrap().next = item.next;
+                self.map.get_mut(&prev).unwrap().next = item.next;
             } else {
                 // first elem
                 self.first_idx = item.next;
             }
             if let Some(next) = item.next {
-                self.map.get(&next).unwrap().prev = item.prev;
+                self.map.get_mut(&next).unwrap().prev = item.prev;
             } else {
                 // last elem
                 self.last_idx = item.prev;
@@ -155,7 +155,7 @@ where
     }
 
     #[cfg(feature = "corpus_btreemap")]
-    pub fn remove(&self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
+    pub fn remove(&mut self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
         self.remove_key(&idx);
         self.map.remove(&idx)
     }

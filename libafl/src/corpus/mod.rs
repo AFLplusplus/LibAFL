@@ -97,6 +97,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
         CorpusIdIterator {
             corpus: self,
             cur: self.first(),
+            cur_back: self.last(),
         }
     }
 
@@ -117,6 +118,7 @@ where
 {
     corpus: &'a C,
     cur: Option<CorpusId>,
+    cur_back: Option<CorpusId>,
 }
 
 impl<'a, C> Iterator for CorpusIdIterator<'a, C>
@@ -129,6 +131,20 @@ where
         if let Some(cur) = self.cur {
             self.cur = self.corpus.next(cur);
             self.cur
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, C> DoubleEndedIterator for CorpusIdIterator<'a, C>
+where
+    C: Corpus,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if let Some(cur_back) = self.cur_back {
+            self.cur_back = self.corpus.prev(cur_back);
+            self.cur_back
         } else {
             None
         }
