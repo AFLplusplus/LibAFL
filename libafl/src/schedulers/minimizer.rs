@@ -118,7 +118,7 @@ where
         };
         entries.sort_unstable(); // this should already be sorted, but just in case
         let mut map = HashMap::new();
-        for i in state.corpus().indexes() {
+        for i in state.corpus().ids() {
             let mut old = state.corpus().get(i)?.borrow_mut();
             let factor = F::compute(&mut *old, state)?;
             if let Some(old_map) = old.metadata_mut().get_mut::<M>() {

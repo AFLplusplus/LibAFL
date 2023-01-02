@@ -49,11 +49,12 @@ impl From<u64> for CorpusId {
     }
 }
 
+/// Utility macro to call `Corpus::random_id`
 #[macro_export]
 macro_rules! random_corpus_id {
     ($corpus:expr, $rand:expr) => {{
         let rand_num = $rand.next();
-        $corpus.random_index(rand_num)
+        $corpus.random_id(rand_num)
     }};
 }
 
@@ -101,7 +102,8 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Get the last inserted corpus id
     fn last(&self) -> Option<CorpusId>;
 
-    fn indexes<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
+    /// An iterator over very active corpus id
+    fn ids<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
         CorpusIdIterator {
             corpus: self,
             cur: self.first(),
@@ -109,14 +111,17 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
         }
     }
 
-    fn random_index(&self, next_random: u64) -> CorpusId {
+    /// Get a random corpus id
+    fn random_id(&self, next_random: u64) -> CorpusId {
         let nth = (next_random as usize) % self.count();
-        self.indexes()
+        self.ids()
             .nth(nth)
             .expect("Failed to get a random CorpusId")
     }
 }
 
+/// `Iterator` over the ids of a `Corpus`
+#[derive(Debug)]
 pub struct CorpusIdIterator<'a, C>
 where
     C: Corpus,

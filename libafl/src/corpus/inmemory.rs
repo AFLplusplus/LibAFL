@@ -11,6 +11,7 @@ use crate::{
     Error,
 };
 
+/// Keep track of the stored `Testcase` and the siblings ids (insertion order)
 #[cfg(not(feature = "corpus_btreemap"))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -18,8 +19,11 @@ pub struct TestcaseStorageItem<I>
 where
     I: Input,
 {
+    /// The stored testcase
     pub testcase: RefCell<Testcase<I>>,
+    /// Previously inserted id
     pub prev: Option<CorpusId>,
+    /// Following inserted id
     pub next: Option<CorpusId>,
 }
 
@@ -64,12 +68,14 @@ impl<I> TestcaseStorage<I>
 where
     I: Input,
 {
+    /// Insert a key in the keys set
     fn insert_key(&mut self, id: &CorpusId) {
         if let Err(idx) = self.keys.binary_search(id) {
             self.keys.insert(idx, *id);
         }
     }
 
+    /// Remove a key from the keys set
     fn remove_key(&mut self, id: &CorpusId) {
         if let Ok(idx) = self.keys.binary_search(id) {
             self.keys.remove(idx);
@@ -113,6 +119,7 @@ where
         idx
     }
 
+    /// Replace a testcase given a `CorpusId`
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
         if let Some(entry) = self.map.get_mut(&idx) {
@@ -122,6 +129,7 @@ where
         }
     }
 
+    /// Replace a testcase given a `CorpusId`
     #[cfg(feature = "corpus_btreemap")]
     pub fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
         if let Some(entry) = self.map.get_mut(&idx) {
@@ -131,6 +139,7 @@ where
         }
     }
 
+    /// Remove a testcase given a `CorpusId`
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn remove(&mut self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
         if let Some(item) = self.map.remove(&idx) {
@@ -153,22 +162,26 @@ where
         }
     }
 
+    /// Remove a testcase given a `CorpusId`
     #[cfg(feature = "corpus_btreemap")]
     pub fn remove(&mut self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
         self.remove_key(&idx);
         self.map.remove(&idx)
     }
 
+    /// Get a testcase given a `CorpusId`
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn get(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
         self.map.get(&idx).as_ref().map(|x| &x.testcase)
     }
 
+    /// Get a testcase given a `CorpusId`
     #[cfg(feature = "corpus_btreemap")]
     pub fn get(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
         self.map.get(&idx)
     }
 
+    /// Get the next id given a `CorpusId` (creation order)
     #[cfg(not(feature = "corpus_btreemap"))]
     fn next(&self, idx: CorpusId) -> Option<CorpusId> {
         if let Some(item) = self.map.get(&idx) {
@@ -178,6 +191,7 @@ where
         }
     }
 
+    /// Get the next id given a `CorpusId` (creation order)
     #[cfg(feature = "corpus_btreemap")]
     fn next(&self, idx: CorpusId) -> Option<CorpusId> {
         // TODO see if using self.keys is faster
@@ -196,6 +210,7 @@ where
         }
     }
 
+    /// Get the previous id given a `CorpusId` (creation order)
     #[cfg(not(feature = "corpus_btreemap"))]
     fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
         if let Some(item) = self.map.get(&idx) {
@@ -205,6 +220,7 @@ where
         }
     }
 
+    /// Get the previous id given a `CorpusId` (creation order)
     #[cfg(feature = "corpus_btreemap")]
     fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
         // TODO see if using self.keys is faster
@@ -223,27 +239,31 @@ where
         }
     }
 
+    /// Get the first created id
     #[cfg(not(feature = "corpus_btreemap"))]
     fn first(&self) -> Option<CorpusId> {
         self.first_idx
     }
 
+    /// Get the first created id
     #[cfg(feature = "corpus_btreemap")]
     fn first(&self) -> Option<CorpusId> {
         self.map.iter().next()
     }
 
+    /// Get the last created id
     #[cfg(not(feature = "corpus_btreemap"))]
     fn last(&self) -> Option<CorpusId> {
         self.last_idx
     }
 
+    /// Get the last created id
     #[cfg(feature = "corpus_btreemap")]
     fn last(&self) -> Option<CorpusId> {
         self.map.iter().next_back()
     }
 
-    /// Create new
+    /// Create new `TestcaseStorage`
     pub fn new() -> Self {
         Self {
             map: TestcaseStorageMap::default(),
@@ -348,8 +368,7 @@ where
         self.storage.last()
     }
 
-    // TODO propagate to others corpuses
-    fn random_index(&self, next_random: u64) -> CorpusId {
+    fn random_id(&self, next_random: u64) -> CorpusId {
         let nth = (next_random as usize) % self.storage.keys.len();
         self.storage.keys[nth]
     }

@@ -71,7 +71,7 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, mut testcase: Testcase<I>) -> Result<CorpusId, Error> {
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let idx = self.inner.add(testcase)?;
         self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), &idx)?;
         Ok(idx)
@@ -79,7 +79,7 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: CorpusId, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         let entry = self.inner.replace(idx, testcase)?;
         self.remove_testcase(&entry)?;
         self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), &idx)?;
@@ -133,8 +133,8 @@ where
     }
 
     #[inline]
-    fn random_index(&self, next_random: u64) -> CorpusId {
-        self.inner.random_index(next_random)
+    fn random_id(&self, next_random: u64) -> CorpusId {
+        self.inner.random_id(next_random)
     }
 }
 

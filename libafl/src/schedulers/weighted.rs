@@ -146,7 +146,7 @@ where
 
         let mut sum: f64 = 0.0;
 
-        for i in state.corpus().indexes() {
+        for i in state.corpus().ids() {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
             let weight = F::compute(&mut *testcase, state)?;
             weights.insert(i, weight);
@@ -163,7 +163,7 @@ where
         // # of items in queue L
         let mut n_l = 0;
         // Divide P into two queues, S and L
-        for s in state.corpus().indexes().rev() {
+        for s in state.corpus().ids().rev() {
             if *p_arr.get(&s).unwrap() < 1.0 {
                 s_arr.insert(n_s, s);
                 n_s += 1;

@@ -123,8 +123,8 @@ where
     }
 
     #[inline]
-    fn random_index(&self, next_random: u64) -> CorpusId {
-        self.inner.random_index(next_random)
+    fn random_id(&self, next_random: u64) -> CorpusId {
+        self.inner.random_id(next_random)
     }
 }
 
