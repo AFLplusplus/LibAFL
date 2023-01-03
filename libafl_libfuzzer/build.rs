@@ -38,5 +38,5 @@ fn main() {
         "cargo:link-lib-search=native={}",
         lib_path.to_str().unwrap()
     );
-    println!("cargo:link-lib=static=libafl_libfuzzer_runtime");
+    println!("cargo:link-lib=static=afl_libfuzzer_runtime");
 }

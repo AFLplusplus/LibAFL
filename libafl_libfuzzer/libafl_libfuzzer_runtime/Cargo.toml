@@ -5,10 +5,19 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
 [lib]
+name = "afl_libfuzzer_runtime" # TODO fix name once cargo-fuzz stops stripping double-prefixes
 path = "src/lib.rs"
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "rlib"]
 
 [dependencies]
+libafl = { version = "0.8.2" }
+libafl_targets = { version = "0.8.2", features = ["sancov_8bit", "sancov_value_profile", "libfuzzer"] }
 
 [workspace]
