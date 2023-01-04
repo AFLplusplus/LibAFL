@@ -256,7 +256,7 @@ where
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
     fn first(&self) -> Option<CorpusId> {
-        self.map.iter().next().map(|x| x.0)
+        self.map.iter().next().map(|x| *x.0)
     }
 
     /// Get the last created id
@@ -270,7 +270,7 @@ where
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
     fn last(&self) -> Option<CorpusId> {
-        self.map.iter().next_back().map(|x| x.0)
+        self.map.iter().next_back().map(|x| *x.0)
     }
 
     /// Create new `TestcaseStorage`
