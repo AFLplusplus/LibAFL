@@ -125,3 +125,14 @@ void __sanitizer_cov_trace_const_cmp4(uint32_t arg1, uint32_t arg2) {
 void __sanitizer_cov_trace_const_cmp8(uint64_t arg1, uint64_t arg2) {
     __sanitizer_cov_trace_cmp8(arg1, arg2);
 }
+
+void __sanitizer_cov_pcs_init(const uintptr_t *pcs_beg,
+                              const uintptr_t *pcs_end) {
+    // unused
+    // TODO implement
+}
+
+void __sanitizer_cov_trace_pc_indir(uintptr_t Callee) {
+    // unused
+    // TODO implement
+}
