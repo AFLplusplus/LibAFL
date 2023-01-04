@@ -4,8 +4,8 @@ An Observer is an entity that provides an information observed during the execut
 
 The information contained in the Observer is not preserved across executions, but it may be serialized and passed on to other nodes if an `Input` is considered `interesting`, and added to the `Corpus`.
 
-As an example, the coverage map, filled during the execution to report the executed edges used by fuzzers such as AFL and `HonggFuzz` can be considered an observation. Another `Observer` can be the time spent executing a run, the program output, or more advanced observation, like maximum stack depth at runtime.
-This information is not preserved across runs, and it is an observation of a dynamic property of the program.
+As an example, the coverage map, filled during the execution to report the executed edges used by fuzzers such as AFL and `HonggFuzz` can be considered an observation. Another `Observer` can collect the time spent executing a run, the program output, or a more advanced observation, like maximum stack depth at runtime.
+This information is an observation of a dynamic property of the program.
 
 In terms of code, in the library this entity is described by the [`Observer`](https://docs.rs/libafl/0/libafl/observers/trait.Observer.html) trait.
 
