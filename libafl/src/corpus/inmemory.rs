@@ -69,15 +69,15 @@ where
     I: Input,
 {
     /// Insert a key in the keys set
-    fn insert_key(&mut self, id: &CorpusId) {
-        if let Err(idx) = self.keys.binary_search(id) {
-            self.keys.insert(idx, *id);
+    fn insert_key(&mut self, id: CorpusId) {
+        if let Err(idx) = self.keys.binary_search(&id) {
+            self.keys.insert(idx, id);
         }
     }
 
     /// Remove a key from the keys set
-    fn remove_key(&mut self, id: &CorpusId) {
-        if let Ok(idx) = self.keys.binary_search(id) {
+    fn remove_key(&mut self, id: CorpusId) {
+        if let Ok(idx) = self.keys.binary_search(&id) {
             self.keys.remove(idx);
         }
     }
@@ -97,7 +97,7 @@ where
             self.first_idx = Some(idx);
         }
         self.last_idx = Some(idx);
-        self.insert_key(&idx);
+        self.insert_key(idx);
         self.map.insert(
             idx,
             TestcaseStorageItem {
@@ -114,7 +114,7 @@ where
     pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
         let idx = CorpusId::from(self.progressive_idx);
         self.progressive_idx += 1;
-        self.insert_key(&idx);
+        self.insert_key(idx);
         self.map.insert(idx, testcase);
         idx
     }
@@ -143,7 +143,7 @@ where
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn remove(&mut self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
         if let Some(item) = self.map.remove(&idx) {
-            self.remove_key(&idx);
+            self.remove_key(idx);
             if let Some(prev) = item.prev {
                 self.map.get_mut(&prev).unwrap().next = item.next;
             } else {
@@ -165,7 +165,7 @@ where
     /// Remove a testcase given a `CorpusId`
     #[cfg(feature = "corpus_btreemap")]
     pub fn remove(&mut self, idx: CorpusId) -> Option<RefCell<Testcase<I>>> {
-        self.remove_key(&idx);
+        self.remove_key(idx);
         self.map.remove(&idx)
     }
 
