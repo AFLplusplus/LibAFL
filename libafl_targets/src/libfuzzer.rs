@@ -22,7 +22,6 @@ use libafl::{
     state::{HasMaxSize, HasRand},
     Error,
 };
-use once_cell::unsync::OnceCell;
 
 extern "C" {
     // int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
@@ -83,15 +82,15 @@ trait ErasedLLVMFuzzerMutator {
 }
 
 thread_local! {
-    static MUTATOR: OnceCell<RefCell<Box<dyn ErasedLLVMFuzzerMutator>>> = OnceCell::new();
+    static MUTATOR: RefCell<Option<Box<dyn ErasedLLVMFuzzerMutator>>> = RefCell::new(None);
 }
 
 #[allow(non_snake_case)]
 #[no_mangle]
 fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     MUTATOR.with(|mutator| {
-        if let Some(mutator) = mutator.get() {
-            if let Ok(mutator) = mutator.try_borrow() {
+        if let Ok(mut mutator) = mutator.try_borrow_mut() {
+            if let Some(mutator) = mutator.deref_mut() {
                 return mutator.mutate(data, size, max_size);
             }
         }
@@ -234,10 +233,11 @@ where
         ))));
         let proxy = MutatorProxy::new(state, &self.mutator, &result, stage_idx);
         MUTATOR.with(|mutator| {
-            if let Some(mutator) = mutator.get() {
-                *mutator.borrow_mut() = Box::new(proxy.weak());
+            let mut mutator = mutator.borrow_mut();
+            if let Some(mutator) = mutator.deref_mut() {
+                *mutator = Box::new(proxy.weak());
             } else {
-                mutator.set(RefCell::new(Box::new(proxy.weak()))).ok();
+                let _ = mutator.insert(Box::new(proxy.weak()));
             }
         });
         let target = input.target_bytes();
