@@ -1,3 +1,4 @@
+use libafl::state::State;
 use libafl_targets::*;
 
 use crate::options::LibfuzzerOptions;

@@ -17,7 +17,7 @@ path = "src/lib.rs"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-libafl = { version = "0.8.2" }
-libafl_targets = { version = "0.8.2", features = ["sancov_8bit", "sancov_value_profile", "libfuzzer"] }
+libafl = { path = "../../libafl" }
+libafl_targets = { path = "../../libafl_targets", features = ["sancov_8bit", "sancov_value_profile", "libfuzzer"] }
 
 [workspace]

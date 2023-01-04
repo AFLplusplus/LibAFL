@@ -41,6 +41,26 @@ EXPORT_FN int libafl_targets_libfuzzer_init(int *argc, char ***argv) {
   if (libafl_targets_has_libfuzzer_init()) {
     return LLVMFuzzerInitialize(argc, argv);
   } else {
-   return 0;
+    return 0;
   }
+}
+
+EXPORT_FN int libafl_targets_has_libfuzzer_custom_mutator() {
+  return CHECK_WEAK_FN(LLVMFuzzerCustomMutator);
+}
+
+// trust the user to check this appropriately :)
+EXPORT_FN size_t libafl_targets_libfuzzer_custom_mutator(uint8_t *Data, size_t Size, size_t MaxSize, unsigned int Seed) {
+  return LLVMFuzzerCustomMutator(Data, Size, MaxSize, Seed);
+}
+
+EXPORT_FN int libafl_targets_has_libfuzzer_custom_crossover() {
+  return CHECK_WEAK_FN(LLVMFuzzerCustomCrossOver);
+}
+
+// trust the user to check this appropriately :)
+EXPORT_FN size_t libafl_targets_libfuzzer_custom_crossover(const uint8_t *Data1, size_t Size1,
+                                                           const uint8_t *Data2, size_t Size2,
+                                                           uint8_t *Out, size_t MaxOutSize, unsigned int Seed) {
+  return LLVMFuzzerCustomCrossOver(Data1, Size1, Data2, Size2, Out, MaxOutSize, Seed);
 }
