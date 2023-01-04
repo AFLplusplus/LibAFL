@@ -174,7 +174,7 @@ pub mod pybind {
         corpus::{
             cached::pybind::PythonCachedOnDiskCorpus, inmemory::pybind::PythonInMemoryCorpus,
             ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
-            Testcase,
+            CorpusId, Testcase,
         },
         inputs::{BytesInput, UsesInput},
         Error,
@@ -260,13 +260,13 @@ pub mod pybind {
 
         #[pyo3(name = "current")]
         fn pycurrent(&self) -> Option<usize> {
-            *self.current()
+            self.current().map(CorpusId::from)
         }
 
         #[pyo3(name = "get")]
         fn pyget(&self, idx: usize) -> PythonTestcaseWrapper {
             let t: &mut Testcase<BytesInput> = unwrap_me!(self.wrapper, c, {
-                c.get(idx)
+                c.get(CorpusId::from(idx))
                     .map(|v| unsafe { v.as_ptr().as_mut().unwrap() })
                     .expect("PythonCorpus::get failed")
             });
@@ -285,7 +285,7 @@ pub mod pybind {
         }
 
         #[inline]
-        fn add(&mut self, testcase: Testcase<BytesInput>) -> Result<usize, Error> {
+        fn add(&mut self, testcase: Testcase<BytesInput>) -> Result<CorpusId, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.add(testcase) })
         }
 
@@ -299,12 +299,12 @@ pub mod pybind {
         }
 
         #[inline]
-        fn remove(&mut self, idx: usize) -> Result<Option<Testcase<BytesInput>>, Error> {
+        fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<BytesInput>>, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.remove(idx) })
         }
 
         #[inline]
-        fn get(&self, idx: usize) -> Result<&RefCell<Testcase<BytesInput>>, Error> {
+        fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<BytesInput>>, Error> {
             let ptr = unwrap_me!(self.wrapper, c, {
                 c.get(idx)
                     .map(|v| v as *const RefCell<Testcase<BytesInput>>)
@@ -313,16 +313,49 @@ pub mod pybind {
         }
 
         #[inline]
-        fn current(&self) -> &Option<usize> {
-            let ptr = unwrap_me!(self.wrapper, c, { c.current() as *const Option<usize> });
+        fn current(&self) -> &Option<CorpusId> {
+            let ptr = unwrap_me!(self.wrapper, c, { c.current() as *const Option<CorpusId> });
             unsafe { ptr.as_ref().unwrap() }
         }
 
         #[inline]
-        fn current_mut(&mut self) -> &mut Option<usize> {
-            let ptr = unwrap_me_mut!(self.wrapper, c, { c.current_mut() as *mut Option<usize> });
+        fn current_mut(&mut self) -> &mut Option<CorpusId> {
+            let ptr = unwrap_me_mut!(self.wrapper, c, {
+                c.current_mut() as *mut Option<CorpusId>
+            });
             unsafe { ptr.as_mut().unwrap() }
         }
+
+        fn next(&self, idx: CorpusId) -> Option<CorpusId> {
+            unwrap_me!(self.wrapper, c, { c.next(idx) })
+        }
+
+        fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
+            unwrap_me!(self.wrapper, c, { c.prev(idx) })
+        }
+
+        fn first(&self) -> Option<CorpusId> {
+            unwrap_me!(self.wrapper, c, { c.first() })
+        }
+
+        fn last(&self) -> Option<CorpusId> {
+            unwrap_me!(self.wrapper, c, { c.last() })
+        }
+
+        /*fn ids<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
+            CorpusIdIterator {
+                corpus: self,
+                cur: self.first(),
+                cur_back: self.last(),
+            }
+        }
+
+        fn random_id(&self, next_random: u64) -> CorpusId {
+            let nth = (next_random as usize) % self.count();
+            self.ids()
+                .nth(nth)
+                .expect("Failed to get a random CorpusId")
+        }*/
     }
 
     /// Register the classes to the python module

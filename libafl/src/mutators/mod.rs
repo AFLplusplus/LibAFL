@@ -219,6 +219,7 @@ pub mod pybind {
 
     use super::{MutationResult, Mutator};
     use crate::{
+        corpus::CorpusId,
         inputs::{BytesInput, HasBytesVec},
         mutators::scheduled::pybind::PythonStdHavocMutator,
         state::pybind::{PythonStdState, PythonStdStateWrapper},

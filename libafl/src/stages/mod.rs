@@ -387,6 +387,7 @@ pub mod pybind {
     use pyo3::prelude::*;
 
     use crate::{
+        corpus::CorpusId,
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
@@ -511,7 +512,7 @@ pub mod pybind {
             executor: &mut PythonExecutor,
             state: &mut PythonStdState,
             manager: &mut PythonEventManager,
-            corpus_idx: usize,
+            corpus_idx: CorpusId,
         ) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, s, {
                 s.perform(fuzzer, executor, state, manager, corpus_idx)
@@ -550,7 +551,7 @@ pub mod pybind {
             executor: &mut PythonExecutor,
             state: &mut PythonStdState,
             manager: &mut PythonEventManager,
-            corpus_idx: usize,
+            corpus_idx: CorpusId,
         ) -> Result<(), Error> {
             for s in &mut self.list {
                 s.perform(fuzzer, executor, state, manager, corpus_idx)?;
