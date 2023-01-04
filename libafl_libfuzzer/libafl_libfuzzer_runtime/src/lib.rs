@@ -1,7 +1,4 @@
-use libafl::state::State;
-use libafl_targets::*;
-
-use crate::options::LibfuzzerOptions;
+use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
 mod fuzz;
 mod options;
@@ -10,5 +7,14 @@ mod options;
 fn main() {
     let args = Vec::from_iter(std::env::args());
     let options = LibfuzzerOptions::new(args.iter().map(|s| s.as_ref())).unwrap();
-    println!("{:?}", options);
+    let res = match options.mode() {
+        LibfuzzerMode::Fuzz => fuzz::fuzz(options),
+        LibfuzzerMode::Merge => {
+            unimplemented!()
+        }
+        LibfuzzerMode::Cmin => {
+            unimplemented!()
+        }
+    };
+    res.expect("Encountered error while performing libfuzzer shimming")
 }
