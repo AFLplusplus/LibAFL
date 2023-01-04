@@ -32,7 +32,7 @@ where
 pub type TestcaseStorageMap<I> = hashbrown::HashMap<CorpusId, TestcaseStorageItem<I>>;
 
 #[cfg(feature = "corpus_btreemap")]
-/// The map type in which testcases are stored (disable the feature 'corpus_btreemap' to use a `HashMap` instead of `BTreeMap`)
+/// The map type in which testcases are stored (disable the feature `corpus_btreemap` to use a `HashMap` instead of `BTreeMap`)
 pub type TestcaseStorageMap<I> =
     alloc::collections::btree_map::BTreeMap<CorpusId, RefCell<Testcase<I>>>;
 
@@ -132,11 +132,7 @@ where
     /// Replace a testcase given a `CorpusId`
     #[cfg(feature = "corpus_btreemap")]
     pub fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
-        if let Some(entry) = self.map.get_mut(&idx) {
-            Some(entry.replace(testcase))
-        } else {
-            None
-        }
+        self.map.get_mut(&idx).map(|entry| entry.replace(testcase))
     }
 
     /// Remove a testcase given a `CorpusId`
