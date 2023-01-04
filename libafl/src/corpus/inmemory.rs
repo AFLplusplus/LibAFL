@@ -28,7 +28,7 @@ where
 }
 
 #[cfg(not(feature = "corpus_btreemap"))]
-/// The map type in which testcases are stored (enable the feature 'corpus_btreemap' to use a `BTreeMap` instead of `HashMap`)
+/// The map type in which testcases are stored (enable the feature `corpus_btreemap` to use a `BTreeMap` instead of `HashMap`)
 pub type TestcaseStorageMap<I> = hashbrown::HashMap<CorpusId, TestcaseStorageItem<I>>;
 
 #[cfg(feature = "corpus_btreemap")]
@@ -171,18 +171,21 @@ where
 
     /// Get a testcase given a `CorpusId`
     #[cfg(not(feature = "corpus_btreemap"))]
+    #[must_use]
     pub fn get(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
         self.map.get(&idx).as_ref().map(|x| &x.testcase)
     }
 
     /// Get a testcase given a `CorpusId`
     #[cfg(feature = "corpus_btreemap")]
+    #[must_use]
     pub fn get(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
         self.map.get(&idx)
     }
 
     /// Get the next id given a `CorpusId` (creation order)
     #[cfg(not(feature = "corpus_btreemap"))]
+    #[must_use]
     fn next(&self, idx: CorpusId) -> Option<CorpusId> {
         if let Some(item) = self.map.get(&idx) {
             item.next
@@ -193,6 +196,7 @@ where
 
     /// Get the next id given a `CorpusId` (creation order)
     #[cfg(feature = "corpus_btreemap")]
+    #[must_use]
     fn next(&self, idx: CorpusId) -> Option<CorpusId> {
         // TODO see if using self.keys is faster
         let mut range = self
@@ -212,6 +216,7 @@ where
 
     /// Get the previous id given a `CorpusId` (creation order)
     #[cfg(not(feature = "corpus_btreemap"))]
+    #[must_use]
     fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
         if let Some(item) = self.map.get(&idx) {
             item.prev
@@ -222,6 +227,7 @@ where
 
     /// Get the previous id given a `CorpusId` (creation order)
     #[cfg(feature = "corpus_btreemap")]
+    #[must_use]
     fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
         // TODO see if using self.keys is faster
         let mut range = self
@@ -241,29 +247,34 @@ where
 
     /// Get the first created id
     #[cfg(not(feature = "corpus_btreemap"))]
+    #[must_use]
     fn first(&self) -> Option<CorpusId> {
         self.first_idx
     }
 
     /// Get the first created id
     #[cfg(feature = "corpus_btreemap")]
+    #[must_use]
     fn first(&self) -> Option<CorpusId> {
         self.map.iter().next()
     }
 
     /// Get the last created id
     #[cfg(not(feature = "corpus_btreemap"))]
+    #[must_use]
     fn last(&self) -> Option<CorpusId> {
         self.last_idx
     }
 
     /// Get the last created id
     #[cfg(feature = "corpus_btreemap")]
+    #[must_use]
     fn last(&self) -> Option<CorpusId> {
         self.map.iter().next_back()
     }
 
     /// Create new `TestcaseStorage`
+    #[must_use]
     pub fn new() -> Self {
         Self {
             map: TestcaseStorageMap::default(),

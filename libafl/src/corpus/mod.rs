@@ -103,7 +103,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     fn last(&self) -> Option<CorpusId>;
 
     /// An iterator over very active corpus id
-    fn ids<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
+    fn ids(&self) -> CorpusIdIterator<'_, Self> {
         CorpusIdIterator {
             corpus: self,
             cur: self.first(),
