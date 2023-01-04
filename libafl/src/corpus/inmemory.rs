@@ -201,7 +201,7 @@ where
         // TODO see if using self.keys is faster
         let mut range = self
             .map
-            .range(core::ops::Bound::Included(idx)..core::ops::Bound::Unbounded);
+            .range((core::ops::Bound::Included(idx), core::ops::Bound::Unbounded));
         if let Some((this_id, _)) = range.next() {
             if idx != *this_id {
                 return None;
@@ -232,7 +232,7 @@ where
         // TODO see if using self.keys is faster
         let mut range = self
             .map
-            .range(core::ops::Bound::Unbounded..core::ops::Bound::Included(idx));
+            .range((core::ops::Bound::Unbounded, core::ops::Bound::Included(idx)));
         if let Some((this_id, _)) = range.next_back() {
             if idx != this_id {
                 return None;
