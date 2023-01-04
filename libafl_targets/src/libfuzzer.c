@@ -12,15 +12,19 @@ EXT_FUNC(LLVMFuzzerCustomCrossOver, size_t,
           const uint8_t *Data2, size_t Size2,
           uint8_t *Out, size_t MaxOutSize, unsigned int Seed),
          false);
-EXT_FUNC_IMPL(LLVMFuzzerTestOneInput, int, (uint8_t *Data, size_t Size), false) {
+EXT_FUNC_IMPL(LLVMFuzzerTestOneInput, int, (const uint8_t *Data, size_t Size), false) {
   return 0;
 }
 
-EXT_FUNC_IMPL(libafl_main, void, (void), false) {
-}
+EXT_FUNC(libafl_main, void, (void), false);
+extern int LLVMFuzzerRunDriver(int *argc, char ***argv, int (*UserCb)(const uint8_t *Data, size_t Size));
+
 EXT_FUNC_IMPL(main, int, (int argc, char** argv), false) {
-  libafl_main();
-  return 0;
+  if (CHECK_WEAK_FN(libafl_main)) {
+    libafl_main();
+    return 0;
+  }
+  return LLVMFuzzerRunDriver(&argc, &argv, &LLVMFuzzerTestOneInput);
 }
 
 #if defined(_WIN32)
