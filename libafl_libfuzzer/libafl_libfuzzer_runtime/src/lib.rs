@@ -3,6 +3,7 @@ use libafl_targets::*;
 
 use crate::options::LibfuzzerOptions;
 
+mod fuzz;
 mod options;
 
 #[no_mangle]

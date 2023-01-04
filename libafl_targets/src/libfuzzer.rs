@@ -87,7 +87,7 @@ thread_local! {
 
 #[allow(non_snake_case)]
 #[no_mangle]
-fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
+pub fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     MUTATOR.with(|mutator| {
         if let Ok(mut mutator) = mutator.try_borrow_mut() {
             if let Some(mutator) = mutator.deref_mut() {

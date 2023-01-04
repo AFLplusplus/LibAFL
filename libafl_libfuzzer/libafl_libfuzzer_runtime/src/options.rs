@@ -65,6 +65,14 @@ impl<'a> LibfuzzerOptions<'a> {
         }
         builder.build()
     }
+
+    pub fn dirs(&self) -> &[&'a str] {
+        &self.dirs
+    }
+
+    pub fn unknown(&self) -> &[&'a str] {
+        &self.unknown
+    }
 }
 
 #[derive(Debug, Default)]

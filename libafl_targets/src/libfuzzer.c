@@ -33,6 +33,11 @@ int main(int argc, char** argv) {
 
 #pragma GCC diagnostic pop
 
+// take a page out of libfuzzer's book: static define __sancov_lowest_stack
+// since we don't support it yet
+// TODO support it
+uintptr_t MAYBE_THREAD_LOCAL __sancov_lowest_stack;
+
 EXPORT_FN int libafl_targets_has_libfuzzer_init() {
   return CHECK_WEAK_FN(LLVMFuzzerInitialize);
 }
