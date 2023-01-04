@@ -73,7 +73,7 @@ where
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let idx = self.inner.add(testcase)?;
-        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), &idx)?;
+        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), idx)?;
         Ok(idx)
     }
 
@@ -82,7 +82,7 @@ where
     fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         let entry = self.inner.replace(idx, testcase)?;
         self.remove_testcase(&entry)?;
-        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), &idx)?;
+        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), idx)?;
         Ok(entry)
     }
 
@@ -173,7 +173,7 @@ where
         })
     }
 
-    fn save_testcase(&self, testcase: &mut Testcase<I>, idx: &CorpusId) -> Result<(), Error> {
+    fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             let file_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);

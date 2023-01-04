@@ -59,10 +59,8 @@ where
         let (mut corpus_idx, mut solutions_idx) =
             if let Some(meta) = state.metadata().get::<DumpToDiskMetadata>() {
                 (
-                    meta.last_corpus.map(|x| state.corpus().next(x)).flatten(),
-                    meta.last_solution
-                        .map(|x| state.solutions().next(x))
-                        .flatten(),
+                    meta.last_corpus.and_then(|x| state.corpus().next(x)),
+                    meta.last_solution.and_then(|x| state.solutions().next(x)),
                 )
             } else {
                 (state.corpus().first(), state.solutions().first())
