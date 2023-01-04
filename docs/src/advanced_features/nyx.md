@@ -90,7 +90,7 @@ let mut helper = NyxHelper::new(
     cpu_id,    // current cpu id
     true,      // open snap_mode
     parallel_mode, // open parallel mode
-    Some(parent_cpu_id.id as u32), // the cpu-id of master instance, there is only one master instance, other instances will be treated as slaves
+    Some(parent_cpu_id.id as u32), // the cpu-id of main instance, there is only one main instance, other instances will be treated as secondaries
 )
 .unwrap();
 ```
