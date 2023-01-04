@@ -271,7 +271,11 @@ pub mod pybind {
                 self.inner.call_method1(
                     py,
                     "post_exec",
-                    (PythonStdStateWrapper::wrap(state), stage_idx, corpus_idx),
+                    (
+                        PythonStdStateWrapper::wrap(state),
+                        stage_idx,
+                        corpus_idx.map(|x| x.0),
+                    ),
                 )?;
                 Ok(())
             })?;
@@ -347,10 +351,10 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             stage_idx: i32,
-            corpus_idx: Option<usize>,
+            corpus_idx: Option<CorpusId>,
         ) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, m, {
-                m.post_exec(state, stage_idx, CorpusId::from(corpus_idx))
+                m.post_exec(state, stage_idx, corpus_idx)
             })
         }
     }

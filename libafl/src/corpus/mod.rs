@@ -260,7 +260,7 @@ pub mod pybind {
 
         #[pyo3(name = "current")]
         fn pycurrent(&self) -> Option<usize> {
-            self.current().map(CorpusId::from)
+            self.current().map(|x| x.0)
         }
 
         #[pyo3(name = "get")]
@@ -292,14 +292,14 @@ pub mod pybind {
         #[inline]
         fn replace(
             &mut self,
-            idx: usize,
+            idx: CorpusId,
             testcase: Testcase<BytesInput>,
         ) -> Result<Testcase<BytesInput>, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.replace(idx, testcase) })
         }
 
         #[inline]
-        fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<BytesInput>>, Error> {
+        fn remove(&mut self, idx: CorpusId) -> Result<Testcase<BytesInput>, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.remove(idx) })
         }
 
