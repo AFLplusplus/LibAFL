@@ -98,7 +98,7 @@ These callbacks allow the runtime to construct a trace that is similar to the pr
 
 SymCC ships with 2 runtimes: 
 
- * a 'simple' runtime that attempts to negate any branch conditions it comes across using [Z3](https://github.com/Z3Prover/z3/wiki) and
+ * a 'simple' runtime that attempts to solve any branch conditions it comes across using [Z3](https://github.com/Z3Prover/z3/wiki) and
  * a [QSym](https://github.com/sslab-gatech/qsym)-based runtime, which does a bit more filtering on the expressions and also solves them using Z3.
 
 The integration with LibAFL, however, requires you to **BYORT** (_bring your own runtime_) using the [`symcc_runtime`](https://docs.rs/symcc_runtime/0.1/symcc_runtime) crate.
