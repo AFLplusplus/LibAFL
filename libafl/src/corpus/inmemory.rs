@@ -234,12 +234,12 @@ where
             .map
             .range((core::ops::Bound::Unbounded, core::ops::Bound::Included(idx)));
         if let Some((this_id, _)) = range.next_back() {
-            if idx != this_id {
+            if idx != *this_id {
                 return None;
             }
         }
         if let Some((prev_id, _)) = range.next_back() {
-            Some(prev_id)
+            Some(*prev_id)
         } else {
             None
         }
@@ -256,7 +256,7 @@ where
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
     fn first(&self) -> Option<CorpusId> {
-        self.map.iter().next()
+        self.map.iter().next().map(|x| x.0)
     }
 
     /// Get the last created id
@@ -270,7 +270,7 @@ where
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
     fn last(&self) -> Option<CorpusId> {
-        self.map.iter().next_back()
+        self.map.iter().next_back().map(|x| x.0)
     }
 
     /// Create new `TestcaseStorage`
