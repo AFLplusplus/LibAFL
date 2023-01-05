@@ -581,6 +581,7 @@ mod apple {
                 THREAD_AFFINITY_POLICY_COUNT,
             );
 
+            // 0 == KERN_SUCCESS
             if result == KERN_SUCCESS {
                 Ok(())
             } else {
