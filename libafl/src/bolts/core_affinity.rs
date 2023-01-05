@@ -592,23 +592,18 @@ mod apple {
     }
 
     #[cfg(target_arch = "aarch64")]
-    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
-        unsafe {
-            // This is the best we can do, unlike on intel architecture
-            // the system does not allow to pin a process/thread to specific cpu
-            // but instead choosing at best between the two available groups
-            // energy consumption's efficient one and the other focusing more on performance.
-            let mut qos_class = QOS_CLASS_USER_INITIATED;
-            let result = pthread_set_qos_class_self_np(qos_class, 0);
+    pub fn set_for_current(_core_id: CoreId) -> Result<(), Error> {
+        // This is the best we can do, unlike on intel architecture
+        // the system does not allow to pin a process/thread to specific cpu.
+        // We just tell the system that we want performance.
+        //
+        // Furthermore, this seems to fail on background threads, so we ignore errors (result != 0).
 
-            if 0 == 0 {
-                Ok(())
-            } else {
-                Err(Error::unknown(format!(
-                    "Failed to set_for_current {result:?}"
-                )))
-            }
+        unsafe {
+            let _result = pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
         }
+
+        Ok(())
     }
 }
 
