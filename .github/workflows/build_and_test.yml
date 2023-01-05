@@ -182,7 +182,7 @@ jobs:
         # todo: remove afl++-clang when nyx support samcov_pcguard
         linux: llvm llvm-dev clang nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libgtk-3-dev afl++-clang pax-utils
         # update bash for macos to support `declare -A` command`
-        macos: llvm libpng nasm coreutils z3 bash
+        macos: llvm libpng nasm coreutils z3 bash wget
     - name: pip install
       run: python3 -m pip install msgpack jinja2
     # Note that nproc needs to have coreutils installed on macOS, so the order of CI commands matters.

@@ -8,9 +8,11 @@ use std::{
     rc::Rc,
 };
 
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+#[cfg(target_arch = "aarch64")]
+use dynasmrt::DynasmLabelApi;
+use dynasmrt::{dynasm, DynasmApi};
 #[cfg(target_arch = "x86_64")]
-use frida_gum::instruction_writer::X86Register;
+use frida_gum::instruction_writer::X86InstructionWriter;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
@@ -26,6 +28,7 @@ pub const MAP_SIZE: usize = 64 * 1024;
 struct CoverageRuntimeInner {
     map: [u8; MAP_SIZE],
     previous_pc: u64,
+    #[cfg(target_arch = "aarch64")]
     current_log_impl: u64,
     blob_maybe_log: Option<Box<[u8]>>,
     _pinned: PhantomPinned,
@@ -50,6 +53,7 @@ impl FridaRuntime for CoverageRuntime {
         _ranges: &RangeMap<usize, (u16, String)>,
         _modules_to_instrument: &[&str],
     ) {
+        #[cfg(target_arch = "aarch64")]
         self.generate_maybe_log_blob();
     }
 
@@ -75,6 +79,7 @@ impl CoverageRuntime {
         Self(Rc::pin(RefCell::new(CoverageRuntimeInner {
             map: [0_u8; MAP_SIZE],
             previous_pc: 0,
+            #[cfg(target_arch = "aarch64")]
             current_log_impl: 0,
             blob_maybe_log: None,
             _pinned: PhantomPinned,
@@ -126,82 +131,93 @@ impl CoverageRuntime {
             Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
     }
 
-    /// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
-    /// every time we need a copy that is within a direct branch of the start of the transformed basic
-    /// block.
+    /// Write inline instrumentation for coverage
     #[cfg(target_arch = "x86_64")]
-    pub fn generate_maybe_log_blob(&mut self) {
+    pub fn generate_inline_code(&mut self, writer: &X86InstructionWriter, h64: u64) {
+        let mut borrow = self.0.borrow_mut();
+        let prev_loc_ptr = addr_of_mut!(borrow.previous_pc);
+        let map_addr_ptr = addr_of_mut!(borrow.map);
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         dynasm!(ops
             ;   .arch x64
-            ;   pushfq
-            ;   push rax
-            ;   push rcx
-            ;   push rdx
-            ;   lea rax, [>map_addr]
-            ;   mov rax, QWORD [rax]
-            ;   lea rcx, [>previous_loc]
-            ;   mov rdx, QWORD [rcx]
-            ;   mov rdx, QWORD [rdx]
-            ;   xor rdx, rdi
-            ;   inc BYTE [rax + rdx]
-            ;   shr rdi, 1
-            ;   mov rax, QWORD [rcx]
-            ;   mov QWORD [rax], rdi
-            ;   pop rdx
-            ;   pop rcx
-            ;   pop rax
-            ;   popfq
-            ;   ret
-            ;map_addr:
-            ;.qword addr_of_mut!(self.0.borrow_mut().map) as i64
-            ;previous_loc:
-            ;.qword 0
+            // Store the context
+            ; mov    QWORD [rsp-0x88], rax
+            ; lahf
+            ; mov    QWORD [rsp-0x90], rax
+            ; mov    QWORD [rsp-0x98], rbx
+
+            // Load the previous_pc
+            ; mov rax, QWORD prev_loc_ptr as *mut u64 as _
+            ; mov rax, QWORD [rax]
+
+            // Calculate the edge id
+            ; mov ebx, WORD h64 as i32
+            ; xor rax, rbx
+
+            // Load the map byte address
+            ; mov rbx, QWORD map_addr_ptr as *mut [u8; MAP_SIZE] as _
+            ; add rax, rbx
+
+            // Update the map byte
+            ; mov bl, BYTE [rax]
+            ; add bl,0x1
+            ; adc bl,0x0
+            ; mov BYTE [rax],bl
+
+            // Update the previous_pc value
+            ; mov rax, QWORD prev_loc_ptr as *mut u64 as _
+            ; mov ebx, WORD (h64 >> 1) as i32
+            ; mov QWORD [rax], rbx
+
+            // Restore the context
+            ; mov    rbx, QWORD [rsp-0x98]
+            ; mov    rax, QWORD [rsp-0x90]
+            ; sahf
+            ; mov    rax, QWORD [rsp-0x88]
         );
         let ops_vec = ops.finalize().unwrap();
-        self.0.borrow_mut().blob_maybe_log =
-            Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
+
+        writer.put_bytes(&ops_vec[..ops_vec.len()].to_vec().into_boxed_slice());
     }
 
     /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
         let h64 = xxh3_rrmxmx_mixer(address);
-
         let writer = output.writer();
-        #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.
-        let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
-        if self.0.borrow().current_log_impl == 0
-            || !writer.can_branch_directly_to(self.0.borrow().current_log_impl)
-            || !writer
-                .can_branch_directly_between(writer.pc() + 128, self.0.borrow().current_log_impl)
-        {
-            let after_log_impl = writer.code_offset() + 1;
 
-            #[cfg(target_arch = "x86_64")]
-            writer.put_jmp_near_label(after_log_impl);
-            #[cfg(target_arch = "aarch64")]
-            writer.put_b_label(after_log_impl);
-
-            self.0.borrow_mut().current_log_impl = writer.pc();
-            writer.put_bytes(&self.blob_maybe_log());
-            let prev_loc_pointer = addr_of_mut!(self.0.borrow_mut().previous_pc) as u64; // Get the pointer to self.previous_pc
-
-            writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
-
-            writer.put_label(after_log_impl);
-        }
         #[cfg(target_arch = "x86_64")]
         {
-            writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(redzone_size));
-            writer.put_push_reg(X86Register::Rdi);
-            writer.put_mov_reg_address(X86Register::Rdi, h64 & (MAP_SIZE as u64 - 1));
-            writer.put_call_address(self.0.borrow().current_log_impl);
-            writer.put_pop_reg(X86Register::Rdi);
-            writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
+            self.generate_inline_code(&writer, h64 & (MAP_SIZE as u64 - 1));
         }
         #[cfg(target_arch = "aarch64")]
         {
+            #[allow(clippy::cast_possible_wrap)]
+            // gum redzone size is u32, we need an offset as i32.
+            let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
+            if self.0.borrow().current_log_impl == 0
+                || !writer.can_branch_directly_to(self.0.borrow().current_log_impl)
+                || !writer.can_branch_directly_between(
+                    writer.pc() + 128,
+                    self.0.borrow().current_log_impl,
+                )
+            {
+                let after_log_impl = writer.code_offset() + 1;
+
+                #[cfg(target_arch = "x86_64")]
+                writer.put_jmp_near_label(after_log_impl);
+                #[cfg(target_arch = "aarch64")]
+                writer.put_b_label(after_log_impl);
+
+                self.0.borrow_mut().current_log_impl = writer.pc();
+                writer.put_bytes(&self.blob_maybe_log());
+                let prev_loc_pointer = addr_of_mut!(self.0.borrow_mut().previous_pc) as u64; // Get the pointer to self.previous_pc
+
+                writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
+
+                writer.put_label(after_log_impl);
+            }
+
             writer.put_stp_reg_reg_reg_offset(
                 Aarch64Register::Lr,
                 Aarch64Register::X0,

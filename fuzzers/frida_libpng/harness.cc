@@ -22,7 +22,7 @@
 #include <vector>
 
 #define PNG_INTERNAL
-#include "png.h"
+#include "libpng-1.6.37/png.h"
 
 #define PNG_CLEANUP                                                        \
   if (png_handler.png_ptr) {                                               \
