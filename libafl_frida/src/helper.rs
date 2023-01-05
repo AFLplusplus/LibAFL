@@ -404,9 +404,9 @@ where
     }
 
     /// Pointer to coverage map
-    pub fn map_ptr_mut(&mut self) -> Option<*mut u8> {
+    pub fn map_mut_ptr(&mut self) -> Option<*mut u8> {
         self.runtime_mut::<CoverageRuntime>()
-            .map(CoverageRuntime::map_ptr_mut)
+            .map(CoverageRuntime::map_mut_ptr)
     }
 
     /// Ranges

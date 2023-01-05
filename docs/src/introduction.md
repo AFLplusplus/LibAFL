@@ -4,10 +4,10 @@ Fuzzers are important tools for security researchers and developers alike.
 A wide range of state-of-the-art tools like [AFL++](https://github.com/AFLplusplus/AFLplusplus), [libFuzzer](https://llvm.org/docs/LibFuzzer.html) or [honggfuzz](https://github.com/google/honggfuzz) are available to users. They do their job in a very effective way, finding thousands of bugs.
 
 From the perspective of a power user, however, these tools are limited.
-Their design does not treat extensibility as a first-class citizen.
+Their designs do not treat extensibility as a first-class citizen.
 Usually, a fuzzer developer can choose to either fork one of these existing tools, or to create a new fuzzer from scratch.
 In any case, researchers end up with tons of fuzzers, all of which are incompatible with each other.
-Their outstanding features can not just be combined for new projects.
+Their outstanding features cannot just be combined for new projects.
 By reinventing the wheel over and over, we may completely miss out on features that are complex to reimplement.
 
 To tackle this issue, we created LibAFL, a library that is _not just another fuzzer_, but a collection of reusable pieces for individual fuzzers.
@@ -24,7 +24,7 @@ Some highlight features currently include:
 This means it does not require a specific OS-dependent runtime to function.
 Define an allocator and a way to map pages, and you are good to inject LibAFL in obscure targets like embedded devices, hypervisors, or maybe even WebAssembly?
 - `adaptable`: Given years of experience fine-tuning *AFLplusplus* and our academic fuzzing background, we could incorporate recent fuzzing trends into LibAFL's design and make it future-proof.
-To give an example, as opposed to old-skool fuzzers, a `BytesInput` is just one of the potential forms of inputs:
+To give an example, as opposed to old-school fuzzers, a `BytesInput` is just one of the potential forms of inputs:
 feel free to use and mutate an Abstract Syntax Tree instead, for structured fuzzing.
 - `scalable`: As part of LibAFL, we developed `Low Level Message Passing`, `LLMP` for short, which allows LibAFL to scale almost linearly over cores. That is, if you chose to use this feature - it is your fuzzer, after all.
 Scaling to multiple machines over TCP is also possible, using LLMP's `broker2broker` feature.

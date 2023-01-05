@@ -42,7 +42,7 @@ use libafl::{
         token_mutations::I2SRandReplace,
         tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -56,8 +56,7 @@ use libafl::{
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
-    MAX_EDGES_NUM,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -286,7 +285,7 @@ fn fuzz_binary(
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{}", s).unwrap();
         #[cfg(windows)]
-        println!("{}", s);
+        println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
     });
 
@@ -303,21 +302,19 @@ fn fuzz_binary(
                 return Ok(());
             }
             _ => {
-                panic!("Failed to setup the restarter: {}", err);
+                panic!("Failed to setup the restarter: {err}");
             }
         },
     };
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let cmplog = unsafe { &mut CMPLOG_MAP };
-    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+    let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 
@@ -490,7 +487,7 @@ fn fuzz_text(
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{}", s).unwrap();
         #[cfg(windows)]
-        println!("{}", s);
+        println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
     });
 
@@ -507,21 +504,19 @@ fn fuzz_text(
                 return Ok(());
             }
             _ => {
-                panic!("Failed to setup the restarter: {}", err);
+                panic!("Failed to setup the restarter: {err}");
             }
         },
     };
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let cmplog = unsafe { &mut CMPLOG_MAP };
-    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+    let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     // New maximization map feedback linked to the edges observer and the feedback state
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);

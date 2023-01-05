@@ -46,7 +46,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
+    let observer = unsafe { StdMapObserver::new("signals", &mut SIGNALS) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = feedback_or!(
@@ -79,7 +79,7 @@ pub fn main() {
     }
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    let monitor = SimpleMonitor::new(|s| println!("{s}"));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus

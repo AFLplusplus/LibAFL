@@ -32,7 +32,7 @@ use libafl::{
     Error,
 };
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CMP_MAP, EDGES_MAP, MAX_EDGES_NUM,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CMP_MAP,
 };
 
 const ALLOC_MAP_SIZE: usize = 16 * 1024;
@@ -62,7 +62,7 @@ pub fn libafl_main() {
 /// The actual fuzzer
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    let monitor = SimpleMonitor::new(|s| println!("{s}"));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
@@ -78,14 +78,13 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = StdMapObserver::new("edges", edges);
+    let edges_observer = unsafe { std_edges_map_observer("edges") };
 
     // Create an observation channel using the cmp map
-    let cmps_observer = StdMapObserver::new("cmps", unsafe { &mut CMP_MAP });
+    let cmps_observer = unsafe { StdMapObserver::new("cmps", &mut CMP_MAP) };
 
     // Create an observation channel using the allocations map
-    let allocs_observer = StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map });
+    let allocs_observer = unsafe { StdMapObserver::new("allocs", &mut libafl_alloc_map) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = feedback_or!(

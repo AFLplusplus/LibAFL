@@ -586,7 +586,7 @@ impl AsanErrorsObserver {
 
     /// Creates a new `AsanErrorsObserver` from a raw ptr
     #[must_use]
-    pub fn new_from_ptr(errors: *const Option<AsanErrors>) -> Self {
+    pub fn from_mut_ptr(errors: *const Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Ptr(errors),
         }

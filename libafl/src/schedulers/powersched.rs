@@ -32,6 +32,8 @@ pub struct SchedulerMetadata {
     cycles: u64,
     /// Size of the observer map
     bitmap_size: u64,
+    /// Sum of log(bitmap_size)
+    bitmap_size_log: f64,
     /// Number of filled map entries
     bitmap_entries: u64,
     /// Queue cycles
@@ -50,6 +52,7 @@ impl SchedulerMetadata {
             exec_time: Duration::from_millis(0),
             cycles: 0,
             bitmap_size: 0,
+            bitmap_size_log: 0.0,
             bitmap_entries: 0,
             queue_cycles: 0,
             n_fuzz: vec![0; N_FUZZ_SIZE],
@@ -93,6 +96,17 @@ impl SchedulerMetadata {
     /// Sets the bitmap size
     pub fn set_bitmap_size(&mut self, val: u64) {
         self.bitmap_size = val;
+    }
+
+    #[must_use]
+    /// The sum of log(`bitmap_size`)
+    pub fn bitmap_size_log(&self) -> f64 {
+        self.bitmap_size_log
+    }
+
+    /// Setts the sum of log(`bitmap_size`)
+    pub fn set_bitmap_size_log(&mut self, val: f64) {
+        self.bitmap_size_log = val;
     }
 
     /// The number of filled map entries

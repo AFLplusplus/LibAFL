@@ -10,7 +10,7 @@ typedef long double max_align_t;
 #endif
 
 #if LLVM_VERSION_MAJOR >= 7 /* use new pass manager */
-//#define USE_NEW_PM 1
+// #define USE_NEW_PM 1
 #endif
 
 /* #if LLVM_VERSION_STRING >= "4.0.1" */

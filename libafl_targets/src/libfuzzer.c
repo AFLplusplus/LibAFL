@@ -22,6 +22,15 @@ EXT_FUNC_IMPL(main, int, (int argc, char** argv), false) {
   libafl_main();
   return 0;
 }
+
+#if defined(_WIN32)
+// If we do not add the main, the MSVC linker fails with: 
+// LINK : fatal error LNK1561: entry point must be defined
+int main(int argc, char** argv) {
+   libafl_main();
+}
+#endif
+
 #pragma GCC diagnostic pop
 
 EXPORT_FN int libafl_targets_has_libfuzzer_init() {

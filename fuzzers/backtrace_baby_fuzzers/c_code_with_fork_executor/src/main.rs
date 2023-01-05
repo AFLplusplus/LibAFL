@@ -45,7 +45,7 @@ pub fn main() {
         libafl::executors::ExitKind::Ok
     };
     // Create an observation channel using the signals map
-    let observer = unsafe { ConstMapObserver::<u8, 3>::new_from_ptr("signals", map_ptr) };
+    let observer = unsafe { ConstMapObserver::<u8, 3>::from_mut_ptr("signals", map_ptr) };
     // Create a stacktrace observer
     let mut bt = shmem_provider.new_shmem_object::<Option<u64>>().unwrap();
     let bt_observer = BacktraceObserver::new(
@@ -78,7 +78,7 @@ pub fn main() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
