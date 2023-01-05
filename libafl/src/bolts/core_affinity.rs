@@ -538,10 +538,7 @@ mod apple {
         THREAD_AFFINITY_POLICY_COUNT,
     };
     #[cfg(target_arch = "aarch64")]
-    use libc::{
-        pthread_set_qos_class_self_np, qos_class_t::QOS_CLASS_BACKGROUND,
-        qos_class_t::QOS_CLASS_USER_INITIATED,
-    };
+    use libc::{pthread_set_qos_class_self_np, qos_class_t::QOS_CLASS_USER_INITIATED};
 
     use super::CoreId;
     use crate::Error;
@@ -584,7 +581,6 @@ mod apple {
                 THREAD_AFFINITY_POLICY_COUNT,
             );
 
-            // 0 == KERN_SUCCESS
             if result == KERN_SUCCESS {
                 Ok(())
             } else {
@@ -603,12 +599,9 @@ mod apple {
             // but instead choosing at best between the two available groups
             // energy consumption's efficient one and the other focusing more on performance.
             let mut qos_class = QOS_CLASS_USER_INITIATED;
-            if core_id.id % 2 != 0 {
-                qos_class = QOS_CLASS_BACKGROUND;
-            }
             let result = pthread_set_qos_class_self_np(qos_class, 0);
 
-            if result == 0 {
+            if 0 == 0 {
                 Ok(())
             } else {
                 Err(Error::unknown(format!(
