@@ -136,7 +136,7 @@ Check out the [example hybrid fuzzer's runtime](https://github.com/AFLplusplus/L
 
 There are two main instrumentation methods to make use of concolic tracing in LibAFL:
 
-* Using an **compile-time** instrumented target with **SymCC**.
+* Using a **compile-time** instrumented target with **SymCC**.
 This only works when the source is available for the target and the target is reasonably easy to build using the SymCC compiler wrapper.
 * Using **SymQEMU** to dynamically instrument the target at **runtime**.
 This avoids building a separate instrumented target with concolic tracing instrumentation and so does not require source code.
