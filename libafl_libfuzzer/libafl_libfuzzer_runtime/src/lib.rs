@@ -1,8 +1,3 @@
-#![no_std]
-
-extern crate alloc;
-
-use alloc::vec::Vec;
 use core::ffi::{c_char, c_int, CStr};
 
 pub use libafl_targets::*;
@@ -24,14 +19,14 @@ pub fn LLVMFuzzerRunDriver(
         .expect("Illegal harness provided to libafl.");
     let argc = unsafe { *argc } as isize;
     let argv = unsafe { *argv };
-    let args = Vec::from_iter(
-        (0..argc)
+
+    let options = LibfuzzerOptions::new(
+        (1..argc)
             .map(|i| unsafe { *argv.offset(i) })
             .map(|cstr| unsafe { CStr::from_ptr(cstr) })
             .map(|cstr| cstr.to_str().unwrap()),
-    );
-
-    let options = LibfuzzerOptions::new(args.iter().map(|s| s.as_ref())).unwrap();
+    )
+    .unwrap();
     let res = match options.mode() {
         LibfuzzerMode::Fuzz => fuzz::fuzz(options, harness),
         LibfuzzerMode::Merge => unimplemented!(),

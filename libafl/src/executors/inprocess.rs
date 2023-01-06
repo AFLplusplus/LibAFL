@@ -22,6 +22,7 @@ use core::{
 };
 #[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
+use std::ptr::drop_in_place;
 
 #[cfg(all(feature = "std", unix))]
 use libc::siginfo_t;
@@ -584,6 +585,10 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     event_mgr.await_restart_safe();
     #[cfg(feature = "std")]
     println!("Bye!");
+
+    unsafe {
+        drop_in_place(state);
+    }
 }
 
 #[cfg(unix)]
@@ -740,8 +745,6 @@ mod unix_signal_handler {
             event_mgr,
             ExitKind::Timeout,
         );
-
-        event_mgr.await_restart_safe();
 
         libc::_exit(55);
     }

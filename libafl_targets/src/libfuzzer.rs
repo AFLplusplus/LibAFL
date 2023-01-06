@@ -15,10 +15,9 @@ use core::{
 };
 
 use libafl::{
-    bolts::AsSlice,
+    bolts::{rands::Rand, AsSlice},
     inputs::{BytesInput, HasBytesVec, HasTargetBytes, UsesInput},
     mutators::{MutationResult, Mutator},
-    prelude::Rand,
     state::{HasMaxSize, HasRand},
     Error,
 };

@@ -3,11 +3,12 @@
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of testcases and removes additional ones in a FIFO manner.
 
+use alloc::string::String;
 use core::{cell::RefCell, time::Duration};
-#[cfg(feature = "std")]
-use std::{fs, fs::File, io::Write};
 use std::{
-    fs::OpenOptions,
+    fs,
+    fs::{File, OpenOptions},
+    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -24,7 +25,6 @@ use crate::{
 };
 
 /// Options for the the format of the on-disk metadata
-#[cfg(feature = "std")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OnDiskMetadataFormat {
     /// A binary-encoded postcard
@@ -39,7 +39,6 @@ pub enum OnDiskMetadataFormat {
 }
 
 /// The [`Testcase`] metadata that'll be stored to disk
-#[cfg(feature = "std")]
 #[derive(Debug, Serialize)]
 pub struct OnDiskMetadata<'a> {
     metadata: &'a SerdeAnyMap,
@@ -50,7 +49,6 @@ pub struct OnDiskMetadata<'a> {
 /// A corpus able to store [`Testcase`]s to disk, and load them from disk, when they are being used.
 ///
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
-#[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct OnDiskCorpus<I>
@@ -59,6 +57,7 @@ where
 {
     inner: InMemoryCorpus<I>,
     dir_path: PathBuf,
+    prefix: Option<String>,
     meta_format: Option<OnDiskMetadataFormat>,
 }
 
@@ -168,7 +167,25 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), Some(OnDiskMetadataFormat::JsonPretty))
+        Self::with_meta_format_and_path(
+            dir_path.as_ref(),
+            Some(OnDiskMetadataFormat::JsonPretty),
+            None,
+        )
+    }
+
+    /// Creates the [`OnDiskCorpus`] with a filename prefix.
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn with_prefix<P>(dir_path: P, prefix: String) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        Self::with_meta_format_and_path(
+            dir_path.as_ref(),
+            Some(OnDiskMetadataFormat::JsonPretty),
+            Some(prefix),
+        )
     }
 
     /// Creates the [`OnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk.
@@ -181,7 +198,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), Some(meta_format))
+        Self::with_meta_format_and_path(dir_path.as_ref(), Some(meta_format), None)
     }
 
     /// Creates an [`OnDiskCorpus`] that will not store .metadata files
@@ -191,15 +208,23 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), None)
+        Self::with_meta_format_and_path(dir_path.as_ref(), None, None)
     }
 
-    /// Private fn to crate a new corpus at the given (non-generic) path with the given optional `meta_format`
-    fn _new(dir_path: &Path, meta_format: Option<OnDiskMetadataFormat>) -> Result<Self, Error> {
+    /// Creates a new corpus at the given (non-generic) path with the given optional `meta_format`
+    /// and `prefix`.
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn with_meta_format_and_path(
+        dir_path: &Path,
+        meta_format: Option<OnDiskMetadataFormat>,
+        prefix: Option<String>,
+    ) -> Result<Self, Error> {
         fs::create_dir_all(dir_path)?;
         Ok(OnDiskCorpus {
             inner: InMemoryCorpus::new(),
             dir_path: dir_path.into(),
+            prefix,
             meta_format,
         })
     }
@@ -208,7 +233,12 @@ where
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             let file_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);
-            let mut file = file_orig.clone();
+            let mut file = if let Some(prefix) = &self.prefix {
+                format!("{prefix}{file_orig}")
+            } else {
+                file_orig.clone()
+            };
+            let mut ctrd = false;
 
             let mut ctr = 2;
             let filename = loop {
@@ -224,7 +254,13 @@ where
                     break self.dir_path.join(file);
                 }
 
-                file = format!("{file_orig}-{ctr}");
+                // first pass, we don't need to split
+                file = if ctrd {
+                    format!("{}-{ctr}", file.rsplit_once('-').unwrap().0)
+                } else {
+                    ctrd = true;
+                    format!("{file}-{ctr}")
+                };
                 ctr += 1;
             };
 

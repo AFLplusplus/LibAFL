@@ -3,6 +3,7 @@
 
 use alloc::string::String;
 use core::{default::Default, option::Option, time::Duration};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -183,13 +184,18 @@ where
 
     /// Create a new Testcase instance given an input
     #[inline]
-    pub fn new(input: I) -> Self {
-        let mut slf = Testcase {
+    pub fn new(mut input: I) -> Self {
+        input.wrapped_as_testcase();
+        Testcase {
             input: Some(input),
-            ..Testcase::default()
-        };
-        slf.input.as_mut().unwrap().wrapped_as_testcase();
-        slf
+            filename: None,
+            metadata: Default::default(),
+            exec_time: None,
+            cached_len: None,
+            executions: 0,
+            fuzz_level: 0,
+            fuzzed: false,
+        }
     }
 
     /// Create a new Testcase instance given an [`Input`] and a `filename`
@@ -199,7 +205,12 @@ where
         Testcase {
             input: Some(input),
             filename: Some(filename),
-            ..Testcase::default()
+            metadata: Default::default(),
+            exec_time: None,
+            cached_len: None,
+            executions: 0,
+            fuzz_level: 0,
+            fuzzed: false,
         }
     }
 
@@ -209,8 +220,13 @@ where
         input.wrapped_as_testcase();
         Testcase {
             input: Some(input),
+            filename: None,
+            metadata: Default::default(),
+            exec_time: None,
+            cached_len: None,
             executions,
-            ..Testcase::default()
+            fuzz_level: 0,
+            fuzzed: false,
         }
     }
 }
@@ -343,6 +359,21 @@ impl SchedulerTestcaseMetaData {
 }
 
 crate::impl_serdeany!(SchedulerTestcaseMetaData);
+
+#[cfg(feature = "std")]
+impl<I> Drop for Testcase<I>
+where
+    I: Input,
+{
+    fn drop(&mut self) {
+        if let Some(filename) = &self.filename {
+            let mut path = PathBuf::from(filename);
+            let lockname = format!(".{}.lafl_lock", path.file_name().unwrap().to_str().unwrap());
+            path.set_file_name(lockname);
+            std::fs::remove_file(path).ok();
+        }
+    }
+}
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
