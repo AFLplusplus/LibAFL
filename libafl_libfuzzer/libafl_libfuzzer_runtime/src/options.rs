@@ -1,7 +1,5 @@
-use std::{
-    error::Error,
-    fmt::{Display, Formatter},
-};
+use alloc::vec::Vec;
+use core::fmt::{Display, Formatter};
 
 use crate::options::RawOption::{Directory, Flag};
 
@@ -36,7 +34,7 @@ pub enum OptionsParseError<'a> {
 }
 
 impl<'a> Display for OptionsParseError<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             OptionsParseError::MultipleModesSelected => {
                 f.write_str("multiple modes selected in options")
@@ -48,8 +46,6 @@ impl<'a> Display for OptionsParseError<'a> {
         }
     }
 }
-
-impl<'a> Error for OptionsParseError<'a> {}
 
 #[derive(Debug)]
 pub struct LibfuzzerOptions<'a> {
