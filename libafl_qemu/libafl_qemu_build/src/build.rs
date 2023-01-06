@@ -266,7 +266,9 @@ pub fn build(
                 .arg("--disable-xen")
                 .arg("--disable-xen-pci-passthrough")
                 .arg("--disable-xkbcommon")
-                .arg("--disable-zstd");
+                .arg("--disable-zstd")
+                .arg("--disable-capstone")
+                .arg("--disable-sndio");
             if cfg!(feature = "debug_assertions") {
                 cmd.arg("--enable-debug");
             }
@@ -400,9 +402,7 @@ pub fn build(
     println!("cargo:rustc-link-lib=glib-2.0");
     println!("cargo:rustc-link-lib=stdc++");
     println!("cargo:rustc-link-lib=z");
-    println!("cargo:rustc-link-lib=sndio");
     println!("cargo:rustc-link-lib=keyutils");
-    println!("cargo:rustc-link-lib=capstone");
 
     if !is_usermode {
         println!("cargo:rustc-link-lib=pixman-1");
