@@ -133,8 +133,8 @@ where
     }
 
     #[inline]
-    fn random_id(&self, next_random: u64) -> CorpusId {
-        self.inner.random_id(next_random)
+    fn nth(&self, nth: usize) -> CorpusId {
+        self.inner.nth(nth)
     }
 }
 

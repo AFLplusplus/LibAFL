@@ -53,8 +53,9 @@ impl From<u64> for CorpusId {
 #[macro_export]
 macro_rules! random_corpus_id {
     ($corpus:expr, $rand:expr) => {{
-        let rand_num = $rand.next();
-        $corpus.random_id(rand_num)
+        let cnt = $corpus.count() as u64;
+        let nth = $rand.below(cnt) as usize;
+        $corpus.nth(nth)
     }};
 }
 
@@ -79,10 +80,10 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     ) -> Result<Testcase<Self::Input>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<Self::Input>, Error>;
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error>;
 
     /// Get by id
-    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<CorpusId>;
@@ -91,10 +92,10 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     fn current_mut(&mut self) -> &mut Option<CorpusId>;
 
     /// Get the next corpus id
-    fn next(&self, idx: CorpusId) -> Option<CorpusId>;
+    fn next(&self, id: CorpusId) -> Option<CorpusId>;
 
     /// Get the prev corpus id
-    fn prev(&self, idx: CorpusId) -> Option<CorpusId>;
+    fn prev(&self, id: CorpusId) -> Option<CorpusId>;
 
     /// Get the first inserted corpus id
     fn first(&self) -> Option<CorpusId>;
@@ -111,12 +112,11 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
         }
     }
 
-    /// Get a random corpus id
-    fn random_id(&self, next_random: u64) -> CorpusId {
-        let nth = (next_random as usize) % self.count();
+    /// Get the nth corpus id
+    fn nth(&self, nth: usize) -> CorpusId {
         self.ids()
             .nth(nth)
-            .expect("Failed to get a random CorpusId")
+            .expect("Failed to get the {nth} CorpusId")
     }
 }
 

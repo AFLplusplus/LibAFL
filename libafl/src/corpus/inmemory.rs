@@ -375,8 +375,8 @@ where
         self.storage.last()
     }
 
-    fn random_id(&self, next_random: u64) -> CorpusId {
-        let nth = (next_random as usize) % self.storage.keys.len();
+    #[inline]
+    fn nth(&self, nth: usize) -> CorpusId {
         self.storage.keys[nth]
     }
 }
