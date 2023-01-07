@@ -10,10 +10,10 @@ use libafl::events::EventRestarter;
 use libafl::prelude::Cores;
 use libafl::prelude::GeneralizationStage;
 use libafl::prelude::GeneralizedInput;
-use libafl::prelude::SkippableStage;
 use libafl::prelude::LlmpRestartingEventManager;
-use libafl::Evaluator;
+use libafl::prelude::SkippableStage;
 use libafl::prelude::TokenInsert;
+use libafl::Evaluator;
 use libafl::{
     bolts::{
         current_nanos,
@@ -135,7 +135,7 @@ struct Opt {
         parse(from_os_str)
     )]
     harness: PathBuf,
-    
+
     #[structopt(
         parse(try_from_str = timeout_from_millis_str),
         short,
@@ -181,12 +181,7 @@ struct Opt {
     )]
     bytes: bool,
 
-    #[structopt(
-        help = "Use tags mutator",
-        name = "TAGS",
-        long = "tags",
-        short = "t"
-    )]
+    #[structopt(help = "Use tags mutator", name = "TAGS", long = "tags", short = "t")]
     tags: bool,
 
     #[structopt(
@@ -197,7 +192,6 @@ struct Opt {
     )]
     cmplog: bool,
 }
-
 
 /// The main fn, `no_mangle` as it is a C symbol
 #[allow(clippy::too_many_lines)]
@@ -233,7 +227,7 @@ pub extern "C" fn main() {
     let iteration_counter = RelaxedCounter::new(0);
 
     let mut run_client = |state: Option<StdState<_, _, _, _>>,
-                          mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                          mut mgr: LlmpRestartingEventManager<_, _>,
                           _core_id| {
         let repro_file = repro_file.clone();
 
@@ -269,9 +263,7 @@ pub extern "C" fn main() {
         corpdir.push("corpus");
 
         let generalization = GeneralizationStage::new(&edges_observer); //TODO: investigate using a multimapobserver
-        let generalization = SkippableStage::new(generalization, |_s| {
-            use_grimoire.into()
-        });
+        let generalization = SkippableStage::new(generalization, |_s| use_grimoire.into());
         let mut state = match state {
             Some(state) => state,
             None => StdState::new(
@@ -327,12 +319,9 @@ pub extern "C" fn main() {
         let calibration = CalibrationStage::new(&max_map_feedback);
 
         // Setup a randomic Input2State stage
-        let i2s =
-            SkippableStage::new(
-                StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new()))),
-                |_s| {
-                    use_cmplog.into()
-                },
+        let i2s = SkippableStage::new(
+            StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new()))),
+            |_s| use_cmplog.into(),
         );
 
         // mutations
@@ -368,27 +357,20 @@ pub extern "C" fn main() {
             GrimoireRandomDeleteMutator::new(),
         ));
 
-
         let byte_mutational_stage = SkippableStage::new(
             StdMutationalStage::new(StdScheduledMutator::new(byte_mutations)),
-            |_s| {
-                use_bytes.into()
-            }
+            |_s| use_bytes.into(),
         );
         let tag_mutational_stage = SkippableStage::new(
             StdMutationalStage::new(StdScheduledMutator::new(tag_mutations)),
-            |_s| {
-                use_tags.into()
-            }
+            |_s| use_tags.into(),
         );
 
-        let grim_mutational_stage = SkippableStage::new( 
-            StdMutationalStage::new(grimoire_mutations),
-            |_s| {
+        let grim_mutational_stage =
+            SkippableStage::new(StdMutationalStage::new(grimoire_mutations), |_s| {
                 use_grimoire.into()
-            }
-        );
-        
+            });
+
         // A minimization+queue policy to get testcases from the corpus
         let scheduler = QueueScheduler::new();
 
@@ -407,11 +389,10 @@ pub extern "C" fn main() {
             ExitKind::Ok
         };
 
-
         // TODO: try without timeout executor
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
         let mut executor = TimeoutExecutor::new(
-            InProcessExecutor::new::<LlmpRestartingEventManager<_, _, _, _>, _, _>(
+            InProcessExecutor::new(
                 &mut harness,
                 tuple_list!(edges_observer, time_observer, js_observer),
                 &mut fuzzer,
@@ -433,19 +414,17 @@ pub extern "C" fn main() {
             ExitKind::Ok
         };
 
-
         // Setup a tracing stage in which we log comparisons
-        let tracing = SkippableStage::new(TracingStage::new(InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?), |_s| {
-            use_cmplog.into()
-        });
-
-
+        let tracing = SkippableStage::new(
+            TracingStage::new(InProcessExecutor::new(
+                &mut harness,
+                tuple_list!(cmplog_observer),
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+            )?),
+            |_s| use_cmplog.into(),
+        );
 
         // The order of the stages matter!
         let mut stages = tuple_list!(
