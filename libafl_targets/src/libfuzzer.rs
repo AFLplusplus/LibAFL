@@ -97,15 +97,15 @@ pub fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     })
 }
 
-struct MutatorProxy<'a, M, S: 'static> {
-    state: Rc<RefCell<&'static mut S>>,
+struct MutatorProxy<'a, M, S> {
+    state: Rc<RefCell<*mut S>>, // refcell to prevent double-mutability over the pointer
     mutator: Weak<RefCell<M>>,
     result: Rc<RefCell<Result<MutationResult, Error>>>,
     stage_idx: i32,
     phantom: PhantomData<&'a mut ()>,
 }
 
-impl<'a, M, S: 'static> MutatorProxy<'a, M, S> {
+impl<'a, M, S> MutatorProxy<'a, M, S> {
     fn new(
         state: &'a mut S,
         mutator: &Rc<RefCell<M>>,
@@ -113,7 +113,7 @@ impl<'a, M, S: 'static> MutatorProxy<'a, M, S> {
         stage_idx: i32,
     ) -> Self {
         Self {
-            state: Rc::new(RefCell::new(unsafe { core::mem::transmute(state) })),
+            state: Rc::new(RefCell::new(state)),
             mutator: Rc::downgrade(mutator),
             result: result.clone(),
             stage_idx,
@@ -121,78 +121,82 @@ impl<'a, M, S: 'static> MutatorProxy<'a, M, S> {
         }
     }
 
-    fn weak(&self) -> WeakMutatorProxy<M, S> {
+    fn weak(&self) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool, M, S> {
+        let state = Rc::downgrade(&self.state);
         WeakMutatorProxy {
-            state: Rc::downgrade(&self.state),
+            accessor: move |f: &mut dyn for<'b> FnMut(&'b mut S)| {
+                if let Some(state) = state.upgrade() {
+                    if let Ok(state) = state.try_borrow_mut() {
+                        let state_ref = unsafe { state.as_mut().unwrap_unchecked() };
+                        f(state_ref);
+                        return true;
+                    }
+                }
+                return false;
+            },
             mutator: self.mutator.clone(),
             stage_idx: self.stage_idx,
             result: self.result.clone(),
+            phantom: PhantomData,
         }
     }
 }
 
 #[derive(Clone)]
-struct WeakMutatorProxy<M, S: 'static> {
-    state: Weak<RefCell<&'static mut S>>,
+struct WeakMutatorProxy<F, M, S> {
+    accessor: F,
     mutator: Weak<RefCell<M>>,
     stage_idx: i32,
     result: Rc<RefCell<Result<MutationResult, Error>>>,
+    phantom: PhantomData<S>,
 }
 
-impl<M, S> ErasedLLVMFuzzerMutator for WeakMutatorProxy<M, S>
+impl<F, M, S> ErasedLLVMFuzzerMutator for WeakMutatorProxy<F, M, S>
 where
+    F: Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool,
     M: Mutator<S>,
-    S: HasMaxSize + UsesInput<Input = BytesInput> + 'static,
+    S: HasMaxSize + UsesInput<Input = BytesInput>,
 {
     fn mutate(&self, data: *mut u8, size: usize, max_size: usize) -> usize {
-        if let Some(state) = self.state.upgrade() {
-            if let Ok(mut state) = state.try_borrow_mut() {
-                if let Some(mutator) = self.mutator.upgrade() {
-                    if let Ok(mut mutator) = mutator.try_borrow_mut() {
-                        let mut intermediary =
-                            BytesInput::from(unsafe { core::slice::from_raw_parts(data, size) });
-                        let old = state.deref_mut().max_size();
-                        state.deref_mut().set_max_size(max_size);
-                        let res = mutator.mutate(*state, &mut intermediary, self.stage_idx);
-                        state.deref_mut().set_max_size(old);
-                        let succeeded = res.is_ok();
+        let mut new_size = 0; // if access fails, the new len is zero
+        (self.accessor)(&mut |state| {
+            if let Some(mutator) = self.mutator.upgrade() {
+                if let Ok(mut mutator) = mutator.try_borrow_mut() {
+                    let mut intermediary =
+                        BytesInput::from(unsafe { core::slice::from_raw_parts(data, size) });
+                    let old = state.max_size();
+                    state.set_max_size(max_size);
+                    let res = mutator.mutate(state, &mut intermediary, self.stage_idx);
+                    state.set_max_size(old);
+                    let succeeded = res.is_ok();
 
-                        let mut result = self.result.deref().borrow_mut();
-                        *result = res;
-                        drop(result);
+                    let mut result = self.result.deref().borrow_mut();
+                    *result = res;
+                    drop(result);
 
-                        return if succeeded {
-                            let target = intermediary.target_bytes();
-                            if target.as_slice().len() > max_size {
-                                self.result
-                                    .replace(Err(Error::illegal_state(
-                                        "Mutation result was too long!",
-                                    )))
-                                    .ok();
-                                return 0;
-                            }
+                    if succeeded {
+                        let target = intermediary.target_bytes();
+                        if target.as_slice().len() > max_size {
+                            self.result
+                                .replace(Err(Error::illegal_state("Mutation result was too long!")))
+                                .ok();
+                        } else {
                             let actual = unsafe { core::slice::from_raw_parts_mut(data, max_size) };
                             actual[..target.as_slice().len()].copy_from_slice(target.as_slice());
-                            target.as_slice().len()
-                        } else {
-                            0
-                        };
-                    }
+                            new_size = target.as_slice().len();
+                        }
+                    };
+                    return;
                 }
-                self.result
-                    .replace(Err(Error::illegal_state(
-                        "Couldn't borrow mutator while mutating!",
-                    )))
-                    .ok();
-                return 0;
             }
-        }
-        self.result
-            .replace(Err(Error::illegal_state(
-                "Couldn't borrow state while mutating!",
-            )))
-            .ok();
-        return 0;
+            self.result
+                .replace(Err(Error::illegal_state(
+                    "Couldn't borrow mutator while mutating!",
+                )))
+                .ok();
+            return;
+        });
+        return new_size;
     }
 }
 
