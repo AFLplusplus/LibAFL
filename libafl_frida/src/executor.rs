@@ -39,7 +39,6 @@ where
     /// User provided callback for instrumentation
     helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     followed: bool,
-    gum: &'b Gum,
     _phantom: PhantomData<&'b u8>,
 }
 
@@ -85,7 +84,7 @@ where
                 self.stalker.activate(NativePointer(core::ptr::null_mut()));
             } else {
                 self.followed = true;
-                let transformer = self.helper.transformer(self.gum);
+                let transformer = self.helper.transformer();
                 self.stalker.follow_me::<NoneEventSink>(&transformer, None);
             }
         }
@@ -190,7 +189,6 @@ where
             base,
             stalker,
             helper,
-            gum,
             followed: false,
             _phantom: PhantomData,
         }

@@ -56,7 +56,7 @@ pub fn main() {
     unsafe {
         match fuzz(options) {
             Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
-            Err(e) => panic!("Error during fuzzing: {:?}", e),
+            Err(e) => panic!("Error during fuzzing: {e:?}"),
         }
     }
 }
