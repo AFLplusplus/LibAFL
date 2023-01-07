@@ -151,6 +151,11 @@ struct WeakMutatorProxy<F, M, S> {
     phantom: PhantomData<S>,
 }
 
+// weak proxies are strictly bound to this thread because the upgraded Rcs must be destroyed before
+// the strong proxy is destroyed, which isn't guaranteed if this is passed between threads
+impl<F, M, S> !Send for WeakMutatorProxy<F, M, S> {}
+impl<F, M, S> !Sync for WeakMutatorProxy<F, M, S> {}
+
 impl<F, M, S> ErasedLLVMFuzzerMutator for WeakMutatorProxy<F, M, S>
 where
     F: Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool,
