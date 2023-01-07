@@ -2,7 +2,7 @@ use libafl::bolts::tuples::Named;
 use libafl::events::EventFirer;
 use libafl::executors::ExitKind;
 use libafl::feedbacks::Feedback;
-use libafl::inputs::Input;
+use libafl::inputs::UsesInput;
 use libafl::observers::Observer;
 use libafl::observers::ObserversTuple;
 use libafl::state::HasClientPerfMonitor;
@@ -29,8 +29,11 @@ extern "C" {
     fn get_js_coverage() -> *const c_char;
 }
 
-impl<I, S> Observer<I, S> for JSObserver {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+impl<S> Observer<S> for JSObserver
+where
+    S: UsesInput,
+{
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         // we don't currently do much here?
         Ok(())
     }
@@ -38,7 +41,7 @@ impl<I, S> Observer<I, S> for JSObserver {
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         unsafe {
@@ -73,20 +76,20 @@ pub struct JSFeedback {
     name: String,
 }
 
-impl<I: Input, S: HasClientPerfMonitor + HasMetadata + HasNamedMetadata> Feedback<I, S>
+impl<S: HasClientPerfMonitor + HasMetadata + HasNamedMetadata + UsesInput> Feedback<S>
     for JSFeedback
 {
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
         _manager: &mut EM,
-        _input: &I,
+        _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         let observer = observers.match_name::<JSObserver>(&self.name).unwrap();
         let novel = state
