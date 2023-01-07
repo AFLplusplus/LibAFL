@@ -16,9 +16,10 @@ use core::{
 
 use libafl::{
     bolts::{rands::Rand, AsSlice},
+    corpus::Corpus,
     inputs::{BytesInput, HasBytesVec, HasTargetBytes, UsesInput},
     mutators::{MutationResult, Mutator},
-    state::{HasMaxSize, HasRand},
+    state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
 
@@ -38,7 +39,6 @@ extern "C" {
     ) -> usize;
 
     fn libafl_targets_has_libfuzzer_custom_crossover() -> bool;
-    #[allow(unused)] // TODO remove
     fn libafl_targets_libfuzzer_custom_crossover(
         data1: *const u8,
         size1: usize,
@@ -151,11 +151,6 @@ struct WeakMutatorProxy<F, M, S> {
     phantom: PhantomData<S>,
 }
 
-// weak proxies are strictly bound to this thread because the upgraded Rcs must be destroyed before
-// the strong proxy is destroyed, which isn't guaranteed if this is passed between threads
-impl<F, M, S> !Send for WeakMutatorProxy<F, M, S> {}
-impl<F, M, S> !Sync for WeakMutatorProxy<F, M, S> {}
-
 impl<F, M, S> ErasedLLVMFuzzerMutator for WeakMutatorProxy<F, M, S>
 where
     F: Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool,
@@ -206,25 +201,29 @@ where
 }
 
 #[derive(Debug)]
-pub struct LLVMFuzzerMutator<M> {
+pub struct LLVMCustomMutator<M> {
     mutator: Rc<RefCell<M>>,
 }
 
-impl<M> LLVMFuzzerMutator<M> {
+impl<M> LLVMCustomMutator<M> {
     pub fn new(mutator: M) -> Result<Self, Error> {
         if unsafe { libafl_targets_has_libfuzzer_custom_mutator() } {
-            Ok(LLVMFuzzerMutator {
-                mutator: Rc::new(RefCell::new(mutator)),
-            })
+            Ok(unsafe { Self::new_unchecked(mutator) })
         } else {
             Err(Error::illegal_state(
                 "Cowardly refusing to create a LLVMFuzzerMutator if a custom mutator is not defined.",
             ))
         }
     }
+
+    pub unsafe fn new_unchecked(mutator: M) -> Self {
+        LLVMCustomMutator {
+            mutator: Rc::new(RefCell::new(mutator)),
+        }
+    }
 }
 
-impl<M, S> Mutator<S> for LLVMFuzzerMutator<M>
+impl<M, S> Mutator<S> for LLVMCustomMutator<M>
 where
     M: Mutator<S> + 'static,
     S: HasRand + HasMaxSize + UsesInput<Input = BytesInput> + 'static,
@@ -280,20 +279,66 @@ where
 }
 
 #[derive(Debug)]
-pub struct LLVMCrossoverStage<S> {
-    phantom: PhantomData<S>,
-}
+pub struct LLVMCustomCrossover;
 
-impl<S> LLVMCrossoverStage<S> {
+impl LLVMCustomCrossover {
     pub fn new() -> Result<Self, Error> {
         if unsafe { libafl_targets_has_libfuzzer_custom_crossover() } {
-            Ok(Self {
-                phantom: PhantomData,
-            })
+            Ok(Self)
         } else {
             Err(Error::illegal_state("Cowardly refusing to create a LLVMCrossoverStage if a custom crossover is not defined."))
         }
     }
+
+    pub unsafe fn new_unchecked() -> Self {
+        Self
+    }
 }
 
-// TODO implement the crossover stage similar to how libfuzzer might implement it, using the custom crossover
+impl<S> Mutator<S> for LLVMCustomCrossover
+where
+    S: HasCorpus + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut S::Input,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        // taken from CrossoverInsertMutator
+
+        let size = input.bytes().len();
+
+        let count = state.corpus().count();
+        let idx = state.rand_mut().below(count as u64) as usize;
+        if let Some(cur) = state.corpus().current() {
+            if idx == *cur {
+                return Ok(MutationResult::Skipped);
+            }
+        }
+
+        let max_size = state.max_size();
+        let seed = state.rand_mut().next() as u32;
+
+        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let other = other_testcase.load_input()?;
+        let other_size = other.bytes().len();
+        let mut out = vec![0u8; max_size];
+        let result_size = unsafe {
+            libafl_targets_libfuzzer_custom_crossover(
+                input.bytes().as_ptr(),
+                size,
+                other.bytes().as_ptr(),
+                other_size,
+                out.as_mut_ptr(),
+                out.len(),
+                seed,
+            )
+        };
+        out.truncate(result_size);
+        core::mem::swap(input.bytes_mut(), &mut out);
+
+        Ok(MutationResult::Mutated)
+    }
+}
