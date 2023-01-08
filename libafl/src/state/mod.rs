@@ -468,15 +468,11 @@ where
         }
 
         while let Some(path) = self.remaining_initial_files.as_mut().unwrap().pop() {
-            println!("Loading file {:?} ...", &path);
             let input = loader(fuzzer, self, &path)?;
             if forced {
                 let _ = fuzzer.add_input(self, executor, manager, input)?;
             } else {
-                let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
-                if res == ExecuteInputResult::None {
-                    println!("File {:?} was not interesting, skipped.", &path);
-                }
+                let _ = fuzzer.evaluate_input(self, executor, manager, input)?;
             }
         }
 
