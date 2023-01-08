@@ -32,6 +32,8 @@ perf.data.old
 .vscode
 test.dict
 
+.idea/
+
 # Ignore all built fuzzers
 fuzzer_*
 AFLplusplus
