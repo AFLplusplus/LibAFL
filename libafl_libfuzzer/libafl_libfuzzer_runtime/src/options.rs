@@ -1,7 +1,6 @@
 use core::fmt::{Display, Formatter};
 use std::{
-    ffi::OsString,
-    path::{Path, PathBuf},
+    path::{PathBuf},
     time::Duration,
 };
 
@@ -44,8 +43,7 @@ impl<'a> Display for OptionsParseError<'a> {
                 f.write_str("multiple modes selected in options")
             }
             OptionsParseError::OptionValueParseFailed(name, value) => f.write_fmt(format_args!(
-                "couldn't parse value `{}' for {}",
-                value, name
+                "couldn't parse value `{value}' for {name}"
             )),
         }
     }
@@ -175,20 +173,13 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                 }
                 Flag { name, value } => match name {
                     "merge" => {
-                        if parse_or_bail!(name, value, u64) > 0 {
-                            if *self.mode.get_or_insert(LibfuzzerMode::Merge)
-                                != LibfuzzerMode::Merge
-                            {
-                                return Err(OptionsParseError::MultipleModesSelected);
-                            }
+                        if parse_or_bail!(name, value, u64) > 0 && *self.mode.get_or_insert(LibfuzzerMode::Merge) != LibfuzzerMode::Merge {
+                            return Err(OptionsParseError::MultipleModesSelected);
                         }
                     }
                     "minimize_crash" => {
-                        if parse_or_bail!(name, value, u64) > 0 {
-                            if *self.mode.get_or_insert(LibfuzzerMode::Cmin) != LibfuzzerMode::Cmin
-                            {
-                                return Err(OptionsParseError::MultipleModesSelected);
-                            }
+                        if parse_or_bail!(name, value, u64) > 0 && *self.mode.get_or_insert(LibfuzzerMode::Cmin) != LibfuzzerMode::Cmin {
+                            return Err(OptionsParseError::MultipleModesSelected);
                         }
                     }
                     "artifact_prefix" => {
@@ -198,7 +189,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         self.timeout = Some(
                             value
                                 .parse()
-                                .map(|timeout_s: f64| Duration::from_secs_f64(timeout_s))
+                                .map(Duration::from_secs_f64)
                                 .map_err(|_| {
                                     OptionsParseError::OptionValueParseFailed(name, value)
                                 })?,
@@ -223,7 +214,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             artifact_prefix: self.artifact_prefix.map(ArtifactPrefix::new),
             timeout: self.timeout.unwrap_or(Duration::from_secs(1200)),
             forks: self.forks,
-            dirs: self.dirs.into_iter().map(|s| PathBuf::from(s)).collect(),
+            dirs: self.dirs.into_iter().map(PathBuf::from).collect(),
             unknown: self.unknown.into_iter().map(|s| s.to_string()).collect(),
         })
     }
