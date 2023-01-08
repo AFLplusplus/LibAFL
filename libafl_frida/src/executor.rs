@@ -85,7 +85,7 @@ where
             } else {
                 self.followed = true;
                 let transformer = self.helper.transformer();
-                self.stalker.follow_me::<NoneEventSink>(&transformer, None);
+                self.stalker.follow_me::<NoneEventSink>(transformer, None);
             }
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);
