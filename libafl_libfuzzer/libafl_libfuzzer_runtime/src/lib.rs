@@ -41,25 +41,20 @@ macro_rules! make_fuzz_closure {
     ($options:ident, $harness:ident, $operation:expr) => {{
         use libafl::{
             bolts::{
-                core_affinity::Cores,
                 current_nanos,
-                launcher::Launcher,
                 rands::StdRand,
-                shmem::{ShMemProvider, StdShMemProvider},
-                tuples::tuple_list,
+                tuples::{Merge, tuple_list},
                 AsSlice,
             },
             corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-            events::{EventConfig, EventFirer, SimpleEventManager},
             executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
             feedback_and_fast, feedback_or,
             feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback},
             generators::RandBytesGenerator,
             inputs::{BytesInput, HasTargetBytes},
-            monitors::tui::TuiMonitor,
             mutators::{
                 havoc_crossover, havoc_mutations, havoc_mutations_no_crossover, I2SRandReplace,
-                StdMOptMutator, StdScheduledMutator,
+                StdMOptMutator, StdScheduledMutator, Tokens, tokens_mutations
             },
             observers::{BacktraceObserver, HitcountsIterableMapObserver, MultiMapObserver, TimeObserver},
             schedulers::{
@@ -69,13 +64,12 @@ macro_rules! make_fuzz_closure {
                 CalibrationStage, SkippableStage, StdMutationalStage, StdPowerMutationalStage, TracingStage,
             },
             state::{HasCorpus, StdState},
-            Error, Fuzzer, StdFuzzer,
+            StdFuzzer,
         };
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, COUNTERS_MAPS};
         use rand::{thread_rng, RngCore};
 
         use crate::CustomMutationStatus;
-        use crate::options::LibfuzzerOptions;
         use crate::BACKTRACE;
 
         |state: Option<_>, mut mgr, _cpu_id| {
@@ -160,21 +154,22 @@ macro_rules! make_fuzz_closure {
                 .expect("Failed to create state")
             });
 
-            // TODO Read tokens from libfuzzer dicts
-            // if state.metadata().get::<Tokens>().is_none() {
-            //     let mut toks = Tokens::default();
-            //     for tokenfile in &token_files {
-            //         toks.add_from_file(tokenfile)?;
-            //     }
-            //     #[cfg(any(target_os = "linux", target_vendor = "apple"))]
-            //     {
-            //         toks += autotokens()?;
-            //     }
-            //
-            //     if !toks.is_empty() {
-            //         state.add_metadata(toks);
-            //     }
-            // }
+            // Attempt to use tokens from libfuzzer dicts
+            if state.metadata().get::<Tokens>().is_none() {
+                let mut toks = if let Some(tokens) = $options.dict() {
+                    tokens.clone()
+                } else {
+                    Tokens::default()
+                };
+                #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+                {
+                    toks += libafl_targets::autotokens()?;
+                }
+
+                if !toks.is_empty() {
+                    state.add_metadata(toks);
+                }
+            }
 
             // Setup a randomic Input2State stage, conditionally within a custom mutator
             let i2s =
@@ -188,10 +183,10 @@ macro_rules! make_fuzz_closure {
             let cm_i2s = SkippableStage::new(cm_i2s, |_| mutator_status.custom_mutation.into());
 
             // Setup a MOPT mutator
-            // TODO configure with mutation stacking options from libfuzzer, use tokens from dictionary
+            // TODO configure with mutation stacking options from libfuzzer
             let std_mutator = StdMOptMutator::new(
                 &mut state,
-                havoc_mutations(), // TODO .merge(tokens_mutations()),
+                havoc_mutations().merge(tokens_mutations()),
                 7,
                 5,
             )?;
@@ -215,7 +210,7 @@ macro_rules! make_fuzz_closure {
             let custom_mutator = unsafe {
                 LLVMCustomMutator::mutate_unchecked(StdMOptMutator::new(
                     &mut state,
-                    havoc_mutations_no_crossover(), // TODO .merge(tokens_mutations()),
+                    havoc_mutations_no_crossover().merge(tokens_mutations()),
                     7,
                     5,
                 )?)
@@ -233,13 +228,13 @@ macro_rules! make_fuzz_closure {
             // we handle it here explicitly anyways
             let custom_crossover = unsafe {
                 LLVMCustomMutator::crossover_unchecked(StdScheduledMutator::with_max_stack_pow(
-                    havoc_mutations_no_crossover(), // TODO .merge(tokens_mutations()),
+                    havoc_mutations_no_crossover().merge(tokens_mutations()),
                     3,
                 ))
             };
             let std_mutator_no_crossover = StdMOptMutator::new(
                 &mut state,
-                havoc_mutations_no_crossover(), // TODO .merge(tokens_mutations()),
+                havoc_mutations_no_crossover().merge(tokens_mutations()),
                 7,
                 5,
             )?;

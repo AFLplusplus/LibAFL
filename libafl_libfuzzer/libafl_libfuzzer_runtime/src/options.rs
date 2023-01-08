@@ -1,8 +1,7 @@
 use core::fmt::{Display, Formatter};
-use std::{
-    path::{PathBuf},
-    time::Duration,
-};
+use std::{path::PathBuf, time::Duration};
+
+use libafl::mutators::Tokens;
 
 use crate::options::RawOption::{Directory, Flag};
 
@@ -42,9 +41,9 @@ impl<'a> Display for OptionsParseError<'a> {
             OptionsParseError::MultipleModesSelected => {
                 f.write_str("multiple modes selected in options")
             }
-            OptionsParseError::OptionValueParseFailed(name, value) => f.write_fmt(format_args!(
-                "couldn't parse value `{value}' for {name}"
-            )),
+            OptionsParseError::OptionValueParseFailed(name, value) => {
+                f.write_fmt(format_args!("couldn't parse value `{value}' for {name}"))
+            }
         }
     }
 }
@@ -93,6 +92,7 @@ pub struct LibfuzzerOptions {
     artifact_prefix: Option<ArtifactPrefix>,
     timeout: Duration,
     forks: Option<usize>,
+    dict: Option<Tokens>,
     dirs: Vec<PathBuf>,
     unknown: Vec<String>,
 }
@@ -135,6 +135,10 @@ impl LibfuzzerOptions {
         self.forks
     }
 
+    pub fn dict(&self) -> Option<&Tokens> {
+        self.dict.as_ref()
+    }
+
     pub fn dirs(&self) -> &[PathBuf] {
         &self.dirs
     }
@@ -150,6 +154,7 @@ struct LibfuzzerOptionsBuilder<'a> {
     artifact_prefix: Option<&'a str>,
     timeout: Option<Duration>,
     forks: Option<usize>,
+    dict: Option<&'a str>,
     dirs: Vec<&'a str>,
     unknown: Vec<&'a str>,
 }
@@ -173,12 +178,17 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                 }
                 Flag { name, value } => match name {
                     "merge" => {
-                        if parse_or_bail!(name, value, u64) > 0 && *self.mode.get_or_insert(LibfuzzerMode::Merge) != LibfuzzerMode::Merge {
+                        if parse_or_bail!(name, value, u64) > 0
+                            && *self.mode.get_or_insert(LibfuzzerMode::Merge)
+                                != LibfuzzerMode::Merge
+                        {
                             return Err(OptionsParseError::MultipleModesSelected);
                         }
                     }
                     "minimize_crash" => {
-                        if parse_or_bail!(name, value, u64) > 0 && *self.mode.get_or_insert(LibfuzzerMode::Cmin) != LibfuzzerMode::Cmin {
+                        if parse_or_bail!(name, value, u64) > 0
+                            && *self.mode.get_or_insert(LibfuzzerMode::Cmin) != LibfuzzerMode::Cmin
+                        {
                             return Err(OptionsParseError::MultipleModesSelected);
                         }
                     }
@@ -186,15 +196,12 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         self.artifact_prefix = Some(value);
                     }
                     "timeout" => {
-                        self.timeout = Some(
-                            value
-                                .parse()
-                                .map(Duration::from_secs_f64)
-                                .map_err(|_| {
-                                    OptionsParseError::OptionValueParseFailed(name, value)
-                                })?,
-                        );
+                        self.timeout =
+                            Some(value.parse().map(Duration::from_secs_f64).map_err(|_| {
+                                OptionsParseError::OptionValueParseFailed(name, value)
+                            })?);
                     }
+                    "dict" => self.dict = Some(value),
                     "fork" | "jobs" => {
                         self.forks = Some(parse_or_bail!(name, value, usize));
                     }
@@ -214,6 +221,9 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             artifact_prefix: self.artifact_prefix.map(ArtifactPrefix::new),
             timeout: self.timeout.unwrap_or(Duration::from_secs(1200)),
             forks: self.forks,
+            dict: self.dict.map(|path| {
+                Tokens::from_file(path).expect("Couldn't load tokens from specified dictionary")
+            }),
             dirs: self.dirs.into_iter().map(PathBuf::from).collect(),
             unknown: self.unknown.into_iter().map(|s| s.to_string()).collect(),
         })
