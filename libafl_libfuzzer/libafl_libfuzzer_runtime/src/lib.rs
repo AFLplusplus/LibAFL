@@ -302,7 +302,6 @@ macro_rules! make_fuzz_closure {
             // In case the corpus is empty (on first run), reset
             if state.corpus().count() < 1 {
                 if !$options.dirs().is_empty() {
-                    println!("Loading from {:?}", $options.dirs());
                     // Load from disk
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, $options.dirs())
