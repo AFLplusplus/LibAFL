@@ -20,5 +20,6 @@ crate-type = ["staticlib", "rlib"]
 rand = "0.8.5"
 libafl = { path = "../../libafl", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "fork"] }
 libafl_targets = { path = "../../libafl_targets", features = ["sancov_8bit", "sancov_cmplog", "libfuzzer"] }
+portpicker = "0.1.1"
 
 [workspace]

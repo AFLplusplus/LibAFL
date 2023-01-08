@@ -19,6 +19,7 @@ use libafl::{
     corpus::Corpus,
     inputs::{BytesInput, HasBytesVec, UsesInput},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
+    random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
@@ -164,8 +165,8 @@ struct WeakMutatorProxy<F, M, MT, S> {
 impl<F, M, MT, S> ErasedLLVMFuzzerMutator for WeakMutatorProxy<F, M, MT, S>
 where
     F: Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool,
-    M: ScheduledMutator<MT, S>,
-    MT: MutatorsTuple<S>,
+    M: ScheduledMutator<BytesInput, MT, S>,
+    MT: MutatorsTuple<BytesInput, S>,
     S: HasMaxSize + UsesInput<Input = BytesInput>,
 {
     fn mutate(&self, data: *mut u8, size: usize, max_size: usize) -> usize {
@@ -257,12 +258,12 @@ impl<MT, SM> LLVMCustomMutator<MT, SM, true> {
     }
 }
 
-impl<MT, S, SM, const CROSSOVER: bool> ComposedByMutations<MT, S>
+impl<MT, S, SM, const CROSSOVER: bool> ComposedByMutations<BytesInput, MT, S>
     for LLVMCustomMutator<MT, SM, CROSSOVER>
 where
-    MT: MutatorsTuple<S>,
+    MT: MutatorsTuple<BytesInput, S>,
     S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize,
-    SM: ScheduledMutator<MT, S>,
+    SM: ScheduledMutator<BytesInput, MT, S>,
 {
     fn mutations(&self) -> &MT {
         unimplemented!("It is unsafe to provide reference-based access to the mutators as they are behind a RefCell.")
@@ -273,11 +274,11 @@ where
     }
 }
 
-impl<MT, S, SM> Mutator<S> for LLVMCustomMutator<MT, SM, false>
+impl<MT, S, SM> Mutator<BytesInput, S> for LLVMCustomMutator<MT, SM, false>
 where
-    MT: MutatorsTuple<S> + 'static,
+    MT: MutatorsTuple<BytesInput, S> + 'static,
     S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + 'static,
-    SM: ScheduledMutator<MT, S> + 'static,
+    SM: ScheduledMutator<BytesInput, MT, S> + 'static,
 {
     #[inline]
     fn mutate(
@@ -290,10 +291,10 @@ where
     }
 }
 
-impl<MT, S, SM> ScheduledMutator<MT, S> for LLVMCustomMutator<MT, SM, false>
+impl<MT, S, SM> ScheduledMutator<BytesInput, MT, S> for LLVMCustomMutator<MT, SM, false>
 where
-    SM: ScheduledMutator<MT, S> + 'static,
-    MT: MutatorsTuple<S> + 'static,
+    SM: ScheduledMutator<BytesInput, MT, S> + 'static,
+    MT: MutatorsTuple<BytesInput, S> + 'static,
     S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + 'static,
 {
     fn iterations(&self, state: &mut S, input: &S::Input) -> u64 {
@@ -348,11 +349,11 @@ where
     }
 }
 
-impl<MT, S, SM> Mutator<S> for LLVMCustomMutator<MT, SM, true>
+impl<MT, S, SM> Mutator<BytesInput, S> for LLVMCustomMutator<MT, SM, true>
 where
-    MT: MutatorsTuple<S> + 'static,
+    MT: MutatorsTuple<BytesInput, S> + 'static,
     S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
-    SM: ScheduledMutator<MT, S> + 'static,
+    SM: ScheduledMutator<BytesInput, MT, S> + 'static,
 {
     #[inline]
     fn mutate(
@@ -365,10 +366,10 @@ where
     }
 }
 
-impl<MT, S, SM> ScheduledMutator<MT, S> for LLVMCustomMutator<MT, SM, true>
+impl<MT, S, SM> ScheduledMutator<BytesInput, MT, S> for LLVMCustomMutator<MT, SM, true>
 where
-    SM: ScheduledMutator<MT, S> + 'static,
-    MT: MutatorsTuple<S> + 'static,
+    SM: ScheduledMutator<BytesInput, MT, S> + 'static,
+    MT: MutatorsTuple<BytesInput, S> + 'static,
     S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
 {
     fn iterations(&self, state: &mut S, input: &S::Input) -> u64 {
@@ -388,8 +389,7 @@ where
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);

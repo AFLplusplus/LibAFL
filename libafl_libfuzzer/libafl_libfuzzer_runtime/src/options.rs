@@ -204,11 +204,8 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                                 })?,
                         );
                     }
-                    "fork" => {
-                        self.forks =
-                            Some(value.parse().map_err(|_| {
-                                OptionsParseError::OptionValueParseFailed(name, value)
-                            })?);
+                    "fork" | "jobs" => {
+                        self.forks = Some(parse_or_bail!(name, value, usize));
                     }
                     _ => self.unknown.push(arg),
                 },
