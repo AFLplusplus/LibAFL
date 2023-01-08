@@ -21,7 +21,7 @@ pub fn LLVMFuzzerRunDriver(
     let argv = unsafe { *argv };
 
     let options = LibfuzzerOptions::new(
-        (1..argc)
+        (0..argc)
             .map(|i| unsafe { *argv.offset(i) })
             .map(|cstr| unsafe { CStr::from_ptr(cstr) })
             .map(|cstr| cstr.to_str().unwrap()),

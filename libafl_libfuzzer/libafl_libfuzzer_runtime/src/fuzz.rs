@@ -9,11 +9,11 @@ use libafl::{
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, Feedback, MaxMapFeedback, NewHashFeedback, TimeFeedback},
     generators::{GeneralizedInputBytesGenerator, RandBytesGenerator},
-    inputs::{GeneralizedInput, HasTargetBytes, UsesInput},
-    monitors::SimplePrintingMonitor,
+    inputs::{BytesInput, GeneralizedInput, HasTargetBytes, UsesInput},
+    monitors::{tui::TuiMonitor, SimplePrintingMonitor},
     mutators::{
-        grimoire::*, havoc_mutations, tokens_mutations, I2SRandReplace, StdMOptMutator,
-        StdScheduledMutator, Tokens,
+        grimoire::*, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
+        tokens_mutations, I2SRandReplace, StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{
         BacktraceObserver, HitcountsIterableMapObserver, MultiMapObserver, ObserversTuple,
@@ -29,18 +29,52 @@ use libafl::{
     state::{HasClientPerfMonitor, HasCorpus, StdState},
     Error, Fuzzer, StdFuzzer,
 };
-use libafl_targets::{autotokens, CmpLogObserver, CMPLOG_MAP, COUNTERS_MAPS};
+use libafl_targets::{autotokens, CmpLogObserver, LLVMCustomMutator, CMPLOG_MAP, COUNTERS_MAPS};
 use rand::{thread_rng, RngCore};
 
 use crate::options::LibfuzzerOptions;
 
 static mut BACKTRACE: Option<u64> = None;
 
+struct CustomMutationStatus {
+    std_mutational: bool,
+    std_no_mutate: bool,
+    std_no_crossover: bool,
+    custom_mutation: bool,
+    custom_crossover: bool,
+}
+
+impl CustomMutationStatus {
+    fn new() -> Self {
+        let custom_mutation = libafl_targets::libfuzzer::has_custom_mutator();
+        let custom_crossover = libafl_targets::libfuzzer::has_custom_crossover();
+
+        // we use all libafl mutations
+        let std_mutational = !(custom_mutation || custom_crossover);
+        // we use libafl crossover, but not libafl mutations
+        let std_no_mutate = !std_mutational && custom_mutation && !custom_crossover;
+        // we use libafl mutations, but not libafl crossover
+        let std_no_crossover = !std_mutational && !custom_mutation && custom_crossover;
+
+        Self {
+            std_mutational,
+            std_no_mutate,
+            std_no_crossover,
+            custom_mutation,
+            custom_crossover,
+        }
+    }
+}
+
 fn fuzz_single(
     options: LibfuzzerOptions,
     harness: &extern "C" fn(*const u8, usize) -> c_int,
 ) -> Result<(), Error> {
     let mut mgr = SimpleEventManager::printing();
+    // let monitor = TuiMonitor::new(options.fuzzer_name().to_string(), true);
+    // let mut mgr = SimpleEventManager::new(monitor);
+
+    let mutator_status = CustomMutationStatus::new();
 
     // Create an observation channel using the coverage map
     let edges = unsafe { &mut COUNTERS_MAPS };
@@ -49,9 +83,8 @@ fn fuzz_single(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    // TODO Create the Cmp observer
-    // let cmplog = unsafe { &mut CMPLOG_MAP };
-    // let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+    // Create the Cmp observer
+    let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     // Create a stacktrace observer
     let backtrace_observer = BacktraceObserver::new(
@@ -134,33 +167,80 @@ fn fuzz_single(
     //     }
     // }
 
-    // TODO Setup a randomic Input2State stage
-    // let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    // Setup a randomic Input2State stage, conditionally within a custom mutator
+    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    let i2s = SkippableStage::new(i2s, |_| (!mutator_status.custom_mutation).into());
+    let cm_i2s = StdMutationalStage::new(unsafe {
+        LLVMCustomMutator::mutate_unchecked(StdScheduledMutator::new(tuple_list!(
+            I2SRandReplace::new()
+        )))
+    });
+    let cm_i2s = SkippableStage::new(cm_i2s, |_| mutator_status.custom_mutation.into());
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new(
+    // TODO configure with mutation stacking options from libfuzzer, use tokens from dictionary
+    let std_mutator = StdMOptMutator::new(
         &mut state,
         havoc_mutations(), // TODO .merge(tokens_mutations()),
         7,
         5,
     )?;
 
-    // TODO support
-    // let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
-    //     tuple_list!(
-    //         GrimoireExtensionMutator::new(),
-    //         GrimoireRecursiveReplacementMutator::new(),
-    //         GrimoireStringReplacementMutator::new(),
-    //         // give more probability to avoid large inputs
-    //         GrimoireRandomDeleteMutator::new(),
-    //         GrimoireRandomDeleteMutator::new(),
-    //     ),
-    //     3,
-    // );
-    // let grimoire = StdMutationalStage::new(grimoire_mutator);
-    // let skippable_grimoire = SkippableStage::new(grimoire, |_s| opt.grimoire.into());
+    let std_power = StdPowerMutationalStage::new(std_mutator, &edges_observer);
+    let std_power = SkippableStage::new(std_power, |_| mutator_status.std_mutational.into());
 
-    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
+    // for custom mutator and crossover, each have access to the LLVMFuzzerMutate -- but it appears
+    // that this method doesn't normally offer stacked mutations where one may expect them
+    // we offer stacked mutations since this appears to be expected; see:
+    // https://github.com/google/fuzzing/blob/bb05211c12328cb16327bb0d58c0c67a9a44576f/docs/structure-aware-fuzzing.md#example-compression
+    // additionally, we perform mutation and crossover in two separate stages due to possible
+    // errors introduced by incorrectly handling custom mutations; see explanation below
+
+    // a custom mutator is defined
+    // note: in libfuzzer, crossover is enabled by default, but this appears to be unintended
+    // and erroneous if custom mutators are defined as it inserts bytes from other test cases
+    // without performing the custom mutator's preprocessing beforehand
+    // we opt not to use crossover in the LLVMFuzzerMutate and instead have a second crossover pass,
+    // though it is likely an error for fuzzers to provide custom mutators but not custom crossovers
+    let custom_mutator = unsafe {
+        LLVMCustomMutator::mutate_unchecked(StdMOptMutator::new(
+            &mut state,
+            havoc_mutations_no_crossover(), // TODO .merge(tokens_mutations()),
+            7,
+            5,
+        )?)
+    };
+    let std_mutator_no_mutate = StdScheduledMutator::with_max_stack_pow(havoc_crossover(), 3);
+
+    let cm_power = StdPowerMutationalStage::new(custom_mutator, &edges_observer);
+    let cm_power = SkippableStage::new(cm_power, |_| mutator_status.custom_mutation.into());
+    let cm_std_power = StdMutationalStage::new(std_mutator_no_mutate);
+    let cm_std_power = SkippableStage::new(cm_std_power, |_| mutator_status.std_no_mutate.into());
+
+    // a custom crossover is defined
+    // while the scenario that a custom crossover is defined without a custom mutator is unlikely
+    // we handle it here explicitly anyways
+    let custom_crossover = unsafe {
+        LLVMCustomMutator::crossover_unchecked(StdScheduledMutator::with_max_stack_pow(
+            havoc_mutations_no_crossover(), // TODO .merge(tokens_mutations()),
+            3,
+        ))
+    };
+    let std_mutator_no_crossover = StdMOptMutator::new(
+        &mut state,
+        havoc_mutations_no_crossover(), // TODO .merge(tokens_mutations()),
+        7,
+        5,
+    )?;
+
+    let cc_power = StdMutationalStage::new(custom_crossover);
+    let cc_power = SkippableStage::new(cc_power, |_| mutator_status.custom_crossover.into());
+    let cc_std_power = StdPowerMutationalStage::new(std_mutator_no_crossover, &edges_observer);
+    let cc_std_power =
+        SkippableStage::new(cc_std_power, |_| mutator_status.std_no_crossover.into());
+
+    // unfortunately, we cannot support grimoire and also support custom mutators
+    // in the future, we can handle this explicitly, but this introduces issues with generics :(
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler =
@@ -170,20 +250,14 @@ fn fuzz_single(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &GeneralizedInput| {
+    let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
-        unsafe {
-            harness(buf.as_ptr(), buf.len());
-        }
+        harness(buf.as_ptr(), buf.len());
         ExitKind::Ok
     };
 
-    // let mut tracing_harness = harness;
-
-    // let generalization = GeneralizationStage::new(&edges_observer);
-    //
-    // let skippable_generalization = SkippableStage::new(generalization, |_s| opt.grimoire.into());
+    let mut tracing_harness = harness;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = TimeoutExecutor::new(
@@ -198,22 +272,25 @@ fn fuzz_single(
     );
 
     // TODO Setup a tracing stage in which we log comparisons
-    // let tracing = TracingStage::new(InProcessExecutor::new(
-    //     &mut tracing_harness,
-    //     tuple_list!(cmplog_observer),
-    //     &mut fuzzer,
-    //     &mut state,
-    //     &mut mgr,
-    // )?);
+    let tracing = TracingStage::new(InProcessExecutor::new(
+        &mut tracing_harness,
+        tuple_list!(cmplog_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+    )?);
 
     // The order of the stages matter!
     let mut stages = tuple_list!(
-        // skippable_generalization,
         calibration,
-        // tracing,
-        // i2s,
-        power,
-        // skippable_grimoire
+        tracing,
+        i2s,
+        cm_i2s,
+        std_power,
+        cm_power,
+        cm_std_power,
+        cc_std_power,
+        cc_power,
     );
 
     // In case the corpus is empty (on first run), reset
@@ -230,7 +307,7 @@ fn fuzz_single(
         }
         if state.corpus().count() < 1 {
             // Generator of printable bytearrays of max size 32
-            let mut generator = GeneralizedInputBytesGenerator::from(RandBytesGenerator::new(32));
+            let mut generator = RandBytesGenerator::from(RandBytesGenerator::new(32));
 
             // Generate 8 initial inputs
             state

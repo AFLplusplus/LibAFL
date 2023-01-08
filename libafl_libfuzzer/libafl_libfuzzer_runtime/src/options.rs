@@ -13,7 +13,6 @@ enum RawOption<'a> {
 }
 
 fn parse_option(arg: &str) -> Option<RawOption> {
-    println!("parsed option: {}", arg);
     if arg.starts_with('-') {
         if let Some((name, value)) = arg.split_at(1).1.split_once('=') {
             Some(Flag { name, value })
@@ -91,19 +90,35 @@ impl ArtifactPrefix {
 
 #[derive(Debug, Clone)]
 pub struct LibfuzzerOptions {
+    fuzzer_name: String,
     mode: LibfuzzerMode,
     artifact_prefix: Option<ArtifactPrefix>,
     timeout: Duration,
+    forks: Option<usize>,
     dirs: Vec<PathBuf>,
     unknown: Vec<String>,
 }
 
 impl LibfuzzerOptions {
     pub fn new<'a>(mut args: impl Iterator<Item = &'a str>) -> Result<Self, OptionsParseError<'a>> {
+        let name = args.next().unwrap();
+        let name = if let Some(executable) = std::env::current_exe().ok().and_then(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.to_string())
+        }) {
+            executable
+        } else {
+            name.to_string()
+        };
         args.try_fold(LibfuzzerOptionsBuilder::default(), |builder, arg| {
             builder.consume(arg)
         })
-        .and_then(|builder| builder.build())
+        .and_then(|builder| builder.build(name))
+    }
+
+    pub fn fuzzer_name(&self) -> &str {
+        &self.fuzzer_name
     }
 
     pub fn mode(&self) -> &LibfuzzerMode {
@@ -116,6 +131,10 @@ impl LibfuzzerOptions {
 
     pub fn timeout(&self) -> Duration {
         self.timeout
+    }
+
+    pub fn forks(&self) -> Option<usize> {
+        self.forks
     }
 
     pub fn dirs(&self) -> &[PathBuf] {
@@ -132,6 +151,7 @@ struct LibfuzzerOptionsBuilder<'a> {
     mode: Option<LibfuzzerMode>,
     artifact_prefix: Option<&'a str>,
     timeout: Option<Duration>,
+    forks: Option<usize>,
     dirs: Vec<&'a str>,
     unknown: Vec<&'a str>,
 }
@@ -174,6 +194,22 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                     "artifact_prefix" => {
                         self.artifact_prefix = Some(value);
                     }
+                    "timeout" => {
+                        self.timeout = Some(
+                            value
+                                .parse()
+                                .map(|timeout_s: f64| Duration::from_secs_f64(timeout_s))
+                                .map_err(|_| {
+                                    OptionsParseError::OptionValueParseFailed(name, value)
+                                })?,
+                        );
+                    }
+                    "fork" => {
+                        self.forks =
+                            Some(value.parse().map_err(|_| {
+                                OptionsParseError::OptionValueParseFailed(name, value)
+                            })?);
+                    }
                     _ => self.unknown.push(arg),
                 },
             }
@@ -183,11 +219,13 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
         Ok(self)
     }
 
-    fn build(self) -> Result<LibfuzzerOptions, OptionsParseError<'a>> {
+    fn build(self, fuzzer_name: String) -> Result<LibfuzzerOptions, OptionsParseError<'a>> {
         Ok(LibfuzzerOptions {
+            fuzzer_name,
             mode: self.mode.unwrap_or(LibfuzzerMode::Fuzz),
             artifact_prefix: self.artifact_prefix.map(ArtifactPrefix::new),
             timeout: self.timeout.unwrap_or(Duration::from_secs(1200)),
+            forks: self.forks,
             dirs: self.dirs.into_iter().map(|s| PathBuf::from(s)).collect(),
             unknown: self.unknown.into_iter().map(|s| s.to_string()).collect(),
         })

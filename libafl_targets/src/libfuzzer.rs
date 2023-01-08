@@ -17,8 +17,8 @@ use core::{
 use libafl::{
     bolts::{rands::Rand, AsSlice},
     corpus::Corpus,
-    inputs::{BytesInput, HasBytesVec, HasTargetBytes, UsesInput},
-    mutators::{MutationResult, Mutator},
+    inputs::{BytesInput, HasBytesVec, UsesInput},
+    mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
@@ -76,6 +76,14 @@ pub fn libfuzzer_test_one_input(buf: &[u8]) -> i32 {
     unsafe { LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len()) }
 }
 
+pub fn has_custom_mutator() -> bool {
+    unsafe { libafl_targets_has_libfuzzer_custom_mutator() }
+}
+
+pub fn has_custom_crossover() -> bool {
+    unsafe { libafl_targets_has_libfuzzer_custom_crossover() }
+}
+
 trait ErasedLLVMFuzzerMutator {
     fn mutate(&self, data: *mut u8, size: usize, max_size: usize) -> usize;
 }
@@ -97,15 +105,15 @@ pub fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     })
 }
 
-struct MutatorProxy<'a, M, S> {
+struct MutatorProxy<'a, M, MT, S> {
     state: Rc<RefCell<*mut S>>, // refcell to prevent double-mutability over the pointer
     mutator: Weak<RefCell<M>>,
     result: Rc<RefCell<Result<MutationResult, Error>>>,
     stage_idx: i32,
-    phantom: PhantomData<&'a mut ()>,
+    phantom: PhantomData<(&'a mut (), MT)>,
 }
 
-impl<'a, M, S> MutatorProxy<'a, M, S> {
+impl<'a, M, MT, S> MutatorProxy<'a, M, MT, S> {
     fn new(
         state: &'a mut S,
         mutator: &Rc<RefCell<M>>,
@@ -121,7 +129,9 @@ impl<'a, M, S> MutatorProxy<'a, M, S> {
         }
     }
 
-    fn weak(&self) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool, M, S> {
+    fn weak(
+        &self,
+    ) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool, M, MT, S> {
         let state = Rc::downgrade(&self.state);
         WeakMutatorProxy {
             accessor: move |f: &mut dyn for<'b> FnMut(&'b mut S)| {
@@ -143,18 +153,19 @@ impl<'a, M, S> MutatorProxy<'a, M, S> {
 }
 
 #[derive(Clone)]
-struct WeakMutatorProxy<F, M, S> {
+struct WeakMutatorProxy<F, M, MT, S> {
     accessor: F,
     mutator: Weak<RefCell<M>>,
     stage_idx: i32,
     result: Rc<RefCell<Result<MutationResult, Error>>>,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(MT, S)>,
 }
 
-impl<F, M, S> ErasedLLVMFuzzerMutator for WeakMutatorProxy<F, M, S>
+impl<F, M, MT, S> ErasedLLVMFuzzerMutator for WeakMutatorProxy<F, M, MT, S>
 where
     F: Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool,
-    M: Mutator<S>,
+    M: ScheduledMutator<MT, S>,
+    MT: MutatorsTuple<S>,
     S: HasMaxSize + UsesInput<Input = BytesInput>,
 {
     fn mutate(&self, data: *mut u8, size: usize, max_size: usize) -> usize {
@@ -166,7 +177,7 @@ where
                         BytesInput::from(unsafe { core::slice::from_raw_parts(data, size) });
                     let old = state.max_size();
                     state.set_max_size(max_size);
-                    let res = mutator.mutate(state, &mut intermediary, self.stage_idx);
+                    let res = mutator.scheduled_mutate(state, &mut intermediary, self.stage_idx);
                     state.set_max_size(old);
                     let succeeded = res.is_ok();
 
@@ -175,7 +186,7 @@ where
                     drop(result);
 
                     if succeeded {
-                        let target = intermediary.target_bytes();
+                        let target = intermediary.bytes();
                         if target.as_slice().len() > max_size {
                             self.result
                                 .replace(Err(Error::illegal_state("Mutation result was too long!")))
@@ -200,15 +211,18 @@ where
     }
 }
 
+// we must implement crossover compatibility here because (according to libfuzzer)
+// LLVMFuzzerCustomCrossover may use LLVMFuzzerMutate (wacky)
 #[derive(Debug)]
-pub struct LLVMCustomMutator<M> {
-    mutator: Rc<RefCell<M>>,
+pub struct LLVMCustomMutator<MT, SM, const CROSSOVER: bool> {
+    mutator: Rc<RefCell<SM>>,
+    phantom: PhantomData<MT>,
 }
 
-impl<M> LLVMCustomMutator<M> {
-    pub fn new(mutator: M) -> Result<Self, Error> {
+impl<MT, SM> LLVMCustomMutator<MT, SM, false> {
+    pub fn mutate(mutator: SM) -> Result<Self, Error> {
         if unsafe { libafl_targets_has_libfuzzer_custom_mutator() } {
-            Ok(unsafe { Self::new_unchecked(mutator) })
+            Ok(unsafe { Self::mutate_unchecked(mutator) })
         } else {
             Err(Error::illegal_state(
                 "Cowardly refusing to create a LLVMFuzzerMutator if a custom mutator is not defined.",
@@ -216,41 +230,102 @@ impl<M> LLVMCustomMutator<M> {
         }
     }
 
-    pub unsafe fn new_unchecked(mutator: M) -> Self {
+    pub unsafe fn mutate_unchecked(mutator: SM) -> Self {
         LLVMCustomMutator {
             mutator: Rc::new(RefCell::new(mutator)),
+            phantom: PhantomData,
         }
     }
 }
 
-impl<M, S> Mutator<S> for LLVMCustomMutator<M>
+impl<MT, SM> LLVMCustomMutator<MT, SM, true> {
+    pub fn crossover(mutator: SM) -> Result<Self, Error> {
+        if unsafe { libafl_targets_has_libfuzzer_custom_crossover() } {
+            Ok(unsafe { Self::crossover_unchecked(mutator) })
+        } else {
+            Err(Error::illegal_state(
+                "Cowardly refusing to create a LLVMFuzzerMutator if a custom crossover is not defined.",
+            ))
+        }
+    }
+
+    pub unsafe fn crossover_unchecked(mutator: SM) -> Self {
+        LLVMCustomMutator {
+            mutator: Rc::new(RefCell::new(mutator)),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<MT, S, SM, const CROSSOVER: bool> ComposedByMutations<MT, S>
+    for LLVMCustomMutator<MT, SM, CROSSOVER>
 where
-    M: Mutator<S> + 'static,
-    S: HasRand + HasMaxSize + UsesInput<Input = BytesInput> + 'static,
+    MT: MutatorsTuple<S>,
+    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize,
+    SM: ScheduledMutator<MT, S>,
 {
+    fn mutations(&self) -> &MT {
+        unimplemented!("It is unsafe to provide reference-based access to the mutators as they are behind a RefCell.")
+    }
+
+    fn mutations_mut(&mut self) -> &mut MT {
+        unimplemented!("It is unsafe to provide reference-based access to the mutators as they are behind a RefCell.")
+    }
+}
+
+impl<MT, S, SM> Mutator<S> for LLVMCustomMutator<MT, SM, false>
+where
+    MT: MutatorsTuple<S> + 'static,
+    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + 'static,
+    SM: ScheduledMutator<MT, S> + 'static,
+{
+    #[inline]
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut BytesInput,
+        input: &mut S::Input,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        self.scheduled_mutate(state, input, stage_idx)
+    }
+}
+
+impl<MT, S, SM> ScheduledMutator<MT, S> for LLVMCustomMutator<MT, SM, false>
+where
+    SM: ScheduledMutator<MT, S> + 'static,
+    MT: MutatorsTuple<S> + 'static,
+    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + 'static,
+{
+    fn iterations(&self, state: &mut S, input: &S::Input) -> u64 {
+        let mutator = self.mutator.deref().borrow();
+        mutator.iterations(state, input)
+    }
+
+    fn schedule(&self, state: &mut S, input: &S::Input) -> usize {
+        let mutator = self.mutator.deref().borrow();
+        mutator.schedule(state, input)
+    }
+
+    fn scheduled_mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let seed = state.rand_mut().next();
+        let target = input.bytes();
+        let mut bytes = Vec::with_capacity(state.max_size());
+        bytes.extend_from_slice(target.as_slice());
+        bytes.resize(state.max_size(), 0);
+
         let result = Rc::new(RefCell::new(Err(Error::illegal_state(
             "Never updated mutator proxy's result.",
         ))));
         let proxy = MutatorProxy::new(state, &self.mutator, &result, stage_idx);
-        MUTATOR.with(|mutator| {
+        let old = MUTATOR.with(|mutator| {
             let mut mutator = mutator.borrow_mut();
-            if let Some(mutator) = mutator.deref_mut() {
-                *mutator = Box::new(proxy.weak());
-            } else {
-                let _ = mutator.insert(Box::new(proxy.weak()));
-            }
+            mutator.replace(Box::new(proxy.weak()))
         });
-        let target = input.target_bytes();
-        let mut bytes = Vec::with_capacity(state.max_size());
-        bytes.extend_from_slice(target.as_slice());
-        bytes.resize(state.max_size(), 0);
         let new_size = unsafe {
             libafl_targets_libfuzzer_custom_mutator(
                 bytes.as_mut_ptr(),
@@ -259,6 +334,11 @@ where
                 seed as u32,
             )
         };
+        drop(proxy);
+        MUTATOR.with(|mutator| {
+            let mut mutator = mutator.borrow_mut();
+            *mutator = old;
+        });
         if result.deref().borrow().is_err() {
             return result.replace(Ok(MutationResult::Skipped));
         }
@@ -266,50 +346,48 @@ where
         core::mem::swap(input.bytes_mut(), &mut bytes);
         Ok(MutationResult::Mutated)
     }
-
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        stage_idx: i32,
-        corpus_idx: Option<usize>,
-    ) -> Result<(), Error> {
-        let mut mutator = self.mutator.deref().borrow_mut();
-        mutator.post_exec(state, stage_idx, corpus_idx)
-    }
 }
 
-#[derive(Debug)]
-pub struct LLVMCustomCrossover;
-
-impl LLVMCustomCrossover {
-    pub fn new() -> Result<Self, Error> {
-        if unsafe { libafl_targets_has_libfuzzer_custom_crossover() } {
-            Ok(Self)
-        } else {
-            Err(Error::illegal_state("Cowardly refusing to create a LLVMCrossoverStage if a custom crossover is not defined."))
-        }
-    }
-
-    pub unsafe fn new_unchecked() -> Self {
-        Self
-    }
-}
-
-impl<S> Mutator<S> for LLVMCustomCrossover
+impl<MT, S, SM> Mutator<S> for LLVMCustomMutator<MT, SM, true>
 where
-    S: HasCorpus + HasRand + HasMaxSize,
-    S::Input: HasBytesVec,
+    MT: MutatorsTuple<S> + 'static,
+    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
+    SM: ScheduledMutator<MT, S> + 'static,
 {
+    #[inline]
     fn mutate(
         &mut self,
         state: &mut S,
         input: &mut S::Input,
-        _stage_idx: i32,
+        stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        // taken from CrossoverInsertMutator
+        self.scheduled_mutate(state, input, stage_idx)
+    }
+}
 
-        let size = input.bytes().len();
+impl<MT, S, SM> ScheduledMutator<MT, S> for LLVMCustomMutator<MT, SM, true>
+where
+    SM: ScheduledMutator<MT, S> + 'static,
+    MT: MutatorsTuple<S> + 'static,
+    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
+{
+    fn iterations(&self, state: &mut S, input: &S::Input) -> u64 {
+        let mutator = self.mutator.deref().borrow();
+        mutator.iterations(state, input)
+    }
 
+    fn schedule(&self, state: &mut S, input: &S::Input) -> usize {
+        let mutator = self.mutator.deref().borrow();
+        mutator.schedule(state, input)
+    }
+
+    fn scheduled_mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut S::Input,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        // We don't want to use the testcase we're already using for splicing
         let count = state.corpus().count();
         let idx = state.rand_mut().below(count as u64) as usize;
         if let Some(cur) = state.corpus().current() {
@@ -318,27 +396,44 @@ where
             }
         }
 
-        let max_size = state.max_size();
-        let seed = state.rand_mut().next() as u32;
-
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input()?;
-        let other_size = other.bytes().len();
-        let mut out = vec![0u8; max_size];
-        let result_size = unsafe {
+        let data2 = Vec::from(other.bytes());
+        drop(other_testcase);
+
+        let seed = state.rand_mut().next();
+        let mut out = vec![0u8; state.max_size()];
+        let data1 = input.bytes();
+
+        let result = Rc::new(RefCell::new(Err(Error::illegal_state(
+            "Never updated mutator proxy's result.",
+        ))));
+        let proxy = MutatorProxy::new(state, &self.mutator, &result, stage_idx);
+        let old = MUTATOR.with(|mutator| {
+            let mut mutator = mutator.borrow_mut();
+            mutator.replace(Box::new(proxy.weak()))
+        });
+        let new_size = unsafe {
             libafl_targets_libfuzzer_custom_crossover(
-                input.bytes().as_ptr(),
-                size,
-                other.bytes().as_ptr(),
-                other_size,
+                data1.as_ptr(),
+                data1.len(),
+                data2.as_ptr(),
+                data2.len(),
                 out.as_mut_ptr(),
                 out.len(),
-                seed,
+                seed as u32,
             )
         };
-        out.truncate(result_size);
+        drop(proxy);
+        MUTATOR.with(|mutator| {
+            let mut mutator = mutator.borrow_mut();
+            *mutator = old;
+        });
+        if result.deref().borrow().is_err() {
+            return result.replace(Ok(MutationResult::Skipped));
+        }
+        out.truncate(new_size);
         core::mem::swap(input.bytes_mut(), &mut out);
-
         Ok(MutationResult::Mutated)
     }
 }
