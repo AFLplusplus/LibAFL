@@ -67,6 +67,7 @@ where
 {
     type Post = ();
 
+    #[inline]
     fn try_transform_from(
         base: &Testcase<I>,
         _state: &S,
@@ -75,6 +76,7 @@ where
         Ok(base.input().as_ref().unwrap().clone())
     }
 
+    #[inline]
     fn try_transform_into(self, _state: &S) -> Result<(I, Self::Post), Error> {
         Ok((self, ()))
     }
