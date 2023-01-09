@@ -266,7 +266,9 @@ pub fn build(
                 .arg("--disable-xen")
                 .arg("--disable-xen-pci-passthrough")
                 .arg("--disable-xkbcommon")
-                .arg("--disable-zstd");
+                .arg("--disable-zstd")
+                .arg("--disable-capstone")
+                .arg("--disable-sndio");
             if cfg!(feature = "debug_assertions") {
                 cmd.arg("--enable-debug");
             }
@@ -400,6 +402,9 @@ pub fn build(
     println!("cargo:rustc-link-lib=glib-2.0");
     println!("cargo:rustc-link-lib=stdc++");
     println!("cargo:rustc-link-lib=z");
+    // if keyutils is available, qemu meson script will compile code with keyutils.
+    // therefore, we need to link with keyutils if our system have libkeyutils.
+    let _ = pkg_config::Config::new().probe("libkeyutils");
 
     if !is_usermode {
         println!("cargo:rustc-link-lib=pixman-1");
