@@ -29,6 +29,7 @@ frida_cli = ["cli"]
 afl_exec_sec = [] # calculate exec/sec like AFL
 errors_backtrace = ["backtrace"]
 cmin = ["z3"] # corpus minimisation
+corpus_btreemap = []
 
 # features hiding dependencies licensed under GPL
 gpl = []

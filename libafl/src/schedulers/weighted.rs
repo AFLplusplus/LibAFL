@@ -1,18 +1,17 @@
 //! The queue corpus scheduler with weighted queue item selection from aflpp (`https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32`)
 //! This queue corpus scheduler needs calibration stage.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
     inputs::UsesInput,
+    random_corpus_id,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
@@ -29,9 +28,9 @@ pub struct WeightedScheduleMetadata {
     /// The fuzzer execution spent in the current cycles
     runs_in_current_cycle: usize,
     /// Alias table for weighted queue entry selection
-    alias_table: Vec<usize>,
+    alias_table: HashMap<CorpusId, CorpusId>,
     /// Probability for which queue entry is selected
-    alias_probability: Vec<f64>,
+    alias_probability: HashMap<CorpusId, f64>,
 }
 
 impl Default for WeightedScheduleMetadata {
@@ -46,8 +45,8 @@ impl WeightedScheduleMetadata {
     pub fn new() -> Self {
         Self {
             runs_in_current_cycle: 0,
-            alias_table: vec![0],
-            alias_probability: vec![0.0],
+            alias_table: HashMap::default(),
+            alias_probability: HashMap::default(),
         }
     }
 
@@ -64,23 +63,23 @@ impl WeightedScheduleMetadata {
 
     /// The getter for `alias_table`
     #[must_use]
-    pub fn alias_table(&self) -> &[usize] {
+    pub fn alias_table(&self) -> &HashMap<CorpusId, CorpusId> {
         &self.alias_table
     }
 
     /// The setter for `alias_table`
-    pub fn set_alias_table(&mut self, table: Vec<usize>) {
+    pub fn set_alias_table(&mut self, table: HashMap<CorpusId, CorpusId>) {
         self.alias_table = table;
     }
 
     /// The getter for `alias_probability`
     #[must_use]
-    pub fn alias_probability(&self) -> &[f64] {
+    pub fn alias_probability(&self) -> &HashMap<CorpusId, f64> {
         &self.alias_probability
     }
 
     /// The setter for `alias_probability`
-    pub fn set_alias_probability(&mut self, probability: Vec<f64>) {
+    pub fn set_alias_probability(&mut self, probability: HashMap<CorpusId, f64>) {
         self.alias_probability = probability;
     }
 }
@@ -137,25 +136,25 @@ where
     pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> {
         let n = state.corpus().count();
 
-        let mut alias_table: Vec<usize> = vec![0; n];
-        let mut alias_probability: Vec<f64> = vec![0.0; n];
-        let mut weights: Vec<f64> = vec![0.0; n];
+        let mut alias_table: HashMap<CorpusId, CorpusId> = HashMap::default();
+        let mut alias_probability: HashMap<CorpusId, f64> = HashMap::default();
+        let mut weights: HashMap<CorpusId, f64> = HashMap::default();
 
-        let mut p_arr: Vec<f64> = vec![0.0; n];
-        let mut s_arr: Vec<usize> = vec![0; n];
-        let mut l_arr: Vec<usize> = vec![0; n];
+        let mut p_arr: HashMap<CorpusId, f64> = HashMap::default();
+        let mut s_arr: HashMap<usize, CorpusId> = HashMap::default();
+        let mut l_arr: HashMap<usize, CorpusId> = HashMap::default();
 
         let mut sum: f64 = 0.0;
 
-        for (i, item) in weights.iter_mut().enumerate().take(n) {
+        for i in state.corpus().ids() {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
             let weight = F::compute(&mut *testcase, state)?;
-            *item = weight;
+            weights.insert(i, weight);
             sum += weight;
         }
 
-        for i in 0..n {
-            p_arr[i] = weights[i] * (n as f64) / sum;
+        for (i, w) in weights.iter() {
+            p_arr.insert(*i, w * (n as f64) / sum);
         }
 
         // # of items in queue S
@@ -164,12 +163,12 @@ where
         // # of items in queue L
         let mut n_l = 0;
         // Divide P into two queues, S and L
-        for s in (0..n).rev() {
-            if p_arr[s] < 1.0 {
-                s_arr[n_s] = s;
+        for s in state.corpus().ids().rev() {
+            if *p_arr.get(&s).unwrap() < 1.0 {
+                s_arr.insert(n_s, s);
                 n_s += 1;
             } else {
-                l_arr[n_l] = s;
+                l_arr.insert(n_l, s);
                 n_l += 1;
             }
         }
@@ -177,30 +176,30 @@ where
         while n_s > 0 && n_l > 0 {
             n_s -= 1;
             n_l -= 1;
-            let a = s_arr[n_s];
-            let g = l_arr[n_l];
+            let a = *s_arr.get(&n_s).unwrap();
+            let g = *l_arr.get(&n_l).unwrap();
 
-            alias_probability[a] = p_arr[a];
-            alias_table[a] = g;
-            p_arr[g] = p_arr[g] + p_arr[a] - 1.0;
+            alias_probability.insert(a, *p_arr.get(&a).unwrap());
+            alias_table.insert(a, g);
+            *p_arr.get_mut(&g).unwrap() += p_arr.get(&a).unwrap() - 1.0;
 
-            if p_arr[g] < 1.0 {
-                s_arr[n_s] = g;
+            if *p_arr.get(&g).unwrap() < 1.0 {
+                *s_arr.get_mut(&n_s).unwrap() = g;
                 n_s += 1;
             } else {
-                l_arr[n_l] = g;
+                *l_arr.get_mut(&n_l).unwrap() = g;
                 n_l += 1;
             }
         }
 
         while n_l > 0 {
             n_l -= 1;
-            alias_probability[l_arr[n_l]] = 1.0;
+            alias_probability.insert(*l_arr.get(&n_l).unwrap(), 1.0);
         }
 
         while n_s > 0 {
             n_s -= 1;
-            alias_probability[s_arr[n_s]] = 1.0;
+            alias_probability.insert(*s_arr.get(&n_s).unwrap(), 1.0);
         }
 
         let wsmeta = state
@@ -230,7 +229,7 @@ where
     S: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata(SchedulerMetadata::new(self.strat));
         }
@@ -271,7 +270,7 @@ where
     fn on_replace(
         &self,
         state: &mut S,
-        idx: usize,
+        idx: CorpusId,
         _testcase: &Testcase<S::Input>,
     ) -> Result<(), Error> {
         // Recreate the alias table
@@ -281,7 +280,7 @@ where
     fn on_remove(
         &self,
         state: &mut S,
-        _idx: usize,
+        _idx: CorpusId,
         _testcase: &Option<Testcase<S::Input>>,
     ) -> Result<(), Error> {
         // Recreate the alias table
@@ -290,12 +289,13 @@ where
     }
 
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
-        if state.corpus().count() == 0 {
+    fn next(&self, state: &mut S) -> Result<CorpusId, Error> {
+        let corpus_counts = state.corpus().count();
+        if corpus_counts == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
-            let corpus_counts = state.corpus().count();
-            let s = state.rand_mut().below(corpus_counts as u64) as usize;
+            let s = random_corpus_id!(state.corpus(), state.rand_mut());
+
             // Choose a random value between 0.000000000 and 1.000000000
             let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
 
@@ -308,16 +308,17 @@ where
 
             let current_cycles = wsmeta.runs_in_current_cycle();
 
+            // TODO deal with corpus_counts decreasing due to removals
             if current_cycles >= corpus_counts {
                 wsmeta.set_runs_current_cycle(0);
             } else {
                 wsmeta.set_runs_current_cycle(current_cycles + 1);
             }
 
-            let idx = if probability < wsmeta.alias_probability()[s] {
+            let idx = if probability < *wsmeta.alias_probability().get(&s).unwrap() {
                 s
             } else {
-                wsmeta.alias_table()[s]
+                *wsmeta.alias_table().get(&s).unwrap()
             };
 
             // Update depth

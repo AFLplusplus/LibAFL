@@ -4,6 +4,7 @@ use alloc::{boxed::Box, vec::Vec};
 
 use crate::{
     bolts::anymap::AsAny,
+    corpus::CorpusId,
     stages::{Stage, StagesTuple},
     state::UsesState,
     Error,
@@ -42,7 +43,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         for s in &mut self.list {
             s.perform(fuzzer, executor, state, manager, corpus_idx)?;
