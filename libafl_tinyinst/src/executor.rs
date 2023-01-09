@@ -176,7 +176,7 @@ where SP: ShMemProvider,
         observers: OT,
     ) -> Result<TinyInstExecutor<'a, S, OT>, Error> {
         let mut has_input = false;
-        let program_args = self
+        let program_args : Vec<String> = self
             .program_args
             .clone()
             .into_iter()
@@ -214,8 +214,8 @@ where SP: ShMemProvider,
 
         let tinyinst = unsafe {
             TinyInst::new(
-                self.tinyinst_args.clone(),
-                program_args,
+                &self.tinyinst_args,
+                &program_args,
                 self.timeout.as_millis() as u32,
             )
         };
