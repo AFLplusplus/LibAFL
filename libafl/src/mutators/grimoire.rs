@@ -134,16 +134,13 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let current = state.corpus().current().unwrap();
-        let mut generalised_meta = if let Some(meta) = state
+        let Some(mut generalised_meta) = state
             .corpus()
             .get(current)?
             .borrow_mut()
             .metadata_mut()
             .get::<GeneralizedInputMetadata>()
-            .cloned()
-        {
-            meta
-        } else {
+            .cloned() else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -153,7 +150,6 @@ where
             &mut self.gap_indices,
         )?;
 
-        generalised_meta.grimoire_mutated = true;
         input.bytes = generalised_meta.generalized_to_bytes();
         Ok(MutationResult::Mutated)
     }
@@ -193,16 +189,13 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let current = state.corpus().current().unwrap();
-        let mut generalised_meta = if let Some(meta) = state
+        let Some(mut generalised_meta) = state
             .corpus()
             .get(current)?
             .borrow_mut()
             .metadata_mut()
             .get::<GeneralizedInputMetadata>()
-            .cloned()
-        {
-            meta
-        } else {
+            .cloned() else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -238,11 +231,10 @@ where
             self.scratch.clear();
 
             mutated = MutationResult::Mutated;
-            generalised_meta.grimoire_mutated = true;
         }
 
         if mutated == MutationResult::Mutated {
-            input.bytes = generalised_meta.generalized_to_bytes()
+            input.bytes = generalised_meta.generalized_to_bytes();
         }
         Ok(mutated)
     }
@@ -292,16 +284,13 @@ where
         };
 
         let current = state.corpus().current().unwrap();
-        let mut generalised_meta = if let Some(meta) = state
+        let Some(mut generalised_meta) = state
             .corpus()
             .get(current)?
             .borrow_mut()
             .metadata_mut()
             .get::<GeneralizedInputMetadata>()
-            .cloned()
-        {
-            meta
-        } else {
+            .cloned() else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -365,8 +354,7 @@ where
         }
 
         if mutated == MutationResult::Mutated {
-            generalised_meta.grimoire_mutated = true;
-            input.bytes = generalised_meta.generalized_to_bytes()
+            input.bytes = generalised_meta.generalized_to_bytes();
         }
         Ok(mutated)
     }
@@ -403,16 +391,13 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let current = state.corpus().current().unwrap();
-        let mut generalised_meta = if let Some(meta) = state
+        let Some(mut generalised_meta) = state
             .corpus()
             .get(current)?
             .borrow_mut()
             .metadata_mut()
             .get::<GeneralizedInputMetadata>()
-            .cloned()
-        {
-            meta
-        } else {
+            .cloned() else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -436,7 +421,6 @@ where
         } else {
             gen.drain(min_idx..max_idx);
 
-            generalised_meta.grimoire_mutated = true;
             input.bytes = generalised_meta.generalized_to_bytes();
             MutationResult::Mutated
         };

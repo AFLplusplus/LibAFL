@@ -19,14 +19,13 @@ pub enum GeneralizedItem {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct GeneralizedInputMetadata {
     generalized: Vec<GeneralizedItem>,
-    /// Whether the input was mutated with grimoire or not
-    pub grimoire_mutated: bool,
 }
 
 impl_serdeany!(GeneralizedInputMetadata);
 
 impl GeneralizedInputMetadata {
     /// Fill the generalized vector from a slice of option (None -> Gap)
+    #[must_use]
     pub fn generalized_from_options(v: &[Option<u8>]) -> Self {
         let mut generalized = vec![];
         let mut bytes = vec![];
@@ -53,10 +52,7 @@ impl GeneralizedInputMetadata {
         if generalized.last() != Some(&GeneralizedItem::Gap) {
             generalized.push(GeneralizedItem::Gap);
         }
-        Self {
-            generalized,
-            grimoire_mutated: false,
-        }
+        Self { generalized }
     }
 
     /// Get the size of the generalized
