@@ -9,7 +9,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-    inputs::{GeneralizedInput, HasTargetBytes},
+    inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
         havoc_mutations, scheduled::StdScheduledMutator, GrimoireExtensionMutator,
@@ -59,13 +59,13 @@ pub fn main() {
             let mut file = fs::File::open(path).expect("no file found");
             let mut buffer = vec![];
             file.read_to_end(&mut buffer).expect("buffer overflow");
-            let input = GeneralizedInput::new(buffer);
+            let input = BytesInput::new(buffer);
             initial_inputs.push(input);
         }
     }
 
     // The closure that we want to fuzz
-    let mut harness = |input: &GeneralizedInput| {
+    let mut harness = |input: &BytesInput| {
         let target_bytes = input.target_bytes();
         let bytes = target_bytes.as_slice();
 
@@ -77,12 +77,6 @@ pub fn main() {
             signals_set(3);
         }
 
-        unsafe {
-            if input.grimoire_mutated {
-                // println!(">>> {:?}", input.generalized());
-                println!(">>> {:?}", std::str::from_utf8_unchecked(bytes));
-            }
-        }
         signals_set(1);
         ExitKind::Ok
     };

@@ -7,7 +7,7 @@ use core::cmp::{max, min};
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::{GeneralizedInput, GeneralizedItem, UsesInput},
+    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, UsesInput},
     mutators::{token_mutations::Tokens, MutationResult, Mutator},
     stages::generalization::GeneralizedIndexesMetadata,
     state::{HasCorpus, HasMetadata, HasRand},
@@ -24,7 +24,7 @@ fn extend_with_random_generalized<S>(
     gap_indices: &mut Vec<usize>,
 ) -> Result<(), Error>
 where
-    S: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
+    S: HasMetadata + HasRand + HasCorpus<Input = BytesInput>,
 {
     let rand_idx = state.rand_mut().next() as usize;
 
@@ -40,50 +40,42 @@ where
             .unwrap()
     };
 
-    /*if state
-        .corpus()
-        .get(idx)?
-        .borrow_mut()
-        .load_input()?
-        .generalized()
-        .is_none()
-    {
-        return Ok(true);
-    }*/
-
     if state.rand_mut().below(100) > CHOOSE_SUBINPUT_PROB {
         if state.rand_mut().below(100) < 50 {
             let rand1 = state.rand_mut().next() as usize;
             let rand2 = state.rand_mut().next() as usize;
 
             let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-            let other = other_testcase.load_input()?;
+            if let Some(other) = other_testcase
+                .metadata_mut()
+                .get::<GeneralizedInputMetadata>()
+            {
+                if other.generalized_len() > 0 {
+                    let gen = other.generalized();
 
-            if other.generalized_len() > 0 {
-                let gen = other.generalized().unwrap();
+                    for (i, _) in gen
+                        .iter()
+                        .enumerate()
+                        .filter(|&(_, x)| *x == GeneralizedItem::Gap)
+                    {
+                        gap_indices.push(i);
+                    }
+                    let min_idx = gap_indices[rand1 % gap_indices.len()];
+                    let max_idx = gap_indices[rand2 % gap_indices.len()];
+                    let (mut min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
 
-                for (i, _) in gen
-                    .iter()
-                    .enumerate()
-                    .filter(|&(_, x)| *x == GeneralizedItem::Gap)
-                {
-                    gap_indices.push(i);
+                    gap_indices.clear();
+
+                    if items.last() == Some(&GeneralizedItem::Gap) {
+                        min_idx += 1;
+                    }
+                    items.extend_from_slice(&gen[min_idx..=max_idx]);
+
+                    debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
+                    debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
+
+                    return Ok(());
                 }
-                let min_idx = gap_indices[rand1 % gap_indices.len()];
-                let max_idx = gap_indices[rand2 % gap_indices.len()];
-                let (mut min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
-
-                gap_indices.clear();
-
-                if items.last() == Some(&GeneralizedItem::Gap) {
-                    min_idx += 1;
-                }
-                items.extend_from_slice(&gen[min_idx..=max_idx]);
-
-                debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
-                debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
-
-                return Ok(());
             }
         }
 
@@ -107,8 +99,11 @@ where
     }
 
     let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-    let other = other_testcase.load_input()?;
-    let gen = other.generalized().unwrap();
+    let other = other_testcase
+        .metadata_mut()
+        .get::<GeneralizedInputMetadata>()
+        .unwrap();
+    let gen = other.generalized();
 
     if items.last() == Some(&GeneralizedItem::Gap) && gen.first() == Some(&GeneralizedItem::Gap) {
         items.extend_from_slice(&gen[1..]);
@@ -130,25 +125,36 @@ pub struct GrimoireExtensionMutator {
 
 impl<S> Mutator<S> for GrimoireExtensionMutator
 where
-    S: UsesInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
+    S: UsesInput<Input = BytesInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut GeneralizedInput,
+        input: &mut BytesInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if input.generalized().is_none() {
+        let current = state.corpus().current().unwrap();
+        let mut generalised_meta = if let Some(meta) = state
+            .corpus()
+            .get(current)?
+            .borrow_mut()
+            .metadata_mut()
+            .get::<GeneralizedInputMetadata>()
+            .cloned()
+        {
+            meta
+        } else {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
         extend_with_random_generalized(
             state,
-            input.generalized_mut().as_mut().unwrap(),
+            generalised_meta.generalized_mut(),
             &mut self.gap_indices,
         )?;
 
-        input.grimoire_mutated = true;
+        generalised_meta.grimoire_mutated = true;
+        input.bytes = generalised_meta.generalized_to_bytes();
         Ok(MutationResult::Mutated)
     }
 }
@@ -178,27 +184,37 @@ pub struct GrimoireRecursiveReplacementMutator {
 
 impl<S> Mutator<S> for GrimoireRecursiveReplacementMutator
 where
-    S: UsesInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
+    S: UsesInput<Input = BytesInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut GeneralizedInput,
+        input: &mut BytesInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if input.generalized().is_none() {
+        let current = state.corpus().current().unwrap();
+        let mut generalised_meta = if let Some(meta) = state
+            .corpus()
+            .get(current)?
+            .borrow_mut()
+            .metadata_mut()
+            .get::<GeneralizedInputMetadata>()
+            .cloned()
+        {
+            meta
+        } else {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
         let mut mutated = MutationResult::Skipped;
 
         let depth = *state.rand_mut().choose(&RECURSIVE_REPLACEMENT_DEPTH);
         for _ in 0..depth {
-            if input.generalized_len() >= MAX_RECURSIVE_REPLACEMENT_LEN {
+            if generalised_meta.generalized_len() >= MAX_RECURSIVE_REPLACEMENT_LEN {
                 break;
             }
 
-            let gen = input.generalized_mut().as_mut().unwrap();
+            let gen = generalised_meta.generalized_mut();
 
             for (i, _) in gen
                 .iter()
@@ -206,6 +222,9 @@ where
                 .filter(|&(_, x)| *x == GeneralizedItem::Gap)
             {
                 self.gap_indices.push(i);
+            }
+            if self.gap_indices.is_empty() {
+                break;
             }
             let selected = *state.rand_mut().choose(&self.gap_indices);
             self.gap_indices.clear();
@@ -219,9 +238,12 @@ where
             self.scratch.clear();
 
             mutated = MutationResult::Mutated;
-            input.grimoire_mutated = true;
+            generalised_meta.grimoire_mutated = true;
         }
 
+        if mutated == MutationResult::Mutated {
+            input.bytes = generalised_meta.generalized_to_bytes()
+        }
         Ok(mutated)
     }
 }
@@ -249,28 +271,40 @@ pub struct GrimoireStringReplacementMutator {}
 
 impl<S> Mutator<S> for GrimoireStringReplacementMutator
 where
-    S: UsesInput<Input = GeneralizedInput> + HasMetadata + HasRand,
+    S: UsesInput<Input = BytesInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut GeneralizedInput,
+        input: &mut BytesInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if input.generalized().is_none() {
-            return Ok(MutationResult::Skipped);
-        }
-
         let tokens_len = {
             let meta = state.metadata().get::<Tokens>();
-            if meta.is_none() {
+            if let Some(tokens) = meta {
+                if tokens.is_empty() {
+                    return Ok(MutationResult::Skipped);
+                }
+                tokens.tokens().len()
+            } else {
                 return Ok(MutationResult::Skipped);
             }
-            if meta.unwrap().tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.unwrap().tokens().len()
         };
+
+        let current = state.corpus().current().unwrap();
+        let mut generalised_meta = if let Some(meta) = state
+            .corpus()
+            .get(current)?
+            .borrow_mut()
+            .metadata_mut()
+            .get::<GeneralizedInputMetadata>()
+            .cloned()
+        {
+            meta
+        } else {
+            return Ok(MutationResult::Skipped);
+        };
+
         let token_find = state.rand_mut().below(tokens_len as u64) as usize;
         let mut token_replace = state.rand_mut().below(tokens_len as u64) as usize;
         if token_find == token_replace {
@@ -286,7 +320,7 @@ where
 
         let mut mutated = MutationResult::Skipped;
 
-        let gen = input.generalized_mut().as_mut().unwrap();
+        let gen = generalised_meta.generalized_mut();
         rand_idx %= gen.len();
 
         'first: for item in &mut gen[..rand_idx] {
@@ -330,7 +364,10 @@ where
             }
         }
 
-        input.grimoire_mutated = true;
+        if mutated == MutationResult::Mutated {
+            generalised_meta.grimoire_mutated = true;
+            input.bytes = generalised_meta.generalized_to_bytes()
+        }
         Ok(mutated)
     }
 }
@@ -357,20 +394,29 @@ pub struct GrimoireRandomDeleteMutator {
 
 impl<S> Mutator<S> for GrimoireRandomDeleteMutator
 where
-    S: UsesInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
+    S: UsesInput<Input = BytesInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut GeneralizedInput,
+        input: &mut BytesInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if input.generalized().is_none() {
+        let current = state.corpus().current().unwrap();
+        let mut generalised_meta = if let Some(meta) = state
+            .corpus()
+            .get(current)?
+            .borrow_mut()
+            .metadata_mut()
+            .get::<GeneralizedInputMetadata>()
+            .cloned()
+        {
+            meta
+        } else {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
-        input.grimoire_mutated = true;
-        let gen = input.generalized_mut().as_mut().unwrap();
+        let gen = generalised_meta.generalized_mut();
 
         for (i, _) in gen
             .iter()
@@ -385,14 +431,17 @@ where
             self.gap_indices[state.rand_mut().below(self.gap_indices.len() as u64) as usize];
         let (min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
 
-        self.gap_indices.clear();
-
-        if min_idx == max_idx {
-            Ok(MutationResult::Skipped)
+        let result = if min_idx == max_idx {
+            MutationResult::Skipped
         } else {
             gen.drain(min_idx..max_idx);
-            Ok(MutationResult::Mutated)
-        }
+
+            generalised_meta.grimoire_mutated = true;
+            input.bytes = generalised_meta.generalized_to_bytes();
+            MutationResult::Mutated
+        };
+
+        Ok(result)
     }
 }
 
