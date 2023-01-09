@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::{Rand, StdRand},
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,
@@ -407,7 +407,7 @@ where
         &mut self,
         state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>,
+        _corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();

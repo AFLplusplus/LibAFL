@@ -1,6 +1,5 @@
 //! The ondisk corpus stores unused testcases to disk.
 
-use alloc::vec::Vec;
 use core::{cell::RefCell, time::Duration};
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
@@ -13,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::serdeany::SerdeAnyMap,
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
     state::HasMetadata,
     Error,
@@ -48,8 +47,7 @@ pub struct OnDiskCorpus<I>
 where
     I: Input,
 {
-    entries: Vec<RefCell<Testcase<I>>>,
-    current: Option<usize>,
+    inner: InMemoryCorpus<I>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
 }
@@ -68,57 +66,75 @@ where
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {
-        self.entries.len()
+        self.inner.count()
     }
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
-        self.save_testcase(&mut testcase)?;
-        self.entries.push(RefCell::new(testcase));
-        Ok(self.entries.len() - 1)
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+        let idx = self.inner.add(testcase)?;
+        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), idx)?;
+        Ok(idx)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        if idx >= self.entries.len() {
-            return Err(Error::key_not_found(format!("Index {idx} out of bounds")));
-        }
-        self.save_testcase(&mut testcase)?;
-        let previous = self.entries[idx].replace(testcase);
-        self.remove_testcase(&previous)?;
-        Ok(previous)
+    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+        let entry = self.inner.replace(idx, testcase)?;
+        self.remove_testcase(&entry)?;
+        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), idx)?;
+        Ok(entry)
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
-        if idx >= self.entries.len() {
-            Ok(None)
-        } else {
-            let prev = self.entries.remove(idx).into_inner();
-            self.remove_testcase(&prev)?;
-            Ok(Some(prev))
-        }
+    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
+        let entry = self.inner.remove(idx)?;
+        self.remove_testcase(&entry)?;
+        Ok(entry)
     }
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
-        Ok(&self.entries[idx])
+    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.inner.get(idx)
     }
 
     /// Current testcase scheduled
     #[inline]
-    fn current(&self) -> &Option<usize> {
-        &self.current
+    fn current(&self) -> &Option<CorpusId> {
+        self.inner.current()
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
-    fn current_mut(&mut self) -> &mut Option<usize> {
-        &mut self.current
+    fn current_mut(&mut self) -> &mut Option<CorpusId> {
+        self.inner.current_mut()
+    }
+
+    #[inline]
+    fn next(&self, idx: CorpusId) -> Option<CorpusId> {
+        self.inner.next(idx)
+    }
+
+    #[inline]
+    fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
+        self.inner.prev(idx)
+    }
+
+    #[inline]
+    fn first(&self) -> Option<CorpusId> {
+        self.inner.first()
+    }
+
+    #[inline]
+    fn last(&self) -> Option<CorpusId> {
+        self.inner.last()
+    }
+
+    #[inline]
+    fn nth(&self, nth: usize) -> CorpusId {
+        self.inner.nth(nth)
     }
 }
 
@@ -135,8 +151,7 @@ where
         fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus<I>, Error> {
             fs::create_dir_all(&dir_path)?;
             Ok(OnDiskCorpus {
-                entries: vec![],
-                current: None,
+                inner: InMemoryCorpus::new(),
                 dir_path,
                 meta_format: None,
             })
@@ -152,21 +167,16 @@ where
     ) -> Result<Self, Error> {
         fs::create_dir_all(&dir_path)?;
         Ok(Self {
-            entries: vec![],
-            current: None,
+            inner: InMemoryCorpus::new(),
             dir_path,
             meta_format,
         })
     }
 
-    fn save_testcase(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            let file_orig = testcase
-                .input()
-                .as_ref()
-                .unwrap()
-                .generate_name(self.entries.len());
+            let file_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);
             let mut file = file_orig.clone();
 
             let mut ctr = 2;
@@ -224,7 +234,7 @@ where
         Ok(())
     }
 
-    fn remove_testcase(&mut self, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn remove_testcase(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         if let Some(filename) = testcase.filename() {
             fs::remove_file(filename)?;
         }

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::AsSlice,
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
@@ -31,7 +31,7 @@ const MAX_GENERALIZED_LEN: usize = 8192;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct GeneralizedIndexesMetadata {
     /// The set of indexes
-    pub indexes: HashSet<usize>,
+    pub indexes: HashSet<CorpusId>,
 }
 
 crate::impl_serdeany!(GeneralizedIndexesMetadata);
@@ -95,7 +95,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         if state
             .metadata()

@@ -11,6 +11,7 @@ use crate::{
     corpus::Corpus,
     inputs::{HasBytesVec, UsesInput},
     mutators::{MutationResult, Mutator},
+    random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
@@ -912,8 +913,8 @@ where
         let size = input.bytes().len();
 
         // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
@@ -990,8 +991,7 @@ where
         }
 
         // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
@@ -1069,8 +1069,7 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
