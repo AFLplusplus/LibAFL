@@ -217,6 +217,20 @@ where
     }
 }
 
+impl<E, EM, M, Z> StdMutationalStage<E, EM, Z::Input, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<Z::Input, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    /// Creates a new default mutational stage
+    pub fn new(mutator: M) -> Self {
+        Self::transforming(mutator)
+    }
+}
+
 impl<E, EM, I, M, Z> StdMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
@@ -225,8 +239,8 @@ where
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
-    /// Creates a new default mutational stage
-    pub fn new(mutator: M) -> Self {
+    /// Creates a new transforming mutational stage
+    pub fn transforming(mutator: M) -> Self {
         Self {
             mutator,
             phantom: PhantomData,

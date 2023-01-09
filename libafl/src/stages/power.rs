@@ -157,6 +157,22 @@ where
     }
 }
 
+impl<E, F, EM, M, O, Z> PowerMutationalStage<E, F, EM, E::Input, M, O, Z>
+where
+    E: Executor<EM, Z> + HasObservers,
+    EM: UsesState<State = E::State>,
+    F: TestcaseScore<E::State>,
+    M: Mutator<E::Input, E::State>,
+    O: MapObserver,
+    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    Z: Evaluator<E, EM, State = E::State>,
+{
+    /// Creates a new [`PowerMutationalStage`]
+    pub fn new(mutator: M, map_observer_name: &O) -> Self {
+        Self::transforming(mutator, map_observer_name)
+    }
+}
+
 impl<E, F, EM, I, M, O, Z> PowerMutationalStage<E, F, EM, I, M, O, Z>
 where
     E: Executor<EM, Z> + HasObservers,
@@ -167,8 +183,8 @@ where
     E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
-    /// Creates a new [`PowerMutationalStage`]
-    pub fn new(mutator: M, map_observer_name: &O) -> Self {
+    /// Creates a new transforming [`PowerMutationalStage`]
+    pub fn transforming(mutator: M, map_observer_name: &O) -> Self {
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             mutator,

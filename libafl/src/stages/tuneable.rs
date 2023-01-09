@@ -133,6 +133,21 @@ where
     }
 }
 
+impl<E, EM, M, Z> TuneableMutationalStage<E, EM, Z::Input, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<Z::Input, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+{
+    /// Creates a new default mutational stage
+    #[must_use]
+    pub fn new(state: &mut Z::State, mutator: M) -> Self {
+        Self::transforming(state, mutator)
+    }
+}
+
 impl<E, EM, I, M, Z> TuneableMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
@@ -140,11 +155,10 @@ where
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
-    I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
-    /// Creates a new default mutational stage
+    /// Creates a new tranforming mutational stage
     #[must_use]
-    pub fn new(state: &mut Z::State, mutator: M) -> Self {
+    pub fn transforming(state: &mut Z::State, mutator: M) -> Self {
         if !state.has_metadata::<TuneableMutationalStageMetadata>() {
             state.add_metadata(TuneableMutationalStageMetadata::default());
         }

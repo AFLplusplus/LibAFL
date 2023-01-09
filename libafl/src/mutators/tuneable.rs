@@ -222,7 +222,7 @@ mod test {
 
     #[test]
     fn test_tuning() {
-        let mut state = NopState::new();
+        let mut state: NopState<BytesInput> = NopState::new();
         let mutators = tuple_list!(
             BitFlipMutator::new(),
             ByteDecMutator::new(),

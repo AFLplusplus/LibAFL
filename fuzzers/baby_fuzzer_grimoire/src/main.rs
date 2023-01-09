@@ -152,7 +152,7 @@ pub fn main() {
     let mut stages = tuple_list!(
         generalization,
         StdMutationalStage::new(mutator),
-        StdMutationalStage::new(grimoire_mutator)
+        StdMutationalStage::transforming(grimoire_mutator)
     );
 
     for input in initial_inputs {
