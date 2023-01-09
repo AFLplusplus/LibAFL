@@ -15,7 +15,7 @@ use crate::{
         tuples::{tuple_list, tuple_list_type, NamedTuple},
         AsMutSlice, AsSlice,
     },
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     mutators::{MutationResult, Mutator, MutatorsTuple},
     state::{HasCorpus, HasMetadata, HasRand, State},
@@ -321,7 +321,7 @@ where
         &mut self,
         state: &mut S,
         _stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         if let Some(idx) = corpus_idx {
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
@@ -441,7 +441,9 @@ mod tests {
             .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
             .unwrap();
 
-        let testcase = corpus.get(0).expect("Corpus did not contain entries");
+        let testcase = corpus
+            .get(corpus.first().unwrap())
+            .expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
         let mut feedback = ConstFeedback::new(false);
@@ -481,7 +483,9 @@ mod tests {
             .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
             .unwrap();
 
-        let testcase = corpus.get(0).expect("Corpus did not contain entries");
+        let testcase = corpus
+            .get(corpus.first().unwrap())
+            .expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
         let input_prior = input.clone();
 

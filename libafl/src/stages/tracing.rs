@@ -5,7 +5,7 @@ use core::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
@@ -45,7 +45,7 @@ where
         _executor: &mut E,
         state: &mut TE::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         start_timer!(state);
         let input = state
@@ -124,7 +124,7 @@ where
         executor: &mut ShadowExecutor<E, SOT>,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         start_timer!(state);
         let input = state

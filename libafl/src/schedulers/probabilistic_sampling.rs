@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     schedulers::{Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
@@ -29,7 +29,7 @@ where
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProbabilityMetadata {
     /// corpus index -> probability
-    pub map: HashMap<usize, f64>,
+    pub map: HashMap<CorpusId, f64>,
     /// total probability of all items in the map
     pub total_probability: f64,
 }
@@ -69,7 +69,7 @@ where
     /// Calculate the score and store in `ProbabilityMetadata`
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::unused_self)]
-    pub fn store_probability(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    pub fn store_probability(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         let factor = F::compute(&mut *state.corpus().get(idx)?.borrow_mut(), state)?;
         if factor == 0.0 {
             return Err(Error::illegal_state(
@@ -99,7 +99,7 @@ where
     F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasRand,
 {
-    fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         if state.metadata().get::<ProbabilityMetadata>().is_none() {
             state.add_metadata(ProbabilityMetadata::new());
         }
@@ -108,7 +108,7 @@ where
 
     /// Gets the next entry
     #[allow(clippy::cast_precision_loss)]
-    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
