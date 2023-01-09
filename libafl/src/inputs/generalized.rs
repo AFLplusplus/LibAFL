@@ -116,8 +116,7 @@ where
             .get::<GeneralizedInputMetadata>()
             .ok_or_else(|| {
                 Error::key_not_found(format!(
-                    "Couldn't find the GeneralizedInputMetadata for corpus entry {}",
-                    corpus_idx
+                    "Couldn't find the GeneralizedInputMetadata for corpus entry {corpus_idx}",
                 ))
             })
             .cloned()
