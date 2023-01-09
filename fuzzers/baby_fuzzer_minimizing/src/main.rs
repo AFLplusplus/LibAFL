@@ -136,7 +136,13 @@ pub fn main() -> Result<(), Error> {
     let mut executor = InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut mgr)?;
 
     state.load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &[solution_dir])?;
-    stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr, 0)?;
+    stages.perform_all(
+        &mut fuzzer,
+        &mut executor,
+        &mut state,
+        &mut mgr,
+        CorpusId::from(0usize),
+    )?;
 
     Ok(())
 }

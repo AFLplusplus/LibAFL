@@ -5,7 +5,7 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     bolts::tuples::MatchName,
-    corpus::{Corpus, SchedulerTestcaseMetaData},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mutators::Mutator,
@@ -58,7 +58,7 @@ where
 
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_sign_loss)]
-    fn iterations(&self, state: &mut E::State, corpus_idx: usize) -> Result<u64, Error> {
+    fn iterations(&self, state: &mut E::State, corpus_idx: CorpusId) -> Result<u64, Error> {
         // Update handicap
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let score = F::compute(&mut *testcase, state)? as u64;
@@ -73,7 +73,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let num = self.iterations(state, corpus_idx)?;
 
@@ -143,7 +143,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
         ret
