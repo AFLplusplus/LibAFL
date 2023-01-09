@@ -7,7 +7,7 @@ use core::cmp::{max, min};
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, UsesInput},
+    inputs::{GeneralizedInputMetadata, GeneralizedItem},
     mutators::{token_mutations::Tokens, MutationResult, Mutator},
     stages::generalization::GeneralizedIndexesMetadata,
     state::{HasCorpus, HasMetadata, HasRand},
@@ -24,7 +24,7 @@ fn extend_with_random_generalized<S>(
     gap_indices: &mut Vec<usize>,
 ) -> Result<(), Error>
 where
-    S: HasMetadata + HasRand + HasCorpus<Input = BytesInput>,
+    S: HasMetadata + HasRand + HasCorpus,
 {
     let rand_idx = state.rand_mut().next() as usize;
 
@@ -123,34 +123,22 @@ pub struct GrimoireExtensionMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<S> Mutator<S> for GrimoireExtensionMutator
+impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireExtensionMutator
 where
-    S: UsesInput<Input = BytesInput> + HasMetadata + HasRand + HasCorpus,
+    S: HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut BytesInput,
+        generalised_meta: &mut GeneralizedInputMetadata,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let current = state.corpus().current().unwrap();
-        let Some(mut generalised_meta) = state
-            .corpus()
-            .get(current)?
-            .borrow_mut()
-            .metadata_mut()
-            .get::<GeneralizedInputMetadata>()
-            .cloned() else {
-            return Ok(MutationResult::Skipped);
-        };
-
         extend_with_random_generalized(
             state,
             generalised_meta.generalized_mut(),
             &mut self.gap_indices,
         )?;
 
-        input.bytes = generalised_meta.generalized_to_bytes();
         Ok(MutationResult::Mutated)
     }
 }
@@ -178,27 +166,16 @@ pub struct GrimoireRecursiveReplacementMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<S> Mutator<S> for GrimoireRecursiveReplacementMutator
+impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireRecursiveReplacementMutator
 where
-    S: UsesInput<Input = BytesInput> + HasMetadata + HasRand + HasCorpus,
+    S: HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut BytesInput,
+        generalised_meta: &mut GeneralizedInputMetadata,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let current = state.corpus().current().unwrap();
-        let Some(mut generalised_meta) = state
-            .corpus()
-            .get(current)?
-            .borrow_mut()
-            .metadata_mut()
-            .get::<GeneralizedInputMetadata>()
-            .cloned() else {
-            return Ok(MutationResult::Skipped);
-        };
-
         let mut mutated = MutationResult::Skipped;
 
         let depth = *state.rand_mut().choose(&RECURSIVE_REPLACEMENT_DEPTH);
@@ -233,9 +210,6 @@ where
             mutated = MutationResult::Mutated;
         }
 
-        if mutated == MutationResult::Mutated {
-            input.bytes = generalised_meta.generalized_to_bytes();
-        }
         Ok(mutated)
     }
 }
@@ -261,14 +235,14 @@ impl GrimoireRecursiveReplacementMutator {
 #[derive(Debug, Default)]
 pub struct GrimoireStringReplacementMutator {}
 
-impl<S> Mutator<S> for GrimoireStringReplacementMutator
+impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireStringReplacementMutator
 where
-    S: UsesInput<Input = BytesInput> + HasMetadata + HasRand + HasCorpus,
+    S: HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut BytesInput,
+        generalised_meta: &mut GeneralizedInputMetadata,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let tokens_len = {
@@ -281,17 +255,6 @@ where
             } else {
                 return Ok(MutationResult::Skipped);
             }
-        };
-
-        let current = state.corpus().current().unwrap();
-        let Some(mut generalised_meta) = state
-            .corpus()
-            .get(current)?
-            .borrow_mut()
-            .metadata_mut()
-            .get::<GeneralizedInputMetadata>()
-            .cloned() else {
-            return Ok(MutationResult::Skipped);
         };
 
         let token_find = state.rand_mut().below(tokens_len as u64) as usize;
@@ -353,9 +316,6 @@ where
             }
         }
 
-        if mutated == MutationResult::Mutated {
-            input.bytes = generalised_meta.generalized_to_bytes();
-        }
         Ok(mutated)
     }
 }
@@ -380,27 +340,16 @@ pub struct GrimoireRandomDeleteMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<S> Mutator<S> for GrimoireRandomDeleteMutator
+impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireRandomDeleteMutator
 where
-    S: UsesInput<Input = BytesInput> + HasMetadata + HasRand + HasCorpus,
+    S: HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut BytesInput,
+        generalised_meta: &mut GeneralizedInputMetadata,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let current = state.corpus().current().unwrap();
-        let Some(mut generalised_meta) = state
-            .corpus()
-            .get(current)?
-            .borrow_mut()
-            .metadata_mut()
-            .get::<GeneralizedInputMetadata>()
-            .cloned() else {
-            return Ok(MutationResult::Skipped);
-        };
-
         let gen = generalised_meta.generalized_mut();
 
         for (i, _) in gen
@@ -416,12 +365,12 @@ where
             self.gap_indices[state.rand_mut().below(self.gap_indices.len() as u64) as usize];
         let (min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
 
+        self.gap_indices.clear();
+
         let result = if min_idx == max_idx {
             MutationResult::Skipped
         } else {
             gen.drain(min_idx..max_idx);
-
-            input.bytes = generalised_meta.generalized_to_bytes();
             MutationResult::Mutated
         };
 
