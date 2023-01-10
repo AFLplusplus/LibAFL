@@ -17,8 +17,8 @@ libafl = { path = "../libafl", version = "0.8.0", features = [
     "std",
     "libafl_derive",
 ] }
-# tinyinst-rs = { git = "https://github.com/elbiazo/tinyinst-rs" }
-tinyinst-rs = { path = "../../TinyInst-rs" }
+#tinyinst = "0.1"
+tinyinst = { path = "../../TinyInst-rs" }
 
 [build-dependencies]
 cmake = "0.1"
