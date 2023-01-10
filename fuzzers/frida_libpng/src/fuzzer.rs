@@ -137,14 +137,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         // RNG
                         StdRand::with_seed(current_nanos()),
                         // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
+                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
+                            .unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new_save_meta(
-                            options.output.clone(),
-                            Some(OnDiskMetadataFormat::JsonPretty),
-                        )
-                        .unwrap(),
+                        OnDiskCorpus::new(options.output.clone()).unwrap(),
                         &mut feedback,
                         &mut objective,
                     )
@@ -255,14 +252,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         // RNG
                         StdRand::with_seed(current_nanos()),
                         // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
+                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
+                            .unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new_save_meta(
-                            options.output.clone(),
-                            Some(OnDiskMetadataFormat::JsonPretty),
-                        )
-                        .unwrap(),
+                        OnDiskCorpus::new(options.output.clone()).unwrap(),
                         &mut feedback,
                         &mut objective,
                     )
@@ -388,14 +382,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         // RNG
                         StdRand::with_seed(current_nanos()),
                         // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
+                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
+                            .unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new_save_meta(
-                            options.output.clone(),
-                            Some(OnDiskMetadataFormat::JsonPretty),
-                        )
-                        .unwrap(),
+                        OnDiskCorpus::new(options.output.clone()).unwrap(),
                         &mut feedback,
                         &mut objective,
                     )
