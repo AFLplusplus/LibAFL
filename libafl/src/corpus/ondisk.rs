@@ -1,4 +1,7 @@
-//! The ondisk corpus stores unused testcases to disk.
+//! The ondisk corpus stores [`Testcase`]s to disk.
+//! Additionally, all of them are kept in memory.
+//! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
+//! which only stores a certain number of testcases and removes additional ones in a FIFO manner.
 
 use core::{cell::RefCell, time::Duration};
 #[cfg(feature = "std")]
@@ -11,7 +14,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::serdeany::SerdeAnyMap,
+    bolts::{bolts_prelude::GzipCompressor, serdeany::SerdeAnyMap},
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
     state::HasMetadata,
@@ -28,9 +31,12 @@ pub enum OnDiskMetadataFormat {
     Json,
     /// JSON formatted for readability
     JsonPretty,
+    #[cfg(feature = "llmp_compression")]
+    /// The same as [`OnDiskMetadataFormat::JsonPretty`], but compressed
+    JsonGzip,
 }
 
-/// A corpus able to store testcases to disk, and load them from disk, when they are being used.
+/// The [`Testcase`] metadata that'll be stored to disk
 #[cfg(feature = "std")]
 #[derive(Debug, Serialize)]
 pub struct OnDiskMetadata<'a> {
@@ -39,7 +45,9 @@ pub struct OnDiskMetadata<'a> {
     executions: &'a usize,
 }
 
-/// A corpus able to store testcases to disk, and load them from disk, when they are being used.
+/// A corpus able to store [`Testcase`]s to disk, and load them from disk, when they are being used.
+///
+/// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -142,33 +150,54 @@ impl<I> OnDiskCorpus<I>
 where
     I: Input,
 {
-    /// Creates the [`OnDiskCorpus`].
+    /// Creates an [`OnDiskCorpus`].
+    ///
+    /// This corpus stores all testcases to disk, and keeps all of them in memory, as well.
+    ///
+    /// by default, it stores metadata for each [`testcase`] as prettified json.
+    /// metadata will be written to a file named `.<testcase>.metadata`
+    /// the metadata may include objective reason, specific information for a fuzz job, and more.
+    ///
+    /// if you don't want metadata, use [`ondiskcorpus::no_meta`].
+    /// to pick a different metadata format, use [`ondiskcorpus::with_meta_format`].
+    ///
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
     pub fn new<P>(dir_path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
-        fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus<I>, Error> {
-            fs::create_dir_all(&dir_path)?;
-            Ok(OnDiskCorpus {
-                inner: InMemoryCorpus::new(),
-                dir_path,
-                meta_format: None,
-            })
-        }
-        new(dir_path.as_ref().to_path_buf())
+        Self::_new(dir_path.as_ref(), Some(OnDiskMetadataFormat::JsonPretty))
     }
 
-    /// Creates the [`OnDiskCorpus`] specifying the type of `Metadata` to be saved to disk.
+    /// Creates the [`OnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk.
+    ///
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
-    pub fn new_save_meta(
-        dir_path: PathBuf,
-        meta_format: Option<OnDiskMetadataFormat>,
-    ) -> Result<Self, Error> {
+    pub fn with_meta_format<P>(
+        dir_path: P,
+        meta_format: OnDiskMetadataFormat,
+    ) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        Self::_new(dir_path.as_ref(), Some(meta_format))
+    }
+
+    /// Creates an [`OnDiskCorpus`] that will not store .metadata files
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn no_meta<P>(dir_path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        Self::_new(dir_path.as_ref(), None)
+    }
+
+    /// Private fn to crate a new corpus at the given (non-generic) path with the given optional `meta_format`
+    fn _new(dir_path: &Path, meta_format: Option<OnDiskMetadataFormat>) -> Result<Self, Error> {
         fs::create_dir_all(&dir_path)?;
-        Ok(Self {
+        Ok(OnDiskCorpus {
             inner: InMemoryCorpus::new(),
-            dir_path,
+            dir_path: dir_path.into(),
             meta_format,
         })
     }
@@ -193,7 +222,7 @@ where
                     break self.dir_path.join(file);
                 }
 
-                file = format!("{}-{ctr}", &file_orig);
+                file = format!("{file_orig}-{ctr}");
                 ctr += 1;
             };
 
@@ -202,14 +231,16 @@ where
         };
         if self.meta_format.is_some() {
             let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
+
             filename.set_file_name(format!(
                 ".{}.metadata",
                 filename.file_name().unwrap().to_string_lossy()
             ));
+
             let mut tmpfile_name = PathBuf::from(&filename);
             tmpfile_name.set_file_name(format!(
                 ".{}.tmp",
-                tmpfile_name.file_name().unwrap().to_string_lossy()
+                filename.file_name().unwrap().to_string_lossy()
             ));
 
             let ondisk_meta = OnDiskMetadata {
@@ -224,6 +255,10 @@ where
                 OnDiskMetadataFormat::Postcard => postcard::to_allocvec(&ondisk_meta)?,
                 OnDiskMetadataFormat::Json => serde_json::to_vec(&ondisk_meta)?,
                 OnDiskMetadataFormat::JsonPretty => serde_json::to_vec_pretty(&ondisk_meta)?,
+                #[cfg(feature = "llmp_compression")]
+                OnDiskMetadataFormat::JsonGzip => GzipCompressor::new(0)
+                    .compress(&serde_json::to_vec_pretty(&ondisk_meta)?)?
+                    .unwrap(),
             };
             tmpfile.write_all(&serialized)?;
             fs::rename(&tmpfile_name, &filename)?;
@@ -249,6 +284,7 @@ where
         Ok(())
     }
 }
+
 #[cfg(feature = "python")]
 /// `OnDiskCorpus` Python bindings
 pub mod pybind {
