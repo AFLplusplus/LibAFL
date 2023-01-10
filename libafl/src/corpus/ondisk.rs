@@ -13,8 +13,11 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "gzip")]
+use crate::bolts::compress::GzipCompressor;
+
 use crate::{
-    bolts::{bolts_prelude::GzipCompressor, serdeany::SerdeAnyMap},
+    bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
     state::HasMetadata,
@@ -31,7 +34,7 @@ pub enum OnDiskMetadataFormat {
     Json,
     /// JSON formatted for readability
     JsonPretty,
-    #[cfg(feature = "llmp_compression")]
+    #[cfg(feature = "gzip")]
     /// The same as [`OnDiskMetadataFormat::JsonPretty`], but compressed
     JsonGzip,
 }
@@ -194,7 +197,7 @@ where
 
     /// Private fn to crate a new corpus at the given (non-generic) path with the given optional `meta_format`
     fn _new(dir_path: &Path, meta_format: Option<OnDiskMetadataFormat>) -> Result<Self, Error> {
-        fs::create_dir_all(&dir_path)?;
+        fs::create_dir_all(dir_path)?;
         Ok(OnDiskCorpus {
             inner: InMemoryCorpus::new(),
             dir_path: dir_path.into(),
@@ -231,16 +234,14 @@ where
         };
         if self.meta_format.is_some() {
             let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
-
             filename.set_file_name(format!(
                 ".{}.metadata",
                 filename.file_name().unwrap().to_string_lossy()
             ));
-
             let mut tmpfile_name = PathBuf::from(&filename);
             tmpfile_name.set_file_name(format!(
                 ".{}.tmp",
-                filename.file_name().unwrap().to_string_lossy()
+                tmpfile_name.file_name().unwrap().to_string_lossy()
             ));
 
             let ondisk_meta = OnDiskMetadata {
@@ -255,7 +256,7 @@ where
                 OnDiskMetadataFormat::Postcard => postcard::to_allocvec(&ondisk_meta)?,
                 OnDiskMetadataFormat::Json => serde_json::to_vec(&ondisk_meta)?,
                 OnDiskMetadataFormat::JsonPretty => serde_json::to_vec_pretty(&ondisk_meta)?,
-                #[cfg(feature = "llmp_compression")]
+                #[cfg(feature = "gzip")]
                 OnDiskMetadataFormat::JsonGzip => GzipCompressor::new(0)
                     .compress(&serde_json::to_vec_pretty(&ondisk_meta)?)?
                     .unwrap(),

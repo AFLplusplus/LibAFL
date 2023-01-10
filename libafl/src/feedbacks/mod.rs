@@ -949,7 +949,7 @@ impl TimeFeedback {
 
     /// Creates a new [`TimeFeedback`], deciding if the given [`TimeObserver`] value of a run is interesting.
     #[must_use]
-    pub fn new_with_observer(observer: &TimeObserver) -> Self {
+    pub fn with_observer(observer: &TimeObserver) -> Self {
         Self {
             exec_time: None,
             name: observer.name().to_string(),
@@ -1021,7 +1021,7 @@ where
 
     /// Creates a new [`TimeFeedback`], deciding if the given [`ListObserver`] value of a run is interesting.
     #[must_use]
-    pub fn new_with_observer(observer: &ListObserver<T>) -> Self {
+    pub fn with_observer(observer: &ListObserver<T>) -> Self {
         Self {
             name: observer.name().to_string(),
             last_addr: 0,
