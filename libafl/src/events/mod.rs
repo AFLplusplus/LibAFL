@@ -652,7 +652,7 @@ mod tests {
 
     #[test]
     fn test_event_serde() {
-        let obv = StdMapObserver::new("test", unsafe { &mut MAP });
+        let obv = unsafe { StdMapObserver::new("test", &mut MAP) };
         let map = tuple_list!(obv);
         let observers_buf = postcard::to_allocvec(&map).unwrap();
 

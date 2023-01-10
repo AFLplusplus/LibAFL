@@ -7,7 +7,7 @@ use std::{fs, fs::File, io::Write, path::PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     stages::Stage,
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions, UsesState},
@@ -17,8 +17,8 @@ use crate::{
 /// Metadata used to store information about disk dump indexes for names
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct DumpToDiskMetadata {
-    last_corpus: usize,
-    last_solution: usize,
+    last_corpus: Option<CorpusId>,
+    last_solution: Option<CorpusId>,
 }
 
 crate::impl_serdeany!(DumpToDiskMetadata);
@@ -54,17 +54,19 @@ where
         _executor: &mut E,
         state: &mut Z::State,
         _manager: &mut EM,
-        _corpus_idx: usize,
+        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let meta = state
-            .metadata()
-            .get::<DumpToDiskMetadata>()
-            .map_or_else(DumpToDiskMetadata::default, Clone::clone);
+        let (mut corpus_idx, mut solutions_idx) =
+            if let Some(meta) = state.metadata().get::<DumpToDiskMetadata>() {
+                (
+                    meta.last_corpus.and_then(|x| state.corpus().next(x)),
+                    meta.last_solution.and_then(|x| state.solutions().next(x)),
+                )
+            } else {
+                (state.corpus().first(), state.solutions().first())
+            };
 
-        let corpus_count = state.corpus().count();
-        let solutions_count = state.solutions().count();
-
-        for i in meta.last_corpus..corpus_count {
+        while let Some(i) = corpus_idx {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
             let input = testcase.load_input()?;
             let bytes = (self.to_bytes)(input);
@@ -72,9 +74,11 @@ where
             let fname = self.corpus_dir.join(format!("id_{i}"));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
+
+            corpus_idx = state.corpus().next(i);
         }
 
-        for i in meta.last_solution..solutions_count {
+        while let Some(i) = solutions_idx {
             let mut testcase = state.solutions().get(i)?.borrow_mut();
             let input = testcase.load_input()?;
             let bytes = (self.to_bytes)(input);
@@ -82,11 +86,13 @@ where
             let fname = self.solutions_dir.join(format!("id_{i}"));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
+
+            solutions_idx = state.solutions().next(i);
         }
 
         state.add_metadata(DumpToDiskMetadata {
-            last_corpus: corpus_count,
-            last_solution: solutions_count,
+            last_corpus: state.corpus().last(),
+            last_solution: state.solutions().last(),
         });
 
         Ok(())

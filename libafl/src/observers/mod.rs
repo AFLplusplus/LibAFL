@@ -36,7 +36,7 @@ pub use value::*;
 use crate::{
     bolts::{
         current_time,
-        ownedref::OwnedRefMut,
+        ownedref::OwnedMutPtr,
         tuples::{MatchName, Named},
     },
     executors::ExitKind,
@@ -475,25 +475,30 @@ where
 /// A simple observer with a list of things.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct ListObserver<'a, T>
+#[allow(clippy::unsafe_derive_deserialize)]
+pub struct ListObserver<T>
 where
     T: Debug + Serialize,
 {
     name: String,
     /// The list
-    list: OwnedRefMut<'a, Vec<T>>,
+    list: OwnedMutPtr<Vec<T>>,
 }
 
-impl<'a, T> ListObserver<'a, T>
+impl<T> ListObserver<T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`ListObserver`] with the given name.
+    ///
+    /// # Safety
+    /// Will dereference the list.
+    /// The list may not move in memory.
     #[must_use]
-    pub fn new(name: &'static str, list: &'a mut Vec<T>) -> Self {
+    pub unsafe fn new(name: &'static str, list: *mut Vec<T>) -> Self {
         Self {
             name: name.to_string(),
-            list: OwnedRefMut::Ref(list),
+            list: OwnedMutPtr::Ptr(list),
         }
     }
 
@@ -510,7 +515,7 @@ where
     }
 }
 
-impl<'a, S, T> Observer<S> for ListObserver<'a, T>
+impl<S, T> Observer<S> for ListObserver<T>
 where
     S: UsesInput,
     T: Debug + Serialize + serde::de::DeserializeOwned,
@@ -521,7 +526,7 @@ where
     }
 }
 
-impl<'a, T> Named for ListObserver<'a, T>
+impl<T> Named for ListObserver<T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
@@ -1331,10 +1336,9 @@ mod tests {
 
     #[test]
     fn test_observer_serde() {
-        let obv = tuple_list!(
-            TimeObserver::new("time"),
-            StdMapObserver::new("map", unsafe { &mut MAP })
-        );
+        let obv = tuple_list!(TimeObserver::new("time"), unsafe {
+            StdMapObserver::new("map", &mut MAP)
+        });
         let vec = postcard::to_allocvec(&obv).unwrap();
         println!("{vec:?}");
         let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32, false>) =

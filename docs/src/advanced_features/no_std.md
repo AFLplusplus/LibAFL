@@ -1,6 +1,6 @@
 # Using LibAFL in `no_std` environments
 
-It is possible to use LibAFL in `no_std` environments e.g. custom platforms like microcontrollers, kernels, hypervisors, and more.
+It is possible to use LibAFL in `no_std` environments e.g. on custom platforms like microcontrollers, kernels, hypervisors, and more.
 
 You can simply add LibAFL to your `Cargo.toml` file:
 
@@ -16,7 +16,7 @@ cargo build --no-default-features --target aarch64-unknown-none
 
 ## Use custom timing
 
-The minimum amount of input LibAFL needs for `no_std` is a monotonically increasing timestamp.
+The minimum amount of support LibAFL needs for a `no_std` environment is a monotonically increasing timestamp.
 For this, anywhere in your project you need to implement the `external_current_millis` function, which returns the current time in milliseconds.
 
 ```c

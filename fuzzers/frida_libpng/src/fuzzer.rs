@@ -45,7 +45,7 @@ use libafl_frida::{
     executor::FridaInProcessExecutor,
     helper::FridaInstrumentationHelper,
 };
-use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
+use libafl_targets::cmplog::CmpLogObserver;
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
@@ -54,18 +54,18 @@ pub fn main() {
     let options = parse_args();
 
     unsafe {
-        match fuzz(options) {
+        match fuzz(&options) {
             Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
-            Err(e) => panic!("Error during fuzzing: {:?}", e),
+            Err(e) => panic!("Error during fuzzing: {e:?}"),
         }
     }
 }
 
 /// The actual fuzzer
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
-unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
+unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     let shmem_provider = StdShMemProvider::new()?;
 
@@ -96,15 +96,15 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
 
                 #[cfg(unix)]
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage, asan));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
                 #[cfg(windows)]
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+                let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_ptr_mut().unwrap(),
+                    frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ));
 
@@ -141,7 +141,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
                         OnDiskCorpus::new_save_meta(
-                            options.output.to_path_buf(),
+                            options.output.clone(),
                             Some(OnDiskMetadataFormat::JsonPretty),
                         )
                         .unwrap(),
@@ -219,12 +219,12 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let cmplog = CmpLogRuntime::new();
 
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage, cmplog));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog));
 
                 // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+                let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_ptr_mut().unwrap(),
+                    frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ));
 
@@ -259,7 +259,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
                         OnDiskCorpus::new_save_meta(
-                            options.output.to_path_buf(),
+                            options.output.clone(),
                             Some(OnDiskMetadataFormat::JsonPretty),
                         )
                         .unwrap(),
@@ -324,7 +324,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 }
 
                 // Create an observation channel using cmplog map
-                let cmplog_observer = CmpLogObserver::new("cmplog", &mut CMPLOG_MAP, true);
+                let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
                 let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
@@ -352,12 +352,12 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let coverage = CoverageRuntime::new();
 
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+                let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_ptr_mut().unwrap(),
+                    frida_helper.map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ));
 
@@ -392,7 +392,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
                         OnDiskCorpus::new_save_meta(
-                            options.output.to_path_buf(),
+                            options.output.clone(),
                             Some(OnDiskMetadataFormat::JsonPretty),
                         )
                         .unwrap(),

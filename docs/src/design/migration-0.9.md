@@ -75,7 +75,7 @@ where
 ```
 
 The executor is constrained to `EM` and `Z`, with each of their respective states being constrained to `E`'s state. It
-is no longer necessary to explicitly defined a generic for the input type, the state type, or the generic type, as these
+is no longer necessary to explicitly define a generic for the input type, the state type, or the generic type, as these
 are all present as associated types for `E`. Additionally, we don't even need to specify any details about the observers
 (`OT` in the previous version) as the type does not need to be constrained and is not shared by other types.
 
@@ -101,7 +101,7 @@ See `fuzzers/` for examples of these changes.
 If you implemented a Mutator, Executor, State, or another kind of component, you must update your implementation. The
 main changes to the API are in the use of "Uses*" for associated types.
 
-In many scenarios, Input, Observers, and State generics have been moved into traits with associated types (namely,
+In many scenarios, Input, Observer, and State generics have been moved into traits with associated types (namely,
 "UsesInput", "UsesObservers", and "UsesState". These traits are required for many existing traits now and are very
 straightforward to implement. In a majority of cases, you will have generics on your custom implementation or a fixed
 type to implement this with. Thankfully, Rust will let you know when you need to implement this type.
@@ -127,7 +127,7 @@ where
 }
 ```
 
-After 0.9, all `Corpus` implementations are required to implement `UsesInput` and `Corpus` no longer has a generic for
+After 0.9, all `Corpus` implementations are required to implement `UsesInput`. Also `Corpus` no longer has a generic for
 the input type (as it is now provided by the UsesInput impl). The migrated implementation is shown below:
 
 ```rust,ignore
@@ -160,3 +160,26 @@ Now, `Corpus` cannot be accidentally implemented for another type other than tha
 is fixed to the associated type for `UsesInput`.
 
 A more complex example of migration can be found in the "Reasons for this change" section of this document.
+
+## Observer Changes
+
+Additionally, we changed the Observer API, as the API in 0.8 led to undefined behavior.
+At the same time, we used the change to simplify the common case: creating an `StdMapObserver`
+from libafl_target's `EDGES_MAP`.
+In the future, instead of using:
+
+```rust,ignore
+let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
+let edges_observer = StdMapObserver::new("edges", edges);
+```
+
+creating the edges observer is as simple as using the new `std_edges_map_observer` function.
+
+```rust,ignore
+let edges_observer = unsafe { std_edges_map_observer("edges") };
+```
+
+Alternatively, `StdMapObserver::new` will still work, but now the whole method is marked as `unsafe`.
+The reason is that the caller has to make sure `EDGES_MAP` (or other maps) are not moved or freed in memory,
+for the lifetime of the `MapObserver`.
+This means that the buffer should either be `static` or `Pin`.

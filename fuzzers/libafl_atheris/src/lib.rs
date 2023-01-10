@@ -34,7 +34,7 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
@@ -42,7 +42,7 @@ use libafl::{
 };
 use libafl_targets::{
     CmpLogObserver, __sanitizer_cov_trace_cmp1, __sanitizer_cov_trace_cmp2,
-    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, CMPLOG_MAP, EDGES_MAP_PTR,
+    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, std_edges_map_observer, EDGES_MAP_PTR,
     MAX_EDGES_NUM,
 };
 
@@ -211,26 +211,19 @@ pub fn LLVMFuzzerRunDriver(
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     // TODO: we need to handle Atheris calls to `exit` on errors somhow.
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges_observer = unsafe {
-            HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
-                "edges",
-                EDGES_MAP_PTR,
-                MAX_EDGES_NUM,
-            ))
-        };
+        let edges_observer = unsafe { HitcountsMapObserver::new(std_edges_map_observer("edges")) };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
 
         // Create the Cmp observer
-        let cmplog = unsafe { &mut CMPLOG_MAP };
-        let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+        let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR

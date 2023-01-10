@@ -1242,7 +1242,7 @@ mod tests {
 
         let executor = ForkserverExecutorBuilder::new()
             .program(bin)
-            .args(&args)
+            .args(args)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
             .build::<_, ()>(tuple_list!(edges_observer));
