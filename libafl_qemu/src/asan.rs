@@ -431,7 +431,7 @@ static mut ASAN_INITED: bool = false;
 pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> Emulator {
     assert!(!args.is_empty());
     let current = env::current_exe().unwrap();
-    let asan_lib = fs::canonicalize(&current)
+    let asan_lib = fs::canonicalize(current)
         .unwrap()
         .parent()
         .unwrap()

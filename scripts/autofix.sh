@@ -17,7 +17,7 @@ echo "[+] Done fixing build"
 echo 
 
 echo 'Fixing clippy (might need a "git commit" and a rerun, if "cargo fix" changed the source)'
-RUST_BACKTRACE=full cargo +nightly clippy --fix --release --all --all-features --tests -- -Z macro-backtrace \
+RUST_BACKTRACE=full cargo +nightly clippy --fix --release --all --all-features --tests --examples --benches -- -Z macro-backtrace \
    -D clippy::all \
    -D clippy::pedantic \
    -W clippy::similar_names \
@@ -32,7 +32,7 @@ RUST_BACKTRACE=full cargo +nightly clippy --fix --release --all --all-features -
    -A clippy::module-name-repetitions \
    -A clippy::unreadable-literal \
 
-cargo +nightly clippy --fix --tests --all-features --allow-dirty --allow-staged
+cargo +nightly clippy --fix --tests --examples --benches --all-features --allow-dirty --allow-staged
 
 echo "[+] Done fixing clippy"
 echo

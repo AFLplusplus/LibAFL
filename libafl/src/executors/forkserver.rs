@@ -369,6 +369,9 @@ pub trait HasForkserver {
 
     /// The map of the fuzzer, mutable
     fn shmem_mut(&mut self) -> &mut Option<<<Self as HasForkserver>::SP as ShMemProvider>::ShMem>;
+
+    /// Whether testcases are expected in shared memory
+    fn uses_shmem_testcase(&self) -> bool;
 }
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
@@ -417,21 +420,19 @@ where
 
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
 
-        match &mut self.executor.shmem_mut() {
-            Some(shmem) => {
-                let target_bytes = input.target_bytes();
-                let size = target_bytes.as_slice().len();
-                let size_in_bytes = size.to_ne_bytes();
-                // The first four bytes tells the size of the shmem.
-                shmem.as_mut_slice()[..4].copy_from_slice(&size_in_bytes[..4]);
-                shmem.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                    .copy_from_slice(target_bytes.as_slice());
-            }
-            None => {
-                self.executor
-                    .input_file_mut()
-                    .write_buf(input.target_bytes().as_slice())?;
-            }
+        if self.executor.uses_shmem_testcase() {
+            let shmem = unsafe { self.executor.shmem_mut().as_mut().unwrap_unchecked() };
+            let target_bytes = input.target_bytes();
+            let size = target_bytes.as_slice().len();
+            let size_in_bytes = size.to_ne_bytes();
+            // The first four bytes tells the size of the shmem.
+            shmem.as_mut_slice()[..4].copy_from_slice(&size_in_bytes[..4]);
+            shmem.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                .copy_from_slice(target_bytes.as_slice());
+        } else {
+            self.executor
+                .input_file_mut()
+                .write_buf(input.target_bytes().as_slice())?;
         }
 
         let send_len = self
@@ -503,6 +504,7 @@ where
     target: OsString,
     args: Vec<OsString>,
     input_file: InputFile,
+    uses_shmem_testcase: bool,
     forkserver: Forkserver,
     observers: OT,
     map: Option<SP::ShMem>,
@@ -521,6 +523,7 @@ where
             .field("target", &self.target)
             .field("args", &self.args)
             .field("input_file", &self.input_file)
+            .field("use_shmem_testcase", &self.uses_shmem_testcase)
             .field("forkserver", &self.forkserver)
             .field("observers", &self.observers)
             .field("map", &self.map)
@@ -572,6 +575,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     envs: Vec<(OsString, OsString)>,
     debug_child: bool,
     use_stdin: bool,
+    uses_shmem_testcase: bool,
     is_persistent: bool,
     is_deferred_frksrv: bool,
     autotokens: Option<&'a mut Tokens>,
@@ -594,7 +598,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             None => OsString::from(".cur_input"),
         };
 
-        let input_file = InputFile::create(&input_filename)?;
+        let input_file = InputFile::create(input_filename)?;
 
         let map = match &mut self.shmem_provider {
             None => None,
@@ -651,6 +655,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) && map.is_some() {
                 println!("Using SHARED MEMORY FUZZING feature.");
                 send_status |= FS_OPT_SHDMEM_FUZZ;
+                self.uses_shmem_testcase = true;
             }
 
             if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
@@ -677,7 +682,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     ));
                 }
 
-                println!("Autodict size {:x}", dict_size);
+                println!("Autodict size {dict_size:x}");
 
                 let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
 
@@ -704,6 +709,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             target,
             args: self.arguments.clone(),
             input_file,
+            uses_shmem_testcase: self.uses_shmem_testcase,
             forkserver,
             observers,
             map,
@@ -765,6 +771,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             envs: vec![],
             debug_child: false,
             use_stdin: true,
+            uses_shmem_testcase: false,
             is_persistent: false,
             is_deferred_frksrv: false,
             autotokens: None,
@@ -882,6 +889,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             envs: self.envs,
             debug_child: self.debug_child,
             use_stdin: self.use_stdin,
+            uses_shmem_testcase: self.uses_shmem_testcase,
             is_persistent: self.is_persistent,
             is_deferred_frksrv: self.is_deferred_frksrv,
             autotokens: self.autotokens,
@@ -917,20 +925,18 @@ where
         let mut exit_kind = ExitKind::Ok;
 
         // Write to testcase
-        match &mut self.map {
-            Some(map) => {
-                let target_bytes = input.target_bytes();
-                let size = target_bytes.as_slice().len();
-                let size_in_bytes = size.to_ne_bytes();
-                // The first four bytes tells the size of the shmem.
-                map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
-                    .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
-                map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                    .copy_from_slice(target_bytes.as_slice());
-            }
-            None => {
-                self.input_file.write_buf(input.target_bytes().as_slice())?;
-            }
+        if self.uses_shmem_testcase {
+            let map = unsafe { self.map.as_mut().unwrap_unchecked() };
+            let target_bytes = input.target_bytes();
+            let size = target_bytes.as_slice().len();
+            let size_in_bytes = size.to_ne_bytes();
+            // The first four bytes tells the size of the shmem.
+            map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
+                .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
+            map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                .copy_from_slice(target_bytes.as_slice());
+        } else {
+            self.input_file.write_buf(input.target_bytes().as_slice())?;
         }
 
         let send_len = self
@@ -1060,6 +1066,11 @@ where
     #[inline]
     fn shmem_mut(&mut self) -> &mut Option<SP::ShMem> {
         &mut self.map
+    }
+
+    #[inline]
+    fn uses_shmem_testcase(&self) -> bool {
+        self.uses_shmem_testcase
     }
 }
 

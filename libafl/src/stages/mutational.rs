@@ -37,7 +37,7 @@ where
     fn mutator_mut(&mut self) -> &mut M;
 
     /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut Z::State, corpus_idx: usize) -> Result<usize, Error>;
+    fn iterations(&self, state: &mut Z::State, corpus_idx: usize) -> Result<u64, Error>;
 
     /// Runs this (mutational) stage for the given testcase
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
@@ -109,8 +109,8 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    fn iterations(&self, state: &mut Z::State, _corpus_idx: usize) -> Result<usize, Error> {
-        Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
+    fn iterations(&self, state: &mut Z::State, _corpus_idx: usize) -> Result<u64, Error> {
+        Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
     }
 }
 

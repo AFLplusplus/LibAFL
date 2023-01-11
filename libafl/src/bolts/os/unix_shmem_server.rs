@@ -95,18 +95,20 @@ where
     }
 }
 
-impl<SH> AsSlice<u8> for ServedShMem<SH>
+impl<SH> AsSlice for ServedShMem<SH>
 where
     SH: ShMem,
 {
+    type Entry = u8;
     fn as_slice(&self) -> &[u8] {
         self.inner.as_slice()
     }
 }
-impl<SH> AsMutSlice<u8> for ServedShMem<SH>
+impl<SH> AsMutSlice for ServedShMem<SH>
 where
     SH: ShMem,
 {
+    type Entry = u8;
     fn as_mut_slice(&mut self) -> &mut [u8] {
         self.inner.as_mut_slice()
     }

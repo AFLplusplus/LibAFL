@@ -644,6 +644,7 @@ where
     }
 
     /// Get the next mutation to apply
+    #[inline]
     fn schedule(&self, state: &mut S, _: &S::Input) -> usize {
         state
             .metadata_mut()

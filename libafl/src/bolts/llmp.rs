@@ -366,7 +366,7 @@ const fn llmp_align(to_align: usize) -> usize {
 #[cfg(feature = "std")]
 #[inline]
 fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
-    let msg_offset_str = env::var(&format!("{env_name}_OFFSET"))?;
+    let msg_offset_str = env::var(format!("{env_name}_OFFSET"))?;
     Ok(if msg_offset_str == _NULL_ENV_STR {
         None
     } else {
@@ -574,7 +574,7 @@ impl LlmpMsg {
         slice::from_raw_parts(self.buf.as_ptr(), self.buf_len as usize)
     }
 
-    /// Gets the buffer from this message as slice, with the corrent length.
+    /// Gets the buffer from this message as slice, with the correct length.
     #[inline]
     pub fn try_as_slice<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
         unsafe {
@@ -586,7 +586,7 @@ impl LlmpMsg {
         }
     }
 
-    /// Returns true, if the pointer is, indeed, in the page of this shared map.
+    /// Returns `true`, if the pointer is, indeed, in the page of this shared map.
     #[inline]
     pub fn in_shmem<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
         let map_size = map.shmem.as_slice().len();
@@ -818,7 +818,7 @@ where
     #[cfg(feature = "std")]
     #[inline]
     fn client_id_from_env(env_name: &str) -> Result<Option<ClientId>, Error> {
-        let client_id_str = env::var(&format!("{env_name}_CLIENT_ID"))?;
+        let client_id_str = env::var(format!("{env_name}_CLIENT_ID"))?;
         Ok(if client_id_str == _NULL_ENV_STR {
             None
         } else {
@@ -829,7 +829,7 @@ where
     /// Writes the `id` to an env var
     #[cfg(feature = "std")]
     fn client_id_to_env(env_name: &str, id: ClientId) {
-        env::set_var(&format!("{env_name}_CLIENT_ID"), &format!("{id}"));
+        env::set_var(format!("{env_name}_CLIENT_ID"), format!("{id}"));
     }
 
     /// Reattach to a vacant `out_shmem`, to with a previous sender stored the information in an env before.
@@ -1722,10 +1722,10 @@ where
     #[cfg(feature = "std")]
     pub unsafe fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), Error> {
         if msg.is_null() {
-            env::set_var(&format!("{map_env_name}_OFFSET"), _NULL_ENV_STR);
+            env::set_var(format!("{map_env_name}_OFFSET"), _NULL_ENV_STR);
         } else {
             env::set_var(
-                &format!("{map_env_name}_OFFSET"),
+                format!("{map_env_name}_OFFSET"),
                 format!("{}", self.msg_to_offset(msg)?),
             );
         }
