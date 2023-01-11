@@ -239,8 +239,7 @@ pub extern "C" fn main() {
         let time_observer = TimeObserver::new("time");
 
         // Create the Cmp observer
-        let cmplog = unsafe { &mut CMPLOG_MAP };
-        let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+        let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
         // feedback from js
         let js_observer = JSObserver::new("js");
