@@ -130,8 +130,10 @@ impl CompilerWrapper for ClangWrapper {
                 "-c" | "-S" | "-E" => linking = false,
                 "-shared" => {
                     linking = false; // TODO dynamic list?
-                    new_args.push("-undefined".into());
-                    new_args.push("dynamic_lookup".into());
+                    if cfg!(target_vendor = "apple") {
+                        new_args.push("-undefined".into());
+                        new_args.push("dynamic_lookup".into());
+                    }
                 }
                 "-Wl,-z,defs" | "-Wl,--no-undefined" | "--no-undefined" => continue,
                 _ => (),
@@ -145,17 +147,28 @@ impl CompilerWrapper for ClangWrapper {
         if linking && suppress_linking > 0 && suppress_linking < 1337 {
             linking = false;
             println!("adding no-link-rt");
-            new_args.push("-force_load".into());
-            new_args.push(
-                PathBuf::from(OUT_DIR)
-                    .join(format!("{}no-link-rt.{}", LIB_PREFIX, LIB_EXT))
-                    .into_os_string()
-                    .into_string()
-                    .unwrap(),
-            );
+            if cfg!(target_vendor = "apple") {
+                new_args.push("-force_load".into());
+                new_args.push(
+                    PathBuf::from(OUT_DIR)
+                        .join(format!("{}no-link-rt.{}", LIB_PREFIX, LIB_EXT))
+                        .into_os_string()
+                        .into_string()
+                        .unwrap(),
+                );
 
-            new_args.push("-undefined".into());
-            new_args.push("dynamic_lookup".into());
+                new_args.push("-undefined".into());
+                new_args.push("dynamic_lookup".into());
+            } else {
+                new_args.push(
+                    PathBuf::from(OUT_DIR)
+                        .join(format!("{}no-link-rt.{}", LIB_PREFIX, LIB_EXT))
+                        .into_os_string()
+                        .into_string()
+                        .unwrap(),
+                );
+                new_args.push("-lsupc++".into());
+            }
         }
 
         self.linking = linking;
@@ -250,7 +263,7 @@ impl CompilerWrapper for ClangWrapper {
             return Ok(args);
         }
 
-        if !self.passes.is_empty() {
+        if !self.passes.is_empty() && cfg!(target_vendor = "apple") {
             args.push("-fno-experimental-new-pass-manager".into());
         }
         for pass in &self.passes {
@@ -422,7 +435,7 @@ pub fn main() {
             .expect("Failed to parse the command line")
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
             // TODO: write the allowlist to a file in /tmp and pass it to the compiler wrapper here
-            .add_arg("-fsanitize-coverage-allowlist=/Users/jhertz/jif/chromium/src/headless/jif/allowlist.txt")
+            .add_arg("-fsanitize-coverage-allowlist=/home/addisoncrump/Dokumente/xss-fuzzing/chromium/src/headless/jif/allowlist.txt")
             .add_pass(LLVMPasses::CmpLogRtn)
             .run()
             .expect("Failed to run the wrapped compiler")

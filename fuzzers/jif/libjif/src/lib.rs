@@ -7,7 +7,6 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 use core::time::Duration;
 use std::{env, fs, io::Read, net::SocketAddr, path::PathBuf};
-
 use clap::{self, Parser};
 use libafl::{
     bolts::{
@@ -107,7 +106,16 @@ struct Opt {
     )]
     output: PathBuf,
 
-    #[arg(
+    #[structopt(
+        help = "Path for the JS file with the harness to run inputs through",
+        name = "HARNESS",
+        long = "harness",
+        parse(from_os_str)
+    )]
+    harness: PathBuf,
+
+    #[structopt(
+        parse(try_from_str = timeout_from_millis_str),
         value_parser = timeout_from_millis_str,
         short,
         long,
@@ -149,7 +157,7 @@ struct Opt {
     )]
     bytes: bool,
 
-    #[arg(help = "Use tags mutator", name = "TAGS", long = "tags", short = 't')]
+    #[structopt(help = "Use tags mutator", name = "TAGS", long = "tags", short = "t")]
     tags: bool,
 
     #[arg(
@@ -360,7 +368,7 @@ pub extern "C" fn main() {
         // TODO: try without timeout executor
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
         let mut executor = TimeoutExecutor::new(
-            InProcessExecutor::new::<LlmpRestartingEventManager<_, _>, _, _>(
+            InProcessExecutor::new(
                 &mut harness,
                 tuple_list!(edges_observer, time_observer, js_observer),
                 &mut fuzzer,

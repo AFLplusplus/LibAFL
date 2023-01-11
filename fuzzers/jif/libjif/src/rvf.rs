@@ -1,8 +1,9 @@
 use libafl::{
+    bolts::tuples::Named, events::EventFirer, executors::ExitKind, feedbacks::Feedback,
+    inputs::UsesInput, observers::ObserversTuple, state::HasClientPerfMonitor, Error,
     prelude::{
         EventFirer, ExitKind, Feedback, HasClientPerfMonitor, Named, ObserversTuple, UsesInput,
     },
-    Error,
 };
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +25,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer,
+        EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
         if let ExitKind::Oom = exit_kind {

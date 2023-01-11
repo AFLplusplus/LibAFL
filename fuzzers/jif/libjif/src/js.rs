@@ -72,9 +72,8 @@ pub struct JSFeedback {
     name: String,
 }
 
-impl<S> Feedback<S> for JSFeedback
-where
-    S: UsesInput + HasClientPerfMonitor + HasMetadata + HasNamedMetadata,
+impl<S: HasClientPerfMonitor + HasMetadata + HasNamedMetadata + UsesInput> Feedback<S>
+    for JSFeedback
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -85,7 +84,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer,
+        EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
         let observer = observers.match_name::<JSObserver>(&self.name).unwrap();

@@ -6,7 +6,7 @@ export LIBAFL_EDGES_MAP_SIZE=3000000
 
 CLANG_FOLDER=`llvm-config --bindir`
 
-pushd libjif
+cd libjif
 cargo build --release
 
 echo "[+] Setting up libAFL LLVM environment"
@@ -19,11 +19,13 @@ if [ ! -d "llvm" ]; then
 fi
 
 # copy the libafl cc's in place to build chrome
-cp target/release/libafl_cc llvm/bin/clang
-cp target/release/libafl_cxx llvm/bin/clang++
-popd
+rm -v llvm/bin/clang{,++}
+cp -v target/release/libafl_cc llvm/bin/clang
+cp -v target/release/libafl_cxx llvm/bin/clang++
+cd -
+
+# allow for symlinks
+outdir="$(dirname "$(dirname "$PWD")")"/out/jif
+
 # build jif
-ninja -v -C ../../out/jif jif
-
-
-
+ninja -v -C "$outdir" jif

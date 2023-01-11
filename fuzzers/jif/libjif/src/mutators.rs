@@ -3,9 +3,8 @@
 use libafl::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::{HasBytesVec, Input},
-    mutators::{MutationResult, Mutator},
-    prelude::{Tokens, UsesInput},
+    inputs::{HasBytesVec, UsesInput},
+    mutators::{MutationResult, Mutator, Tokens},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -14,15 +13,15 @@ use libafl::{
 #[derive(Default, Debug)]
 pub struct TagDeleteMutator;
 
-impl<I, S> Mutator<S> for TagDeleteMutator
+impl<S> Mutator<S> for TagDeleteMutator
 where
-    I: Input + HasBytesVec,
-    S: HasRand + UsesInput<Input = I>,
+    S: HasRand + UsesInput,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -88,15 +87,15 @@ impl TagDeleteMutator {
 #[derive(Default, Debug)]
 pub struct TagCopyMutator;
 
-impl<I, S> Mutator<S> for TagCopyMutator
+impl<S> Mutator<S> for TagCopyMutator
 where
-    I: Input + HasBytesVec,
-    S: HasRand + UsesInput<Input = I>,
+    S: HasRand + UsesInput,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -170,15 +169,15 @@ impl TagCopyMutator {
 #[derive(Default, Debug)]
 pub struct TagCrossoverMutator;
 
-impl<I, S> Mutator<S> for TagCrossoverMutator
+impl<S> Mutator<S> for TagCrossoverMutator
 where
-    I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<Input = I>,
+    S: HasRand + HasCorpus,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -281,15 +280,15 @@ impl TagCrossoverMutator {
 #[derive(Default, Debug)]
 pub struct TagTokenMutator;
 
-impl<I, S> Mutator<S> for TagTokenMutator
+impl<S> Mutator<S> for TagTokenMutator
 where
-    I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<Input = I> + HasMetadata,
+    S: HasRand + HasCorpus + HasMetadata,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();

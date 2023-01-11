@@ -4,7 +4,8 @@
 
 * setup a chromium repo: https://www.chromium.org/developers/how-tos/get-the-code
     * note that this will take several hours
-* `mv jif $root/chromium/src/headless/jif`
+    * you MUST use revision: fc68e53944be7
+* `mv jif $root/chromium/src/headless/jif` (or symbolic link appropriately)
 * `cd $root/chromium/src`
 * `python3 tools/mb/mb.py gen -m chromium.fuzz -b 'Libfuzzer Upload Mac ASan' out/jif`
 *  apply patches in chromium_patches.diff
