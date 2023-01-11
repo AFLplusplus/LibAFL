@@ -1,0 +1,34 @@
+[package]
+name = "libjif"
+version = "0.0.1"
+authors = ["jhertz"]
+edition = "2021"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+which = { version = "4.0.2" }
+num_cpus = "1.0"
+
+[dependencies]
+
+# previous rev: 7b345 0fe81
+libafl = { path = "../../../libafl", features = ["std", "derive", "llmp_compression", "rand_trait", "cmin", "prelude"], default-features = false }
+libafl_targets = { path = "../../../libafl_targets", features = ["sancov_pcguard_hitcounts", "sancov_cmplog", "libfuzzer"] }
+
+libafl_cc = { path = "../../../libafl_cc"}
+
+mimalloc = { version = "*", default-features = false }
+clap = { version = "4.0", features = ["derive"] }
+serde_json = "1.0"
+serde = "1.0"
+atomic-counter = "1.0.1"
+
+[lib]
+name = "jif"
+crate-type = ["staticlib"]
