@@ -1,16 +1,16 @@
 //! Uses LLVM compiler Wrapper from `LibAFL`
 
-use libafl_cc::{
-    clang::{CLANGXX_PATH, CLANG_PATH, OUT_DIR},
-    CompilerWrapper, Error, LLVMPasses, LIB_EXT, LIB_PREFIX,
-};
-
 use std::{
     convert::Into,
     env,
     path::{Path, PathBuf},
     string::String,
     vec::Vec,
+};
+
+use libafl_cc::{
+    clang::{CLANGXX_PATH, CLANG_PATH, OUT_DIR},
+    CompilerWrapper, Error, LLVMPasses, LIB_EXT, LIB_PREFIX,
 };
 
 /// Wrap Clang
@@ -396,6 +396,10 @@ impl ClangWrapper {
 
 #[cfg(test)]
 mod tests {
+    use libafl_cc::CompilerWrapper;
+
+    use super::ClangWrapper;
+
     #[test]
     fn test_clang_version() {
         if let Err(res) = ClangWrapper::new()

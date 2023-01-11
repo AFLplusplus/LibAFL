@@ -14,6 +14,8 @@ pub mod gramatron;
 pub use gramatron::*;
 pub mod grimoire;
 pub use grimoire::*;
+pub mod tuneable;
+pub use tuneable::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;

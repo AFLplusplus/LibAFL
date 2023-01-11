@@ -1,4 +1,4 @@
-cargo clippy --all --all-features --tests -- `
+cargo clippy --all --all-features --tests --benches --examples -- `
    -D clippy::all `
    -D clippy::pedantic `
    -W clippy::similar_names `

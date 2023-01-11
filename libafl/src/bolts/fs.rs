@@ -166,6 +166,6 @@ mod test {
         let two = one.clone();
         one.write_buf("Welp".as_bytes()).unwrap();
         drop(one);
-        assert_eq!("Welp", fs::read_to_string(&two.path).unwrap());
+        assert_eq!("Welp", fs::read_to_string(two.path.as_path()).unwrap());
     }
 }

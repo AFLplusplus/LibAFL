@@ -1,20 +1,16 @@
-use libafl::bolts::tuples::Named;
-use libafl::events::EventFirer;
-use libafl::executors::ExitKind;
-use libafl::feedbacks::Feedback;
-use libafl::inputs::UsesInput;
-use libafl::observers::Observer;
-use libafl::observers::ObserversTuple;
-use libafl::state::HasClientPerfMonitor;
-use libafl::state::HasMetadata;
-use libafl::state::HasNamedMetadata;
-use libafl::Error;
-use libafl::SerdeAny;
-use serde::{Deserialize, Serialize};
+use std::{cmp::max, ffi::CStr, os::raw::c_char};
 
-use std::cmp::max;
-use std::ffi::CStr;
-use std::os::raw::c_char;
+use libafl::{
+    bolts::tuples::Named,
+    events::EventFirer,
+    executors::ExitKind,
+    feedbacks::Feedback,
+    observers::{Observer, ObserversTuple},
+    prelude::UsesInput,
+    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
+    Error, SerdeAny,
+};
+use serde::{Deserialize, Serialize};
 
 // This module contains everything needed to do parse chrome's JS "block coverage"
 // and provide an Oberserver and Feedback for LibAFL

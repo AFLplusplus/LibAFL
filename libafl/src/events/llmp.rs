@@ -552,7 +552,7 @@ where
 {
 }
 
-impl<S, SP> HasCustomBufHandlers<S> for LlmpEventManager<S, SP>
+impl<S, SP> HasCustomBufHandlers for LlmpEventManager<S, SP>
 where
     S: UsesInput,
     SP: ShMemProvider,

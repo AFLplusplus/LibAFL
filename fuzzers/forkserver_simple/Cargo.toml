@@ -16,6 +16,6 @@ codegen-units = 1
 opt-level = 3
 
 [dependencies]
-libafl = { path = "../../libafl/" }
-clap = { version = "3.2", features = ["default"] }
+libafl = { path = "../../libafl/", features = ["std", "derive"] }
+clap = { version = "4.0", features = ["derive"] }
 nix = "0.25"
