@@ -1,6 +1,6 @@
 //! A libfuzzer-like fuzzer using qemu for binary-only coverage
 //!
-use core::time::Duration;
+use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
@@ -29,16 +29,18 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
+    drcov::QemuDrCovHelper,
     //asan::QemuAsanHelper,
-    edges,
-    edges::QemuEdgeCoverageHelper,
+    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
     emu::Emulator,
     MmapPerms,
     QemuExecutor,
     QemuHooks,
+    QemuInstrumentationFilter,
     Regs,
 };
+use rangemap::RangeMap;
 
 pub fn fuzz() {
     // Hardcoded parameters
@@ -106,10 +108,13 @@ pub fn fuzz() {
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges = unsafe { &mut edges::EDGES_MAP };
-        let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
-        let edges_observer =
-            HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
+        let edges_observer = unsafe {
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                "edges",
+                edges_map_mut_slice(),
+                addr_of_mut!(MAX_EDGES_NUM),
+            ))
+        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -151,7 +156,30 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default()));
+        let mut rangemap = RangeMap::<usize, (u16, String)>::new();
+        let mappings = emu.mappings();
+        let mut idx = 0;
+        for map in mappings {
+            if map.path().unwrap() != "" {
+                rangemap.insert(
+                    (map.start() as usize)..(map.end() as usize),
+                    (idx, map.path().unwrap().to_string()),
+                );
+                idx += 1;
+            }
+        }
+        let mut hooks = QemuHooks::new(
+            &emu,
+            tuple_list!(
+                QemuEdgeCoverageHelper::default(),
+                QemuDrCovHelper::new(
+                    QemuInstrumentationFilter::None,
+                    rangemap,
+                    PathBuf::from("drcov.log"),
+                    false,
+                )
+            ),
+        );
 
         // Create a QEMU in-process executor
         let executor = QemuExecutor::new(
@@ -189,7 +217,7 @@ pub fn fuzz() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     // The stats reporter for the broker
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     // Build and run a Launcher
     match Launcher::builder()

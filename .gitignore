@@ -18,6 +18,7 @@ vendor
 *.dll
 *.exe
 *.dSYM
+*.obj
 
 .cur_input
 .venv
@@ -50,3 +51,6 @@ __pycache__
 **/libxml2
 **/corpus_discovered
 **/libxml2-*.tar.gz
+
+libafl_nyx/QEMU-Nyx
+libafl_nyx/packer

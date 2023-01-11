@@ -165,7 +165,7 @@ where
 
     /// Set the `fuzz_level`
     #[inline]
-    pub fn set_fuzz_leve(&mut self, fuzz_level: usize) {
+    pub fn set_fuzz_level(&mut self, fuzz_level: usize) {
         self.fuzz_level = fuzz_level;
     }
 
@@ -354,7 +354,7 @@ pub mod pybind {
 
     use super::{HasMetadata, Testcase};
     use crate::{
-        bolts::ownedref::OwnedPtrMut,
+        bolts::ownedref::OwnedMutPtr,
         inputs::{BytesInput, HasBytesVec},
         pybind::PythonMetadata,
     };
@@ -367,13 +367,13 @@ pub mod pybind {
     /// Python class for Testcase
     pub struct PythonTestcaseWrapper {
         /// Rust wrapped Testcase object
-        pub inner: OwnedPtrMut<PythonTestcase>,
+        pub inner: OwnedMutPtr<PythonTestcase>,
     }
 
     impl PythonTestcaseWrapper {
         pub fn wrap(r: &mut PythonTestcase) -> Self {
             Self {
-                inner: OwnedPtrMut::Ptr(r),
+                inner: OwnedMutPtr::Ptr(r),
             }
         }
 
@@ -392,7 +392,7 @@ pub mod pybind {
         #[new]
         fn new(input: Vec<u8>) -> Self {
             Self {
-                inner: OwnedPtrMut::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
+                inner: OwnedMutPtr::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
             }
         }
 

@@ -46,8 +46,7 @@ fn find_llvm_config_brew() -> Result<PathBuf, String> {
             match glob_results.last() {
                 Some(path) => Ok(path.unwrap()),
                 None => Err(format!(
-                    "No llvm-config found in brew cellar with pattern {}",
-                    cellar_glob
+                    "No llvm-config found in brew cellar with pattern {cellar_glob}"
                 )),
             }
         }

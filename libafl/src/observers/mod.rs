@@ -18,12 +18,12 @@ pub use stacktrace::*;
 
 pub mod concolic;
 
+pub mod value;
 // Rust is breaking this with 'error: intrinsic safety mismatch between list of intrinsics within the compiler and core library intrinsics for intrinsic `type_id`' and so we disable this component for the moment
 //#[cfg(unstable_feature)]
 //pub mod owned;
 //#[cfg(unstable_feature)]
 //pub use owned::*;
-
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -31,11 +31,12 @@ use alloc::{
 use core::{fmt::Debug, time::Duration};
 
 use serde::{Deserialize, Serialize};
+pub use value::*;
 
 use crate::{
     bolts::{
         current_time,
-        ownedref::OwnedRefMut,
+        ownedref::OwnedMutPtr,
         tuples::{MatchName, Named},
     },
     executors::ExitKind,
@@ -286,6 +287,130 @@ pub trait ObserverWithHashField {
     fn clear_hash(&mut self);
 }
 
+/// A trait for [`Observer`]`s` which observe over differential execution.
+///
+/// Differential observers have the following flow during a single execution:
+///  - `Observer::pre_exec` for the differential observer is invoked.
+///  - `DifferentialObserver::pre_observe_first` for the differential observer is invoked.
+///  - `Observer::pre_exec` for each of the observers for the first executor is invoked.
+///  - The first executor is invoked.
+///  - `Observer::post_exec` for each of the observers for the first executor is invoked.
+///  - `DifferentialObserver::post_observe_first` for the differential observer is invoked.
+///  - `DifferentialObserver::pre_observe_second` for the differential observer is invoked.
+///  - `Observer::pre_exec` for each of the observers for the second executor is invoked.
+///  - The second executor is invoked.
+///  - `Observer::post_exec` for each of the observers for the second executor is invoked.
+///  - `DifferentialObserver::post_observe_second` for the differential observer is invoked.
+///  - `Observer::post_exec` for the differential observer is invoked.
+///
+/// You should perform any preparation for the diff execution in `Observer::pre_exec` and respective
+/// cleanup in `Observer::post_exec`. For individual executions, use
+/// `DifferentialObserver::{pre,post}_observe_{first,second}` as necessary for first and second,
+/// respectively.
+#[allow(unused_variables)]
+pub trait DifferentialObserver<OTA, OTB, S>: Observer<S>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    /// Perform an operation with the first set of observers before they are `pre_exec`'d.
+    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the first set of observers after they are `post_exec`'d.
+    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the second set of observers before they are `pre_exec`'d.
+    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the second set of observers after they are `post_exec`'d.
+    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// Differential observers tuple, for when you're using multiple differential observers.
+pub trait DifferentialObserversTuple<OTA, OTB, S>: ObserversTuple<S>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    /// Perform an operation with the first set of observers before they are `pre_exec`'d on all the
+    /// differential observers in this tuple.
+    fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
+
+    /// Perform an operation with the first set of observers after they are `post_exec`'d on all the
+    /// differential observers in this tuple.
+    fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
+
+    /// Perform an operation with the second set of observers before they are `pre_exec`'d on all
+    /// the differential observers in this tuple.
+    fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
+
+    /// Perform an operation with the second set of observers after they are `post_exec`'d on all
+    /// the differential observers in this tuple.
+    fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
+}
+
+impl<OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for ()
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    fn pre_observe_first_all(&mut self, _: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_observe_first_all(&mut self, _: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn pre_observe_second_all(&mut self, _: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_observe_second_all(&mut self, _: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<Head, Tail, OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for (Head, Tail)
+where
+    Head: DifferentialObserver<OTA, OTB, S>,
+    Tail: DifferentialObserversTuple<OTA, OTB, S>,
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.0.pre_observe_first(observers)?;
+        self.1.pre_observe_first_all(observers)
+    }
+
+    fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.0.post_observe_first(observers)?;
+        self.1.post_observe_first_all(observers)
+    }
+
+    fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.0.pre_observe_second(observers)?;
+        self.1.pre_observe_second_all(observers)
+    }
+
+    fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.0.post_observe_second(observers)?;
+        self.1.post_observe_second_all(observers)
+    }
+}
+
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
@@ -339,28 +464,41 @@ impl Named for TimeObserver {
     }
 }
 
+impl<OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for TimeObserver
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+}
+
 /// A simple observer with a list of things.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct ListObserver<'a, T>
+#[allow(clippy::unsafe_derive_deserialize)]
+pub struct ListObserver<T>
 where
     T: Debug + Serialize,
 {
     name: String,
     /// The list
-    list: OwnedRefMut<'a, Vec<T>>,
+    list: OwnedMutPtr<Vec<T>>,
 }
 
-impl<'a, T> ListObserver<'a, T>
+impl<T> ListObserver<T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`ListObserver`] with the given name.
+    ///
+    /// # Safety
+    /// Will dereference the list.
+    /// The list may not move in memory.
     #[must_use]
-    pub fn new(name: &'static str, list: &'a mut Vec<T>) -> Self {
+    pub unsafe fn new(name: &'static str, list: *mut Vec<T>) -> Self {
         Self {
             name: name.to_string(),
-            list: OwnedRefMut::Ref(list),
+            list: OwnedMutPtr::Ptr(list),
         }
     }
 
@@ -377,7 +515,7 @@ where
     }
 }
 
-impl<'a, S, T> Observer<S> for ListObserver<'a, T>
+impl<S, T> Observer<S> for ListObserver<T>
 where
     S: UsesInput,
     T: Debug + Serialize + serde::de::DeserializeOwned,
@@ -388,7 +526,7 @@ where
     }
 }
 
-impl<'a, T> Named for ListObserver<'a, T>
+impl<T> Named for ListObserver<T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
@@ -1198,13 +1336,12 @@ mod tests {
 
     #[test]
     fn test_observer_serde() {
-        let obv = tuple_list!(
-            TimeObserver::new("time"),
-            StdMapObserver::new("map", unsafe { &mut MAP })
-        );
+        let obv = tuple_list!(TimeObserver::new("time"), unsafe {
+            StdMapObserver::new("map", &mut MAP)
+        });
         let vec = postcard::to_allocvec(&obv).unwrap();
         println!("{vec:?}");
-        let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32>) =
+        let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32, false>) =
             postcard::from_bytes(&vec).unwrap();
         assert_eq!(obv.0.name(), obv2.0.name());
     }

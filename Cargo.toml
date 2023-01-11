@@ -6,6 +6,7 @@ members = [
     "libafl_targets",
     "libafl_frida",
     "libafl_qemu",
+    "libafl_tinyinst",
     "libafl_sugar",
     "libafl_nyx",
     "libafl_concolic/symcc_runtime",
@@ -15,6 +16,7 @@ members = [
     "utils/deexit",
     "utils/gramatron/construct_automata",
     "utils/libafl_benches",
+    "utils/build_and_test_fuzzers",
 ]
 default-members = [
     "libafl",
@@ -26,6 +28,8 @@ exclude = [
     "fuzzers",
     "bindings",
     "scripts",
+    "libafl_qemu/libafl_qemu_build",
+    "libafl_qemu/libafl_qemu_sys"
 ]
 
 [workspace.package]

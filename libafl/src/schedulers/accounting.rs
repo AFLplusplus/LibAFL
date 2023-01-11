@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
     schedulers::{
@@ -74,7 +74,7 @@ impl AccountingIndexesMetadata {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TopAccountingMetadata {
     /// map index -> corpus index
-    pub map: HashMap<usize, usize>,
+    pub map: HashMap<usize, CorpusId>,
     /// If changed sicne the previous add to the corpus
     pub changed: bool,
     /// The max accounting seen so far
@@ -125,7 +125,7 @@ where
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as UsesInput>::Input: HasLen,
 {
-    fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
         self.inner.on_add(state, idx)
     }
@@ -133,7 +133,7 @@ where
     fn on_replace(
         &self,
         state: &mut Self::State,
-        idx: usize,
+        idx: CorpusId,
         testcase: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         self.inner.on_replace(state, idx, testcase)
@@ -142,13 +142,13 @@ where
     fn on_remove(
         &self,
         state: &mut Self::State,
-        idx: usize,
+        idx: CorpusId,
         testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         self.inner.on_remove(state, idx, testcase)
     }
 
-    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state
             .metadata()
             .get::<TopAccountingMetadata>()
@@ -183,7 +183,11 @@ where
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_accounting_score(&self, state: &mut CS::State, idx: usize) -> Result<(), Error> {
+    pub fn update_accounting_score(
+        &self,
+        state: &mut CS::State,
+        idx: CorpusId,
+    ) -> Result<(), Error> {
         let mut indexes = vec![];
         let mut new_favoreds = vec![];
         {
@@ -210,8 +214,7 @@ where
                         let must_remove = {
                             let old_meta = old.metadata_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
                                 Error::key_not_found(format!(
-                                    "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{}",
-                                    old_idx
+                                    "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{old_idx}"
                                 ))
                             })?;
                             *old_meta.refcnt_mut() -= 1;
@@ -264,10 +267,7 @@ where
     /// Cull the `Corpus`
     #[allow(clippy::unused_self)]
     pub fn accounting_cull(&self, state: &mut CS::State) -> Result<(), Error> {
-        let top_rated = match state.metadata().get::<TopAccountingMetadata>() {
-            None => return Ok(()),
-            Some(val) => val,
-        };
+        let Some(top_rated) = state.metadata().get::<TopAccountingMetadata>() else { return Ok(()) };
 
         for (_key, idx) in &top_rated.map {
             let mut entry = state.corpus().get(*idx)?.borrow_mut();

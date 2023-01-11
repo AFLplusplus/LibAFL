@@ -31,6 +31,11 @@ use crate::bolts::{
 };
 #[cfg(feature = "std")]
 use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
+#[cfg(all(unix, feature = "std"))]
+use crate::{
+    bolts::os::unix_signals::setup_signal_handler,
+    events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
+};
 use crate::{
     bolts::{
         llmp::{self, Flags, LlmpClient, LlmpClientDescription, Tag},
@@ -393,10 +398,7 @@ where
                 executions: _,
             } => {
                 #[cfg(feature = "std")]
-                println!(
-                    "Received new Testcase from {} ({:?})",
-                    _client_id, client_config
-                );
+                println!("Received new Testcase from {_client_id} ({client_config:?})");
 
                 let _res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
@@ -885,17 +887,42 @@ where
             mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
+            #[cfg(unix)]
+            let mut staterestorer: StateRestorer<SP> =
+                StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
+
+            #[cfg(not(unix))]
             let staterestorer: StateRestorer<SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+
+            #[cfg(unix)]
+            unsafe {
+                let data = &mut SHUTDOWN_SIGHANDLER_DATA;
+                // Write the pointer to staterestorer so we can release its shmem later
+                core::ptr::write_volatile(
+                    &mut data.staterestorer_ptr,
+                    &mut staterestorer as *mut _ as *mut std::ffi::c_void,
+                );
+                data.allocator_pid = std::process::id() as usize;
+                data.shutdown_handler = shutdown_handler::<SP> as *const std::ffi::c_void;
+            }
+
+            // We setup signal handlers to clean up shmem segments used by state restorer
+            #[cfg(unix)]
+            if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
+                // We can live without a proper ctrl+c signal handler. Print and ignore.
+                #[cfg(feature = "std")]
+                println!("Failed to setup signal handlers: {_e}");
+            }
 
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
                 println!("Spawning next client (id {ctr})");
 
-                // On Unix, we fork
+                // On Unix, we fork (when fork feature is enabled)
                 #[cfg(all(unix, feature = "fork"))]
                 let child_status = {
                     self.shmem_provider.pre_fork()?;

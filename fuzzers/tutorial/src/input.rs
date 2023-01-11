@@ -52,7 +52,7 @@ impl Default for PacketType {
 
 impl Input for PacketData {
     fn generate_name(&self, idx: usize) -> String {
-        format!("id_{}", idx)
+        format!("id_{idx}")
     }
 }
 

@@ -165,7 +165,7 @@ const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
 
 /// The llmp broker registers a signal handler for cleanups on `SIGINT`.
 #[cfg(unix)]
-static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHandler {
+static mut LLMP_SIGHANDLER_STATE: LlmpShutdownSignalHandler = LlmpShutdownSignalHandler {
     shutting_down: false,
 };
 
@@ -466,9 +466,7 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allo
     if !allow_reinit {
         assert!(
             (*page).magic != PAGE_INITIALIZED_MAGIC,
-            "Tried to initialize page {:?} twice (for shmem {:?})",
-            page,
-            shmem
+            "Tried to initialize page {page:?} twice (for shmem {shmem:?})"
         );
     }
 
@@ -641,10 +639,7 @@ where
             }
             Err(Error::File(e, _)) if e.kind() == ErrorKind::AddrInUse => {
                 // We are the client :)
-                println!(
-                    "We're the client (internal port already bound by broker, {:#?})",
-                    e
-                );
+                println!("We're the client (internal port already bound by broker, {e:#?})");
                 Ok(LlmpConnection::IsClient {
                     client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
                 })
@@ -1082,8 +1077,7 @@ where
         let page = self.out_shmems.last_mut().unwrap().page_mut();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
             return Err(Error::unknown(format!(
-                "Llmp Message {:?} is null or not in current page",
-                msg
+                "Llmp Message {msg:?} is null or not in current page"
             )));
         }
 
@@ -1189,8 +1183,7 @@ where
         match unsafe { self.alloc_next_if_space(buf_len) } {
             Some(msg) => Ok(msg),
             None => Err(Error::unknown(format!(
-                "Error allocating {} bytes in shmap",
-                buf_len
+                "Error allocating {buf_len} bytes in shmap"
             ))),
         }
     }
@@ -1258,8 +1251,7 @@ where
             || tag == LLMP_TAG_UNSET
         {
             return Err(Error::unknown(format!(
-                "Reserved tag supplied to send_buf ({:#X})",
-                tag
+                "Reserved tag supplied to send_buf ({tag:#X})"
             )));
         }
 
@@ -1282,8 +1274,7 @@ where
             || tag == LLMP_TAG_UNSET
         {
             return Err(Error::unknown(format!(
-                "Reserved tag supplied to send_buf ({:#X})",
-                tag
+                "Reserved tag supplied to send_buf ({tag:#X})"
             )));
         }
 
@@ -1742,8 +1733,7 @@ where
         let page_size = self.shmem.as_slice().len() - size_of::<LlmpPage>();
         if offset > page_size {
             Err(Error::illegal_argument(format!(
-                "Msg offset out of bounds (size: {}, requested offset: {})",
-                page_size, offset
+                "Msg offset out of bounds (size: {page_size}, requested offset: {offset})"
             )))
         } else {
             unsafe { Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg) }
@@ -1770,12 +1760,12 @@ where
 /// A signal handler for the [`LlmpBroker`].
 #[cfg(unix)]
 #[derive(Debug, Clone)]
-pub struct LlmpBrokerSignalHandler {
+pub struct LlmpShutdownSignalHandler {
     shutting_down: bool,
 }
 
 #[cfg(unix)]
-impl Handler for LlmpBrokerSignalHandler {
+impl Handler for LlmpShutdownSignalHandler {
     fn handle(&mut self, _signal: Signal, _info: siginfo_t, _context: &mut ucontext_t) {
         unsafe {
             ptr::write_volatile(&mut self.shutting_down, true);
@@ -1957,7 +1947,7 @@ where
     #[cfg(unix)]
     #[allow(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
-        unsafe { ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) }
+        unsafe { ptr::read_volatile(&LLMP_SIGHANDLER_STATE.shutting_down) }
     }
 
     /// Always returns true on platforms, where no shutdown signal handlers are supported
@@ -1976,7 +1966,7 @@ where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         #[cfg(unix)]
-        if let Err(_e) = unsafe { setup_signal_handler(&mut GLOBAL_SIGHANDLER_STATE) } {
+        if let Err(_e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler. Print and ignore.
             #[cfg(feature = "std")]
             println!("Failed to setup signal handlers: {_e}");
@@ -2048,7 +2038,7 @@ where
     /// This function returns the [`ShMemDescription`] the client uses to place incoming messages.
     /// The thread exits, when the remote broker disconnects.
     #[cfg(feature = "std")]
-    #[allow(clippy::let_and_return)]
+    #[allow(clippy::let_and_return, clippy::too_many_lines)]
     fn b2b_thread_on(
         mut stream: TcpStream,
         b2b_client_id: ClientId,
@@ -2096,36 +2086,46 @@ where
             #[cfg(all(feature = "llmp_debug", feature = "std"))]
             println!("B2B: Starting proxy loop :)");
 
+            let peer_address = stream.peer_addr().unwrap();
+
             loop {
                 // first, forward all data we have.
-                while let Some((client_id, tag, flags, payload)) = local_receiver
-                    .recv_buf_with_flags()
-                    .expect("Error reading from local page!")
-                {
-                    if client_id == b2b_client_id {
-                        println!(
-                            "Ignored message we probably sent earlier (same id), TAG: {:x}",
-                            tag
-                        );
-                        continue;
-                    }
+                loop {
+                    match local_receiver.recv_buf_with_flags() {
+                        Ok(None) => break, // no more data to forward
+                        Ok(Some((client_id, tag, flags, payload))) => {
+                            if client_id == b2b_client_id {
+                                println!(
+                                    "Ignored message we probably sent earlier (same id), TAG: {tag:x}"
+                                );
+                                continue;
+                            }
 
-                    #[cfg(all(feature = "llmp_debug", feature = "std"))]
-                    println!(
-                        "Fowarding message ({} bytes) via broker2broker connection",
-                        payload.len()
-                    );
-                    // We got a new message! Forward...
-                    send_tcp_msg(
-                        &mut stream,
-                        &TcpRemoteNewMessage {
-                            client_id,
-                            tag,
-                            flags,
-                            payload: payload.to_vec(),
-                        },
-                    )
-                    .expect("Error sending message via broker 2 broker");
+                            #[cfg(all(feature = "llmp_debug", feature = "std"))]
+                            println!(
+                                "Fowarding message ({} bytes) via broker2broker connection",
+                                payload.len()
+                            );
+                            // We got a new message! Forward...
+                            if let Err(e) = send_tcp_msg(
+                                &mut stream,
+                                &TcpRemoteNewMessage {
+                                    client_id,
+                                    tag,
+                                    flags,
+                                    payload: payload.to_vec(),
+                                },
+                            ) {
+                                println!("Got error {e} while trying to forward a message to broker {peer_address}, exiting thread");
+                                return;
+                            }
+                        }
+                        Err(Error::ShuttingDown) => {
+                            println!("Local broker is shutting down, exiting thread");
+                            return;
+                        }
+                        Err(e) => panic!("Error reading from local page! {e}"),
+                    }
                 }
 
                 // Then, see if we can receive something.
@@ -2134,25 +2134,41 @@ where
                 // Forwarding happens between each recv, too, as simplification.
                 // We ignore errors completely as they may be timeout, or stream closings.
                 // Instead, we catch stream close when/if we next try to send.
-                if let Ok(val) = recv_tcp_msg(&mut stream) {
-                    let msg: TcpRemoteNewMessage = val.try_into().expect(
-                        "Illegal message received from broker 2 broker connection - shutting down.",
-                    );
+                match recv_tcp_msg(&mut stream) {
+                    Ok(val) => {
+                        let msg: TcpRemoteNewMessage = val.try_into().expect(
+                            "Illegal message received from broker 2 broker connection - shutting down.",
+                        );
 
-                    #[cfg(all(feature = "llmp_debug", feature = "std"))]
-                    println!(
-                        "Fowarding incoming message ({} bytes) from broker2broker connection",
-                        msg.payload.len()
-                    );
+                        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+                        println!(
+                            "Fowarding incoming message ({} bytes) from broker2broker connection",
+                            msg.payload.len()
+                        );
 
-                    // TODO: Could probably optimize this somehow to forward all queued messages between locks... oh well.
-                    // Todo: somehow mangle in the other broker id? ClientId?
-                    new_sender
-                        .send_buf_with_flags(msg.tag, msg.flags | LLMP_FLAG_FROM_B2B, &msg.payload)
-                        .expect("B2B: Error forwarding message. Exiting.");
-                } else {
-                    #[cfg(all(feature = "llmp_debug", feature = "std"))]
-                    println!("Received no input, timeout or closed. Looping back up :)");
+                        // TODO: Could probably optimize this somehow to forward all queued messages between locks... oh well.
+                        // Todo: somehow mangle in the other broker id? ClientId?
+                        new_sender
+                            .send_buf_with_flags(
+                                msg.tag,
+                                msg.flags | LLMP_FLAG_FROM_B2B,
+                                &msg.payload,
+                            )
+                            .expect("B2B: Error forwarding message. Exiting.");
+                    }
+                    Err(e) => {
+                        if let Error::File(e, _) = e {
+                            if e.kind() == ErrorKind::UnexpectedEof {
+                                println!(
+                                    "Broker {peer_address} seems to have disconnected, exiting"
+                                );
+                                return;
+                            }
+                        }
+
+                        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+                        println!("Received no input, timeout or closed. Looping back up :)");
+                    }
                 }
             }
         });
@@ -2389,8 +2405,7 @@ where
                             println!("Error adding client! Ignoring: {e:?}");
                             #[cfg(not(feature = "std"))]
                             return Err(Error::unknown(format!(
-                                "Error adding client! PANIC! {:?}",
-                                e
+                                "Error adding client! PANIC! {e:?}"
                             )));
                         }
                     };
@@ -2681,17 +2696,14 @@ where
         };
         println!("Connected to port {port}");
 
-        let broker_shmem_description = if let TcpResponse::BrokerConnectHello {
+        let TcpResponse::BrokerConnectHello {
             broker_shmem_description,
             hostname: _,
-        } = recv_tcp_msg(&mut stream)?.try_into()?
-        {
-            broker_shmem_description
-        } else {
+        } = recv_tcp_msg(&mut stream)?.try_into()? else {
             return Err(Error::illegal_state(
                 "Received unexpected Broker Hello".to_string(),
             ));
-        };
+         };
 
         let map = LlmpSharedMap::existing(
             shmem_provider.shmem_from_description(broker_shmem_description)?,
@@ -2706,15 +2718,11 @@ where
 
         send_tcp_msg(&mut stream, &client_hello_req)?;
 
-        let client_id = if let TcpResponse::LocalClientAccepted { client_id } =
-            recv_tcp_msg(&mut stream)?.try_into()?
-        {
-            client_id
-        } else {
-            return Err(Error::illegal_state(
-                "Unexpected Response from Broker".to_string(),
+        let TcpResponse::LocalClientAccepted { client_id } = recv_tcp_msg(&mut stream)?.try_into()? else {
+             return Err(Error::illegal_state(
+                 "Unexpected Response from Broker".to_string(),
             ));
-        };
+       };
 
         // Set our ID to the one the broker sent us..
         // This is mainly so we can filter out our own msgs later.

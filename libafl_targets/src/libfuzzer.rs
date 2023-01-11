@@ -14,7 +14,7 @@ extern "C" {
 
 /// Calls the (native) libfuzzer initialize function.
 /// Returns the value returned by the init function.
-/// # Safety
+/// # Note
 /// Calls the libfuzzer-style init function which is native code.
 #[allow(clippy::similar_names)]
 #[allow(clippy::must_use_candidate)] // nobody uses that return code...
@@ -31,7 +31,7 @@ pub fn libfuzzer_initialize(args: &[String]) -> i32 {
 }
 
 /// Call a single input of a libfuzzer-style cpp-harness
-/// # Safety
+/// # Note
 /// Calls the libfuzzer harness. We actually think the target is unsafe and crashes eventually, that's why we do all this fuzzing.
 #[allow(clippy::must_use_candidate)]
 pub fn libfuzzer_test_one_input(buf: &[u8]) -> i32 {

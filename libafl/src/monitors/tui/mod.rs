@@ -169,13 +169,14 @@ pub struct ClientTuiContext {
     pub corpus: u64,
     pub objectives: u64,
     pub executions: u64,
-    pub exec_sec: u64,
+    /// Float value formatted as String
+    pub exec_sec: String,
 
     pub user_stats: HashMap<String, UserStats>,
 }
 
 impl ClientTuiContext {
-    pub fn grab_data(&mut self, client: &ClientStats, exec_sec: u64) {
+    pub fn grab_data(&mut self, client: &ClientStats, exec_sec: String) {
         self.corpus = client.corpus_size;
         self.objectives = client.objective_size;
         self.executions = client.executions;
@@ -256,11 +257,13 @@ impl Monitor for TuiMonitor {
         self.start_time
     }
 
+    #[allow(clippy::cast_sign_loss)]
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let cur_time = current_time();
 
         {
-            let execsec = self.execs_per_sec();
+            // TODO implement floating-point support for TimedStat
+            let execsec = self.execs_per_sec() as u64;
             let totalexec = self.total_execs();
             let run_time = cur_time - self.start_time;
 
@@ -274,7 +277,7 @@ impl Monitor for TuiMonitor {
         }
 
         let client = self.client_stats_mut_for(sender_id);
-        let exec_sec = client.execs_per_sec(cur_time);
+        let exec_sec = client.execs_per_sec_pretty(cur_time);
 
         let sender = format!("#{sender_id}");
         let pad = if event_msg.len() + sender.len() < 13 {

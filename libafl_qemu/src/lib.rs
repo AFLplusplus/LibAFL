@@ -14,9 +14,14 @@
 #![allow(clippy::borrow_deref_ref)]
 // Allow only ATM, it will be evetually removed
 #![allow(clippy::missing_safety_doc)]
+// libafl_qemu_sys export types with empty struct markers (e.g. struct {} start_init_save)
+// This causes bindgen to generate empty Rust struct that are generally not FFI-safe due to C++ having empty structs with size 1
+// As the QEMU codebase is C, it is FFI-safe and we just ignore the warning
+#![allow(improper_ctypes)]
 
 use std::env;
 
+pub use libafl_qemu_sys as sys;
 pub use strum::IntoEnumIterator;
 
 #[cfg(cpu_target = "aarch64")]
@@ -39,6 +44,11 @@ pub mod x86_64;
 #[cfg(cpu_target = "x86_64")]
 pub use x86_64::*;
 
+#[cfg(cpu_target = "mips")]
+pub mod mips;
+#[cfg(cpu_target = "mips")]
+pub use mips::*;
+
 pub mod elf;
 
 pub mod helper;
@@ -48,18 +58,26 @@ pub use hooks::*;
 
 pub mod edges;
 pub use edges::QemuEdgeCoverageHelper;
+
+#[cfg(not(cpu_target = "mips"))]
 pub mod cmplog;
+#[cfg(not(cpu_target = "mips"))]
 pub use cmplog::QemuCmpLogHelper;
+
 #[cfg(emulation_mode = "usermode")]
 pub mod snapshot;
 #[cfg(emulation_mode = "usermode")]
 pub use snapshot::QemuSnapshotHelper;
+
 #[cfg(emulation_mode = "usermode")]
 pub mod asan;
 #[cfg(emulation_mode = "usermode")]
 pub use asan::{init_with_asan, QemuAsanHelper};
 
+pub mod blocks;
+
 pub mod calls;
+pub mod drcov;
 
 pub mod executor;
 pub use executor::QemuExecutor;

@@ -8,6 +8,14 @@ use libafl::{inputs::UsesInput, state::HasMetadata};
 use meminterval::{Interval, IntervalTree};
 use thread_local::ThreadLocal;
 
+#[cfg(any(cpu_target = "arm", cpu_target = "i386", cpu_target = "mips"))]
+use crate::SYS_fstatat64;
+#[cfg(not(cpu_target = "arm"))]
+use crate::SYS_mmap;
+#[cfg(any(cpu_target = "arm", cpu_target = "mips"))]
+use crate::SYS_mmap2;
+#[cfg(not(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "i386")))]
+use crate::SYS_newfstatat;
 use crate::{
     emu::{Emulator, MmapPerms, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple},
@@ -15,11 +23,8 @@ use crate::{
     GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
     SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
-#[cfg(cpu_target = "arm")]
-use crate::{SYS_fstatat64, SYS_mmap2};
-#[cfg(not(cpu_target = "arm"))]
-use crate::{SYS_mmap, SYS_newfstatat};
 
+// TODO use the functions provided by Emulator
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
 
@@ -298,6 +303,10 @@ impl QemuSnapshotHelper {
     }
 
     pub fn add_mapped(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
+        if size == 0 {
+            return;
+        }
+
         let total_size = {
             if size % SNAPSHOT_PAGE_SIZE != 0 {
                 size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
@@ -629,14 +638,14 @@ where
             let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
             h.access(a0 as GuestAddr, a3 as usize);
         }
-        #[cfg(not(cpu_target = "arm"))]
+        #[cfg(not(any(cpu_target = "arm", cpu_target = "i386", cpu_target = "mips")))]
         SYS_newfstatat => {
             if a2 != 0 {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
                 h.access(a2 as GuestAddr, 4096); // stat is not greater than a page
             }
         }
-        #[cfg(cpu_target = "arm")]
+        #[cfg(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "i386"))]
         SYS_fstatat64 => {
             if a2 != 0 {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
@@ -661,26 +670,11 @@ where
 
             // TODO handle huge pages
 
-            #[cfg(cpu_target = "arm")]
+            #[cfg(any(cpu_target = "arm", cpu_target = "mips"))]
             if i64::from(sys_num) == SYS_mmap2 {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
                     h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
-                }
-            } else if i64::from(sys_num) == SYS_mremap {
-                let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                h.remove_mapped(a0 as GuestAddr, a1 as usize);
-                h.add_mapped(result as GuestAddr, a2 as usize, None);
-                // TODO get the old permissions from the removed mapping
-            } else if i64::from(sys_num) == SYS_mprotect {
-                if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
-                    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                    h.add_mapped(a0 as GuestAddr, a1 as usize, Some(prot));
-                }
-            } else if i64::from(sys_num) == SYS_munmap {
-                let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                if !h.accurate_unmap && !h.is_unmap_allowed(a0 as GuestAddr, a1 as usize) {
-                    h.remove_mapped(a0 as GuestAddr, a1 as usize);
                 }
             }
 
@@ -690,7 +684,9 @@ where
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
                     h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
                 }
-            } else if i64::from(sys_num) == SYS_mremap {
+            }
+
+            if i64::from(sys_num) == SYS_mremap {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
                 h.remove_mapped(a0 as GuestAddr, a1 as usize);
                 h.add_mapped(result as GuestAddr, a2 as usize, None);

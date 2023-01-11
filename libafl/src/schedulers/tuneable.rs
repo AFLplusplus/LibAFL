@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     impl_serdeany,
     inputs::UsesInput,
     schedulers::Scheduler,
@@ -18,7 +18,7 @@ use crate::{
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
 struct TuneableSchedulerMetadata {
-    next: Option<usize>,
+    next: Option<CorpusId>,
 }
 
 impl_serdeany!(TuneableSchedulerMetadata);
@@ -57,12 +57,12 @@ where
     }
 
     /// Sets the next corpus id to be used
-    pub fn set_next(state: &mut S, next: usize) {
+    pub fn set_next(state: &mut S, next: CorpusId) {
         Self::metadata_mut(state).next = Some(next);
     }
 
     /// Gets the next set corpus id
-    pub fn get_next(state: &S) -> Option<usize> {
+    pub fn get_next(state: &S) -> Option<CorpusId> {
         Self::metadata(state).next
     }
 
@@ -73,8 +73,11 @@ where
     }
 
     /// Gets the current corpus entry id
-    pub fn get_current(state: &S) -> usize {
-        state.corpus().current().unwrap_or_default()
+    pub fn get_current(state: &S) -> CorpusId {
+        state
+            .corpus()
+            .current()
+            .unwrap_or_else(|| state.corpus().first().expect("Empty corpus"))
     }
 }
 
@@ -90,17 +93,17 @@ where
     S: HasCorpus + HasMetadata,
 {
     /// Gets the next entry in the queue
-    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             return Err(Error::empty("No entries in corpus".to_owned()));
         }
         let id = if let Some(next) = Self::get_next(state) {
             // next was set
             next
-        } else if Self::get_current(state) + 1 >= state.corpus().count() {
-            0
+        } else if let Some(next) = state.corpus().next(Self::get_current(state)) {
+            next
         } else {
-            Self::get_current(state) + 1
+            state.corpus().first().unwrap()
         };
         *state.corpus_mut().current_mut() = Some(id);
         Ok(id)

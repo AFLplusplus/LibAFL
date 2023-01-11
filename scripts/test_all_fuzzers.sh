@@ -2,11 +2,16 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR/.." || exit 1
-
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
-fuzzers=$(find ./fuzzers -mindepth 1 -maxdepth 1 -type d)
-backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -mindepth 1 -maxdepth 1 -type d)
+if [[ -z "${RUN_ON_CI}" ]]; then
+  fuzzers=$(find ./fuzzers -mindepth 1 -maxdepth 1 -type d)
+  backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -mindepth 1 -maxdepth 1 -type d)
+else
+  cargo build -p build_and_test_fuzzers
+  fuzzers=$(cargo run -p build_and_test_fuzzers -- "remotes/origin/main" "HEAD^")
+  backtrace_fuzzers=""
+fi
 
 libafl=$(pwd)
 
@@ -31,9 +36,6 @@ do
     export CARGO_PROFILE_"$profile"_INCREMENTAL=true
 done
 
-# record time of each fuzzer
-declare -A time_record || (echo "declare -A not avaliable, please update your bash version to 4";exit 1)
-
 # shellcheck disable=SC2116
 for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
@@ -43,7 +45,6 @@ do
     fi
 
     cd "$fuzzer" || exit 1
-    start=$(date +%s)
     # Clippy checks
     if [ "$1" != "--no-fmt" ]; then
         
@@ -68,8 +69,6 @@ do
         cargo build || exit 1
         echo "[+] Done building $fuzzer"
     fi
-    end=$(date +%s)
-    time_record[$fuzzer]=$((end-start))
     du -sh "$CARGO_TARGET_DIR"
     # Save disk space
     cargo clean -p "$(basename "$fuzzer")"
@@ -83,9 +82,4 @@ do
     du -sh "$CARGO_TARGET_DIR"
     cd "$libafl" || exit 1
     echo ""
-done
-
-# print time for each fuzzer
-for key in "${!time_record[@]}"; do
-    echo "dir: $key, time: ${time_record[$key]}";
 done

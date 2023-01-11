@@ -31,6 +31,7 @@ where
     S::Input: HasTargetBytes,
     S: UsesInput,
     OT: ObserversTuple<S>,
+    'a: 'b,
 {
     base: InProcessExecutor<'a, H, OT, S>,
     /// Frida's dynamic rewriting engine
@@ -83,8 +84,8 @@ where
                 self.stalker.activate(NativePointer(core::ptr::null_mut()));
             } else {
                 self.followed = true;
-                self.stalker
-                    .follow_me::<NoneEventSink>(self.helper.transformer(), None);
+                let transformer = self.helper.transformer();
+                self.stalker.follow_me::<NoneEventSink>(transformer, None);
             }
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);
@@ -170,12 +171,15 @@ where
                 break;
             }
         }
-        for range in ranges.gaps(&(0..usize::MAX)) {
-            println!("excluding range: {:x}-{:x}", range.start, range.end);
-            stalker.exclude(&MemoryRange::new(
-                NativePointer(range.start as *mut c_void),
-                range.end - range.start,
-            ));
+
+        if !helper.options().disable_excludes {
+            for range in ranges.gaps(&(0..usize::MAX)) {
+                println!("excluding range: {:x}-{:x}", range.start, range.end);
+                stalker.exclude(&MemoryRange::new(
+                    NativePointer(range.start as *mut c_void),
+                    range.end - range.start,
+                ));
+            }
         }
 
         #[cfg(windows)]

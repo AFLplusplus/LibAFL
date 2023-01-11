@@ -8,11 +8,8 @@ use core::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{
-        current_nanos,
-        rands::{Rand, StdRand},
-    },
-    corpus::Corpus,
+    bolts::rands::{Rand, StdRand},
+    corpus::{Corpus, CorpusId},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,
@@ -141,9 +138,9 @@ const PERIOD_PILOT_COEF: f64 = 5000.0;
 
 impl MOpt {
     /// Creates a new [`struct@MOpt`] instance.
-    pub fn new(operator_num: usize, swarm_num: usize) -> Result<Self, Error> {
+    pub fn new(operator_num: usize, swarm_num: usize, rand_seed: u64) -> Result<Self, Error> {
         let mut mopt = Self {
-            rand: StdRand::with_seed(current_nanos()),
+            rand: StdRand::with_seed(rand_seed),
             total_finds: 0,
             finds_until_last_swarm: 0,
             w_init: 0.9,
@@ -410,7 +407,7 @@ where
         &mut self,
         state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>,
+        _corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();
@@ -537,7 +534,8 @@ where
         swarm_num: usize,
     ) -> Result<Self, Error> {
         if !state.has_metadata::<MOpt>() {
-            state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num)?);
+            let rand_seed = state.rand_mut().next();
+            state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num, rand_seed)?);
         }
         Ok(Self {
             mode: MOptMode::Pilotfuzzing,

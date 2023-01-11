@@ -16,7 +16,7 @@ pub use prometheus::PrometheusMonitor;
 #[cfg(feature = "std")]
 pub mod disk;
 use alloc::{fmt::Debug, string::String, vec::Vec};
-use core::{fmt, time::Duration};
+use core::{fmt, fmt::Write, time::Duration};
 
 #[cfg(feature = "std")]
 pub use disk::{OnDiskJSONMonitor, OnDiskTOMLMonitor};
@@ -55,6 +55,29 @@ impl fmt::Display for UserStats {
                     write!(f, "{a}/{b} ({}%)", a * 100 / b)
                 }
             }
+        }
+    }
+}
+
+/// Prettifies float values for human-readable output
+fn prettify_float(value: f64) -> String {
+    let (value, suffix) = match value {
+        value if value >= 1000000.0 => (value / 1000000.0, "M"),
+        value if value >= 1000.0 => (value / 1000.0, "k"),
+        value => (value, ""),
+    };
+    match value {
+        value if value >= 1000.0 => {
+            format!("{value}{suffix}")
+        }
+        value if value >= 100.0 => {
+            format!("{value:.1}{suffix}")
+        }
+        value if value >= 10.0 => {
+            format!("{value:.2}{suffix}")
+        }
+        value => {
+            format!("{value:.3}{suffix}")
         }
     }
 }
@@ -116,24 +139,24 @@ impl ClientStats {
     }
 
     /// Get the calculated executions per second for this client
-    #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
     #[cfg(feature = "afl_exec_sec")]
-    pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
+    pub fn execs_per_sec(&mut self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
-            return 0;
+            return 0.0;
         }
 
         let elapsed = cur_time
             .checked_sub(self.last_window_time)
             .map_or(0.0, |d| d.as_secs_f64());
         if elapsed as u64 == 0 {
-            return self.last_execs_per_sec as u64;
+            return self.last_execs_per_sec;
         }
 
         let cur_avg = ((self.executions - self.last_window_executions) as f64) / elapsed;
         if self.last_window_executions == 0 {
             self.last_execs_per_sec = cur_avg;
-            return self.last_execs_per_sec as u64;
+            return self.last_execs_per_sec;
         }
 
         // If there is a dramatic (5x+) jump in speed, reset the indicator more quickly
@@ -143,25 +166,30 @@ impl ClientStats {
 
         self.last_execs_per_sec =
             self.last_execs_per_sec * (1.0 - 1.0 / 16.0) + cur_avg * (1.0 / 16.0);
-        self.last_execs_per_sec as u64
+        self.last_execs_per_sec
     }
 
     /// Get the calculated executions per second for this client
-    #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
     #[cfg(not(feature = "afl_exec_sec"))]
-    pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
+    pub fn execs_per_sec(&mut self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
-            return 0;
+            return 0.0;
         }
 
         let elapsed = cur_time
             .checked_sub(self.last_window_time)
             .map_or(0.0, |d| d.as_secs_f64());
         if elapsed as u64 == 0 {
-            return 0;
+            return 0.0;
         }
 
-        ((self.executions as f64) / elapsed) as u64
+        (self.executions as f64) / elapsed
+    }
+
+    /// Executions per second
+    fn execs_per_sec_pretty(&mut self, cur_time: Duration) -> String {
+        prettify_float(self.execs_per_sec(cur_time))
     }
 
     /// Update the user-defined stat with name and value
@@ -218,12 +246,18 @@ pub trait Monitor {
     }
 
     /// Executions per second
+    #[allow(clippy::cast_sign_loss)]
     #[inline]
-    fn execs_per_sec(&mut self) -> u64 {
+    fn execs_per_sec(&mut self) -> f64 {
         let cur_time = current_time();
         self.client_stats_mut()
             .iter_mut()
-            .fold(0_u64, |acc, x| acc + x.execs_per_sec(cur_time))
+            .fold(0.0, |acc, x| acc + x.execs_per_sec(cur_time))
+    }
+
+    /// Executions per second
+    fn execs_per_sec_pretty(&mut self) -> String {
+        prettify_float(self.execs_per_sec())
     }
 
     /// The client monitor for a specific id, creating new if it doesn't exist
@@ -327,7 +361,7 @@ impl Monitor for SimplePrintingMonitor {
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec_pretty()
         );
 
         // Only print perf monitor if the feature is enabled
@@ -352,6 +386,7 @@ where
 {
     print_fn: F,
     start_time: Duration,
+    print_user_monitor: bool,
     client_stats: Vec<ClientStats>,
 }
 
@@ -387,7 +422,7 @@ where
     }
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
-        let fmt = format!(
+        let mut fmt = format!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id,
@@ -396,8 +431,16 @@ where
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec_pretty()
         );
+
+        if self.print_user_monitor {
+            let client = self.client_stats_mut_for(sender_id);
+            for (key, val) in &client.user_monitor {
+                write!(fmt, ", {key}: {val}").unwrap();
+            }
+        }
+
         (self.print_fn)(fmt);
 
         // Only print perf monitor if the feature is enabled
@@ -425,6 +468,7 @@ where
         Self {
             print_fn,
             start_time: current_time(),
+            print_user_monitor: false,
             client_stats: vec![],
         }
     }
@@ -434,6 +478,17 @@ where
         Self {
             print_fn,
             start_time,
+            print_user_monitor: false,
+            client_stats: vec![],
+        }
+    }
+
+    /// Creates the monitor that also prints the user monitor
+    pub fn with_user_monitor(print_fn: F, print_user_monitor: bool) -> Self {
+        Self {
+            print_fn,
+            start_time: current_time(),
+            print_user_monitor,
             client_stats: vec![],
         }
     }
@@ -832,8 +887,7 @@ impl core::fmt::Display for ClientPerfMonitor {
         // Create the formatted string
         writeln!(
             f,
-            "  {:6.4}: Scheduler\n  {:6.4}: Manager",
-            scheduler_percent, manager_percent
+            "  {scheduler_percent:6.4}: Scheduler\n  {manager_percent:6.4}: Manager"
         )?;
 
         // Calculate each stage
@@ -938,6 +992,7 @@ pub mod pybind {
                 inner: SimpleMonitor {
                     print_fn: Box::new(closure),
                     start_time: self.inner.start_time,
+                    print_user_monitor: false,
                     client_stats: self.inner.client_stats.clone(),
                 },
                 print_fn: self.print_fn.clone(),
@@ -1033,5 +1088,24 @@ pub mod pybind {
         m.add_class::<PythonSimpleMonitor>()?;
         m.add_class::<PythonMonitor>()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::monitors::prettify_float;
+    #[test]
+    fn test_prettify_float() {
+        assert_eq!(prettify_float(123423123.0), "123.4M");
+        assert_eq!(prettify_float(12342312.3), "12.34M");
+        assert_eq!(prettify_float(1234231.23), "1.234M");
+        assert_eq!(prettify_float(123423.123), "123.4k");
+        assert_eq!(prettify_float(12342.3123), "12.34k");
+        assert_eq!(prettify_float(1234.23123), "1.234k");
+        assert_eq!(prettify_float(123.423123), "123.4");
+        assert_eq!(prettify_float(12.3423123), "12.34");
+        assert_eq!(prettify_float(1.23423123), "1.234");
+        assert_eq!(prettify_float(0.123423123), "0.123");
+        assert_eq!(prettify_float(0.0123423123), "0.012");
     }
 }

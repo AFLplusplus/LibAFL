@@ -23,9 +23,14 @@ pub use windows::Win32::{
 
 use crate::Error;
 
-//const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
+// For VEH
+const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
+
+// For VEH
 //const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
-const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
+
+// For SEH
+//const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
 
 // From https://github.com/Alexpux/mingw-w64/blob/master/mingw-w64-headers/crt/signal.h
 pub const SIGINT: i32 = 2;
@@ -314,9 +319,9 @@ unsafe fn internal_handle_exception(
         Some(handler_holder) => {
             let handler = &mut **handler_holder.handler.get();
             handler.handle(exception_code, exception_pointers);
-            EXCEPTION_EXECUTE_HANDLER
+            EXCEPTION_CONTINUE_EXECUTION
         }
-        None => EXCEPTION_EXECUTE_HANDLER,
+        None => EXCEPTION_CONTINUE_EXECUTION,
     }
 }
 
@@ -376,7 +381,7 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     // SetUnhandledFilter does not work with frida since the stack is changed and exception handler is lost with Stalker enabled.
     // See https://github.com/AFLplusplus/LibAFL/pull/403
     AddVectoredExceptionHandler(
-        1,
+        0,
         Some(core::mem::transmute(handle_exception as *const c_void)),
     );
     Ok(())

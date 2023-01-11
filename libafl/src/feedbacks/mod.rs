@@ -1,7 +1,8 @@
 //! The feedbacks reduce observer state after each run to a single `is_interesting`-value.
 //! If a testcase is interesting, it may be added to a Corpus.
 //!
-//! TODO: make S of Feedback<S> an associated type when specialisation + AT is stable
+
+// TODO: make S of Feedback<S> an associated type when specialisation + AT is stable
 
 pub mod map;
 pub use map::*;
@@ -963,6 +964,7 @@ where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     name: String,
+    last_addr: usize,
     phantom: PhantomData<T>,
 }
 
@@ -1012,6 +1014,7 @@ where
     pub fn new(name: &'static str) -> Self {
         Self {
             name: name.to_string(),
+            last_addr: 0,
             phantom: PhantomData,
         }
     }
@@ -1021,6 +1024,7 @@ where
     pub fn new_with_observer(observer: &ListObserver<T>) -> Self {
         Self {
             name: observer.name().to_string(),
+            last_addr: 0,
             phantom: PhantomData,
         }
     }

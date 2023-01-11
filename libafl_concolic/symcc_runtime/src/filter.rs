@@ -68,7 +68,7 @@ macro_rules! rust_filter_function_declaration {
 /// }
 ///
 /// impl Filter for SelectiveSymbolication {
-///     fn get_input_byte(&mut self, offset: usize) -> bool {
+///     fn get_input_byte(&mut self, offset: usize, value: u8) -> bool {
 ///         self.bytes_to_symbolize.contains(&offset)
 ///     }
 ///     // Note: No need to implement methods that we are not interested in!
@@ -150,7 +150,7 @@ impl SelectiveSymbolication {
 }
 
 impl Filter for SelectiveSymbolication {
-    fn get_input_byte(&mut self, offset: usize) -> bool {
+    fn get_input_byte(&mut self, offset: usize, _value: u8) -> bool {
         self.bytes_to_symbolize.contains(&offset)
     }
 }

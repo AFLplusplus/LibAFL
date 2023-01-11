@@ -13,7 +13,7 @@ In Rust, we bind this concept to the [`Executor`](https://docs.rs/libafl/0/libaf
 
 By default, we implement some commonly used Executors such as [`InProcessExecutor`](https://docs.rs/libafl/0/libafl/executors/inprocess/struct.InProcessExecutor.html) in which the target is a harness function providing in-process crash detection. Another Executor is the [`ForkserverExecutor`](https://docs.rs/libafl/0/libafl/executors/forkserver/struct.ForkserverExecutor.html) that implements an AFL-like mechanism to spawn child processes to fuzz.
 
-A common pattern when creating an Executor is wrapping an existing one, for instance [`TimeoutExecutor`](https://docs.rs/libafl/0.6.1/libafl/executors/timeout/struct.TimeoutExecutor.html) wraps an executor and install a timeout callback before calling the original run function of the wrapped executor.
+A common pattern when creating an Executor is wrapping an existing one, for instance [`TimeoutExecutor`](https://docs.rs/libafl/0.6.1/libafl/executors/timeout/struct.TimeoutExecutor.html) wraps an executor and installs a timeout callback before calling the original `run` function of the wrapped executor.
 
 ## InProcessExecutor
 Let's begin with the base case; `InProcessExecutor`.
@@ -24,7 +24,7 @@ When you want to execute the harness as fast as possible, you will most probably
  One thing to note here is, when your harness is likely to have heap corruption bugs, you want to use another allocator so that corrupted heap does not affect the fuzzer itself. (For example, we adopt MiMalloc in some of our fuzzers.). Alternatively you can compile your harness with address sanitizer to make sure you can catch these heap bugs.
 
 ## ForkserverExecutor
-Next, we'll take a look at the `ForkserverExecutor`. In this case, it is `afl-cc` (from AFLplusplus/AFLplusplus) that compiles the harness code, and therefore, we can't use `EDGES_MAP` anymore. Hopefully, we have [_a way_](https://github.com/AFLplusplus/AFLplusplus/blob/2e15661f184c77ac1fbb6f868c894e946cbb7f17/instrumentation/afl-compiler-rt.o.c#L270) to tell the forkserver which map to record the coverage.
+Next, we'll take a look at the `ForkserverExecutor`. In this case, it is `afl-cc` (from AFLplusplus/AFLplusplus) that compiles the harness code, and therefore, we can't use `EDGES_MAP` anymore. Fortunately we have [_a way_](https://github.com/AFLplusplus/AFLplusplus/blob/2e15661f184c77ac1fbb6f868c894e946cbb7f17/instrumentation/afl-compiler-rt.o.c#L270) to tell the forkserver which map to record the coverage in.
 
 As you can see from the forkserver example,
 
@@ -48,7 +48,7 @@ See AFL++'s [_documentation_](https://github.com/AFLplusplus/AFLplusplus/blob/st
 Finally, we'll talk about the `InProcessForkExecutor`.
 `InProcessForkExecutor` has only one difference from `InprocessExecutor`; It forks before running the harness and that's it.
 
-But why do we want to do so? well, under some circumstances, you may find your harness pretty unstable or your harness wreaks havoc on the global states. In this case, you want to fork it before executing the harness runs in the child process so that it doesn't break things.
+But why do we want to do so? Well, under some circumstances, you may find your harness pretty unstable or your harness wreaks havoc on the global states. In this case, you want to fork it before executing the harness runs in the child process so that it doesn't break things.
 
 However, we have to take care of the shared memory, it's the child process that runs the harness code and writes the coverage to the map.
 

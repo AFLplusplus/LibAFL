@@ -50,7 +50,7 @@ impl<S> QemuHelper<S> for QemuCallTracerHelper
 where
     S: UsesInput,
 {
-    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'a, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -96,6 +96,13 @@ where
     let ret_addr = {
         let emu = hooks.emulator();
         let ret_addr: GuestAddr = emu.read_reg(Regs::Lr).unwrap();
+        ret_addr
+    };
+
+    #[cfg(cpu_target = "mips")]
+    let ret_addr = {
+        let emu = hooks.emulator();
+        let ret_addr: GuestAddr = emu.read_reg(Regs::Ra).unwrap();
         ret_addr
     };
 

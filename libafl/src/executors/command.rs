@@ -152,7 +152,7 @@ impl CommandConfigurator for StdCommandConfigurator {
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
 pub struct CommandExecutor<EM, OT, S, T, Z> {
-    /// The wrapped comand configurer
+    /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
     observers: OT,
@@ -526,7 +526,7 @@ impl CommandExecutorBuilder {
         self
     }
 
-    /// Builds the `ComandExecutor`
+    /// Builds the `CommandExecutor`
     pub fn build<EM, OT, S, Z>(
         &self,
         observers: OT,
@@ -535,13 +535,12 @@ impl CommandExecutorBuilder {
         OT: Debug + MatchName + ObserversTuple<S>,
         S: UsesInput,
     {
-        let program = if let Some(program) = &self.program {
-            program
-        } else {
-            return Err(Error::illegal_argument(
-                "ComandExecutor::builder: no program set!",
-            ));
+        let Some(program) = &self.program else {
+             return Err(Error::illegal_argument(
+                "CommandExecutor::builder: no program set!",
+           ));
         };
+
         let mut command = Command::new(program);
         match &self.input_location {
             InputLocation::StdIn => {

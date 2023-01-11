@@ -47,7 +47,7 @@ impl FridaRuntime for DrCovRuntime {
         hasher.write(input.target_bytes().as_slice());
 
         let filename = format!("./coverage/{:016x}.drcov", hasher.finish(),);
-        DrCovWriter::new(&self.ranges).write(&filename, &self.drcov_basic_blocks)?;
+        DrCovWriter::new(&self.ranges).write(filename, &self.drcov_basic_blocks)?;
         self.drcov_basic_blocks.clear();
 
         Ok(())

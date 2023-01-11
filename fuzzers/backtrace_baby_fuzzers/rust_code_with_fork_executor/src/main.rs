@@ -65,7 +65,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", signals_clone.as_mut_slice());
+    let observer = unsafe { StdMapObserver::new("signals", signals_clone.as_mut_slice()) };
     // Create a stacktrace observer
     let bt_observer = BacktraceObserver::new(
         "BacktraceObserver",
@@ -97,7 +97,7 @@ pub fn main() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
