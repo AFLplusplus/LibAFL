@@ -5,6 +5,7 @@ use libafl::{
     corpus::Corpus,
     inputs::{HasBytesVec, UsesInput},
     mutators::{MutationResult, Mutator, Tokens},
+    prelude::CorpusId,
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -205,13 +206,13 @@ where
 
         // We don't want to use the testcase we're already using for splicing
         let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let idx: usize = state.rand_mut().below(count as u64) as usize;
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if CorpusId::from(idx) == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut().clone();
+        let mut other_testcase = state.corpus().get(idx.into())?.borrow_mut().clone();
         let other_bytes = other_testcase.load_input()?.bytes();
 
         // pick a tag in other_bytes

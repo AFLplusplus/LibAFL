@@ -7,6 +7,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 use core::time::Duration;
 use std::{env, fs, io::Read, net::SocketAddr, path::PathBuf};
+
 use clap::{self, Parser};
 use libafl::{
     bolts::{
@@ -45,8 +46,7 @@ use libafl::{
     Error, Evaluator,
 };
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
-    MAX_EDGES_NUM,
+    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, EDGES_MAP, MAX_EDGES_NUM,
 };
 
 mod js;
@@ -109,13 +109,11 @@ struct Opt {
     #[structopt(
         help = "Path for the JS file with the harness to run inputs through",
         name = "HARNESS",
-        long = "harness",
-        parse(from_os_str)
+        long = "harness"
     )]
     harness: PathBuf,
 
-    #[structopt(
-        parse(try_from_str = timeout_from_millis_str),
+    #[arg(
         value_parser = timeout_from_millis_str,
         short,
         long,
@@ -128,7 +126,7 @@ struct Opt {
     #[arg(
         short = 'x',
         long,
-        help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",
+        help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\")",
         name = "TOKENS"
     )]
     tokens: Vec<PathBuf>,
@@ -157,7 +155,7 @@ struct Opt {
     )]
     bytes: bool,
 
-    #[structopt(help = "Use tags mutator", name = "TAGS", long = "tags", short = "t")]
+    #[structopt(help = "Use tags mutator", name = "TAGS", long = "tags", short = 't')]
     tags: bool,
 
     #[arg(
@@ -209,7 +207,8 @@ pub extern "C" fn main() {
 
         // Create an observation channel using the coverage map
         let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-        let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+        let edges_observer =
+            unsafe { HitcountsMapObserver::new(StdMapObserver::new("edges", edges)) };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");

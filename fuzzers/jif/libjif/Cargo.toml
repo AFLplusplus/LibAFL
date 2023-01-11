@@ -17,10 +17,8 @@ num_cpus = "1.0"
 
 [dependencies]
 
-# previous rev: 7b345 0fe81
 libafl = { path = "../../../libafl", features = ["std", "derive", "llmp_compression", "rand_trait", "cmin", "prelude"], default-features = false }
 libafl_targets = { path = "../../../libafl_targets", features = ["sancov_pcguard_hitcounts", "sancov_cmplog", "libfuzzer"] }
-
 libafl_cc = { path = "../../../libafl_cc"}
 
 mimalloc = { version = "*", default-features = false }

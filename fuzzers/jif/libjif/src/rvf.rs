@@ -1,9 +1,6 @@
 use libafl::{
     bolts::tuples::Named, events::EventFirer, executors::ExitKind, feedbacks::Feedback,
     inputs::UsesInput, observers::ObserversTuple, state::HasClientPerfMonitor, Error,
-    prelude::{
-        EventFirer, ExitKind, Feedback, HasClientPerfMonitor, Named, ObserversTuple, UsesInput,
-    },
 };
 use serde::{Deserialize, Serialize};
 
