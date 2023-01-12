@@ -67,11 +67,11 @@ fn main() {
         .expect("Failed to build runtime");
 
     std::fs::copy(
-        &runtime_dir
+        runtime_dir
             .join("target")
             .join("release")
             .join("libSymRuntime.so"),
-        &runtime_dir.join("libSymRuntime.so"),
+        runtime_dir.join("libSymRuntime.so"),
     )
     .unwrap();
 

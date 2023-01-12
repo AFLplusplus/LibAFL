@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "gzip")]
 use crate::bolts::compress::GzipCompressor;
-
 use crate::{
     bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
