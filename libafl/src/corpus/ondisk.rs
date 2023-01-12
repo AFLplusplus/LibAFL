@@ -157,12 +157,12 @@ where
     ///
     /// This corpus stores all testcases to disk, and keeps all of them in memory, as well.
     ///
-    /// by default, it stores metadata for each [`testcase`] as prettified json.
-    /// metadata will be written to a file named `.<testcase>.metadata`
-    /// the metadata may include objective reason, specific information for a fuzz job, and more.
+    /// By default, it stores metadata for each [`Testcase`] as prettified json.
+    /// Metadata will be written to a file named `.<testcase>.metadata`
+    /// The metadata may include objective reason, specific information for a fuzz job, and more.
     ///
-    /// if you don't want metadata, use [`ondiskcorpus::no_meta`].
-    /// to pick a different metadata format, use [`ondiskcorpus::with_meta_format`].
+    /// If you don't want metadata, use [`OnDiskCorpus::no_meta`].
+    /// To pick a different metadata format, use [`OnDiskCorpus::with_meta_format`].
     ///
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
     pub fn new<P>(dir_path: P) -> Result<Self, Error>
