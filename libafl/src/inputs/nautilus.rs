@@ -15,7 +15,12 @@ use grammartec::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::HasLen, generators::nautilus::NautilusContext, inputs::Input};
+use crate::{
+    bolts::HasLen,
+    generators::nautilus::NautilusContext,
+    inputs::{BytesInput, Input, InputConverter},
+    Error,
+};
 
 /// An [`Input`] implementation for `Nautilus` grammar.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -113,6 +118,7 @@ pub struct NautilusToBytesInputConverter<'a> {
 
 impl<'a> NautilusToBytesInputConverter<'a> {
     #[must_use]
+    /// Create a new `NautilusToBytesInputConverter` from a context
     pub fn new(ctx: &'a NautilusContext) -> Self {
         Self { ctx }
     }
