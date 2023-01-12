@@ -91,6 +91,14 @@ pub trait InputConverter: Debug {
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error>;
 }
 
+/// `None` type to satisfy the type infearence in an `Option`
+#[macro_export]
+macro_rules! none_input_converter {
+    () => {
+        None::<$crate::inputs::ClosureInputConverter<_, _>>
+    };
+}
+
 /// An input for tests, mainly. There is no real use much else.
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, Hash)]
 pub struct NopInput {}
