@@ -89,15 +89,6 @@ pub trait InputConverter: Debug {
 
     /// Convert the src type to the dest
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error>;
-
-    /// Convert back the dest type to the src
-    fn convert_back(&mut self, input: Self::To) -> Result<Self::From, Error>;
-
-    /// True if the src type can be converted
-    fn can_convert(&self) -> bool;
-
-    /// True if the dest type can be converted back
-    fn can_convert_back(&self) -> bool;
 }
 
 /// An input for tests, mainly. There is no real use much else.
@@ -162,28 +153,15 @@ where
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
         Ok(input)
     }
-
-    fn convert_back(&mut self, input: Self::To) -> Result<Self::From, Error> {
-        Ok(input)
-    }
-
-    fn can_convert(&self) -> bool {
-        true
-    }
-
-    fn can_convert_back(&self) -> bool {
-        true
-    }
 }
 
-/// `InputConverter` that uses two closures to convert and convert back
+/// `InputConverter` that uses a closure to convert
 pub struct ClosureInputConverter<F, T>
 where
     F: Input,
     T: Input,
 {
-    convert_from: Option<Box<dyn FnMut(F) -> Result<T, Error>>>,
-    convert_to: Option<Box<dyn FnMut(T) -> Result<F, Error>>>,
+    convert_cb: Box<dyn FnMut(F) -> Result<T, Error>>,
 }
 
 impl<F, T> Debug for ClosureInputConverter<F, T>
@@ -203,14 +181,8 @@ where
     T: Input,
 {
     /// Create a new converter using two closures, use None to forbid the conversion or the conversion back
-    pub fn new(
-        convert_from: Option<Box<dyn FnMut(F) -> Result<T, Error>>>,
-        convert_to: Option<Box<dyn FnMut(T) -> Result<F, Error>>>,
-    ) -> Self {
-        Self {
-            convert_from,
-            convert_to,
-        }
+    pub fn new(convert_cb: Box<dyn FnMut(F) -> Result<T, Error>>) -> Self {
+        Self { convert_cb }
     }
 }
 
@@ -223,24 +195,6 @@ where
     type To = T;
 
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
-        (self
-            .convert_from
-            .as_mut()
-            .expect("ClosureInputConverter cannot convert"))(input)
-    }
-
-    fn convert_back(&mut self, input: Self::To) -> Result<Self::From, Error> {
-        (self
-            .convert_to
-            .as_mut()
-            .expect("ClosureInputConverter cannot convert back"))(input)
-    }
-
-    fn can_convert(&self) -> bool {
-        self.convert_from.is_some()
-    }
-
-    fn can_convert_back(&self) -> bool {
-        self.convert_to.is_some()
+        (self.convert_cb)(input)
     }
 }

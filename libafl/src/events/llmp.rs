@@ -1015,11 +1015,12 @@ where
 }
 
 /// A manager-like llmp client that converts between input types
-pub struct LlmpEventConverter<IC, DI, S, SP>
+pub struct LlmpEventConverter<IC, ICB, DI, S, SP>
 where
     S: UsesInput,
     SP: ShMemProvider + 'static,
     IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
     llmp: LlmpClient<SP>,
@@ -1027,15 +1028,17 @@ where
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
-    converter: IC,
+    converter: Option<IC>,
+    converter_back: Option<ICB>,
     phantom: PhantomData<S>,
 }
 
-impl<IC, DI, S, SP> core::fmt::Debug for LlmpEventConverter<IC, DI, S, SP>
+impl<IC, ICB, DI, S, SP> core::fmt::Debug for LlmpEventConverter<IC, ICB, DI, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: UsesInput,
     IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -1045,26 +1048,35 @@ where
         #[cfg(feature = "llmp_compression")]
         let debug = debug.field("compressor", &self.compressor);
         debug
+            .field("converter", &self.converter)
+            .field("converter_back", &self.converter_back)
             .field("phantom", &self.phantom)
             .finish_non_exhaustive()
     }
 }
 
-impl<IC, DI, S, SP> LlmpEventConverter<IC, DI, S, SP>
+impl<IC, ICB, DI, S, SP> LlmpEventConverter<IC, ICB, DI, S, SP>
 where
     S: UsesInput + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
     IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    /// Create a client from port and a converter
+    /// Create a client from port and the input converters
     #[cfg(feature = "std")]
-    pub fn new_on_port(shmem_provider: SP, port: u16, converter: IC) -> Result<Self, Error> {
+    pub fn new_on_port(
+        shmem_provider: SP,
+        port: u16,
+        converter: Option<IC>,
+        converter_back: Option<ICB>,
+    ) -> Result<Self, Error> {
         Ok(Self {
             llmp: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             converter,
+            converter_back,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -1112,12 +1124,11 @@ where
                 #[cfg(feature = "std")]
                 println!("Received new Testcase from {_client_id} ({client_config:?})");
 
-                if !self.converter.can_convert_back() {
+                let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
-                }
+                };
 
-                let converted = self.converter.convert_back(input)?;
-                // If there is no need to converter, convert_back is a no-op
+                let converted = converter.convert(input)?;
 
                 let _res = fuzzer.evaluate_input_with_observers::<E, EM>(
                     state, executor, manager, converted, false,
@@ -1190,21 +1201,23 @@ where
     }
 }
 
-impl<IC, DI, S, SP> UsesState for LlmpEventConverter<IC, DI, S, SP>
+impl<IC, ICB, DI, S, SP> UsesState for LlmpEventConverter<IC, ICB, DI, S, SP>
 where
     S: UsesInput,
     SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
     type State = S;
 }
 
-impl<IC, DI, S, SP> EventFirer for LlmpEventConverter<IC, DI, S, SP>
+impl<IC, ICB, DI, S, SP> EventFirer for LlmpEventConverter<IC, ICB, DI, S, SP>
 where
     S: UsesInput,
     SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
     #[cfg(feature = "llmp_compression")]
@@ -1213,7 +1226,7 @@ where
         _state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        if !self.converter.can_convert() {
+        if self.converter.is_none() {
             return Ok(());
         }
 
@@ -1228,7 +1241,7 @@ where
                 time,
                 executions,
             } => Event::NewTestcase {
-                input: self.converter.convert(input)?,
+                input: self.converter.as_mut().unwrap().convert(input)?,
                 client_config,
                 exit_kind,
                 corpus_size,
@@ -1265,7 +1278,7 @@ where
         _state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        if !self.converter.can_convert() {
+        if self.converter.is_none() {
             return Ok(());
         }
 
@@ -1280,7 +1293,7 @@ where
                 time,
                 executions,
             } => Event::NewTestcase {
-                input: self.converter.convert(input)?,
+                input: self.converter.as_mut().unwrap().convert(input)?,
                 client_config,
                 exit_kind,
                 corpus_size,

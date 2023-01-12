@@ -104,3 +104,27 @@ impl Hash for NautilusInput {
         self.tree().sizes.hash(state);
     }
 }
+
+/// `InputConverter` to convert from `NautilusInput` to `BytesInput`
+#[derive(Debug)]
+pub struct NautilusToBytesInputConverter<'a> {
+    ctx: &'a NautilusContext,
+}
+
+impl<'a> NautilusToBytesInputConverter<'a> {
+    #[must_use]
+    pub fn new(ctx: &'a NautilusContext) -> Self {
+        Self { ctx }
+    }
+}
+
+impl<'a> InputConverter for NautilusToBytesInputConverter<'a> {
+    type From = NautilusInput;
+    type To = BytesInput;
+
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
+        let mut bytes = vec![];
+        input.unparse(&self.ctx, &mut bytes);
+        Ok(BytesInput::new(bytes))
+    }
+}

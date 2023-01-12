@@ -10,11 +10,14 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    bolts::shmem::ShMemProvider,
     corpus::CorpusId,
-    fuzzer::Evaluator,
-    inputs::{Input, UsesInput},
+    events::{llmp::LlmpEventConverter, EventFirer},
+    executors::{Executor, HasObservers},
+    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
+    inputs::{Input, InputConverter, UsesInput},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -187,31 +190,31 @@ where
     }
 }
 
-use crate::prelude::*;
-
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromBrokerStage<IC, DI, S, SP>
+pub struct SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: UsesInput,
     IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    client: LlmpEventConverter<IC, DI, S, SP>,
+    client: LlmpEventConverter<IC, ICB, DI, S, SP>,
 }
 
-impl<IC, DI, S, SP> UsesState for SyncFromBrokerStage<IC, DI, S, SP>
+impl<IC, ICB, DI, S, SP> UsesState for SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: UsesInput,
     IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
     type State = S;
 }
 
-impl<E, EM, IC, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<IC, DI, S, SP>
+impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     EM: UsesState<State = S> + EventFirer,
     S: UsesInput + HasClientPerfMonitor + HasExecutions + HasCorpus + HasRand,
@@ -220,6 +223,7 @@ where
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
     IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
     #[inline]
@@ -238,16 +242,17 @@ where
     }
 }
 
-impl<IC, DI, S, SP> SyncFromBrokerStage<IC, DI, S, SP>
+impl<IC, ICB, DI, S, SP> SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     SP: ShMemProvider + 'static,
     S: UsesInput,
     IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
     /// Creates a new [`SyncFromBrokerStage`]
     #[must_use]
-    pub fn new(client: LlmpEventConverter<IC, DI, S, SP>) -> Self {
+    pub fn new(client: LlmpEventConverter<IC, ICB, DI, S, SP>) -> Self {
         Self { client }
     }
 }
