@@ -1213,7 +1213,35 @@ where
         _state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        let serialized = postcard::to_allocvec(&event)?;
+        if !self.converter.can_convert() {
+            return Ok(());
+        }
+
+        // Filter out non interestign events and convert `NewTestcase`
+        let converted_event = match event {
+            Event::NewTestcase {
+                input,
+                client_config,
+                exit_kind,
+                corpus_size,
+                observers_buf,
+                time,
+                executions,
+            } => Event::NewTestcase {
+                input: self.converter.convert(input)?,
+                client_config,
+                exit_kind,
+                corpus_size,
+                observers_buf,
+                time,
+                executions,
+            },
+            Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
+            _ => {
+                return Ok(());
+            }
+        };
+        let serialized = postcard::to_allocvec(&converted_event)?;
         let flags: Flags = LLMP_FLAG_INITIALIZED;
 
         match self.compressor.compress(&serialized)? {
@@ -1237,36 +1265,35 @@ where
         _state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        let serialized = if !self.converter.need_conversion() {
-            postcard::to_allocvec(&event)?
-        } else {
-            if !self.converter.can_convert() {
+        if !self.converter.can_convert() {
+            return Ok(());
+        }
+
+        // Filter out non interestign events and convert `NewTestcase`
+        let converted_event = match event {
+            Event::NewTestcase {
+                input,
+                client_config,
+                exit_kind,
+                corpus_size,
+                observers_buf,
+                time,
+                executions,
+            } => Event::NewTestcase {
+                input: self.converter.convert(input)?,
+                client_config,
+                exit_kind,
+                corpus_size,
+                observers_buf,
+                time,
+                executions,
+            },
+            Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
+            _ => {
                 return Ok(());
             }
-
-            let converted_event = match event {
-                Event::NewTestcase {
-                    input,
-                    client_config,
-                    exit_kind,
-                    corpus_size,
-                    observers_buf,
-                    time,
-                    executions,
-                } => Event::NewTestcase {
-                    input: self.converter.convert(input)?,
-                    client_config,
-                    exit_kind,
-                    corpus_size,
-                    observers_buf,
-                    time,
-                    executions,
-                },
-                _ => event,
-            };
-            postcard::to_allocvec(&converted_event)?
         };
-
+        let serialized = postcard::to_allocvec(&converted_event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
     }

@@ -98,11 +98,6 @@ pub trait InputConverter: Debug {
 
     /// True if the dest type can be converted back
     fn can_convert_back(&self) -> bool;
-
-    /// False if the src and teh dest type are the same type
-    fn need_conversion(&self) -> bool {
-        true
-    }
 }
 
 /// An input for tests, mainly. There is no real use much else.
@@ -179,10 +174,6 @@ where
     fn can_convert_back(&self) -> bool {
         true
     }
-
-    fn need_conversion(&self) -> bool {
-        false
-    }
 }
 
 /// `InputConverter` that uses two closures to convert and convert back
@@ -251,9 +242,5 @@ where
 
     fn can_convert_back(&self) -> bool {
         self.convert_to.is_some()
-    }
-
-    fn need_conversion(&self) -> bool {
-        true
     }
 }
