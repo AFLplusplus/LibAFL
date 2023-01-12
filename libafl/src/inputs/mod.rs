@@ -18,7 +18,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{clone::Clone, fmt::Debug};
+use core::{clone::Clone, fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
 
@@ -77,6 +77,72 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 
     /// An hook executed if the input is stored as `Testcase`
     fn wrapped_as_testcase(&mut self) {}
+}
+
+pub trait InputConverter: Debug {
+    type From: Input;
+    type To: Input;
+
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error>;
+
+    fn convert_back(&mut self, input: Self::To) -> Result<Self::From, Error>;
+
+    fn can_convert(&self) -> bool;
+
+    fn can_convert_back(&self) -> bool;
+
+    fn need_conversion(&self) -> bool {
+        true
+    }
+
+    fn need_conversion_back(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Debug)]
+pub struct NopInputConverter<I> {
+    phantom: PhantomData<I>,
+}
+
+impl<I> Default for NopInputConverter<I> {
+    fn default() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> InputConverter for NopInputConverter<I>
+where
+    I: Input,
+{
+    type From = I;
+    type To = I;
+
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
+        Ok(input)
+    }
+
+    fn convert_back(&mut self, input: Self::To) -> Result<Self::From, Error> {
+        Ok(input)
+    }
+
+    fn can_convert(&self) -> bool {
+        true
+    }
+
+    fn can_convert_back(&self) -> bool {
+        true
+    }
+
+    fn need_conversion(&self) -> bool {
+        false
+    }
+
+    fn need_conversion_back(&self) -> bool {
+        false
+    }
 }
 
 /// An input for tests, mainly. There is no real use much else.
