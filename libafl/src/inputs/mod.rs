@@ -15,6 +15,7 @@ pub use generalized::*;
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 use alloc::{
+    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
@@ -181,5 +182,78 @@ where
 
     fn need_conversion(&self) -> bool {
         false
+    }
+}
+
+/// `InputConverter` that uses two closures to convert and convert back
+pub struct ClosureInputConverter<F, T>
+where
+    F: Input,
+    T: Input,
+{
+    convert_from: Option<Box<dyn FnMut(F) -> Result<T, Error>>>,
+    convert_to: Option<Box<dyn FnMut(T) -> Result<F, Error>>>,
+}
+
+impl<F, T> Debug for ClosureInputConverter<F, T>
+where
+    F: Input,
+    T: Input,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ClosureInputConverter")
+            .finish_non_exhaustive()
+    }
+}
+
+impl<F, T> ClosureInputConverter<F, T>
+where
+    F: Input,
+    T: Input,
+{
+    /// Create a new converter using two closures, use None to forbid the conversion or the conversion back
+    pub fn new(
+        convert_from: Option<Box<dyn FnMut(F) -> Result<T, Error>>>,
+        convert_to: Option<Box<dyn FnMut(T) -> Result<F, Error>>>,
+    ) -> Self {
+        Self {
+            convert_from,
+            convert_to,
+        }
+    }
+}
+
+impl<F, T> InputConverter for ClosureInputConverter<F, T>
+where
+    F: Input,
+    T: Input,
+{
+    type From = F;
+    type To = T;
+
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
+        (self
+            .convert_from
+            .as_mut()
+            .expect("ClosureInputConverter cannot convert"))(input)
+    }
+
+    fn convert_back(&mut self, input: Self::To) -> Result<Self::From, Error> {
+        (self
+            .convert_to
+            .as_mut()
+            .expect("ClosureInputConverter cannot convert back"))(input)
+    }
+
+    fn can_convert(&self) -> bool {
+        self.convert_from.is_some()
+    }
+
+    fn can_convert_back(&self) -> bool {
+        self.convert_to.is_some()
+    }
+
+    fn need_conversion(&self) -> bool {
+        true
     }
 }

@@ -186,3 +186,68 @@ where
         }
     }
 }
+
+use crate::prelude::*;
+
+/// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
+#[derive(Debug)]
+pub struct SyncFromBrokerStage<IC, DI, S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+    IC: InputConverter<From = S::Input, To = DI>,
+    DI: Input,
+{
+    client: LlmpEventConverter<IC, DI, S, SP>,
+}
+
+impl<IC, DI, S, SP> UsesState for SyncFromBrokerStage<IC, DI, S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+    IC: InputConverter<From = S::Input, To = DI>,
+    DI: Input,
+{
+    type State = S;
+}
+
+impl<E, EM, IC, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<IC, DI, S, SP>
+where
+    EM: UsesState<State = S> + EventFirer,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasCorpus + HasRand,
+    SP: ShMemProvider,
+    E: HasObservers<State = S> + Executor<EM, Z>,
+    for<'a> E::Observers: Deserialize<'a>,
+    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
+    IC: InputConverter<From = S::Input, To = DI>,
+    DI: Input,
+{
+    #[inline]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Z::State,
+        manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<(), Error> {
+        self.client.process(fuzzer, state, executor, manager)?;
+        #[cfg(feature = "introspection")]
+        state.introspection_monitor_mut().finish_stage();
+        Ok(())
+    }
+}
+
+impl<IC, DI, S, SP> SyncFromBrokerStage<IC, DI, S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+    IC: InputConverter<From = S::Input, To = DI>,
+    DI: Input,
+{
+    /// Creates a new [`SyncFromBrokerStage`]
+    #[must_use]
+    pub fn new(client: LlmpEventConverter<IC, DI, S, SP>) -> Self {
+        Self { client }
+    }
+}
