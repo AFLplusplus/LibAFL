@@ -213,7 +213,7 @@ pub fn libafl_main() {
         // Call LLVMFUzzerInitialize() if present.
         let args: Vec<String> = env::args().collect();
         if libfuzzer_initialize(&args) == -1 {
-            println!("Warning: LLVMFuzzerInitialize failed with -1")
+            println!("Warning: LLVMFuzzerInitialize failed with -1");
         }
 
         // In case the corpus is empty (on first run), reset
