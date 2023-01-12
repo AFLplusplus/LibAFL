@@ -79,69 +79,28 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     fn wrapped_as_testcase(&mut self) {}
 }
 
+/// Convert between two input types with a state
 pub trait InputConverter: Debug {
+    /// Source type
     type From: Input;
+    /// Destination type
     type To: Input;
 
+    /// Convert the src type to the dest
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error>;
 
+    /// Convert back the dest type to the src
     fn convert_back(&mut self, input: Self::To) -> Result<Self::From, Error>;
 
+    /// True if the src type can be converted
     fn can_convert(&self) -> bool;
 
+    /// True if the dest type can be converted back
     fn can_convert_back(&self) -> bool;
 
+    /// False if the src and teh dest type are the same type
     fn need_conversion(&self) -> bool {
         true
-    }
-
-    fn need_conversion_back(&self) -> bool {
-        true
-    }
-}
-
-#[derive(Debug)]
-pub struct NopInputConverter<I> {
-    phantom: PhantomData<I>,
-}
-
-impl<I> Default for NopInputConverter<I> {
-    fn default() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> InputConverter for NopInputConverter<I>
-where
-    I: Input,
-{
-    type From = I;
-    type To = I;
-
-    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
-        Ok(input)
-    }
-
-    fn convert_back(&mut self, input: Self::To) -> Result<Self::From, Error> {
-        Ok(input)
-    }
-
-    fn can_convert(&self) -> bool {
-        true
-    }
-
-    fn can_convert_back(&self) -> bool {
-        true
-    }
-
-    fn need_conversion(&self) -> bool {
-        false
-    }
-
-    fn need_conversion_back(&self) -> bool {
-        false
     }
 }
 
@@ -181,4 +140,46 @@ pub trait HasBytesVec {
 pub trait UsesInput {
     /// Type which will be used throughout this state.
     type Input: Input;
+}
+
+#[derive(Debug)]
+/// Basic `InputConverter` with just one type that is not converting
+pub struct NopInputConverter<I> {
+    phantom: PhantomData<I>,
+}
+
+impl<I> Default for NopInputConverter<I> {
+    fn default() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> InputConverter for NopInputConverter<I>
+where
+    I: Input,
+{
+    type From = I;
+    type To = I;
+
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
+        Ok(input)
+    }
+
+    fn convert_back(&mut self, input: Self::To) -> Result<Self::From, Error> {
+        Ok(input)
+    }
+
+    fn can_convert(&self) -> bool {
+        true
+    }
+
+    fn can_convert_back(&self) -> bool {
+        true
+    }
+
+    fn need_conversion(&self) -> bool {
+        false
+    }
 }

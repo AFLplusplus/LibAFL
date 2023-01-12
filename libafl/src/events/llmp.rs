@@ -458,7 +458,7 @@ where
 
                 let _res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
-                    && !self.converter.need_conversion_back()
+                    && !self.converter.need_conversion()
                 {
                     let observers: E::Observers =
                         postcard::from_bytes(observers_buf.as_ref().unwrap())?;
