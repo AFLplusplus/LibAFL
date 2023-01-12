@@ -11,12 +11,12 @@ use which::which;
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
-        println!("Checking for build tool {}...", tool);
+        println!("Checking for build tool {tool}...");
 
         if let Ok(path) = which(tool) {
             println!("Found build tool {}", path.to_str().unwrap());
         } else {
-            println!("ERROR: missing build tool {}", tool);
+            println!("ERROR: missing build tool {tool}");
             exit(1);
         };
     }
