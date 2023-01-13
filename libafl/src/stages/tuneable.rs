@@ -9,7 +9,10 @@ use crate::{
     corpus::CorpusId,
     impl_serdeany,
     mutators::Mutator,
-    stages::{mutational::DEFAULT_MUTATIONAL_MAX_ITERATIONS, MutationalStage, Stage},
+    stages::{
+        mutational::{MutatedTransform, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
+        MutationalStage, Stage,
+    },
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
     Error, Evaluator,
 };
@@ -52,18 +55,19 @@ pub fn reset<S: HasMetadata>(state: &mut S) -> Result<(), Error> {
 
 /// A [`crate::stages::MutationalStage`] where the mutator iteration can be tuned at runtime
 #[derive(Clone, Debug)]
-pub struct TuneableMutationalStage<E, EM, M, Z> {
+pub struct TuneableMutationalStage<E, EM, I, M, Z> {
     mutator: M,
-    phantom: PhantomData<(E, EM, Z)>,
+    phantom: PhantomData<(E, EM, I, Z)>,
 }
 
-impl<E, EM, M, Z> MutationalStage<E, EM, M, Z> for TuneableMutationalStage<E, EM, M, Z>
+impl<E, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for TuneableMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: Mutator<Z::State>,
+    M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -89,24 +93,26 @@ where
     }
 }
 
-impl<E, EM, M, Z> UsesState for TuneableMutationalStage<E, EM, M, Z>
+impl<E, EM, I, M, Z> UsesState for TuneableMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: Mutator<Z::State>,
+    M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     type State = Z::State;
 }
 
-impl<E, EM, M, Z> Stage<E, EM, Z> for TuneableMutationalStage<E, EM, M, Z>
+impl<E, EM, I, M, Z> Stage<E, EM, Z> for TuneableMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: Mutator<Z::State>,
+    M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -127,17 +133,32 @@ where
     }
 }
 
-impl<E, EM, M, Z> TuneableMutationalStage<E, EM, M, Z>
+impl<E, EM, M, Z> TuneableMutationalStage<E, EM, Z::Input, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: Mutator<Z::State>,
+    M: Mutator<Z::Input, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new default mutational stage
     #[must_use]
     pub fn new(state: &mut Z::State, mutator: M) -> Self {
+        Self::transforming(state, mutator)
+    }
+}
+
+impl<E, EM, I, M, Z> TuneableMutationalStage<E, EM, I, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+{
+    /// Creates a new tranforming mutational stage
+    #[must_use]
+    pub fn transforming(state: &mut Z::State, mutator: M) -> Self {
         if !state.has_metadata::<TuneableMutationalStageMetadata>() {
             state.add_metadata(TuneableMutationalStageMetadata::default());
         }
