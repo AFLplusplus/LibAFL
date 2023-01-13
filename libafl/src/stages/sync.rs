@@ -256,8 +256,7 @@ where
             let last_id = state
                 .metadata()
                 .get::<SyncFromBrokerMetadata>()
-                .map(|m| m.last_id)
-                .flatten();
+                .and_then(|m| m.last_id);
 
             let mut cur_id =
                 last_id.map_or_else(|| state.corpus().first(), |id| state.corpus().next(id));

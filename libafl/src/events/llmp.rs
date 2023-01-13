@@ -1138,10 +1138,12 @@ where
                     return Ok(());
                 };
 
-                let converted = converter.convert(input)?;
-
                 let _res = fuzzer.evaluate_input_with_observers::<E, EM>(
-                    state, executor, manager, converted, false,
+                    state,
+                    executor,
+                    manager,
+                    converter.convert(input)?,
+                    false,
                 )?;
                 #[cfg(feature = "std")]
                 if let Some(item) = _res.1 {
