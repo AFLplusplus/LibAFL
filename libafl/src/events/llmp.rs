@@ -1124,7 +1124,7 @@ where
         match event {
             Event::NewTestcase {
                 input,
-                client_config,
+                client_config: _,
                 exit_kind: _,
                 corpus_size: _,
                 observers_buf: _, // Useless as we are converting between types
@@ -1132,7 +1132,7 @@ where
                 executions: _,
             } => {
                 #[cfg(feature = "std")]
-                println!("Received new Testcase from {_client_id} ({client_config:?})");
+                println!("Received new Testcase to convert from {_client_id}");
 
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
