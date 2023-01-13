@@ -87,6 +87,13 @@ script='''
 '''
 dependencies = [ "fuzzer" ]
 
+[tasks.run_unix_sync]
+script_runner = "@shell"
+script='''
+./${FUZZER_NAME} --cores 0 -b 1337
+'''
+dependencies = [ "fuzzer" ]
+
 # Test
 [tasks.test]
 linux_alias = "test_unix"

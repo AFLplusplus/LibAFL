@@ -190,6 +190,23 @@ where
     }
 }
 
+/// Metadata used to store information about the last sent testcase with `SyncFromBrokerStage`
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SyncFromBrokerMetadata {
+    /// The `CorpusId` of the last sent testcase
+    pub last_id: Option<CorpusId>,
+}
+
+crate::impl_serdeany!(SyncFromBrokerMetadata);
+
+impl SyncFromBrokerMetadata {
+    /// Create a new [`struct@SyncFromBrokerMetadata`]
+    #[must_use]
+    pub fn new(last_id: Option<CorpusId>) -> Self {
+        Self { last_id }
+    }
+}
+
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
 pub struct SyncFromBrokerStage<IC, ICB, DI, S, SP>
@@ -201,7 +218,6 @@ where
     DI: Input,
 {
     client: LlmpEventConverter<IC, ICB, DI, S, SP>,
-    last_id: Option<CorpusId>,
 }
 
 impl<IC, ICB, DI, S, SP> UsesState for SyncFromBrokerStage<IC, ICB, DI, S, SP>
@@ -218,7 +234,7 @@ where
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     EM: UsesState<State = S> + EventFirer,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasCorpus + HasRand,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasCorpus + HasRand + HasMetadata,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<EM, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -237,10 +253,14 @@ where
         _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         if self.client.can_convert() {
-            let mut cur_id = self
-                .last_id
-                .and_then(|id| state.corpus().next(id))
-                .or_else(|| state.corpus().first());
+            let last_id = state
+                .metadata()
+                .get::<SyncFromBrokerMetadata>()
+                .map(|m| m.last_id)
+                .flatten();
+
+            let mut cur_id =
+                last_id.map_or_else(|| state.corpus().first(), |id| state.corpus().next(id));
 
             while let Some(id) = cur_id {
                 let input = state.corpus().get(id)?.borrow_mut().load_input()?.clone();
@@ -259,9 +279,19 @@ where
                 )?;
 
                 cur_id = state.corpus().next(id);
-                if cur_id.is_none() {
-                    self.last_id = Some(id);
-                }
+            }
+
+            let last = state.corpus().last();
+            if last_id.is_none() {
+                state
+                    .metadata_mut()
+                    .insert(SyncFromBrokerMetadata::new(last));
+            } else {
+                state
+                    .metadata_mut()
+                    .get_mut::<SyncFromBrokerMetadata>()
+                    .unwrap()
+                    .last_id = last;
             }
         }
 
@@ -283,9 +313,6 @@ where
     /// Creates a new [`SyncFromBrokerStage`]
     #[must_use]
     pub fn new(client: LlmpEventConverter<IC, ICB, DI, S, SP>) -> Self {
-        Self {
-            client,
-            last_id: None,
-        }
+        Self { client }
     }
 }
