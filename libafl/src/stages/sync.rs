@@ -10,10 +10,10 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::shmem::ShMemProvider,
-    corpus::CorpusId,
-    events::{llmp::LlmpEventConverter, EventFirer},
-    executors::{Executor, HasObservers},
+    bolts::{current_time, shmem::ShMemProvider},
+    corpus::{Corpus, CorpusId},
+    events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
+    executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::Stage,
@@ -201,6 +201,7 @@ where
     DI: Input,
 {
     client: LlmpEventConverter<IC, ICB, DI, S, SP>,
+    last_id: Option<CorpusId>,
 }
 
 impl<IC, ICB, DI, S, SP> UsesState for SyncFromBrokerStage<IC, ICB, DI, S, SP>
@@ -235,6 +236,35 @@ where
         manager: &mut EM,
         _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        if self.client.can_convert() {
+            let mut cur_id = self
+                .last_id
+                .and_then(|id| state.corpus().next(id))
+                .or_else(|| state.corpus().first());
+
+            while let Some(id) = cur_id {
+                let input = state.corpus().get(id)?.borrow_mut().load_input()?.clone();
+
+                self.client.fire(
+                    state,
+                    Event::NewTestcase {
+                        input,
+                        observers_buf: None,
+                        exit_kind: ExitKind::Ok,
+                        corpus_size: 0, // TODO choose if sending 0 or the actual real value
+                        client_config: EventConfig::AlwaysUnique,
+                        time: current_time(),
+                        executions: 0,
+                    },
+                )?;
+
+                cur_id = state.corpus().next(id);
+                if cur_id.is_none() {
+                    self.last_id = Some(id);
+                }
+            }
+        }
+
         self.client.process(fuzzer, state, executor, manager)?;
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
@@ -253,6 +283,9 @@ where
     /// Creates a new [`SyncFromBrokerStage`]
     #[must_use]
     pub fn new(client: LlmpEventConverter<IC, ICB, DI, S, SP>) -> Self {
-        Self { client }
+        Self {
+            client,
+            last_id: None,
+        }
     }
 }

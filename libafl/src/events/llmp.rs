@@ -1084,6 +1084,16 @@ where
 
     // TODO other new_* routines
 
+    /// Check if it can convert the input
+    pub fn can_convert(&self) -> bool {
+        self.converter.is_some()
+    }
+
+    /// Check if it can convert the input back
+    pub fn can_convert_back(&self) -> bool {
+        self.converter_back.is_some()
+    }
+
     /// Describe the client event mgr's llmp parts in a restorable fashion
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         self.llmp.describe()
