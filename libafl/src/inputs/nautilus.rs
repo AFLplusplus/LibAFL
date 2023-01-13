@@ -130,7 +130,7 @@ impl<'a> InputConverter for NautilusToBytesInputConverter<'a> {
 
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
         let mut bytes = vec![];
-        input.unparse(&self.ctx, &mut bytes);
+        input.unparse(self.ctx, &mut bytes);
         Ok(BytesInput::new(bytes))
     }
 }

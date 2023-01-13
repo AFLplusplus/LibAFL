@@ -10,6 +10,7 @@ std = []
 
 [profile.dev]
 panic = "abort"
+debug = true
 
 [profile.release]
 panic = "abort"

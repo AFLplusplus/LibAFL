@@ -189,6 +189,7 @@ where
     T: Input,
 {
     /// Create a new converter using two closures, use None to forbid the conversion or the conversion back
+    #[must_use]
     pub fn new(convert_cb: Box<dyn FnMut(F) -> Result<T, Error>>) -> Self {
         Self { convert_cb }
     }
