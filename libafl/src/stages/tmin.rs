@@ -41,7 +41,7 @@ where
     EM: EventFirer<State = Self::State>,
     F1: Feedback<Self::State>,
     F2: Feedback<Self::State>,
-    M: Mutator<Self::State>,
+    M: Mutator<Self::Input, Self::State>,
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<OT, State = Self::State>
         + ExecutesInput<E, EM>
@@ -177,7 +177,7 @@ impl<CS, E, EM, F1, F2, FF, M, OT, Z> UsesState
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>,
 {
     type State = CS::State;
@@ -194,7 +194,7 @@ where
     F1: Feedback<CS::State>,
     F2: Feedback<CS::State>,
     FF: FeedbackFactory<F2, CS::State, OT>,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>
         + ExecutesInput<E, EM>
@@ -241,7 +241,7 @@ where
     F2: Feedback<CS::State>,
     FF: FeedbackFactory<F2, CS::State, OT>,
     <CS::State as UsesInput>::Input: HasLen + Hash,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
     Z: ExecutionProcessor<OT, State = CS::State>
@@ -270,7 +270,7 @@ where
 impl<CS, E, EM, F1, F2, FF, M, OT, Z> StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>,
 {
     /// Creates a new minimising mutational stage that will minimize provided corpus entries

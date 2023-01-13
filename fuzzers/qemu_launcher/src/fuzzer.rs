@@ -129,7 +129,7 @@ pub fn fuzz() {
             // New maximization map feedback linked to the edges observer and the feedback state
             MaxMapFeedback::new_tracking(&edges_observer, true, false),
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::new_with_observer(&time_observer)
+            TimeFeedback::with_observer(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not

@@ -291,15 +291,15 @@ impl<'it> IntoIterator for &'it Tokens {
 #[derive(Debug, Default)]
 pub struct TokenInsert;
 
-impl<S> Mutator<S> for TokenInsert
+impl<I, S> Mutator<I, S> for TokenInsert
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
-    S::Input: HasBytesVec,
+    S: HasMetadata + HasRand + HasMaxSize,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -357,15 +357,15 @@ impl TokenInsert {
 #[derive(Debug, Default)]
 pub struct TokenReplace;
 
-impl<S> Mutator<S> for TokenReplace
+impl<I, S> Mutator<I, S> for TokenReplace
 where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize,
-    S::Input: HasBytesVec,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -419,16 +419,16 @@ impl TokenReplace {
 #[derive(Debug, Default)]
 pub struct I2SRandReplace;
 
-impl<S> Mutator<S> for I2SRandReplace
+impl<I, S> Mutator<I, S> for I2SRandReplace
 where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize,
-    S::Input: HasBytesVec,
+    I: HasBytesVec,
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();

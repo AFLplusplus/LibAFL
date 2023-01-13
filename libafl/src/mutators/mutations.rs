@@ -9,7 +9,7 @@ use core::{
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::{HasBytesVec, UsesInput},
+    inputs::HasBytesVec,
     mutators::{MutationResult, Mutator},
     random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},
@@ -101,15 +101,15 @@ pub const INTERESTING_32: [i32; 27] = [
 #[derive(Default, Debug)]
 pub struct BitFlipMutator;
 
-impl<S> Mutator<S> for BitFlipMutator
+impl<I, S> Mutator<I, S> for BitFlipMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut <S as UsesInput>::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -141,15 +141,15 @@ impl BitFlipMutator {
 #[derive(Default, Debug)]
 pub struct ByteFlipMutator;
 
-impl<S> Mutator<S> for ByteFlipMutator
+impl<I, S> Mutator<I, S> for ByteFlipMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -179,15 +179,15 @@ impl ByteFlipMutator {
 #[derive(Default, Debug)]
 pub struct ByteIncMutator;
 
-impl<S> Mutator<S> for ByteIncMutator
+impl<I, S> Mutator<I, S> for ByteIncMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -218,15 +218,15 @@ impl ByteIncMutator {
 #[derive(Default, Debug)]
 pub struct ByteDecMutator;
 
-impl<S> Mutator<S> for ByteDecMutator
+impl<I, S> Mutator<I, S> for ByteDecMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -257,15 +257,15 @@ impl ByteDecMutator {
 #[derive(Default, Debug)]
 pub struct ByteNegMutator;
 
-impl<S> Mutator<S> for ByteNegMutator
+impl<I, S> Mutator<I, S> for ByteNegMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -296,15 +296,15 @@ impl ByteNegMutator {
 #[derive(Default, Debug)]
 pub struct ByteRandMutator;
 
-impl<S> Mutator<S> for ByteRandMutator
+impl<I, S> Mutator<I, S> for ByteRandMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -340,15 +340,15 @@ macro_rules! add_mutator_impl {
         pub struct $name;
 
         #[allow(trivial_numeric_casts)]
-        impl<S> Mutator<S> for $name
+        impl<I, S> Mutator<I, S> for $name
         where
-            S: UsesInput + HasRand,
-            S::Input: HasBytesVec,
+            S: HasRand,
+            I: HasBytesVec,
         {
             fn mutate(
                 &mut self,
                 state: &mut S,
-                input: &mut S::Input,
+                input: &mut I,
                 _stage_idx: i32,
             ) -> Result<MutationResult, Error> {
                 if input.bytes().len() < size_of::<$size>() {
@@ -406,16 +406,16 @@ macro_rules! interesting_mutator_impl {
         #[derive(Default, Debug)]
         pub struct $name;
 
-        impl<S> Mutator<S> for $name
+        impl<I, S> Mutator<I, S> for $name
         where
-            S: UsesInput + HasRand,
-            S::Input: HasBytesVec,
+            S: HasRand,
+            I: HasBytesVec,
         {
             #[allow(clippy::cast_sign_loss)]
             fn mutate(
                 &mut self,
                 state: &mut S,
-                input: &mut S::Input,
+                input: &mut I,
                 _stage_idx: i32,
             ) -> Result<MutationResult, Error> {
                 if input.bytes().len() < size_of::<$size>() {
@@ -459,15 +459,15 @@ interesting_mutator_impl!(DwordInterestingMutator, u32, INTERESTING_32);
 #[derive(Default, Debug)]
 pub struct BytesDeleteMutator;
 
-impl<S> Mutator<S> for BytesDeleteMutator
+impl<I, S> Mutator<I, S> for BytesDeleteMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -501,15 +501,15 @@ impl BytesDeleteMutator {
 #[derive(Default, Debug)]
 pub struct BytesExpandMutator;
 
-impl<S> Mutator<S> for BytesExpandMutator
+impl<I, S> Mutator<I, S> for BytesExpandMutator
 where
-    S: UsesInput + HasRand + HasMaxSize,
-    S::Input: HasBytesVec,
+    S: HasRand + HasMaxSize,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -550,15 +550,15 @@ impl BytesExpandMutator {
 #[derive(Default, Debug)]
 pub struct BytesInsertMutator;
 
-impl<S> Mutator<S> for BytesInsertMutator
+impl<I, S> Mutator<I, S> for BytesInsertMutator
 where
-    S: UsesInput + HasRand + HasMaxSize,
-    S::Input: HasBytesVec,
+    S: HasRand + HasMaxSize,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -605,15 +605,15 @@ impl BytesInsertMutator {
 #[derive(Default, Debug)]
 pub struct BytesRandInsertMutator;
 
-impl<S> Mutator<S> for BytesRandInsertMutator
+impl<I, S> Mutator<I, S> for BytesRandInsertMutator
 where
-    S: UsesInput + HasRand + HasMaxSize,
-    S::Input: HasBytesVec,
+    S: HasRand + HasMaxSize,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -657,15 +657,15 @@ impl BytesRandInsertMutator {
 #[derive(Default, Debug)]
 pub struct BytesSetMutator;
 
-impl<S> Mutator<S> for BytesSetMutator
+impl<I, S> Mutator<I, S> for BytesSetMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -701,15 +701,15 @@ impl BytesSetMutator {
 #[derive(Default, Debug)]
 pub struct BytesRandSetMutator;
 
-impl<S> Mutator<S> for BytesRandSetMutator
+impl<I, S> Mutator<I, S> for BytesRandSetMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -745,15 +745,15 @@ impl BytesRandSetMutator {
 #[derive(Default, Debug)]
 pub struct BytesCopyMutator;
 
-impl<S> Mutator<S> for BytesCopyMutator
+impl<I, S> Mutator<I, S> for BytesCopyMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -791,15 +791,15 @@ pub struct BytesInsertCopyMutator {
     tmp_buf: Vec<u8>,
 }
 
-impl<S> Mutator<S> for BytesInsertCopyMutator
+impl<I, S> Mutator<I, S> for BytesInsertCopyMutator
 where
-    S: UsesInput + HasRand + HasMaxSize,
-    S::Input: HasBytesVec,
+    S: HasRand + HasMaxSize,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -853,15 +853,15 @@ impl BytesInsertCopyMutator {
 #[derive(Debug, Default)]
 pub struct BytesSwapMutator;
 
-impl<S> Mutator<S> for BytesSwapMutator
+impl<I, S> Mutator<I, S> for BytesSwapMutator
 where
-    S: UsesInput + HasRand,
-    S::Input: HasBytesVec,
+    S: HasRand,
+    I: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -899,7 +899,7 @@ impl BytesSwapMutator {
 #[derive(Debug, Default)]
 pub struct CrossoverInsertMutator;
 
-impl<S> Mutator<S> for CrossoverInsertMutator
+impl<S> Mutator<S::Input, S> for CrossoverInsertMutator
 where
     S: HasCorpus + HasRand + HasMaxSize,
     S::Input: HasBytesVec,
@@ -974,7 +974,7 @@ impl CrossoverInsertMutator {
 #[derive(Debug, Default)]
 pub struct CrossoverReplaceMutator;
 
-impl<S> Mutator<S> for CrossoverReplaceMutator
+impl<S> Mutator<S::Input, S> for CrossoverReplaceMutator
 where
     S: HasCorpus + HasRand,
     S::Input: HasBytesVec,
@@ -1056,7 +1056,7 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 #[derive(Debug, Default)]
 pub struct SpliceMutator;
 
-impl<S> Mutator<S> for SpliceMutator
+impl<S> Mutator<S::Input, S> for SpliceMutator
 where
     S: HasCorpus + HasRand,
     S::Input: HasBytesVec,
@@ -1178,10 +1178,10 @@ mod tests {
         state::{HasMetadata, StdState},
     };
 
-    fn test_mutations<S>() -> impl MutatorsTuple<S>
+    fn test_mutations<I, S>() -> impl MutatorsTuple<I, S>
     where
-        S: HasRand + HasCorpus + HasMetadata + HasMaxSize,
-        S::Input: HasBytesVec,
+        S: HasRand + HasMetadata + HasMaxSize,
+        I: HasBytesVec,
     {
         tuple_list!(
             BitFlipMutator::new(),

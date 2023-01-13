@@ -15,7 +15,7 @@ use crate::{
     bolts::rands::Rand,
     impl_serdeany,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
-    state::{HasMetadata, HasRand, State},
+    state::{HasMetadata, HasRand},
     Error,
 };
 
@@ -54,51 +54,51 @@ impl_serdeany!(TuneableScheduledMutatorMetadata);
 
 /// A [`Mutator`] that schedules one of the embedded mutations on each call.
 /// The index of the next mutation can be set.
-pub struct TuneableScheduledMutator<MT, S>
+pub struct TuneableScheduledMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
-    S: State + HasRand,
+    MT: MutatorsTuple<I, S>,
+    S: HasRand,
 {
     mutations: MT,
     max_stack_pow: u64,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<MT, S> Debug for TuneableScheduledMutator<MT, S>
+impl<I, MT, S> Debug for TuneableScheduledMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
-    S: State + HasRand,
+    MT: MutatorsTuple<I, S>,
+    S: HasRand,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "TuneableScheduledMutator with {} mutations for Input type {}",
             self.mutations.len(),
-            core::any::type_name::<S::Input>()
+            core::any::type_name::<I>()
         )
     }
 }
 
-impl<MT, S> Mutator<S> for TuneableScheduledMutator<MT, S>
+impl<I, MT, S> Mutator<I, S> for TuneableScheduledMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
-    S: State + HasRand + HasMetadata,
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata,
 {
     #[inline]
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input, stage_idx)
     }
 }
 
-impl<MT, S> ComposedByMutations<MT, S> for TuneableScheduledMutator<MT, S>
+impl<I, MT, S> ComposedByMutations<I, MT, S> for TuneableScheduledMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
-    S: State + HasRand,
+    MT: MutatorsTuple<I, S>,
+    S: HasRand,
 {
     /// Get the mutations
     #[inline]
@@ -113,13 +113,13 @@ where
     }
 }
 
-impl<MT, S> ScheduledMutator<MT, S> for TuneableScheduledMutator<MT, S>
+impl<I, MT, S> ScheduledMutator<I, MT, S> for TuneableScheduledMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
-    S: State + HasRand + HasMetadata,
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut S, _: &S::Input) -> u64 {
+    fn iterations(&self, state: &mut S, _: &I) -> u64 {
         if let Some(iters) = Self::get_iters(state) {
             iters
         } else {
@@ -129,7 +129,7 @@ where
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut S, _: &S::Input) -> usize {
+    fn schedule(&self, state: &mut S, _: &I) -> usize {
         debug_assert!(!self.mutations().is_empty());
         // Assumption: we can not reach this code path without previously adding this metadatum.
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
@@ -152,10 +152,10 @@ where
     }
 }
 
-impl<MT, S> TuneableScheduledMutator<MT, S>
+impl<I, MT, S> TuneableScheduledMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
-    S: State + HasRand + HasMetadata,
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata,
 {
     /// Create a new [`TuneableScheduledMutator`] instance specifying mutations
     pub fn new(state: &mut S, mutations: MT) -> Self {
@@ -222,7 +222,7 @@ mod test {
 
     #[test]
     fn test_tuning() {
-        let mut state = NopState::new();
+        let mut state: NopState<BytesInput> = NopState::new();
         let mutators = tuple_list!(
             BitFlipMutator::new(),
             ByteDecMutator::new(),
