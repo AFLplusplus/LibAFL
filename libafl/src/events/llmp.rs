@@ -1063,6 +1063,23 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
+    /// Create a client from a raw llmp client
+    pub fn new(
+        llmp: LlmpClient<SP>,
+        converter: Option<IC>,
+        converter_back: Option<ICB>,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            llmp,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            converter,
+            converter_back,
+            phantom: PhantomData,
+            custom_buf_handlers: vec![],
+        })
+    }
+
     /// Create a client from port and the input converters
     #[cfg(feature = "std")]
     pub fn new_on_port(
@@ -1078,6 +1095,25 @@ where
             converter,
             converter_back,
             phantom: PhantomData,
+            custom_buf_handlers: vec![],
+        })
+    }
+
+    /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].
+    #[cfg(feature = "std")]
+    pub fn existing_client_from_env(
+        shmem_provider: SP,
+        env_name: &str,
+        converter: Option<IC>,
+        converter_back: Option<ICB>,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            llmp: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            phantom: PhantomData,
+            converter,
+            converter_back,
             custom_buf_handlers: vec![],
         })
     }
