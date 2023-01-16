@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "e5424c34d223c2b638af6e4c9eef039db8b69dd4";
+const QEMU_REVISION: &str = "711b8b9b1d0984e344a6953665e592f7a4acc88f";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -139,7 +139,6 @@ pub fn build(
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
                 .args([
-                    "--disable-blobs",
                     "--disable-bsd-user",
                     "--disable-fdt",
                     "--disable-system",
@@ -165,7 +164,6 @@ pub fn build(
                 .arg("--disable-attr")
                 .arg("--disable-auth-pam")
                 .arg("--disable-dbus-display")
-                .arg("--disable-blobs")
                 .arg("--disable-bochs")
                 .arg("--disable-bpf")
                 .arg("--disable-brlapi")
