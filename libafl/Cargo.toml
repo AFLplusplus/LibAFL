@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["std", "derive", "llmp_compression", "rand_trait", "fork", "prelude"]
+default = ["std", "derive", "llmp_compression", "rand_trait", "fork", "prelude", "gzip"]
 std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "bincode", "wait-timeout", "regex", "byteorder", "once_cell", "uuid", "tui_monitor", "ctor", "backtrace", "uds"] # print, env, launcher ... support
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
@@ -23,22 +23,24 @@ python = ["pyo3", "concat-idents"]
 prelude = [] # Expose libafl::prelude for access without additional using directives
 tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
 prometheus_monitor = ["std", "async-std", "prometheus-client", "tide", "futures"]
-cli = ["clap"]  # expose bolts::cli
-qemu_cli = ["cli"]
-frida_cli = ["cli"]
+cli = ["clap"]  # expose bolts::cli for easy commandline parsing
+qemu_cli = ["cli"] # Commandline flags for qemu-based fuzzers
+frida_cli = ["cli"] # Commandline flags for frida-based fuzzers
 afl_exec_sec = [] # calculate exec/sec like AFL
-errors_backtrace = ["backtrace"]
-cmin = ["z3"] # corpus minimisation
-corpus_btreemap = []
+errors_backtrace = ["backtrace"] # Create backtraces at Error creation
+cmin = ["z3"] # for corpus minimisation
+corpus_btreemap = [] # Switches from HashMap to BTreeMap for CorpusId
+gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
 
 # features hiding dependencies licensed under GPL
 gpl = []
 # features hiding dependencies licensed under AGPL
 agpl = ["gpl", "nautilus"]
 nautilus = ["grammartec", "std", "serde_json/std"]
+
 # LLMP features
 llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
-llmp_compression = ["miniz_oxide"] # llmp compression using GZip
+llmp_compression = ["gzip"] # llmp compression using GZip
 llmp_debug = [] # Enables debug output for LLMP
 llmp_small_maps = [] # reduces initial map size for llmp
 

@@ -1,10 +1,10 @@
-//! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
-//! The example harness is built for gdiplus.
-//! NOTE: This file is 1-to-1 copy of the ../../frida_libpng/fuzzer.rs, which
+//! A `libfuzzer`-like fuzzer with `llmp`-multithreading support and restarts
+//! The example harness is built for `gdiplus`.
+//! NOTE: This file is 1-to-1 copy of `../../frida_libpng/fuzzer.rs`, which
 //! is platform independent. Hence, this file contains code for other platforms
-//! but it's only meaningful for Windows because of the gdiplus target. If you
-//! going to make it compilable only for windows, don't foret to modify the
-//! scripts/test_all_fuzzers.sh to opt-out this fuzzer from that test.
+//! but it's only meaningful for Windows because of the `gdiplus` target. If you
+//! going to make it compilable only for Windows, don't forget to modify the
+//! `scripts/test_all_fuzzers.sh` to opt-out this fuzzer from that test.
 
 use mimalloc::MiMalloc;
 #[global_allocator]
@@ -23,7 +23,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsSlice,
     },
-    corpus::{ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus, OnDiskCorpus},
+    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_and_fast, feedback_or, feedback_or_fast,
@@ -60,16 +60,16 @@ pub fn main() {
     let options = parse_args();
 
     unsafe {
-        match fuzz(options) {
+        match fuzz(&options) {
             Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
-            Err(e) => panic!("Error during fuzzing: {:?}", e),
+            Err(e) => panic!("Error during fuzzing: {e:?}"),
         }
     }
 }
 
 /// The actual fuzzer
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
-unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
+unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
@@ -102,10 +102,10 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
 
                 #[cfg(unix)]
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage, asan));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
                 #[cfg(windows)]
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -123,7 +123,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new_tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::new_with_observer(&time_observer)
+                    TimeFeedback::with_observer(&time_observer)
                 );
 
                 // Feedbacks to recognize an input as solution
@@ -146,11 +146,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                         CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new_save_meta(
-                            options.output.to_path_buf(),
-                            Some(OnDiskMetadataFormat::JsonPretty),
-                        )
-                        .unwrap(),
+                        OnDiskCorpus::new(&options.output).unwrap(),
                         &mut feedback,
                         &mut objective,
                     )
@@ -225,7 +221,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let cmplog = CmpLogRuntime::new();
 
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage, cmplog));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -243,7 +239,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new_tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::new_with_observer(&time_observer)
+                    TimeFeedback::with_observer(&time_observer)
                 );
 
                 #[cfg(unix)]
@@ -261,14 +257,11 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                         // RNG
                         StdRand::with_seed(current_nanos()),
                         // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
+                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
+                            .unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new_save_meta(
-                            options.output.to_path_buf(),
-                            Some(OnDiskMetadataFormat::JsonPretty),
-                        )
-                        .unwrap(),
+                        OnDiskCorpus::new(&options.output).unwrap(),
                         &mut feedback,
                         &mut objective,
                     )
@@ -358,7 +351,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let coverage = CoverageRuntime::new();
 
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -376,7 +369,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new_tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::new_with_observer(&time_observer)
+                    TimeFeedback::with_observer(&time_observer)
                 );
 
                 #[cfg(unix)]
@@ -394,14 +387,11 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                         // RNG
                         StdRand::with_seed(current_nanos()),
                         // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
+                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
+                            .unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new_save_meta(
-                            options.output.to_path_buf(),
-                            Some(OnDiskMetadataFormat::JsonPretty),
-                        )
-                        .unwrap(),
+                        OnDiskCorpus::new(&options.output).unwrap(),
                         &mut feedback,
                         &mut objective,
                     )

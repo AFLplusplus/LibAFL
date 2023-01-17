@@ -117,7 +117,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new_tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::new_with_observer(&time_observer)
+                    TimeFeedback::with_observer(&time_observer)
                 );
 
                 // Feedbacks to recognize an input as solution
@@ -137,14 +137,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         // RNG
                         StdRand::with_seed(current_nanos()),
                         // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
+                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
+                            .unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new_save_meta(
-                            options.output.clone(),
-                            Some(OnDiskMetadataFormat::JsonPretty),
-                        )
-                        .unwrap(),
+                        OnDiskCorpus::new(options.output.clone()).unwrap(),
                         &mut feedback,
                         &mut objective,
                     )
@@ -237,7 +234,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new_tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::new_with_observer(&time_observer)
+                    TimeFeedback::with_observer(&time_observer)
                 );
 
                 #[cfg(unix)]
@@ -255,14 +252,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         // RNG
                         StdRand::with_seed(current_nanos()),
                         // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
+                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
+                            .unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new_save_meta(
-                            options.output.clone(),
-                            Some(OnDiskMetadataFormat::JsonPretty),
-                        )
-                        .unwrap(),
+                        OnDiskCorpus::new(options.output.clone()).unwrap(),
                         &mut feedback,
                         &mut objective,
                     )
@@ -370,7 +364,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     // New maximization map feedback linked to the edges observer and the feedback state
                     MaxMapFeedback::new_tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
-                    TimeFeedback::new_with_observer(&time_observer)
+                    TimeFeedback::with_observer(&time_observer)
                 );
 
                 #[cfg(unix)]
@@ -388,14 +382,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         // RNG
                         StdRand::with_seed(current_nanos()),
                         // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
+                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
+                            .unwrap(),
                         // Corpus in which we store solutions (crashes in this example),
                         // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new_save_meta(
-                            options.output.clone(),
-                            Some(OnDiskMetadataFormat::JsonPretty),
-                        )
-                        .unwrap(),
+                        OnDiskCorpus::new(options.output.clone()).unwrap(),
                         &mut feedback,
                         &mut objective,
                     )

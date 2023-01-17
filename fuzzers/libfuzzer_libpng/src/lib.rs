@@ -100,7 +100,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::new_with_observer(&time_observer)
+        TimeFeedback::with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
