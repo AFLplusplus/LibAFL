@@ -311,7 +311,7 @@ where
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.bytes_mut());
-            *byte = state.rand_mut().next() as u8;
+            *byte ^= 1 + state.rand_mut().below(254) as u8;
             Ok(MutationResult::Mutated)
         }
     }
