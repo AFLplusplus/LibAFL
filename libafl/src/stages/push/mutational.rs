@@ -41,7 +41,7 @@ pub struct StdMutationalPushStage<CS, EM, M, OT, Z>
 where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasRand + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
@@ -63,7 +63,7 @@ impl<CS, EM, M, OT, Z> StdMutationalPushStage<CS, EM, M, OT, Z>
 where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasCorpus + HasRand + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
@@ -86,7 +86,7 @@ impl<CS, EM, M, OT, Z> PushStage<CS, EM, OT, Z> for StdMutationalPushStage<CS, E
 where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State:
         HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
@@ -199,7 +199,7 @@ impl<CS, EM, M, OT, Z> Iterator for StdMutationalPushStage<CS, EM, M, OT, Z>
 where
     CS: Scheduler,
     EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter<State = CS::State>,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State:
         HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
@@ -218,7 +218,7 @@ impl<CS, EM, M, OT, Z> StdMutationalPushStage<CS, EM, M, OT, Z>
 where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasCorpus + HasRand + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
