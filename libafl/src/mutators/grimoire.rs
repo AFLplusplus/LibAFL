@@ -281,7 +281,12 @@ where
                     continue;
                 }
                 let mut i = 0;
-                while i < bytes.len() - token_1.len() {
+                while bytes
+                    .len()
+                    .checked_sub(token_1.len())
+                    .map(|len| i < len)
+                    .unwrap_or(false)
+                {
                     if bytes[i..].starts_with(token_1) {
                         bytes.splice(i..(i + token_1.len()), token_2.clone());
 
