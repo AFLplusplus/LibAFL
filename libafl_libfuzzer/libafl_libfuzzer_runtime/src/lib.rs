@@ -46,22 +46,24 @@ macro_rules! make_fuzz_closure {
                 tuples::{Merge, tuple_list},
                 AsSlice,
             },
-            corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
+            corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, ondisk::OnDiskMetadataFormat},
             executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
             feedback_and_fast, feedback_or,
             feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback},
             generators::RandBytesGenerator,
             inputs::{BytesInput, HasTargetBytes},
             mutators::{
-                havoc_crossover, havoc_mutations, havoc_mutations_no_crossover, I2SRandReplace,
-                StdMOptMutator, StdScheduledMutator, Tokens, tokens_mutations
+                GrimoireExtensionMutator, GrimoireRecursiveReplacementMutator, GrimoireRandomDeleteMutator,
+                GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
+                I2SRandReplace, StdMOptMutator, StdScheduledMutator, Tokens, tokens_mutations
             },
             observers::{BacktraceObserver, HitcountsIterableMapObserver, MultiMapObserver, TimeObserver},
             schedulers::{
                 powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
             },
             stages::{
-                CalibrationStage, SkippableStage, StdMutationalStage, StdPowerMutationalStage, TracingStage,
+                CalibrationStage, GeneralizationStage, SkippableStage, StdMutationalStage, StdPowerMutationalStage,
+                TracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
@@ -74,6 +76,23 @@ macro_rules! make_fuzz_closure {
 
         |state: Option<_>, mut mgr, _cpu_id| {
             let mutator_status = CustomMutationStatus::new();
+            let grimoire = if let Some(grimoire) = $options.grimoire() {
+                if grimoire && !mutator_status.std_mutational {
+                    eprintln!("WARNING: cowardly refusing to use grimoire after detecting the presence of a custom mutator");
+                }
+                grimoire && mutator_status.std_mutational
+            } else if mutator_status.std_mutational {
+                if $options.dirs().is_empty() {
+                    eprintln!("WARNING: cowardly refusing to use grimoire since we cannot determine if the input is primarily text; set -grimoire=1 or provide a corpus directory.");
+                    false
+                } else {
+                    // TODO determine if the corpus is mostly text to conditionally enable grimoire
+                    eprintln!("INFO: inferred grimoire mutator; if this is undesired, set -grimoire=0");
+                    true
+                }
+            } else {
+                false
+            };
 
             // Create an observation channel using the coverage map
             let edges = unsafe { &mut COUNTERS_MAPS };
@@ -94,7 +113,11 @@ macro_rules! make_fuzz_closure {
             );
 
             // New maximization map feedback linked to the edges observer
-            let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+            let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, grimoire);
+
+            // Set up a generalization stage for grimoire
+            let generalization = GeneralizationStage::new(&edges_observer);
+            let generalization = SkippableStage::new(generalization, |_| grimoire.into());
 
             let calibration = CalibrationStage::new(&map_feedback);
 
@@ -130,7 +153,7 @@ macro_rules! make_fuzz_closure {
             };
 
             let crash_corpus = if let Some(prefix) = $options.artifact_prefix() {
-                OnDiskCorpus::with_prefix(prefix.dir().clone(), prefix.filename_prefix().clone().unwrap())
+                OnDiskCorpus::with_meta_format_and_path(prefix.dir(), Some(OnDiskMetadataFormat::JsonPretty), prefix.filename_prefix().clone())
                     .unwrap()
             } else {
                 OnDiskCorpus::new(std::env::current_dir().unwrap()).unwrap()
@@ -245,8 +268,18 @@ macro_rules! make_fuzz_closure {
             let cc_std_power =
                 SkippableStage::new(cc_std_power, |_| mutator_status.std_no_crossover.into());
 
-            // unfortunately, we cannot support grimoire and also support custom mutators
-            // in the future, we can handle this explicitly, but this introduces issues with generics :(
+            let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
+                tuple_list!(
+                    GrimoireExtensionMutator::new(),
+                    GrimoireRecursiveReplacementMutator::new(),
+                    GrimoireStringReplacementMutator::new(),
+                    // give more probability to avoid large inputs
+                    GrimoireRandomDeleteMutator::new(),
+                    GrimoireRandomDeleteMutator::new(),
+                ),
+                3,
+            );
+            let grimoire = SkippableStage::new(StdMutationalStage::transforming(grimoire_mutator), |_| grimoire.into());
 
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler =
@@ -275,28 +308,6 @@ macro_rules! make_fuzz_closure {
                     &mut mgr,
                 )?,
                 $options.timeout(),
-            );
-
-            // TODO Setup a tracing stage in which we log comparisons
-            let tracing = TracingStage::new(InProcessExecutor::new(
-                &mut tracing_harness,
-                tuple_list!(cmplog_observer),
-                &mut fuzzer,
-                &mut state,
-                &mut mgr,
-            )?);
-
-            // The order of the stages matter!
-            let mut stages = tuple_list!(
-                calibration,
-                tracing,
-                i2s,
-                cm_i2s,
-                std_power,
-                cm_power,
-                cm_std_power,
-                cc_std_power,
-                cc_power,
             );
 
             // In case the corpus is empty (on first run), reset
@@ -330,6 +341,30 @@ macro_rules! make_fuzz_closure {
                     );
                 }
             }
+
+            // Setup a tracing stage in which we log comparisons
+            let tracing = TracingStage::new(InProcessExecutor::new(
+                &mut tracing_harness,
+                tuple_list!(cmplog_observer),
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+            )?);
+
+            // The order of the stages matter!
+            let mut stages = tuple_list!(
+                generalization,
+                calibration,
+                tracing,
+                i2s,
+                cm_i2s,
+                std_power,
+                cm_power,
+                cm_std_power,
+                cc_std_power,
+                cc_power,
+                grimoire,
+            );
 
             $operation(&mut fuzzer, &mut stages, &mut executor, &mut state, &mut mgr)
         }

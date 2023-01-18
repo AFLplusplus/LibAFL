@@ -91,6 +91,7 @@ pub struct LibfuzzerOptions {
     mode: LibfuzzerMode,
     artifact_prefix: Option<ArtifactPrefix>,
     timeout: Duration,
+    grimoire: Option<bool>,
     forks: Option<usize>,
     dict: Option<Tokens>,
     dirs: Vec<PathBuf>,
@@ -131,6 +132,10 @@ impl LibfuzzerOptions {
         self.timeout
     }
 
+    pub fn grimoire(&self) -> Option<bool> {
+        self.grimoire
+    }
+
     pub fn forks(&self) -> Option<usize> {
         self.forks
     }
@@ -153,6 +158,7 @@ struct LibfuzzerOptionsBuilder<'a> {
     mode: Option<LibfuzzerMode>,
     artifact_prefix: Option<&'a str>,
     timeout: Option<Duration>,
+    grimoire: Option<bool>,
     forks: Option<usize>,
     dict: Option<&'a str>,
     dirs: Vec<&'a str>,
@@ -192,6 +198,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                             return Err(OptionsParseError::MultipleModesSelected);
                         }
                     }
+                    "grimoire" => self.grimoire = Some(parse_or_bail!(name, value, u64) > 0),
                     "artifact_prefix" => {
                         self.artifact_prefix = Some(value);
                     }
@@ -220,6 +227,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             mode: self.mode.unwrap_or(LibfuzzerMode::Fuzz),
             artifact_prefix: self.artifact_prefix.map(ArtifactPrefix::new),
             timeout: self.timeout.unwrap_or(Duration::from_secs(1200)),
+            grimoire: self.grimoire,
             forks: self.forks,
             dict: self.dict.map(|path| {
                 Tokens::from_file(path).expect("Couldn't load tokens from specified dictionary")

@@ -11,7 +11,7 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{self, null_mut},
+    ptr::{self, drop_in_place, null_mut},
 };
 #[cfg(all(target_os = "linux", feature = "std"))]
 use core::{ptr::addr_of_mut, time::Duration};
@@ -22,7 +22,6 @@ use core::{
 };
 #[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
-use std::ptr::drop_in_place;
 
 #[cfg(all(feature = "std", unix))]
 use libc::siginfo_t;

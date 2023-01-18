@@ -3,6 +3,7 @@
 
 use alloc::string::String;
 use core::{default::Default, option::Option, time::Duration};
+#[cfg(feature = "std")]
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};

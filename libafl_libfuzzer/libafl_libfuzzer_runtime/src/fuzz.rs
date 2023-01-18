@@ -50,7 +50,7 @@ pub fn fuzz(
 
         match Launcher::builder()
             .shmem_provider(shmem_provider)
-            .configuration(EventConfig::from_name("default"))
+            .configuration(EventConfig::AlwaysUnique)
             .monitor(monitor)
             .run_client(&mut run_client)
             .cores(&cores)
