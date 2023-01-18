@@ -371,7 +371,7 @@ where
             let mut path = PathBuf::from(filename);
             let lockname = format!(".{}.lafl_lock", path.file_name().unwrap().to_str().unwrap());
             path.set_file_name(lockname);
-            std::fs::remove_file(path).ok();
+            let _ = std::fs::remove_file(path);
         }
     }
 }
