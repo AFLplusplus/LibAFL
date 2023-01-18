@@ -117,7 +117,7 @@ where
 
         start_timer!(state);
         let testcase = state.corpus().get(corpus_idx)?.borrow();
-        let input = I::try_transform_from(&testcase, state, corpus_idx)?;
+        let Ok(input) = I::try_transform_from(&testcase, state, corpus_idx) else { return Ok(()); };
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
