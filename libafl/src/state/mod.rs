@@ -367,6 +367,10 @@ where
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
             let path = entry.path();
+            if path.file_name().unwrap().to_string_lossy().starts_with('.') {
+                continue;
+            }
+
             let attributes = fs::metadata(&path);
 
             if attributes.is_err() {
