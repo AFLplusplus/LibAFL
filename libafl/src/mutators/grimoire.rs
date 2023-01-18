@@ -277,9 +277,6 @@ where
 
         'first: for item in &mut gen[..rand_idx] {
             if let GeneralizedItem::Bytes(bytes) = item {
-                if bytes.len() < token_1.len() {
-                    continue;
-                }
                 let mut i = 0;
                 while bytes
                     .len()
@@ -303,9 +300,6 @@ where
         if mutated == MutationResult::Skipped || !stop_at_first {
             'second: for item in &mut gen[rand_idx..] {
                 if let GeneralizedItem::Bytes(bytes) = item {
-                    if bytes.len() < token_1.len() {
-                        continue;
-                    }
                     let mut i = 0;
                     while bytes
                         .len()
