@@ -465,7 +465,10 @@ where
                     state,
                     Event::UpdateUserStats {
                         name: "stability".to_string(),
-                        value: UserStats::Ratio(unstable_entries as u64, map_len as u64),
+                        value: UserStats::Ratio(
+                            (map_len - unstable_entries) as u64,
+                            map_len as u64,
+                        ),
                         phantom: PhantomData,
                     },
                 )?;
