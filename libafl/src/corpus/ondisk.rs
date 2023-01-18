@@ -167,7 +167,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::with_meta_format_and_path(
+        Self::with_meta_format_and_prefix(
             dir_path.as_ref(),
             Some(OnDiskMetadataFormat::JsonPretty),
             None,
@@ -181,7 +181,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::with_meta_format_and_path(
+        Self::with_meta_format_and_prefix(
             dir_path.as_ref(),
             Some(OnDiskMetadataFormat::JsonPretty),
             Some(prefix),
@@ -198,7 +198,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::with_meta_format_and_path(dir_path.as_ref(), Some(meta_format), None)
+        Self::with_meta_format_and_prefix(dir_path.as_ref(), Some(meta_format), None)
     }
 
     /// Creates an [`OnDiskCorpus`] that will not store .metadata files
@@ -208,14 +208,14 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::with_meta_format_and_path(dir_path.as_ref(), None, None)
+        Self::with_meta_format_and_prefix(dir_path.as_ref(), None, None)
     }
 
     /// Creates a new corpus at the given (non-generic) path with the given optional `meta_format`
     /// and `prefix`.
     ///
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
-    pub fn with_meta_format_and_path(
+    pub fn with_meta_format_and_prefix(
         dir_path: &Path,
         meta_format: Option<OnDiskMetadataFormat>,
         prefix: Option<String>,
