@@ -20,7 +20,7 @@ which = { version = "4.0.2" }
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "sancov_cmplog", "libfuzzer"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "sancov_cmplog", "libfuzzer_no_link_main"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 clap = { version = "4.0", features = ["default"] }
