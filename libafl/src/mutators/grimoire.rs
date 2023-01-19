@@ -277,40 +277,46 @@ where
 
         'first: for item in &mut gen[..rand_idx] {
             if let GeneralizedItem::Bytes(bytes) = item {
-                if bytes.len() < token_1.len() {
-                    continue;
-                }
                 let mut i = 0;
-                while i < bytes.len() - token_1.len() {
+                while bytes
+                    .len()
+                    .checked_sub(token_1.len())
+                    .map_or(false, |len| i < len)
+                {
                     if bytes[i..].starts_with(token_1) {
-                        bytes.splice(i..(i + token_1.len()), token_2.clone());
+                        bytes.splice(i..(i + token_1.len()), token_2.iter().copied());
 
                         mutated = MutationResult::Mutated;
                         if stop_at_first {
                             break 'first;
                         }
+                        i += token_2.len();
+                    } else {
+                        i += 1;
                     }
-                    i += 1;
                 }
             }
         }
         if mutated == MutationResult::Skipped || !stop_at_first {
             'second: for item in &mut gen[rand_idx..] {
                 if let GeneralizedItem::Bytes(bytes) = item {
-                    if bytes.len() < token_1.len() {
-                        continue;
-                    }
                     let mut i = 0;
-                    while i < bytes.len() - token_1.len() {
+                    while bytes
+                        .len()
+                        .checked_sub(token_1.len())
+                        .map_or(false, |len| i < len)
+                    {
                         if bytes[i..].starts_with(token_1) {
-                            bytes.splice(i..(i + token_1.len()), token_2.clone());
+                            bytes.splice(i..(i + token_1.len()), token_2.iter().copied());
 
                             mutated = MutationResult::Mutated;
                             if stop_at_first {
                                 break 'second;
                             }
+                            i += token_2.len();
+                        } else {
+                            i += 1;
                         }
-                        i += 1;
                     }
                 }
             }
