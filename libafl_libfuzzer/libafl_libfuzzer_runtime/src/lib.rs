@@ -153,7 +153,7 @@ macro_rules! make_fuzz_closure {
             };
 
             let crash_corpus = if let Some(prefix) = $options.artifact_prefix() {
-                OnDiskCorpus::with_meta_format_and_path(prefix.dir(), Some(OnDiskMetadataFormat::JsonPretty), prefix.filename_prefix().clone())
+                OnDiskCorpus::with_meta_format_and_prefix(prefix.dir(), Some(OnDiskMetadataFormat::JsonPretty), prefix.filename_prefix().clone())
                     .unwrap()
             } else {
                 OnDiskCorpus::new(std::env::current_dir().unwrap()).unwrap()
