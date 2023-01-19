@@ -1930,16 +1930,17 @@ where
     /// The broker walks all pages and looks for changes, then broadcasts them on
     /// its own shared page, once.
     #[inline]
-    pub fn once<F>(&mut self, on_new_msg: &mut F) -> Result<(), Error>
+    pub fn once<F>(&mut self, on_new_msg: &mut F) -> Result<bool, Error>
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
+        let mut new_messages = false;
         for i in 0..self.llmp_clients.len() {
             unsafe {
-                self.handle_new_msgs(i as u32, on_new_msg)?;
+                new_messages |= self.handle_new_msgs(i as u32, on_new_msg)?;
             }
         }
-        Ok(())
+        Ok(new_messages)
     }
 
     /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
@@ -1959,8 +1960,65 @@ where
     }
 
     /// Loops infinitely, forwarding and handling all incoming messages from clients.
+    /// Never returns.
+    /// Will call `on_timeout` roughly after `timeout`
+    /// Panics on error.
+    /// 5 millis of sleep can't hurt to keep busywait not at 100%
+    #[cfg(feature = "std")]
+    pub fn loop_with_timeouts<F>(
+        &mut self,
+        on_new_msg_or_timeout: &mut F,
+        timeout: Duration,
+        sleep_time: Option<Duration>,
+    ) where
+        F: FnMut(Option<(ClientId, Tag, Flags, &[u8])>) -> Result<LlmpMsgHookResult, Error>,
+    {
+        use super::current_milliseconds;
+
+        #[cfg(unix)]
+        if let Err(_e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
+            // We can live without a proper ctrl+c signal handler. Print and ignore.
+            #[cfg(feature = "std")]
+            println!("Failed to setup signal handlers: {_e}");
+        }
+
+        let timeout = timeout.as_millis() as u64;
+        let mut end_time = current_milliseconds() + timeout;
+
+        while !self.is_shutting_down() {
+            if current_milliseconds() > end_time {
+                on_new_msg_or_timeout(None).expect("An error occured in broker timeout. Exiting.");
+                end_time = current_milliseconds() + timeout;
+            }
+
+            if self
+                .once(&mut |client_id, tag, flags, buf| {
+                    on_new_msg_or_timeout(Some((client_id, tag, flags, buf)))
+                })
+                .expect("An error occurred when brokering. Exiting.")
+            {
+                end_time = current_milliseconds() + timeout;
+            }
+
+            #[cfg(feature = "std")]
+            if let Some(time) = sleep_time {
+                thread::sleep(time);
+            }
+
+            #[cfg(not(feature = "std"))]
+            if let Some(time) = sleep_time {
+                panic!("Cannot sleep on no_std platform (requested {:?})", time);
+            }
+        }
+        self.llmp_out
+            .send_buf(LLMP_TAG_EXITING, &[])
+            .expect("Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.");
+    }
+
+    /// Loops infinitely, forwarding and handling all incoming messages from clients.
     /// Never returns. Panics on error.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
+    /// If you need to run code even if no update got sent, use [`Self::loop_with_timeout`].
     pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>)
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
@@ -2338,13 +2396,19 @@ where
         Ok(ret)
     }
 
-    /// broker broadcast to its own page for all others to read */
+    /// Broker broadcast to its own page for all others to read
+    /// Returns `true` if new messages were broker-ed
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
-    unsafe fn handle_new_msgs<F>(&mut self, client_id: u32, on_new_msg: &mut F) -> Result<(), Error>
+    unsafe fn handle_new_msgs<F>(
+        &mut self,
+        client_id: u32,
+        on_new_msg: &mut F,
+    ) -> Result<bool, Error>
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
+        let mut new_mesages = false;
         let mut next_id = self.llmp_clients.len() as u32;
 
         // TODO: We could memcpy a range of pending messages, instead of one by one.
@@ -2354,11 +2418,13 @@ where
                 match client.recv()? {
                     None => {
                         // We're done handling this client
-                        return Ok(());
+                        return Ok(new_mesages);
                     }
                     Some(msg) => msg,
                 }
             };
+            // We got a new message
+            new_mesages = true;
 
             match (*msg).tag {
                 // first, handle the special, llmp-internal messages
