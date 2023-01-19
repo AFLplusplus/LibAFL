@@ -173,10 +173,11 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Add no_std toolchain
       run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-    - name: Install python
+    - name: Install python (macOS)
       # Removing macOS things already installed in CI against failed linking
       if: runner.os == 'macOS'
       run: rm /usr/local/bin/2to3* /usr/local/bin/idle3* /usr/local/bin/pydoc3* /usr/local/bin/python3*; brew install --force-bottle --overwrite python@3.8
+    - name: Install python (macOS)
       if: runner.os == 'Linux'
       run: sudo apt-get install -y python3.8-dev
     - uses: lyricwulf/abc@v1
