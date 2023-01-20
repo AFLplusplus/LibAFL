@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
-        rands::{Rand, StdRand, XkcdRand},
+        rands::{Rand, RandomSeed, StdRand},
         HasLen,
     },
     inputs::Input,
@@ -43,7 +43,7 @@ where
 pub trait InputDecoder {
     /// Decode encoded input to bytes
     #[allow(clippy::ptr_arg)] // we reuse the alloced `Vec`
-    fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
+    fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 
 /// Tokenizer is a trait that can tokenize bytes into a [`Vec`] of tokens
@@ -66,6 +66,8 @@ pub struct TokenInputEncoderDecoder {
     encoding_type: TokenizationKind,
     // This is for TokenizationKind::WithWhitespace
     max_whitespace_id: u32,
+    // We need an RNG for TokenizationKind::WithWhitespace
+    rand: StdRand,
 }
 
 impl<T> InputEncoder<T> for TokenInputEncoderDecoder
@@ -90,7 +92,7 @@ where
 }
 
 impl InputDecoder for TokenInputEncoderDecoder {
-    fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
+    fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
         let mut prev_len = 0;
         for id in input.codes() {
             let tok = self
@@ -100,9 +102,9 @@ impl InputDecoder for TokenInputEncoderDecoder {
             if self.encoding_type == TokenizationKind::WithWhitespace {
                 let len = tok.len();
                 if prev_len > 1 && len > 1 {
-                    let mut r = 0;
+                    let mut r: u32;
                     loop {
-                        r += 1; // TODO rand_below(self.next_id) here
+                        r = self.rand.below(self.next_id as u64) as u32;
                         if r < self.max_whitespace_id {
                             break;
                         }
@@ -142,6 +144,7 @@ impl TokenInputEncoderDecoder {
             next_id: 0,
             max_whitespace_id: 0,
             encoding_type: TokenizationKind::NoWhitespace,
+            rand: StdRand::new(),
         }
     }
     pub fn set_encoding_type(&mut self, enc_type: TokenizationKind) {
