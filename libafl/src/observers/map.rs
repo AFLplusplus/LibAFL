@@ -884,7 +884,7 @@ where
 {
     /// Creates a new [`MapObserver`]
     ///
-    /// # Safety
+    /// # Note
     /// Will get a pointer to the map and dereference it at any point in time.
     /// The map must not move in memory!
     #[must_use]
