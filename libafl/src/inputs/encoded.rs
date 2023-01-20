@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{bolts::HasLen, inputs::Input, Error};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TokenizationKind {
     NoWhitespace,
     WithWhitespace,
@@ -42,7 +42,8 @@ pub trait InputDecoder {
 /// Tokenizer is a trait that can tokenize bytes into a [`Vec`] of tokens
 pub trait Tokenizer {
     /// Tokenize the given bytes
-    fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error>;
+    fn tokenize(&self, bytes: &[u8], encoding_type: TokenizationKind)
+        -> Result<Vec<String>, Error>;
 }
 
 /// A token input encoder/decoder
@@ -66,7 +67,7 @@ where
 {
     fn encode(&mut self, bytes: &[u8], tokenizer: &mut T) -> Result<EncodedInput, Error> {
         let mut codes = vec![];
-        let tokens = tokenizer.tokenize(bytes)?;
+        let tokens = tokenizer.tokenize(bytes, self.encoding_type)?;
         for tok in tokens {
             if let Some(id) = self.token_table.get(&tok) {
                 codes.push(*id);
@@ -108,6 +109,7 @@ impl TokenInputEncoderDecoder {
         }
     }
     pub fn set_encoding_type(&mut self, enc_type: TokenizationKind) {
+        // This can only be set until the first tokenization has occured!
         if self.next_id == 0 {
             if enc_type == TokenizationKind::WithWhitespace {
                 // we preset whitespace variations to be able to easily find
@@ -210,8 +212,8 @@ impl Default for NaiveTokenizer {
         Self {
             // Generic identifier regex
             ident_re: Regex::new("[A-Za-z0-9_$]+").unwrap(),
-            // C++ style comments
-            comment_re: Regex::new(r"(/\*[^*]*\*/)|(//[^*]*)").unwrap(),
+            // C++ style /* ... */ comments, no // because is bad for XML and other
+            comment_re: Regex::new(r"(/\*[^*]*\*/)").unwrap(),
             // " and ' string regex
             string_re: Regex::new("\"(\\\\|\\\\\"|[^\"])*\"|'(\\\\|\\\\'|[^'])*'").unwrap(),
         }
@@ -220,7 +222,11 @@ impl Default for NaiveTokenizer {
 
 #[cfg(feature = "std")]
 impl Tokenizer for NaiveTokenizer {
-    fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error> {
+    fn tokenize(
+        &self,
+        bytes: &[u8],
+        encoding_type: TokenizationKind,
+    ) -> Result<Vec<String>, Error> {
         let mut tokens = vec![];
         let string =
             from_utf8(bytes).map_err(|_| Error::illegal_argument("Invalid UTF-8".to_owned()))?;
@@ -228,17 +234,40 @@ impl Tokenizer for NaiveTokenizer {
         let mut str_prev = 0;
         for str_match in self.string_re.find_iter(&string) {
             if str_match.start() > str_prev {
-                for ws_tok in string[str_prev..str_match.start()].split_whitespace() {
+                if encoding_type == TokenizationKind::WithWhitespace {
                     let mut ident_prev = 0;
-                    for ident_match in self.ident_re.find_iter(ws_tok) {
+                    let substring = string[str_prev..str_match.start()].to_owned();
+                    for ident_match in self.ident_re.find_iter(&substring) {
                         if ident_match.start() > ident_prev {
-                            tokens.push(ws_tok[ident_prev..ident_match.start()].to_owned());
+                            for cnt in ident_prev..ident_match.start() {
+                                tokens.push(substring[cnt..cnt].to_owned());
+                            }
                         }
-                        tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
+                        tokens.push(substring[ident_match.start()..ident_match.end()].to_owned());
                         ident_prev = ident_match.end();
                     }
-                    if ident_prev < ws_tok.len() {
-                        tokens.push(ws_tok[ident_prev..].to_owned());
+                    if ident_prev < substring.len() {
+                        for cnt in ident_prev..substring.len() {
+                            tokens.push(substring[cnt..cnt].to_owned());
+                        }
+                    }
+                } else {
+                    for ws_tok in string[str_prev..str_match.start()].split_whitespace() {
+                        let mut ident_prev = 0;
+                        for ident_match in self.ident_re.find_iter(ws_tok) {
+                            if ident_match.start() > ident_prev {
+                                for cnt in ident_prev..ident_match.start() {
+                                    tokens.push(ws_tok[cnt..cnt].to_owned());
+                                }
+                            }
+                            tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
+                            ident_prev = ident_match.end();
+                        }
+                        if ident_prev < ws_tok.len() {
+                            for cnt in ident_prev..ws_tok.len() {
+                                tokens.push(ws_tok[cnt..cnt].to_owned());
+                            }
+                        }
                     }
                 }
             }
@@ -246,17 +275,40 @@ impl Tokenizer for NaiveTokenizer {
             str_prev = str_match.end();
         }
         if str_prev < string.len() {
-            for ws_tok in string[str_prev..].split_whitespace() {
+            if encoding_type == TokenizationKind::WithWhitespace {
                 let mut ident_prev = 0;
-                for ident_match in self.ident_re.find_iter(ws_tok) {
+                let substring = string[str_prev..].to_owned();
+                for ident_match in self.ident_re.find_iter(&substring) {
                     if ident_match.start() > ident_prev {
-                        tokens.push(ws_tok[ident_prev..ident_match.start()].to_owned());
+                        for cnt in ident_prev..ident_match.start() {
+                            tokens.push(substring[cnt..cnt].to_owned());
+                        }
                     }
-                    tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
+                    tokens.push(substring[ident_match.start()..ident_match.end()].to_owned());
                     ident_prev = ident_match.end();
                 }
-                if ident_prev < ws_tok.len() {
-                    tokens.push(ws_tok[ident_prev..].to_owned());
+                if ident_prev < substring.len() {
+                    for cnt in ident_prev..substring.len() {
+                        tokens.push(substring[cnt..cnt].to_owned());
+                    }
+                }
+            } else {
+                for ws_tok in string[str_prev..].split_whitespace() {
+                    let mut ident_prev = 0;
+                    for ident_match in self.ident_re.find_iter(ws_tok) {
+                        if ident_match.start() > ident_prev {
+                            for cnt in ident_prev..ident_match.start() {
+                                tokens.push(ws_tok[cnt..cnt].to_owned());
+                            }
+                        }
+                        tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
+                        ident_prev = ident_match.end();
+                    }
+                    if ident_prev < ws_tok.len() {
+                        for cnt in ident_prev..ws_tok.len() {
+                            tokens.push(ws_tok[cnt..cnt].to_owned());
+                        }
+                    }
                 }
             }
         }
