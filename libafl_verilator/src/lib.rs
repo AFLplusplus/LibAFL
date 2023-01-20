@@ -103,7 +103,7 @@ mod wrapper {
 
 use wrapper::*;
 
-static mut COVERAGE_FILE: Option<File> = None;
+pub static mut COVERAGE_FILE: Option<File> = None;
 
 /// Reset the global coverage file.
 pub unsafe fn reset_coverage_file() {
@@ -115,9 +115,7 @@ pub unsafe fn reset_coverage_file() {
 /// extract.
 pub unsafe fn initialize_coverage_file<P: ?Sized + NixPath>(dir: &P) -> Result<(), Error> {
     if COVERAGE_FILE.is_some() {
-        return Err(Error::unsupported(
-            "The coverage file may only be initialized once.",
-        ));
+        return Ok(());
     }
     let fd = nix::fcntl::open(
         dir,
@@ -154,15 +152,6 @@ fn get_coverage_file() -> Result<&'static mut File, Error> {
     }
 }
 
-/// Metadata which tracks the design hierarchical coverage to coverage index mapping for MapObserver
-/// compatibility.
-#[derive(Debug, Deserialize, Serialize, Default)]
-pub struct VerilatorMappingMetadata {
-    mapping: HashMap<Vec<u8>, usize>,
-}
-
-impl_serdeany!(VerilatorMappingMetadata);
-
 /// Map observer which monitors verilated design coverage.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct VerilatorMapObserver {
@@ -187,33 +176,8 @@ impl VerilatorMapObserver {
         })
     }
 
-    fn get_verilator_metadata<'a, S: HasNamedMetadata>(
-        &self,
-        state: &'a mut S,
-    ) -> &'a mut VerilatorMappingMetadata {
-        if state
-            .named_metadata()
-            .contains::<VerilatorMappingMetadata>(&self.name)
-        {
-            state
-                .named_metadata_mut()
-                .get_mut::<VerilatorMappingMetadata>(&self.name)
-                .unwrap()
-        } else {
-            state
-                .named_metadata_mut()
-                .insert(VerilatorMappingMetadata::default(), &self.name);
-            state
-                .named_metadata_mut()
-                .get_mut::<VerilatorMappingMetadata>(&self.name)
-                .unwrap()
-        }
-    }
-
-    fn process_verilator_coverage(
-        &mut self,
-        mapping: &mut HashMap<Vec<u8>, usize>,
-    ) -> Result<(), Error> {
+    fn process_verilator_coverage(&mut self) -> Result<(), Error> {
+        self.map.clear();
         for line in BufReader::new(get_coverage_file()?).split(b'\n') {
             let line = line?;
             if line[0] == b'C' {
@@ -224,21 +188,10 @@ impl VerilatorMapObserver {
                     }
                     separator -= 1;
                 }
-                let (name, count) = line.split_at(separator);
-                let name = Vec::from(&name[3..(name.len() - 2)]); // "C '...' "
-                let count = std::str::from_utf8(count)
+                let count = std::str::from_utf8(&line[separator..])
                     .map_err(|_| Error::illegal_state("Couldn't parse the coverage count value!"))?
                     .parse()?;
-                match mapping.entry(name) {
-                    Entry::Occupied(e) => {
-                        let idx = *e.get();
-                        self.map[idx] = count;
-                    }
-                    Entry::Vacant(e) => {
-                        e.insert(self.map.len());
-                        self.map.push(count);
-                    }
-                }
+                self.map.push(count);
             }
         }
         Ok(())
@@ -333,9 +286,7 @@ where
                 __libafl_process_verilator_coverage();
             }
         }
-        let metadata = self.get_verilator_metadata(state);
-        self.process_verilator_coverage(&mut metadata.mapping)?;
-        println!("{}", self.count_bytes());
+        self.process_verilator_coverage()?;
         Ok(())
     }
 

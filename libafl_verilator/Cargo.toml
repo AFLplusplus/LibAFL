@@ -11,6 +11,6 @@ cc = "1.0"
 
 [dependencies]
 hashbrown = { version = "0.13.1", features = ["serde"] }
-libafl = { path = "../libafl", features = ["std"], no-default-features = true }
+libafl = { path = "../libafl", features = ["std"], default-features = false }
 nix = "0.26"
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
