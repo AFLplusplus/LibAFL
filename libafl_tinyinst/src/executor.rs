@@ -2,11 +2,14 @@ use core::marker::PhantomData;
 use std::time::Duration;
 
 use libafl::{
-    bolts::fs::{InputFile, INPUTFILE_STD},
+    bolts::{
+        fs::{InputFile, INPUTFILE_STD},
+        shmem::{ShMem, ShMemId, ShMemProvider},
+        AsMutSlice, AsSlice,
+    },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    bolts::{{AsSlice, AsMutSlice}, shmem::{ShMemProvider, ShMem, ShMemId}},
     state::{State, UsesState},
     Error,
 };
@@ -56,7 +59,6 @@ where
             }
         }
 
-
         #[allow(unused_assignments)]
         let mut status = RunResult::OK;
         unsafe {
@@ -80,14 +82,15 @@ pub struct TinyInstExecutorBuilder<'a, SP> {
     tinyinst_args: Vec<String>,
     program_args: Vec<String>,
     timeout: Duration,
-    shmem_provider: Option<&'a mut SP>
+    shmem_provider: Option<&'a mut SP>,
 }
 
 const MAX_FILE: usize = 1024 * 1024;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 
 impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
-where SP: ShMemProvider,
+where
+    SP: ShMemProvider,
 {
     pub fn new() -> TinyInstExecutorBuilder<'a, SP> {
         Self {
@@ -176,7 +179,7 @@ where SP: ShMemProvider,
         observers: OT,
     ) -> Result<TinyInstExecutor<'a, S, OT>, Error> {
         let mut has_input = false;
-        let program_args : Vec<String> = self
+        let program_args: Vec<String> = self
             .program_args
             .clone()
             .into_iter()
@@ -203,12 +206,12 @@ where SP: ShMemProvider,
                 // TODO: Replace .cur_input with shmem.id()
                 println!("{:#?}", shmem.id());
                 // shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
-            
+
                 let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
                 shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
 
                 Some(shmem.id())
-            },
+            }
             None => None,
         };
 

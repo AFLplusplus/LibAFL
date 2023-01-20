@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use libafl::{
     bolts::{
         rands::{RandomSeed, StdRand},
+        shmem::{ShMem, ShMemProvider, Win32ShMemProvider},
         tuples::tuple_list,
-        shmem::{ShMemProvider, ShMem, Win32ShMemProvider},
     },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
