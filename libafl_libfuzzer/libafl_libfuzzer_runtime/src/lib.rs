@@ -48,8 +48,8 @@ macro_rules! make_fuzz_closure {
             },
             corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, ondisk::OnDiskMetadataFormat},
             executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
-            feedback_and_fast, feedback_or,
-            feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback},
+            feedback_and_fast, feedback_or, feedback_or_fast,
+            feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
             generators::RandBytesGenerator,
             inputs::{BytesInput, HasTargetBytes},
             mutators::{
@@ -130,9 +130,12 @@ macro_rules! make_fuzz_closure {
             );
 
             // A feedback to choose if an input is a solution or not
-            let mut objective = feedback_and_fast!(
-                CrashFeedback::new(),
-                NewHashFeedback::new(&backtrace_observer)
+            let mut objective = feedback_or_fast!(
+                feedback_and_fast!(
+                    CrashFeedback::new(),
+                    NewHashFeedback::new(&backtrace_observer)
+                ),
+                TimeoutFeedback::new()
             );
 
             let corpus_dir = if let Some(main) = $options.dirs().first() {
@@ -153,10 +156,10 @@ macro_rules! make_fuzz_closure {
             };
 
             let crash_corpus = if let Some(prefix) = $options.artifact_prefix() {
-                OnDiskCorpus::with_meta_format_and_prefix(prefix.dir(), Some(OnDiskMetadataFormat::JsonPretty), prefix.filename_prefix().clone())
+                OnDiskCorpus::with_meta_format_and_prefix(prefix.dir(), None, prefix.filename_prefix().clone())
                     .unwrap()
             } else {
-                OnDiskCorpus::new(std::env::current_dir().unwrap()).unwrap()
+                OnDiskCorpus::no_meta(std::env::current_dir().unwrap()).unwrap()
             };
 
             // If not restarting, create a State from scratch
