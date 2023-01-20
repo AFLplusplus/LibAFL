@@ -17,6 +17,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{bolts::HasLen, inputs::Input, Error};
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum TokenizationKind {
+    NoWhitespace,
+    WithWhitespace,
+}
+
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
 pub trait InputEncoder<T>
 where
@@ -48,6 +54,10 @@ pub struct TokenInputEncoderDecoder {
     id_table: HashMap<u32, String>,
     /// The next id
     next_id: u32,
+    // Which type of encoding
+    encoding_type: TokenizationKind,
+    // This is for TokenizationKind::WithWhitespace
+    max_whitespace_id: u32,
 }
 
 impl<T> InputEncoder<T> for TokenInputEncoderDecoder
@@ -93,6 +103,72 @@ impl TokenInputEncoderDecoder {
             token_table: HashMap::default(),
             id_table: HashMap::default(),
             next_id: 0,
+            max_whitespace_id: 0,
+            encoding_type: TokenizationKind::NoWhitespace,
+        }
+    }
+    pub fn set_encoding_type(&mut self, enc_type: TokenizationKind) {
+        if self.next_id == 0 {
+            if enc_type == TokenizationKind::WithWhitespace {
+                // we preset whitespace variations to be able to easily find
+                // these for later, this is what max_whitespace_id is for.
+                // This does not need to be a complete list, just the most common
+                // ones.
+                self.token_table.insert(" ".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, " ".to_string());
+                self.next_id += 1;
+                self.token_table.insert("\t".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "\t".to_string());
+                self.next_id += 1;
+                self.token_table.insert("\n".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "\n".to_string());
+                self.next_id += 1;
+                self.token_table.insert("\r\n".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "\r\n".to_string());
+                self.next_id += 1;
+                self.token_table.insert("  ".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "  ".to_string());
+                self.next_id += 1;
+                self.token_table.insert("\t\t".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "\t\t".to_string());
+                self.next_id += 1;
+                self.token_table.insert("\n\n".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "\n\n".to_string());
+                self.next_id += 1;
+                self.token_table
+                    .insert("\r\n\r\n".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "\r\n\r\n".to_string());
+                self.next_id += 1;
+                self.token_table.insert("    ".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "    ".to_string());
+                self.next_id += 1;
+                self.token_table
+                    .insert("\t\t\t\t".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "\t\t\t\t".to_string());
+                self.next_id += 1;
+                self.token_table
+                    .insert("\n\n\n\n".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "\n\n\n\n".to_string());
+                self.next_id += 1;
+                self.token_table
+                    .insert("\r\n\r\n".to_string(), self.next_id);
+                self.id_table
+                    .insert(self.next_id, "\r\n\r\n\r\n\r\n".to_string());
+                self.next_id += 1;
+                self.max_whitespace_id = self.next_id;
+
+                // To be able to also insert single quote types during mutation
+                // we also add these
+                self.token_table.insert("\"".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "\"".to_string());
+                self.next_id += 1;
+                self.token_table.insert("'".to_string(), self.next_id);
+                self.id_table.insert(self.next_id, "'".to_string());
+                self.next_id += 1;
+            }
+            self.encoding_type = enc_type;
+        } else {
+            // TODO: this needs an else that errors
         }
     }
 }
