@@ -15,7 +15,14 @@ use hashbrown::HashMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::HasLen, inputs::Input, Error};
+use crate::{
+    bolts::{
+        rands::{Rand, StdRand, XkcdRand},
+        HasLen,
+    },
+    inputs::Input,
+    Error,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TokenizationKind {
@@ -84,11 +91,38 @@ where
 
 impl InputDecoder for TokenInputEncoderDecoder {
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
+        let mut prev_len = 0;
         for id in input.codes() {
             let tok = self
                 .id_table
                 .get(&(id % self.next_id))
                 .ok_or_else(|| Error::illegal_state(format!("Id {id} not in the decoder table")))?;
+            if self.encoding_type == TokenizationKind::WithWhitespace {
+                let len = tok.len();
+                if prev_len > 1 && len > 1 {
+                    let mut r = 0;
+                    loop {
+                        r += 1; // TODO rand_below(self.next_id) here
+                        if r < self.max_whitespace_id {
+                            break;
+                        }
+                        if self
+                            .id_table
+                            .get(&(id % self.next_id))
+                            .expect("Id not found")
+                            .len()
+                            == 1
+                        {
+                            break;
+                        }
+                    }
+                    let w = self.id_table.get(&(r % self.next_id)).ok_or_else(|| {
+                        Error::illegal_state(format!("Id {r} not in the decoder table"))
+                    })?;
+                    bytes.extend_from_slice(w.as_bytes());
+                }
+                prev_len = len;
+            }
             bytes.extend_from_slice(tok.as_bytes());
             if self.encoding_type == TokenizationKind::NoWhitespace {
                 bytes.push(b' ');
