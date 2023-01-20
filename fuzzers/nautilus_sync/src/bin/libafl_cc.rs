@@ -1,6 +1,24 @@
-use std::env;
+use std::{env, process::Command, str};
 
 use libafl_cc::{ClangWrapper, CompilerWrapper};
+
+fn find_libpython() -> Result<String, String> {
+    match Command::new("python3")
+        .args(&["-m", "find_libpython"])
+        .output()
+    {
+        Ok(output) => {
+            let shared_obj = str::from_utf8(&output.stdout).unwrap_or_default().trim();
+            if shared_obj.is_empty() {
+                return Err("Empty return from python3 -m find_libpython".to_string());
+            }
+            Ok(shared_obj.to_owned())
+        }
+        Err(err) => Err(format!(
+            "Could not execute python3 -m find_libpython: {err:?}"
+        )),
+    }
+}
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -16,6 +34,8 @@ pub fn main() {
 
         dir.pop();
 
+        let libpython = find_libpython().expect("Failed to find libpython");
+
         let mut cc = ClangWrapper::new();
         if let Some(code) = cc
             .cpp(is_cpp)
@@ -26,9 +46,7 @@ pub fn main() {
             .link_staticlib(&dir, "nautilus_sync")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
             // needed by Nautilus
-            .add_link_arg("-L/usr/local/lib/python3.8/config-3.8-x86_64-linux-gnu/")
-            .add_link_arg("-L/usr/lib/python3.8/config-3.8-x86_64-linux-gnu/")
-            .add_link_arg("-lpython3.8")
+            .add_link_arg(libpython)
             .add_link_arg("-lutil")
             .run()
             .expect("Failed to run the wrapped compiler")
