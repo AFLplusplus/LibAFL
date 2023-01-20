@@ -90,7 +90,9 @@ impl InputDecoder for TokenInputEncoderDecoder {
                 .get(&(id % self.next_id))
                 .ok_or_else(|| Error::illegal_state(format!("Id {id} not in the decoder table")))?;
             bytes.extend_from_slice(tok.as_bytes());
-            bytes.push(b' ');
+            if self.encoding_type == TokenizationKind::NoWhitespace {
+                bytes.push(b' ');
+            }
         }
         Ok(())
     }
