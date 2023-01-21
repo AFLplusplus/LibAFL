@@ -67,10 +67,10 @@ fn main() {
         TinyInstExecutorBuilder::new()
             .tinyinst_args(tinyinst_args)
             .program_args(args)
-            .shmem_provider(&mut shmem_provider)
             .use_shmem()
             .persistent("test.exe".to_string(), "fuzz".to_string(), 1, 10000)
             .timeout(std::time::Duration::new(5, 0))
+            .shmem_provider(&mut shmem_provider)
             .build(&mut COVERAGE, tuple_list!(observer))
             .unwrap()
     };
