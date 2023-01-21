@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 
+#[cfg(windows)]
+use libafl::bolts::shmem::Win32ShMemProvider;
 use libafl::{
     bolts::{
         rands::{RandomSeed, StdRand},
-        shmem::{ShMem, ShMemProvider, Win32ShMemProvider},
+        shmem::{ShMem, ShMemProvider},
         tuples::tuple_list,
     },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
