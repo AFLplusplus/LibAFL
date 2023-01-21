@@ -1,12 +1,10 @@
 use core::marker::PhantomData;
 use std::time::Duration;
 
-use libafl::bolts::shmem::StdShMemProvider;
-
 use libafl::{
     bolts::{
         fs::{InputFile, INPUTFILE_STD},
-        shmem::{ShMem, ShMemProvider},
+        shmem::{ShMem, ShMemProvider, StdShMemProvider},
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
@@ -106,15 +104,13 @@ pub struct TinyInstExecutorBuilder<'a, SP> {
 const MAX_FILE: usize = 1024 * 1024;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 
-impl<'a> Default for TinyInstExecutorBuilder<'a, StdShMemProvider>
-{
+impl<'a> Default for TinyInstExecutorBuilder<'a, StdShMemProvider> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> TinyInstExecutorBuilder<'a, StdShMemProvider>
-{
+impl<'a> TinyInstExecutorBuilder<'a, StdShMemProvider> {
     /// Constructor
     #[must_use]
     pub fn new() -> TinyInstExecutorBuilder<'a, StdShMemProvider> {
@@ -211,17 +207,20 @@ impl<'a> TinyInstExecutorBuilder<'a, StdShMemProvider>
 
     /// Use this to enable shmem testcase passing.
     #[must_use]
-    pub fn shmem_provider<SP: ShMemProvider>(self, shmem_provider: &'a mut SP) -> TinyInstExecutorBuilder<'a, SP> {
+    pub fn shmem_provider<SP: ShMemProvider>(
+        self,
+        shmem_provider: &'a mut SP,
+    ) -> TinyInstExecutorBuilder<'a, SP> {
         TinyInstExecutorBuilder {
             tinyinst_args: self.tinyinst_args,
             program_args: self.program_args,
             timeout: self.timeout,
-            shmem_provider: Some(shmem_provider)
+            shmem_provider: Some(shmem_provider),
         }
     }
 }
 
-impl<'a, SP> TinyInstExecutorBuilder<'a, SP> 
+impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
 where
     SP: ShMemProvider,
 {
@@ -293,7 +292,6 @@ where
         })
     }
 }
-
 
 impl<'a, S, SP, OT> HasObservers for TinyInstExecutor<'a, S, SP, OT>
 where
