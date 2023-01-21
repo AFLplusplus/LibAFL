@@ -15,17 +15,23 @@ use libafl::{
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
 
-pub struct TinyInstExecutor<'a, S, OT> {
+pub struct TinyInstExecutor<'a, S, SP, OT>
+where
+    SP: ShMemProvider,
+{
     tinyinst: TinyInst,
     coverage: &'a mut Vec<u64>,
     timeout: Duration,
     observers: OT,
     phantom: PhantomData<S>,
     cur_input: InputFile,
-    shmem_id: Option<ShMemId>,
+    map: Option<<SP as ShMemProvider>::ShMem>,
 }
 
-impl<'a, S, OT> std::fmt::Debug for TinyInstExecutor<'a, S, OT> {
+impl<'a, S, SP, OT> std::fmt::Debug for TinyInstExecutor<'a, S, SP, OT>
+where
+    SP: ShMemProvider,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TinyInstExecutor")
             .field("timeout", &self.timeout)
@@ -33,11 +39,12 @@ impl<'a, S, OT> std::fmt::Debug for TinyInstExecutor<'a, S, OT> {
     }
 }
 
-impl<'a, EM, S, Z, OT> Executor<EM, Z> for TinyInstExecutor<'a, S, OT>
+impl<'a, EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<'a, S, SP, OT>
 where
     EM: UsesState<State = S>,
     S: UsesInput,
     S::Input: HasTargetBytes,
+    SP: ShMemProvider,
     Z: UsesState<State = S>,
 {
     #[inline]
@@ -48,11 +55,19 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        match self.shmem_id {
-            Some(id) => {
+        match &self.map {
+            Some(_) => {
                 // use shmem to pass testcase
                 // TODO: write bytes into the shmem map
-                self.cur_input.write_buf(input.target_bytes().as_slice())?;
+                let shmem = unsafe { self.map.as_mut().unwrap_unchecked() };
+                let target_bytes = input.target_bytes();
+                let size = target_bytes.as_slice().len();
+                let size_in_bytes = size.to_ne_bytes();
+                // The first four bytes tells the size of the shmem.
+                shmem.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
+                    .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
+                shmem.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                    .copy_from_slice(target_bytes.as_slice());
             }
             None => {
                 self.cur_input.write_buf(input.target_bytes().as_slice())?;
@@ -177,7 +192,24 @@ where
         &mut self,
         coverage: &'a mut Vec<u64>,
         observers: OT,
-    ) -> Result<TinyInstExecutor<'a, S, OT>, Error> {
+    ) -> Result<TinyInstExecutor<'a, S, SP, OT>, Error> {
+        let (map, shmem_id) = match &mut self.shmem_provider {
+            Some(provider) => {
+                // setup shared memory
+                let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
+                // TODO: Replace .cur_input with shmem.id()
+                let shmem_id = shmem.id();
+                println!("{:#?}", shmem.id());
+                shmem.write_to_env("__TINY_SHM_FUZZ_ID")?;
+
+                let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
+                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
+
+                (Some(shmem), Some(shmem_id))
+            }
+            None => (None, None),
+        };
+
         let mut has_input = false;
         let program_args: Vec<String> = self
             .program_args
@@ -186,34 +218,22 @@ where
             .map(|arg| {
                 if arg == "@@" {
                     has_input = true;
-                    INPUTFILE_STD.to_string()
+                    match shmem_id {
+                        Some(shmem_name) => shmem_name.to_string(),
+                        None => INPUTFILE_STD.to_string(),
+                    }
                 } else {
                     arg
                 }
             })
             .collect();
+
         if !has_input {
             return Err(Error::unknown(format!("No input file or shmem provided")));
         }
         println!("tinyinst args: {:#?}", &self.tinyinst_args);
 
         let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
-
-        let shmem_id = match &mut self.shmem_provider {
-            Some(provider) => {
-                // setup shared memory
-                let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
-                // TODO: Replace .cur_input with shmem.id()
-                println!("{:#?}", shmem.id());
-                // shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
-
-                let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
-
-                Some(shmem.id())
-            }
-            None => None,
-        };
 
         let tinyinst = unsafe {
             TinyInst::new(
@@ -230,14 +250,15 @@ where
             observers: observers,
             phantom: PhantomData,
             cur_input,
-            shmem_id,
+            map,
         })
     }
 }
 
-impl<'a, S, OT> HasObservers for TinyInstExecutor<'a, S, OT>
+impl<'a, S, SP, OT> HasObservers for TinyInstExecutor<'a, S, SP, OT>
 where
     S: State,
+    SP: ShMemProvider,
     OT: ObserversTuple<S>,
 {
     fn observers(&self) -> &OT {
@@ -248,16 +269,18 @@ where
         &mut self.observers
     }
 }
-impl<'a, S, OT> UsesState for TinyInstExecutor<'a, S, OT>
+impl<'a, S, SP, OT> UsesState for TinyInstExecutor<'a, S, SP, OT>
 where
     S: UsesInput,
+    SP: ShMemProvider,
 {
     type State = S;
 }
-impl<'a, S, OT> UsesObservers for TinyInstExecutor<'a, S, OT>
+impl<'a, S, SP, OT> UsesObservers for TinyInstExecutor<'a, S, SP, OT>
 where
     OT: ObserversTuple<S>,
     S: UsesInput,
+    SP: ShMemProvider,
 {
     type Observers = OT;
 }
