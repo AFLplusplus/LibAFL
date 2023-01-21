@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+#[cfg(target_vendor = "apple")]
+use libafl::bolts::shmem::UnixShMemProvider;
 #[cfg(windows)]
 use libafl::bolts::shmem::Win32ShMemProvider;
 use libafl::{
@@ -23,6 +25,10 @@ use libafl::{
 use libafl_tinyinst::executor::TinyInstExecutorBuilder;
 static mut COVERAGE: Vec<u64> = vec![];
 
+#[cfg(not(any(target_vendor = "apple", windows)))]
+fn main() {}
+
+#[cfg(any(target_vendor = "apple", windows))]
 fn main() {
     // Tinyinst things
     let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
@@ -35,8 +41,12 @@ fn main() {
 
     let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
     let mut feedback = ListFeedback::with_observer(&observer);
-
+    #[cfg(windows)]
     let mut shmem_provider = Win32ShMemProvider::new().unwrap();
+
+    #[cfg(target_vendor = "apple")]
+    let mut shmem_provider = UnixShMemProvider::new().unwrap();
+
     let input = BytesInput::new(b"bad".to_vec());
     let rand = StdRand::new();
     let mut corpus = CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap();
