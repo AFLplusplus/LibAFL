@@ -1,10 +1,12 @@
 use core::marker::PhantomData;
 use std::time::Duration;
 
+use libafl::bolts::shmem::StdShMemProvider;
+
 use libafl::{
     bolts::{
         fs::{InputFile, INPUTFILE_STD},
-        shmem::{ShMem, ShMemId, ShMemProvider},
+        shmem::{ShMem, ShMemProvider},
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
@@ -15,6 +17,7 @@ use libafl::{
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
 
+/// Tinyinst executor
 pub struct TinyInstExecutor<'a, S, SP, OT>
 where
     SP: ShMemProvider,
@@ -58,7 +61,6 @@ where
         match &self.map {
             Some(_) => {
                 // use shmem to pass testcase
-                // TODO: write bytes into the shmem map
                 let shmem = unsafe { self.map.as_mut().unwrap_unchecked() };
                 let target_bytes = input.target_bytes();
                 let size = target_bytes.as_slice().len();
@@ -92,6 +94,7 @@ where
     }
 }
 
+/// Builder for `TinyInstExecutor`
 #[derive(Debug)]
 pub struct TinyInstExecutorBuilder<'a, SP> {
     tinyinst_args: Vec<String>,
@@ -103,21 +106,18 @@ pub struct TinyInstExecutorBuilder<'a, SP> {
 const MAX_FILE: usize = 1024 * 1024;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 
-impl<'a, SP> Default for TinyInstExecutorBuilder<'a, SP>
-where
-    SP: ShMemProvider,
+impl<'a> Default for TinyInstExecutorBuilder<'a, StdShMemProvider>
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
-where
-    SP: ShMemProvider,
+impl<'a> TinyInstExecutorBuilder<'a, StdShMemProvider>
 {
+    /// Constructor
     #[must_use]
-    pub fn new() -> TinyInstExecutorBuilder<'a, SP> {
+    pub fn new() -> TinyInstExecutorBuilder<'a, StdShMemProvider> {
         Self {
             tinyinst_args: vec![],
             program_args: vec![],
@@ -126,12 +126,14 @@ where
         }
     }
 
+    /// Argument for tinyinst instrumentation
     #[must_use]
     pub fn tinyinst_arg(mut self, arg: String) -> Self {
         self.tinyinst_args.push(arg);
         self
     }
 
+    /// Arguments for tinyinst instrumentation
     #[must_use]
     pub fn tinyinst_args(mut self, args: Vec<String>) -> Self {
         for arg in args {
@@ -140,6 +142,7 @@ where
         self
     }
 
+    /// The module to instrument.
     #[must_use]
     pub fn instrument_module(mut self, module: Vec<String>) -> Self {
         for modname in module {
@@ -149,6 +152,7 @@ where
         self
     }
 
+    /// Use shmem
     #[must_use]
     pub fn use_shmem(mut self) -> Self {
         self.tinyinst_args.push("-delivery".to_string());
@@ -156,6 +160,7 @@ where
         self
     }
 
+    /// Persistent mode
     #[must_use]
     pub fn persistent(
         mut self,
@@ -181,12 +186,14 @@ where
         self
     }
 
+    /// Program arg
     #[must_use]
     pub fn program_arg(mut self, arg: String) -> Self {
         self.program_args.push(arg);
         self
     }
 
+    /// Program args
     #[must_use]
     pub fn program_args(mut self, args: Vec<String>) -> Self {
         for arg in args {
@@ -195,18 +202,30 @@ where
         self
     }
 
+    /// Set timeout
     #[must_use]
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
+    /// Use this to enable shmem testcase passing.
     #[must_use]
-    pub fn shmem_provider(mut self, shmem_provider: &'a mut SP) -> Self {
-        self.shmem_provider = Some(shmem_provider);
-        self
+    pub fn shmem_provider<SP: ShMemProvider>(self, shmem_provider: &'a mut SP) -> TinyInstExecutorBuilder<'a, SP> {
+        TinyInstExecutorBuilder {
+            tinyinst_args: self.tinyinst_args,
+            program_args: self.program_args,
+            timeout: self.timeout,
+            shmem_provider: Some(shmem_provider)
+        }
     }
+}
 
+impl<'a, SP> TinyInstExecutorBuilder<'a, SP> 
+where
+    SP: ShMemProvider,
+{
+    /// Build tinyinst executor
     pub fn build<OT, S>(
         &mut self,
         coverage: &'a mut Vec<u64>,
@@ -216,7 +235,6 @@ where
             Some(provider) => {
                 // setup shared memory
                 let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
-                // TODO: Replace .cur_input with shmem.id()
                 let shmem_id = shmem.id();
                 println!("{:#?}", shmem.id());
                 shmem.write_to_env("__TINY_SHM_FUZZ_ID")?;
@@ -275,6 +293,7 @@ where
         })
     }
 }
+
 
 impl<'a, S, SP, OT> HasObservers for TinyInstExecutor<'a, S, SP, OT>
 where

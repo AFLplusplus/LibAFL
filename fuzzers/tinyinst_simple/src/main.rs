@@ -1,11 +1,13 @@
 use std::path::PathBuf;
 
+#[cfg(target_vendor = "apple")]
+use libafl::bolts::shmem::UnixShMemProvider;
 #[cfg(windows)]
 use libafl::bolts::shmem::Win32ShMemProvider;
 use libafl::{
     bolts::{
         rands::{RandomSeed, StdRand},
-        shmem::{ShMem, ShMemProvider},
+        shmem::ShMemProvider,
         tuples::tuple_list,
     },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
@@ -36,7 +38,12 @@ fn main() {
     let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
     let mut feedback = ListFeedback::with_observer(&observer);
 
+    #[cfg(windows)]
     let mut shmem_provider = Win32ShMemProvider::new().unwrap();
+
+    #[cfg(target_vendor = "apple")]
+    let mut shmem_provider = UnixShMemProvider::new().unwrap();
+
     let input = BytesInput::new(b"bad".to_vec());
     let rand = StdRand::new();
     let mut corpus = CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap();
@@ -58,6 +65,7 @@ fn main() {
             .tinyinst_args(tinyinst_args)
             .program_args(args)
             .shmem_provider(&mut shmem_provider)
+            .use_shmem()
             .persistent("test.exe".to_string(), "fuzz".to_string(), 1, 10000)
             .timeout(std::time::Duration::new(5, 0))
             .build(&mut COVERAGE, tuple_list!(observer))
