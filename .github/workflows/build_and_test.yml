@@ -255,6 +255,8 @@ jobs:
     - name: install cargo-make
       run: cargo install --force cargo-make
     - uses: ilammy/msvc-dev-cmd@v1
+    - name: install cxx bridge
+      run: cargo add cxxbridge-cmd
     - name: Build fuzzers/frida_libpng
       run: cd fuzzers/frida_libpng/ && cargo make test
     - name: Build fuzzers/frida_gdiplus

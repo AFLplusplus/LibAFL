@@ -25,7 +25,12 @@ fn main() {
     // Tinyinst things
     let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
 
+    // use shmem to pass testcases
     let args = vec!["test.exe".to_string(), "-m".to_string(), "@@".to_string()];
+
+    // use file to pass testcases
+    // let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
+
 
     let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
     let mut feedback = ListFeedback::with_observer(&observer);
