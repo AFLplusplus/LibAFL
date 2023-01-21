@@ -194,7 +194,7 @@ where
         }
         self
     }
-    
+
     #[must_use]
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
@@ -248,7 +248,9 @@ where
             .collect();
 
         if !has_input {
-            return Err(Error::unknown("No input file or shmem provided".to_string()));
+            return Err(Error::unknown(
+                "No input file or shmem provided".to_string(),
+            ));
         }
         println!("tinyinst args: {:#?}", &self.tinyinst_args);
 
