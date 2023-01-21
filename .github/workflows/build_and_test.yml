@@ -259,6 +259,8 @@ jobs:
       run: cd fuzzers/frida_libpng/ && cargo make test
     - name: Build fuzzers/frida_gdiplus
       run: cd fuzzers/frida_gdiplus/ && cargo make test
+    - name: Build fuzzers/tinyinst_simple
+      run: cd fuzzers/tinyinst_simple/ && cargo make test
       
   macos:
     runs-on: macOS-latest
