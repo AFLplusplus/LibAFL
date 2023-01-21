@@ -1,9 +1,34 @@
-[tasks.build_test]
+[tasks.unsupported]
+script_runner="@shell"
+script='''
+echo "Cargo-make not integrated yet on this"
+'''
+
+# Harness
+[tasks.harness]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "harness_windows"
+
+[tasks.harness_windows]
 script='''
 cl test\test.cpp -o test.exe
 '''
 
+# Run the fuzzer
 [tasks.run]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "run_windows"
+
+[tasks.run_windows]
 dependencies = ["build_test"]
 command = "cargo"
 args = ["run", "--release"]
+
+
+# Run the fuzzer
+[tasks.test]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
