@@ -236,8 +236,8 @@ where
                 // setup shared memory
                 let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
                 let shmem_id = shmem.id();
-                println!("{:#?}", shmem.id());
-                shmem.write_to_env("__TINY_SHM_FUZZ_ID")?;
+                // println!("{:#?}", shmem.id());
+                // shmem.write_to_env("__TINY_SHM_FUZZ_ID")?;
 
                 let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
                 shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
