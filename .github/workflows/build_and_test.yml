@@ -173,7 +173,7 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Add no_std toolchain
       run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-    - name: Install python
+    - name: Install python (macOS)
       # Removing macOS things already installed in CI against failed linking
       if: runner.os == 'macOS'
       run: rm /usr/local/bin/2to3* /usr/local/bin/idle3* /usr/local/bin/pydoc3* /usr/local/bin/python3*; brew install --force-bottle --overwrite python
@@ -184,7 +184,7 @@ jobs:
         # update bash for macos to support `declare -A` command`
         macos: llvm libpng nasm coreutils z3 bash wget
     - name: pip install
-      run: python3 -m pip install msgpack jinja2
+      run: python3 -m pip install msgpack jinja2 find_libpython
     # Note that nproc needs to have coreutils installed on macOS, so the order of CI commands matters.
     - name: enable mult-thread for `make`
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
