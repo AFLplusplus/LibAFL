@@ -103,10 +103,20 @@ pub struct TinyInstExecutorBuilder<'a, SP> {
 const MAX_FILE: usize = 1024 * 1024;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 
+impl<'a, SP> Default for TinyInstExecutorBuilder<'a, SP>
+where
+    SP: ShMemProvider,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
 where
     SP: ShMemProvider,
 {
+    #[must_use]
     pub fn new() -> TinyInstExecutorBuilder<'a, SP> {
         Self {
             tinyinst_args: vec![],
@@ -116,11 +126,13 @@ where
         }
     }
 
+    #[must_use]
     pub fn tinyinst_arg(mut self, arg: String) -> Self {
         self.tinyinst_args.push(arg);
         self
     }
 
+    #[must_use]
     pub fn tinyinst_args(mut self, args: Vec<String>) -> Self {
         for arg in args {
             self.tinyinst_args.push(arg);
@@ -128,20 +140,23 @@ where
         self
     }
 
+    #[must_use]
     pub fn instrument_module(mut self, module: Vec<String>) -> Self {
         for modname in module {
             self.tinyinst_args.push("-instrument_module".to_string());
-            self.tinyinst_args.push(modname)
+            self.tinyinst_args.push(modname);
         }
         self
     }
 
+    #[must_use]
     pub fn use_shmem(mut self) -> Self {
         self.tinyinst_args.push("-delivery".to_string());
         self.tinyinst_args.push("shmem".to_string());
         self
     }
 
+    #[must_use]
     pub fn persistent(
         mut self,
         target_module: String,
@@ -166,23 +181,27 @@ where
         self
     }
 
+    #[must_use]
     pub fn program_arg(mut self, arg: String) -> Self {
         self.program_args.push(arg);
         self
     }
 
+    #[must_use]
     pub fn program_args(mut self, args: Vec<String>) -> Self {
         for arg in args {
             self.program_args.push(arg);
         }
         self
     }
-
+    
+    #[must_use]
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
+    #[must_use]
     pub fn shmem_provider(mut self, shmem_provider: &'a mut SP) -> Self {
         self.shmem_provider = Some(shmem_provider);
         self
@@ -229,7 +248,7 @@ where
             .collect();
 
         if !has_input {
-            return Err(Error::unknown(format!("No input file or shmem provided")));
+            return Err(Error::unknown("No input file or shmem provided".to_string()));
         }
         println!("tinyinst args: {:#?}", &self.tinyinst_args);
 
@@ -244,10 +263,10 @@ where
         };
 
         Ok(TinyInstExecutor {
-            tinyinst: tinyinst,
-            coverage: coverage,
+            tinyinst,
+            coverage,
             timeout: self.timeout,
-            observers: observers,
+            observers,
             phantom: PhantomData,
             cur_input,
             map,
