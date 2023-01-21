@@ -25,9 +25,9 @@ limitations under the License.
 // shared memory stuff
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#include <windows.h>
+  #include <windows.h>
 #else
-#include <sys/mman.h>
+  #include <sys/mman.h>
 #endif
 
 #define MAX_SAMPLE_SIZE 1000000
@@ -38,24 +38,22 @@ bool use_shared_memory;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 
-int setup_shmem(const char* name) {
+int setup_shmem(const char *name) {
   HANDLE map_file;
 
-  map_file = OpenFileMapping(
-    FILE_MAP_ALL_ACCESS,   // read/write access
-    FALSE,                 // do not inherit the name
-    name);            // name of mapping object
+  map_file = OpenFileMapping(FILE_MAP_ALL_ACCESS,  // read/write access
+                             FALSE,                // do not inherit the name
+                             name);                // name of mapping object
 
   if (map_file == NULL) {
     printf("Error accessing shared memory\n");
     return 0;
   }
 
-  shm_data = (unsigned char*)MapViewOfFile(map_file, // handle to map object
-    FILE_MAP_ALL_ACCESS,  // read/write permission
-    0,
-    0,
-    SHM_SIZE);
+  shm_data = (unsigned char *)MapViewOfFile(
+      map_file,             // handle to map object
+      FILE_MAP_ALL_ACCESS,  // read/write permission
+      0, 0, SHM_SIZE);
 
   if (shm_data == NULL) {
     printf("Error accessing shared memory\n");
@@ -67,22 +65,20 @@ int setup_shmem(const char* name) {
 
 #else
 
-int setup_shmem(const char *name)
-{
+int setup_shmem(const char *name) {
   int fd;
 
   // get shared memory file descriptor (NOT a file)
   fd = shm_open(name, O_RDONLY, S_IRUSR | S_IWUSR);
-  if (fd == -1)
-  {
+  if (fd == -1) {
     printf("Error in shm_open\n");
     return 0;
   }
 
   // map shared memory to process address space
-  shm_data = (unsigned char *)mmap(NULL, SHM_SIZE, PROT_READ, MAP_SHARED, fd, 0);
-  if (shm_data == MAP_FAILED)
-  {
+  shm_data =
+      (unsigned char *)mmap(NULL, SHM_SIZE, PROT_READ, MAP_SHARED, fd, 0);
+  if (shm_data == MAP_FAILED) {
     printf("Error in mmap\n");
     return 0;
   }
@@ -98,27 +94,27 @@ char *crash = NULL;
 // ensure we can find the target
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#define FUZZ_TARGET_MODIFIERS __declspec(dllexport)
+  #define FUZZ_TARGET_MODIFIERS __declspec(dllexport)
 #else
-#define FUZZ_TARGET_MODIFIERS __attribute__ ((noinline))
+  #define FUZZ_TARGET_MODIFIERS __attribute__((noinline))
 #endif
 
 // actual target function
 
 void FUZZ_TARGET_MODIFIERS fuzz(char *name) {
-  char *sample_bytes = NULL;
+  char    *sample_bytes = NULL;
   uint32_t sample_size = 0;
-  
+
   // read the sample either from file or
   // shared memory
-  if(use_shared_memory) {
+  if (use_shared_memory) {
     sample_size = *(uint32_t *)(shm_data);
-    if(sample_size > MAX_SAMPLE_SIZE) sample_size = MAX_SAMPLE_SIZE;
+    if (sample_size > MAX_SAMPLE_SIZE) sample_size = MAX_SAMPLE_SIZE;
     sample_bytes = (char *)malloc(sample_size);
     memcpy(sample_bytes, shm_data + sizeof(uint32_t), sample_size);
   } else {
     FILE *fp = fopen(name, "rb");
-    if(!fp) {
+    if (!fp) {
       printf("Error opening %s a\n", name);
       return;
     }
@@ -130,26 +126,25 @@ void FUZZ_TARGET_MODIFIERS fuzz(char *name) {
     fclose(fp);
   }
   // printf("sample_bytes: %s", sample_bytes);
-  if(sample_size >= 4) {
+  if (sample_size >= 4) {
     // check if the sample spells "test"
-    if(*(uint32_t *)(sample_bytes) == 0x74736574) {
+    if (*(uint32_t *)(sample_bytes) == 0x74736574) {
       // if so, crash
       crash[0] = 1;
     }
   }
-  
-  if(sample_bytes) free(sample_bytes);
+
+  if (sample_bytes) free(sample_bytes);
 }
 
-int main(int argc, char **argv)
-{
-  if(argc != 3) {
+int main(int argc, char **argv) {
+  if (argc != 3) {
     printf("Usage: %s <-f|-m> <file or shared memory name>\n", argv[0]);
     return 0;
   }
-  if(!strcmp(argv[1], "-m")) {
+  if (!strcmp(argv[1], "-m")) {
     use_shared_memory = true;
-  } else if(!strcmp(argv[1], "-f")) {
+  } else if (!strcmp(argv[1], "-f")) {
     use_shared_memory = false;
   } else {
     printf("Usage: %s <-f|-m> <file or shared memory name>\n", argv[0]);
@@ -158,13 +153,11 @@ int main(int argc, char **argv)
 
   // map shared memory here as we don't want to do it
   // for every operation
-  if(use_shared_memory) {
-    if(!setup_shmem(argv[2])) {
-      printf("Error mapping shared memory\n");
-    }
+  if (use_shared_memory) {
+    if (!setup_shmem(argv[2])) { printf("Error mapping shared memory\n"); }
   }
 
   fuzz(argv[2]);
-  
+
   return 0;
 }
