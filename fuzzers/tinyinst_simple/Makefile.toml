@@ -15,6 +15,17 @@ script='''
 cl test\test.cpp -o test.exe
 '''
 
+# Fuzzer
+[tasks.fuzzer]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "fuzzer_windows"
+
+[tasks.fuzzer_windows]
+dependencies = ["harness"]
+command = "cargo"
+args = ["build", "--release"]
+
 # Run the fuzzer
 [tasks.run]
 linux_alias = "unsupported"
@@ -22,7 +33,7 @@ mac_alias = "unsupported"
 windows_alias = "run_windows"
 
 [tasks.run_windows]
-dependencies = ["build_test"]
+dependencies = ["harness", "fuzzer"]
 command = "cargo"
 args = ["run", "--release"]
 
@@ -31,4 +42,15 @@ args = ["run", "--release"]
 [tasks.test]
 linux_alias = "unsupported"
 mac_alias = "unsupported"
-windows_alias = "unsupported"
+windows_alias = "test_windows"
+
+[tasks.test_windows]
+script_runner = "@shell"
+script='''
+copy .\target\release\tinyinst_simple.exe .
+start "" "tinyinst_simple.exe"
+#ping is for timeout
+ping -n 10 127.0.0.1>NUL && taskkill /im tinyinst_simple.exe /F
+>nul 2>nul dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
+'''
+dependencies = [ "harness" ]
