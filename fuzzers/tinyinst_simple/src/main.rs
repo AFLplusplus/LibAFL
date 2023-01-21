@@ -25,6 +25,10 @@ use libafl::{
 use libafl_tinyinst::executor::TinyInstExecutorBuilder;
 static mut COVERAGE: Vec<u64> = vec![];
 
+#[cfg(not(any(target_vendor = "apple", windows)))]
+fn main() {}
+
+#[cfg(any(target_vendor = "apple", windows))]
 fn main() {
     // Tinyinst things
     let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
@@ -37,7 +41,6 @@ fn main() {
 
     let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
     let mut feedback = ListFeedback::with_observer(&observer);
-
     #[cfg(windows)]
     let mut shmem_provider = Win32ShMemProvider::new().unwrap();
 
