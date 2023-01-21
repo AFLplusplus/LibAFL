@@ -19,6 +19,11 @@ typedef long double max_align_t;
   #define HAVE_VECTOR_INTRINSICS 1
 #endif
 
+#if LLVM_VERSION_MAJOR >= 16
+  #include <optional>
+constexpr std::nullopt_t None = std::nullopt;
+#endif
+
 #ifdef USE_NEW_PM
   #include "llvm/Passes/PassPlugin.h"
   #include "llvm/Passes/PassBuilder.h"
