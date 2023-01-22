@@ -104,7 +104,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
                 if prev_len > 1 && len > 1 {
                     let mut r: u32;
                     loop {
-                        r = self.rand.below(self.next_id as u64) as u32;
+                        r = self.rand.below(u64::from(self.next_id)) as u32;
                         if r < self.max_whitespace_id {
                             break;
                         }
@@ -147,7 +147,7 @@ impl TokenInputEncoderDecoder {
             rand: StdRand::new(),
         }
     }
-    pub fn set_encoding_type(&mut self, enc_type: TokenizationKind) {
+    pub fn set_encoding_type(&mut self, enc_type: TokenizationKind) -> Result<(), Error> {
         // This can only be set until the first tokenization has occured!
         if self.next_id == 0 {
             if enc_type == TokenizationKind::WithWhitespace {
@@ -209,8 +209,11 @@ impl TokenInputEncoderDecoder {
             }
             self.encoding_type = enc_type;
         } else {
-            // TODO: this needs an else that errors
+            return Err(Error::illegal_state(format!(
+                "An input was already encoded, set_encoding_type() must be called prior!"
+            )));
         }
+        Ok(())
     }
 }
 
@@ -279,7 +282,7 @@ impl Tokenizer for NaiveTokenizer {
                     for ident_match in self.ident_re.find_iter(&substring) {
                         if ident_match.start() > ident_prev {
                             for cnt in ident_prev..ident_match.start() {
-                                tokens.push(substring[cnt..cnt].to_owned());
+                                tokens.push(substring[cnt..cnt + 1].to_owned());
                             }
                         }
                         tokens.push(substring[ident_match.start()..ident_match.end()].to_owned());
@@ -287,7 +290,7 @@ impl Tokenizer for NaiveTokenizer {
                     }
                     if ident_prev < substring.len() {
                         for cnt in ident_prev..substring.len() {
-                            tokens.push(substring[cnt..cnt].to_owned());
+                            tokens.push(substring[cnt..cnt + 1].to_owned());
                         }
                     }
                 } else {
@@ -296,7 +299,7 @@ impl Tokenizer for NaiveTokenizer {
                         for ident_match in self.ident_re.find_iter(ws_tok) {
                             if ident_match.start() > ident_prev {
                                 for cnt in ident_prev..ident_match.start() {
-                                    tokens.push(ws_tok[cnt..cnt].to_owned());
+                                    tokens.push(ws_tok[cnt..cnt + 1].to_owned());
                                 }
                             }
                             tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
@@ -304,7 +307,7 @@ impl Tokenizer for NaiveTokenizer {
                         }
                         if ident_prev < ws_tok.len() {
                             for cnt in ident_prev..ws_tok.len() {
-                                tokens.push(ws_tok[cnt..cnt].to_owned());
+                                tokens.push(ws_tok[cnt..cnt + 1].to_owned());
                             }
                         }
                     }
@@ -320,7 +323,7 @@ impl Tokenizer for NaiveTokenizer {
                 for ident_match in self.ident_re.find_iter(&substring) {
                     if ident_match.start() > ident_prev {
                         for cnt in ident_prev..ident_match.start() {
-                            tokens.push(substring[cnt..cnt].to_owned());
+                            tokens.push(substring[cnt..cnt + 1].to_owned());
                         }
                     }
                     tokens.push(substring[ident_match.start()..ident_match.end()].to_owned());
@@ -328,7 +331,7 @@ impl Tokenizer for NaiveTokenizer {
                 }
                 if ident_prev < substring.len() {
                     for cnt in ident_prev..substring.len() {
-                        tokens.push(substring[cnt..cnt].to_owned());
+                        tokens.push(substring[cnt..cnt + 1].to_owned());
                     }
                 }
             } else {
@@ -337,7 +340,7 @@ impl Tokenizer for NaiveTokenizer {
                     for ident_match in self.ident_re.find_iter(ws_tok) {
                         if ident_match.start() > ident_prev {
                             for cnt in ident_prev..ident_match.start() {
-                                tokens.push(ws_tok[cnt..cnt].to_owned());
+                                tokens.push(ws_tok[cnt..cnt + 1].to_owned());
                             }
                         }
                         tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
@@ -345,7 +348,7 @@ impl Tokenizer for NaiveTokenizer {
                     }
                     if ident_prev < ws_tok.len() {
                         for cnt in ident_prev..ws_tok.len() {
-                            tokens.push(ws_tok[cnt..cnt].to_owned());
+                            tokens.push(ws_tok[cnt..cnt + 1].to_owned());
                         }
                     }
                 }
@@ -425,25 +428,30 @@ impl EncodedInput {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
-    use alloc::borrow::ToOwned;
     use core::str::from_utf8;
 
     use crate::inputs::encoded::{
-        InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder,
+        InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder, TokenizationKind,
     };
 
     #[test]
     fn test_input() {
+        let string = "/* test */a = 'pippo baudo'; b=c+a\n";
+        let verify1 = "a = 'pippo baudo' ; b = c + a ";
+        let verify2 = "a = 'pippo baudo'; b=c+a\n";
         let mut t = NaiveTokenizer::default();
         let mut ed = TokenInputEncoderDecoder::new();
-        let input = ed
-            .encode("/* test */a = 'pippo baudo'; b=c+a\n".as_bytes(), &mut t)
-            .unwrap();
+        let mut input = ed.encode(string.clone().as_bytes(), &mut t).unwrap();
         let mut bytes = vec![];
         ed.decode(&input, &mut bytes).unwrap();
-        assert_eq!(
-            from_utf8(&bytes).unwrap(),
-            "a = 'pippo baudo' ; b = c + a ".to_owned()
-        );
+        assert_eq!(from_utf8(&bytes).unwrap(), verify1);
+        t = NaiveTokenizer::default();
+        ed = TokenInputEncoderDecoder::new();
+        ed.set_encoding_type(TokenizationKind::WithWhitespace)
+            .unwrap();
+        input = ed.encode(string.clone().as_bytes(), &mut t).unwrap();
+        bytes = vec![];
+        ed.decode(&input, &mut bytes).unwrap();
+        assert_eq!(from_utf8(&bytes).unwrap(), verify2);
     }
 }
