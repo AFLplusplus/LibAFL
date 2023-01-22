@@ -173,6 +173,9 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Add no_std toolchain
       run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+    - name: Install cxxbridge
+      if: runner.os == 'macOS'
+      run: cargo install cxxbridge-cmd
     - name: Install python (macOS)
       # Removing macOS things already installed in CI against failed linking
       if: runner.os == 'macOS'
@@ -275,6 +278,8 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: brew install z3 gtk+3
+    - name: Install cxxbridge
+      run: cargo install cxxbrdige-cmd
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: MacOS Build
