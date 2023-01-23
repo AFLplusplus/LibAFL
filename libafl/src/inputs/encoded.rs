@@ -281,8 +281,22 @@ impl Tokenizer for NaiveTokenizer {
                     let substring = string[str_prev..str_match.start()].to_owned();
                     for ident_match in self.ident_re.find_iter(&substring) {
                         if ident_match.start() > ident_prev {
+                            let mut ws_start = 0;
                             for cnt in ident_prev..ident_match.start() {
-                                tokens.push(substring[cnt..cnt + 1].to_owned());
+                                if substring.chars().nth(cnt).unwrap().is_whitespace() {
+                                    if ws_start == 0 {
+                                        ws_start = cnt;
+                                    }
+                                } else {
+                                    if ws_start > 0 {
+                                        tokens.push(substring[ws_start..cnt].to_owned());
+                                        ws_start = 0;
+                                    }
+                                    tokens.push(substring[cnt..cnt + 1].to_owned());
+                                }
+                            }
+                            if ws_start > 0 {
+                                tokens.push(substring[ws_start..ident_match.start()].to_owned());
                             }
                         }
                         tokens.push(substring[ident_match.start()..ident_match.end()].to_owned());
@@ -294,6 +308,7 @@ impl Tokenizer for NaiveTokenizer {
                         }
                     }
                 } else {
+                    // it is better to use .split(' \t') to keep EOLs, but it is currently unstable
                     for ws_tok in string[str_prev..str_match.start()].split_whitespace() {
                         let mut ident_prev = 0;
                         for ident_match in self.ident_re.find_iter(ws_tok) {
@@ -322,8 +337,22 @@ impl Tokenizer for NaiveTokenizer {
                 let substring = string[str_prev..].to_owned();
                 for ident_match in self.ident_re.find_iter(&substring) {
                     if ident_match.start() > ident_prev {
+                        let mut ws_start = 0;
                         for cnt in ident_prev..ident_match.start() {
-                            tokens.push(substring[cnt..cnt + 1].to_owned());
+                            if substring.chars().nth(cnt).unwrap().is_whitespace() {
+                                if ws_start == 0 {
+                                    ws_start = cnt;
+                                }
+                            } else {
+                                if ws_start > 0 {
+                                    tokens.push(substring[ws_start..cnt].to_owned());
+                                    ws_start = 0;
+                                }
+                                tokens.push(substring[cnt..cnt + 1].to_owned());
+                            }
+                        }
+                        if ws_start > 0 {
+                            tokens.push(substring[ws_start..ident_match.start()].to_owned());
                         }
                     }
                     tokens.push(substring[ident_match.start()..ident_match.end()].to_owned());
@@ -335,6 +364,7 @@ impl Tokenizer for NaiveTokenizer {
                     }
                 }
             } else {
+                // it is better to use .split(' \t') to keep EOLs, but it is currently unstable
                 for ws_tok in string[str_prev..].split_whitespace() {
                     let mut ident_prev = 0;
                     for ident_match in self.ident_re.find_iter(ws_tok) {
@@ -436,9 +466,9 @@ mod tests {
 
     #[test]
     fn test_input() {
-        let string = "/* test */a = 'pippo baudo'; b=c+a\n";
+        let string = "/* test */a = 'pippo baudo';   b=c+a\n";
         let verify1 = "a = 'pippo baudo' ; b = c + a ";
-        let verify2 = "a = 'pippo baudo'; b=c+a\n";
+        let verify2 = "a = 'pippo baudo';   b=c+a\n";
         let mut t = NaiveTokenizer::default();
         let mut ed = TokenInputEncoderDecoder::new();
         let mut input = ed.encode(string.clone().as_bytes(), &mut t).unwrap();
@@ -451,7 +481,21 @@ mod tests {
             .unwrap();
         input = ed.encode(string.clone().as_bytes(), &mut t).unwrap();
         bytes = vec![];
+        /*
+        for i in 0..input.codes.len() {
+          println!("Code {i}: {:?}", input.codes[i]);
+        }
+        */
         ed.decode(&input, &mut bytes).unwrap();
         assert_eq!(from_utf8(&bytes).unwrap(), verify2);
+        /*
+        for id in 0..ed.next_id {
+            let tok = ed
+                .id_table
+                .get(&(id % ed.next_id));
+            assert_eq!(from_utf8(&bytes).unwrap(), verify2);
+            println!("Token {id}: {:?}", tok.unwrap());
+        }
+        */
     }
 }
