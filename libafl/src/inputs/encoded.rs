@@ -288,7 +288,7 @@ impl Tokenizer for NaiveTokenizer {
                         if ident_match.start() > ident_prev {
                             let mut ws_start = 0;
                             for cnt in ident_prev..ident_match.start() {
-                                if substring.chars().nth(cnt).unwrap().is_whitespace() {
+                                if substring.chars().nth(cnt).unwrap_or('x').is_whitespace() {
                                     if ws_start == 0 {
                                         ws_start = cnt;
                                     }
@@ -344,7 +344,7 @@ impl Tokenizer for NaiveTokenizer {
                     if ident_match.start() > ident_prev {
                         let mut ws_start = 0;
                         for cnt in ident_prev..ident_match.start() {
-                            if substring.chars().nth(cnt).unwrap().is_whitespace() {
+                            if substring.chars().nth(cnt).unwrap_or('x').is_whitespace() {
                                 if ws_start == 0 {
                                     ws_start = cnt;
                                 }
