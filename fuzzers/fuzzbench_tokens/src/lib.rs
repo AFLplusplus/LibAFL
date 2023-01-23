@@ -42,6 +42,7 @@ use libafl::{
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
+    Evaluator,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
@@ -319,7 +320,7 @@ fn fuzz(
             let input = encoder_decoder
                 .encode(&buffer, &mut tokenizer)
                 .expect("encoding failed");
-            corpus.push(input);
+            initial_inputs.push(input);
         }
     }
 
@@ -363,6 +364,13 @@ fn fuzz(
         if !toks.is_empty() {
             state.add_metadata(toks);
         }
+    }
+
+
+    for input in initial_inputs {
+        fuzzer
+            .evaluate_input(&mut state, &mut executor, &mut mgr, input)
+            .unwrap();
     }
 
     // In case the corpus is empty (on first run), reset
