@@ -26,7 +26,7 @@ use crate::{
 /// ([`Debug`] is currently used for dev purposes, symbols hash will be used eventually)
 #[must_use]
 pub fn collect_backtrace() -> u64 {
-    let b = Backtrace::new();
+    let b = Backtrace::new_unresolved();
     if b.frames().is_empty() {
         return 0;
     }

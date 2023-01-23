@@ -47,7 +47,7 @@ use crate::{
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, UsesInput},
+    inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
@@ -1055,6 +1055,352 @@ where
         */
 
         Ok((state, mgr))
+    }
+}
+
+/// A manager-like llmp client that converts between input types
+pub struct LlmpEventConverter<IC, ICB, DI, S, SP>
+where
+    S: UsesInput,
+    SP: ShMemProvider + 'static,
+    IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
+    DI: Input,
+{
+    llmp: LlmpClient<SP>,
+    /// The custom buf handler
+    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
+    #[cfg(feature = "llmp_compression")]
+    compressor: GzipCompressor,
+    converter: Option<IC>,
+    converter_back: Option<ICB>,
+    phantom: PhantomData<S>,
+}
+
+impl<IC, ICB, DI, S, SP> core::fmt::Debug for LlmpEventConverter<IC, ICB, DI, S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+    IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
+    DI: Input,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut debug_struct = f.debug_struct("LlmpEventConverter");
+        let debug = debug_struct.field("llmp", &self.llmp);
+        //.field("custom_buf_handlers", &self.custom_buf_handlers)
+        #[cfg(feature = "llmp_compression")]
+        let debug = debug.field("compressor", &self.compressor);
+        debug
+            .field("converter", &self.converter)
+            .field("converter_back", &self.converter_back)
+            .field("phantom", &self.phantom)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<IC, ICB, DI, S, SP> LlmpEventConverter<IC, ICB, DI, S, SP>
+where
+    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    SP: ShMemProvider + 'static,
+    IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
+    DI: Input,
+{
+    /// Create a client from a raw llmp client
+    pub fn new(
+        llmp: LlmpClient<SP>,
+        converter: Option<IC>,
+        converter_back: Option<ICB>,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            llmp,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            converter,
+            converter_back,
+            phantom: PhantomData,
+            custom_buf_handlers: vec![],
+        })
+    }
+
+    /// Create a client from port and the input converters
+    #[cfg(feature = "std")]
+    pub fn new_on_port(
+        shmem_provider: SP,
+        port: u16,
+        converter: Option<IC>,
+        converter_back: Option<ICB>,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            llmp: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            converter,
+            converter_back,
+            phantom: PhantomData,
+            custom_buf_handlers: vec![],
+        })
+    }
+
+    /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].
+    #[cfg(feature = "std")]
+    pub fn existing_client_from_env(
+        shmem_provider: SP,
+        env_name: &str,
+        converter: Option<IC>,
+        converter_back: Option<ICB>,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            llmp: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            phantom: PhantomData,
+            converter,
+            converter_back,
+            custom_buf_handlers: vec![],
+        })
+    }
+
+    // TODO other new_* routines
+
+    /// Check if it can convert the input
+    pub fn can_convert(&self) -> bool {
+        self.converter.is_some()
+    }
+
+    /// Check if it can convert the input back
+    pub fn can_convert_back(&self) -> bool {
+        self.converter_back.is_some()
+    }
+
+    /// Describe the client event mgr's llmp parts in a restorable fashion
+    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
+        self.llmp.describe()
+    }
+
+    /// Write the config for a client [`EventManager`] to env vars, a new client can reattach using [`LlmpEventConverter::existing_client_from_env()`].
+    #[cfg(feature = "std")]
+    pub fn to_env(&self, env_name: &str) {
+        self.llmp.to_env(env_name).unwrap();
+    }
+
+    // Handle arriving events in the client
+    fn handle_in_client<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+        _client_id: u32,
+        event: Event<DI>,
+    ) -> Result<(), Error>
+    where
+        E: Executor<EM, Z> + HasObservers<State = S>,
+        EM: UsesState<State = S> + EventFirer,
+        for<'a> E::Observers: Deserialize<'a>,
+        Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
+    {
+        match event {
+            Event::NewTestcase {
+                input,
+                client_config: _,
+                exit_kind: _,
+                corpus_size: _,
+                observers_buf: _, // Useless as we are converting between types
+                time: _,
+                executions: _,
+            } => {
+                #[cfg(feature = "std")]
+                println!("Received new Testcase to convert from {_client_id}");
+
+                let Some(converter) = self.converter_back.as_mut() else {
+                    return Ok(());
+                };
+
+                let _res = fuzzer.evaluate_input_with_observers::<E, EM>(
+                    state,
+                    executor,
+                    manager,
+                    converter.convert(input)?,
+                    false,
+                )?;
+                #[cfg(feature = "std")]
+                if let Some(item) = _res.1 {
+                    println!("Added received Testcase as item #{item}");
+                }
+                Ok(())
+            }
+            Event::CustomBuf { tag, buf } => {
+                for handler in &mut self.custom_buf_handlers {
+                    if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
+                        break;
+                    }
+                }
+                Ok(())
+            }
+            _ => Err(Error::unknown(format!(
+                "Received illegal message that message should not have arrived: {:?}.",
+                event.name()
+            ))),
+        }
+    }
+
+    /// Handle arriving events in the client
+    #[allow(clippy::unused_self)]
+    pub fn process<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+    ) -> Result<usize, Error>
+    where
+        E: Executor<EM, Z> + HasObservers<State = S>,
+        EM: UsesState<State = S> + EventFirer,
+        for<'a> E::Observers: Deserialize<'a>,
+        Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
+    {
+        // TODO: Get around local event copy by moving handle_in_client
+        let self_id = self.llmp.sender.id;
+        let mut count = 0;
+        while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
+            assert!(
+                tag != _LLMP_TAG_EVENT_TO_BROKER,
+                "EVENT_TO_BROKER parcel should not have arrived in the client!"
+            );
+
+            if client_id == self_id {
+                continue;
+            }
+            #[cfg(not(feature = "llmp_compression"))]
+            let event_bytes = msg;
+            #[cfg(feature = "llmp_compression")]
+            let compressed;
+            #[cfg(feature = "llmp_compression")]
+            let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                compressed = self.compressor.decompress(msg)?;
+                &compressed
+            } else {
+                msg
+            };
+
+            let event: Event<DI> = postcard::from_bytes(event_bytes)?;
+            self.handle_in_client(fuzzer, executor, state, manager, client_id, event)?;
+            count += 1;
+        }
+        Ok(count)
+    }
+}
+
+impl<IC, ICB, DI, S, SP> UsesState for LlmpEventConverter<IC, ICB, DI, S, SP>
+where
+    S: UsesInput,
+    SP: ShMemProvider,
+    IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
+    DI: Input,
+{
+    type State = S;
+}
+
+impl<IC, ICB, DI, S, SP> EventFirer for LlmpEventConverter<IC, ICB, DI, S, SP>
+where
+    S: UsesInput,
+    SP: ShMemProvider,
+    IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
+    DI: Input,
+{
+    #[cfg(feature = "llmp_compression")]
+    fn fire(
+        &mut self,
+        _state: &mut Self::State,
+        event: Event<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
+        if self.converter.is_none() {
+            return Ok(());
+        }
+
+        // Filter out non interestign events and convert `NewTestcase`
+        let converted_event = match event {
+            Event::NewTestcase {
+                input,
+                client_config,
+                exit_kind,
+                corpus_size,
+                observers_buf,
+                time,
+                executions,
+            } => Event::NewTestcase {
+                input: self.converter.as_mut().unwrap().convert(input)?,
+                client_config,
+                exit_kind,
+                corpus_size,
+                observers_buf,
+                time,
+                executions,
+            },
+            Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
+            _ => {
+                return Ok(());
+            }
+        };
+        let serialized = postcard::to_allocvec(&converted_event)?;
+        let flags: Flags = LLMP_FLAG_INITIALIZED;
+
+        match self.compressor.compress(&serialized)? {
+            Some(comp_buf) => {
+                self.llmp.send_buf_with_flags(
+                    LLMP_TAG_EVENT_TO_BOTH,
+                    flags | LLMP_FLAG_COMPRESSED,
+                    &comp_buf,
+                )?;
+            }
+            None => {
+                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "llmp_compression"))]
+    fn fire(
+        &mut self,
+        _state: &mut Self::State,
+        event: Event<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
+        if self.converter.is_none() {
+            return Ok(());
+        }
+
+        // Filter out non interestign events and convert `NewTestcase`
+        let converted_event = match event {
+            Event::NewTestcase {
+                input,
+                client_config,
+                exit_kind,
+                corpus_size,
+                observers_buf,
+                time,
+                executions,
+            } => Event::NewTestcase {
+                input: self.converter.as_mut().unwrap().convert(input)?,
+                client_config,
+                exit_kind,
+                corpus_size,
+                observers_buf,
+                time,
+                executions,
+            },
+            Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
+            _ => {
+                return Ok(());
+            }
+        };
+        let serialized = postcard::to_allocvec(&converted_event)?;
+        self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+        Ok(())
     }
 }
 

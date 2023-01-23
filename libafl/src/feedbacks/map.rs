@@ -526,21 +526,22 @@ where
 
         let initial = observer.initial();
         if interesting {
-            let len = history_map.len();
-            let mut filled = 0;
-            for i in 0..len {
-                if history_map[i] != initial {
-                    filled += 1;
-                    if self.indexes.is_some() {
-                        self.indexes.as_mut().unwrap().push(i);
-                    }
-                }
+            if let Some(indexes) = self.indexes.as_mut() {
+                indexes.extend(
+                    observer
+                        .as_iter()
+                        .enumerate()
+                        .filter_map(|(i, &e)| (e != initial).then_some(i)),
+                );
             }
+
+            let len = history_map.len();
+            let filled = history_map.iter().filter(|&&i| i != initial).count();
             manager.fire(
                 state,
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
-                    value: UserStats::Ratio(filled, len as u64),
+                    value: UserStats::Ratio(filled as u64, len as u64),
                     phantom: PhantomData,
                 },
             )?;
@@ -700,21 +701,22 @@ where
 
         let initial = observer.initial();
         if interesting {
-            let len = history_map.len();
-            let mut filled = 0;
-            for i in 0..len {
-                if history_map[i] != initial {
-                    filled += 1;
-                    if self.indexes.is_some() {
-                        self.indexes.as_mut().unwrap().push(i);
-                    }
-                }
+            if let Some(indexes) = self.indexes.as_mut() {
+                indexes.extend(
+                    observer
+                        .as_iter()
+                        .enumerate()
+                        .filter_map(|(i, &e)| (e != initial).then_some(i)),
+                );
             }
+
+            let len = history_map.len();
+            let filled = history_map.iter().filter(|&&i| i != initial).count();
             manager.fire(
                 state,
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
-                    value: UserStats::Ratio(filled, len as u64),
+                    value: UserStats::Ratio(filled as u64, len as u64),
                     phantom: PhantomData,
                 },
             )?;
