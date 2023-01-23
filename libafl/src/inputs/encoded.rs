@@ -491,9 +491,8 @@ impl EncodedInput {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
-    use core::str::from_utf8;
-
     use alloc::string::ToString;
+    use core::str::from_utf8;
 
     use crate::inputs::encoded::{
         InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder, TokenizationKind,
