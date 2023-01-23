@@ -2,9 +2,12 @@
 //! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 //! See also [the paper on token-level fuzzing](https://www.usenix.org/system/files/sec21-salls.pdf)
 
-#[cfg(feature = "std")]
-use alloc::string::ToString;
-use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
+use alloc::{
+    borrow::ToOwned,
+    rc::Rc,
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(feature = "std")]
 use core::str::from_utf8;
 use core::{cell::RefCell, convert::From, hash::Hasher};
@@ -15,9 +18,11 @@ use hashbrown::HashMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "std")]
+use crate::bolts::rands::RandomSeed;
 use crate::{
     bolts::{
-        rands::{Rand, RandomSeed, StdRand},
+        rands::{Rand, StdRand},
         HasLen,
     },
     inputs::Input,
@@ -141,13 +146,17 @@ impl TokenInputEncoderDecoder {
     /// Creates a new [`TokenInputEncoderDecoder`]
     #[must_use]
     pub fn new() -> Self {
+        #[cfg(feature = "std")]
+        let rand = StdRand::new();
+        #[cfg(not(feature = "std"))]
+        let rand = StdRand::with_seed(123);
         Self {
             token_table: HashMap::default(),
             id_table: HashMap::default(),
             next_id: 0,
             max_whitespace_id: 0,
             encoding_type: TokenizationKind::NoWhitespace,
-            rand: StdRand::new(),
+            rand,
         }
     }
     /// Sets an encoding type of type [`TokenizationKind`]
