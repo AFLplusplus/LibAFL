@@ -213,9 +213,9 @@ impl TokenInputEncoderDecoder {
             }
             self.encoding_type = enc_type;
         } else {
-            return Err(Error::illegal_state(format!(
-                "An input was already encoded, set_encoding_type() must be called prior!"
-            )));
+            return Err(Error::illegal_state(
+                "An input was already encoded, set_encoding_type() must be called prior!",
+            ));
         }
         Ok(())
     }
@@ -268,6 +268,7 @@ impl Default for NaiveTokenizer {
 
 #[cfg(feature = "std")]
 impl Tokenizer for NaiveTokenizer {
+    #[allow(clippy::too_many_lines)]
     fn tokenize(
         &self,
         bytes: &[u8],
