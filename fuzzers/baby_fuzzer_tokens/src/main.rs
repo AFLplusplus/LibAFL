@@ -9,7 +9,10 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-    inputs::{EncodedInput, InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder, TokenizationKind},
+    inputs::{
+        EncodedInput, InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder,
+        TokenizationKind,
+    },
     monitors::SimpleMonitor,
     mutators::{encoded_mutations::encoded_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
@@ -31,7 +34,9 @@ fn signals_set(idx: usize) {
 pub fn main() {
     let mut tokenizer = NaiveTokenizer::default();
     let mut encoder_decoder = TokenInputEncoderDecoder::new();
-    encoder_decoder.set_encoding_type(TokenizationKind::WithWhitespace).unwrap();
+    encoder_decoder
+        .set_encoding_type(TokenizationKind::WithWhitespace)
+        .unwrap();
     let mut initial_inputs = vec![];
     let mut decoded_bytes = vec![];
 
