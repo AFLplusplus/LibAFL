@@ -319,7 +319,7 @@ fn fuzz(
             let input = encoder_decoder
                 .encode(&buffer, &mut tokenizer)
                 .expect("encoding failed");
-            initial_inputs.push(input);
+            corpus.push(input);
         }
     }
 
