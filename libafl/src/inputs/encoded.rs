@@ -25,8 +25,11 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Enum to specify the time of encoding for [`TokenInputEncoderDecoder::set_encoding_type`]
 pub enum TokenizationKind {
+    /// NoWhitespace - do not encode whitespace, every token will be separated by a space
     NoWhitespace,
+    /// WithWhitespace - encode also whitespace (continiously)
     WithWhitespace,
 }
 
@@ -147,6 +150,7 @@ impl TokenInputEncoderDecoder {
             rand: StdRand::new(),
         }
     }
+    /// Sets an encoding type of type [`TokenizationKind`]
     pub fn set_encoding_type(&mut self, enc_type: TokenizationKind) -> Result<(), Error> {
         // This can only be set until the first tokenization has occured!
         if self.next_id == 0 {
@@ -292,7 +296,7 @@ impl Tokenizer for NaiveTokenizer {
                                         tokens.push(substring[ws_start..cnt].to_owned());
                                         ws_start = 0;
                                     }
-                                    tokens.push(substring[cnt..cnt + 1].to_owned());
+                                    tokens.push(substring[cnt..=cnt].to_owned());
                                 }
                             }
                             if ws_start > 0 {
@@ -304,7 +308,7 @@ impl Tokenizer for NaiveTokenizer {
                     }
                     if ident_prev < substring.len() {
                         for cnt in ident_prev..substring.len() {
-                            tokens.push(substring[cnt..cnt + 1].to_owned());
+                            tokens.push(substring[cnt..=cnt].to_owned());
                         }
                     }
                 } else {
@@ -314,7 +318,7 @@ impl Tokenizer for NaiveTokenizer {
                         for ident_match in self.ident_re.find_iter(ws_tok) {
                             if ident_match.start() > ident_prev {
                                 for cnt in ident_prev..ident_match.start() {
-                                    tokens.push(ws_tok[cnt..cnt + 1].to_owned());
+                                    tokens.push(ws_tok[cnt..=cnt].to_owned());
                                 }
                             }
                             tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
@@ -322,7 +326,7 @@ impl Tokenizer for NaiveTokenizer {
                         }
                         if ident_prev < ws_tok.len() {
                             for cnt in ident_prev..ws_tok.len() {
-                                tokens.push(ws_tok[cnt..cnt + 1].to_owned());
+                                tokens.push(ws_tok[cnt..=cnt].to_owned());
                             }
                         }
                     }
@@ -348,7 +352,7 @@ impl Tokenizer for NaiveTokenizer {
                                     tokens.push(substring[ws_start..cnt].to_owned());
                                     ws_start = 0;
                                 }
-                                tokens.push(substring[cnt..cnt + 1].to_owned());
+                                tokens.push(substring[cnt..=cnt].to_owned());
                             }
                         }
                         if ws_start > 0 {
@@ -360,7 +364,7 @@ impl Tokenizer for NaiveTokenizer {
                 }
                 if ident_prev < substring.len() {
                     for cnt in ident_prev..substring.len() {
-                        tokens.push(substring[cnt..cnt + 1].to_owned());
+                        tokens.push(substring[cnt..=cnt].to_owned());
                     }
                 }
             } else {
@@ -370,7 +374,7 @@ impl Tokenizer for NaiveTokenizer {
                     for ident_match in self.ident_re.find_iter(ws_tok) {
                         if ident_match.start() > ident_prev {
                             for cnt in ident_prev..ident_match.start() {
-                                tokens.push(ws_tok[cnt..cnt + 1].to_owned());
+                                tokens.push(ws_tok[cnt..=cnt].to_owned());
                             }
                         }
                         tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
@@ -378,7 +382,7 @@ impl Tokenizer for NaiveTokenizer {
                     }
                     if ident_prev < ws_tok.len() {
                         for cnt in ident_prev..ws_tok.len() {
-                            tokens.push(ws_tok[cnt..cnt + 1].to_owned());
+                            tokens.push(ws_tok[cnt..=cnt].to_owned());
                         }
                     }
                 }
