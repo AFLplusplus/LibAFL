@@ -373,6 +373,7 @@ fn fuzz(
             .unwrap();
     }
 
+    /*
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
@@ -383,6 +384,7 @@ fn fuzz(
             });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
+    */
 
     // Remove target ouput (logs still survive)
     #[cfg(unix)]
