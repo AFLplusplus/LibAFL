@@ -493,6 +493,8 @@ impl EncodedInput {
 mod tests {
     use core::str::from_utf8;
 
+    use alloc::string::ToString;
+
     use crate::inputs::encoded::{
         InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder, TokenizationKind,
     };
@@ -504,7 +506,7 @@ mod tests {
         let verify2 = "a = 'pippo baudo';   b=c+a\n";
         let mut t = NaiveTokenizer::default();
         let mut ed = TokenInputEncoderDecoder::new();
-        let mut input = ed.encode(string.clone().as_bytes(), &mut t).unwrap();
+        let mut input = ed.encode(string.to_string().as_bytes(), &mut t).unwrap();
         let mut bytes = vec![];
         ed.decode(&input, &mut bytes).unwrap();
         assert_eq!(from_utf8(&bytes).unwrap(), verify1);
@@ -512,7 +514,7 @@ mod tests {
         ed = TokenInputEncoderDecoder::new();
         ed.set_encoding_type(TokenizationKind::WithWhitespace)
             .unwrap();
-        input = ed.encode(string.clone().as_bytes(), &mut t).unwrap();
+        input = ed.encode(string.to_string().as_bytes(), &mut t).unwrap();
         bytes = vec![];
         /*
         for i in 0..input.codes.len() {

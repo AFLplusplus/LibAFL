@@ -303,7 +303,7 @@ fn fuzz(
     let mut initial_inputs = vec![];
     let mut decoded_bytes = vec![];
 
-    for entry in fs::read_dir(&seed_dir).unwrap() {
+    for entry in fs::read_dir(seed_dir).unwrap() {
         let path = entry.unwrap().path();
         let attr = fs::metadata(&path);
         if attr.is_err() {
