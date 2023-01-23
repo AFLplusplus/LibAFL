@@ -10,11 +10,14 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::CorpusId,
-    fuzzer::Evaluator,
-    inputs::{Input, UsesInput},
+    bolts::{current_time, shmem::ShMemProvider},
+    corpus::{Corpus, CorpusId},
+    events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
+    executors::{Executor, ExitKind, HasObservers},
+    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
+    inputs::{Input, InputConverter, UsesInput},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -184,5 +187,131 @@ where
             load_callback: load_callback::<_, _>,
             phantom: PhantomData,
         }
+    }
+}
+
+/// Metadata used to store information about the last sent testcase with `SyncFromBrokerStage`
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SyncFromBrokerMetadata {
+    /// The `CorpusId` of the last sent testcase
+    pub last_id: Option<CorpusId>,
+}
+
+crate::impl_serdeany!(SyncFromBrokerMetadata);
+
+impl SyncFromBrokerMetadata {
+    /// Create a new [`struct@SyncFromBrokerMetadata`]
+    #[must_use]
+    pub fn new(last_id: Option<CorpusId>) -> Self {
+        Self { last_id }
+    }
+}
+
+/// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
+#[derive(Debug)]
+pub struct SyncFromBrokerStage<IC, ICB, DI, S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+    IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
+    DI: Input,
+{
+    client: LlmpEventConverter<IC, ICB, DI, S, SP>,
+}
+
+impl<IC, ICB, DI, S, SP> UsesState for SyncFromBrokerStage<IC, ICB, DI, S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+    IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
+    DI: Input,
+{
+    type State = S;
+}
+
+impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<IC, ICB, DI, S, SP>
+where
+    EM: UsesState<State = S> + EventFirer,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasCorpus + HasRand + HasMetadata,
+    SP: ShMemProvider,
+    E: HasObservers<State = S> + Executor<EM, Z>,
+    for<'a> E::Observers: Deserialize<'a>,
+    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
+    IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
+    DI: Input,
+{
+    #[inline]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Z::State,
+        manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<(), Error> {
+        if self.client.can_convert() {
+            let last_id = state
+                .metadata()
+                .get::<SyncFromBrokerMetadata>()
+                .and_then(|m| m.last_id);
+
+            let mut cur_id =
+                last_id.map_or_else(|| state.corpus().first(), |id| state.corpus().next(id));
+
+            while let Some(id) = cur_id {
+                let input = state.corpus().get(id)?.borrow_mut().load_input()?.clone();
+
+                self.client.fire(
+                    state,
+                    Event::NewTestcase {
+                        input,
+                        observers_buf: None,
+                        exit_kind: ExitKind::Ok,
+                        corpus_size: 0, // TODO choose if sending 0 or the actual real value
+                        client_config: EventConfig::AlwaysUnique,
+                        time: current_time(),
+                        executions: 0,
+                    },
+                )?;
+
+                cur_id = state.corpus().next(id);
+            }
+
+            let last = state.corpus().last();
+            if last_id.is_none() {
+                state
+                    .metadata_mut()
+                    .insert(SyncFromBrokerMetadata::new(last));
+            } else {
+                state
+                    .metadata_mut()
+                    .get_mut::<SyncFromBrokerMetadata>()
+                    .unwrap()
+                    .last_id = last;
+            }
+        }
+
+        self.client.process(fuzzer, state, executor, manager)?;
+        #[cfg(feature = "introspection")]
+        state.introspection_monitor_mut().finish_stage();
+        Ok(())
+    }
+}
+
+impl<IC, ICB, DI, S, SP> SyncFromBrokerStage<IC, ICB, DI, S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+    IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
+    DI: Input,
+{
+    /// Creates a new [`SyncFromBrokerStage`]
+    #[must_use]
+    pub fn new(client: LlmpEventConverter<IC, ICB, DI, S, SP>) -> Self {
+        Self { client }
     }
 }
