@@ -18,8 +18,6 @@ use hashbrown::HashMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "std")]
-use crate::bolts::rands::RandomSeed;
 use crate::{
     bolts::{
         rands::{Rand, StdRand},
@@ -54,6 +52,17 @@ pub trait InputDecoder {
     fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 
+/// Marks that this [`EncodedInput`] uses an internal rand state
+/// Only implement if the input actually changes according to the rand state.
+/// The state can then be changed by mutations.
+pub trait HasRandState {
+    /// Gets the current rand state
+    fn rand_state(&self) -> u64;
+
+    /// Sets a new rand state
+    fn set_rand_state(&mut self, rand_state: u64);
+}
+
 /// Tokenizer is a trait that can tokenize bytes into a [`Vec`] of tokens
 pub trait Tokenizer {
     /// Tokenize the given bytes
@@ -74,8 +83,6 @@ pub struct TokenInputEncoderDecoder {
     encoding_type: TokenizationKind,
     // This is for TokenizationKind::WithWhitespace
     max_whitespace_id: u32,
-    // We need an RNG for TokenizationKind::WithWhitespace
-    rand: StdRand,
 }
 
 impl<T> InputEncoder<T> for TokenInputEncoderDecoder
@@ -101,6 +108,9 @@ where
 
 impl InputDecoder for TokenInputEncoderDecoder {
     fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
+        // Use the same state each decode, to make sure we decode it in the same way
+        let mut rand = StdRand::with_seed(input.rand_state);
+
         let mut prev_len = 0;
         for id in input.codes() {
             let tok = self
@@ -112,7 +122,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
                 if prev_len > 1 && len > 1 {
                     let mut r: u32;
                     loop {
-                        r = self.rand.below(u64::from(self.next_id)) as u32;
+                        r = rand.below(u64::from(self.next_id)) as u32;
                         if r < self.max_whitespace_id {
                             break;
                         }
@@ -146,17 +156,12 @@ impl TokenInputEncoderDecoder {
     /// Creates a new [`TokenInputEncoderDecoder`]
     #[must_use]
     pub fn new() -> Self {
-        #[cfg(feature = "std")]
-        let rand = StdRand::new();
-        #[cfg(not(feature = "std"))]
-        let rand = StdRand::with_seed(123);
         Self {
             token_table: HashMap::default(),
             id_table: HashMap::default(),
             next_id: 0,
             max_whitespace_id: 0,
             encoding_type: TokenizationKind::NoWhitespace,
-            rand,
         }
     }
     /// Sets an encoding type of type [`TokenizationKind`]
@@ -407,6 +412,8 @@ impl Tokenizer for NaiveTokenizer {
 pub struct EncodedInput {
     /// The input representation as list of codes
     codes: Vec<u32>,
+    /// The rand_state used to decode this input
+    rand_state: u64,
 }
 
 impl Input for EncodedInput {
@@ -449,11 +456,23 @@ impl From<&[u32]> for EncodedInput {
     }
 }
 
+impl HasRandState for EncodedInput {
+    fn rand_state(&self) -> u64 {
+        self.rand_state
+    }
+
+    fn set_rand_state(&mut self, rand_state: u64) {
+        self.rand_state = rand_state;
+    }
+}
+
 impl EncodedInput {
     /// Creates a new codes input using the given codes
+    /// Uses `codes.len()` as initial `rand_state`.
     #[must_use]
     pub fn new(codes: Vec<u32>) -> Self {
-        Self { codes }
+        let rand_state = codes.len().try_into().unwrap();
+        Self { codes, rand_state }
     }
 
     /// The codes of this encoded input

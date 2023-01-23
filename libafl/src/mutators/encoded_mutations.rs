@@ -9,7 +9,7 @@ use crate::{
         tuples::{tuple_list, tuple_list_type},
     },
     corpus::Corpus,
-    inputs::{EncodedInput, UsesInput},
+    inputs::{EncodedInput, HasRandState, UsesInput},
     mutators::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
         MutationResult, Mutator, Named,
@@ -442,6 +442,45 @@ impl EncodedCrossoverReplaceMutator {
     }
 }
 
+/// Changes the rand state for an [`EncodedInput`] that also implements [`HasRandState`]
+#[derive(Debug, Default)]
+pub struct RandStateMutator;
+
+impl<S> Mutator<S::Input, S> for RandStateMutator
+where
+    S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus,
+    S::Input: HasRandState,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut S::Input,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let size = input.codes().len();
+        if size == 0 {
+            Ok(MutationResult::Skipped)
+        } else {
+            input.set_rand_state(state.rand_mut().next());
+            Ok(MutationResult::Mutated)
+        }
+    }
+}
+
+impl Named for RandStateMutator {
+    fn name(&self) -> &str {
+        "RandStateMutator"
+    }
+}
+
+impl RandStateMutator {
+    /// Creates a new [`RandStateMutator`].
+    #[must_use]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 /// Get the mutations that compose the encoded mutator
 #[must_use]
 pub fn encoded_mutations() -> tuple_list_type!(
@@ -454,6 +493,7 @@ pub fn encoded_mutations() -> tuple_list_type!(
     EncodedCopyMutator,
     EncodedCrossoverInsertMutator,
     EncodedCrossoverReplaceMutator,
+    RandStateMutator,
 ) {
     tuple_list!(
         EncodedRandMutator::new(),
@@ -465,5 +505,6 @@ pub fn encoded_mutations() -> tuple_list_type!(
         EncodedCopyMutator::new(),
         EncodedCrossoverInsertMutator::new(),
         EncodedCrossoverReplaceMutator::new(),
+        RandStateMutator::new(),
     )
 }
