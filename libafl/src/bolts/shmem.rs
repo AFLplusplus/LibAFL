@@ -610,15 +610,22 @@ pub mod unix_shmem {
 
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
-            pub fn new(map_size: usize, shmem_ctr: usize) -> Result<Self, Error> {
+            pub fn new(map_size: usize, shmem_ctr: u64) -> Result<Self, Error> {
                 unsafe {
-                    let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
+                    let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN]; // This is the filename string used to search for shmem.
+                    let mut shmem_id = [0_u8; 20]; // This is the 20-bytes shmem_id that libafl uses to identify each unique shmem
+
                     write!(
                         &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
                         "/libafl_{}_{}",
                         process::id(),
                         shmem_ctr
                     )?;
+
+                    let process_id_as_bytes: [u8; 4] = process::id().to_ne_bytes(); // 4 bytes
+                    let shmem_ctr_as_bytes: [u8; 8] = shmem_ctr.to_ne_bytes(); // 8 bytes
+                    shmem_id[..process_id_as_bytes.len()].copy_from_slice(&process_id_as_bytes); // shmem_id[0..4]
+                    shmem_id[process_id_as_bytes.len()..].copy_from_slice(&shmem_ctr_as_bytes); // shmem_id[4..12]
 
                     /* create the shared memory segment as if it was a file */
                     let shm_fd = shm_open(
@@ -665,14 +672,37 @@ pub mod unix_shmem {
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: ShMemId::from_string(&format!("{shm_fd}")),
+                        id: ShMemId::from_array(&shmem_id),
                     })
                 }
             }
 
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let shm_fd: i32 = id.to_string().parse().unwrap();
+                    let shmem_id_array = id.as_array();
+
+                    // Parse shmem id into string
+                    let mut process_id_as_bytes = [0_u8; 4];
+                    let mut shmem_ctr_as_bytes = [0_u8; 8];
+
+                    process_id_as_bytes.copy_from_slice(&shmem_id_array[..4]);
+                    shmem_ctr_as_bytes.copy_from_slice(&shmem_id_array[4..12]);
+
+                    let process_id = u32::from_ne_bytes(process_id_as_bytes);
+                    let shmem_ctr = u64::from_ne_bytes(shmem_ctr_as_bytes);
+
+                    let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN]; // This is the filename string used to search for shmem.
+                    write!(
+                        &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
+                        "/libafl_{process_id}_{shmem_ctr}",
+                    )?;
+
+                    /* Open the shared memory segment as if it was a file */
+                    let shm_fd = shm_open(
+                        filename_path.as_ptr() as *const _,
+                        libc::O_RDWR | libc::O_EXCL,
+                        0o600,
+                    );
 
                     /* map the shared memory segment to the address space of the process */
                     let map = mmap(
@@ -706,7 +736,7 @@ pub mod unix_shmem {
         #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct MmapShMemProvider {
-            current_shmem_id: usize,
+            current_shmem_id: u64,
         }
 
         unsafe impl Send for MmapShMemProvider {}
