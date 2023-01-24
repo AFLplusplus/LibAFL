@@ -698,11 +698,7 @@ pub mod unix_shmem {
                     )?;
 
                     /* Open the shared memory segment as if it was a file */
-                    let shm_fd = shm_open(
-                        filename_path.as_ptr() as *const _,
-                        libc::O_RDWR,
-                        0o600,
-                    );
+                    let shm_fd = shm_open(filename_path.as_ptr() as *const _, libc::O_RDWR, 0o600);
 
                     /* map the shared memory segment to the address space of the process */
                     let map = mmap(
