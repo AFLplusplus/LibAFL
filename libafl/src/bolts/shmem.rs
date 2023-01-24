@@ -624,8 +624,8 @@ pub mod unix_shmem {
 
                     let process_id_as_bytes: [u8; 4] = process::id().to_ne_bytes(); // 4 bytes
                     let shmem_ctr_as_bytes: [u8; 8] = shmem_ctr.to_ne_bytes(); // 8 bytes
-                    shmem_id[..process_id_as_bytes.len()].copy_from_slice(&process_id_as_bytes); // shmem_id[0..4]
-                    shmem_id[process_id_as_bytes.len()..].copy_from_slice(&shmem_ctr_as_bytes); // shmem_id[4..12]
+                    shmem_id[..4].copy_from_slice(&process_id_as_bytes); // shmem_id[0..4]
+                    shmem_id[4..12].copy_from_slice(&shmem_ctr_as_bytes); // shmem_id[4..12]
 
                     /* create the shared memory segment as if it was a file */
                     let shm_fd = shm_open(
