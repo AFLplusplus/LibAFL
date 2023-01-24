@@ -588,7 +588,7 @@ pub mod unix_shmem {
             pub __glibc_reserved5: c_ulong,
         }
 
-        const MAX_MMAP_FILENAME_LEN: usize = 256;
+        const MAX_MMAP_FILENAME_LEN: usize = 20;
 
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
         /// Default on `MacOS` and `iOS`, where we need a central point to unmap
@@ -610,12 +610,12 @@ pub mod unix_shmem {
 
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
-            pub fn new(map_size: usize, shmem_ctr: usize) -> Result<Self, Error> {
+            pub fn new(map_size: usize, shmem_ctr: u16) -> Result<Self, Error> {
                 unsafe {
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
                     write!(
                         &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
-                        "/libafl_{}_{}",
+                        "/{}_{}",
                         process::id(),
                         shmem_ctr
                     )?;
@@ -665,14 +665,19 @@ pub mod unix_shmem {
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: ShMemId::from_string(&format!("{shm_fd}")),
+                        id: ShMemId::from_array(&filename_path),
                     })
                 }
             }
 
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let shm_fd: i32 = id.to_string().parse().unwrap();
+                    let shm_name = id.as_array();
+                    let shm_fd = shm_open(
+                        shm_name.as_ptr() as *const _,
+                        libc::O_CREAT | libc::O_RDWR | libc::O_EXCL,
+                        0o600,
+                    );
 
                     /* map the shared memory segment to the address space of the process */
                     let map = mmap(
@@ -706,7 +711,7 @@ pub mod unix_shmem {
         #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct MmapShMemProvider {
-            current_shmem_id: usize,
+            current_shmem_id: u16,
         }
 
         unsafe impl Send for MmapShMemProvider {}
