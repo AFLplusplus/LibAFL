@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
-        rands::{Rand, RandomSeed, StdRand},
+        rands::{Rand, StdRand},
         HasLen,
     },
     inputs::Input,
@@ -96,7 +96,6 @@ where
 }
 
 impl InputDecoder for TokenInputEncoderDecoder {
-    #[allow(clippy::needless_range_loop)]
     fn decode(&mut self, input: &mut EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
         let codes = &mut input.codes;
         if self.encoding_type == TokenizationKind::WithWhitespace {
@@ -112,7 +111,8 @@ impl InputDecoder for TokenInputEncoderDecoder {
             let mut prev_len = 0;
 
             // not using for (p, <i>) in codes because it makes it harder to understand
-            for pos in 0..=codes.len() {
+            #[allow(clippy::needless_range_loop)]
+            for pos in 0..codes.len() {
                 let tok = self
                     .id_table
                     .get(&(codes[pos] % self.next_id))
@@ -129,10 +129,14 @@ impl InputDecoder for TokenInputEncoderDecoder {
             if !positions.is_empty() {
                 // We need to repair the input
                 #[cfg(feature = "std")]
-                let mut rand = StdRand::new();
+                let mut rand = StdRand::default();
                 #[cfg(not(feature = "std"))]
-                let rand = StdRand::with_seed(
-                    positions.len() << 24 + codes.len() << 16 + codes[0] << 8 + positions[0],
+                #[allow(clippy::cast_lossless)]
+                let mut rand = StdRand::with_seed(
+                    ((positions.len() as u64) << 24)
+                        + ((codes.len() as u64) << 16)
+                        + ((codes[0] as u64) << 8)
+                        + positions[0] as u64,
                 );
 
                 // we have to walk backwards otherwise the positions become wrong
