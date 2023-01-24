@@ -128,7 +128,12 @@ impl InputDecoder for TokenInputEncoderDecoder {
 
             if !positions.is_empty() {
                 // We need to repair the input
+                #[cfg(feature = "std")]
                 let mut rand = StdRand::new();
+                #[cfg(not(feature = "std"))]
+                let rand = StdRand::with_seed(
+                    positions.len() << 24 + codes.len() << 16 + codes[0] << 8 + positions[0],
+                );
 
                 // we have to walk backwards otherwise the positions become wrong
                 for pos in positions.iter().rev() {
