@@ -1030,7 +1030,11 @@ where
         if self.uses_shmem_testcase {
             let map = unsafe { self.map.as_mut().unwrap_unchecked() };
             let target_bytes = input.target_bytes();
-            let size = target_bytes.as_slice().len();
+            let mut size = target_bytes.as_slice().len();
+            if size > MAX_FILE {
+                // Truncate like AFL++ does
+                size = MAX_FILE;
+            }
             let size_in_bytes = size.to_ne_bytes();
             // The first four bytes tells the size of the shmem.
             map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
