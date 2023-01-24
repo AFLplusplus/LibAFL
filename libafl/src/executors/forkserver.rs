@@ -537,7 +537,7 @@ where
             .field("target", &self.target)
             .field("args", &self.args)
             .field("input_file", &self.input_file)
-            .field("use_shmem_testcase", &self.uses_shmem_testcase)
+            .field("uses_shmem_testcase", &self.uses_shmem_testcase)
             .field("forkserver", &self.forkserver)
             .field("observers", &self.observers)
             .field("map", &self.map)
