@@ -94,7 +94,6 @@ impl ShMemId {
     /// It should contain a valid cstring.
     #[must_use]
     pub fn from_array(array: &[u8; 20]) -> Self {
-        println!("Creating using from_array, {array:#?}");
         Self { id: *array }
     }
 
@@ -107,14 +106,12 @@ impl ShMemId {
     /// Create a new id from an int
     #[must_use]
     pub fn from_int(val: i32) -> Self {
-        println!("Creating using from_int, {val}");
         Self::from_string(&val.to_string())
     }
 
     /// Create a new id from a string
     #[must_use]
     pub fn from_string(val: &str) -> Self {
-        println!("Creating using from_string, {val}");
         let mut slice: [u8; 20] = [0; 20];
         for (i, val) in val.as_bytes().iter().enumerate() {
             slice[i] = *val;
@@ -213,7 +210,6 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
     fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
         let map_size = self.len();
         let map_size_env = format!("{env_name}_SIZE");
-        println!("id: {:#?}", self.id());
         env::set_var(env_name, self.id().to_string());
         env::set_var(map_size_env, format!("{map_size}"));
         Ok(())
@@ -624,8 +620,7 @@ pub mod unix_shmem {
 
                     write!(
                         &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1], // Leave the last one as 0x00
-                        "/{}",
-                        random_u64
+                        "/{random_u64}",
                     )?;
 
                     /* create the shared memory segment as if it was a file */
@@ -668,15 +663,14 @@ pub mod unix_shmem {
                         )));
                     }
 
-                    let shm_id = ShMemId::from_array(&filename_path);
+                    let id = ShMemId::from_array(&filename_path);
 
-                    println!("Creating: id: {:#?}", shm_id);
                     Ok(Self {
                         filename_path: Some(filename_path),
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: shm_id,
+                        id,
                     })
                 }
             }
@@ -713,14 +707,14 @@ pub mod unix_shmem {
                         )));
                     }
 
-                    let shm_id = ShMemId::from_array(&filename_path);
+                    let id = ShMemId::from_array(filename_path);
 
                     Ok(Self {
                         filename_path: None,
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: shm_id,
+                        id,
                     })
                 }
             }
