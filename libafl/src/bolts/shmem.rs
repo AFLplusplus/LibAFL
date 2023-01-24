@@ -613,6 +613,9 @@ pub mod unix_shmem {
             pub fn new(map_size: usize, shmem_ctr: u16) -> Result<Self, Error> {
                 unsafe {
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
+                    // shmem_ctr is 5 chars at most, process::id() is 10 chars at most (u16 and u32 respectively)
+                    // 5 + 10 + 2 (slash and underscore) + 1 (null byte) fit into this 20 bytes buffer.
+                    // We can't directly put numbers in hex, because the name of the shmem should not contain any slashes(/) except the first one
                     write!(
                         &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
                         "/{}_{}",
