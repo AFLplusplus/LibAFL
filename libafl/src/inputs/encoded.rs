@@ -50,6 +50,8 @@ pub trait InputDecoder {
     /// Decode encoded input to bytes
     #[allow(clippy::ptr_arg)] // we reuse the alloced `Vec`
     fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
+    /// Repair mutated input in [`TokenizationKind::WithWhitespace`] form before decoding
+    fn repair(&mut self, input: &mut EncodedInput);
 }
 
 /// Tokenizer is a trait that can tokenize bytes into a [`Vec`] of tokens
@@ -97,7 +99,22 @@ where
 
 impl InputDecoder for TokenInputEncoderDecoder {
     fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
-        let mut codes = input.codes.clone();
+        let codes = &input.codes;
+        // Decode the input vector to actual bytes
+        for id in codes {
+            let tok = self
+                .id_table
+                .get(&(id % self.next_id))
+                .ok_or_else(|| Error::illegal_state(format!("Id {id} not in the decoder table")))?;
+            bytes.extend_from_slice(tok.as_bytes());
+            if self.encoding_type == TokenizationKind::NoWhitespace {
+                bytes.push(b' ');
+            }
+        }
+        Ok(())
+    }
+    fn repair(&mut self, input: &mut EncodedInput) {
+        let codes = &mut input.codes;
         if self.encoding_type == TokenizationKind::WithWhitespace {
             // If we encode whitespace, mutations can f*ck up validity
             // by removing whitespace or single char tokens like `+` to
@@ -113,12 +130,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
             // not using for (p, <i>) in codes because it makes it harder to understand
             #[allow(clippy::needless_range_loop)]
             for pos in 0..codes.len() {
-                let tok = self
-                    .id_table
-                    .get(&(codes[pos] % self.next_id))
-                    .ok_or_else(|| {
-                        Error::illegal_state(format!("Id {} not in the decoder table", codes[pos]))
-                    })?;
+                let tok = self.id_table.get(&(codes[pos] % self.next_id)).unwrap();
                 let len = tok.len();
                 if prev_len > 1 && len > 1 {
                     positions.push(pos);
@@ -144,18 +156,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
                         if r < self.max_whitespace_id {
                             break;
                         }
-                        if self
-                            .id_table
-                            .get(&(r % self.next_id))
-                            .ok_or_else(|| {
-                                Error::illegal_state(format!(
-                                    "Id {:?} not found in {self:?}",
-                                    self.next_id
-                                ))
-                            })?
-                            .len()
-                            == 1
-                        {
+                        if self.id_table.get(&(r % self.next_id)).unwrap().len() == 1 {
                             break;
                         }
                     }
@@ -163,19 +164,6 @@ impl InputDecoder for TokenInputEncoderDecoder {
                 }
             }
         }
-
-        // Decode the input vector to actual bytes
-        for id in codes {
-            let tok = self
-                .id_table
-                .get(&(id % self.next_id))
-                .ok_or_else(|| Error::illegal_state(format!("Id {id} not in the decoder table")))?;
-            bytes.extend_from_slice(tok.as_bytes());
-            if self.encoding_type == TokenizationKind::NoWhitespace {
-                bytes.push(b' ');
-            }
-        }
-        Ok(())
     }
 }
 

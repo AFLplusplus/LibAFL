@@ -331,8 +331,9 @@ fn fuzz(
 
     let encoder_decoder_harness = encoder_decoder.clone();
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &EncodedInput| {
+    let mut harness = |input: &mut EncodedInput| {
         decoded_bytes.clear();
+        encoder_decoder_harness.borrow_mut().repair(input);
         encoder_decoder_harness
             .borrow_mut()
             .decode(input, &mut decoded_bytes)
@@ -354,8 +355,9 @@ fn fuzz(
     );
 
     let dump_to_disk_stage = DumpToDiskStage::new(
-        |input| {
+        |input : &mut EncodedInput| {
             let mut dump_to_disk_bytes = vec![];
+            encoder_decoder_harness.borrow_mut().repair(input);
             encoder_decoder_harness
                 .borrow_mut()
                 .decode(input, &mut dump_to_disk_bytes)?;
