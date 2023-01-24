@@ -96,6 +96,7 @@ where
 }
 
 impl InputDecoder for TokenInputEncoderDecoder {
+    #[allow(clippy::needless_range_loop)]
     fn decode(&mut self, input: &mut EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
         let codes = &mut input.codes;
         if self.encoding_type == TokenizationKind::WithWhitespace {
@@ -110,7 +111,8 @@ impl InputDecoder for TokenInputEncoderDecoder {
             let mut positions: Vec<usize> = vec![];
             let mut prev_len = 0;
 
-            for pos in 0..codes.len() {
+            // not using for (p, <i>) in codes because it makes it harder to understand
+            for pos in 0..=codes.len() {
                 let tok = self
                     .id_table
                     .get(&(codes[pos] % self.next_id))
@@ -124,12 +126,12 @@ impl InputDecoder for TokenInputEncoderDecoder {
                 prev_len = len;
             }
 
-            if positions.len() > 0 {
+            if !positions.is_empty() {
                 // We need to repair the input
                 let mut rand = StdRand::new();
 
                 // we have to walk backwards otherwise the positions become wrong
-                for pos in positions.len() - 1..0 {
+                for pos in positions.iter().rev() {
                     let mut r: u32;
                     loop {
                         r = rand.below(u64::from(self.next_id)) as u32;
@@ -151,7 +153,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
                             break;
                         }
                     }
-                    codes.insert(positions[pos], r);
+                    codes.insert(*pos, r);
                 }
             }
         }
