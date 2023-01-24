@@ -675,6 +675,7 @@ pub mod unix_shmem {
                 }
             }
 
+            #[allow(clippy::cast_sign_loss)]
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let id: i32 = id.into();
