@@ -49,7 +49,7 @@ where
 pub trait InputDecoder {
     /// Decode encoded input to bytes
     #[allow(clippy::ptr_arg)] // we reuse the alloced `Vec`
-    fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
+    fn decode(&mut self, input: &mut EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 
 /// Tokenizer is a trait that can tokenize bytes into a [`Vec`] of tokens
@@ -79,7 +79,7 @@ where
     T: Tokenizer,
 {
     fn encode(&mut self, bytes: &[u8], tokenizer: &mut T) -> Result<EncodedInput, Error> {
-        let mut codes = vec![];
+        let mut codes: Vec<u32> = vec![];
         let tokens = tokenizer.tokenize(bytes, self.encoding_type)?;
         for tok in tokens {
             if let Some(id) = self.token_table.get(&tok) {
@@ -96,28 +96,40 @@ where
 }
 
 impl InputDecoder for TokenInputEncoderDecoder {
-    fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
-        // Use a specific rand state each decode, to make sure we decode it in the same way
-        // But try to mix up the seed, as it empirically yields better results
-        let codes = input.codes();
-        let mut rand = StdRand::new();
-        let mut prev_len = 0;
-        for id in codes {
-            let tok = self
-                .id_table
-                .get(&(id % self.next_id))
-                .ok_or_else(|| Error::illegal_state(format!("Id {id} not in the decoder table")))?;
-            if self.encoding_type == TokenizationKind::WithWhitespace {
-                // If we encode whitespace, mutations can f*ck up validity
-                // by removing whitespace or single char tokens like `+` to
-                // create illegal entries like Variable1"String". We need to
-                // fix such entries. So wherever we have two tokens that have
-                // a length larger than 1 and are not whitespace we randomly
-                // insert whitespace or a single byte token from our token vec.
-                // We do this randomly because this enhances the overall
-                // mutation quality.
+    fn decode(&mut self, input: &mut EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
+        let codes = &mut input.codes;
+        if self.encoding_type == TokenizationKind::WithWhitespace {
+            // If we encode whitespace, mutations can f*ck up validity
+            // by removing whitespace or single char tokens like `+` to
+            // create illegal entries like Variable1"String". We need to
+            // fix such entries. So wherever we have two tokens that have
+            // a length larger than 1 and are not whitespace, we randomly
+            // insert whitespace or a single byte token from our token vec.
+            // We do this randomly because this enhances the overall
+            // mutation quality.
+            let mut positions: Vec<usize> = vec![];
+            let mut prev_len = 0;
+
+            for pos in 0..codes.len() {
+                let tok = self
+                    .id_table
+                    .get(&(codes[pos] % self.next_id))
+                    .ok_or_else(|| {
+                        Error::illegal_state(format!("Id {} not in the decoder table", codes[pos]))
+                    })?;
                 let len = tok.len();
                 if prev_len > 1 && len > 1 {
+                    positions.push(pos);
+                }
+                prev_len = len;
+            }
+
+            if positions.len() > 0 {
+                // We need to repair the input
+                let mut rand = StdRand::new();
+
+                // we have to walk backwards otherwise the positions become wrong
+                for pos in positions.len() - 1..0 {
                     let mut r: u32;
                     loop {
                         r = rand.below(u64::from(self.next_id)) as u32;
@@ -126,7 +138,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
                         }
                         if self
                             .id_table
-                            .get(&(id % self.next_id))
+                            .get(&(r % self.next_id))
                             .ok_or_else(|| {
                                 Error::illegal_state(format!(
                                     "Id {:?} not found in {self:?}",
@@ -139,13 +151,17 @@ impl InputDecoder for TokenInputEncoderDecoder {
                             break;
                         }
                     }
-                    let w = self.id_table.get(&(r % self.next_id)).ok_or_else(|| {
-                        Error::illegal_state(format!("Id {r} not in the decoder table"))
-                    })?;
-                    bytes.extend_from_slice(w.as_bytes());
+                    codes.insert(positions[pos], r);
                 }
-                prev_len = len;
             }
+        }
+
+        // Decode the input vector to actual bytes
+        for id in codes {
+            let tok = self
+                .id_table
+                .get(&(*id % self.next_id))
+                .ok_or_else(|| Error::illegal_state(format!("Id {id} not in the decoder table")))?;
             bytes.extend_from_slice(tok.as_bytes());
             if self.encoding_type == TokenizationKind::NoWhitespace {
                 bytes.push(b' ');
@@ -499,7 +515,7 @@ mod tests {
         let mut ed = TokenInputEncoderDecoder::new();
         let mut input = ed.encode(string.to_string().as_bytes(), &mut t).unwrap();
         let mut bytes = vec![];
-        ed.decode(&input, &mut bytes).unwrap();
+        ed.decode(&mut input, &mut bytes).unwrap();
         assert_eq!(from_utf8(&bytes).unwrap(), verify1);
         t = NaiveTokenizer::default();
         ed = TokenInputEncoderDecoder::new();
@@ -512,7 +528,7 @@ mod tests {
           println!("Code {i}: {:?}", input.codes[i]);
         }
         */
-        ed.decode(&input, &mut bytes).unwrap();
+        ed.decode(&mut input, &mut bytes).unwrap();
         assert_eq!(from_utf8(&bytes).unwrap(), verify2);
 
         let val = StdRand::default().choose(input.codes_mut());
@@ -521,8 +537,8 @@ mod tests {
         bytes.clear();
         let mut bytes2 = vec![];
 
-        ed.decode(&input, &mut bytes).unwrap();
-        ed.decode(&input, &mut bytes2).unwrap();
+        ed.decode(&mut input, &mut bytes).unwrap();
+        ed.decode(&mut input, &mut bytes2).unwrap();
 
         assert_eq!(bytes, bytes2);
 
