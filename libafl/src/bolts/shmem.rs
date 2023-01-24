@@ -94,6 +94,7 @@ impl ShMemId {
     /// It should contain a valid cstring.
     #[must_use]
     pub fn from_array(array: &[u8; 20]) -> Self {
+        println!("Creating using from_array, {array:#?}");
         Self { id: *array }
     }
 
@@ -106,12 +107,14 @@ impl ShMemId {
     /// Create a new id from an int
     #[must_use]
     pub fn from_int(val: i32) -> Self {
+        println!("Creating using from_int, {val}");
         Self::from_string(&val.to_string())
     }
 
     /// Create a new id from a string
     #[must_use]
     pub fn from_string(val: &str) -> Self {
+        println!("Creating using from_string, {val}");
         let mut slice: [u8; 20] = [0; 20];
         for (i, val) in val.as_bytes().iter().enumerate() {
             slice[i] = *val;
@@ -210,6 +213,7 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
     fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
         let map_size = self.len();
         let map_size_env = format!("{env_name}_SIZE");
+        println!("id: {:#?}", self.id());
         env::set_var(env_name, self.id().to_string());
         env::set_var(map_size_env, format!("{map_size}"));
         Ok(())
@@ -547,10 +551,12 @@ pub mod unix_shmem {
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
             perror, shm_open, shm_unlink, shmat, shmctl, shmget,
         };
-        use uuid::Uuid;
+        use rand_core::RngCore;
 
         use crate::{
             bolts::{
+                cpu::read_time_counter,
+                rands::StdRand,
                 shmem::{ShMem, ShMemId, ShMemProvider},
                 AsMutSlice, AsSlice,
             },
@@ -589,7 +595,7 @@ pub mod unix_shmem {
             pub __glibc_reserved5: c_ulong,
         }
 
-        const MAX_MMAP_FILENAME_LEN: usize = 256;
+        const MAX_MMAP_FILENAME_LEN: usize = 20;
 
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
         /// Default on `MacOS` and `iOS`, where we need a central point to unmap
@@ -614,17 +620,13 @@ pub mod unix_shmem {
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN]; // This is the filename string used to search for shmem.
-                    let mut shmem_id = [0_u8; 20]; // This is the 20-bytes shmem_id that libafl uses to identify each unique shmem
-                    let uuid = Uuid::new_v4();
+                    let random_u64 = StdRand::with_seed(read_time_counter()).next_u64();
 
                     write!(
-                        &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
-                        "/libafl_{}",
-                        uuid
+                        &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1], // Leave the last one as 0x00
+                        "/{}",
+                        random_u64
                     )?;
-
-                    let uuid_as_u128: [u8; 16] = uuid.as_u128().to_be_bytes(); // This needs to be big endian!
-                    shmem_id[..16].copy_from_slice(&uuid_as_u128);
 
                     /* create the shared memory segment as if it was a file */
                     let shm_fd = shm_open(
@@ -666,37 +668,22 @@ pub mod unix_shmem {
                         )));
                     }
 
-                    // println!("Creating: filename_path {:?}", filename_path);
-                    println!("Creating: uuid {:#?}", uuid);
-                    println!("Creating: shmem_content: {:#?}", shmem_id);
+                    let shm_id = ShMemId::from_array(&filename_path);
+
+                    println!("Creating: id: {:#?}", shm_id);
                     Ok(Self {
                         filename_path: Some(filename_path),
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: ShMemId::from_array(&shmem_id),
+                        id: shm_id,
                     })
                 }
             }
 
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let shmem_id_array = id.as_array();
-                    println!("Using shmem_content: {:#?}", shmem_id_array);
-
-                    let mut uuid_as_bytes: [u8; 16] = [0_u8; 16];
-
-                    uuid_as_bytes.copy_from_slice(&shmem_id_array[..16]);
-
-                    let uuid = Uuid::from_bytes(uuid_as_bytes);
-                    println!("Using: uuid {:#?}", uuid);
-
-                    let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN]; // This is the filename string used to search for shmem.
-                    write!(
-                        &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
-                        "/libafl_{uuid}",
-                    )?;
-
+                    let filename_path = id.as_array();
                     /* Open the shared memory segment as if it was a file */
                     let shm_fd = shm_open(filename_path.as_ptr() as *const _, libc::O_RDWR, 0o600);
 
@@ -726,12 +713,14 @@ pub mod unix_shmem {
                         )));
                     }
 
+                    let shm_id = ShMemId::from_array(&filename_path);
+
                     Ok(Self {
                         filename_path: None,
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: ShMemId::from_string(&format!("{shm_fd}")),
+                        id: shm_id,
                     })
                 }
             }
