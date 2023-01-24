@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
-        rands::{Rand, StdRand},
+        rands::{Rand, RandomSeed, StdRand},
         HasLen,
     },
     inputs::Input,
@@ -100,15 +100,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
         // Use a specific rand state each decode, to make sure we decode it in the same way
         // But try to mix up the seed, as it empirically yields better results
         let codes = input.codes();
-        let rand_seed = match codes.len() {
-            0 => 1337_u64,
-            1 => u64::from(codes[0]),
-            _ => {
-                u64::from(codes[0]) << 32 | u64::from(codes[codes.len()]) << 16 | codes.len() as u64
-            }
-        };
-        let mut rand = StdRand::with_seed(rand_seed);
-
+        let mut rand = StdRand::new();
         let mut prev_len = 0;
         for id in codes {
             let tok = self
@@ -116,6 +108,14 @@ impl InputDecoder for TokenInputEncoderDecoder {
                 .get(&(id % self.next_id))
                 .ok_or_else(|| Error::illegal_state(format!("Id {id} not in the decoder table")))?;
             if self.encoding_type == TokenizationKind::WithWhitespace {
+                // If we encode whitespace, mutations can f*ck up validity
+                // by removing whitespace or single char tokens like `+` to
+                // create illegal entries like Variable1"String". We need to
+                // fix such entries. So wherever we have two tokens that have
+                // a length larger than 1 and are not whitespace we randomly
+                // insert whitespace or a single byte token from our token vec.
+                // We do this randomly because this enhances the overall
+                // mutation quality.
                 let len = tok.len();
                 if prev_len > 1 && len > 1 {
                     let mut r: u32;

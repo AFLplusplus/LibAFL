@@ -9,7 +9,7 @@ use core::{
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::{HasBytesVec, HasRandState, UsesInput},
+    inputs::HasBytesVec,
     mutators::{MutationResult, Mutator},
     random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},
@@ -1114,40 +1114,6 @@ impl Named for SpliceMutator {
 
 impl SpliceMutator {
     /// Creates a new [`SpliceMutator`].
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-/// Changes the rand state for an [`Input`] that implements [`HasRandState`]
-#[derive(Debug, Default)]
-pub struct RandStateMutator;
-
-impl<S> Mutator<S::Input, S> for RandStateMutator
-where
-    S: UsesInput + HasRand + HasCorpus,
-    S::Input: HasRandState,
-{
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut S::Input,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
-        input.set_rand_state(state.rand_mut().next());
-        Ok(MutationResult::Mutated)
-    }
-}
-
-impl Named for RandStateMutator {
-    fn name(&self) -> &str {
-        "RandStateMutator"
-    }
-}
-
-impl RandStateMutator {
-    /// Creates a new [`RandStateMutator`].
     #[must_use]
     pub fn new() -> Self {
         Self

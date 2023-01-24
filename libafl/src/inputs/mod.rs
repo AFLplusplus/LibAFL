@@ -207,14 +207,3 @@ where
         (self.convert_cb)(input)
     }
 }
-
-/// Marks that an [`Input`] uses an internal rand state
-/// Only implement if the input actually changes according to the rand state.
-/// The state can then be changed by mutations.
-pub trait HasRandState {
-    /// Gets the current rand state
-    fn rand_state(&self) -> u64;
-
-    /// Sets a new rand state
-    fn set_rand_state(&mut self, rand_state: u64);
-}
