@@ -123,7 +123,7 @@ where
     }
 
     /// Run forever in the broker
-    #[cfg(not(features = "std"))]
+    #[cfg(not(feature = "llmp_broker_timeouts"))]
     pub fn broker_loop(&mut self) -> Result<(), Error> {
         let monitor = &mut self.monitor;
         #[cfg(feature = "llmp_compression")]
@@ -158,7 +158,7 @@ where
     }
 
     /// Run forever in the broker
-    #[cfg(features = "std")]
+    #[cfg(feature = "llmp_broker_timeouts")]
     pub fn broker_loop(&mut self) -> Result<(), Error> {
         let monitor = &mut self.monitor;
         #[cfg(feature = "llmp_compression")]
@@ -1347,7 +1347,7 @@ where
             }
         };
         let serialized = postcard::to_allocvec(&converted_event)?;
-        let flags: Flags = LLMP_FLAG_INITIALIZED;
+        let flags = LLMP_FLAG_INITIALIZED;
 
         match self.compressor.compress(&serialized)? {
             Some(comp_buf) => {
