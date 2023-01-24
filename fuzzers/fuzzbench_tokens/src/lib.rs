@@ -11,7 +11,7 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
     path::PathBuf,
-    process,
+    rc::Rc,
 };
 
 use clap::{Arg, Command};
@@ -23,7 +23,7 @@ use libafl::{
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::tuple_list,
     },
-    corpus::{Corpus, OnDiskCorpus},
+    corpus::InMemoryCorpus,
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
@@ -39,10 +39,9 @@ use libafl::{
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
-    stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
-    state::{HasCorpus, HasMetadata, StdState},
-    Error,
-    Evaluator,
+    stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage, DumpToDiskStage},
+    state::{HasMetadata, StdState},
+    Error, Evaluator,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
@@ -264,10 +263,10 @@ fn fuzz(
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
-            OnDiskCorpus::new(corpus_dir).unwrap(),
+            InMemoryCorpus::new(),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
-            OnDiskCorpus::new(objective_dir).unwrap(),
+            InMemoryCorpus::new(),
             // States of the feedbacks.
             // The feedbacks can report the data that should persist in the State.
             &mut feedback,
@@ -297,10 +296,12 @@ fn fuzz(
     ));
 
     let mut tokenizer = NaiveTokenizer::default();
-    let mut encoder_decoder = TokenInputEncoderDecoder::new();
+    let encoder_decoder = Rc::new(RefCell::new(TokenInputEncoderDecoder::new()));
     encoder_decoder
+        .borrow_mut()
         .set_encoding_type(TokenizationKind::WithWhitespace)
         .unwrap();
+
     let mut initial_inputs = vec![];
     let mut decoded_bytes = vec![];
 
@@ -318,6 +319,7 @@ fn fuzz(
             let mut buffer = vec![];
             file.read_to_end(&mut buffer).expect("buffer overflow");
             let input = encoder_decoder
+                .borrow_mut()
                 .encode(&buffer, &mut tokenizer)
                 .expect("encoding failed");
             initial_inputs.push(input);
@@ -327,10 +329,14 @@ fn fuzz(
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+    let encoder_decoder_harness = encoder_decoder.clone();
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &EncodedInput| {
         decoded_bytes.clear();
-        encoder_decoder.decode(input, &mut decoded_bytes).unwrap();
+        encoder_decoder_harness
+            .borrow_mut()
+            .decode(input, &mut decoded_bytes)
+            .unwrap();
         libfuzzer_test_one_input(&decoded_bytes);
         ExitKind::Ok
     };
@@ -347,8 +353,21 @@ fn fuzz(
         timeout,
     );
 
+    let dump_to_disk_stage = DumpToDiskStage::new(
+        |input| {
+            let mut dump_to_disk_bytes = vec![];
+            encoder_decoder_harness
+                .borrow_mut()
+                .decode(input, &mut dump_to_disk_bytes)?;
+            Ok(dump_to_disk_bytes)
+        },
+        corpus_dir,
+        objective_dir,
+    )
+    .unwrap();
+
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, power);
+    let mut stages = tuple_list!(calibration, power, dump_to_disk_stage);
 
     // Read tokens
     if state.metadata().get::<Tokens>().is_none() {
@@ -366,27 +385,13 @@ fn fuzz(
         }
     }
 
-
     for input in initial_inputs {
         fuzzer
             .evaluate_input(&mut state, &mut executor, &mut mgr, input)
             .unwrap();
     }
 
-    /*
-    // In case the corpus is empty (on first run), reset
-    if state.corpus().count() < 1 {
-        state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
-            .unwrap_or_else(|_| {
-                println!("Failed to load initial corpus at {:?}", &seed_dir);
-                process::exit(0);
-            });
-        println!("We imported {} inputs from disk.", state.corpus().count());
-    }
-    */
-
-    // Remove target ouput (logs still survive)
+    // Remove target output (logs still survive)
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
