@@ -241,6 +241,8 @@ fn fuzz(
     // let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
     let shmem_buf = shmem.as_mut_slice();
+    // To let know the AFL++ binary that we have a big map
+    std::env::set_var("AFL_MAP_SIZE", format!("{}", MAP_SIZE));
 
     // Create an observation channel using the hitcounts map of AFL++
     let edges_observer =
