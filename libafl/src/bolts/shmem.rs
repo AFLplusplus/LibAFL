@@ -551,7 +551,7 @@ pub mod unix_shmem {
 
         use crate::{
             bolts::{
-                cpu::read_time_counter,
+                current_nanos,
                 rands::StdRand,
                 shmem::{ShMem, ShMemId, ShMemProvider},
                 AsMutSlice, AsSlice,
@@ -613,10 +613,11 @@ pub mod unix_shmem {
 
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
+            #[allow(clippy::cast_possible_wrap)]
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN]; // This is the filename string used to search for shmem.
-                    let random_id = StdRand::with_seed(read_time_counter()).next_u32() as i32;
+                    let random_id = StdRand::with_seed(current_nanos()).next_u32();
 
                     write!(
                         &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1], // Leave the last one as 0x00
@@ -663,7 +664,7 @@ pub mod unix_shmem {
                         )));
                     }
 
-                    let id = ShMemId::from_int(random_id);
+                    let id = ShMemId::from_int(random_id as i32);
 
                     Ok(Self {
                         filename_path: Some(filename_path),
