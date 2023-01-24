@@ -49,7 +49,7 @@ where
 pub trait InputDecoder {
     /// Decode encoded input to bytes
     #[allow(clippy::ptr_arg)] // we reuse the alloced `Vec`
-    fn decode(&mut self, input: &mut EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
+    fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 
 /// Tokenizer is a trait that can tokenize bytes into a [`Vec`] of tokens
@@ -79,8 +79,8 @@ where
     T: Tokenizer,
 {
     fn encode(&mut self, bytes: &[u8], tokenizer: &mut T) -> Result<EncodedInput, Error> {
-        let mut codes: Vec<u32> = vec![];
         let tokens = tokenizer.tokenize(bytes, self.encoding_type)?;
+        let mut codes: Vec<u32> = Vec::with_capacity(tokens.len());
         for tok in tokens {
             if let Some(id) = self.token_table.get(&tok) {
                 codes.push(*id);
@@ -96,8 +96,8 @@ where
 }
 
 impl InputDecoder for TokenInputEncoderDecoder {
-    fn decode(&mut self, input: &mut EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
-        let codes = &mut input.codes;
+    fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
+        let mut codes = input.codes.clone();
         if self.encoding_type == TokenizationKind::WithWhitespace {
             // If we encode whitespace, mutations can f*ck up validity
             // by removing whitespace or single char tokens like `+` to
@@ -128,9 +128,6 @@ impl InputDecoder for TokenInputEncoderDecoder {
 
             if !positions.is_empty() {
                 // We need to repair the input
-                #[cfg(feature = "std")]
-                let mut rand = StdRand::default();
-                #[cfg(not(feature = "std"))]
                 #[allow(clippy::cast_lossless)]
                 let mut rand = StdRand::with_seed(
                     ((positions.len() as u64) << 24)
@@ -171,7 +168,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
         for id in codes {
             let tok = self
                 .id_table
-                .get(&(*id % self.next_id))
+                .get(&(id % self.next_id))
                 .ok_or_else(|| Error::illegal_state(format!("Id {id} not in the decoder table")))?;
             bytes.extend_from_slice(tok.as_bytes());
             if self.encoding_type == TokenizationKind::NoWhitespace {
@@ -526,7 +523,7 @@ mod tests {
         let mut ed = TokenInputEncoderDecoder::new();
         let mut input = ed.encode(string.to_string().as_bytes(), &mut t).unwrap();
         let mut bytes = vec![];
-        ed.decode(&mut input, &mut bytes).unwrap();
+        ed.decode(&input, &mut bytes).unwrap();
         assert_eq!(from_utf8(&bytes).unwrap(), verify1);
         t = NaiveTokenizer::default();
         ed = TokenInputEncoderDecoder::new();
@@ -539,7 +536,7 @@ mod tests {
           println!("Code {i}: {:?}", input.codes[i]);
         }
         */
-        ed.decode(&mut input, &mut bytes).unwrap();
+        ed.decode(&input, &mut bytes).unwrap();
         assert_eq!(from_utf8(&bytes).unwrap(), verify2);
 
         let val = StdRand::default().choose(input.codes_mut());
@@ -548,8 +545,8 @@ mod tests {
         bytes.clear();
         let mut bytes2 = vec![];
 
-        ed.decode(&mut input, &mut bytes).unwrap();
-        ed.decode(&mut input, &mut bytes2).unwrap();
+        ed.decode(&input, &mut bytes).unwrap();
+        ed.decode(&input, &mut bytes2).unwrap();
 
         assert_eq!(bytes, bytes2);
 
