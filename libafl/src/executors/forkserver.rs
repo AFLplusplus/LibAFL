@@ -765,6 +765,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     map_size = ((map_size + 63) >> 6) << 6;
                 }
 
+                // TODO set AFL_MAP_SIZE
                 assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
 
                 println!("Target MAP SIZE = {:#x}", self.real_map_size);
