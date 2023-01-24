@@ -1,6 +1,6 @@
 //! A wide variety of mutations used during fuzzing.
 
-use alloc::{borrow::ToOwned, vec::Vec};
+use alloc::vec::Vec;
 use core::{
     cmp::{max, min},
     mem::size_of,
@@ -9,7 +9,7 @@ use core::{
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::HasBytesVec,
+    inputs::{HasBytesVec, HasRandState, UsesInput},
     mutators::{MutationResult, Mutator},
     random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},
@@ -1120,13 +1120,49 @@ impl SpliceMutator {
     }
 }
 
+/// Changes the rand state for an [`Input`] that implements [`HasRandState`]
+#[derive(Debug, Default)]
+pub struct RandStateMutator;
+
+impl<S> Mutator<S::Input, S> for RandStateMutator
+where
+    S: UsesInput + HasRand + HasCorpus,
+    S::Input: HasRandState,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut S::Input,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        input.set_rand_state(state.rand_mut().next());
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl Named for RandStateMutator {
+    fn name(&self) -> &str {
+        "RandStateMutator"
+    }
+}
+
+impl RandStateMutator {
+    /// Creates a new [`RandStateMutator`].
+    #[must_use]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 // Converts a hex u8 to its u8 value: 'A' -> 10 etc.
 fn from_hex(hex: u8) -> Result<u8, Error> {
     match hex {
         48..=57 => Ok(hex - 48),
         65..=70 => Ok(hex - 55),
         97..=102 => Ok(hex - 87),
-        _ => Err(Error::illegal_argument("Invalid hex character".to_owned())),
+        _ => Err(Error::illegal_argument(format!(
+            "Invalid hex character: {hex}"
+        ))),
     }
 }
 

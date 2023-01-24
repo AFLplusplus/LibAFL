@@ -18,6 +18,7 @@ use hashbrown::HashMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+use super::HasRandState;
 use crate::{
     bolts::{
         rands::{Rand, StdRand},
@@ -32,7 +33,7 @@ use crate::{
 pub enum TokenizationKind {
     /// NoWhitespace - do not encode whitespace, every token will be separated by a space
     NoWhitespace,
-    /// WithWhitespace - encode also whitespace (continiously)
+    /// WithWhitespace - also encode whitespace (continiously)
     WithWhitespace,
 }
 
@@ -50,17 +51,6 @@ pub trait InputDecoder {
     /// Decode encoded input to bytes
     #[allow(clippy::ptr_arg)] // we reuse the alloced `Vec`
     fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
-}
-
-/// Marks that this [`EncodedInput`] uses an internal rand state
-/// Only implement if the input actually changes according to the rand state.
-/// The state can then be changed by mutations.
-pub trait HasRandState {
-    /// Gets the current rand state
-    fn rand_state(&self) -> u64;
-
-    /// Sets a new rand state
-    fn set_rand_state(&mut self, rand_state: u64);
 }
 
 /// Tokenizer is a trait that can tokenize bytes into a [`Vec`] of tokens
@@ -120,6 +110,9 @@ impl InputDecoder for TokenInputEncoderDecoder {
             if self.encoding_type == TokenizationKind::WithWhitespace {
                 let len = tok.len();
                 if prev_len > 1 && len > 1 {
+                    // We need to fix the input.
+                    // This should only happen once, the second decode without prior mutation
+                    // should yield the same result, even though we use rand here, internally.
                     let mut r: u32;
                     loop {
                         r = rand.below(u64::from(self.next_id)) as u32;
@@ -129,7 +122,12 @@ impl InputDecoder for TokenInputEncoderDecoder {
                         if self
                             .id_table
                             .get(&(id % self.next_id))
-                            .expect("Id not found")
+                            .ok_or_else(|| {
+                                Error::illegal_state(format!(
+                                    "Id {:?} not found in {self:?}",
+                                    self.next_id
+                                ))
+                            })?
                             .len()
                             == 1
                         {
@@ -166,7 +164,7 @@ impl TokenInputEncoderDecoder {
     }
     /// Sets an encoding type of type [`TokenizationKind`]
     pub fn set_encoding_type(&mut self, enc_type: TokenizationKind) -> Result<(), Error> {
-        // This can only be set until the first tokenization has occured!
+        // This can only be set until the first tokenization has occurred!
         if self.next_id == 0 {
             if enc_type == TokenizationKind::WithWhitespace {
                 // we preset whitespace variations to be able to easily find
@@ -494,8 +492,11 @@ mod tests {
     use alloc::string::ToString;
     use core::str::from_utf8;
 
-    use crate::inputs::encoded::{
-        InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder, TokenizationKind,
+    use crate::{
+        bolts::rands::{Rand, StdRand},
+        inputs::encoded::{
+            InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder, TokenizationKind,
+        },
     };
 
     #[test]
@@ -522,6 +523,18 @@ mod tests {
         */
         ed.decode(&input, &mut bytes).unwrap();
         assert_eq!(from_utf8(&bytes).unwrap(), verify2);
+
+        let val = StdRand::default().choose(input.codes_mut());
+        *val = val.wrapping_sub(1);
+
+        bytes.clear();
+        let mut bytes2 = vec![];
+
+        ed.decode(&input, &mut bytes).unwrap();
+        ed.decode(&input, &mut bytes2).unwrap();
+
+        assert_eq!(bytes, bytes2);
+
         /*
         for id in 0..ed.next_id {
             let tok = ed
