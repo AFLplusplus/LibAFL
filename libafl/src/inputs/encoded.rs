@@ -18,7 +18,6 @@ use hashbrown::HashMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use super::HasRandState;
 use crate::{
     bolts::{
         rands::{Rand, StdRand},
@@ -98,11 +97,20 @@ where
 
 impl InputDecoder for TokenInputEncoderDecoder {
     fn decode(&mut self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
-        // Use the same state each decode, to make sure we decode it in the same way
-        let mut rand = StdRand::with_seed(input.rand_state);
+        // Use a specific rand state each decode, to make sure we decode it in the same way
+        // But try to mix up the seed, as it empirically yields better results
+        let codes = input.codes();
+        let rand_seed = match codes.len() {
+            0 => 1337_u64,
+            1 => u64::from(codes[0]),
+            _ => {
+                u64::from(codes[0]) << 32 | u64::from(codes[codes.len()]) << 16 | codes.len() as u64
+            }
+        };
+        let mut rand = StdRand::with_seed(rand_seed);
 
         let mut prev_len = 0;
-        for id in input.codes() {
+        for id in codes {
             let tok = self
                 .id_table
                 .get(&(id % self.next_id))
@@ -110,9 +118,6 @@ impl InputDecoder for TokenInputEncoderDecoder {
             if self.encoding_type == TokenizationKind::WithWhitespace {
                 let len = tok.len();
                 if prev_len > 1 && len > 1 {
-                    // We need to fix the input.
-                    // This should only happen once, the second decode without prior mutation
-                    // should yield the same result, even though we use rand here, internally.
                     let mut r: u32;
                     loop {
                         r = rand.below(u64::from(self.next_id)) as u32;
@@ -405,13 +410,11 @@ impl Tokenizer for NaiveTokenizer {
     }
 }
 
-/// A codes input is the basic input
+/// A `codes` input is the basic input
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EncodedInput {
     /// The input representation as list of codes
     codes: Vec<u32>,
-    /// The rand_state used to decode this input
-    rand_state: u64,
 }
 
 impl Input for EncodedInput {
@@ -454,23 +457,11 @@ impl From<&[u32]> for EncodedInput {
     }
 }
 
-impl HasRandState for EncodedInput {
-    fn rand_state(&self) -> u64 {
-        self.rand_state
-    }
-
-    fn set_rand_state(&mut self, rand_state: u64) {
-        self.rand_state = rand_state;
-    }
-}
-
 impl EncodedInput {
     /// Creates a new codes input using the given codes
-    /// Uses `codes.len()` as initial `rand_state`.
     #[must_use]
     pub fn new(codes: Vec<u32>) -> Self {
-        let rand_state = codes.len().try_into().unwrap();
-        Self { codes, rand_state }
+        Self { codes }
     }
 
     /// The codes of this encoded input
