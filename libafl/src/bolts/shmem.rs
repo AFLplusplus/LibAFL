@@ -53,7 +53,7 @@ pub type StdShMemService = ShMemService<MmapShMemProvider>;
     unix,
     not(any(target_os = "android", target_vendor = "apple"))
 ))]
-pub type StdShMemProvider = UnixShMemProvider;
+pub type StdShMemProvider = MmapShMemProvider;
 /// The standard sharedmem service
 #[cfg(any(
     not(any(target_os = "android", target_vendor = "apple")),
@@ -541,12 +541,13 @@ pub mod unix_shmem {
 
         use alloc::string::ToString;
         use core::{ptr, slice};
-        use std::{io::Write, process};
+        use std::io::Write;
 
         use libc::{
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
             perror, shm_open, shm_unlink, shmat, shmctl, shmget,
         };
+        use uuid::Uuid;
 
         use crate::{
             bolts::{
@@ -610,22 +611,20 @@ pub mod unix_shmem {
 
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
-            pub fn new(map_size: usize, shmem_ctr: u64) -> Result<Self, Error> {
+            pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN]; // This is the filename string used to search for shmem.
                     let mut shmem_id = [0_u8; 20]; // This is the 20-bytes shmem_id that libafl uses to identify each unique shmem
+                    let uuid = Uuid::new_v4();
 
                     write!(
                         &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
-                        "/libafl_{}_{}",
-                        process::id(),
-                        shmem_ctr
+                        "/libafl_{}",
+                        uuid
                     )?;
 
-                    let process_id_as_bytes: [u8; 4] = process::id().to_ne_bytes(); // 4 bytes
-                    let shmem_ctr_as_bytes: [u8; 8] = shmem_ctr.to_ne_bytes(); // 8 bytes
-                    shmem_id[..4].copy_from_slice(&process_id_as_bytes); // shmem_id[0..4]
-                    shmem_id[4..12].copy_from_slice(&shmem_ctr_as_bytes); // shmem_id[4..12]
+                    let uuid_as_u128: [u8; 16] = uuid.as_u128().to_be_bytes(); // This needs to be big endian!
+                    shmem_id[..16].copy_from_slice(&uuid_as_u128);
 
                     /* create the shared memory segment as if it was a file */
                     let shm_fd = shm_open(
@@ -636,7 +635,7 @@ pub mod unix_shmem {
                     if shm_fd == -1 {
                         perror(b"shm_open\0".as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "Failed to shm_open map with id {shmem_ctr:?}"
+                            "Failed to shm_open map with filename {filename_path:?}"
                         )));
                     }
 
@@ -645,7 +644,7 @@ pub mod unix_shmem {
                         perror(b"ftruncate\0".as_ptr() as *const _);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "setup_shm(): ftruncate() failed for map with id {shmem_ctr:?}"
+                            "setup_shm(): ftruncate() failed for map with id {filename_path:?}"
                         )));
                     }
 
@@ -663,10 +662,13 @@ pub mod unix_shmem {
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "mmap() failed for map with id {shmem_ctr:?}"
+                            "mmap() failed for map with id {filename_path:?}"
                         )));
                     }
 
+                    // println!("Creating: filename_path {:?}", filename_path);
+                    println!("Creating: uuid {:#?}", uuid);
+                    println!("Creating: shmem_content: {:#?}", shmem_id);
                     Ok(Self {
                         filename_path: Some(filename_path),
                         map: map as *mut u8,
@@ -680,25 +682,32 @@ pub mod unix_shmem {
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let shmem_id_array = id.as_array();
+                    println!("Using shmem_content: {:#?}", shmem_id_array);
 
-                    // Parse shmem id into string
-                    let mut process_id_as_bytes = [0_u8; 4];
-                    let mut shmem_ctr_as_bytes = [0_u8; 8];
+                    let mut uuid_as_bytes: [u8; 16] = [0_u8; 16];
 
-                    process_id_as_bytes.copy_from_slice(&shmem_id_array[..4]);
-                    shmem_ctr_as_bytes.copy_from_slice(&shmem_id_array[4..12]);
+                    uuid_as_bytes.copy_from_slice(&shmem_id_array[..16]);
 
-                    let process_id = u32::from_ne_bytes(process_id_as_bytes);
-                    let shmem_ctr = u64::from_ne_bytes(shmem_ctr_as_bytes);
+                    let uuid = Uuid::from_bytes(uuid_as_bytes);
+                    println!("Using: uuid {:#?}", uuid);
 
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN]; // This is the filename string used to search for shmem.
                     write!(
                         &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
-                        "/libafl_{process_id}_{shmem_ctr}",
+                        "/libafl_{uuid}",
                     )?;
 
                     /* Open the shared memory segment as if it was a file */
                     let shm_fd = shm_open(filename_path.as_ptr() as *const _, libc::O_RDWR, 0o600);
+
+                    // println!("Using: filename_path {:?}", filename_path);
+
+                    if shm_fd == -1 {
+                        perror(b"shm_open\0".as_ptr() as *const _);
+                        return Err(Error::unknown(format!(
+                            "Failed to shm_open map with filename {filename_path:?}"
+                        )));
+                    }
 
                     /* map the shared memory segment to the address space of the process */
                     let map = mmap(
@@ -731,9 +740,7 @@ pub mod unix_shmem {
         /// A [`ShMemProvider`] which uses `shmget`/`shmat`/`shmctl` to provide shared memory mappings.
         #[cfg(unix)]
         #[derive(Clone, Debug)]
-        pub struct MmapShMemProvider {
-            current_shmem_id: u64,
-        }
+        pub struct MmapShMemProvider {}
 
         unsafe impl Send for MmapShMemProvider {}
 
@@ -750,13 +757,10 @@ pub mod unix_shmem {
             type ShMem = MmapShMem;
 
             fn new() -> Result<Self, Error> {
-                Ok(Self {
-                    current_shmem_id: 0,
-                })
+                Ok(Self {})
             }
             fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
-                self.current_shmem_id += 1;
-                MmapShMem::new(map_size, self.current_shmem_id)
+                MmapShMem::new(map_size)
             }
 
             fn shmem_from_id_and_size(
