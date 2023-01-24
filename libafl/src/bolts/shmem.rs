@@ -616,11 +616,11 @@ pub mod unix_shmem {
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN]; // This is the filename string used to search for shmem.
-                    let random_u64 = StdRand::with_seed(read_time_counter()).next_u64();
+                    let random_id = StdRand::with_seed(read_time_counter()).next_u32() as i32;
 
                     write!(
                         &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1], // Leave the last one as 0x00
-                        "/{random_u64}",
+                        "/{random_id}",
                     )?;
 
                     /* create the shared memory segment as if it was a file */
@@ -663,7 +663,7 @@ pub mod unix_shmem {
                         )));
                     }
 
-                    let id = ShMemId::from_array(&filename_path);
+                    let id = ShMemId::from_int(random_id);
 
                     Ok(Self {
                         filename_path: Some(filename_path),
@@ -677,7 +677,15 @@ pub mod unix_shmem {
 
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let filename_path = id.as_array();
+                    let id: i32 = id.into();
+                    let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN]; // This is the filename string used to search for shmem.
+
+                    write!(
+                        &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1], // Leave the last one as 0x00
+                        "/{}",
+                        id as u32
+                    )?;
+
                     /* Open the shared memory segment as if it was a file */
                     let shm_fd = shm_open(filename_path.as_ptr() as *const _, libc::O_RDWR, 0o600);
 
@@ -707,7 +715,7 @@ pub mod unix_shmem {
                         )));
                     }
 
-                    let id = ShMemId::from_array(filename_path);
+                    let id = ShMemId::from_int(id);
 
                     Ok(Self {
                         filename_path: None,
