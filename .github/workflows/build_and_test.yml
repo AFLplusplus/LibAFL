@@ -21,6 +21,8 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
+      - name: Run tests
+        run: RUST_BACKTRACE=full cargo test
       - name: install mdbook
         uses: baptiste0928/cargo-install@v1.3.0
         with:
@@ -45,8 +47,6 @@ jobs:
         # TODO: fix books test fail with updated windows-rs
         if: runner.os != 'Windows'
         run: cd docs && mdbook test -L ../target/debug/deps
-      - name: Run tests
-        run: cargo test
       - name: Test libafl no_std
         run: cd libafl && cargo test --no-default-features
       - name: Test libafl_targets no_std
