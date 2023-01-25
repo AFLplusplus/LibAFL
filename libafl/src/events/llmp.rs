@@ -38,7 +38,7 @@ use crate::{
 };
 use crate::{
     bolts::{
-        llmp::{self, Flags, LlmpClient, LlmpClientDescription, Tag},
+        llmp::{self, LlmpClient, LlmpClientDescription, Tag},
         shmem::ShMemProvider,
     },
     events::{
@@ -123,12 +123,13 @@ where
     }
 
     /// Run forever in the broker
+    #[cfg(not(feature = "llmp_broker_timeouts"))]
     pub fn broker_loop(&mut self) -> Result<(), Error> {
         let monitor = &mut self.monitor;
         #[cfg(feature = "llmp_compression")]
         let compressor = &self.compressor;
         self.llmp.loop_forever(
-            &mut |client_id: u32, tag: Tag, _flags: Flags, msg: &[u8]| {
+            &mut |client_id, tag, _flags, msg| {
                 if tag == LLMP_TAG_EVENT_TO_BOTH {
                     #[cfg(not(feature = "llmp_compression"))]
                     let event_bytes = msg;
@@ -150,6 +151,49 @@ where
                     Ok(llmp::LlmpMsgHookResult::ForwardToClients)
                 }
             },
+            Some(Duration::from_millis(5)),
+        );
+
+        Ok(())
+    }
+
+    /// Run forever in the broker
+    #[cfg(feature = "llmp_broker_timeouts")]
+    pub fn broker_loop(&mut self) -> Result<(), Error> {
+        let monitor = &mut self.monitor;
+        #[cfg(feature = "llmp_compression")]
+        let compressor = &self.compressor;
+        self.llmp.loop_with_timeouts(
+            &mut |msg_or_timeout| {
+                if let Some((client_id, tag, _flags, msg)) = msg_or_timeout {
+                    if tag == LLMP_TAG_EVENT_TO_BOTH {
+                        #[cfg(not(feature = "llmp_compression"))]
+                        let event_bytes = msg;
+                        #[cfg(feature = "llmp_compression")]
+                        let compressed;
+                        #[cfg(feature = "llmp_compression")]
+                        let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                            compressed = compressor.decompress(msg)?;
+                            &compressed
+                        } else {
+                            msg
+                        };
+                        let event: Event<I> = postcard::from_bytes(event_bytes)?;
+                        match Self::handle_in_broker(monitor, client_id, &event)? {
+                            BrokerEventResult::Forward => {
+                                Ok(llmp::LlmpMsgHookResult::ForwardToClients)
+                            }
+                            BrokerEventResult::Handled => Ok(llmp::LlmpMsgHookResult::Handled),
+                        }
+                    } else {
+                        Ok(llmp::LlmpMsgHookResult::ForwardToClients)
+                    }
+                } else {
+                    monitor.display("Timeout".into(), 0);
+                    Ok(llmp::LlmpMsgHookResult::Handled)
+                }
+            },
+            Duration::from_millis(1000),
             Some(Duration::from_millis(5)),
         );
 
@@ -453,7 +497,7 @@ where
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
-        let flags: Flags = LLMP_FLAG_INITIALIZED;
+        let flags = LLMP_FLAG_INITIALIZED;
 
         match self.compressor.compress(&serialized)? {
             Some(comp_buf) => {
@@ -1303,7 +1347,7 @@ where
             }
         };
         let serialized = postcard::to_allocvec(&converted_event)?;
-        let flags: Flags = LLMP_FLAG_INITIALIZED;
+        let flags = LLMP_FLAG_INITIALIZED;
 
         match self.compressor.compress(&serialized)? {
             Some(comp_buf) => {

@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["std", "derive", "llmp_compression", "rand_trait", "fork", "prelude", "gzip"]
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip"]
 std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "bincode", "wait-timeout", "regex", "byteorder", "once_cell", "uuid", "tui_monitor", "ctor", "backtrace", "uds"] # print, env, launcher ... support
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
@@ -43,6 +43,7 @@ llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device
 llmp_compression = ["gzip"] # llmp compression using GZip
 llmp_debug = [] # Enables debug output for LLMP
 llmp_small_maps = [] # reduces initial map size for llmp
+llmp_broker_timeouts = ["std"] # The broker loop will yield occasionally, even without status messages from client nodes
 
 [build-dependencies]
 rustversion = "1.0"
