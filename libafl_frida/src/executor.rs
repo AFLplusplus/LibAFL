@@ -27,7 +27,7 @@ use crate::windows_hooks::initialize;
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
 pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     S::Input: HasTargetBytes,
     S: UsesInput,
     OT: ObserversTuple<S>,
@@ -44,7 +44,7 @@ where
 
 impl<'a, 'b, 'c, H, OT, RT, S> Debug for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     S: UsesInput,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
@@ -62,7 +62,7 @@ impl<'a, 'b, 'c, EM, H, OT, RT, S, Z> Executor<EM, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     S: UsesInput,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
@@ -106,7 +106,7 @@ where
 
 impl<'a, 'b, 'c, H, OT, RT, S> UsesObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
     S::Input: HasTargetBytes,
@@ -116,7 +116,7 @@ where
 
 impl<'a, 'b, 'c, H, OT, RT, S> UsesState for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
     S::Input: HasTargetBytes,
@@ -126,7 +126,7 @@ where
 
 impl<'a, 'b, 'c, H, OT, RT, S> HasObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     S::Input: HasTargetBytes,
     S: UsesInput,
     OT: ObserversTuple<S>,
@@ -144,7 +144,7 @@ where
 
 impl<'a, 'b, 'c, H, OT, S, RT> FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     S: UsesInput,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
@@ -199,7 +199,7 @@ where
 impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHandlers
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     S: UsesInput + HasClientPerfMonitor + HasSolutions,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,

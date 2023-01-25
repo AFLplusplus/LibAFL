@@ -346,7 +346,7 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());

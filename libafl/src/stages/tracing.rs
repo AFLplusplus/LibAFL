@@ -48,7 +48,7 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         start_timer!(state);
-        let input = state
+        let mut input = state
             .corpus()
             .get(corpus_idx)?
             .borrow_mut()
@@ -65,7 +65,7 @@ where
         start_timer!(state);
         let exit_kind = self
             .tracer_executor
-            .run_target(fuzzer, state, manager, &input)?;
+            .run_target(fuzzer, state, manager, &mut input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -143,7 +143,8 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+        let mut input = input;
+        let exit_kind = executor.run_target(fuzzer, state, manager, &mut input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;

@@ -355,7 +355,7 @@ fn fuzz(
     );
 
     let dump_to_disk_stage = DumpToDiskStage::new(
-        |input : &mut EncodedInput| {
+        |input: &mut EncodedInput| {
             let mut dump_to_disk_bytes = vec![];
             encoder_decoder_harness.borrow_mut().repair(input);
             encoder_decoder_harness

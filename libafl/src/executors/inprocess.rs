@@ -57,8 +57,8 @@ pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
-    dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
-    Box<dyn FnMut(&<S as UsesInput>::Input) -> ExitKind>,
+    dyn FnMut(&mut <S as UsesInput>::Input) -> ExitKind,
+    Box<dyn FnMut(&mut <S as UsesInput>::Input) -> ExitKind>,
     OT,
     S,
 >;
@@ -67,7 +67,7 @@ pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
 #[allow(dead_code)]
 pub struct GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -83,7 +83,7 @@ where
 
 impl<H, HB, OT, S> Debug for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -98,7 +98,7 @@ where
 
 impl<H, HB, OT, S> UsesState for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -108,7 +108,7 @@ where
 
 impl<H, HB, OT, S> UsesObservers for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -118,7 +118,7 @@ where
 
 impl<EM, H, HB, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     EM: UsesState<State = S>,
     OT: ObserversTuple<S>,
@@ -130,7 +130,7 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
@@ -144,7 +144,7 @@ where
 
 impl<H, HB, OT, S> HasObservers for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -162,7 +162,7 @@ where
 
 impl<H, HB, OT, S> GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut <S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: HasSolutions + HasClientPerfMonitor,
@@ -246,7 +246,7 @@ pub trait HasInProcessHandlers {
 #[cfg(windows)]
 impl<'a, H, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, OT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
 {
@@ -344,7 +344,7 @@ impl InProcessHandlers {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = E::State>,
-        H: FnMut(&<E::State as UsesInput>::Input) -> ExitKind + ?Sized,
+        H: FnMut(&mut <E::State as UsesInput>::Input) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
         unsafe {
@@ -1419,7 +1419,7 @@ impl Handler for InProcessForkExecutorGlobalData {
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1435,7 +1435,7 @@ where
 #[cfg(all(feature = "std", target_os = "linux"))]
 pub struct TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1451,7 +1451,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> Debug for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1467,7 +1467,7 @@ where
 #[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, H, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1484,7 +1484,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesState for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1495,7 +1495,7 @@ where
 #[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, H, OT, S, SP> UsesState for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1507,7 +1507,7 @@ where
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1520,7 +1520,7 @@ where
         _fuzzer: &mut Z,
         state: &mut Self::State,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             self.shmem_provider.pre_fork()?;
@@ -1575,7 +1575,7 @@ where
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1588,7 +1588,7 @@ where
         _fuzzer: &mut Z,
         state: &mut Self::State,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             self.shmem_provider.pre_fork()?;
@@ -1662,7 +1662,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1708,7 +1708,7 @@ where
 #[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, H, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     S: UsesInput,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
@@ -1770,7 +1770,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesObservers for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1781,7 +1781,7 @@ where
 #[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, H, OT, S, SP> UsesObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1792,7 +1792,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     S: UsesInput,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
@@ -1811,7 +1811,7 @@ where
 #[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, H, OT, S, SP> HasObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     S: UsesInput,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,

@@ -68,6 +68,14 @@ where
         Ok(self.input.as_ref().unwrap())
     }
 
+    /// Returns this testcase with a loaded input
+    pub fn load_input_mut(&mut self) -> Result<&mut I, Error> {
+        if self.input.is_none() {
+            self.input = Some(I::from_file(self.filename.as_ref().unwrap())?);
+        }
+        Ok(self.input.as_mut().unwrap())
+    }
+
     /// Store the input to disk if possible
     pub fn store_input(&mut self) -> Result<bool, Error> {
         match self.filename() {

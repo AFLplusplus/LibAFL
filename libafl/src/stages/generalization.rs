@@ -134,8 +134,10 @@ where
             (payload, original, meta.as_slice().to_vec())
         };
 
+        let mut original = original;
+
         // Do not generalized unstable inputs
-        if !self.verify_input(fuzzer, executor, state, manager, &novelties, &original)? {
+        if !self.verify_input(fuzzer, executor, state, manager, &novelties, &mut original)? {
             return Ok(());
         }
 
@@ -382,7 +384,7 @@ where
         state: &mut EM::State,
         manager: &mut EM,
         novelties: &[usize],
-        input: &BytesInput,
+        input: &mut BytesInput,
     ) -> Result<bool, Error>
     where
         E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
@@ -448,7 +450,7 @@ where
                 .bytes_mut()
                 .extend(payload[end..].iter().flatten());
 
-            if self.verify_input(fuzzer, executor, state, manager, novelties, &candidate)? {
+            if self.verify_input(fuzzer, executor, state, manager, novelties, &mut candidate)? {
                 for item in &mut payload[start..end] {
                     *item = None;
                 }
@@ -501,7 +503,14 @@ where
                         .bytes_mut()
                         .extend(payload[end..].iter().flatten());
 
-                    if self.verify_input(fuzzer, executor, state, manager, novelties, &candidate)? {
+                    if self.verify_input(
+                        fuzzer,
+                        executor,
+                        state,
+                        manager,
+                        novelties,
+                        &mut candidate,
+                    )? {
                         for item in &mut payload[start..end] {
                             *item = None;
                         }

@@ -42,7 +42,7 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Z::State as UsesInput>::Input) -> Result<Vec<u8>, Error>,
+    CB: FnMut(&mut <Z::State as UsesInput>::Input) -> Result<Vec<u8>, Error>,
     EM: UsesState<State = Z::State>,
     E: UsesState<State = Z::State>,
     Z: UsesState,
@@ -69,7 +69,7 @@ where
 
         while let Some(i) = corpus_idx {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
-            let input = testcase.load_input()?;
+            let input = testcase.load_input_mut()?;
             let bytes = (self.to_bytes)(input)?;
 
             let fname = self.corpus_dir.join(format!("id_{i}"));
@@ -81,7 +81,7 @@ where
 
         while let Some(i) = solutions_idx {
             let mut testcase = state.solutions().get(i)?.borrow_mut();
-            let input = testcase.load_input()?;
+            let input = testcase.load_input_mut()?;
             let bytes = (self.to_bytes)(input)?;
 
             let fname = self.solutions_dir.join(format!("id_{i}"));
@@ -102,7 +102,7 @@ where
 
 impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Z::State as UsesInput>::Input) -> Result<Vec<u8>, Error>,
+    CB: FnMut(&mut <Z::State as UsesInput>::Input) -> Result<Vec<u8>, Error>,
     EM: UsesState<State = Z::State>,
     Z: UsesState,
     Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,

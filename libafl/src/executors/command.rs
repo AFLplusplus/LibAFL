@@ -307,7 +307,7 @@ where
         _fuzzer: &mut Z,
         _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 

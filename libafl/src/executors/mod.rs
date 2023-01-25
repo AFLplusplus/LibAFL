@@ -121,7 +121,7 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error>;
 
     /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
@@ -167,7 +167,7 @@ where
         _fuzzer: &mut Z,
         _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         if input.target_bytes().as_slice().is_empty() {
             Err(Error::empty("Input Empty"))
