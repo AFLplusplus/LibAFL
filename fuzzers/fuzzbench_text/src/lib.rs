@@ -48,16 +48,14 @@ use libafl::{
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
-        StdMutationalStage, TracingStage,
+        StdMutationalStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
-use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
-};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 #[cfg(unix)]
 use nix::{self, unistd::dup};
 
@@ -309,8 +307,6 @@ fn fuzz_binary(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let cmplog_observer = CmpLogObserver::new("cmplog", true);
-
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 
     let calibration = CalibrationStage::new(&map_feedback);
@@ -376,14 +372,12 @@ fn fuzz_binary(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |input: &mut BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };
-
-    let mut tracing_harness = harness;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = TimeoutExecutor::new(
@@ -397,21 +391,8 @@ fn fuzz_binary(
         timeout,
     );
 
-    // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(TimeoutExecutor::new(
-        InProcessExecutor::new(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?,
-        // Give it more time!
-        timeout * 10,
-    ));
-
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, i2s, power);
+    let mut stages = tuple_list!(calibration, i2s, power);
 
     // Read tokens
     if state.metadata().get::<Tokens>().is_none() {
@@ -510,8 +491,6 @@ fn fuzz_text(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let cmplog_observer = CmpLogObserver::new("cmplog", true);
-
     // New maximization map feedback linked to the edges observer and the feedback state
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
 
@@ -591,14 +570,12 @@ fn fuzz_text(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |input: &mut BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };
-
-    let mut tracing_harness = harness;
 
     let generalization = GeneralizationStage::new(&edges_observer);
 
@@ -614,21 +591,8 @@ fn fuzz_text(
         timeout,
     );
 
-    // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(TimeoutExecutor::new(
-        InProcessExecutor::new(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?,
-        // Give it more time!
-        timeout * 10,
-    ));
-
     // The order of the stages matter!
-    let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);
+    let mut stages = tuple_list!(generalization, calibration, i2s, power, grimoire);
 
     // Read tokens
     if state.metadata().get::<Tokens>().is_none() {
