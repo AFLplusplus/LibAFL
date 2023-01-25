@@ -714,7 +714,7 @@ pub mod unix_shmem {
 
             /// Get `filename_path`
             #[must_use]
-            pub fn filename_path(&self) -> &Option<[u8; 256]> {
+            pub fn filename_path(&self) -> &Option<[u8; MAX_MMAP_FILENAME_LEN]> {
                 &self.filename_path
             }
         }
