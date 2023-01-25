@@ -43,8 +43,7 @@ pub fn fuzz(
         let mut run_client = make_fuzz_closure!(options, harness, do_fuzz);
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
         let cores = Cores::from((0..forks).collect::<Vec<_>>());
-        let broker_listener = TcpListener::bind("0.0.0.0:0");
-        let broker_port = broker_listener.local_addr().unwrap().port();
+        let broker_port = TcpListener::bind("0.0.0.0:0")?.local_addr().unwrap().port();
 
         let monitor = TuiMonitor::new(options.fuzzer_name().to_string(), true);
 

@@ -2,6 +2,7 @@ use core::ffi::{c_char, c_int, CStr};
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
+pub(crate) mod feedbacks;
 mod fuzz;
 mod options;
 
@@ -46,7 +47,7 @@ macro_rules! make_fuzz_closure {
                 tuples::{Merge, tuple_list},
                 AsSlice,
             },
-            corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, ondisk::OnDiskMetadataFormat},
+            corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
             executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
             feedback_and_fast, feedback_or, feedback_or_fast,
             feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
@@ -73,6 +74,7 @@ macro_rules! make_fuzz_closure {
 
         use crate::CustomMutationStatus;
         use crate::BACKTRACE;
+        use crate::feedbacks::LibfuzzerKeepFeedback;
 
         |state: Option<_>, mut mgr, _cpu_id| {
             let mutator_status = CustomMutationStatus::new();
@@ -99,6 +101,9 @@ macro_rules! make_fuzz_closure {
             let edges_observer =
                 HitcountsIterableMapObserver::new(MultiMapObserver::new("edges", edges));
 
+            let keep_observer = LibfuzzerKeepFeedback::new();
+            let keep = keep_observer.keep();
+
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
 
@@ -123,10 +128,13 @@ macro_rules! make_fuzz_closure {
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
-            let mut feedback = feedback_or!(
-                map_feedback,
-                // Time feedback, this one does not need a feedback state
-                TimeFeedback::with_observer(&time_observer)
+            let mut feedback = feedback_and_fast!(
+                keep_observer,
+                feedback_or!(
+                    map_feedback,
+                    // Time feedback, this one does not need a feedback state
+                    TimeFeedback::with_observer(&time_observer)
+                )
             );
 
             // A feedback to choose if an input is a solution or not
@@ -295,7 +303,10 @@ macro_rules! make_fuzz_closure {
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
                 let buf = target.as_slice();
-                $harness(buf.as_ptr(), buf.len());
+
+                let result = $harness(buf.as_ptr(), buf.len());
+                *keep.borrow_mut() = result == 0;
+
                 ExitKind::Ok
             };
 
