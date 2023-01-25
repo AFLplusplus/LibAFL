@@ -9,7 +9,6 @@ use alloc::{
     vec::Vec,
 };
 #[cfg(feature = "std")]
-use core::str::from_utf8;
 use core::{cell::RefCell, convert::From, hash::Hasher};
 
 use ahash::AHasher;
@@ -304,8 +303,10 @@ impl Tokenizer for NaiveTokenizer {
         encoding_type: TokenizationKind,
     ) -> Result<Vec<String>, Error> {
         let mut tokens = vec![];
-        let string =
-            from_utf8(bytes).map_err(|_| Error::illegal_argument("Invalid UTF-8".to_owned()))?;
+        let stringer = String::from_utf8_lossy(bytes).into_owned();//.unwrap();
+        let string : &str = &stringer;
+//        let stringer = String::from_utf8_lossy(bytes);//.map_err(|_| Error::illegal_argument("Invalid UTF-8".to_owned()))?;
+//        let string = &str::from(stringer);
         let string = self.comment_re.replace_all(string, "").to_string();
         let mut str_prev = 0;
         for str_match in self.string_re.find_iter(&string) {
