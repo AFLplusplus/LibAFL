@@ -593,8 +593,10 @@ pub mod unix_shmem {
             pub __glibc_reserved5: c_ulong,
         }
 
+        // This is macOS's limit
+        // https://stackoverflow.com/questions/38049068/osx-shm-open-returns-enametoolong
         #[cfg(target_vendor = "apple")]
-        const MAX_MMAP_FILENAME_LEN: usize = 32;
+        const MAX_MMAP_FILENAME_LEN: usize = 31;
 
         #[cfg(not(target_vendor = "apple"))]
         const MAX_MMAP_FILENAME_LEN: usize = 256;
