@@ -554,7 +554,7 @@ pub mod unix_shmem {
 
         use crate::{
             bolts::{
-                current_nanos,
+                rands::{Rand, RandomSeed, StdRand},
                 shmem::{ShMem, ShMemId, ShMemProvider},
                 AsMutSlice, AsSlice,
             },
@@ -593,6 +593,10 @@ pub mod unix_shmem {
             pub __glibc_reserved5: c_ulong,
         }
 
+        #[cfg(target_vendor = "apple")]
+        const MAX_MMAP_FILENAME_LEN: usize = 32;
+
+        #[cfg(not(target_vendor = "apple"))]
         const MAX_MMAP_FILENAME_LEN: usize = 256;
 
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
@@ -615,15 +619,14 @@ pub mod unix_shmem {
 
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
-            pub fn new(map_size: usize) -> Result<Self, Error> {
+            pub fn new(map_size: usize, rand_id: u32) -> Result<Self, Error> {
                 unsafe {
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
-                    let current_time = current_nanos();
                     write!(
                         &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
                         "/libafl_{}_{}",
                         process::id(),
-                        current_time
+                        rand_id
                     )?;
 
                     /* create the shared memory segment as if it was a file */
@@ -717,7 +720,9 @@ pub mod unix_shmem {
         /// A [`ShMemProvider`] which uses `shmget`/`shmat`/`shmctl` to provide shared memory mappings.
         #[cfg(unix)]
         #[derive(Clone, Debug)]
-        pub struct MmapShMemProvider {}
+        pub struct MmapShMemProvider {
+            rand: StdRand,
+        }
 
         unsafe impl Send for MmapShMemProvider {}
 
@@ -734,10 +739,13 @@ pub mod unix_shmem {
             type ShMem = MmapShMem;
 
             fn new() -> Result<Self, Error> {
-                Ok(Self {})
+                Ok(Self {
+                    rand: StdRand::new(),
+                })
             }
             fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
-                MmapShMem::new(map_size)
+                let id = self.rand.next() as u32;
+                MmapShMem::new(map_size, id)
             }
 
             fn shmem_from_id_and_size(
