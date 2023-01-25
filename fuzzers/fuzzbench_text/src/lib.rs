@@ -22,7 +22,7 @@ use libafl::{
         os::dup2,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
+        tuples::{tuple_list},
         AsSlice,
     },
     corpus::{Corpus, OnDiskCorpus},
@@ -38,7 +38,6 @@ use libafl::{
             GrimoireExtensionMutator, GrimoireRandomDeleteMutator,
             GrimoireRecursiveReplacementMutator, GrimoireStringReplacementMutator,
         },
-        scheduled::havoc_mutations,
         token_mutations::I2SRandReplace,
         tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
     },
@@ -356,7 +355,7 @@ fn fuzz_binary(
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(
         &mut state,
-        havoc_mutations().merge(tokens_mutations()),
+        tokens_mutations(),
         7,
         5,
     )?;
@@ -541,7 +540,7 @@ fn fuzz_text(
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(
         &mut state,
-        havoc_mutations().merge(tokens_mutations()),
+        tokens_mutations(),
         7,
         5,
     )?;
