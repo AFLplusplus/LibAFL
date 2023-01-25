@@ -170,13 +170,15 @@ pub fn libafl_main() {
             .expect("Could not parse timeout in milliseconds"),
     );
 
-    if check_if_textual(&in_dir, &tokens) {
+//    if check_if_textual(&in_dir, &tokens) {
         fuzz_text(out_dir, crashes, &in_dir, tokens, &logfile, timeout)
             .expect("An error occurred while fuzzing");
+/*
     } else {
         fuzz_binary(out_dir, crashes, &in_dir, tokens, &logfile, timeout)
             .expect("An error occurred while fuzzing");
     }
+*/
 }
 
 fn count_textual_inputs(dir: &Path) -> (usize, usize) {
@@ -252,6 +254,7 @@ fn run_testcases(filenames: &[&str]) {
     }
 }
 
+/*
 /// The actual fuzzer
 #[allow(clippy::too_many_lines)]
 fn fuzz_binary(
@@ -435,6 +438,7 @@ fn fuzz_binary(
     // Never reached
     Ok(())
 }
+*/
 
 /// The actual fuzzer based on `Grimoire`
 #[allow(clippy::too_many_lines)]
