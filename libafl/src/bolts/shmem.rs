@@ -87,7 +87,7 @@ impl ShMemDescription {
 /// Id is a file descriptor if you use `MmapShMem` or `AshmemShMem`.
 /// That means you have to use shmem server to access to the shmem segment from other processes in these cases.
 /// On the other hand, id is a unique identifier if you use `CommonUnixShMem` or `Win32ShMem`.
-/// In these two cases, you can use shmat() or `OpenFileMappingA`() to gain access to the shmem
+/// In these two cases, you can use shmat(id) or `OpenFileMappingA`(id) to gain access to the shmem
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct ShMemId {
     id: [u8; 20],
