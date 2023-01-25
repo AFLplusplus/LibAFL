@@ -32,7 +32,7 @@ use crate::{
 pub enum TokenizationKind {
     /// NoWhitespace - do not encode whitespace, every token will be separated by a space
     NoWhitespace,
-    /// WithWhitespace - also encode whitespace (continiously)
+    /// WithWhitespace - also encode whitespace (continuously)
     WithWhitespace,
 }
 
