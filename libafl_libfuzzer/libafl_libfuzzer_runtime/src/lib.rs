@@ -58,7 +58,7 @@ macro_rules! make_fuzz_closure {
                 GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
                 I2SRandReplace, StdMOptMutator, StdScheduledMutator, Tokens, tokens_mutations
             },
-            observers::{BacktraceObserver, HitcountsIterableMapObserver, MultiMapObserver, TimeObserver},
+            observers::{BacktraceObserver, HitcountsMapObserver, StdMapObserver, TimeObserver},
             schedulers::{
                 powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
             },
@@ -98,8 +98,9 @@ macro_rules! make_fuzz_closure {
 
             // Create an observation channel using the coverage map
             let edges = unsafe { &mut COUNTERS_MAPS };
+            assert_eq!(1, edges.len());
             let edges_observer =
-                HitcountsIterableMapObserver::new(MultiMapObserver::new("edges", edges));
+                HitcountsMapObserver::new(unsafe { StdMapObserver::new("edges", &mut edges[0]) });
 
             let keep_observer = LibfuzzerKeepFeedback::new();
             let keep = keep_observer.keep();
