@@ -89,6 +89,11 @@ pub mod sancov_8bit;
 #[cfg(feature = "sancov_8bit")]
 pub use sancov_8bit::*;
 
+#[cfg(feature = "dataflow")]
+pub mod dataflow;
+#[cfg(feature = "dataflow")]
+pub use dataflow::*;
+
 pub mod coverage;
 pub use coverage::*;
 
@@ -108,5 +113,6 @@ pub use windows_asan::*;
 
 #[cfg(unix)]
 pub mod forkserver;
+
 #[cfg(unix)]
 pub use forkserver::*;

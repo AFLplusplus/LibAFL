@@ -105,6 +105,21 @@ fn main() {
 
     common.file(src_dir.join("common.c")).compile("common");
 
+    #[cfg(feature = "dataflow")]
+    {
+        let bindings = bindgen::builder()
+            .header("src/dataflow.h")
+            // Tell cargo to invalidate the built crate whenever any of the
+            // included header files changed.
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+            // Finish the builder and generate the bindings.
+            .generate()
+            .unwrap();
+        bindings
+            .write_to_file(<String as AsRef<Path>>::as_ref(&out_dir).join("dfsan_interface.rs"))
+            .expect("Couldn't write bindings!");
+    }
+
     println!("cargo:rerun-if-changed=src/coverage.c");
 
     cc::Build::new()
