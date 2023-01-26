@@ -320,30 +320,29 @@ impl Tokenizer for NaiveTokenizer {
                     let substring = string[str_prev..str_match.start()].to_owned();
                     for ident_match in self.ident_re.find_iter(&substring) {
                         if ident_match.start() > ident_prev {
-                            let mut ws_start = 0;
-                            for cnt in ident_prev..ident_match.start() {
-                                if substring.chars().nth(cnt).unwrap_or('x').is_whitespace() {
-                                    if ws_start == 0 {
-                                        ws_start = cnt;
-                                    }
+                            let mut ws = String::from("");
+                            let s = &substring[ident_prev..ident_match.start()];
+                            for c in s.chars() {
+                                if c.is_whitespace() {
+                                    ws.push_str(&c.to_string());
                                 } else {
-                                    if ws_start > 0 {
-                                        tokens.push(substring[ws_start..cnt].to_owned());
-                                        ws_start = 0;
+                                    if ws.len() > 0 {
+                                        tokens.push(ws);
+                                        ws = "".to_string();
                                     }
-                                    tokens.push(substring[cnt..=cnt].to_owned());
+                                    tokens.push(c.to_string());
                                 }
                             }
-                            if ws_start > 0 {
-                                tokens.push(substring[ws_start..ident_match.start()].to_owned());
+                            if ws.len() > 0 {
+                                tokens.push(ws);
                             }
                         }
                         tokens.push(substring[ident_match.start()..ident_match.end()].to_owned());
                         ident_prev = ident_match.end();
                     }
                     if ident_prev < substring.len() {
-                        for cnt in ident_prev..substring.len() {
-                            tokens.push(substring[cnt..=cnt].to_owned());
+                        for c in substring[ident_prev..substring.len()].chars() {
+                            tokens.push(c.to_string());
                         }
                     }
                 } else {
@@ -352,16 +351,16 @@ impl Tokenizer for NaiveTokenizer {
                         let mut ident_prev = 0;
                         for ident_match in self.ident_re.find_iter(ws_tok) {
                             if ident_match.start() > ident_prev {
-                                for cnt in ident_prev..ident_match.start() {
-                                    tokens.push(ws_tok[cnt..=cnt].to_owned());
+                                for c in ws_tok[ident_prev..ident_match.start()].chars() {
+                                    tokens.push(c.to_string());
                                 }
                             }
                             tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
                             ident_prev = ident_match.end();
                         }
                         if ident_prev < ws_tok.len() {
-                            for cnt in ident_prev..ws_tok.len() {
-                                tokens.push(ws_tok[cnt..=cnt].to_owned());
+                            for c in ws_tok[ident_prev..ws_tok.len()].chars() {
+                                tokens.push(c.to_string());
                             }
                         }
                     }
@@ -376,30 +375,29 @@ impl Tokenizer for NaiveTokenizer {
                 let substring = string[str_prev..].to_owned();
                 for ident_match in self.ident_re.find_iter(&substring) {
                     if ident_match.start() > ident_prev {
-                        let mut ws_start = 0;
-                        for cnt in ident_prev..ident_match.start() {
-                            if substring.chars().nth(cnt).unwrap_or('x').is_whitespace() {
-                                if ws_start == 0 {
-                                    ws_start = cnt;
-                                }
+                        let mut ws = String::from("");
+                        let s = &substring[ident_prev..ident_match.start()];
+                        for c in s.chars() {
+                            if c.is_whitespace() {
+                                ws.push_str(&c.to_string());
                             } else {
-                                if ws_start > 0 {
-                                    tokens.push(substring[ws_start..cnt].to_owned());
-                                    ws_start = 0;
+                                if ws.len() > 0 {
+                                    tokens.push(ws);
+                                    ws = "".to_string();
                                 }
-                                tokens.push(substring[cnt..=cnt].to_owned());
+                                tokens.push(c.to_string());
                             }
                         }
-                        if ws_start > 0 {
-                            tokens.push(substring[ws_start..ident_match.start()].to_owned());
+                        if ws.len() > 0 {
+                            tokens.push(ws);
                         }
                     }
                     tokens.push(substring[ident_match.start()..ident_match.end()].to_owned());
                     ident_prev = ident_match.end();
                 }
                 if ident_prev < substring.len() {
-                    for cnt in ident_prev..substring.len() {
-                        tokens.push(substring[cnt..=cnt].to_owned());
+                    for c in substring[ident_prev..substring.len()].chars() {
+                        tokens.push(c.to_string());
                     }
                 }
             } else {
@@ -408,16 +406,16 @@ impl Tokenizer for NaiveTokenizer {
                     let mut ident_prev = 0;
                     for ident_match in self.ident_re.find_iter(ws_tok) {
                         if ident_match.start() > ident_prev {
-                            for cnt in ident_prev..ident_match.start() {
-                                tokens.push(ws_tok[cnt..=cnt].to_owned());
+                            for c in ws_tok[ident_prev..ident_match.start()].chars() {
+                                tokens.push(c.to_string());
                             }
                         }
                         tokens.push(ws_tok[ident_match.start()..ident_match.end()].to_owned());
                         ident_prev = ident_match.end();
                     }
                     if ident_prev < ws_tok.len() {
-                        for cnt in ident_prev..ws_tok.len() {
-                            tokens.push(ws_tok[cnt..=cnt].to_owned());
+                        for c in ws_tok[ident_prev..ws_tok.len()].chars() {
+                            tokens.push(c.to_string());
                         }
                     }
                 }
