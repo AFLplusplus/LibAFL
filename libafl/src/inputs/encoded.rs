@@ -324,7 +324,7 @@ impl Tokenizer for NaiveTokenizer {
                             let s = &substring[ident_prev..ident_match.start()];
                             for c in s.chars() {
                                 if c.is_whitespace() {
-                                    ws.push_str(&c.to_string());
+                                    ws.push(c);
                                 } else {
                                     if ws.len() > 0 {
                                         tokens.push(ws);
@@ -379,7 +379,7 @@ impl Tokenizer for NaiveTokenizer {
                         let s = &substring[ident_prev..ident_match.start()];
                         for c in s.chars() {
                             if c.is_whitespace() {
-                                ws.push_str(&c.to_string());
+                                ws.push(c);
                             } else {
                                 if ws.len() > 0 {
                                     tokens.push(ws);
