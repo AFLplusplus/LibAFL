@@ -3,7 +3,6 @@ name = "baby_fuzzer_dataflow"
 version = "0.7.1"
 authors = ["Addison Crump <research@addisoncrump.info>"]
 edition = "2021"
-default-run = "fuzzer_sd"
 
 [features]
 tui = []
@@ -19,22 +18,10 @@ codegen-units = 1
 opt-level = 3
 debug = true
 
-[build-dependencies]
-anyhow = "1"
-bindgen = "0.61"
-cc = "1.0"
-
 [dependencies]
 libafl = { path = "../../libafl" }
-libafl_targets = { path = "../../libafl_targets", features = ["sancov_pcguard_hitcounts", "libfuzzer", "sancov_cmplog", "dataflow"] }
+libafl_targets = { path = "../../libafl_targets", features = ["libfuzzer", "dataflow"] }
 mimalloc = { version = "*", default-features = false }
 
-libafl_cc = { path = "../../libafl_cc/" }
-
-[[bin]]
-name = "fuzzer_sd"
-path = "src/main.rs"
-
-[[bin]]
-name = "libafl_cc"
-path = "src/bin/libafl_cc.rs"
+[lib]
+crate-type = ["staticlib"]

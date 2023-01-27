@@ -80,6 +80,35 @@ fn main() {
             .compile("sancov_cmp");
     }
 
+    #[cfg(feature = "dataflow")]
+    {
+        println!("cargo:rerun-if-changed=src/dataflow.h");
+        println!("cargo:rerun-if-changed=src/dataflow.c");
+
+        let bindings = bindgen::builder()
+            .header("src/dataflow.h")
+            // Tell cargo to invalidate the built crate whenever any of the
+            // included header files changed.
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+            // Finish the builder and generate the bindings.
+            .generate()
+            .unwrap();
+        bindings
+            .write_to_file(<String as AsRef<Path>>::as_ref(&out_dir).join("dfsan_interface.rs"))
+            .expect("Couldn't write bindings!");
+
+        let mut build = cc::Build::new();
+        assert!(
+            build.get_compiler().is_like_clang(),
+            "Clang MUST be used to build dataflow support!"
+        );
+        build
+            .file("src/dataflow.c")
+            .flag("-fsanitize=dataflow")
+            .opt_level(2)
+            .compile("dataflow");
+    }
+
     #[cfg(feature = "libfuzzer")]
     {
         println!("cargo:rerun-if-changed=src/libfuzzer.c");
@@ -89,6 +118,8 @@ fn main() {
 
         #[cfg(feature = "libfuzzer_no_link_main")]
         libfuzzer.define("FUZZER_NO_LINK_MAIN", "1");
+        #[cfg(feature = "dataflow")]
+        libfuzzer.flag("-fsanitize=dataflow");
 
         libfuzzer.compile("libfuzzer");
     }
@@ -104,21 +135,6 @@ fn main() {
     }
 
     common.file(src_dir.join("common.c")).compile("common");
-
-    #[cfg(feature = "dataflow")]
-    {
-        let bindings = bindgen::builder()
-            .header("src/dataflow.h")
-            // Tell cargo to invalidate the built crate whenever any of the
-            // included header files changed.
-            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-            // Finish the builder and generate the bindings.
-            .generate()
-            .unwrap();
-        bindings
-            .write_to_file(<String as AsRef<Path>>::as_ref(&out_dir).join("dfsan_interface.rs"))
-            .expect("Couldn't write bindings!");
-    }
 
     println!("cargo:rerun-if-changed=src/coverage.c");
 

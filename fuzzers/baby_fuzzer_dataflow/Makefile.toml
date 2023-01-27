@@ -1,21 +1,25 @@
 # Variables
 [env]
-FUZZER_NAME='fuzzer_sd'
+FUZZER_NAME='fuzzer_dataflow'
 CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-LIBAFL_CC = '${CARGO_TARGET_DIR}/release/libafl_cc'
-FUZZER = '${CARGO_TARGET_DIR}/release/${FUZZER_NAME}'
+FUZZER_RUNTIME = '${CARGO_TARGET_DIR}/release/libbaby_fuzzer_dataflow.a'
 PROJECT_DIR = { script = ["pwd"] }
 
-# Compilers
-[tasks.cc]
-command = "cargo"
-args = ["build" , "--release", "--bin", "libafl_cc"]
-
 # Harness
-[tasks.fuzzer]
+[tasks.harness]
 command = "cargo"
-args = ["build" , "--release", "--bin", "${FUZZER_NAME}"]
-dependencies = [ "cc" ]
+args = ["build" , "--release"]
+
+# Target
+[tasks.target]
+command = "clang"
+args = ["-c", "-fsanitize=dataflow", "-fsanitize-coverage=trace-pc-guard,pc-table,bb,trace-cmp", "target.c", "-o", "target.o"]
+
+# Link
+[tasks.fuzzer]
+command = "clang"
+args = ["-fsanitize=dataflow", "-dfsan-abilist=done_abilist.txt", "target.o", "${FUZZER_RUNTIME}", "-o", "${FUZZER_NAME}"]
+dependencies = [ "harness", "target" ]
 
 # Run the fuzzer
 [tasks.run]
