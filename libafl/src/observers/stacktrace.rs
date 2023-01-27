@@ -92,8 +92,8 @@ impl<'a> BacktraceObserver<'a> {
 impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
     /// Gets the hash value of this observer.
     #[must_use]
-    fn hash(&self) -> &Option<u64> {
-        self.hash.as_ref()
+    fn hash(&self) -> Option<u64> {
+        *self.hash.as_ref()
     }
 }
 
@@ -229,8 +229,8 @@ impl AsanBacktraceObserver {
 impl ObserverWithHashField for AsanBacktraceObserver {
     /// Gets the hash value of this observer.
     #[must_use]
-    fn hash(&self) -> &Option<u64> {
-        &self.hash
+    fn hash(&self) -> Option<u64> {
+        self.hash
     }
 }
 

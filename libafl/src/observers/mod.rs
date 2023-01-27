@@ -280,7 +280,7 @@ where
 /// A trait for [`Observer`]`s` with a hash field
 pub trait ObserverWithHashField {
     /// get the value of the hash field
-    fn hash(&self) -> &Option<u64>;
+    fn hash(&self) -> Option<u64>;
 }
 
 /// A trait for [`Observer`]`s` which observe over differential execution.
