@@ -118,8 +118,6 @@ fn main() {
 
         #[cfg(feature = "libfuzzer_no_link_main")]
         libfuzzer.define("FUZZER_NO_LINK_MAIN", "1");
-        #[cfg(feature = "dataflow")]
-        libfuzzer.flag("-fsanitize=dataflow");
 
         libfuzzer.compile("libfuzzer");
     }

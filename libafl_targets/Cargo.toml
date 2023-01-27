@@ -25,7 +25,7 @@ sancov_value_profile = []
 sancov_8bit = []
 sancov_cmplog = []
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
-dataflow = ["libfuzzer", "bindgen"]
+dataflow = ["bindgen"]
 clippy = [] # Ignore compiler warnings during clippy
 
 [build-dependencies]

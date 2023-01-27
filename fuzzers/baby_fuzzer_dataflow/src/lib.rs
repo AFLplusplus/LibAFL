@@ -13,6 +13,7 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::inprocess::InProcessExecutor,
+    feedback_or,
     feedbacks::CrashFeedback,
     fuzzer::{Fuzzer, StdFuzzer},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
@@ -25,8 +26,16 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use libafl::generators::RandBytesGenerator;
-use libafl_targets::{create_dfsan_harness, DFSanMapFeedback, DFSanObserver};
+use libafl::{
+    feedbacks::MaxMapFeedback,
+    generators::RandBytesGenerator,
+    mutators::BytesInsertMutator,
+    observers::{HitcountsMapObserver, StdMapObserver},
+};
+use libafl_targets::{
+    create_dfsan_harness, DFSanMapFeedback, DFSanObserver, DataflowCmplogTracingStage,
+    DataflowI2SMutator, EDGES_MAP, MAX_EDGES_NUM,
+};
 
 #[allow(clippy::similar_names)]
 #[allow(clippy::too_many_lines)]
@@ -34,10 +43,16 @@ use libafl_targets::{create_dfsan_harness, DFSanMapFeedback, DFSanObserver};
 pub fn main() {
     // The closure that we want to fuzz
     let mut harness = create_dfsan_harness();
-    let map_observer = DFSanObserver::new().unwrap();
+    let dfsan_observer = DFSanObserver::new();
+    let edges_observer = HitcountsMapObserver::new(unsafe {
+        StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
+    });
 
     // Feedback to rate the interestingness of an input
-    let mut feedback = DFSanMapFeedback::new(&map_observer);
+    let mut feedback = feedback_or!(
+        DFSanMapFeedback::new(&dfsan_observer),
+        MaxMapFeedback::new(&edges_observer)
+    );
 
     // A feedback to choose if an input is a solution or not
     // Crash here means "both crashed", which is our objective
@@ -79,7 +94,7 @@ pub fn main() {
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
         &mut harness,
-        tuple_list!(map_observer),
+        tuple_list!(dfsan_observer, edges_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
@@ -95,8 +110,15 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let i2s = StdScheduledMutator::new(tuple_list!(DataflowI2SMutator::new()));
+    let mutator = StdScheduledMutator::new(tuple_list!(BytesInsertMutator::new()));
+
+    let cmplog = DataflowCmplogTracingStage::new();
+    let mut stages = tuple_list!(
+        cmplog,
+        StdMutationalStage::new(mutator),
+        StdMutationalStage::new(i2s)
+    );
 
     while state.solutions().is_empty() {
         fuzzer

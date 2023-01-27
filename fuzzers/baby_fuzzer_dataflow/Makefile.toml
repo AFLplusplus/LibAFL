@@ -13,12 +13,12 @@ args = ["build" , "--release"]
 # Target
 [tasks.target]
 command = "clang"
-args = ["-c", "-fsanitize=dataflow", "-fsanitize-coverage=trace-pc-guard,pc-table,bb,trace-cmp", "target.c", "-o", "target.o"]
+args = ["-c", "-gdwarf-4", "-fsanitize=dataflow", "-fsanitize-coverage=trace-pc-guard,pc-table,trace-cmp", "target.c", "-o", "target.o"]
 
 # Link
 [tasks.fuzzer]
 command = "clang"
-args = ["-fsanitize=dataflow", "-dfsan-abilist=done_abilist.txt", "target.o", "${FUZZER_RUNTIME}", "-o", "${FUZZER_NAME}"]
+args = ["-gdwarf-4", "-fsanitize=dataflow", "-dfsan-abilist=done_abilist.txt", "target.o", "${FUZZER_RUNTIME}", "-o", "${FUZZER_NAME}"]
 dependencies = [ "harness", "target" ]
 
 # Run the fuzzer

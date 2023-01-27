@@ -43,6 +43,10 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
             *EDGES_MAP.get_unchecked_mut(pos) = val;
         }
     }
+    #[cfg(feature = "dataflow")]
+    {
+        crate::dataflow::LAST_GUARD = *guard as usize;
+    }
 }
 
 /// Initialize the sancov `pc_guard` - usually called by `llvm`.

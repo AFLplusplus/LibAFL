@@ -13,14 +13,14 @@ panic = "abort"
 
 [profile.release]
 panic = "abort"
-lto = true
+#lto = true
 codegen-units = 1
 opt-level = 3
 debug = true
 
 [dependencies]
 libafl = { path = "../../libafl" }
-libafl_targets = { path = "../../libafl_targets", features = ["libfuzzer", "dataflow"] }
+libafl_targets = { path = "../../libafl_targets", features = ["dataflow", "sancov_pcguard_hitcounts"] }
 mimalloc = { version = "*", default-features = false }
 
 [lib]
