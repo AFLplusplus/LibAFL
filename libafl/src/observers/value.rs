@@ -6,12 +6,20 @@ use alloc::{
 };
 use core::fmt::Debug;
 
+#[cfg(feature = "std")]
+use core::hash::Hash;
+#[cfg(feature = "std")]
+use core::hash::Hasher;
+#[cfg(feature = "std")]
+use std::collections::hash_map::DefaultHasher;
+
 use serde::{Deserialize, Serialize};
 
 use super::Observer;
 use crate::{
     bolts::{ownedref::OwnedRef, tuples::Named},
     inputs::UsesInput,
+    observers::ObserverWithHashField,
     Error,
 };
 
@@ -86,5 +94,17 @@ where
 {
     fn name(&self) -> &str {
         &self.name
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'a, T: Hash> ObserverWithHashField for ValueObserver<'a, T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    fn hash(&self) -> Option<u64> {
+        let mut s = DefaultHasher::new();
+        Hash::hash(self.value.as_ref(), &mut s);
+        Some(s.finish())
     }
 }
