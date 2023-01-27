@@ -77,6 +77,16 @@ impl<'a> BacktraceObserver<'a> {
             harness_type,
         }
     }
+
+    /// Updates the hash value of this observer.
+    fn update_hash(&mut self, hash: u64) {
+        *self.hash.as_mut() = Some(hash);
+    }
+
+    /// Clears the current hash value (sets it to `None`)
+    fn clear_hash(&mut self) {
+        *self.hash.as_mut() = None;
+    }
 }
 
 impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
@@ -84,16 +94,6 @@ impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
     #[must_use]
     fn hash(&self) -> &Option<u64> {
         self.hash.as_ref()
-    }
-
-    /// Updates the hash value of this observer.
-    fn update_hash(&mut self, hash: u64) {
-        *self.hash.as_mut() = Some(hash);
-    }
-
-    /// Clears the current hash value
-    fn clear_hash(&mut self) {
-        *self.hash.as_mut() = None;
     }
 }
 
@@ -219,6 +219,11 @@ impl AsanBacktraceObserver {
         });
         self.update_hash(hash);
     }
+
+    /// Updates the hash value of this observer.
+    fn update_hash(&mut self, hash: u64) {
+        self.hash = Some(hash);
+    }
 }
 
 impl ObserverWithHashField for AsanBacktraceObserver {
@@ -226,16 +231,6 @@ impl ObserverWithHashField for AsanBacktraceObserver {
     #[must_use]
     fn hash(&self) -> &Option<u64> {
         &self.hash
-    }
-
-    /// Updates the hash value of this observer.
-    fn update_hash(&mut self, hash: u64) {
-        self.hash = Some(hash);
-    }
-
-    /// Clears the current hash value
-    fn clear_hash(&mut self) {
-        self.hash = None;
     }
 }
 
