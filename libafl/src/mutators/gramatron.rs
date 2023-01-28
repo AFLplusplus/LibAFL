@@ -36,7 +36,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut GramatronInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if !input.terminals().is_empty() {
             let size = state.rand_mut().below(input.terminals().len() as u64 + 1) as usize;
@@ -105,7 +104,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut GramatronInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.terminals().is_empty() {
             return Ok(MutationResult::Skipped);
@@ -177,7 +175,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut GramatronInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.terminals().is_empty() {
             return Ok(MutationResult::Skipped);

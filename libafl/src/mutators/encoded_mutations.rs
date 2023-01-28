@@ -24,12 +24,7 @@ use crate::{
 pub struct EncodedRandMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut EncodedInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -59,12 +54,7 @@ impl EncodedRandMutator {
 pub struct EncodedIncMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut EncodedInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -94,12 +84,7 @@ impl EncodedIncMutator {
 pub struct EncodedDecMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut EncodedInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -129,12 +114,7 @@ impl EncodedDecMutator {
 pub struct EncodedAddMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut EncodedInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -168,12 +148,7 @@ impl EncodedAddMutator {
 pub struct EncodedDeleteMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut EncodedInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
         if size <= 2 {
             return Ok(MutationResult::Skipped);
@@ -211,12 +186,7 @@ impl<S> Mutator<EncodedInput, S> for EncodedInsertCopyMutator
 where
     S: HasRand + HasMaxSize,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut EncodedInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.codes().len();
         if size == 0 {
@@ -269,12 +239,7 @@ impl EncodedInsertCopyMutator {
 pub struct EncodedCopyMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut EncodedInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
@@ -312,12 +277,7 @@ impl<S> Mutator<S::Input, S> for EncodedCrossoverInsertMutator
 where
     S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus + HasMaxSize,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut EncodedInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
 
         // We don't want to use the testcase we're already using for splicing
@@ -385,12 +345,7 @@ impl<S> Mutator<S::Input, S> for EncodedCrossoverReplaceMutator
 where
     S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut EncodedInput,
-        _stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
