@@ -417,8 +417,8 @@ pub struct AFLCmpHeader {
 
 #[derive(Debug)]
 pub enum AFLCmpValues {
-    Operands(AFLCmpOperands),
-    FnOperands(AFLCmpFnOperands),
+    OperandsVec(Vec<AFLCmpOperands>),
+    FnOperandsVec(Vec<AFLCmpFnOperands>),
 }
 
 /// The AFL++ `cmp_operands` struct

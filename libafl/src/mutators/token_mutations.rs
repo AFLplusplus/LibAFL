@@ -25,7 +25,7 @@ use crate::{
     inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{
-        AFLCmpValues::{FnOperands, Operands},
+        AFLCmpValues::{FnOperandsVec, OperandsVec},
         AFLCmpValuesMetadata, CmpValues, CmpValuesMetadata,
     },
     state::{HasMaxSize, HasMetadata, HasRand},
@@ -610,9 +610,17 @@ const CMP_TYPE_RTN: usize = 2;
 pub struct AFLRedQueen;
 
 impl AFLRedQueen {
-    pub fn cmp_fuzz(&self) {}
+    pub fn cmp_extend_encoding(
+        &self,
+        pattern: u64,
+        repl: u64,
+        orig_pattern: u64,
+        changed_val: u64,
+        attribute: u32,
+    ) {
+    }
 
-    pub fn rtn_fuzz(&self) {}
+    pub fn rtn_extend_encoding(&self) {}
 }
 
 impl<I, S> Mutator<I, S> for AFLRedQueen
@@ -668,20 +676,54 @@ where
         let new_val = new_cmpvals.get(&idx).unwrap();
 
         match (orig_val, new_val) {
-            (Operands(orig), Operands(new)) => {
+            (OperandsVec(orig), OperandsVec(new)) => {
+                // This match branch is cmp_fuzz (AFL++ RQ)
                 assert!(header._type() == CMP_TYPE_INS as u32);
 
-                // Compare v0 against v1
-                self.cmp_fuzz();
-                // Compare v1 against v0
-                self.cmp_fuzz();
+                let logged = std::cmp::min(orig.len(), new.len());
+
+                for idx in 0..logged {
+                    let (orig_v0, orig_v1, new_v0, new_v1, attribute) = (
+                        orig[idx].v0(),
+                        orig[idx].v1(),
+                        new[idx].v0(),
+                        new[idx].v1(),
+                        header.attribute(),
+                    );
+                    if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                        // Compare v0 against v1
+                        self.cmp_extend_encoding(new_v0, new_v1, orig_v0, orig_v1, attribute);
+                    }
+
+                    if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                        // Compare v1 against v0
+                        // self.cmp_extend_encoding(new_v1, new_v0, orig_v1, orig_v0, SWAPA(attribute));
+                    }
+                }
             }
-            (FnOperands(orig), FnOperands(new)) => {
+            (FnOperandsVec(orig), FnOperandsVec(new)) => {
+                // This match branch is rtn_fuzz (AFL++ RQ)
                 assert!(header._type() == CMP_TYPE_RTN as u32);
-                // Compare v0 against v1
-                self.rtn_fuzz();
-                // Compare v1 against v0
-                self.rtn_fuzz()
+
+                let logged = std::cmp::min(orig.len(), new.len());
+                for idx in 0..logged {
+                    let (orig_v0, orig_v1, new_v0, new_v1, attribute) = (
+                        orig[idx].v0(),
+                        orig[idx].v1(),
+                        new[idx].v0(),
+                        new[idx].v1(),
+                        header.attribute(),
+                    );
+                    if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                        // Compare v0 against v1
+                        self.rtn_extend_encoding();
+                    }
+
+                    if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                        // Compare v1 against v0
+                        self.rtn_extend_encoding()
+                    }
+                }
             }
             (_, _) => {
                 // Collision?
