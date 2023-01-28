@@ -145,11 +145,11 @@ hook_const!(__dfsw___sanitizer_cov_trace_const_cmp4, CMPLOG_CONST, u32);
 hook_const!(__dfsw___sanitizer_cov_trace_const_cmp8, CMPLOG_CONST, u64);
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DFSanObserver {
+pub struct DataflowObserver {
     last_guards: Vec<u8>,
 }
 
-impl DFSanObserver {
+impl DataflowObserver {
     pub fn new() -> Self {
         Self {
             last_guards: vec![0; unsafe { MAX_EDGES_NUM }],
@@ -157,13 +157,13 @@ impl DFSanObserver {
     }
 }
 
-impl Named for DFSanObserver {
+impl Named for DataflowObserver {
     fn name(&self) -> &str {
         "dfsan-guards"
     }
 }
 
-impl<S> Observer<S> for DFSanObserver
+impl<S> Observer<S> for DataflowObserver
 where
     S: UsesInput,
 {
@@ -187,13 +187,13 @@ where
     }
 }
 
-impl HasLen for DFSanObserver {
+impl HasLen for DataflowObserver {
     fn len(&self) -> usize {
         self.last_guards.len()
     }
 }
 
-impl MapObserver for DFSanObserver {
+impl MapObserver for DataflowObserver {
     type Entry = u8;
 
     fn get(&self, idx: usize) -> &Self::Entry {
@@ -238,25 +238,25 @@ impl MapObserver for DFSanObserver {
     }
 }
 
-impl AsSlice for DFSanObserver {
-    type Entry = <DFSanObserver as MapObserver>::Entry;
+impl AsSlice for DataflowObserver {
+    type Entry = <DataflowObserver as MapObserver>::Entry;
 
     fn as_slice(&self) -> &[Self::Entry] {
         &self.last_guards
     }
 }
 
-impl<'it> AsIter<'it> for DFSanObserver {
-    type Item = <DFSanObserver as MapObserver>::Entry;
-    type IntoIter = core::slice::Iter<'it, <DFSanObserver as MapObserver>::Entry>;
+impl<'it> AsIter<'it> for DataflowObserver {
+    type Item = <DataflowObserver as MapObserver>::Entry;
+    type IntoIter = core::slice::Iter<'it, <DataflowObserver as MapObserver>::Entry>;
 
     fn as_iter(&'it self) -> Self::IntoIter {
         self.last_guards.iter()
     }
 }
 
-pub type DFSanMapFeedback<S> =
-    MaxMapFeedback<DFSanObserver, S, <DFSanObserver as MapObserver>::Entry>;
+pub type DataflowMapFeedback<S> =
+    MaxMapFeedback<DataflowObserver, S, <DataflowObserver as MapObserver>::Entry>;
 
 pub fn create_dfsan_harness<I: HasTargetBytes>() -> impl FnMut(&I) -> ExitKind {
     |input| {

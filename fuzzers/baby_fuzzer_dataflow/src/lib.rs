@@ -33,8 +33,8 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver},
 };
 use libafl_targets::{
-    create_dfsan_harness, DFSanMapFeedback, DFSanObserver, DataflowCmplogTracingStage,
-    DataflowI2SMutator, EDGES_MAP, MAX_EDGES_NUM,
+    create_dfsan_harness, DataflowCmplogTracingStage, DataflowI2SMutator, DataflowMapFeedback,
+    DataflowObserver, EDGES_MAP, MAX_EDGES_NUM,
 };
 
 #[allow(clippy::similar_names)]
@@ -43,14 +43,14 @@ use libafl_targets::{
 pub fn main() {
     // The closure that we want to fuzz
     let mut harness = create_dfsan_harness();
-    let dfsan_observer = DFSanObserver::new();
+    let dfsan_observer = DataflowObserver::new();
     let edges_observer = HitcountsMapObserver::new(unsafe {
         StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
     });
 
     // Feedback to rate the interestingness of an input
     let mut feedback = feedback_or!(
-        DFSanMapFeedback::new(&dfsan_observer),
+        DataflowMapFeedback::new(&dfsan_observer),
         MaxMapFeedback::new(&edges_observer)
     );
 
