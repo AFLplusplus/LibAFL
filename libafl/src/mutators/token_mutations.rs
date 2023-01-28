@@ -24,7 +24,7 @@ use crate::{
     bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
-    observers::cmp::{CmpValues, CmpValuesMetadata},
+    observers::cmp::{CmpValues, CmpValuesMetadata, AFLCmpValuesMetadata},
     state::{HasMaxSize, HasMetadata, HasRand},
     Error,
 };
@@ -593,6 +593,86 @@ impl Named for I2SRandReplace {
 
 impl I2SRandReplace {
     /// Creates a new `I2SRandReplace` struct.
+    #[must_use]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+/// AFL++ redqueen mutation
+#[derive(Debug, Default)]
+pub struct AFLRedQueen;
+
+impl<I, S> Mutator<I, S> for AFLRedQueen
+where
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    I: HasBytesVec,
+{
+    #[allow(clippy::too_many_lines)]
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        let size = input.bytes().len();
+        if size == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+
+        let cmp_len = {
+            let meta = state.metadata().get::<AFLCmpValuesMetadata>();
+            if meta.is_none() {
+                return Ok(MutationResult::Skipped);
+            }
+
+            let len = meta.unwrap().new_cmpvals().len();
+            if len == 0 {
+                return Ok(MutationResult::Skipped);
+            }
+            len
+        };
+
+
+        let meta = state.metadata().get::<AFLCmpValuesMetadata>().unwrap();
+
+        let orig_cmpvals = meta.orig_cmpvals();
+        let new_cmpvals = meta.new_cmpvals();
+        let headers = meta.headers();
+
+        let input_len = input.bytes().len();
+        let input_bytes = input.bytes_mut();
+
+        let keys = meta.headers();
+
+        // Randomly choose one from the cmplogs, Maybe just iterate over everything
+        let r = state.rand_mut().below(keys.len() as u64) as usize;
+
+        let (idx, header) = headers[r];
+
+        if header._type() == 1 {
+            // INS
+
+        }
+        else if header._type() == 2{
+            // RTN
+
+        }
+        else {
+            // Something is wrong if it reaches here
+        }
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl Named for AFLRedQueen {
+    fn name(&self) -> &str {
+        "AFLRedQueen"
+    }
+}
+
+impl AFLRedQueen {
+    /// Create a new `AFLRedQueen` Mutator
     #[must_use]
     pub fn new() -> Self {
         Self

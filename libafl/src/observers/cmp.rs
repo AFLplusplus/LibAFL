@@ -6,6 +6,7 @@ use alloc::{
 };
 use core::{fmt::Debug, marker::PhantomData};
 
+use hashbrown::HashMap;
 use c2rust_bitfields::BitfieldStruct;
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -347,6 +348,36 @@ struct cmp_map {
 
 };
 */
+
+/// A state metadata holding a list of values logged from comparisons. AFL++ RQ version.
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct AFLCmpValuesMetadata {
+    /// The first map of AFLCmpVals retrieved by running the un-mutated input
+    #[serde(skip)]
+    pub orig_cmpvals: HashMap<usize, AFLCmpVals>,
+    /// The second map of AFLCmpVals retrieved by runnning the mutated input
+    #[serde(skip)]
+    pub new_cmpvals: HashMap<usize, AFLCmpVals>,
+    /// The list of logged idx and headers
+    #[serde(skip)]
+    pub headers: Vec<(usize, AFLCmpHeader)>
+}
+
+crate::impl_serdeany!(AFLCmpValuesMetadata);
+
+impl AFLCmpValuesMetadata {
+    pub fn orig_cmpvals(&self) -> &HashMap<usize, AFLCmpVals> {
+        &self.orig_cmpvals
+    }
+
+    pub fn new_cmpvals(&self) -> &HashMap<usize, AFLCmpVals> {
+        &self.new_cmpvals
+    }
+
+    pub fn headers(&self) -> &Vec<(usize, AFLCmpHeader)> {
+        &self.headers
+    }
+}
 
 /// The AFL++ `CMP_MAP_W`
 pub const AFL_CMP_MAP_W: usize = 65536;
