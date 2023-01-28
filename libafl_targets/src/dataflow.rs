@@ -12,9 +12,14 @@ compile_error!(
     "either `sancov_pcguard_edges` or `sancov_pcguard_hitcounts` must be enabled to use `dataflow`."
 );
 
-use alloc::{collections::BTreeSet, vec::Vec};
+use alloc::{
+    collections::{btree_map::Entry, BTreeSet},
+    vec::Vec,
+};
 use core::{cmp::min, ffi::c_int, fmt::Debug, marker::PhantomData};
+use std::collections::BTreeMap;
 
+use rand::{rngs::StdRng, RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 pub mod dfsan_interface {
@@ -39,8 +44,11 @@ extern "C" {
 }
 
 use dfsan_interface::*;
+#[cfg(feature = "introspection")]
+use libafl::monitors::PerfFeature;
 use libafl::{
     bolts::{
+        rands::Rand,
         tuples::{tuple_list, MatchName, Named},
         AsIter, AsSlice, HasLen,
     },
@@ -50,11 +58,16 @@ use libafl::{
     feedbacks::MaxMapFeedback,
     impl_serdeany,
     inputs::{HasBytesVec, HasTargetBytes, Input, UsesInput},
+    mark_feature_time,
     mutators::{MutationResult, Mutator},
     observers::{hash_slice, MapObserver, Observer, ObserversTuple},
-    prelude::Rand,
+    prelude::Tokens,
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, HasSolutions, UsesState},
+    start_timer,
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, HasSolutions,
+        UsesState,
+    },
     Error, HasObjective,
 };
 
@@ -62,13 +75,164 @@ use crate::MAX_EDGES_NUM;
 
 static mut GUARD_LABELS: Vec<u8> = Vec::new();
 
-pub(crate) static mut LAST_GUARD: usize = 0;
+pub(crate) static mut LAST_GUARD: u32 = 0;
 
 pub static mut CMPLOG_ENABLED: bool = false;
-static mut CMPLOG_MAX_LABELS: u32 = 8;
 
-static mut CMPLOG: Vec<(u8, u64, u64, usize, dfsan_label, dfsan_label)> = Vec::new();
-static mut CMPLOG_CONST: Vec<(u8, u64, u64, usize, dfsan_label)> = Vec::new();
+static mut INPUT: Vec<u8> = Vec::new();
+static mut LABEL_START: usize = 0;
+
+type Cmplog = BTreeMap<u32, BTreeMap<(usize, usize), BTreeSet<(u8, u8)>>>;
+type ConstCmplog = BTreeMap<u32, BTreeMap<usize, BTreeSet<(u8, u8)>>>;
+
+static mut CMPLOG: Cmplog = Cmplog::new();
+static mut CMPLOG_CONST: ConstCmplog = ConstCmplog::new();
+
+#[allow(non_camel_case_types)]
+type dfsan_label = u8;
+
+fn valid_label(size: u8, label: dfsan_label) -> bool {
+    // there is at least one bit set
+    label != 0
+        // there are not more bits set than the size of the value
+        && label.count_ones() <= size as u32
+        // the bits are all grouped together
+        && label.count_zeros() == label.trailing_zeros() + label.leading_zeros()
+}
+
+fn label_indices(label: dfsan_label) -> impl Iterator<Item = usize> {
+    (0..8)
+        .map(move |i| label >> i)
+        .enumerate()
+        .filter_map(|(i, label)| (label & 1 != 0).then_some(i))
+}
+
+const INVALID_INDEX: usize = usize::MAX;
+
+// precondition: this is a valid label
+// we "guess" the validity of the check by assuming that if all of the labelled regions in the input
+// line up with our value AND that the value at the computed index of the value is equal to the
+// value, then the value's comparison is correct
+fn checked_index(size: u8, value: u64, label: dfsan_label) -> Option<usize> {
+    let mut index = unsafe { LABEL_START };
+    if label.trailing_zeros() > 0 {
+        index += label.trailing_zeros() as usize;
+    } else if label.trailing_ones() > 0 {
+        if let Some(new_index) = index.checked_sub((size as u32 - label.trailing_ones()) as usize) {
+            index = new_index;
+        } else {
+            return None;
+        }
+    }
+    if index + size as usize > unsafe { INPUT.len() } {
+        return None;
+    }
+    if match size {
+        1 => unsafe { INPUT[index] == value as u8 },
+        2 => unsafe {
+            u16::from_ne_bytes(INPUT[index..(index + 2)].try_into().unwrap()) == value as u16
+        },
+        4 => unsafe {
+            u32::from_ne_bytes(INPUT[index..(index + 4)].try_into().unwrap()) == value as u32
+        },
+        8 => unsafe { u64::from_ne_bytes(INPUT[index..(index + 8)].try_into().unwrap()) == value },
+        _ => unreachable!("Invalid size while performing index check."),
+    } {
+        Some(index)
+    } else {
+        None
+    }
+}
+
+fn cmplog_insert_range<const N: usize>(guard: u32, v1: [u8; N], v2: [u8; N], i1: usize, i2: usize) {
+    if v1 != v2 {
+        let base = unsafe { CMPLOG.entry(guard).or_insert_with(BTreeMap::new) };
+        for (offset, (v1, v2)) in v1.into_iter().zip(v2).enumerate() {
+            base.entry((i1.saturating_add(offset), i2.saturating_add(offset)))
+                .or_insert_with(BTreeSet::new)
+                .insert((v1, v2));
+        }
+    }
+}
+
+fn cmplog_insert(guard: u32, size: u8, v1: u64, v2: u64, l1: dfsan_label, l2: dfsan_label) {
+    // we have to check label validity because we might be comparing a (as of now) unlabelled value
+    let first_idx = valid_label(size, l1)
+        .then(|| checked_index(size, v1, l1))
+        .flatten()
+        .unwrap_or(INVALID_INDEX);
+    let second_idx = valid_label(size, l2)
+        .then(|| checked_index(size, v2, l2))
+        .flatten()
+        .unwrap_or(INVALID_INDEX);
+
+    // if this doesn't pass, either both are invalid or both indices correspond to the same position
+    // and thus both be equal and matching (not a good replacement candidate)
+    if first_idx != second_idx {
+        unsafe {
+            match size {
+                1 => cmplog_insert_range(guard, [v1 as u8], [v2 as u8], first_idx, second_idx),
+                2 => cmplog_insert_range(
+                    guard,
+                    (v1 as u16).to_ne_bytes(),
+                    (v2 as u16).to_ne_bytes(),
+                    first_idx,
+                    second_idx,
+                ),
+                4 => cmplog_insert_range(
+                    guard,
+                    (v1 as u32).to_ne_bytes(),
+                    (v2 as u32).to_ne_bytes(),
+                    first_idx,
+                    second_idx,
+                ),
+                8 => cmplog_insert_range(
+                    guard,
+                    v1.to_ne_bytes(),
+                    v2.to_ne_bytes(),
+                    first_idx,
+                    second_idx,
+                ),
+                _ => unreachable!("Illegal size while inserting to comparison log."),
+            }
+        }
+    }
+}
+
+fn cmplog_const_insert_range<const N: usize>(guard: u32, v1: [u8; N], v2: [u8; N], i2: usize) {
+    let base = unsafe { CMPLOG_CONST.entry(guard).or_insert_with(BTreeMap::new) };
+    for (offset, (v1, v2)) in v1.into_iter().zip(v2).enumerate() {
+        if unsafe { INPUT[i2 + offset] != v1 } {
+            base.entry(i2 + offset)
+                .or_insert_with(BTreeSet::new)
+                .insert((v1, v2));
+        }
+    }
+}
+
+fn cmplog_const_insert(guard: u32, size: u8, v1: u64, v2: u64, l2: dfsan_label) {
+    if let Some(index) = checked_index(size, v2, l2) {
+        unsafe {
+            match size {
+                1 => cmplog_const_insert_range(guard, [v1 as u8], [v2 as u8], index),
+                2 => cmplog_const_insert_range(
+                    guard,
+                    (v1 as u16).to_ne_bytes(),
+                    (v2 as u16).to_ne_bytes(),
+                    index,
+                ),
+                4 => cmplog_const_insert_range(
+                    guard,
+                    (v1 as u32).to_ne_bytes(),
+                    (v2 as u32).to_ne_bytes(),
+                    index,
+                ),
+                8 => cmplog_const_insert_range(guard, v1.to_ne_bytes(), v2.to_ne_bytes(), index),
+                _ => unreachable!("Illegal size while inserting to comparison log."),
+            }
+        }
+    }
+}
 
 #[no_mangle]
 pub unsafe fn __dfsw___sanitizer_cov_trace_switch(
@@ -77,20 +241,24 @@ pub unsafe fn __dfsw___sanitizer_cov_trace_switch(
     l1: dfsan_label,
     _l2: dfsan_label,
 ) {
-    GUARD_LABELS.get_mut(LAST_GUARD).map(|label| *label |= l1);
-    if CMPLOG_ENABLED {
-        // From: https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-data-flow
-        // Called before a switch statement.
-        // Val is the switch operand.
-        // Cases[0] is the number of case constants.
-        // Cases[1] is the size of Val in bits.
-        // Cases[2:] are the case constants.
-        let val_size = (*cases.offset(1) / 8) as u8;
-        if l1.count_ones() <= val_size as u32 && l1.count_ones() <= CMPLOG_MAX_LABELS {
-            let case_counts = *cases as usize;
-            let cases = core::slice::from_raw_parts(cases.offset(2), case_counts);
-            for &case in cases {
-                CMPLOG_CONST.push((val_size, val, case, LAST_GUARD, l1));
+    if l1 != 0 {
+        GUARD_LABELS
+            .get_mut(LAST_GUARD as usize)
+            .map(|label| *label |= l1);
+        if CMPLOG_ENABLED {
+            // From: https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-data-flow
+            // Called before a switch statement.
+            // Val is the switch operand.
+            // Cases[0] is the number of case constants.
+            // Cases[1] is the size of Val in bits.
+            // Cases[2:] are the case constants.
+            let val_size = (*cases.offset(1) / 8) as u8;
+            if valid_label(val_size, l1) {
+                let case_counts = *cases as usize;
+                let cases = core::slice::from_raw_parts(cases.offset(2), case_counts);
+                for &case in cases {
+                    cmplog_const_insert(LAST_GUARD, val_size, case, val, l1);
+                }
             }
         }
     }
@@ -102,22 +270,17 @@ macro_rules! hook {
         pub unsafe fn $name(arg1: $arg_type, arg2: $arg_type, l1: dfsan_label, l2: dfsan_label) {
             if l1 != 0 || l2 != 0 {
                 GUARD_LABELS
-                    .get_mut(LAST_GUARD)
+                    .get_mut(LAST_GUARD as usize)
                     .map(|label| *label |= l1 | l2);
-                if CMPLOG_ENABLED
-                    && ((l1.count_ones() <= core::mem::size_of::<$arg_type>() as u32
-                        && l1.count_ones() <= CMPLOG_MAX_LABELS)
-                        || (l2.count_ones() <= core::mem::size_of::<$arg_type>() as u32
-                            && l2.count_ones() <= CMPLOG_MAX_LABELS))
-                {
-                    CMPLOG.push((
+                if CMPLOG_ENABLED {
+                    cmplog_insert(
+                        LAST_GUARD,
                         core::mem::size_of::<$arg_type>() as u8,
                         arg1.into(),
                         arg2.into(),
-                        LAST_GUARD,
                         l1,
                         l2,
-                    ));
+                    );
                 }
             }
         }
@@ -132,18 +295,17 @@ macro_rules! hook_const {
         #[no_mangle]
         pub unsafe fn $name(arg1: $arg_type, arg2: $arg_type, _l1: dfsan_label, l2: dfsan_label) {
             if l2 != 0 {
-                GUARD_LABELS.get_mut(LAST_GUARD).map(|label| *label |= l2);
-                if CMPLOG_ENABLED
-                    && l2.count_ones() <= core::mem::size_of::<$arg_type>() as u32
-                    && l2.count_ones() <= CMPLOG_MAX_LABELS
-                {
-                    CMPLOG_CONST.push((
+                GUARD_LABELS
+                    .get_mut(LAST_GUARD as usize)
+                    .map(|label| *label |= l2);
+                if CMPLOG_ENABLED && valid_label(core::mem::size_of::<$arg_type>() as u8, l2) {
+                    cmplog_const_insert(
+                        LAST_GUARD,
                         core::mem::size_of::<$arg_type>() as u8,
                         arg1.into(),
                         arg2.into(),
-                        LAST_GUARD,
                         l2,
-                    ));
+                    );
                 }
             }
         }
@@ -287,10 +449,7 @@ pub fn create_dfsan_harness<I: HasTargetBytes>() -> impl FnMut(&I) -> ExitKind {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct DataflowCmplogObserver {
-    last_cmplog: Vec<(u8, u64, u64, usize, dfsan_label, dfsan_label)>,
-    last_cmplog_const: Vec<(u8, u64, u64, usize, dfsan_label)>,
-}
+struct DataflowCmplogObserver;
 
 const CMPLOG_NAME: &str = "dataflow-cmplog";
 
@@ -305,12 +464,9 @@ where
     S: UsesInput,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        self.last_cmplog.clear();
-        self.last_cmplog_const.clear();
         unsafe {
             CMPLOG_ENABLED = true;
-            core::mem::swap(&mut self.last_cmplog, &mut CMPLOG);
-            core::mem::swap(&mut self.last_cmplog_const, &mut CMPLOG_CONST);
+            dfsan_flush();
         }
         Ok(())
     }
@@ -323,8 +479,6 @@ where
     ) -> Result<(), Error> {
         unsafe {
             CMPLOG_ENABLED = false;
-            core::mem::swap(&mut self.last_cmplog, &mut CMPLOG);
-            core::mem::swap(&mut self.last_cmplog_const, &mut CMPLOG_CONST);
         }
         Ok(())
     }
@@ -349,82 +503,6 @@ where
     type State = S;
 }
 
-fn label_indices(label: dfsan_label) -> impl Iterator<Item = usize> {
-    (0..8)
-        .map(move |i| label >> i)
-        .enumerate()
-        .filter_map(|(i, label)| (label & 1 != 0).then_some(i))
-}
-
-fn position_by_label(size: u8, mut labels: impl Iterator<Item = dfsan_label>) -> Option<usize> {
-    let Some(first) = labels.next() else { return None; };
-    let Some(second) = labels.next() else { return None; };
-    if min(first.count_ones(), second.count_ones()) != (size as u32 + 1) / 2 {
-        // this offset is impossible; we must be using multiple ranges or sources
-        return None;
-    }
-    let first_idx = label_indices(first).next().unwrap();
-    let second_idx = label_indices(second).next().unwrap();
-
-    // slightly misleading because we compare indices here zero-indexed, not one-indexed... oh well
-
-    // input:  [., ., ., ., ., ., ., ., ., ., ., ., ...]
-    // label1: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, ...]
-    // label2: [1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, ...]
-    let mut offset = if first_idx == second_idx {
-        // if they're the same, this is the low position of the offset
-        2 * first_idx
-    } else if first_idx == (second_idx + 1) % 8 {
-        // high bit
-        2 * first_idx + 1
-    } else if second_idx == 0 && label_indices(first).last() == Some(7) {
-        // we're crossing a boundary with the last byte
-        16 - (size as usize)
-    } else {
-        // something strange happened; these values are not actually comparable and must be based on
-        // a combo which isn't valid
-        return None;
-    };
-
-    // input:  [., ., ., ., ., ., ., ., ., ., ., ., ...]
-    // label1: [1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, ...]
-    // label2: [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, ...]
-    for (idx, label) in labels.enumerate() {
-        let mut indices = label_indices(label);
-        let Some(first_idx) = indices.next() else { return None; };
-        let next = match indices.next() {
-            Some(7) if first_idx == 0 => 7,
-            Some(second_idx) if second_idx == first_idx + 1 => first_idx,
-            None => first_idx,
-            _ => return None, // something strange happened...
-        };
-        if indices.next().is_some() {
-            // by this point, we're handling indices that should exceed the width of any individual value
-            return None;
-        }
-        offset |= next << (3 * idx + 4);
-    }
-
-    Some(offset)
-}
-
-fn check_position(size: u8, pos: usize, value: u64, slice: &[u8]) -> bool {
-    let expected = match size {
-        1 if pos < slice.len() => Some(slice[pos] as u64),
-        2 if pos < slice.len() - 1 => {
-            Some(u16::from_ne_bytes(slice[pos..(pos + 2)].try_into().unwrap()) as u64)
-        }
-        4 if pos < slice.len() - 3 => {
-            Some(u32::from_ne_bytes(slice[pos..(pos + 4)].try_into().unwrap()) as u64)
-        }
-        8 if pos < slice.len() - 7 => Some(u64::from_ne_bytes(
-            slice[pos..(pos + 8)].try_into().unwrap(),
-        )),
-        _ => None,
-    };
-    expected == Some(value)
-}
-
 fn run_and_collect_cmplogs<E, EM, Z>(
     fuzzer: &mut Z,
     _executor: &mut E,
@@ -432,14 +510,12 @@ fn run_and_collect_cmplogs<E, EM, Z>(
     manager: &mut EM,
     input: &E::Input,
     labels: &Vec<u8>,
-    cmplogs: &mut Vec<Vec<(u8, u64, u64, usize, dfsan_label, dfsan_label)>>,
-    cmplog_consts: &mut Vec<Vec<(u8, u64, u64, usize, dfsan_label)>>,
 ) -> Result<(), Error>
 where
     E: UsesState,
     EM: EventFirer<State = E::State> + EventRestarter,
     Z: UsesState<State = E::State> + HasObjective,
-    E::State: HasCorpus + HasSolutions + HasClientPerfMonitor,
+    E::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
     E::Input: HasTargetBytes,
 {
     let mut harness = |input: &E::Input| {
@@ -457,47 +533,39 @@ where
         ExitKind::Ok
     };
 
-    let observer = DataflowCmplogObserver {
-        last_cmplog: cmplogs.last().cloned().unwrap_or_else(Vec::new),
-        last_cmplog_const: cmplog_consts.last().cloned().unwrap_or_else(Vec::new),
-    };
+    let observer = DataflowCmplogObserver;
 
     let mut executor =
         InProcessExecutor::new(&mut harness, tuple_list!(observer), fuzzer, state, manager)?;
 
+    start_timer!(state);
     executor.observers_mut().pre_exec_all(state, input)?;
+    mark_feature_time!(state, PerfFeature::PreExecObservers);
 
+    start_timer!(state);
     let kind = executor.run_target(fuzzer, state, manager, input)?;
     if kind != ExitKind::Ok {
         return Err(Error::illegal_state(
             "Encountered a crash while performing dataflow cmplog.",
         ));
     }
+    mark_feature_time!(state, PerfFeature::TargetExecution);
 
+    start_timer!(state);
     executor
         .observers_mut()
         .post_exec_all(state, input, &kind)?;
+    mark_feature_time!(state, PerfFeature::PostExecObservers);
 
-    let observer = executor
-        .observers_mut()
-        .match_name_mut::<DataflowCmplogObserver>(CMPLOG_NAME)
-        .unwrap();
-
-    let mut cmplog = Vec::new();
-    let mut cmplog_const = Vec::new();
-    core::mem::swap(&mut observer.last_cmplog, &mut cmplog);
-    core::mem::swap(&mut observer.last_cmplog_const, &mut cmplog_const);
-
-    cmplogs.push(cmplog);
-    cmplog_consts.push(cmplog_const);
+    *state.executions_mut() += 1;
 
     Ok(())
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DataflowCmplogReplacementsMetadata {
-    replacements: Vec<(u8, (usize, u64))>,
-    cross_replacements: Vec<(u8, (usize, u64), (usize, u64))>,
+    replacements: Vec<(usize, Vec<Vec<(u8, u8)>>)>,
+    cross_replacements: Vec<(usize, usize, Vec<usize>)>,
 }
 
 impl_serdeany!(DataflowCmplogReplacementsMetadata);
@@ -507,7 +575,7 @@ where
     E: UsesState,
     EM: EventFirer<State = E::State> + EventRestarter,
     Z: UsesState<State = E::State> + HasObjective,
-    E::State: HasCorpus + HasSolutions + HasClientPerfMonitor,
+    E::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasMetadata,
     E::Input: HasTargetBytes,
 {
     fn perform(
@@ -518,8 +586,11 @@ where
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        start_timer!(state);
         let testcase = state.corpus().get(corpus_idx)?.borrow();
         if testcase.has_metadata::<DataflowCmplogReplacementsMetadata>() {
+            drop(testcase);
+            mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
             return Ok(());
         }
 
@@ -530,8 +601,13 @@ where
             ))
         })?;
         drop(testcase);
+        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+
         let target_bytes = input.target_bytes();
         let slice: &[u8] = target_bytes.as_slice();
+        unsafe {
+            INPUT.extend_from_slice(slice);
+        }
         let mut labels = Vec::with_capacity(slice.len());
 
         let mut len = slice.len();
@@ -539,257 +615,202 @@ where
             return Ok(()); // nothing to do
         }
 
-        // We want to precisely identify the position at which the comparison is derived
-        // DFSan provides us with 8 possible labels (one for each bit), so we can subdivide an input
-        // such that we can uniquely identify where the comparison took place after log_8(len) runs:
-        //
-        // input:  [., ., ., ., ., ., ., ., ., ., ., ., ...]
-        // label1: [1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, ...]
-        // label2: [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, ...]
-        //
-        // However, because the value is provided to us as a union and not an ordered set, we have
-        // to determine the offset. To do so, we collect two additional runs which allow us to
-        // uniquely identify 8-bit comparison indices:
-        //
-        // input:  [., ., ., ., ., ., ., ., ., ., ., ., ...]
-        // label1: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, ...]
-        // label2: [1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, ...]
-        //
-        // By staggering, we can definitively find the index for 8-bit comparisons. We do this
-        // instead of the first label pass, which only costs us 1 more execution.
-        //
-        // To handle potential non-determinism in the target, we sort the comparisons by their
-        // compared sizes and values. If duplicates are detected, we can "guess" positions for small
-        // combinations, or abort otherwise.
-
-        let mut cmplogs = Vec::new();
-        let mut cmplog_consts = Vec::new();
-
-        unsafe {
-            CMPLOG_MAX_LABELS = 5;
-        }
-        for i in 0..=1 {
+        // There used to be a comment here detailing a very cool approach for identifying indices in
+        // the input which corresponded to comparison. Another victim of path explosion :(
+        for i in (0..slice.len()).step_by(8) {
             labels.clear();
-            labels.extend(
-                core::iter::repeat(
-                    (0..8)
-                        .map(|label_idx| 1u8 << label_idx)
-                        .flat_map(|label| core::iter::repeat(label).take(2)),
-                )
-                .flatten()
-                .skip(i)
-                .take(slice.len()),
-            );
-            run_and_collect_cmplogs(
-                fuzzer,
-                executor,
-                state,
-                manager,
-                &input,
-                &labels,
-                &mut cmplogs,
-                &mut cmplog_consts,
-            )?;
+            labels.resize(slice.len(), 0);
+            for (e, l) in labels[i..].iter_mut().zip(0..8) {
+                *e = 1 << l;
+            }
+            unsafe {
+                LABEL_START = i;
+            }
+            run_and_collect_cmplogs(fuzzer, executor, state, manager, &input, &labels)?;
         }
 
-        unsafe {
-            CMPLOG_MAX_LABELS = 2;
-        }
-        let mut repetitions = 16;
-        len /= 8;
-        while len > 0 {
-            labels.clear();
-            labels.extend(
-                core::iter::repeat(
-                    (0..8)
-                        .map(|label_idx| 1u8 << label_idx)
-                        .flat_map(|label| core::iter::repeat(label).take(repetitions)),
-                )
-                .flatten()
-                .take(slice.len()),
-            );
+        start_timer!(state);
+        let mut last_cmplog = Cmplog::new();
+        let mut last_const_cmplog = ConstCmplog::new();
+        core::mem::swap(&mut last_cmplog, unsafe { &mut CMPLOG });
+        core::mem::swap(&mut last_const_cmplog, unsafe { &mut CMPLOG_CONST });
 
-            run_and_collect_cmplogs(
-                fuzzer,
-                executor,
-                state,
-                manager,
-                &input,
-                &labels,
-                &mut cmplogs,
-                &mut cmplog_consts,
-            )?;
-
-            len /= 8;
-            repetitions *= 8;
-        }
-
-        for cmplog in &mut cmplogs {
-            cmplog.sort_unstable();
-            cmplog.dedup();
-        }
-        for cmplog in &mut cmplog_consts {
-            cmplog.sort_unstable();
-            cmplog.dedup();
-        }
-
-        let mut cmp_combos = Vec::new();
-        let mut current_cmps = vec![Vec::new(); cmplogs.len()];
-        while cmplogs.iter().all(|cmplog| !cmplog.is_empty()) {
-            let (size, v1, v2, guard, _, _) = cmplogs[0].last().copied().unwrap();
-            for (cmplog, current_cmp) in cmplogs.iter_mut().zip(current_cmps.iter_mut()) {
-                current_cmp.clear();
-                while let Some(cmp) = cmplog.last() {
-                    if cmp.0 == size && cmp.1 == v1 && cmp.2 == v2 && cmp.3 == guard {
-                        let (_, _, _, _, l1, l2) = cmplog.pop().unwrap();
-                        current_cmp.push((l1, l2));
-                    } else {
-                        break;
+        let mut replacements = BTreeMap::new();
+        let mut cross_replacements = BTreeMap::new();
+        for (guard, mut comparisons) in last_cmplog {
+            let mut inferred = BTreeMap::new();
+            let mut first_observed = comparisons
+                .range(..(usize::MAX, 0))
+                .filter(|((_, second), _)| *second == INVALID_INDEX);
+            for ((first, _), first_set) in first_observed {
+                let mut second_observed = comparisons.range((usize::MAX, 0)..);
+                for ((_, second), second_set) in second_observed {
+                    let intersection = first_set.intersection(second_set).copied();
+                    let intersection = intersection.collect::<BTreeSet<_>>();
+                    if !intersection.is_empty() {
+                        inferred.insert((*first, *second), intersection);
                     }
                 }
             }
-            if v1 == v2 {
-                continue;
-            }
 
-            let combos = current_cmps
-                .iter()
-                .map(|cmps| cmps.len())
-                .reduce(|combos, len| combos * len)
-                .unwrap_or(0);
-            if combos == 0 || combos > (1 << 8) {
-                // are there no combinations? too many? skip, since we can't determine the location
-                continue;
-            }
-
-            // perform combinations, but avoid cloning unnecessarily here
-            let mut combined = vec![current_cmps[0].clone()];
-            for current_cmp in current_cmps.iter_mut().skip(1) {
-                let prev_len = combined.len();
-                let first = current_cmp.pop().unwrap();
-                for &mut label_pair in current_cmp {
-                    for i in 0..prev_len {
-                        let mut curr = combined[i].clone();
-                        curr.push(label_pair);
-                        combined.push(curr);
+            fn insert_combo(
+                replacements: &mut BTreeMap<(u32, usize), Vec<BTreeSet<(u8, u8)>>>,
+                cross_replacements: &mut BTreeMap<(usize, usize), BTreeSet<usize>>,
+                guard: u32,
+                current: &mut Vec<BTreeSet<(u8, u8)>>,
+                base: (usize, usize),
+            ) {
+                if base.0 == INVALID_INDEX {
+                    // no index for this combo was found, so commit it to the const combos
+                    let target = replacements
+                        .entry((guard, base.1))
+                        .or_insert_with(Vec::<BTreeSet<(u8, u8)>>::new);
+                    if !target.is_empty() {
+                        let existing = min(current.len(), target.len());
+                        for (existing, current) in target.iter_mut().zip(current.drain(..existing))
+                        {
+                            existing.extend(current);
+                        }
                     }
-                }
-                for i in 0..prev_len {
-                    let mut curr = &mut combined[i];
-                    curr.push(first);
-                }
-            }
-
-            cmp_combos.push(((size, v1, v2), combined));
-        }
-        drop(cmplogs);
-
-        let mut replacements = Vec::new();
-        let mut cross_replacements = Vec::new();
-
-        for ((size, v1, v2), combos) in cmp_combos {
-            for combo in combos {
-                let first = if let Some(pos) =
-                    position_by_label(size, combo.iter().copied().map(|(l1, _)| l1))
-                {
-                    if check_position(size, pos, v1, slice) {
-                        Some(pos)
-                    } else {
-                        None
+                    target.extend(current.drain(..));
+                } else if base.1 == INVALID_INDEX {
+                    // no index for this combo was found, so commit it to the const combos
+                    // const_combo_chains expects the items to be in (const, non-const)
+                    // so we have to reorder items here
+                    let target = replacements.entry((guard, base.0)).or_insert_with(Vec::new);
+                    if !target.is_empty() {
+                        let existing = min(current.len(), target.len());
+                        for (existing, current) in
+                            target.iter_mut().zip(current.drain(..existing).map(|set| {
+                                set.into_iter()
+                                    .map(|(v1, v2)| (v2, v1))
+                                    .collect::<BTreeSet<_>>()
+                            }))
+                        {
+                            existing.extend(current);
+                        }
                     }
+                    target.extend(current.drain(..).map(|set| {
+                        set.into_iter()
+                            .map(|(v1, v2)| (v2, v1))
+                            .collect::<BTreeSet<_>>()
+                    }));
                 } else {
-                    None
-                };
-                let second = if let Some(pos) =
-                    position_by_label(size, combo.into_iter().map(|(_, l2)| l2))
-                {
-                    if check_position(size, pos, v2, slice) {
-                        Some(pos)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-                match (first, second) {
-                    (Some(pos1), Some(pos2)) => {
-                        cross_replacements.push((size, (pos1, v2), (pos2, v1)));
-                    }
-                    (Some(pos1), None) => replacements.push((size, (pos1, v2))),
-                    (None, Some(pos2)) => replacements.push((size, (pos2, v1))),
-                    (None, None) => {}
+                    let target = cross_replacements.entry(base).or_insert_with(BTreeSet::new);
+                    current.iter().for_each(|set| {
+                        assert_eq!(set.len(), 1);
+                    });
+                    target.insert(current.len());
+                    current.clear();
                 }
+            }
+
+            let mut comparisons = comparisons.into_iter().chain(inferred);
+            let mut current = Vec::new();
+            if let Some(mut last) = comparisons.next() {
+                current.push(last.1);
+                let mut base = last.0;
+                let mut last = last.0;
+                for (compared, values) in comparisons {
+                    if compared != (last.0.saturating_add(1), last.1.saturating_add(1)) {
+                        insert_combo(
+                            &mut replacements,
+                            &mut cross_replacements,
+                            guard,
+                            &mut current,
+                            base,
+                        );
+                        base = compared;
+                    }
+                    current.push(values);
+                    last = compared;
+                }
+                insert_combo(
+                    &mut replacements,
+                    &mut cross_replacements,
+                    guard,
+                    &mut current,
+                    base,
+                );
             }
         }
 
-        let mut cmp_const_combos = Vec::new();
-        let mut current_cmps = vec![Vec::new(); cmplog_consts.len()];
-        while cmplog_consts.iter().all(|cmplog| !cmplog.is_empty()) {
-            let (size, v1, v2, guard, _) = cmplog_consts[0].last().copied().unwrap();
-            for (cmplog, current_cmp) in cmplog_consts.iter_mut().zip(current_cmps.iter_mut()) {
-                current_cmp.clear();
-                while let Some(cmp) = cmplog.last() {
-                    if cmp.0 == size && cmp.1 == v1 && cmp.2 == v2 && cmp.3 == guard {
-                        let (_, _, _, _, l2) = cmplog.pop().unwrap();
-                        current_cmp.push(l2);
-                    } else {
-                        break;
-                    }
+        fn insert_const_combo(
+            replacements: &mut BTreeMap<(u32, usize), Vec<BTreeSet<(u8, u8)>>>,
+            guard: u32,
+            current: &mut Vec<BTreeSet<(u8, u8)>>,
+            base: usize,
+        ) {
+            let target = replacements.entry((guard, base)).or_insert_with(Vec::new);
+            if !target.is_empty() {
+                let existing = min(current.len(), target.len());
+                for (existing, current) in target.iter_mut().zip(current.drain(..existing)) {
+                    existing.extend(current);
                 }
             }
-            if v1 == v2 {
-                continue;
-            }
-
-            let combos = current_cmps
-                .iter()
-                .map(|cmps| cmps.len())
-                .reduce(|combos, len| combos * len)
-                .unwrap_or(0);
-            if combos == 0 || combos > (1 << 8) {
-                // are there no combinations? too many? skip, since we can't determine the location
-                continue;
-            }
-
-            // perform combinations, but avoid cloning unnecessarily here
-            let mut combined = vec![current_cmps[0].clone()];
-            for current_cmp in current_cmps.iter_mut().skip(1) {
-                let prev_len = combined.len();
-                let first = current_cmp.pop().unwrap();
-                for &mut label in current_cmp {
-                    for i in 0..prev_len {
-                        let mut curr = combined[i].clone();
-                        curr.push(label);
-                        combined.push(curr);
-                    }
-                }
-                for i in 0..prev_len {
-                    let mut curr = &mut combined[i];
-                    curr.push(first);
-                }
-            }
-
-            cmp_const_combos.push(((size, v1, v2), combined));
+            target.extend(current.drain(..));
         }
-        drop(cmplog_consts);
 
-        for ((size, v1, v2), combos) in cmp_const_combos {
-            for combo in combos {
-                if let Some(pos) = position_by_label(size, combo.into_iter()) {
-                    if check_position(size, pos, v2, slice) {
-                        replacements.push((size, (pos, v1)));
+        for (guard, mut comparisons) in last_const_cmplog {
+            let mut comparisons = comparisons.into_iter();
+            let mut current = Vec::new();
+            if let Some(mut last) = comparisons.next() {
+                current.push(last.1);
+                let mut base = last.0;
+                let mut last = last.0;
+                for (compared, values) in comparisons {
+                    if compared != last + 1 {
+                        insert_const_combo(&mut replacements, guard, &mut current, base);
+                        base = compared;
                     }
+                    current.push(values);
+                    last = compared;
                 }
+                insert_const_combo(&mut replacements, guard, &mut current, base);
             }
         }
+
+        let mut mined_tokens = BTreeSet::new();
+        for (_, replacement) in replacements.iter() {
+            if replacement.len() > 3 && replacement.iter().all(|options| options.len() == 1) {
+                mined_tokens.insert(
+                    replacement
+                        .iter()
+                        .flat_map(|options| options.into_iter())
+                        .map(|(k, _)| *k)
+                        .collect::<Vec<_>>(),
+                );
+            }
+        }
+        mark_feature_time!(state, PerfFeature::GetFeedbackInterestingAll);
+
+        if !state.has_metadata::<Tokens>() {
+            state.add_metadata(Tokens::default());
+        }
+        if let Some(tokens) = state.metadata_mut().get_mut::<Tokens>() {
+            tokens.add_tokens(mined_tokens);
+        }
+
+        let meta = DataflowCmplogReplacementsMetadata {
+            replacements: replacements
+                .into_iter()
+                .map(|((_, idx), seq)| (idx, seq.into_iter().map(Vec::from_iter).collect()))
+                .collect(),
+            cross_replacements: cross_replacements
+                .into_iter()
+                .map(|((first, second), indices)| (first, second, Vec::from_iter(indices)))
+                .collect(),
+        };
 
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        testcase
-            .metadata_mut()
-            .insert(DataflowCmplogReplacementsMetadata {
-                replacements,
-                cross_replacements,
-            });
+        // convert for optimisations later with direct indexing
+        testcase.metadata_mut().insert(meta);
+
+        unsafe {
+            CMPLOG.clear();
+            CMPLOG_CONST.clear();
+            INPUT.clear();
+        }
 
         Ok(())
     }
@@ -806,15 +827,6 @@ impl DataflowI2SMutator {
 impl Named for DataflowI2SMutator {
     fn name(&self) -> &str {
         "DataflowI2SMutator"
-    }
-}
-
-fn apply_mutation<const N: usize>(target: &mut [u8], source: [u8; N]) -> MutationResult {
-    if target == &source {
-        MutationResult::Skipped
-    } else {
-        target.copy_from_slice(&source);
-        MutationResult::Mutated
     }
 }
 
@@ -837,33 +849,46 @@ where
             .unwrap()
             .borrow();
         let Some(meta) = tc.metadata().get::<DataflowCmplogReplacementsMetadata>() else { return Ok(MutationResult::Skipped); };
-        let (size, (pos, value)) = if !meta.replacements.is_empty() && choice & 1 == 0 {
+        if !meta.replacements.is_empty() && choice & 1 == 0 {
             let index = index % meta.replacements.len();
-            meta.replacements[index]
+            let (pos, value) = &meta.replacements[index];
+            let mut rng = StdRng::seed_from_u64(choice >> 1);
+            let mut amount = rng.next_u64() as usize % value.len() + 1;
+            let mut modified = false;
+            for (e, values) in input.bytes_mut()[*pos..].iter_mut().zip(value.iter()) {
+                if amount == 0 {
+                    break;
+                }
+                let (chosen, existing) = values[rng.next_u64() as usize % values.len()];
+                if *e == existing {
+                    *e = chosen;
+                    modified = true;
+                    amount -= 1;
+                }
+            }
+            if modified {
+                Ok(MutationResult::Mutated)
+            } else {
+                Ok(MutationResult::Skipped)
+            }
         } else if !meta.cross_replacements.is_empty() {
             let index = index % meta.cross_replacements.len();
-            let chosen = meta.cross_replacements[index];
+            let (mut first, mut second, amounts) = &meta.cross_replacements[index];
             if choice & 2 == 0 {
-                (chosen.0, (chosen.1 .0, chosen.1 .1))
+                core::mem::swap(&mut first, &mut second);
+            }
+            let index = (choice >> 2) as usize % amounts.len();
+            let amount = amounts[index];
+            if input.bytes()[first..(first + amount)] == input.bytes()[second..(second + amount)] {
+                Ok(MutationResult::Skipped)
             } else {
-                (chosen.0, (chosen.2 .0, chosen.2 .1))
+                input
+                    .bytes_mut()
+                    .copy_within(first..(first + amount), second);
+                Ok(MutationResult::Mutated)
             }
         } else {
             return Ok(MutationResult::Skipped);
-        };
-        let res = match size {
-            1 => apply_mutation(&mut input.bytes_mut()[pos..(pos + 1)], [value as u8]),
-            2 => apply_mutation(
-                &mut input.bytes_mut()[pos..(pos + 2)],
-                (value as u16).to_ne_bytes(),
-            ),
-            4 => apply_mutation(
-                &mut input.bytes_mut()[pos..(pos + 4)],
-                (value as u32).to_ne_bytes(),
-            ),
-            8 => apply_mutation(&mut input.bytes_mut()[pos..(pos + 8)], value.to_ne_bytes()),
-            _ => unreachable!("Illegal size while performing dataflow-based I2S mutation"),
-        };
-        Ok(res)
+        }
     }
 }

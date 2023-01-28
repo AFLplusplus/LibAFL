@@ -1,6 +1,6 @@
 [package]
-name = "baby_fuzzer_dataflow"
-version = "0.7.1"
+name = "libfuzzer_stb_image_dataflow"
+version = "0.8.2"
 authors = ["Addison Crump <research@addisoncrump.info>"]
 edition = "2021"
 
@@ -22,8 +22,8 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../libafl" }
-libafl_targets = { path = "../../libafl_targets", features = ["dataflow", "sancov_pcguard_hitcounts"] }
+libafl = { path = "../../libafl", features = ["introspection"] }
+libafl_targets = { path = "../../libafl_targets", features = ["dataflow", "introspection", "sancov_pcguard_hitcounts"] }
 mimalloc = { version = "*", default-features = false }
 
 [lib]

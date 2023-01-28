@@ -25,8 +25,10 @@ sancov_value_profile = []
 sancov_8bit = []
 sancov_cmplog = []
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
-dataflow = ["bindgen"]
+dataflow = ["bindgen", "rand"]
 clippy = [] # Ignore compiler warnings during clippy
+
+introspection = ["libafl/introspection"]
 
 [build-dependencies]
 bindgen = { version = "0.63.0", optional = true }
@@ -35,6 +37,7 @@ cc = { version = "1.0", features = ["parallel"] }
 [dependencies]
 libafl = { path = "../libafl", version = "0.10.0", default-features = false, features = [] }
 log = "0.4.17"
+rand = { version = "0.8.5", optional = true }
 
 rangemap = "1.0"
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
