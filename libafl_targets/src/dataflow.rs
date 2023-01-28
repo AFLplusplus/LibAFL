@@ -67,40 +67,58 @@ pub(crate) static mut LAST_GUARD: usize = 0;
 pub static mut CMPLOG_ENABLED: bool = false;
 static mut CMPLOG_MAX_LABELS: u32 = 8;
 
+static mut CMPLOG: Vec<(u8, u64, u64, usize, dfsan_label, dfsan_label)> = Vec::new();
+static mut CMPLOG_CONST: Vec<(u8, u64, u64, usize, dfsan_label)> = Vec::new();
+
 #[no_mangle]
 pub unsafe fn __dfsw___sanitizer_cov_trace_switch(
-    _val: u64,
-    _cases: *const u64,
+    val: u64,
+    cases: *const u64,
     l1: dfsan_label,
     _l2: dfsan_label,
 ) {
-    GUARD_LABELS[LAST_GUARD] |= l1;
+    GUARD_LABELS.get_mut(LAST_GUARD).map(|label| *label |= l1);
+    if CMPLOG_ENABLED {
+        // From: https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-data-flow
+        // Called before a switch statement.
+        // Val is the switch operand.
+        // Cases[0] is the number of case constants.
+        // Cases[1] is the size of Val in bits.
+        // Cases[2:] are the case constants.
+        let val_size = (*cases.offset(1) / 8) as u8;
+        if l1.count_ones() <= val_size as u32 && l1.count_ones() <= CMPLOG_MAX_LABELS {
+            let case_counts = *cases as usize;
+            let cases = core::slice::from_raw_parts(cases.offset(2), case_counts);
+            for &case in cases {
+                CMPLOG_CONST.push((val_size, val, case, LAST_GUARD, l1));
+            }
+        }
+    }
 }
 
 macro_rules! hook {
-    ($name:ident, $cmplog:ident, $arg_type:ty) => {
+    ($name:ident, $arg_type:ty) => {
         #[no_mangle]
         pub unsafe fn $name(arg1: $arg_type, arg2: $arg_type, l1: dfsan_label, l2: dfsan_label) {
-            let name = stringify!($name);
-            GUARD_LABELS
-                .get_mut(LAST_GUARD)
-                .map(|label| *label |= l1 | l2);
-            if CMPLOG_ENABLED
-                && ((l1 != 0
-                    && l1.count_ones() <= core::mem::size_of::<$arg_type>() as u32
-                    && l1.count_ones() <= CMPLOG_MAX_LABELS)
-                    || (l2 != 0
-                        && l2.count_ones() <= core::mem::size_of::<$arg_type>() as u32
-                        && l2.count_ones() <= CMPLOG_MAX_LABELS))
-            {
-                $cmplog.push((
-                    core::mem::size_of::<$arg_type>() as u8,
-                    arg1.into(),
-                    arg2.into(),
-                    LAST_GUARD,
-                    l1,
-                    l2,
-                ));
+            if l1 != 0 || l2 != 0 {
+                GUARD_LABELS
+                    .get_mut(LAST_GUARD)
+                    .map(|label| *label |= l1 | l2);
+                if CMPLOG_ENABLED
+                    && ((l1.count_ones() <= core::mem::size_of::<$arg_type>() as u32
+                        && l1.count_ones() <= CMPLOG_MAX_LABELS)
+                        || (l2.count_ones() <= core::mem::size_of::<$arg_type>() as u32
+                            && l2.count_ones() <= CMPLOG_MAX_LABELS))
+                {
+                    CMPLOG.push((
+                        core::mem::size_of::<$arg_type>() as u8,
+                        arg1.into(),
+                        arg2.into(),
+                        LAST_GUARD,
+                        l1,
+                        l2,
+                    ));
+                }
             }
         }
     };
@@ -110,39 +128,36 @@ macro_rules! hook {
 // const variants of sanitizer cov have the first argument as a compile-time constant, so we do not
 // need to record the labels of these values
 macro_rules! hook_const {
-    ($name:ident, $cmplog:ident, $arg_type:ty) => {
+    ($name:ident, $arg_type:ty) => {
         #[no_mangle]
         pub unsafe fn $name(arg1: $arg_type, arg2: $arg_type, _l1: dfsan_label, l2: dfsan_label) {
-            let name = stringify!($name);
-            GUARD_LABELS.get_mut(LAST_GUARD).map(|label| *label |= l2);
-            if CMPLOG_ENABLED
-                && l2 != 0
-                && l2.count_ones() <= core::mem::size_of::<$arg_type>() as u32
-                && l2.count_ones() <= CMPLOG_MAX_LABELS
-            {
-                $cmplog.push((
-                    core::mem::size_of::<$arg_type>() as u8,
-                    arg1.into(),
-                    arg2.into(),
-                    LAST_GUARD,
-                    l2,
-                ));
+            if l2 != 0 {
+                GUARD_LABELS.get_mut(LAST_GUARD).map(|label| *label |= l2);
+                if CMPLOG_ENABLED
+                    && l2.count_ones() <= core::mem::size_of::<$arg_type>() as u32
+                    && l2.count_ones() <= CMPLOG_MAX_LABELS
+                {
+                    CMPLOG_CONST.push((
+                        core::mem::size_of::<$arg_type>() as u8,
+                        arg1.into(),
+                        arg2.into(),
+                        LAST_GUARD,
+                        l2,
+                    ));
+                }
             }
         }
     };
 }
 
-static mut CMPLOG: Vec<(u8, u64, u64, usize, dfsan_label, dfsan_label)> = Vec::new();
-static mut CMPLOG_CONST: Vec<(u8, u64, u64, usize, dfsan_label)> = Vec::new();
-
-hook!(__dfsw___sanitizer_cov_trace_cmp1, CMPLOG, u8);
-hook!(__dfsw___sanitizer_cov_trace_cmp2, CMPLOG, u16);
-hook!(__dfsw___sanitizer_cov_trace_cmp4, CMPLOG, u32);
-hook!(__dfsw___sanitizer_cov_trace_cmp8, CMPLOG, u64);
-hook_const!(__dfsw___sanitizer_cov_trace_const_cmp1, CMPLOG_CONST, u8);
-hook_const!(__dfsw___sanitizer_cov_trace_const_cmp2, CMPLOG_CONST, u16);
-hook_const!(__dfsw___sanitizer_cov_trace_const_cmp4, CMPLOG_CONST, u32);
-hook_const!(__dfsw___sanitizer_cov_trace_const_cmp8, CMPLOG_CONST, u64);
+hook!(__dfsw___sanitizer_cov_trace_cmp1, u8);
+hook!(__dfsw___sanitizer_cov_trace_cmp2, u16);
+hook!(__dfsw___sanitizer_cov_trace_cmp4, u32);
+hook!(__dfsw___sanitizer_cov_trace_cmp8, u64);
+hook_const!(__dfsw___sanitizer_cov_trace_const_cmp1, u8);
+hook_const!(__dfsw___sanitizer_cov_trace_const_cmp2, u16);
+hook_const!(__dfsw___sanitizer_cov_trace_const_cmp4, u32);
+hook_const!(__dfsw___sanitizer_cov_trace_const_cmp8, u64);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DataflowObserver {
