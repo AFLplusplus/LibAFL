@@ -125,7 +125,7 @@ where
             let mut input = input.clone();
 
             start_timer!(state);
-            self.mutator_mut().mutate(state, &mut input, i as i32)?;
+            self.mutator_mut().mutate(state, &mut input)?;
             mark_feature_time!(state, PerfFeature::Mutate);
 
             // Time is measured directly the `evaluate_input` function
@@ -133,7 +133,7 @@ where
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
 
             start_timer!(state);
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+            self.mutator_mut().post_exec(state, corpus_idx)?;
             post.post_exec(state, i as i32, corpus_idx)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
         }

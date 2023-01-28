@@ -392,23 +392,13 @@ where
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
     #[inline]
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         self.finds_before = state.corpus().count() + state.solutions().count();
-        self.scheduled_mutate(state, input, stage_idx)
+        self.scheduled_mutate(state, input)
     }
 
     #[allow(clippy::cast_precision_loss)]
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        _stage_idx: i32,
-        _corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, _corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();
 
@@ -545,12 +535,7 @@ where
             phantom: PhantomData,
         })
     }
-    fn core_mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn core_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
         let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
         for i in 0..mopt.operator_num {
@@ -559,9 +544,7 @@ where
 
         for _i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
-            let outcome = self
-                .mutations_mut()
-                .get_and_mutate(idx, state, input, stage_idx)?;
+            let outcome = self.mutations_mut().get_and_mutate(idx, state, input)?;
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
@@ -575,12 +558,7 @@ where
         Ok(r)
     }
 
-    fn pilot_mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn pilot_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
         let swarm_now;
         {
@@ -595,9 +573,7 @@ where
 
         for _i in 0..self.iterations(state, input) {
             let idx = self.schedule(state, input);
-            let outcome = self
-                .mutations_mut()
-                .get_and_mutate(idx, state, input, stage_idx)?;
+            let outcome = self.mutations_mut().get_and_mutate(idx, state, input)?;
             if outcome == MutationResult::Mutated {
                 r = MutationResult::Mutated;
             }
@@ -652,16 +628,11 @@ where
             .unwrap()
     }
 
-    fn scheduled_mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+    fn scheduled_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let mode = self.mode;
         match mode {
-            MOptMode::Corefuzzing => self.core_mutate(state, input, stage_idx),
-            MOptMode::Pilotfuzzing => self.pilot_mutate(state, input, stage_idx),
+            MOptMode::Corefuzzing => self.core_mutate(state, input),
+            MOptMode::Pilotfuzzing => self.pilot_mutate(state, input),
         }
     }
 }

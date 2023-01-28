@@ -102,7 +102,7 @@ where
             state.set_max_size(before_len);
 
             start_timer!(state);
-            self.mutator_mut().mutate(state, &mut input, i as i32)?;
+            self.mutator_mut().mutate(state, &mut input)?;
             mark_feature_time!(state, PerfFeature::Mutate);
 
             let corpus_idx = if input.len() < before_len {
@@ -137,7 +137,7 @@ where
             };
 
             start_timer!(state);
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+            self.mutator_mut().post_exec(state, corpus_idx)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
 
             i = next_i;

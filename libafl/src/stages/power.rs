@@ -89,7 +89,7 @@ where
         for i in 0..num {
             let mut input = input.clone();
 
-            self.mutator_mut().mutate(state, &mut input, i as i32)?;
+            self.mutator_mut().mutate(state, &mut input)?;
 
             let (untransformed, post) = input.try_transform_into(state)?;
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
@@ -123,7 +123,7 @@ where
                     .set_n_fuzz_entry(hash);
             }
 
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+            self.mutator_mut().post_exec(state, corpus_idx)?;
             post.post_exec(state, i as i32, corpus_idx)?;
         }
 
