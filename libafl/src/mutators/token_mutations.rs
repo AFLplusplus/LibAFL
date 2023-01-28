@@ -24,7 +24,10 @@ use crate::{
     bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
-    observers::cmp::{CmpValues, CmpValuesMetadata, AFLCmpValuesMetadata},
+    observers::cmp::{
+        AFLCmpValues::{FnOperands, Operands},
+        AFLCmpValuesMetadata, CmpValues, CmpValuesMetadata,
+    },
     state::{HasMaxSize, HasMetadata, HasRand},
     Error,
 };
@@ -599,9 +602,18 @@ impl I2SRandReplace {
     }
 }
 
+const CMP_TYPE_INS: usize = 1;
+const CMP_TYPE_RTN: usize = 2;
+
 /// AFL++ redqueen mutation
 #[derive(Debug, Default)]
 pub struct AFLRedQueen;
+
+impl AFLRedQueen {
+    pub fn cmp_fuzz(&self) {}
+
+    pub fn rtn_fuzz(&self) {}
+}
 
 impl<I, S> Mutator<I, S> for AFLRedQueen
 where
@@ -626,13 +638,15 @@ where
                 return Ok(MutationResult::Skipped);
             }
 
-            let len = meta.unwrap().new_cmpvals().len();
+            let len = meta.unwrap().headers().len();
             if len == 0 {
                 return Ok(MutationResult::Skipped);
             }
             len
         };
 
+        // Randomly choose one from the cmplogs, Maybe just iterate over everything
+        let r = state.rand_mut().below(cmp_len as u64) as usize;
 
         let meta = state.metadata().get::<AFLCmpValuesMetadata>().unwrap();
 
@@ -643,24 +657,37 @@ where
         let input_len = input.bytes().len();
         let input_bytes = input.bytes_mut();
 
-        let keys = meta.headers();
-
-        // Randomly choose one from the cmplogs, Maybe just iterate over everything
-        let r = state.rand_mut().below(keys.len() as u64) as usize;
-
         let (idx, header) = headers[r];
 
-        if header._type() == 1 {
-            // INS
+        if orig_cmpvals.get(&idx).is_none() || new_cmpvals.get(&idx).is_none() {
+            // new_cmpvals.get(&idx) is always Some()
+            return Ok(MutationResult::Skipped);
+        }
 
-        }
-        else if header._type() == 2{
-            // RTN
+        let orig_val = orig_cmpvals.get(&idx).unwrap();
+        let new_val = new_cmpvals.get(&idx).unwrap();
 
+        match (orig_val, new_val) {
+            (Operands(orig), Operands(new)) => {
+                assert!(header._type() == CMP_TYPE_INS as u32);
+
+                // Compare v0 against v1
+                self.cmp_fuzz();
+                // Compare v1 against v0
+                self.cmp_fuzz();
+            }
+            (FnOperands(orig), FnOperands(new)) => {
+                assert!(header._type() == CMP_TYPE_RTN as u32);
+                // Compare v0 against v1
+                self.rtn_fuzz();
+                // Compare v1 against v0
+                self.rtn_fuzz()
+            }
+            (_, _) => {
+                // Collision?
+            }
         }
-        else {
-            // Something is wrong if it reaches here
-        }
+
         Ok(MutationResult::Mutated)
     }
 }

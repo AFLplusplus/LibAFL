@@ -6,8 +6,8 @@ use alloc::{
 };
 use core::{fmt::Debug, marker::PhantomData};
 
-use hashbrown::HashMap;
 use c2rust_bitfields::BitfieldStruct;
+use hashbrown::HashMap;
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
@@ -354,28 +354,38 @@ struct cmp_map {
 pub struct AFLCmpValuesMetadata {
     /// The first map of AFLCmpVals retrieved by running the un-mutated input
     #[serde(skip)]
-    pub orig_cmpvals: HashMap<usize, AFLCmpVals>,
+    pub orig_cmpvals: HashMap<usize, AFLCmpValues>,
     /// The second map of AFLCmpVals retrieved by runnning the mutated input
     #[serde(skip)]
-    pub new_cmpvals: HashMap<usize, AFLCmpVals>,
-    /// The list of logged idx and headers
+    pub new_cmpvals: HashMap<usize, AFLCmpValues>,
+    /// The list of logged idx and headers retrieved by runnning the mutated input
     #[serde(skip)]
-    pub headers: Vec<(usize, AFLCmpHeader)>
+    pub headers: Vec<(usize, AFLCmpHeader)>,
+    /// The bytes of mutant retrieved by runnning the mutated input
+    pub mutant: Vec<u8>,
 }
 
 crate::impl_serdeany!(AFLCmpValuesMetadata);
 
 impl AFLCmpValuesMetadata {
-    pub fn orig_cmpvals(&self) -> &HashMap<usize, AFLCmpVals> {
+    /// Getter for `orig_cmpvals`
+    pub fn orig_cmpvals(&self) -> &HashMap<usize, AFLCmpValues> {
         &self.orig_cmpvals
     }
 
-    pub fn new_cmpvals(&self) -> &HashMap<usize, AFLCmpVals> {
+    /// Getter for `new_cmpvals`
+    pub fn new_cmpvals(&self) -> &HashMap<usize, AFLCmpValues> {
         &self.new_cmpvals
     }
 
+    /// Getter for `headers`
     pub fn headers(&self) -> &Vec<(usize, AFLCmpHeader)> {
         &self.headers
+    }
+
+    /// Getter for `mutant`
+    pub fn mutant(&self) -> &Vec<u8> {
+        &self.mutant
     }
 }
 
@@ -405,6 +415,12 @@ pub struct AFLCmpHeader {
     data: [u8; 8],
 }
 
+#[derive(Debug)]
+pub enum AFLCmpValues {
+    Operands(AFLCmpOperands),
+    FnOperands(AFLCmpFnOperands),
+}
+
 /// The AFL++ `cmp_operands` struct
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C, packed)]
@@ -413,6 +429,24 @@ pub struct AFLCmpOperands {
     v1: u64,
     v0_128: u64,
     v1_128: u64,
+}
+
+impl AFLCmpOperands {
+    pub fn v0(&self) -> u64 {
+        self.v0
+    }
+
+    pub fn v1(&self) -> u64 {
+        self.v1
+    }
+
+    pub fn v0_128(&self) -> u64 {
+        self.v0_128
+    }
+
+    pub fn v1_128(&self) -> u64 {
+        self.v1_128
+    }
 }
 
 /// The AFL++ `cmpfn_operands` struct
