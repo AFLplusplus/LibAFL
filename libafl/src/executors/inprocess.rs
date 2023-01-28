@@ -1189,10 +1189,7 @@ mod windows_exception_handler {
                     .unwrap()
                     .ExceptionAddress as usize;
 
-                eprintln!(
-                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
-                    crash_addr
-                );
+                eprintln!("We crashed at addr 0x{crash_addr:x}, but are not in the target... Bug in the fuzzer? Exiting.");
             }
             #[cfg(feature = "std")]
             {

@@ -25,12 +25,7 @@ use crate::{
 pub trait MutatedTransformPost<S>: Sized {
     /// Perform any post-execution steps necessary for the transformed input (e.g., updating metadata)
     #[inline]
-    fn post_exec(
-        self,
-        state: &mut S,
-        stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
+    fn post_exec(self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -121,7 +116,7 @@ where
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
-        for i in 0..num {
+        for _i in 0..num {
             let mut input = input.clone();
 
             start_timer!(state);
@@ -134,7 +129,7 @@ where
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, corpus_idx)?;
-            post.post_exec(state, i as i32, corpus_idx)?;
+            post.post_exec(state, corpus_idx)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
         }
         Ok(())

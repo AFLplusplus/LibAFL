@@ -23,7 +23,6 @@ where
         &mut self,
         state: &mut S,
         input: &mut PacketData,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // Lain uses its own instance of StdRand, but we want to keep it in sync with LibAFL's state.
         self.inner.rng_mut().set_seed(state.rand_mut().next());

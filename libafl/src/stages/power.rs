@@ -86,7 +86,7 @@ where
         let Ok(input) = I::try_transform_from(&testcase, state, corpus_idx) else { return Ok(()); };
         drop(testcase);
 
-        for i in 0..num {
+        for _i in 0..num {
             let mut input = input.clone();
 
             self.mutator_mut().mutate(state, &mut input)?;
@@ -124,7 +124,7 @@ where
             }
 
             self.mutator_mut().post_exec(state, corpus_idx)?;
-            post.post_exec(state, i as i32, corpus_idx)?;
+            post.post_exec(state, corpus_idx)?;
         }
 
         Ok(())

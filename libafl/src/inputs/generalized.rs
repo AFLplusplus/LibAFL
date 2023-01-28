@@ -131,12 +131,7 @@ impl<S> MutatedTransformPost<S> for GeneralizedInputMetadata
 where
     S: HasCorpus,
 {
-    fn post_exec(
-        self,
-        state: &mut S,
-        _stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
+    fn post_exec(self, state: &mut S, corpus_idx: Option<CorpusId>) -> Result<(), Error> {
         if let Some(corpus_idx) = corpus_idx {
             let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
             testcase.metadata_mut().insert(self);

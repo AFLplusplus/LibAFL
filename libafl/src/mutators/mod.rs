@@ -189,14 +189,13 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             input: &mut BytesInput,
-            stage_idx: i32,
         ) -> Result<MutationResult, Error> {
             let mutated = Python::with_gil(|py| -> PyResult<bool> {
                 self.inner
                     .call_method1(
                         py,
                         "mutate",
-                        (PythonStdStateWrapper::wrap(state), input.bytes(), stage_idx),
+                        (PythonStdStateWrapper::wrap(state), input.bytes()),
                     )?
                     .extract(py)
             })?;
@@ -210,18 +209,13 @@ pub mod pybind {
         fn post_exec(
             &mut self,
             state: &mut PythonStdState,
-            stage_idx: i32,
             corpus_idx: Option<CorpusId>,
         ) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
                     py,
                     "post_exec",
-                    (
-                        PythonStdStateWrapper::wrap(state),
-                        stage_idx,
-                        corpus_idx.map(|x| x.0),
-                    ),
+                    (PythonStdStateWrapper::wrap(state), corpus_idx.map(|x| x.0)),
                 )?;
                 Ok(())
             })?;
@@ -288,20 +282,16 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             input: &mut BytesInput,
-            stage_idx: i32,
         ) -> Result<MutationResult, Error> {
-            unwrap_me_mut!(self.wrapper, m, { m.mutate(state, input, stage_idx) })
+            unwrap_me_mut!(self.wrapper, m, { m.mutate(state, input) })
         }
 
         fn post_exec(
             &mut self,
             state: &mut PythonStdState,
-            stage_idx: i32,
             corpus_idx: Option<CorpusId>,
         ) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, m, {
-                m.post_exec(state, stage_idx, corpus_idx)
-            })
+            unwrap_me_mut!(self.wrapper, m, { m.post_exec(state, corpus_idx) })
         }
     }
 
