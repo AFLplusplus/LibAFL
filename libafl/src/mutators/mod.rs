@@ -1,10 +1,13 @@
 //! Mutators mutate input during fuzzing.
 
 pub mod scheduled;
+use core::fmt;
+
 pub use scheduled::*;
 pub mod mutations;
 pub use mutations::*;
 pub mod token_mutations;
+use serde::{Deserialize, Serialize};
 pub use token_mutations::*;
 pub mod encoded_mutations;
 pub use encoded_mutations::*;
@@ -30,6 +33,36 @@ use crate::{
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event
 // We can use it to report which mutations generated the testcase in the broker logs
+
+/// The index of a mutation in the mutations tuple
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[repr(transparent)]
+pub struct MutationId(pub(crate) usize);
+
+impl fmt::Display for MutationId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MutationId({})", self.0)
+    }
+}
+
+impl Into<MutationId> for usize {
+    fn into(self) -> MutationId {
+        MutationId(self)
+    }
+}
+
+impl Into<MutationId> for u64 {
+    fn into(self) -> MutationId {
+        MutationId(self as usize)
+    }
+}
+
+impl Into<MutationId> for i32 {
+    fn into(self) -> MutationId {
+        debug_assert!(self >= 0);
+        MutationId(self as usize)
+    }
+}
 
 /// The result of a mutation.
 /// If the mutation got skipped, the target
@@ -85,7 +118,7 @@ pub trait MutatorsTuple<I, S>: HasConstLen {
     /// Gets the [`Mutator`] at the given index and runs the `mutate` function on it.
     fn get_and_mutate(
         &mut self,
-        index: usize,
+        index: MutationId,
         state: &mut S,
         input: &mut I,
         stage_idx: i32,
@@ -122,7 +155,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
 
     fn get_and_mutate(
         &mut self,
-        _index: usize,
+        _index: MutationId,
         _state: &mut S,
         _input: &mut I,
         _stage_idx: i32,
@@ -172,15 +205,16 @@ where
 
     fn get_and_mutate(
         &mut self,
-        index: usize,
+        index: MutationId,
         state: &mut S,
         input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if index == 0 {
+        if index.0 == 0 {
             self.0.mutate(state, input, stage_idx)
         } else {
-            self.1.get_and_mutate(index - 1, state, input, stage_idx)
+            self.1
+                .get_and_mutate((index.0 - 1).into(), state, input, stage_idx)
         }
     }
 

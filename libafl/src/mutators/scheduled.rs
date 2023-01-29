@@ -21,6 +21,8 @@ use crate::{
     Error,
 };
 
+use super::MutationId;
+
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LogMutationMetadata {
@@ -74,7 +76,7 @@ where
     fn iterations(&self, state: &mut S, input: &I) -> u64;
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut S, input: &I) -> usize;
+    fn schedule(&self, state: &mut S, input: &I) -> MutationId;
 
     /// New default implementation for mutate.
     /// Implementations must forward mutate() to this method
@@ -170,9 +172,9 @@ where
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut S, _: &I) -> usize {
+    fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert!(!self.mutations().is_empty());
-        state.rand_mut().below(self.mutations().len() as u64) as usize
+        state.rand_mut().below(self.mutations().len() as u64).into()
     }
 }
 
@@ -279,7 +281,7 @@ where
     SM: ScheduledMutator<I, MT, S>,
 {
     scheduled: SM,
-    mutation_log: Vec<usize>,
+    mutation_log: Vec<MutationId>,
     phantom: PhantomData<(I, MT, S)>,
 }
 
@@ -324,7 +326,7 @@ where
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
             let mut log = Vec::<String>::new();
             while let Some(idx) = self.mutation_log.pop() {
-                let name = String::from(self.scheduled.mutations().name(idx).unwrap()); // TODO maybe return an Error on None
+                let name = String::from(self.scheduled.mutations().name(idx.0).unwrap()); // TODO maybe return an Error on None
                 log.push(name);
             }
             let meta = LogMutationMetadata::new(log);
@@ -365,11 +367,12 @@ where
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut S, _: &I) -> usize {
+    fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert!(!self.scheduled.mutations().is_empty());
         state
             .rand_mut()
-            .below(self.scheduled.mutations().len() as u64) as usize
+            .below(self.scheduled.mutations().len() as u64)
+            .into()
     }
 
     fn scheduled_mutate(

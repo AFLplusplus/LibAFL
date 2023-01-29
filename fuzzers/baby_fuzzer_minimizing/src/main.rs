@@ -141,7 +141,7 @@ pub fn main() -> Result<(), Error> {
         &mut executor,
         &mut state,
         &mut mgr,
-        CorpusId::from(0usize),
+        CorpusId::from(0_usize),
     )?;
 
     Ok(())
