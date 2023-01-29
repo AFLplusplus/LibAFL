@@ -32,7 +32,7 @@ pub struct TuneableScheduledMutatorMetadata {
     /// The cumulative probability distribution for each mutation.
     /// Will not be used when `mutation_ids` are set.
     /// Clear to fall back to random.
-    pub mutation_probabilities_cumulative: Vec<f64>,
+    pub mutation_probabilities_cumulative: Vec<f32>,
     /// The count of total mutations to perform.
     /// If `mutation_ids` is of length `10`, and this number is `20`,
     /// the mutations will be iterated through twice.
@@ -174,7 +174,7 @@ where
         // We will sample using the mutation probabilities.
         // Doing this outside of the original if branch to make the borrow checker happy.
         #[allow(clippy::cast_precision_loss)]
-        let coin: f64 = state.rand_mut().next() as f64 / u64::MAX as f64;
+        let coin = state.rand_mut().next() as f32 / u64::MAX as f32;
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata
             .mutation_probabilities_cumulative
@@ -247,7 +247,7 @@ where
     /// Sets the mutation probabilities.
     /// The `Vec` should ideally contain one value per [`MutationId`].
     /// Setting the probabilities will remove the value set through `set_mutation_ids`.
-    pub fn set_mutation_probabilities(state: &mut S, mutation_probabilities: Vec<f64>) {
+    pub fn set_mutation_probabilities(state: &mut S, mutation_probabilities: Vec<f32>) {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids.clear();
         metadata.next_id = 0.into();
