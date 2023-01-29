@@ -61,6 +61,7 @@ extern "C" {
     fn __register_frame(begin: *mut c_void);
 }
 
+#[cfg(not(target_os = "ios"))]
 extern "C" {
     fn tls_ptr() -> *const c_void;
 }
@@ -390,6 +391,7 @@ impl AsanRuntime {
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
     /// tls mappings.
     #[allow(clippy::unused_self)]
+    #[cfg(not(target_os = "ios"))]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
         self.allocator
@@ -401,6 +403,17 @@ impl AsanRuntime {
         println!(
             "registering thread with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}"
         );
+    }
+
+    /// Register the current thread with the runtime, implementing shadow memory for its stack mapping.
+    #[allow(clippy::unused_self)]
+    #[cfg(target_os = "ios")]
+    pub fn register_thread(&mut self) {
+        let (stack_start, stack_end) = Self::current_stack();
+        self.allocator
+            .map_shadow_for_region(stack_start, stack_end, true);
+
+        println!("registering thread with stack {stack_start:x}:{stack_end:x}");
     }
 
     /// Get the maximum stack size for the current stack
@@ -470,6 +483,7 @@ impl AsanRuntime {
 
     /// Determine the tls start, end for the currently running thread
     #[must_use]
+    #[cfg(not(target_os = "ios"))]
     fn current_tls() -> (usize, usize) {
         let tls_address = unsafe { tls_ptr() } as usize;
 
