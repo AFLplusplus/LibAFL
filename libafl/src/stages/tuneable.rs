@@ -146,7 +146,9 @@ where
     pub fn new(state: &mut Z::State, mutator: M) -> Self {
         Self::transforming(state, mutator)
     }
+}
 
+impl TuneableMutationalStage<(), (), (), (), ()> {
     /// Set the number of iterations to be used by this mutational stage
     pub fn set_iters<S: HasMetadata>(state: &mut S, iters: u64) -> Result<(), Error> {
         set_iters(state, iters)
