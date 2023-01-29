@@ -45,22 +45,23 @@ impl fmt::Display for MutationId {
     }
 }
 
-impl Into<MutationId> for usize {
-    fn into(self) -> MutationId {
-        MutationId(self)
+impl From<usize> for MutationId {
+    fn from(value: usize) -> Self {
+        MutationId(value)
     }
 }
 
-impl Into<MutationId> for u64 {
-    fn into(self) -> MutationId {
-        MutationId(self as usize)
+impl From<u64> for MutationId {
+    fn from(value: u64) -> Self {
+        MutationId(value as usize)
     }
 }
 
-impl Into<MutationId> for i32 {
-    fn into(self) -> MutationId {
-        debug_assert!(self >= 0);
-        MutationId(self as usize)
+impl From<i32> for MutationId {
+    #[allow(clippy::cast_sign_loss)]
+    fn from(value: i32) -> Self {
+        debug_assert!(value >= 0);
+        MutationId(value as usize)
     }
 }
 

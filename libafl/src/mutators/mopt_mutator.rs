@@ -7,6 +7,7 @@ use core::{
 
 use serde::{Deserialize, Serialize};
 
+use super::MutationId;
 use crate::{
     bolts::rands::{Rand, StdRand},
     corpus::{Corpus, CorpusId},
@@ -14,8 +15,6 @@ use crate::{
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,
 };
-
-use super::MutationId;
 
 /// A Struct for managing MOpt-mutator parameters.
 /// There are 2 modes for `MOpt` scheduler, the core fuzzing mode and the pilot fuzzing mode.

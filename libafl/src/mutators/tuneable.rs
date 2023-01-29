@@ -14,12 +14,12 @@ pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
     bolts::rands::Rand,
     impl_serdeany,
-    mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
+    mutators::{
+        ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
+    },
     state::{HasMetadata, HasRand},
     Error,
 };
-
-use super::MutationId;
 
 /// Metadata in the state, that controls the behavior of the [`TuneableScheduledMutator`] at runtime
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -37,9 +37,9 @@ pub struct TuneableScheduledMutatorMetadata {
 impl Default for TuneableScheduledMutatorMetadata {
     fn default() -> Self {
         Self {
-            mutation_ids: Default::default(),
+            mutation_ids: Vec::default(),
             next_id: 0.into(),
-            iters: Default::default(),
+            iters: None,
         }
     }
 }
@@ -159,7 +159,7 @@ where
                 self.mutations().len() > ret.0,
                 "TuneableScheduler: next vec may not contain id larger than number of mutations!"
             );
-            ret.into()
+            ret
         }
     }
 }
@@ -269,10 +269,10 @@ mod test {
         let tuneable = TuneableScheduledMutator::new(&mut state, mutators);
         let input = BytesInput::new(vec![42]);
         let metadata = TuneableScheduledMutatorMetadata::get_mut(&mut state).unwrap();
-        metadata.mutation_ids.push(1);
-        metadata.mutation_ids.push(2);
-        assert_eq!(tuneable.schedule(&mut state, &input), 1);
-        assert_eq!(tuneable.schedule(&mut state, &input), 2);
-        assert_eq!(tuneable.schedule(&mut state, &input), 1);
+        metadata.mutation_ids.push(1.into());
+        metadata.mutation_ids.push(2.into());
+        assert_eq!(tuneable.schedule(&mut state, &input), 1.into());
+        assert_eq!(tuneable.schedule(&mut state, &input), 2.into());
+        assert_eq!(tuneable.schedule(&mut state, &input), 1.into());
     }
 }

@@ -8,6 +8,7 @@ use core::{
 
 use serde::{Deserialize, Serialize};
 
+use super::MutationId;
 pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
     bolts::{
@@ -20,8 +21,6 @@ use crate::{
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
-
-use super::MutationId;
 
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
 #[derive(Debug, Serialize, Deserialize)]
