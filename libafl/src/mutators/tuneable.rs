@@ -22,12 +22,17 @@ use crate::{
 };
 
 /// Metadata in the state, that controls the behavior of the [`TuneableScheduledMutator`] at runtime
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct TuneableScheduledMutatorMetadata {
-    /// The offsets of mutators to run, in order. Clear to fall back to random.
+    /// The offsets of mutators to run, in order. Clear to fall back to random,
+    /// or use `mutation_probabilities`
     pub mutation_ids: Vec<MutationId>,
     /// The next index to read from in the `next` vec
     pub next_id: MutationId,
+    /// The cumulative probability distribution for each mutation.
+    /// Will not be used when `mutation_ids` are set.
+    /// Clear to fall back to random.
+    pub mutation_probabilities_cumulative: Vec<f64>,
     /// The count of total mutations to perform.
     /// If `mutation_ids` is of length `10`, and this number is `20`,
     /// the mutations will be iterated through twice.
@@ -39,6 +44,7 @@ impl Default for TuneableScheduledMutatorMetadata {
         Self {
             mutation_ids: Vec::default(),
             next_id: 0.into(),
+            mutation_probabilities_cumulative: Vec::default(),
             iters: None,
         }
     }
@@ -147,9 +153,12 @@ where
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         #[allow(clippy::cast_possible_truncation)]
         if metadata.mutation_ids.is_empty() {
-            // fall back to random if no entries in the vec
-            state.rand_mut().below(self.mutations().len() as u64).into()
+            if metadata.mutation_probabilities_cumulative.is_empty() {
+                // fall back to random if no entries in either vec, the scheduling is not tuned.
+                return state.rand_mut().below(self.mutations().len() as u64).into();
+            }
         } else {
+            // using pre-set ids.
             let ret = metadata.mutation_ids[metadata.next_id.0];
             metadata.next_id.0 += 1_usize;
             if metadata.next_id.0 >= metadata.mutation_ids.len() {
@@ -159,8 +168,20 @@ where
                 self.mutations().len() > ret.0,
                 "TuneableScheduler: next vec may not contain id larger than number of mutations!"
             );
-            ret
+            return ret;
         }
+
+        // We will sample using the mutation probabilities.
+        // Doing this outside of the original if branch to make the borrow checker happy.
+        #[allow(clippy::cast_precision_loss)]
+        let coin: f64 = state.rand_mut().next() as f64 / u64::MAX as f64;
+        let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
+        metadata
+            .mutation_probabilities_cumulative
+            .iter()
+            .position(|i| *i >= coin)
+            .unwrap()
+            .into()
     }
 }
 
@@ -223,6 +244,27 @@ where
         metadata.next_id = 0.into();
     }
 
+    /// Sets the mutation probabilities.
+    /// The `Vec` should ideally contain one value per [`MutationId`].
+    /// Setting the probabilities will remove the value set through `set_mutation_ids`.
+    pub fn set_mutation_probabilities(state: &mut S, mutation_probabilities: Vec<f64>) {
+        let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
+        metadata.mutation_ids.clear();
+        metadata.next_id = 0.into();
+
+        // we precalculate the cumulative probability to be faster when sampling later.
+        let mut mutation_probabilities_cumulative = mutation_probabilities;
+        let mut acc = 0.0;
+
+        for probability in &mut mutation_probabilities_cumulative {
+            let l = *probability;
+            *probability += acc;
+            acc += l;
+        }
+
+        metadata.mutation_probabilities_cumulative = mutation_probabilities_cumulative;
+    }
+
     /// mutation ids and iterations
     pub fn set_mutation_ids_and_iters(state: &mut S, mutations: Vec<MutationId>, iters: u64) {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
@@ -232,7 +274,7 @@ where
     }
 
     /// Appends a mutation id to the end of the mutations
-    pub fn push_mutation(state: &mut S, mutation_id: MutationId) {
+    pub fn push_mutation_id(state: &mut S, mutation_id: MutationId) {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids.push(mutation_id);
     }
