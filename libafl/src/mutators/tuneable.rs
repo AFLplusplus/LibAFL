@@ -23,11 +23,11 @@ use crate::{
 #[derive(Default, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct TuneableScheduledMutatorMetadata {
     /// The offsets of mutators to run, in order. Clear to fall back to random.
-    pub next: Vec<usize>,
+    pub mutation_ids: Vec<MutationId>,
     /// The next index to read from in the `next` vec
-    pub next_idx: usize,
+    pub next_id: MutationId,
     /// The count of total mutations to perform.
-    /// If `next` is of length `10`, and this number is `20`,
+    /// If `mutation_ids` is of length `10`, and this number is `20`,
     /// the mutations will be iterated through twice.
     pub iters: Option<u64>,
 }
@@ -51,6 +51,9 @@ impl TuneableScheduledMutatorMetadata {
 }
 
 impl_serdeany!(TuneableScheduledMutatorMetadata);
+
+/// The index of a mutation in the mutations tuple
+type MutationId = usize;
 
 /// A [`Mutator`] that schedules one of the embedded mutations on each call.
 /// The index of the next mutation can be set.
@@ -89,9 +92,9 @@ where
         &mut self,
         state: &mut S,
         input: &mut I,
-        stage_idx: i32,
+        stage_id: i32,
     ) -> Result<MutationResult, Error> {
-        self.scheduled_mutate(state, input, stage_idx)
+        self.scheduled_mutate(state, input, stage_id)
     }
 }
 
@@ -134,18 +137,18 @@ where
         // Assumption: we can not reach this code path without previously adding this metadatum.
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         #[allow(clippy::cast_possible_truncation)]
-        if metadata.next.is_empty() {
+        if metadata.mutation_ids.is_empty() {
             // fall back to random if no entries in the vec
             state.rand_mut().below(self.mutations().len() as u64) as usize
         } else {
-            let ret = metadata.next[metadata.next_idx];
-            metadata.next_idx += 1_usize;
-            if metadata.next_idx >= metadata.next.len() {
-                metadata.next_idx = 0;
+            let ret = metadata.mutation_ids[metadata.next_id];
+            metadata.next_id += 1_usize;
+            if metadata.next_id >= metadata.mutation_ids.len() {
+                metadata.next_id = 0;
             }
             debug_assert!(
                 self.mutations().len() > ret,
-                "TuneableScheduler: next vec may not contain idx larger than number of mutations!"
+                "TuneableScheduler: next vec may not contain id larger than number of mutations!"
             );
             ret
         }
@@ -185,7 +188,7 @@ where
 
     /// Sets the next iterations count, i.e., how many times to mutate the input
     ///
-    /// Using `set_next_and_iter` to set multiple values at the same time
+    /// Using `set_mutation_ids_and_iter` to set multiple values at the same time
     /// will be faster than setting them individually
     /// as it internally only needs a single metadata lookup
     pub fn set_iters(state: &mut S, iters: u64) {
@@ -193,17 +196,38 @@ where
         metadata.iters = Some(iters);
     }
 
-    /// Gets the set iterations
+    /// Gets the set amount of iterations
     pub fn get_iters(state: &S) -> Option<u64> {
         let metadata = Self::metadata(state);
         metadata.iters
     }
 
+    /// Sets the mutation ids
+    pub fn set_mutation_ids(state: &mut S, mutations: Vec<MutationId>) {
+        let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
+        metadata.mutation_ids = mutations;
+        metadata.next_id = 0;
+    }
+
+    /// mutation ids and iterations
+    pub fn set_mutation_ids_and_iters(state: &mut S, mutations: Vec<MutationId>, iters: u64) {
+        let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
+        metadata.mutation_ids = mutations;
+        metadata.next_id = 0;
+        metadata.iters = Some(iters);
+    }
+
+    /// Appends a mutation id to the end of the mutations
+    pub fn push_mutation(state: &mut S, mutation_id: MutationId) {
+        let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
+        metadata.mutation_ids.push(mutation_id);
+    }
+
     /// Resets this to a randomic mutational stage
     pub fn reset(state: &mut S) {
         let metadata = Self::metadata_mut(state);
-        metadata.next.clear();
-        metadata.next_idx = 0;
+        metadata.mutation_ids.clear();
+        metadata.next_id = 0;
         metadata.iters = None;
     }
 }
@@ -231,8 +255,8 @@ mod test {
         let tuneable = TuneableScheduledMutator::new(&mut state, mutators);
         let input = BytesInput::new(vec![42]);
         let metadata = TuneableScheduledMutatorMetadata::get_mut(&mut state).unwrap();
-        metadata.next.push(1);
-        metadata.next.push(2);
+        metadata.mutation_ids.push(1);
+        metadata.mutation_ids.push(2);
         assert_eq!(tuneable.schedule(&mut state, &input), 1);
         assert_eq!(tuneable.schedule(&mut state, &input), 2);
         assert_eq!(tuneable.schedule(&mut state, &input), 1);
