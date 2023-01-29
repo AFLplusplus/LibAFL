@@ -132,7 +132,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        if let Some(iters) = Self::get_iters(state) {
+        if let Some(iters) = TuneableScheduledMutator::get_iters(state) {
             iters
         } else {
             // fall back to random
@@ -180,7 +180,12 @@ where
             phantom: PhantomData,
         }
     }
+}
 
+impl<S> TuneableScheduledMutator<(), (), S>
+where
+    S: HasRand + HasMetadata,
+{
     fn metadata_mut(state: &mut S) -> &mut TuneableScheduledMutatorMetadata {
         state
             .metadata_mut()
