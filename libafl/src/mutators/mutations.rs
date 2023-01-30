@@ -1249,7 +1249,7 @@ mod tests {
                 for input in &inputs {
                     let mut mutant = input.clone();
                     match mutations
-                        .get_and_mutate(idx, &mut state, &mut mutant, 0)
+                        .get_and_mutate(idx.into(), &mut state, &mut mutant, 0)
                         .unwrap()
                     {
                         MutationResult::Mutated => new_testcases.push(mutant),

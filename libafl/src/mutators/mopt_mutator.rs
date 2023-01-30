@@ -7,6 +7,7 @@ use core::{
 
 use serde::{Deserialize, Serialize};
 
+use super::MutationId;
 use crate::{
     bolts::rands::{Rand, StdRand},
     corpus::{Corpus, CorpusId},
@@ -310,7 +311,7 @@ impl MOpt {
     /// This function is used to decide the operator that we want to apply next
     /// see <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L397>
     #[allow(clippy::cast_precision_loss)]
-    pub fn select_algorithm(&mut self) -> Result<usize, Error> {
+    pub fn select_algorithm(&mut self) -> Result<MutationId, Error> {
         let mut res = 0;
         let mut sentry = 0;
 
@@ -341,7 +342,7 @@ impl MOpt {
                 "MOpt: Error in select_algorithm".to_string(),
             ));
         }
-        Ok(res)
+        Ok(res.into())
     }
 }
 
@@ -570,7 +571,7 @@ where
                 .metadata_mut()
                 .get_mut::<MOpt>()
                 .unwrap()
-                .core_operator_cycles_v2[idx] += 1;
+                .core_operator_cycles_v2[idx.0] += 1;
         }
         Ok(r)
     }
@@ -606,7 +607,7 @@ where
                 .metadata_mut()
                 .get_mut::<MOpt>()
                 .unwrap()
-                .pilot_operator_cycles_v2[swarm_now][idx] += 1;
+                .pilot_operator_cycles_v2[swarm_now][idx.0] += 1;
         }
 
         Ok(r)
@@ -643,7 +644,7 @@ where
 
     /// Get the next mutation to apply
     #[inline]
-    fn schedule(&self, state: &mut S, _: &I) -> usize {
+    fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         state
             .metadata_mut()
             .get_mut::<MOpt>()
