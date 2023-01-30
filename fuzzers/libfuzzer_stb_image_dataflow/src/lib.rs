@@ -27,6 +27,7 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 use libafl::{
+    corpus::CachedOnDiskCorpus,
     feedbacks::MaxMapFeedback,
     generators::RandBytesGenerator,
     inputs::BytesInput,
@@ -65,7 +66,7 @@ pub fn main() {
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
-        InMemoryCorpus::<BytesInput>::new(),
+        CachedOnDiskCorpus::<BytesInput>::new(PathBuf::from("./fuzzer_generated"), 1 << 8).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
@@ -119,19 +120,7 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let i2s = StdScheduledMutator::new(tuple_list!(DataflowI2SMutator::new()));
-    let mutator = StdScheduledMutator::new(
-        havoc_mutations()
-            .merge(tuple_list!(
-                BytesDeleteMutator::new(),
-                BytesDeleteMutator::new(),
-                BytesDeleteMutator::new(),
-                BytesDeleteMutator::new(),
-                BytesDeleteMutator::new(),
-                BytesDeleteMutator::new(),
-                BytesDeleteMutator::new()
-            ))
-            .merge(tokens_mutations()),
-    );
+    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
     let cmplog = DataflowCmplogTracingStage::new();
     let mut stages = tuple_list!(
