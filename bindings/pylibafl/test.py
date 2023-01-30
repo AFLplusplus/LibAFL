@@ -1,6 +1,6 @@
 from pylibafl.libafl import *
 import ctypes
-
+import platform
 
 class FooObserver(BaseObserver):
     def __init__(self):
@@ -33,7 +33,10 @@ class FooExecutor(BaseExecutor):
         return (self.h)(input)
 
 
-libc = ctypes.cdll.LoadLibrary("libc.so.6")
+if platform.system() == "Darwin":
+    libc = ctypes.cdll.LoadLibrary("libc.dylib")
+else:
+    libc = ctypes.cdll.LoadLibrary("libc.so.6")
 
 area_ptr = libc.calloc(1, 4096)
 
