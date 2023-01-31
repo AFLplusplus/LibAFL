@@ -1,13 +1,13 @@
 [package]
 name = "pylibafl"
-version = "0.8.2"
+version = "0.9.0"
 edition = "2021"
 
 [dependencies]
 pyo3 = { version = "0.17", features = ["extension-module"] }
-libafl_qemu = { path = "../../libafl_qemu", version = "0.8.2", features = ["python"] }
-libafl_sugar = { path = "../../libafl_sugar", version = "0.8.2", features = ["python"] }
-libafl = { path = "../../libafl", version = "0.8.2", features = ["python"] }
+libafl_qemu = { path = "../../libafl_qemu", version = "0.9.0", features = ["python"] }
+libafl_sugar = { path = "../../libafl_sugar", version = "0.9.0", features = ["python"] }
+libafl = { path = "../../libafl", version = "0.9.0", features = ["python"] }
 
 [build-dependencies]
 pyo3-build-config = { version = "0.17" }

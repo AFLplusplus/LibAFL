@@ -27,9 +27,9 @@ aarch64 = ["libafl_qemu/aarch64"] # build qemu for aarch64
 pyo3-build-config = { version = "0.15", optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.8.2" }
-libafl_targets = { path = "../libafl_targets", version = "0.8.2" }
-libafl_qemu = { path = "../libafl_qemu", version = "0.8.2" }
+libafl = { path = "../libafl", version = "0.9.0" }
+libafl_targets = { path = "../libafl_targets", version = "0.9.0" }
+libafl_qemu = { path = "../libafl_qemu", version = "0.9.0" }
 
 typed-builder = "0.10.0" # Implement the builder pattern at compiletime
 #pyo3 = { version = "0.17", features = ["extension-module"], optional = true }

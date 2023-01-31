@@ -13,7 +13,7 @@ description = "TinyInst backend for libafl"
 
 [dependencies]
 cxx = "1.0"
-libafl = { path = "../libafl", version = "0.8.0", features = [
+libafl = { path = "../libafl", version = "0.9.0", features = [
     "std",
     "libafl_derive",
 ] }

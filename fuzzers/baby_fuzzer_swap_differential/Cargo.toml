@@ -1,6 +1,6 @@
 [package]
 name = "baby_fuzzer_swap_differential"
-version = "0.7.1"
+version = "0.9.0"
 authors = ["Addison Crump <research@addisoncrump.info>"]
 edition = "2021"
 default-run = "fuzzer_sd"
