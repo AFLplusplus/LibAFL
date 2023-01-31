@@ -1,24 +1,32 @@
 #![no_main]
 
-use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
+use std::{ffi::c_int, path::PathBuf};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
+    corpus::{CachedOnDiskCorpus, Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::inprocess::InProcessExecutor,
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
-    feedbacks::CrashFeedback,
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    generators::RandBytesGenerator,
+    inputs::{BytesInput, HasTargetBytes},
+    mutators::{
+        scheduled::{havoc_mutations, StdScheduledMutator},
+        token_mutations::I2SRandReplace,
+        tokens_mutations, BytesDeleteMutator,
+    },
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    prelude::Merge,
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
+    stages::{mutational::StdMutationalStage, ShadowTracingStage},
     state::{HasSolutions, StdState},
 };
 use mimalloc::MiMalloc;
@@ -26,35 +34,45 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use libafl::{
-    corpus::CachedOnDiskCorpus,
-    feedbacks::MaxMapFeedback,
-    generators::RandBytesGenerator,
-    inputs::BytesInput,
-    mutators::{tokens_mutations, BytesDeleteMutator},
-    observers::{HitcountsMapObserver, StdMapObserver},
-    prelude::Merge,
-};
 use libafl_targets::{
-    create_dfsan_harness, DataflowCmplogTracingStage, DataflowI2SMutator, DataflowMapFeedback,
-    DataflowObserver, EDGES_MAP, MAX_EDGES_NUM,
+    create_dfsan_harness, CmpLogObserver, DataflowCmplogTracingStage, DataflowI2SMutator,
+    DataflowMapFeedback, DataflowObserver, EDGES_MAP, MAX_EDGES_NUM,
 };
+
+#[allow(non_snake_case)]
+extern "C" {
+    fn LLVMFuzzerTestOneInput(data: *const u8, len: usize) -> c_int;
+}
 
 #[allow(clippy::similar_names)]
 #[allow(clippy::too_many_lines)]
 #[no_mangle]
 pub fn main() {
     // The closure that we want to fuzz
-    let mut harness = create_dfsan_harness();
-    let dfsan_observer = DataflowObserver::new();
+    let mut harness = |input: &BytesInput| {
+        let target = input.target_bytes();
+        let slice: &[u8] = target.as_slice();
+
+        unsafe {
+            LLVMFuzzerTestOneInput(slice.as_ptr(), slice.len());
+        }
+
+        ExitKind::Ok
+    };
     let edges_observer = HitcountsMapObserver::new(unsafe {
         StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
     });
 
+    // Create an observation channel to keep track of the execution time
+    let time_observer = TimeObserver::new("time");
+
     // Feedback to rate the interestingness of an input
+    // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
-        DataflowMapFeedback::new(&dfsan_observer),
-        MaxMapFeedback::new(&edges_observer)
+        // New maximization map feedback linked to the edges observer and the feedback state
+        MaxMapFeedback::new_tracking(&edges_observer, true, false),
+        // Time feedback, this one does not need a feedback state
+        TimeFeedback::with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -95,14 +113,15 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with just one observer
+    // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = InProcessExecutor::new(
         &mut harness,
-        tuple_list!(dfsan_observer, edges_observer),
+        tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
     )
-    .expect("Failed to create the executor");
+    .unwrap();
 
     // Generate 8 initial inputs
     // state
@@ -119,15 +138,15 @@ pub fn main() {
         .unwrap();
 
     // Setup a mutational stage with a basic bytes mutator
-    let i2s = StdScheduledMutator::new(tuple_list!(DataflowI2SMutator::new()));
-    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+    let dfi2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+        DataflowI2SMutator::new()
+    )));
+    let mutations = StdMutationalStage::new(StdScheduledMutator::new(
+        havoc_mutations().merge(tokens_mutations()),
+    ));
 
-    let cmplog = DataflowCmplogTracingStage::new();
-    let mut stages = tuple_list!(
-        cmplog,
-        StdMutationalStage::new(mutator),
-        StdMutationalStage::new(i2s),
-    );
+    let dataflow = DataflowCmplogTracingStage::new();
+    let mut stages = tuple_list!(dataflow, dfi2s, mutations);
 
     while state.solutions().is_empty() {
         fuzzer

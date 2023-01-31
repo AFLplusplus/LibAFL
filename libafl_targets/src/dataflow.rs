@@ -1,10 +1,8 @@
 #![allow(non_snake_case)]
 
-#[cfg(any(feature = "sancov_value_profile", feature = "sancov_cmplog"))]
+#[cfg(any(feature = "sancov_value_profile"))]
 #[cfg(not(any(doc, feature = "clippy")))]
-compile_error!(
-    "the libafl_targets `sancov_value_profile` and `sancov_cmplog` are incompatible with `dataflow`."
-);
+compile_error!("the libafl_targets `sancov_value_profile` are incompatible with `dataflow`.");
 
 #[cfg(not(any(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts")))]
 #[cfg(not(any(doc, feature = "clippy")))]

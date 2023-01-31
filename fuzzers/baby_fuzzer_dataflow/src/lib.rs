@@ -1,22 +1,28 @@
 #![no_main]
 
-use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
+use std::{ffi::c_int, path::PathBuf};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::inprocess::InProcessExecutor,
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::CrashFeedback,
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    generators::RandBytesGenerator,
+    inputs::{BytesInput, HasTargetBytes},
+    mutators::{
+        scheduled::{havoc_mutations, StdScheduledMutator},
+        BytesInsertMutator,
+    },
+    observers::{HitcountsMapObserver, StdMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::{HasSolutions, StdState},
@@ -26,33 +32,37 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use libafl::{
-    feedbacks::MaxMapFeedback,
-    generators::RandBytesGenerator,
-    mutators::BytesInsertMutator,
-    observers::{HitcountsMapObserver, StdMapObserver},
-};
 use libafl_targets::{
     create_dfsan_harness, DataflowCmplogTracingStage, DataflowI2SMutator, DataflowMapFeedback,
     DataflowObserver, EDGES_MAP, MAX_EDGES_NUM,
 };
+
+#[allow(non_snake_case)]
+extern "C" {
+    fn LLVMFuzzerTestOneInput(data: *const u8, len: usize) -> c_int;
+}
 
 #[allow(clippy::similar_names)]
 #[allow(clippy::too_many_lines)]
 #[no_mangle]
 pub fn main() {
     // The closure that we want to fuzz
-    let mut harness = create_dfsan_harness();
-    let dfsan_observer = DataflowObserver::new();
+    let mut harness = |input: &BytesInput| {
+        let target = input.target_bytes();
+        let slice: &[u8] = target.as_slice();
+
+        unsafe {
+            LLVMFuzzerTestOneInput(slice.as_ptr(), slice.len());
+        }
+
+        ExitKind::Ok
+    };
     let edges_observer = HitcountsMapObserver::new(unsafe {
         StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_NUM)
     });
 
     // Feedback to rate the interestingness of an input
-    let mut feedback = feedback_or!(
-        DataflowMapFeedback::new(&dfsan_observer),
-        MaxMapFeedback::new(&edges_observer)
-    );
+    let mut feedback = feedback_or!(MaxMapFeedback::new(&edges_observer));
 
     // A feedback to choose if an input is a solution or not
     // Crash here means "both crashed", which is our objective
@@ -94,7 +104,7 @@ pub fn main() {
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
         &mut harness,
-        tuple_list!(dfsan_observer, edges_observer),
+        tuple_list!(edges_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,

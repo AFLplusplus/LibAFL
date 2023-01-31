@@ -23,7 +23,7 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl", features = ["introspection"] }
-libafl_targets = { path = "../../libafl_targets", features = ["dataflow", "introspection", "sancov_pcguard_hitcounts"] }
+libafl_targets = { path = "../../libafl_targets", features = ["dataflow", "introspection", "sancov_pcguard_hitcounts", "sancov_cmplog"] }
 mimalloc = { version = "*", default-features = false }
 
 [lib]

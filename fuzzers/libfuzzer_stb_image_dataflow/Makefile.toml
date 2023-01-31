@@ -11,15 +11,20 @@ command = "cargo"
 args = ["build", "--release"]
 
 # Target
+[tasks.target-dfsan]
+command = "clang"
+args = ["-c", "-gdwarf-4", "-fPIC", "-fsanitize=dataflow", "-fsanitize-coverage=trace-pc-guard,trace-cmp", "harness.c", "-o", "harness-dfsan.o"]
+
+# Target
 [tasks.target]
 command = "clang"
-args = ["-c", "-gdwarf-4", "-fsanitize=dataflow", "-fsanitize-coverage=trace-pc-guard,pc-table,trace-cmp", "harness.c", "-o", "harness.o"]
+args = ["-c", "-gdwarf-4", "-fPIC", "-fsanitize-coverage=trace-pc-guard", "harness.c", "-o", "harness.o"]
 
 # Link
 [tasks.fuzzer]
 command = "clang"
-args = ["-gdwarf-4", "-fsanitize=dataflow", "harness.o", "${FUZZER_RUNTIME}", "-o", "${FUZZER_NAME}"]
-dependencies = [ "harness", "target" ]
+args = ["-gdwarf-4", "-fsanitize=dataflow", "harness-dfsan.o", "harness.o", "${FUZZER_RUNTIME}", "-o", "${FUZZER_NAME}"]
+dependencies = [ "harness", "target", "target-dfsan" ]
 
 # Run the fuzzer
 [tasks.run]
