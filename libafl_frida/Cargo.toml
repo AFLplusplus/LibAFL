@@ -19,8 +19,8 @@ cmplog = []
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", default-features = false, version = "0.8.2", features = ["std", "libafl_derive", "frida_cli"] }
-libafl_targets = { path = "../libafl_targets", version = "0.8.2", features = ["std", "sancov_cmplog"] }
+libafl = { path = "../libafl", default-features = false, version = "0.9.0", features = ["std", "libafl_derive", "frida_cli"] }
+libafl_targets = { path = "../libafl_targets", version = "0.9.0", features = ["std", "sancov_cmplog"] }
 
 nix = "0.25"
 libc = "0.2"
@@ -41,4 +41,4 @@ ahash = "0.7"
 paste = "1.0"
 
 [dev-dependencies]
-serial_test = "*"
+serial_test = "1"

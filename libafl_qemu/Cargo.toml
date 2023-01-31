@@ -33,9 +33,9 @@ slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslir
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.8.2", default-features = false, features = ["std", "derive", "llmp_compression"] }
-libafl_targets = { path = "../libafl_targets", version = "0.8.2" }
-libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.8.2" }
+libafl = { path = "../libafl", version = "0.9.0", default-features = false, features = ["std", "derive", "llmp_compression"] }
+libafl_targets = { path = "../libafl_targets", version = "0.9.0" }
+libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.9.0" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.12", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible

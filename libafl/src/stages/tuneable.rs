@@ -148,6 +148,18 @@ where
     }
 }
 
+impl TuneableMutationalStage<(), (), (), (), ()> {
+    /// Set the number of iterations to be used by this mutational stage
+    pub fn set_iters<S: HasMetadata>(state: &mut S, iters: u64) -> Result<(), Error> {
+        set_iters(state, iters)
+    }
+
+    /// Get the set iterations
+    pub fn iters<S: HasMetadata>(state: &S) -> Result<Option<u64>, Error> {
+        get_iters(state)
+    }
+}
+
 impl<E, EM, I, M, Z> TuneableMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,

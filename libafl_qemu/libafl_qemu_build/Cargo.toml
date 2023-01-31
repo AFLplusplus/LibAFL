@@ -1,6 +1,6 @@
 [package]
 name = "libafl_qemu_build"
-version = "0.8.2"
+version = "0.9.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Builder for LibAFL QEMU"
 documentation = "https://docs.rs/libafl_qemu_build"
