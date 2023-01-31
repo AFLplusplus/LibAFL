@@ -4,7 +4,10 @@ use alloc::{
     boxed::Box,
     string::{String, ToString},
 };
-use core::{fmt::Debug, hash::{Hash, Hasher,libafl/src/bolts/core_affinity.rs:596:5 BuildHasher}};
+use core::{
+    fmt::Debug,
+    hash::{BuildHasher, Hash, Hasher},
+};
 
 use ahash::RandomState;
 use serde::{Deserialize, Serialize};
