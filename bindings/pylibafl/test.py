@@ -2,6 +2,7 @@ from pylibafl.libafl import *
 import ctypes
 import platform
 
+
 class FooObserver(BaseObserver):
     def __init__(self):
         self.n = 0
@@ -43,6 +44,7 @@ area_ptr = libc.calloc(1, 4096)
 
 print("Area_ptr", area_ptr)
 import sys
+
 sys.stdout.flush()
 
 observer = StdMapObserverI8("mymap", area_ptr, 4096)
