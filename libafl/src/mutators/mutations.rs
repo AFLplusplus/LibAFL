@@ -60,7 +60,7 @@ pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
 /// The solution for this is to specify a window length, then pretend we can start at indices that
 /// would lead to invalid ranges. Then, clamp the values.
 ///
-/// This problem corresponds to: https://oeis.org/A059036
+/// This problem corresponds to: <https://oeis.org/A059036>
 #[inline]
 pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: usize) -> Range<usize> {
     let len = state.rand_mut().next() as usize % max_len + 1;
