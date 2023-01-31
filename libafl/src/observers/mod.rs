@@ -280,11 +280,7 @@ where
 /// A trait for [`Observer`]`s` with a hash field
 pub trait ObserverWithHashField {
     /// get the value of the hash field
-    fn hash(&self) -> &Option<u64>;
-    /// update the hash field with the given value
-    fn update_hash(&mut self, hash: u64);
-    /// clears the current value of the hash and sets it to None
-    fn clear_hash(&mut self);
+    fn hash(&self) -> Option<u64>;
 }
 
 /// A trait for [`Observer`]`s` which observe over differential execution.

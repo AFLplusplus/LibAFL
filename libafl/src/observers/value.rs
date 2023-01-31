@@ -4,14 +4,19 @@ use alloc::{
     boxed::Box,
     string::{String, ToString},
 };
-use core::fmt::Debug;
+use core::{
+    fmt::Debug,
+    hash::{BuildHasher, Hash, Hasher},
+};
 
+use ahash::RandomState;
 use serde::{Deserialize, Serialize};
 
 use super::Observer;
 use crate::{
     bolts::{ownedref::OwnedRef, tuples::Named},
     inputs::UsesInput,
+    observers::ObserverWithHashField,
     Error,
 };
 
@@ -86,5 +91,16 @@ where
 {
     fn name(&self) -> &str {
         &self.name
+    }
+}
+
+impl<'a, T: Hash> ObserverWithHashField for ValueObserver<'a, T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    fn hash(&self) -> Option<u64> {
+        let mut s = RandomState::with_seeds(1, 2, 3, 4).build_hasher();
+        Hash::hash(self.value.as_ref(), &mut s);
+        Some(s.finish())
     }
 }

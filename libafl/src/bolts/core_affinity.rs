@@ -593,6 +593,7 @@ mod apple {
     }
 
     #[cfg(target_arch = "aarch64")]
+    #[allow(clippy::unnecessary_wraps)]
     pub fn set_for_current(_core_id: CoreId) -> Result<(), Error> {
         // This is the best we can do, unlike on intel architecture
         // the system does not allow to pin a process/thread to specific cpu.

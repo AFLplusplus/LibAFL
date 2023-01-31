@@ -109,7 +109,7 @@ where
         match observer.hash() {
             Some(hash) => {
                 let res = backtrace_state
-                    .update_hash_set(*hash)
+                    .update_hash_set(hash)
                     .expect("Failed to update the hash state");
                 Ok(res)
             }
