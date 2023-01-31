@@ -459,6 +459,24 @@ pub struct AFLCmpFnOperands {
     v1_len: u8,
 }
 
+impl AFLCmpFnOperands {
+    pub fn v0(&self) -> &[u8; 31] {
+        &self.v0
+    }
+
+    pub fn v0_len(&self) -> u8 {
+        self.v0_len
+    }
+
+    pub fn v1(&self) -> &[u8; 31] {
+        &self.v1
+    }
+    
+    pub fn v1_len(&self) -> u8 {
+        self.v1_len
+    }
+}
+
 /// A proxy union to avoid casting operands as in AFL++
 #[derive(Clone, Copy)]
 #[repr(C, packed)]

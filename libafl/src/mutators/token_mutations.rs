@@ -617,7 +617,25 @@ impl AFLRedQueen {
         orig_pattern: u64,
         changed_val: u64,
         attribute: u32,
+        input: &mut [u8],
+        input_len: usize,
     ) {
+        // Try matching pattern with num
+
+
+        // Try matching pattern with unum
+
+        
+        // Try Arithmetic
+
+
+        // Try XOR
+
+
+        // Try Lowercase
+
+
+        // Try Uppercase
     }
 
     pub fn rtn_extend_encoding(&self) {}
@@ -682,6 +700,7 @@ where
 
                 let logged = std::cmp::min(orig.len(), new.len());
 
+                // Try to solve it!
                 for idx in 0..logged {
                     let (orig_v0, orig_v1, new_v0, new_v1, attribute) = (
                         orig[idx].v0(),
