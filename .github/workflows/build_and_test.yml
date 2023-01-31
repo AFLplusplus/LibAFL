@@ -157,7 +157,9 @@ jobs:
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Run a maturin build
-      run: cd ./bindings/pylibafl && maturin build
+      run: cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && maturin develop && ./test.sh
+    - name: Run python test
+      run: . ./bindings/pylibafl/.env/bin/activate && cd ./fuzzers/baby_fuzzer && python3 baby_fuzzer.py | grep "Bye"
 
   fuzzers:
     strategy:
