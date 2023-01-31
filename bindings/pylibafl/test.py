@@ -38,7 +38,12 @@ if platform.system() == "Darwin":
 else:
     libc = ctypes.cdll.LoadLibrary("libc.so.6")
 
+libc.calloc.restype = ctypes.c_void_p
 area_ptr = libc.calloc(1, 4096)
+
+print("Area_ptr", area_ptr)
+import sys
+sys.stdout.flush()
 
 observer = StdMapObserverI8("mymap", area_ptr, 4096)
 
