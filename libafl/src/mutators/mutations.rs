@@ -1424,7 +1424,7 @@ mod tests {
         Ok(())
     }
 
-    /// This test guarantees that the likelihood of a byte being re-inserted is equally likely
+    /// This test guarantees that the likelihood of a random byte being inserted is equally likely
     #[test]
     fn test_rand_insert() -> Result<(), Error> {
         let base = BytesInput::new((0..10).collect());
