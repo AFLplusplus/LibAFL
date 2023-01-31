@@ -34,7 +34,7 @@ use libafl::{
         TokenizationKind,
     },
     monitors::SimpleMonitor,
-    mutators::{encoded_mutations, StdScheduledMutator, Tokens},
+    mutators::{encoded_mutations, StdMOptMutator, /*StdScheduledMutator, */ Tokens},
     observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
@@ -241,7 +241,7 @@ fn fuzz(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -286,7 +286,8 @@ fn fuzz(
     }
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_stack_pow(encoded_mutations(), 2);
+    //let mutator = StdScheduledMutator::with_max_stack_pow(encoded_mutations(), 2);
+    let mutator = StdMOptMutator::new(&mut state, encoded_mutations(), 7, 5)?;
 
     let power = StdPowerMutationalStage::new(mutator, &edges_observer);
 

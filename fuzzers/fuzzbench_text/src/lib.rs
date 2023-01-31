@@ -10,19 +10,18 @@ use std::{
     env,
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process,
 };
 
 use clap::{Arg, Command};
-use content_inspector::inspect;
 use libafl::{
     bolts::{
         current_nanos, current_time,
         os::dup2,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list},
+        tuples::tuple_list,
         AsSlice,
     },
     corpus::{Corpus, OnDiskCorpus},
@@ -38,7 +37,7 @@ use libafl::{
             GrimoireExtensionMutator, GrimoireRandomDeleteMutator,
             GrimoireRecursiveReplacementMutator, GrimoireStringReplacementMutator,
         },
-        token_mutations::I2SRandReplace,
+        /*token_mutations::I2SRandReplace,*/
         tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{HitcountsMapObserver, TimeObserver},
@@ -170,65 +169,8 @@ pub fn libafl_main() {
             .expect("Could not parse timeout in milliseconds"),
     );
 
-//    if check_if_textual(&in_dir, &tokens) {
-        fuzz_text(out_dir, crashes, &in_dir, tokens, &logfile, timeout)
-            .expect("An error occurred while fuzzing");
-/*
-    } else {
-        fuzz_binary(out_dir, crashes, &in_dir, tokens, &logfile, timeout)
-            .expect("An error occurred while fuzzing");
-    }
-*/
-}
-
-fn count_textual_inputs(dir: &Path) -> (usize, usize) {
-    let mut textuals = 0;
-    let mut total = 0;
-    for entry in fs::read_dir(dir).unwrap() {
-        let entry = entry.unwrap();
-        let path = entry.path();
-        let attributes = fs::metadata(&path);
-        if attributes.is_err() {
-            continue;
-        }
-        let attr = attributes.unwrap();
-        if attr.is_dir() {
-            let (found, tot) = count_textual_inputs(&path);
-            textuals += found;
-            total += tot;
-        } else if attr.is_file() && attr.len() != 0 {
-            let mut file = File::open(&path).expect("No file found");
-            let mut buffer = vec![];
-            file.read_to_end(&mut buffer).expect("Buffer overflow");
-
-            if inspect(&buffer).is_text() {
-                println!("Testcase {:?} is text", &path);
-                textuals += 1;
-            } else {
-                println!("Testcase {:?} is binary", &path);
-            }
-            total += 1;
-        }
-    }
-    (textuals, total)
-}
-
-fn check_if_textual(seeds_dir: &Path, tokenfile: &Option<PathBuf>) -> bool {
-    let (found, tot) = count_textual_inputs(seeds_dir);
-    let is_text = found * 100 / tot > 90; // 90% of text inputs
-    if let Some(tokenfile) = tokenfile {
-        let toks = Tokens::from_file(tokenfile).unwrap();
-        if !toks.tokens().is_empty() {
-            let mut cnt = 0;
-            for t in toks.tokens() {
-                if inspect(t).is_text() {
-                    cnt += 1;
-                }
-            }
-            return is_text && cnt * 100 / toks.tokens().len() > 90; // 90% of text tokens
-        }
-    }
-    is_text
+    fuzz_text(out_dir, crashes, &in_dir, tokens, &logfile, timeout)
+        .expect("An error occurred while fuzzing");
 }
 
 fn run_testcases(filenames: &[&str]) {
@@ -253,192 +195,6 @@ fn run_testcases(filenames: &[&str]) {
         libfuzzer_test_one_input(&buffer);
     }
 }
-
-/*
-/// The actual fuzzer
-#[allow(clippy::too_many_lines)]
-fn fuzz_binary(
-    corpus_dir: PathBuf,
-    objective_dir: PathBuf,
-    seed_dir: &PathBuf,
-    tokenfile: Option<PathBuf>,
-    logfile: &PathBuf,
-    timeout: Duration,
-) -> Result<(), Error> {
-    let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
-
-    #[cfg(unix)]
-    let mut stdout_cpy = unsafe {
-        let new_fd = dup(io::stdout().as_raw_fd())?;
-        File::from_raw_fd(new_fd)
-    };
-    #[cfg(unix)]
-    let file_null = File::open("/dev/null")?;
-
-    // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
-    let monitor = SimpleMonitor::new(|s| {
-        #[cfg(unix)]
-        writeln!(&mut stdout_cpy, "{}", s).unwrap();
-        #[cfg(windows)]
-        println!("{s}");
-        writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
-    });
-
-    // We need a shared map to store our state before a crash.
-    // This way, we are able to continue fuzzing afterwards.
-    let mut shmem_provider = StdShMemProvider::new()?;
-
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
-    {
-        // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
-        Ok(res) => res,
-        Err(err) => match err {
-            Error::ShuttingDown => {
-                return Ok(());
-            }
-            _ => {
-                panic!("Failed to setup the restarter: {err}");
-            }
-        },
-    };
-
-    // Create an observation channel using the coverage map
-    // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
-
-    // Create an observation channel to keep track of the execution time
-    let time_observer = TimeObserver::new("time");
-
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
-
-    let calibration = CalibrationStage::new(&map_feedback);
-
-    // Feedback to rate the interestingness of an input
-    // This one is composed by two Feedbacks in OR
-    let mut feedback = feedback_or!(
-        // New maximization map feedback linked to the edges observer and the feedback state
-        map_feedback,
-        // Time feedback, this one does not need a feedback state
-        TimeFeedback::with_observer(&time_observer)
-    );
-    // A feedback to choose if an input is a solution or not
-    let mut objective = CrashFeedback::new();
-
-    // If not restarting, create a State from scratch
-    let mut state = state.unwrap_or_else(|| {
-        StdState::new(
-            // RNG
-            StdRand::with_seed(current_nanos()),
-            // Corpus that will be evolved, we keep it in memory for performance
-            OnDiskCorpus::new(corpus_dir).unwrap(),
-            // Corpus in which we store solutions (crashes in this example),
-            // on disk so the user can get them after stopping the fuzzer
-            OnDiskCorpus::new(objective_dir).unwrap(),
-            // States of the feedbacks.
-            // The feedbacks can report the data that should persist in the State.
-            &mut feedback,
-            // Same for objective feedbacks
-            &mut objective,
-        )
-        .unwrap()
-    });
-
-    println!("Let's fuzz :)");
-
-    // The actual target run starts here.
-    // Call LLVMFUzzerInitialize() if present.
-    let args: Vec<String> = env::args().collect();
-    if libfuzzer_initialize(&args) == -1 {
-        println!("Warning: LLVMFuzzerInitialize failed with -1");
-    }
-
-    // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
-
-    // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new(
-        &mut state,
-        tokens_mutations(),
-        7,
-        5,
-    )?;
-
-    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
-
-    // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        PowerSchedule::EXPLORE,
-    ));
-
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-    // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &mut BytesInput| {
-        let target = input.target_bytes();
-        let buf = target.as_slice();
-        libfuzzer_test_one_input(buf);
-        ExitKind::Ok
-    };
-
-    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = TimeoutExecutor::new(
-        InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?,
-        timeout,
-    );
-
-    // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, i2s, power);
-
-    // Read tokens
-    if state.metadata().get::<Tokens>().is_none() {
-        let mut toks = Tokens::default();
-        if let Some(tokenfile) = tokenfile {
-            toks.add_from_file(tokenfile)?;
-        }
-        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
-        {
-            toks += autotokens()?;
-        }
-
-        if !toks.is_empty() {
-            state.add_metadata(toks);
-        }
-    }
-
-    // In case the corpus is empty (on first run), reset
-    if state.corpus().count() < 1 {
-        state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
-            .unwrap_or_else(|_| {
-                println!("Failed to load initial corpus at {:?}", &seed_dir);
-                process::exit(0);
-            });
-        println!("We imported {} inputs from disk.", state.corpus().count());
-    }
-
-    // Remove target ouput (logs still survive)
-    #[cfg(unix)]
-    {
-        let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        dup2(null_fd, io::stderr().as_raw_fd())?;
-    }
-    // reopen file to make sure we're at the end
-    log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
-
-    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-
-    // Never reached
-    Ok(())
-}
-*/
 
 /// The actual fuzzer based on `Grimoire`
 #[allow(clippy::too_many_lines)]
@@ -539,15 +295,10 @@ fn fuzz_text(
     }
 
     // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    //let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new(
-        &mut state,
-        tokens_mutations(),
-        7,
-        5,
-    )?;
+    let mutator = StdMOptMutator::new(&mut state, tokens_mutations(), 7, 5)?;
 
     let power = StdPowerMutationalStage::new(mutator, &edges_observer);
 
@@ -595,7 +346,7 @@ fn fuzz_text(
     );
 
     // The order of the stages matter!
-    let mut stages = tuple_list!(generalization, calibration, i2s, power, grimoire);
+    let mut stages = tuple_list!(generalization, calibration, /*i2s, */ power, grimoire);
 
     // Read tokens
     if state.metadata().get::<Tokens>().is_none() {
