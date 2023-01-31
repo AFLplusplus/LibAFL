@@ -136,7 +136,7 @@ where
 
         let mut original = original;
 
-        // Do not generalized unstable inputs
+        // Do not generalize unstable inputs
         if !self.verify_input(fuzzer, executor, state, manager, &novelties, &mut original)? {
             return Ok(());
         }

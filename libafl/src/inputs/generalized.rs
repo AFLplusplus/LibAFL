@@ -1,4 +1,4 @@
-//! The `GeneralizedInput` is an input that ca be generalized to represent a rule, used by Grimoire
+//! The `GeneralizedInput` is an input that can be generalized to represent a rule, used by Grimoire
 
 use alloc::vec::Vec;
 
