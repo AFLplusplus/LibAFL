@@ -12,6 +12,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::HasBytesVec,
+    mutators::mutations::buffer_copy,
     observers::MapObserver,
     stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
@@ -52,47 +53,92 @@ where
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let orig = state
+        let input = state
             .corpus()
             .get(corpus_idx)?
             .borrow_mut()
             .load_input()
             .unwrap()
             .clone();
-        let mut changed = orig.clone();
+        // The backup of the input
+        let backup = input.clone();
+        // This is the buffer we'll randomly mutate during type_replace
+        let mut changed = input.clone();
 
         // First, run orig_input once and get the original hash
-        let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, orig)?;
+        let (_, _) = fuzzer.evaluate_input(state, executor, manager, input)?;
 
         let observer = executor
             .observers()
             .match_name::<O>(&self.map_observer_name)
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
-        let mut orig_hash = observer.hash() as usize;
+        let orig_hash = observer.hash() as usize;
 
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
-        let ranges: Vec<Range<usize>> = vec![0..input_len - 1];
+        let mut ranges: Vec<Range<usize>> = vec![0..input_len - 1];
 
         // Now replace with random values (This is type_replace)
         self.type_replace(changed_bytes, state);
+
+        // This is the buffer we want to pass to the cmplog stage
+        let mut buf = backup.clone();
 
         // while ((rng = pop_biggest_range(&ranges)) != NULL &&
         // afl->stage_cur < afl->stage_max) {
         // What we do is now to separate the input into smaller regions
         // And in each small regions make sure changing those bytes in the regions does not affect the coverage
-        for idx in 0..input_len * 2 {
-            if let Some(idx) = self.pop_biggest_range(&ranges) {
+        for _ in 0..input_len * 2 {
+            if let Some(r) = self.pop_biggest_range(&mut ranges) {
                 // Separate the ranges
-                let range_start = ranges[idx].start;
-                let range_end = ranges[idx].end;
-            }
-            else {
+                let range_start = r.start;
+                let range_end = r.end;
+                let copy_len = r.len();
+                buffer_copy(
+                    buf.bytes_mut(),
+                    changed.bytes(),
+                    range_start,
+                    range_start,
+                    copy_len,
+                );
+
+                // We need to clone buf because evaluate_input will consume input
+                let input = buf.clone();
+                let (_, _) = fuzzer.evaluate_input(state, executor, manager, input)?;
+
+                let observer = executor
+                    .observers()
+                    .match_name::<O>(&self.map_observer_name)
+                    .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
+
+                let changed_hash = observer.hash() as usize;
+
+                if orig_hash != changed_hash {
+                    // Ok seems like this range is too big that we can't keep the original hash anymore
+
+                    // Revert the changes
+                    buffer_copy(
+                        buf.bytes_mut(),
+                        backup.bytes(),
+                        range_start,
+                        range_start,
+                        copy_len,
+                    );
+
+                    // Add smaller range
+                    if copy_len > 1 {
+                        ranges.push(range_start..(range_start - 1 + copy_len / 2));
+                        ranges.push((range_start + copy_len / 2)..range_end);
+                    }
+                }
+            } else {
                 break;
             }
-
         }
+
+        // Now ranges is a list of smaller range
+        // Each of them should be stored into a metadata and we'll use them later in afl++ redqueen
 
         Ok(())
     }
@@ -112,18 +158,22 @@ where
     }
 
     /// Return the biggest range
-    pub fn pop_biggest_range(&self, ranges: &Vec<Range<usize>>) -> Option<usize> {
-        let mut max_len = 0;
-        let mut ret_idx = 0;
-        for idx in 0..ranges.len() {
-            let len = ranges[idx].len();
-            if len > max_len {
-                max_len = len;
-                ret_idx = idx;
+    pub fn pop_biggest_range(&self, ranges: &mut Vec<Range<usize>>) -> Option<Range<usize>> {
+        if ranges.is_empty() {
+            return None;
+        } else {
+            let mut max_len = 0;
+            let mut ret_idx = 0;
+            for idx in 0..ranges.len() {
+                let len = ranges[idx].len();
+                if len > max_len {
+                    max_len = len;
+                    ret_idx = idx;
+                }
             }
-        }
 
-        Some(ret_idx)
+            Some(ranges.remove(ret_idx))
+        }
     }
 
     /// Replace bytes with random values but following certain rules
