@@ -1,11 +1,11 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
-use alloc::vec::Vec;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::{
     fs,
     path::{Path, PathBuf},
+    vec::Vec,
 };
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
