@@ -350,6 +350,13 @@ where
     R: Rand,
     SC: Corpus<Input = <Self as UsesInput>::Input>,
 {
+    /// Decide if the state nust load the inputs
+    pub fn must_load_initial_inputs(&self) -> bool {
+        self.corpus().count() == 0
+            || (self.remaining_initial_files.is_some()
+                && self.remaining_initial_files.as_ref().unwrap().len() > 0)
+    }
+
     /// List initial inputs from a directory.
     fn visit_initial_directory(files: &mut Vec<PathBuf>, in_dir: &Path) -> Result<(), Error> {
         for entry in fs::read_dir(in_dir)? {
