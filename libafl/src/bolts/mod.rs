@@ -30,7 +30,7 @@ pub mod staterestore;
 pub mod tuples;
 
 use alloc::{string::String, vec::Vec};
-use core::{iter::Iterator, time};
+use core::{iter::Iterator, ops::AddAssign, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -202,6 +202,29 @@ pub fn current_milliseconds() -> u64 {
 pub fn format_duration_hms(duration: &time::Duration) -> String {
     let secs = duration.as_secs();
     format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
+}
+
+/// Calculates the cumulative sum for a slice, in-place.
+/// The values are useful for example for cumulative probabilities.
+///
+/// So, to give an example:
+/// ```rust
+/// use libafl::bolts::calculate_cumulative_sum_in_place;
+///
+/// let mut value = [2, 4, 1, 3];
+/// calculate_cumulative_sum_in_place(&mut value);
+/// assert_eq!(&[2, 6, 7, 10], &value);
+/// ```
+pub fn calculate_cumulative_sum_in_place<T>(mut_slice: &mut [T])
+where
+    T: Default + AddAssign<T> + Copy,
+{
+    let mut acc = T::default();
+
+    for val in mut_slice {
+        acc += *val;
+        *val = acc;
+    }
 }
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.

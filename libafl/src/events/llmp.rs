@@ -17,7 +17,7 @@ use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-use super::{CustomBufEventResult, CustomBufHandlerFn};
+use super::{CustomBufEventResult, CustomBufHandlerFn, HasLocalEventHandlers, LocalEventHandlerFn};
 #[cfg(feature = "std")]
 use crate::bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -298,12 +298,18 @@ where
     S: UsesInput,
     SP: ShMemProvider + 'static,
 {
+    /// The llmp client for inter process communication
     llmp: LlmpClient<SP>,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
+    /// The configuration defines this specific fuzzer.
+    /// A node will not re-use the observer values sent over `LLMP`
+    /// from nodes with other configurations.
     configuration: EventConfig,
+    /// Local event Handlers
+    local_event_handlers: Vec<Box<LocalEventHandlerFn<S, S::Input>>>,
     phantom: PhantomData<S>,
 }
 
@@ -350,6 +356,7 @@ where
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
+            local_event_handlers: vec![],
         })
     }
 
@@ -369,6 +376,7 @@ where
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
+            local_event_handlers: vec![],
         })
     }
 
@@ -386,6 +394,7 @@ where
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
+            local_event_handlers: vec![],
         })
     }
 
@@ -407,6 +416,7 @@ where
             configuration,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
+            local_event_handlers: vec![],
         })
     }
 
@@ -493,9 +503,13 @@ where
     #[cfg(feature = "llmp_compression")]
     fn fire(
         &mut self,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
+        for event_handler_fn in &mut self.local_event_handlers {
+            event_handler_fn(state, &event);
+        }
+
         let serialized = postcard::to_allocvec(&event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
@@ -517,9 +531,13 @@ where
     #[cfg(not(feature = "llmp_compression"))]
     fn fire(
         &mut self,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
+        for event_handler_fn in &mut self.local_event_handlers {
+            event_handler_fn(state, &event);
+        }
+
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
@@ -611,6 +629,19 @@ where
     }
 }
 
+impl<S, SP> HasLocalEventHandlers for LlmpEventManager<S, SP>
+where
+    S: UsesInput,
+    SP: ShMemProvider,
+{
+    fn add_local_event_handler(
+        &mut self,
+        event_handler_fn: Box<LocalEventHandlerFn<Self::State, Self::Input>>,
+    ) {
+        self.local_event_handlers.push(event_handler_fn)
+    }
+}
+
 impl<S, SP> ProgressReporter for LlmpEventManager<S, SP>
 where
     S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
@@ -661,6 +692,19 @@ where
     S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize,
     SP: ShMemProvider,
 {
+}
+
+impl<S, SP> HasLocalEventHandlers for LlmpRestartingEventManager<S, SP>
+where
+    S: UsesInput,
+    SP: ShMemProvider,
+{
+    fn add_local_event_handler(
+        &mut self,
+        event_handler_fn: Box<LocalEventHandlerFn<Self::State, Self::Input>>,
+    ) {
+        self.llmp_mgr.add_local_event_handler(event_handler_fn);
+    }
 }
 
 #[cfg(feature = "std")]

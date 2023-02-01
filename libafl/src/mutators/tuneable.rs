@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
-    bolts::rands::Rand,
+    bolts::{calculate_cumulative_sum_in_place, rands::Rand},
     impl_serdeany,
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
@@ -33,10 +33,12 @@ pub struct TuneableScheduledMutatorMetadata {
     /// Will not be used when `mutation_ids` are set.
     /// Clear to fall back to random.
     pub mutation_probabilities_cumulative: Vec<f32>,
-    /// The count of total mutations to perform.
+    /// The count of mutations to stack.
     /// If `mutation_ids` is of length `10`, and this number is `20`,
     /// the mutations will be iterated through twice.
     pub iters: Option<u64>,
+    /// The probability of each number of mutations to stack.
+    pub iter_probabilities_cumulative: Vec<f32>,
 }
 
 impl Default for TuneableScheduledMutatorMetadata {
@@ -46,6 +48,7 @@ impl Default for TuneableScheduledMutatorMetadata {
             next_id: 0.into(),
             mutation_probabilities_cumulative: Vec::default(),
             iters: None,
+            iter_probabilities_cumulative: Vec::default(),
         }
     }
 }
@@ -138,11 +141,29 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        if let Some(iters) = TuneableScheduledMutator::get_iters(state) {
-            iters
+        let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
+
+        if metadata.iter_probabilities_cumulative.is_empty() {
+            if let Some(iters) = metadata.iters {
+                iters
+            } else {
+                // fall back to random
+                1 << (1 + state.rand_mut().below(self.max_stack_pow))
+            }
         } else {
-            // fall back to random
-            1 << (1 + state.rand_mut().below(self.max_stack_pow))
+            // We will sample using the mutation probabilities.
+            // Doing this outside of the original if branch to make the borrow checker happy.
+            #[allow(clippy::cast_precision_loss)]
+            let coin = state.rand_mut().next() as f32 / u64::MAX as f32;
+
+            let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
+            metadata
+                .iter_probabilities_cumulative
+                .iter()
+                .position(|i| *i >= coin)
+                .unwrap()
+                .try_into()
+                .unwrap()
         }
     }
 
@@ -229,6 +250,27 @@ where
     pub fn set_iters(state: &mut S, iters: u64) {
         let metadata = Self::metadata_mut(state);
         metadata.iters = Some(iters);
+        metadata.iter_probabilities_cumulative.clear();
+    }
+
+    /// Sets the probability of next iteration counts,
+    /// i.e., how many times the mutation is likely to get mutated.
+    ///
+    /// So, setting the `iter_probabilities` to `vec![0.1, 0.7, 0.2]`
+    /// would apply one mutation with the likelihood of 10%, two mutations with the
+    /// a probability of 70% (0.7), and 3 mutations with the likelihood of 20%.
+    /// These will be applied for each call of this `mutate` function.
+    ///
+    /// Setting this function will unset everything previously set in `set_iters`.
+    pub fn set_iter_probabilities(state: &mut S, iter_probabilities: Vec<f32>) {
+        let metadata = Self::metadata_mut(state);
+        metadata.iters = None;
+
+        // we precalculate the cumulative probability to be faster when sampling later.
+        let mut iter_probabilities_cumulative = iter_probabilities;
+        calculate_cumulative_sum_in_place(&mut iter_probabilities_cumulative);
+
+        metadata.iter_probabilities_cumulative = iter_probabilities_cumulative;
     }
 
     /// Gets the set amount of iterations
@@ -254,13 +296,7 @@ where
 
         // we precalculate the cumulative probability to be faster when sampling later.
         let mut mutation_probabilities_cumulative = mutation_probabilities;
-        let mut acc = 0.0;
-
-        for probability in &mut mutation_probabilities_cumulative {
-            let l = *probability;
-            *probability += acc;
-            acc += l;
-        }
+        calculate_cumulative_sum_in_place(&mut mutation_probabilities_cumulative);
 
         metadata.mutation_probabilities_cumulative = mutation_probabilities_cumulative;
     }

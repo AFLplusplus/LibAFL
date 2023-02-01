@@ -548,10 +548,27 @@ where
 type CustomBufHandlerFn<S> =
     dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>;
 
+/// The handler function for local events during an [`EventManager`] fire
+/// Parameters are the `state`, and the current [`Event`].
+type LocalEventHandlerFn<S, I> = dyn FnMut(&mut S, &Event<I>);
+
 /// Supports custom buf handlers to handle `CustomBuf` events.
 pub trait HasCustomBufHandlers: UsesState {
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
     fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<Self::State>>);
+}
+
+/// Supports local event handlers of type [`LocalEventHandlerFn`].
+pub trait HasLocalEventHandlers: UsesState {
+    /// Adds a new local event handler of type [`LocalEventHandlerFn`].
+    /// All local event handlers are called before the event is sent over the wire,
+    /// or otherwise processed further.
+    /// They can be used to gather observer values, new testcases, as well as local statistics.
+    /// Parameters for the `event_handler_fn` are the state, as well as the current [`Event`].
+    fn add_local_event_handler(
+        &mut self,
+        event_handler_fn: Box<LocalEventHandlerFn<Self::State, <Self::State as UsesInput>::Input>>,
+    );
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
