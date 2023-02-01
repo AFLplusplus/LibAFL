@@ -99,7 +99,7 @@ where
         &mut self,
         event_handler_fn: Box<LocalEventHandlerFn<Self::State, Self::Input>>,
     ) {
-        self.local_event_handlers.push(event_handler_fn)
+        self.local_event_handlers.push(event_handler_fn);
     }
 }
 
@@ -347,6 +347,7 @@ where
     type State = S;
 }
 
+#[cfg(feature = "std")]
 impl<MT, S, SP> HasLocalEventHandlers for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,

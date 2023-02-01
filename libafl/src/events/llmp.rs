@@ -638,7 +638,7 @@ where
         &mut self,
         event_handler_fn: Box<LocalEventHandlerFn<Self::State, Self::Input>>,
     ) {
-        self.local_event_handlers.push(event_handler_fn)
+        self.local_event_handlers.push(event_handler_fn);
     }
 }
 
@@ -694,6 +694,7 @@ where
 {
 }
 
+#[cfg(feature = "std")]
 impl<S, SP> HasLocalEventHandlers for LlmpRestartingEventManager<S, SP>
 where
     S: UsesInput,
