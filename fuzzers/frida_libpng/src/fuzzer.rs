@@ -37,9 +37,11 @@ use libafl::{
 };
 #[cfg(unix)]
 use libafl::{feedback_and_fast, feedbacks::ConstFeedback};
-
 #[cfg(unix)]
-use libafl_frida::asan::{asan_rt::AsanRuntime, errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS}};
+use libafl_frida::asan::{
+    asan_rt::AsanRuntime,
+    errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+};
 use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
