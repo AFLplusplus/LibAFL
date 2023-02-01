@@ -202,8 +202,11 @@ impl CoverageRuntime {
         // these spilt registers. This, however, means we need to retard the
         // code writer so that we can overwrite the so-called "restoration
         // prologue".
-        let pc = writer.pc();
-        writer.reset(pc - 4);
+        #[cfg(target_arch = "aarch64")]
+        {
+            let pc = writer.pc();
+            writer.reset(pc - 4);
+        }
 
         let code = self.generate_inline_code(h64 & (MAP_SIZE as u64 - 1));
         writer.put_bytes(&code);
