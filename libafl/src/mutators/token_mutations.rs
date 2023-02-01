@@ -24,10 +24,7 @@ use crate::{
     bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
-    observers::cmp::{
-        AFLCmpValues::{FnOperandsVec, OperandsVec},
-        AFLCmpValuesMetadata, CmpValues, CmpValuesMetadata,
-    },
+    observers::cmp::{AFLCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     state::{HasMaxSize, HasMetadata, HasRand},
     Error,
 };
@@ -622,18 +619,13 @@ impl AFLRedQueen {
     ) {
         // Try matching pattern with num
 
-
         // Try matching pattern with unum
 
-        
         // Try Arithmetic
-
 
         // Try XOR
 
-
         // Try Lowercase
-
 
         // Try Uppercase
     }
