@@ -80,7 +80,19 @@ where
 
         // while ((rng = pop_biggest_range(&ranges)) != NULL &&
         // afl->stage_cur < afl->stage_max) {
-        for idx in 0..input_len * 2 {}
+        // What we do is now to separate the input into smaller regions
+        // And in each small regions make sure changing those bytes in the regions does not affect the coverage
+        for idx in 0..input_len * 2 {
+            if let Some(idx) = self.pop_biggest_range(&ranges) {
+                // Separate the ranges
+                let range_start = ranges[idx].start;
+                let range_end = ranges[idx].end;
+            }
+            else {
+                break;
+            }
+
+        }
 
         Ok(())
     }
@@ -99,6 +111,22 @@ where
         Self::transforming(map_observer_name)
     }
 
+    /// Return the biggest range
+    pub fn pop_biggest_range(&self, ranges: &Vec<Range<usize>>) -> Option<usize> {
+        let mut max_len = 0;
+        let mut ret_idx = 0;
+        for idx in 0..ranges.len() {
+            let len = ranges[idx].len();
+            if len > max_len {
+                max_len = len;
+                ret_idx = idx;
+            }
+        }
+
+        Some(ret_idx)
+    }
+
+    /// Replace bytes with random values but following certain rules
     pub fn type_replace(&self, bytes: &mut [u8], state: &mut E::State) {
         let len = bytes.len();
         for idx in 0..len {
