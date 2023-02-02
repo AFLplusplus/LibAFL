@@ -185,7 +185,7 @@ where
 
         // let's merge ranges in ok_ranges
         let mut res: Vec<Range<usize>> = Vec::new();
-        for item in ok_ranges.into_sorted_vec() {
+        for item in ok_ranges.into_sorted_vec().into_iter().rev() {
             match res.last_mut() {
                 Some(last) => {
                     // Try merge
