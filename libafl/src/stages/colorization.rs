@@ -53,20 +53,20 @@ impl Ord for Earlier {
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct ColorizationStage<E, EM, O, Z> {
+pub struct ColorizationStage<E, EM, O, TE, Z> {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, O, Z)>,
+    phantom: PhantomData<(E, EM, O, TE, Z)>,
 }
 
-impl<E, EM, O, Z> UsesState for ColorizationStage<E, EM, O, Z>
+impl<E, EM, O, TE, Z> UsesState for ColorizationStage<E, EM, O, TE, Z>
 where
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<E, EM, O, Z>
+impl<E, EM, O, TE, Z> Stage<E, EM, Z> for ColorizationStage<E, EM, O, TE, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State>,
@@ -143,6 +143,8 @@ where
                 );
 
                 // We need to clone buf because evaluate_input will consume input (we can't use buf in evaluate_input)
+
+                // TODO: change this to run_target
                 let input = buf.clone();
                 let (_, _) = fuzzer.evaluate_input(state, executor, manager, input)?;
 
@@ -203,11 +205,14 @@ where
             }
         }
 
+        // TODO: Run trace_executor and log cmplog
+
+        // TODO: Put res, buf into metadata
         Ok(())
     }
 }
 
-impl<E, EM, O, Z> ColorizationStage<E, EM, O, Z>
+impl<E, EM, O, TE, Z> ColorizationStage<E, EM, O, TE, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State>,
