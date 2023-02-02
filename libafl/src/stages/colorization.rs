@@ -153,8 +153,11 @@ where
 
                 let changed_hash = observer.hash() as usize;
 
-                if orig_hash != changed_hash {
-                    // Ok seems like this range is too big that we can't keep the original hash anymore
+                if orig_hash == changed_hash {
+                    // The change in this range is safe!
+                    ok_ranges.push(Earlier(range_start..range_end));
+                } else {
+                    // Seems like this range is too big that we can't keep the original hash anymore
 
                     // Revert the changes
                     buffer_copy(
@@ -171,9 +174,6 @@ where
                         ranges.push(Bigger(range_start..(range_start + copy_len / 2)));
                         ranges.push(Bigger((range_start + copy_len / 2)..range_end));
                     }
-                } else {
-                    // The change in this range is safe!
-                    ok_ranges.push(Earlier(range_start..range_end));
                 }
             } else {
                 break;
@@ -194,7 +194,7 @@ where
                         // so merge
                         last.end = item.0.end;
                     } else {
-                        res.push(item.0)
+                        res.push(item.0);
                     }
                 }
                 None => {
@@ -224,6 +224,7 @@ where
     }
 
     /// Replace bytes with random values but following certain rules
+    #[allow(clippy::needless_range_loop)]
     pub fn type_replace(&self, bytes: &mut [u8], state: &mut E::State) {
         let len = bytes.len();
         for idx in 0..len {
@@ -301,8 +302,7 @@ where
                     0xd
                 }
                 0x0 => 0x1,
-                0x1 => 0x0,
-                0xff => 0x0,
+                0x1 | 0xff => 0x0,
                 _ => {
                     if bytes[idx] < 32 {
                         bytes[idx] ^ 0x1f
