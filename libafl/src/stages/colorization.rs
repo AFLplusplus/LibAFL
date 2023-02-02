@@ -168,7 +168,7 @@ where
                     // Add smaller range
                     if copy_len > 1 {
                         // Separate the ranges
-                        ranges.push(Bigger(range_start..(range_start - 1 + copy_len / 2)));
+                        ranges.push(Bigger(range_start..(range_start + copy_len / 2)));
                         ranges.push(Bigger((range_start + copy_len / 2)..range_end));
                     }
                 } else {
