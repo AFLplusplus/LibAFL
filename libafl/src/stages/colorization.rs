@@ -15,7 +15,7 @@ use crate::{
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState, HasExecutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -85,7 +85,7 @@ where
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let input = state
+        let mut input = state
             .corpus()
             .get(corpus_idx)?
             .borrow_mut()
@@ -96,19 +96,9 @@ where
         let backup = input.clone();
         // This is the buffer we'll randomly mutate during type_replace
         let mut changed = input.clone();
-        // This is the buffer we want to pass to the cmplog stage
-        let mut buf = input.clone();
 
         // First, run orig_input once and get the original hash
-        let (_, _) = fuzzer.evaluate_input(state, executor, manager, input)?;
-
-        let observer = executor
-            .observers()
-            .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
-
-        let orig_hash = observer.hash() as usize;
-
+        let orig_hash = self.get_raw_map_hash_run(fuzzer, executor, state, manager, &mut input)?;
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
 
@@ -135,25 +125,14 @@ where
                 let range_end = r.end;
                 let copy_len = r.len();
                 buffer_copy(
-                    buf.bytes_mut(),
+                    input.bytes_mut(),
                     changed.bytes(),
                     range_start,
                     range_start,
                     copy_len,
                 );
 
-                // We need to clone buf because evaluate_input will consume input (we can't use buf in evaluate_input)
-
-                // TODO: change this to run_target
-                let input = buf.clone();
-                let (_, _) = fuzzer.evaluate_input(state, executor, manager, input)?;
-
-                let observer = executor
-                    .observers()
-                    .match_name::<O>(&self.map_observer_name)
-                    .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
-
-                let changed_hash = observer.hash() as usize;
+                let changed_hash = self.get_raw_map_hash_run(fuzzer, executor, state, manager, &mut input)?;
 
                 if orig_hash == changed_hash {
                     // The change in this range is safe!
@@ -163,7 +142,7 @@ where
 
                     // Revert the changes
                     buffer_copy(
-                        buf.bytes_mut(),
+                        input.bytes_mut(),
                         backup.bytes(),
                         range_start,
                         range_start,
@@ -226,9 +205,38 @@ where
         }
     }
 
+    // Run the target and get map hash but before hitcounts's post_exec is used
+    fn get_raw_map_hash_run(
+        &self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut E::State,
+        manager: &mut EM,
+        input: &mut E::Input,
+    ) -> Result<usize, Error> {
+        executor.observers_mut().pre_exec_all(state, &input)?;
+
+        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+
+        let observer = executor
+            .observers()
+            .match_name::<O>(&self.map_observer_name)
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
+
+        let hash = observer.hash() as usize;
+
+        executor
+            .observers_mut()
+            .post_exec_all(state, &input, &exit_kind)?;
+
+
+
+        Ok(hash)
+    }
+
     /// Replace bytes with random values but following certain rules
     #[allow(clippy::needless_range_loop)]
-    pub fn type_replace(&self, bytes: &mut [u8], state: &mut E::State) {
+    fn type_replace(&self, bytes: &mut [u8], state: &mut E::State) {
         let len = bytes.len();
         for idx in 0..len {
             let c = match bytes[idx] {
@@ -320,7 +328,6 @@ where
     }
 }
 
-
 /// A stage that runs a tracer executor with the original input and the colorized input
 #[derive(Clone, Debug)]
 pub struct ColorizationTracingStage<EM, TE, Z> {
@@ -328,7 +335,6 @@ pub struct ColorizationTracingStage<EM, TE, Z> {
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
-
 
 impl<EM, TE, Z> UsesState for ColorizationTracingStage<EM, TE, Z>
 where
