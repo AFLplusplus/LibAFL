@@ -355,7 +355,7 @@ where
     pub fn must_load_initial_inputs(&self) -> bool {
         self.corpus().count() == 0
             || (self.remaining_initial_files.is_some()
-                && self.remaining_initial_files.as_ref().unwrap().len() > 0)
+                && !self.remaining_initial_files.as_ref().unwrap().is_empty())
     }
 
     /// List initial inputs from a directory.
@@ -403,7 +403,7 @@ where
     {
         if let Some(remaining) = self.remaining_initial_files.as_ref() {
             // everything was loaded
-            if remaining.len() == 0 {
+            if remaining.is_empty() {
                 return Ok(());
             }
         } else {
