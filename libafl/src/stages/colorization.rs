@@ -15,7 +15,7 @@ use crate::{
     events::EventFirer,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
-    inputs::{BytesInput, HasBytesVec},
+    inputs::HasBytesVec,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
@@ -382,51 +382,48 @@ where
 
 /// A stage that runs a tracer executor with the original input and the colorized input
 #[derive(Clone, Debug)]
-pub struct ColorizationTracingStage<EM, TE, Z> {
-    tracing_stage: TracingStage<EM, TE, Z>,
+pub struct ColorizationTracingStage<E, EM, O, Z> {
+    colorization: ColorizationStage<E, EM, O, Z>,
+    tracing_stage: TracingStage<EM, E, Z>,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, TE, Z)>,
+    phantom: PhantomData<(E, EM, O, Z)>,
 }
 
-impl<EM, TE, Z> UsesState for ColorizationTracingStage<EM, TE, Z>
+impl<E, EM, O, Z> UsesState for ColorizationTracingStage<E, EM, O, Z>
 where
-    TE: UsesState,
+    E: UsesState,
 {
-    type State = TE::State;
+    type State = E::State;
 }
 
-impl<E, EM, TE, Z> Stage<E, EM, Z> for ColorizationTracingStage<EM, TE, Z>
+impl<E, EM, O, Z> Stage<E, EM, Z> for ColorizationTracingStage<E, EM, O, Z>
 where
-    E: UsesState<State = TE::State>,
     E::Input: HasBytesVec,
-    TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus + HasMetadata,
-    EM: UsesState<State = TE::State>,
-    Z: UsesState<State = TE::State>,
+    O: MapObserver,
+    E: Executor<EM, Z> + HasObservers,
+    E::State: HasClientPerfMonitor + HasExecutions + HasCorpus + HasMetadata + HasRand,
+    EM: UsesState<State = E::State> + EventFirer,
+    Z: UsesState<State = E::State> + Evaluator<E, EM> + ExecutionProcessor<E::Observers>,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
-        _executor: &mut E,
-        state: &mut TE::State,
+        executor: &mut E,
+        state: &mut E::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         // You don't use _executor to execute the PUT in tracing stage!
         self.tracing_stage
-            .perform(fuzzer, _executor, state, manager, corpus_idx)?;
+            .perform(fuzzer, executor, state, manager, corpus_idx)?;
 
-        // TODO: Run colorized input from colorization stage
+        let tracer_executor = self.tracing_stage.executor_mut();
 
-        let meta = state
-            .metadata()
-            .get::<TaintMetadata>()
-            .ok_or_else(|| Error::key_not_found("TaintMetadata not found"))?;
-
-        let input_vec = meta.input_vec();
-
-        let tracer_executor = self.tracing_stage.executor();
+        // This one uses the given(?) executor
+        self.colorization
+            .perform(fuzzer, executor, state, manager, corpus_idx)?;
+        // self.colorization.trace(fuzzer, tracer_executor, state, manager, corpus_idx)?;
 
         /*
         tracer_executor
@@ -443,17 +440,21 @@ where
     }
 }
 
-impl<EM, TE, Z> ColorizationTracingStage<EM, TE, Z> {
+impl<E, EM, O, Z> ColorizationTracingStage<E, EM, O, Z> {
     /// Creates a new default stage
-    pub fn new(tracing_stage: TracingStage<EM, TE, Z>) -> Self {
+    pub fn new(
+        colorization: ColorizationStage<E, EM, O, Z>,
+        tracing_stage: TracingStage<EM, E, Z>,
+    ) -> Self {
         Self {
+            colorization,
             tracing_stage,
             phantom: PhantomData,
         }
     }
 
     /// Gets the underlying tracer executor
-    pub fn tracing_stage(&self) -> &TracingStage<EM, TE, Z> {
+    pub fn tracing_stage(&self) -> &TracingStage<EM, E, Z> {
         &self.tracing_stage
     }
 }
