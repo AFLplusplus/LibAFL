@@ -13,9 +13,9 @@ use crate::{
     fuzzer::Evaluator,
     inputs::HasBytesVec,
     mutators::mutations::buffer_copy,
-    observers::MapObserver,
+    observers::{MapObserver, ObserversTuple},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState, HasExecutions},
     Error,
 };
 
@@ -205,8 +205,6 @@ where
             }
         }
 
-        // TODO: Run trace_executor and log cmplog
-
         // TODO: Put res, buf into metadata
         Ok(())
     }
@@ -319,5 +317,81 @@ where
 
             bytes[idx] = c;
         }
+    }
+}
+
+
+/// A stage that runs a tracer executor with the original input and the colorized input
+#[derive(Clone, Debug)]
+pub struct ColorizationTracingStage<EM, TE, Z> {
+    tracer_executor: TE,
+    #[allow(clippy::type_complexity)]
+    phantom: PhantomData<(EM, TE, Z)>,
+}
+
+
+impl<EM, TE, Z> UsesState for ColorizationTracingStage<EM, TE, Z>
+where
+    TE: UsesState,
+{
+    type State = TE::State;
+}
+
+impl<E, EM, TE, Z> Stage<E, EM, Z> for ColorizationTracingStage<EM, TE, Z>
+where
+    E: UsesState<State = TE::State>,
+    TE: Executor<EM, Z> + HasObservers,
+    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    EM: UsesState<State = TE::State>,
+    Z: UsesState<State = TE::State>,
+{
+    #[inline]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut TE::State,
+        manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<(), Error> {
+        let input = state
+            .corpus()
+            .get(corpus_idx)?
+            .borrow_mut()
+            .load_input()?
+            .clone();
+
+        self.tracer_executor
+            .observers_mut()
+            .pre_exec_all(state, &input)?;
+
+        let exit_kind = self
+            .tracer_executor
+            .run_target(fuzzer, state, manager, &input)?;
+
+        *state.executions_mut() += 1;
+
+        self.tracer_executor
+            .observers_mut()
+            .post_exec_all(state, &input, &exit_kind)?;
+
+        // TODO: Run colorized input from colorization stage
+
+        Ok(())
+    }
+}
+
+impl<EM, TE, Z> ColorizationTracingStage<EM, TE, Z> {
+    /// Creates a new default stage
+    pub fn new(tracer_executor: TE) -> Self {
+        Self {
+            tracer_executor,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Gets the underlying tracer executor
+    pub fn executor(&self) -> &TE {
+        &self.tracer_executor
     }
 }
