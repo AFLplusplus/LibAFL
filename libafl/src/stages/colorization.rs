@@ -6,13 +6,16 @@ use alloc::{
 };
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
+use serde::{Deserialize, Serialize};
+
+use super::TracingStage;
 use crate::{
     bolts::{rands::Rand, tuples::MatchName},
     corpus::{Corpus, CorpusId},
     events::EventFirer,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
-    inputs::HasBytesVec,
+    inputs::{BytesInput, HasBytesVec},
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
@@ -118,7 +121,7 @@ where
         let mut ok_ranges = BinaryHeap::new();
 
         // Now replace with random values (This is type_replace)
-        self.type_replace(changed_bytes, state);
+        Self::type_replace(changed_bytes, state);
 
         // What we do is now to separate the input into smaller regions
         // And in each small regions make sure changing those bytes in the regions does not affect the coverage
@@ -191,10 +194,50 @@ where
             }
         }
 
+        if state.has_metadata::<TaintMetadata>() {
+            let meta = state.metadata_mut().get_mut::<TaintMetadata>().unwrap();
+            meta.update(input.bytes().to_vec(), res);
+        } else {
+            let meta = TaintMetadata::new(input.bytes().to_vec(), res);
+            state.add_metadata::<TaintMetadata>(meta);
+        };
         // TODO: Put res, buf into metadata
         Ok(())
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+/// Store the taint and the input
+pub struct TaintMetadata {
+    input_vec: Vec<u8>,
+    ranges: Vec<Range<usize>>,
+}
+
+impl TaintMetadata {
+    #[must_use]
+    /// Constructor for taint metadata
+    pub fn new(input_vec: Vec<u8>, ranges: Vec<Range<usize>>) -> Self {
+        Self { input_vec, ranges }
+    }
+
+    /// Set input and ranges
+    pub fn update(&mut self, input: Vec<u8>, ranges: Vec<Range<usize>>) {
+        self.input_vec = input;
+        self.ranges = ranges;
+    }
+
+    /// Getter for input_vec
+    pub fn input_vec(&self) -> &Vec<u8> {
+        &self.input_vec
+    }
+
+    /// Getter for ranges
+    pub fn ranges(&self) -> &Vec<Range<usize>> {
+        &self.ranges
+    }
+}
+
+crate::impl_serdeany!(TaintMetadata);
 
 impl<E, EM, O, TE, Z> ColorizationStage<E, EM, O, TE, Z>
 where
@@ -204,6 +247,7 @@ where
     E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State> + ExecutionProcessor<E::Observers>,
 {
+    #[must_use]
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer_name: &O) -> Self {
         Self {
@@ -244,7 +288,7 @@ where
 
     /// Replace bytes with random values but following certain rules
     #[allow(clippy::needless_range_loop)]
-    fn type_replace(&self, bytes: &mut [u8], state: &mut E::State) {
+    fn type_replace(bytes: &mut [u8], state: &mut E::State) {
         let len = bytes.len();
         for idx in 0..len {
             let c = match bytes[idx] {
@@ -339,7 +383,7 @@ where
 /// A stage that runs a tracer executor with the original input and the colorized input
 #[derive(Clone, Debug)]
 pub struct ColorizationTracingStage<EM, TE, Z> {
-    tracer_executor: TE,
+    tracing_stage: TracingStage<EM, TE, Z>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
@@ -354,8 +398,9 @@ where
 impl<E, EM, TE, Z> Stage<E, EM, Z> for ColorizationTracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
+    E::Input: HasBytesVec,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus + HasMetadata,
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
@@ -368,44 +413,47 @@ where
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let input = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .load_input()?
-            .clone();
-
-        self.tracer_executor
-            .observers_mut()
-            .pre_exec_all(state, &input)?;
-
-        let exit_kind = self
-            .tracer_executor
-            .run_target(fuzzer, state, manager, &input)?;
-
-        *state.executions_mut() += 1;
-
-        self.tracer_executor
-            .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
+        // You don't use _executor to execute the PUT in tracing stage!
+        self.tracing_stage
+            .perform(fuzzer, _executor, state, manager, corpus_idx)?;
 
         // TODO: Run colorized input from colorization stage
 
+        let meta = state
+            .metadata()
+            .get::<TaintMetadata>()
+            .ok_or_else(|| Error::key_not_found("TaintMetadata not found"))?;
+
+        let input_vec = meta.input_vec();
+
+        let tracer_executor = self.tracing_stage.executor();
+
+        /*
+        tracer_executor
+            .observers_mut()
+            .pre_exec_all(state, &input)?;
+
+        let exit_kind = tracer_executor.run_target(fuzzer, state, manager, &input)?;
+
+        tracer_executor
+            .observers_mut()
+            .post_exec_all(state, &input, &exit_kind)?;
+        */
         Ok(())
     }
 }
 
 impl<EM, TE, Z> ColorizationTracingStage<EM, TE, Z> {
     /// Creates a new default stage
-    pub fn new(tracer_executor: TE) -> Self {
+    pub fn new(tracing_stage: TracingStage<EM, TE, Z>) -> Self {
         Self {
-            tracer_executor,
+            tracing_stage,
             phantom: PhantomData,
         }
     }
 
     /// Gets the underlying tracer executor
-    pub fn executor(&self) -> &TE {
-        &self.tracer_executor
+    pub fn tracing_stage(&self) -> &TracingStage<EM, TE, Z> {
+        &self.tracing_stage
     }
 }
