@@ -158,7 +158,6 @@ where
         exit_kind: ExitKind,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
-
 }
 
 /// The main fuzzer trait.
@@ -487,15 +486,14 @@ where
     /// Trigger the observer and the feedback
     #[inline]
     fn process_without_execution(
-            &mut self,
-            state: &mut Self::State,
-            executor: &mut E,
-            manager: &mut EM,
-            input: <Self::State as UsesInput>::Input,
-            exit_kind: ExitKind,
-            send_events: bool,
-        ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
-    {
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        exit_kind: ExitKind,
+        send_events: bool,
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         let observers = executor.observers();
         self.process_execution(state, manager, input, observers, &exit_kind, send_events)
     }
