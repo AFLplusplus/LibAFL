@@ -190,7 +190,9 @@ where
                 Some(last) => {
                     // Try merge
                     if last.end == item.0.start {
-                        last.end = item.0.start;
+                        // The last one in `res` is the start of the new one
+                        // so merge
+                        last.end = item.0.end;
                     } else {
                         res.push(item.0)
                     }
