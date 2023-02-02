@@ -147,6 +147,18 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error>;
+
+    /// Triggers observers and feedback without running the input
+    fn process_without_execution(
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        exit_kind: ExitKind,
+        send_events: bool,
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
+
 }
 
 /// The main fuzzer trait.
@@ -472,6 +484,22 @@ where
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
 {
+    /// Trigger the observer and the feedback
+    #[inline]
+    fn process_without_execution(
+            &mut self,
+            state: &mut Self::State,
+            executor: &mut E,
+            manager: &mut EM,
+            input: <Self::State as UsesInput>::Input,
+            exit_kind: ExitKind,
+            send_events: bool,
+        ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
+    {
+        let observers = executor.observers();
+        self.process_execution(state, manager, input, observers, &exit_kind, send_events)
+    }
+
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
     fn evaluate_input_events(
