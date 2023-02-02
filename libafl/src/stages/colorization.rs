@@ -57,20 +57,20 @@ impl Ord for Earlier {
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct ColorizationStage<E, EM, O, TE, Z> {
+pub struct ColorizationStage<E, EM, O, Z> {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, O, TE, Z)>,
+    phantom: PhantomData<(E, EM, O, Z)>,
 }
 
-impl<E, EM, O, TE, Z> UsesState for ColorizationStage<E, EM, O, TE, Z>
+impl<E, EM, O, Z> UsesState for ColorizationStage<E, EM, O, Z>
 where
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E, EM, O, TE, Z> Stage<E, EM, Z> for ColorizationStage<E, EM, O, TE, Z>
+impl<E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<E, EM, O, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State> + EventFirer,
@@ -239,7 +239,7 @@ impl TaintMetadata {
 
 crate::impl_serdeany!(TaintMetadata);
 
-impl<E, EM, O, TE, Z> ColorizationStage<E, EM, O, TE, Z>
+impl<E, EM, O, Z> ColorizationStage<E, EM, O, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State> + EventFirer,
