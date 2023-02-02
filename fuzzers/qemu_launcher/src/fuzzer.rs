@@ -176,7 +176,7 @@ pub fn fuzz() {
         // Wrap the executor to keep track of the timeout
         let mut executor = TimeoutExecutor::new(executor, timeout);
 
-        if state.corpus().count() < 1 {
+        if state.must_load_initial_inputs() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
                 .unwrap_or_else(|_| {
