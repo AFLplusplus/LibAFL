@@ -1,11 +1,23 @@
 //! The colorization stage from colorization() in afl++
-
 use alloc::{
     collections::binary_heap::BinaryHeap,
     string::{String, ToString},
     vec::Vec,
 };
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
+
+use crate::{
+    bolts::{rands::Rand, tuples::MatchName},
+    corpus::{Corpus, CorpusId},
+    executors::{Executor, HasObservers},
+    fuzzer::Evaluator,
+    inputs::HasBytesVec,
+    mutators::mutations::buffer_copy,
+    observers::MapObserver,
+    stages::Stage,
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
+    Error,
+};
 
 // Bigger range is better
 #[derive(Debug, PartialEq, Eq)]
@@ -38,19 +50,6 @@ impl Ord for Earlier {
         other.0.start.cmp(&self.0.start)
     }
 }
-
-use crate::{
-    bolts::{rands::Rand, tuples::MatchName},
-    corpus::{Corpus, CorpusId},
-    executors::{Executor, HasObservers},
-    fuzzer::Evaluator,
-    inputs::HasBytesVec,
-    mutators::mutations::buffer_copy,
-    observers::MapObserver,
-    stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
-    Error,
-};
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
@@ -97,6 +96,8 @@ where
         let backup = input.clone();
         // This is the buffer we'll randomly mutate during type_replace
         let mut changed = input.clone();
+        // This is the buffer we want to pass to the cmplog stage
+        let mut buf = input.clone();
 
         // First, run orig_input once and get the original hash
         let (_, _) = fuzzer.evaluate_input(state, executor, manager, input)?;
@@ -118,22 +119,17 @@ where
         ranges.push(Bigger(0..input_len));
 
         // This heap contains the smaller ranges. Changes inside them does not affect the coverage.
-        // Keep it sorted, we want the earliest ones to come first
+        // Keep it sorted, we want the earliest ones to come first so that it's easier to sort them
         let mut ok_ranges = BinaryHeap::new();
 
         // Now replace with random values (This is type_replace)
         self.type_replace(changed_bytes, state);
 
-        // This is the buffer we want to pass to the cmplog stage
-        let mut buf = backup.clone();
-
-        // while ((rng = pop_biggest_range(&ranges)) != NULL &&
-        // afl->stage_cur < afl->stage_max) {
         // What we do is now to separate the input into smaller regions
         // And in each small regions make sure changing those bytes in the regions does not affect the coverage
         for _ in 0..input_len * 2 {
             if let Some(b) = ranges.pop() {
-                // Separate the ranges
+                // Let's try the largest one (ranges is sorted)
                 let r = b.0;
                 let range_start = r.start;
                 let range_end = r.end;
@@ -146,7 +142,7 @@ where
                     copy_len,
                 );
 
-                // We need to clone buf because evaluate_input will consume input
+                // We need to clone buf because evaluate_input will consume input (we can't use buf in evaluate_input)
                 let input = buf.clone();
                 let (_, _) = fuzzer.evaluate_input(state, executor, manager, input)?;
 
@@ -171,6 +167,7 @@ where
 
                     // Add smaller range
                     if copy_len > 1 {
+                        // Separate the ranges
                         ranges.push(Bigger(range_start..(range_start - 1 + copy_len / 2)));
                         ranges.push(Bigger((range_start + copy_len / 2)..range_end));
                     }
@@ -186,14 +183,14 @@ where
         // Now ok_ranges is a list of smaller range
         // Each of them should be stored into a metadata and we'll use them later in afl++ redqueen
 
-        // let's consolidate ranges in ok_ranges
+        // let's merge ranges in ok_ranges
         let mut res: Vec<Range<usize>> = Vec::new();
         for item in ok_ranges.into_sorted_vec() {
             match res.last_mut() {
-                Some(l) => {
-                    // Try consolidate
-                    if l.end == item.0.start {
-                        l.end = item.0.start;
+                Some(last) => {
+                    // Try merge
+                    if last.end == item.0.start {
+                        last.end = item.0.start;
                     } else {
                         res.push(item.0)
                     }
@@ -216,9 +213,12 @@ where
     E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
-    /// Creates a new [`PowerMutationalStage`]
+    /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer_name: &O) -> Self {
-        Self::transforming(map_observer_name)
+        Self {
+            map_observer_name: map_observer_name.name().to_string(),
+            phantom: PhantomData,
+        }
     }
 
     /// Replace bytes with random values but following certain rules
@@ -311,23 +311,6 @@ where
             };
 
             bytes[idx] = c;
-        }
-    }
-}
-
-impl<E, EM, O, Z> ColorizationStage<E, EM, O, Z>
-where
-    E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
-    O: MapObserver,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, State = E::State>,
-{
-    /// Creates a new transforming [`PowerMutationalStage`]
-    pub fn transforming(map_observer_name: &O) -> Self {
-        Self {
-            map_observer_name: map_observer_name.name().to_string(),
-            phantom: PhantomData,
         }
     }
 }
