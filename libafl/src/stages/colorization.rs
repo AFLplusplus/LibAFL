@@ -9,6 +9,7 @@ use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 use crate::{
     bolts::{rands::Rand, tuples::MatchName},
     corpus::{Corpus, CorpusId},
+    events::EventFirer,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::HasBytesVec,
@@ -16,7 +17,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
-    Error,
+    Error, ExecutionProcessor,
 };
 
 // Bigger range is better
@@ -69,10 +70,10 @@ where
 impl<E, EM, O, TE, Z> Stage<E, EM, Z> for ColorizationStage<E, EM, O, TE, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
+    EM: UsesState<State = E::State> + EventFirer,
     O: MapObserver,
     E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, State = E::State>,
+    Z: Evaluator<E, EM, State = E::State> + ExecutionProcessor<E::Observers>,
     E::Input: HasBytesVec,
 {
     #[inline]
@@ -97,8 +98,12 @@ where
         // This is the buffer we'll randomly mutate during type_replace
         let mut changed = input.clone();
 
+        // input will be consumed so clone it
+        let consumed_input = input.clone();
+
         // First, run orig_input once and get the original hash
-        let orig_hash = self.get_raw_map_hash_run(fuzzer, executor, state, manager, &mut input)?;
+        let orig_hash =
+            self.get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input)?;
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
 
@@ -132,7 +137,9 @@ where
                     copy_len,
                 );
 
-                let changed_hash = self.get_raw_map_hash_run(fuzzer, executor, state, manager, &mut input)?;
+                let consumed_input = input.clone();
+                let changed_hash =
+                    self.get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input)?;
 
                 if orig_hash == changed_hash {
                     // The change in this range is safe!
@@ -192,10 +199,10 @@ where
 impl<E, EM, O, TE, Z> ColorizationStage<E, EM, O, TE, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State>,
+    EM: UsesState<State = E::State> + EventFirer,
     O: MapObserver,
     E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, State = E::State>,
+    Z: Evaluator<E, EM, State = E::State> + ExecutionProcessor<E::Observers>,
 {
     /// Creates a new [`ColorizationStage`]
     pub fn new(map_observer_name: &O) -> Self {
@@ -212,7 +219,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        input: &mut E::Input,
+        input: E::Input,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
 
@@ -229,7 +236,8 @@ where
             .observers_mut()
             .post_exec_all(state, &input, &exit_kind)?;
 
-
+        let observers = executor.observers();
+        fuzzer.process_execution(state, manager, input, observers, &exit_kind, true)?;
 
         Ok(hash)
     }
