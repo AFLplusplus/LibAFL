@@ -3,11 +3,11 @@
 use alloc::string::{String, ToString};
 use core::{
     fmt::Debug,
-    hash::{Hash, Hasher},
+    hash::{BuildHasher, Hash, Hasher},
     marker::PhantomData,
 };
 
-use ahash::AHasher;
+use ahash::RandomState;
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
@@ -78,7 +78,7 @@ where
             .borrow_mut()
             .load_input()?
             .clone();
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         base.hash(&mut hasher);
         let base_hash = hasher.finish();
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
@@ -143,7 +143,7 @@ where
             i = next_i;
         }
 
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         base.hash(&mut hasher);
         let new_hash = hasher.finish();
         if base_hash != new_hash {
