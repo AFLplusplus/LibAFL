@@ -20,6 +20,7 @@ use crate::{
     inputs::UsesInput,
     mark_feature_time,
     observers::ObserversTuple,
+    prelude::HasFuzzedCorpusId,
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
@@ -327,7 +328,7 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasFuzzedCorpusId,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -384,6 +385,7 @@ where
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+                testcase.set_parent_id_optional(state.fuzzed_corpus_id());
                 self.feedback_mut().append_metadata(state, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
@@ -416,6 +418,7 @@ where
 
                 // The input is a solution, add it to the respective corpus
                 let mut testcase = Testcase::with_executions(input, *state.executions());
+                testcase.set_parent_id_optional(state.fuzzed_corpus_id());
                 self.objective_mut().append_metadata(state, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
 
@@ -440,7 +443,7 @@ where
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasFuzzedCorpusId,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -470,7 +473,7 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasFuzzedCorpusId,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -502,6 +505,7 @@ where
 
         // Add the input to the main corpus
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+        testcase.set_parent_id_optional(state.fuzzed_corpus_id());
         self.feedback_mut().append_metadata(state, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
