@@ -62,7 +62,7 @@ pub fn fuzz() {
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
-    println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
+    println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
     emu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     unsafe { emu.run() };
@@ -73,14 +73,14 @@ pub fn fuzz() {
     let stack_ptr: u64 = emu.read_reg(Regs::Sp).unwrap();
     let ret_addr: u32 = emu.read_reg(Regs::Lr).unwrap();
 
-    println!("Stack pointer = {:#x}", stack_ptr);
-    println!("Return address = {:#x}", ret_addr);
+    println!("Stack pointer = {stack_ptr:#x}");
+    println!("Return address = {ret_addr:#x}");
 
     emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
     let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
-    println!("Placing input at {:#x}", input_addr);
+    println!("Placing input at {input_addr:#x}");
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
@@ -233,6 +233,6 @@ pub fn fuzz() {
     {
         Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
-        Err(err) => panic!("Failed to run launcher: {:?}", err),
+        Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
 }

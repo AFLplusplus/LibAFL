@@ -4,7 +4,7 @@ use libafl_cc::{ClangWrapper, CompilerWrapper};
 
 fn find_libpython() -> Result<String, String> {
     match Command::new("python3")
-        .args(&["-m", "find_libpython"])
+        .args(["-m", "find_libpython"])
         .output()
     {
         Ok(output) => {

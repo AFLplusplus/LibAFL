@@ -21,7 +21,7 @@ debug = true
 
 [build-dependencies]
 anyhow = "1"
-bindgen = "0.61"
+bindgen = "0.63"
 cc = "1.0"
 
 [dependencies]
