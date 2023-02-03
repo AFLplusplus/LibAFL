@@ -222,7 +222,7 @@ pub fn libafl_main() {
         }
 
         // In case the corpus is empty (on first run), reset
-        if state.corpus().count() < 1 {
+        if state.must_load_initial_inputs() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));

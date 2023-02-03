@@ -5,6 +5,7 @@ use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use std::{
     fs,
     path::{Path, PathBuf},
+    vec::Vec,
 };
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -194,6 +195,9 @@ pub struct StdState<I, C, R, SC> {
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
+    #[cfg(feature = "std")]
+    /// Remaining initial inputs to load, if any
+    remaining_initial_files: Option<Vec<PathBuf>>,
     phantom: PhantomData<I>,
 }
 
@@ -347,23 +351,15 @@ where
     R: Rand,
     SC: Corpus<Input = <Self as UsesInput>::Input>,
 {
-    /// Loads inputs from a directory.
-    /// If `forced` is `true`, the value will be loaded,
-    /// even if it's not considered to be `interesting`.
-    pub fn load_from_directory<E, EM, Z>(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        manager: &mut EM,
-        in_dir: &Path,
-        forced: bool,
-        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
-    ) -> Result<(), Error>
-    where
-        E: UsesState<State = Self>,
-        EM: UsesState<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
-    {
+    /// Decide if the state nust load the inputs
+    pub fn must_load_initial_inputs(&self) -> bool {
+        self.corpus().count() == 0
+            || (self.remaining_initial_files.is_some()
+                && !self.remaining_initial_files.as_ref().unwrap().is_empty())
+    }
+
+    /// List initial inputs from a directory.
+    fn visit_initial_directory(files: &mut Vec<PathBuf>, in_dir: &Path) -> Result<(), Error> {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -380,18 +376,9 @@ where
             let attr = attributes?;
 
             if attr.is_file() && attr.len() > 0 {
-                println!("Loading file {:?} ...", &path);
-                let input = loader(fuzzer, self, &path)?;
-                if forced {
-                    let _ = fuzzer.add_input(self, executor, manager, input)?;
-                } else {
-                    let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
-                    if res == ExecuteInputResult::None {
-                        println!("File {:?} was not interesting, skipped.", &path);
-                    }
-                }
+                files.push(path);
             } else if attr.is_dir() {
-                self.load_from_directory(fuzzer, executor, manager, &path, forced, loader)?;
+                Self::visit_initial_directory(files, in_dir)?;
             }
         }
 
@@ -400,29 +387,48 @@ where
 
     /// Loads initial inputs from the passed-in `in_dirs`.
     /// If `forced` is true, will add all testcases, no matter what.
-    fn load_initial_inputs_internal<E, EM, Z>(
+    fn load_initial_inputs_custom<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         manager: &mut EM,
         in_dirs: &[PathBuf],
         forced: bool,
+        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
     ) -> Result<(), Error>
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
-        for in_dir in in_dirs {
-            self.load_from_directory(
-                fuzzer,
-                executor,
-                manager,
-                in_dir,
-                forced,
-                &mut |_, _, path| I::from_file(path),
-            )?;
+        if let Some(remaining) = self.remaining_initial_files.as_ref() {
+            // everything was loaded
+            if remaining.is_empty() {
+                return Ok(());
+            }
+        } else {
+            let mut files = vec![];
+            for in_dir in in_dirs {
+                Self::visit_initial_directory(&mut files, in_dir)?;
+            }
+
+            self.remaining_initial_files = Some(files);
         }
+
+        // TODO option to shuffle the initial files
+        while let Some(path) = self.remaining_initial_files.as_mut().unwrap().pop() {
+            println!("Loading file {:?} ...", &path);
+            let input = loader(fuzzer, self, &path)?;
+            if forced {
+                let _ = fuzzer.add_input(self, executor, manager, input)?;
+            } else {
+                let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+                if res == ExecuteInputResult::None {
+                    println!("File {:?} was not interesting, skipped.", &path);
+                }
+            }
+        }
+
         manager.fire(
             self,
             Event::Log {
@@ -449,7 +455,14 @@ where
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
-        self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, true)
+        self.load_initial_inputs_custom(
+            fuzzer,
+            executor,
+            manager,
+            in_dirs,
+            true,
+            &mut |_, _, path| I::from_file(path),
+        )
     }
 
     /// Loads initial inputs from the passed-in `in_dirs`.
@@ -465,7 +478,14 @@ where
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
-        self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, false)
+        self.load_initial_inputs_custom(
+            fuzzer,
+            executor,
+            manager,
+            in_dirs,
+            false,
+            &mut |_, _, path| I::from_file(path),
+        )
     }
 }
 
@@ -574,6 +594,8 @@ where
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
+            #[cfg(feature = "std")]
+            remaining_initial_files: None,
             phantom: PhantomData,
         };
         feedback.init_state(&mut state)?;
