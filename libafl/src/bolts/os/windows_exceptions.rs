@@ -325,7 +325,9 @@ unsafe fn internal_handle_exception(
         }
         None => {
             // Go to Default one
-            let handler_holder = &EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1].as_ref().unwrap();
+            let handler_holder = &EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]
+                .as_ref()
+                .unwrap();
             let handler = &mut **handler_holder.handler.get();
             handler.handle(exception_code, exception_pointers);
             EXCEPTION_CONTINUE_EXECUTION

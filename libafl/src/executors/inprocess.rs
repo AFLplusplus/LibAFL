@@ -965,9 +965,9 @@ mod windows_exception_handler {
     };
 
     use crate::{
-        bolts::{os::windows_exceptions::{
-            ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
-        }, bolts_prelude::windows_exceptions::EXCEPTION_HANDLERS_SIZE},
+        bolts::os::windows_exceptions::{
+            ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS,
+        },
         events::{EventFirer, EventRestarter},
         executors::{
             inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
@@ -1173,13 +1173,14 @@ mod windows_exception_handler {
 
             let exception_list = data.exceptions();
             if !exception_list.contains(&code) {
-                println!("Exception code received, but {} is not in CRASH_EXCEPTIONS", code);
+                println!(
+                    "Exception code received, but {} is not in CRASH_EXCEPTIONS",
+                    code
+                );
                 is_crash = false;
-            }
-            else {
+            } else {
                 eprintln!("Crashed with {code}");
             }
-
         } else {
             eprintln!("Crashed without exception (probably due to SIGABRT)");
         };
@@ -1225,8 +1226,7 @@ mod windows_exception_handler {
             #[cfg(feature = "std")]
             if is_crash {
                 eprintln!("Child crashed!");
-            }
-            else{
+            } else {
                 eprintln!("Exception received!");
             }
 
@@ -1245,8 +1245,7 @@ mod windows_exception_handler {
                     event_mgr,
                     ExitKind::Crash,
                 );
-            }
-            else{
+            } else {
                 // This is not worth saving
                 run_observers_and_save_state::<E, EM, OF, Z>(
                     executor,
@@ -1255,7 +1254,7 @@ mod windows_exception_handler {
                     fuzzer,
                     event_mgr,
                     ExitKind::Ok,
-                );   
+                );
             }
         }
         ExitProcess(1);
