@@ -1172,14 +1172,11 @@ mod windows_exception_handler {
             .unwrap();
 
             let exception_list = data.exceptions();
-            if !exception_list.contains(&code) {
-                println!(
-                    "Exception code received, but {} is not in CRASH_EXCEPTIONS",
-                    code
-                );
-                is_crash = false;
-            } else {
+            if exception_list.contains(&code) {
                 eprintln!("Crashed with {code}");
+            } else {
+                eprintln!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
+                is_crash = false;
             }
         } else {
             eprintln!("Crashed without exception (probably due to SIGABRT)");
