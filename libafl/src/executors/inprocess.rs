@@ -929,11 +929,6 @@ pub mod windows_asan_handler {
             // Make sure we don't crash in the crash handler forever.
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-            #[cfg(feature = "std")]
-            eprintln!("Child crashed!");
-            #[cfg(feature = "std")]
-            drop(stdout().flush());
-
             run_observers_and_save_state::<E, EM, OF, Z>(
                 executor,
                 state,
@@ -970,9 +965,9 @@ mod windows_exception_handler {
     };
 
     use crate::{
-        bolts::os::windows_exceptions::{
+        bolts::{os::windows_exceptions::{
             ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
-        },
+        }, bolts_prelude::windows_exceptions::EXCEPTION_HANDLERS_SIZE},
         events::{EventFirer, EventRestarter},
         executors::{
             inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
@@ -1007,6 +1002,7 @@ mod windows_exception_handler {
         }
 
         fn exceptions(&self) -> Vec<ExceptionCode> {
+            assert!(CRASH_EXCEPTIONS.to_vec().len() < EXCEPTION_HANDLERS_SIZE);
             CRASH_EXCEPTIONS.to_vec()
         }
     }
@@ -1161,6 +1157,8 @@ mod windows_exception_handler {
             compiler_fence(Ordering::SeqCst);
         }
 
+        // Is this really crash?
+        let mut is_crash = true;
         #[cfg(feature = "std")]
         if let Some(exception_pointers) = exception_pointers.as_mut() {
             let code = ExceptionCode::try_from(
@@ -1172,7 +1170,16 @@ mod windows_exception_handler {
                     .0,
             )
             .unwrap();
-            eprintln!("Crashed with {code}");
+
+            let exception_list = data.exceptions();
+            if !exception_list.contains(&code) {
+                println!("Exception code received, but {} is not in CRASH_EXCEPTIONS", code);
+                is_crash = false;
+            }
+            else {
+                eprintln!("Crashed with {code}");
+            }
+
         } else {
             eprintln!("Crashed without exception (probably due to SIGABRT)");
         };
@@ -1216,26 +1223,40 @@ mod windows_exception_handler {
             let event_mgr = data.event_mgr_mut::<EM>();
 
             #[cfg(feature = "std")]
-            eprintln!("Child crashed!");
+            if is_crash {
+                eprintln!("Child crashed!");
+            }
+            else{
+                eprintln!("Exception received!");
+            }
+
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
             // Make sure we don't crash in the crash handler forever.
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-            #[cfg(feature = "std")]
-            eprintln!("Child crashed!");
-            #[cfg(feature = "std")]
-            drop(stdout().flush());
-
-            run_observers_and_save_state::<E, EM, OF, Z>(
-                executor,
-                state,
-                input,
-                fuzzer,
-                event_mgr,
-                ExitKind::Crash,
-            );
+            if is_crash {
+                run_observers_and_save_state::<E, EM, OF, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
+            }
+            else{
+                // This is not worth saving
+                run_observers_and_save_state::<E, EM, OF, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Ok,
+                );   
+            }
         }
         ExitProcess(1);
     }
