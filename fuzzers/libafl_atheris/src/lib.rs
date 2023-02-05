@@ -10,7 +10,7 @@ use std::{
     path::PathBuf,
 };
 
-use clap::{AppSettings, Arg, Command};
+use clap::{Arg, ArgAction, Command};
 use libafl::{
     bolts::{
         core_affinity::Cores,
@@ -74,8 +74,8 @@ pub fn __sanitizer_weak_hook_memcmp(
     _result: c_int,
 ) {
     unsafe {
-        let s1 = slice::from_raw_parts(s1 as *const u8, n);
-        let s2 = slice::from_raw_parts(s2 as *const u8, n);
+        let s1 = slice::from_raw_parts(s1.cast::<u8>(), n);
+        let s2 = slice::from_raw_parts(s2.cast::<u8>(), n);
         match n {
             0 => (),
             1 => __sanitizer_cov_trace_cmp1(
@@ -113,64 +113,46 @@ pub fn LLVMFuzzerRunDriver(
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    if harness_fn.is_none() {
-        panic!("No harness callback provided");
-    }
+    assert!(harness_fn.is_some(), "No harness callback provided");
     let harness_fn = harness_fn.unwrap();
 
-    if unsafe { EDGES_MAP_PTR.is_null() } {
-        panic!(
-            "Edges map was never initialized - __sanitizer_cov_8bit_counters_init never got called"
-        );
-    }
+    assert!(
+        !unsafe { EDGES_MAP_PTR.is_null() },
+        "Edges map was never initialized - __sanitizer_cov_8bit_counters_init never got called"
+    );
 
     println!("Args: {:?}", std::env::args());
 
     let matches = Command::new("libafl_atheris")
         .version("0.1.0")
-        .setting(AppSettings::AllowExternalSubcommands)
+        .allow_external_subcommands(true)
         .arg(Arg::new("script")) // The python script is the first arg
-        .arg(
-            Arg::new("cores")
-                .short('c')
-                .long("cores")
-                .required(true)
-                .takes_value(true),
-        )
+        .arg(Arg::new("cores").short('c').long("cores").required(true))
         .arg(
             Arg::new("broker_port")
                 .short('p')
                 .long("broker-port")
-                .required(false)
-                .takes_value(true),
+                .required(false),
         )
-        .arg(
-            Arg::new("output")
-                .short('o')
-                .long("output")
-                .required(false)
-                .takes_value(true),
-        )
+        .arg(Arg::new("output").short('o').long("output").required(false))
         .arg(
             Arg::new("input")
                 .short('i')
                 .long("input")
                 .required(true)
-                .takes_value(true),
+                .action(ArgAction::Append),
         )
         .arg(
             Arg::new("remote_broker_addr")
                 .short('B')
                 .long("remote-broker-addr")
-                .required(false)
-                .takes_value(true),
+                .required(false),
         )
         .arg(
             Arg::new("timeout")
                 .short('t')
                 .long("timeout")
-                .required(false)
-                .takes_value(true),
+                .required(false),
         )
         .get_matches();
 
@@ -184,27 +166,24 @@ pub fn LLVMFuzzerRunDriver(
         .expect("No valid core count given!");
     let broker_port = matches
         .get_one::<String>("broker_port")
-        .map(|s| s.parse().expect("Invalid broker port"))
-        .unwrap_or(1337);
+        .map_or(1337, |s| s.parse().expect("Invalid broker port"));
     let remote_broker_addr = matches
         .get_one::<String>("remote_broker_addr")
         .map(|s| s.parse().expect("Invalid broker address"));
     let input_dirs: Vec<PathBuf> = matches
-        .values_of("input")
+        .get_many::<PathBuf>("input")
         .map(|v| v.map(PathBuf::from).collect())
         .unwrap_or_default();
     let output_dir = matches
         .get_one::<String>("output")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| workdir.clone());
-    let token_files: Vec<&str> = matches
-        .values_of("tokens")
-        .map(|v| v.collect())
+        .map_or_else(|| workdir.clone(), PathBuf::from);
+    let token_files: Vec<PathBuf> = matches
+        .get_many::<PathBuf>("tokens")
+        .map(|v| v.map(PathBuf::from).collect())
         .unwrap_or_default();
     let timeout_ms = matches
         .get_one::<String>("timeout")
-        .map(|s| s.parse().expect("Invalid timeout"))
-        .unwrap_or(10000);
+        .map_or(10000, |s| s.parse().expect("Invalid timeout"));
     // let cmplog_enabled = matches.is_present("cmplog");
 
     println!("Workdir: {:?}", workdir.to_string_lossy().to_string());
@@ -369,6 +348,6 @@ pub fn LLVMFuzzerRunDriver(
         .launch()
     {
         Ok(_) | Err(Error::ShuttingDown) => (),
-        Err(e) => panic!("Error in fuzzer: {}", e),
+        Err(e) => panic!("Error in fuzzer: {e}"),
     };
 }

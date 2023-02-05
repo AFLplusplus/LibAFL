@@ -1,8 +1,6 @@
 #![no_std]
 // Embedded targets: build with no_main
 #![cfg_attr(not(any(windows)), no_main)]
-// Embedded needs alloc error handlers which only work on nightly right now...
-#![cfg_attr(not(any(windows)), feature(default_alloc_error_handler))]
 
 #[cfg(any(windows, unix))]
 extern crate alloc;
