@@ -2298,9 +2298,9 @@ impl AsanRuntime {
         basereg: RegId,
         indexreg: RegId,
         scale: i32,
-        disp: i64,
+        disp: isize,
     ) {
-        let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
+        let redzone_size = isize::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).unwrap();
         let writer = output.writer();
         let true_rip = address;
 
