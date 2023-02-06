@@ -1175,7 +1175,6 @@ mod windows_exception_handler {
             let exception_list = data.exceptions();
             if exception_list.contains(&code) {
                 eprintln!("Crashed with {code}");
-                panic!("AA!");
             } else {
                 // eprintln!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
                 is_crash = false;
