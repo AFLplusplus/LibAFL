@@ -45,6 +45,14 @@ impl NewHashFeedbackMetadata {
         Self::default()
     }
 
+    /// Create a new [`NewHashFeedbackMetadata`] with the given initial capacity
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            hash_set: HashSet::with_capacity(capacity),
+        }
+    }
+
     /// Reset the internal state
     pub fn reset(&mut self) -> Result<(), Error> {
         self.hash_set.clear();
@@ -71,6 +79,8 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 pub struct NewHashFeedback<O, S> {
     name: String,
     observer_name: String,
+    /// Initial capacity of hash set
+    capacity: usize,
     o_type: PhantomData<(O, S)>,
 }
 
@@ -80,7 +90,10 @@ where
     S: UsesInput + Debug + HasNamedMetadata + HasClientPerfMonitor,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(NewHashFeedbackMetadata::default(), &self.name);
+        state.add_named_metadata(
+            NewHashFeedbackMetadata::with_capacity(self.capacity),
+            &self.name,
+        );
         Ok(())
     }
 
@@ -146,6 +159,7 @@ where
         Self {
             name: name.to_string(),
             observer_name: observer_name.to_string(),
+            capacity: 0,
             o_type: PhantomData,
         }
     }
@@ -153,9 +167,17 @@ where
     /// Returns a new [`NewHashFeedback`].
     #[must_use]
     pub fn new(observer: &O) -> Self {
+        Self::with_capacity(observer, 0)
+    }
+
+    /// Returns a new [`NewHashFeedback`] that will create a hash set with the
+    /// given initial capacity.
+    #[must_use]
+    pub fn with_capacity(observer: &O, capacity: usize) -> Self {
         Self {
             name: NEWHASHFEEDBACK_PREFIX.to_string() + observer.name(),
             observer_name: observer.name().to_string(),
+            capacity,
             o_type: PhantomData,
         }
     }
