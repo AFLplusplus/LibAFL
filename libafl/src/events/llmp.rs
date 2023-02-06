@@ -189,7 +189,7 @@ where
                         Ok(llmp::LlmpMsgHookResult::ForwardToClients)
                     }
                 } else {
-                    monitor.display("Ping".into(), 0);
+                    monitor.display("Broker".into(), 0);
                     Ok(llmp::LlmpMsgHookResult::Handled)
                 }
             },
