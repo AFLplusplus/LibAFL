@@ -1002,8 +1002,9 @@ mod windows_exception_handler {
         }
 
         fn exceptions(&self) -> Vec<ExceptionCode> {
-            assert!(CRASH_EXCEPTIONS.to_vec().len() < EXCEPTION_HANDLERS_SIZE);
-            CRASH_EXCEPTIONS.to_vec()
+            let crash_list = CRASH_EXCEPTIONS.to_vec();
+            assert!(crash_list.len() < EXCEPTION_HANDLERS_SIZE);
+            crash_list
         }
     }
 
@@ -1253,7 +1254,6 @@ mod windows_exception_handler {
             ExitProcess(1);
         }
         // println!("Not Exiting!");
-
     }
 }
 
