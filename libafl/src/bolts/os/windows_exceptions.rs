@@ -26,6 +26,8 @@ use crate::Error;
 // For VEH
 const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 
+const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
+
 // For VEH
 //const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
 
@@ -330,7 +332,7 @@ unsafe fn internal_handle_exception(
                 .unwrap();
             let handler = &mut **handler_holder.handler.get();
             handler.handle(exception_code, exception_pointers);
-            EXCEPTION_CONTINUE_EXECUTION
+            EXCEPTION_EXECUTE_HANDLER
         }
     }
 }
