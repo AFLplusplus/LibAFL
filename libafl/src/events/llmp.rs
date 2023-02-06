@@ -193,7 +193,7 @@ where
                     Ok(llmp::LlmpMsgHookResult::Handled)
                 }
             },
-            Duration::from_millis(1000),
+            Duration::from_secs(30),
             Some(Duration::from_millis(5)),
         );
 
