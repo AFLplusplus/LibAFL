@@ -349,7 +349,7 @@ pub unsafe extern "system" fn handle_exception(
         .unwrap()
         .ExceptionCode;
     let exception_code = ExceptionCode::try_from(code.0).unwrap();
-    println!("Received exception; code: {exception_code}");
+    // println!("Received exception; code: {exception_code}");
     internal_handle_exception(exception_code, exception_pointers)
 }
 

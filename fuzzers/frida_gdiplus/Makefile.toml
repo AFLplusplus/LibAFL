@@ -45,7 +45,7 @@ windows_alias = "run_windows"
 [tasks.run_windows]
 script_runner = "@shell"
 script='''
-./${FUZZER_NAME} -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll
+./${FUZZER_NAME} -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
 '''
 dependencies = [ "fuzzer", "harness" ]
 
@@ -58,7 +58,7 @@ windows_alias = "test_windows"
 [tasks.test_windows]
 script_runner = "@shell"
 script='''
-start "" "frida_gdiplus.exe" -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll
+start "" "frida_gdiplus.exe" -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
 #ping is for timeout
 ping -n 10 127.0.0.1>NUL && taskkill /im frida_gdiplus.exe /F
 >nul 2>nul dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)

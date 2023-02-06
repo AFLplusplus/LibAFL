@@ -1174,8 +1174,9 @@ mod windows_exception_handler {
             let exception_list = data.exceptions();
             if exception_list.contains(&code) {
                 eprintln!("Crashed with {code}");
+                panic!("AA!");
             } else {
-                eprintln!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
+                // eprintln!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
                 is_crash = false;
             }
         } else {
@@ -1224,16 +1225,16 @@ mod windows_exception_handler {
             if is_crash {
                 eprintln!("Child crashed!");
             } else {
-                eprintln!("Exception received!");
+                // eprintln!("Exception received!");
             }
 
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
             // Make sure we don't crash in the crash handler forever.
-            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
-
             if is_crash {
+                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+
                 run_observers_and_save_state::<E, EM, OF, Z>(
                     executor,
                     state,
@@ -1244,17 +1245,15 @@ mod windows_exception_handler {
                 );
             } else {
                 // This is not worth saving
-                run_observers_and_save_state::<E, EM, OF, Z>(
-                    executor,
-                    state,
-                    input,
-                    fuzzer,
-                    event_mgr,
-                    ExitKind::Ok,
-                );
             }
         }
-        ExitProcess(1);
+
+        if is_crash {
+            println!("Exiting!");
+            ExitProcess(1);
+        }
+        // println!("Not Exiting!");
+
     }
 }
 
