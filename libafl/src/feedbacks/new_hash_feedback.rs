@@ -148,6 +148,12 @@ impl<O, S> HasObserverName for NewHashFeedback<O, S> {
     }
 }
 
+/// Default capacity for the [`HashSet`] in [`NewHashFeedback`].
+///
+/// This is reasonably large on the assumption that you expect there to be many
+/// runs of the target, producing many different feedbacks.
+const DEFAULT_CAPACITY: usize = 4096;
+
 impl<O, S> NewHashFeedback<O, S>
 where
     O: ObserverWithHashField + Named + Debug,
@@ -159,7 +165,7 @@ where
         Self {
             name: name.to_string(),
             observer_name: observer_name.to_string(),
-            capacity: 0,
+            capacity: DEFAULT_CAPACITY,
             o_type: PhantomData,
         }
     }
@@ -167,7 +173,7 @@ where
     /// Returns a new [`NewHashFeedback`].
     #[must_use]
     pub fn new(observer: &O) -> Self {
-        Self::with_capacity(observer, 0)
+        Self::with_capacity(observer, DEFAULT_CAPACITY)
     }
 
     /// Returns a new [`NewHashFeedback`] that will create a hash set with the
