@@ -2,11 +2,15 @@
 //! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
-use core::{cell::RefCell, convert::From, hash::Hasher};
+use core::{
+    cell::RefCell,
+    convert::From,
+    hash::{BuildHasher, Hasher},
+};
 #[cfg(feature = "std")]
 use std::{fs::File, io::Read, path::Path};
 
-use ahash::AHasher;
+use ahash::RandomState;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -47,7 +51,7 @@ impl Input for BytesInput {
 
     /// Generate a name for this input
     fn generate_name(&self, _idx: usize) -> String {
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         hasher.write(self.bytes());
         format!("{:016x}", hasher.finish())
     }

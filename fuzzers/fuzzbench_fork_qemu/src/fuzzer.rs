@@ -70,21 +70,18 @@ pub fn main() {
             Arg::new("out")
                 .help("The directory to place finds in ('corpus')")
                 .long("libafl-out")
-                .required(true)
-                .takes_value(true),
+                .required(true),
         )
         .arg(
             Arg::new("in")
                 .help("The directory to read initial inputs from ('seeds')")
                 .long("libafl-in")
-                .required(true)
-                .takes_value(true),
+                .required(true),
         )
         .arg(
             Arg::new("tokens")
                 .long("libafl-tokens")
-                .help("A file to read tokens from, to be used during fuzzing")
-                .takes_value(true),
+                .help("A file to read tokens from, to be used during fuzzing"),
         )
         .arg(
             Arg::new("logfile")
@@ -158,7 +155,7 @@ fn fuzz(
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
-    println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
+    println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
     emu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     unsafe { emu.run() };
@@ -170,14 +167,14 @@ fn fuzz(
     unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
     let ret_addr = u64::from_le_bytes(ret_addr);
 
-    println!("Stack pointer = {:#x}", stack_ptr);
-    println!("Return address = {:#x}", ret_addr);
+    println!("Stack pointer = {stack_ptr:#x}");
+    println!("Return address = {ret_addr:#x}");
 
     emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
     let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
-    println!("Placing input at {:#x}", input_addr);
+    println!("Placing input at {input_addr:#x}");
 
     let log = RefCell::new(
         OpenOptions::new()

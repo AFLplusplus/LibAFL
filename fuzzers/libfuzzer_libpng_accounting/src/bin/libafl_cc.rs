@@ -28,7 +28,7 @@ pub fn main() {
             .link_staticlib(&dir, "libfuzzer_libpng")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
             .add_pass(LLVMPasses::CoverageAccounting)
-            .add_passes_arg(format!("-granularity={}", GRANULARITY))
+            .add_passes_arg(format!("-granularity={GRANULARITY}"))
             .run()
             .expect("Failed to run the wrapped compiler")
         {

@@ -278,7 +278,7 @@ fn fuzz_binary(
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
-        writeln!(&mut stdout_cpy, "{}", s).unwrap();
+        writeln!(&mut stdout_cpy, "{s}").unwrap();
         #[cfg(windows)]
         println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
@@ -479,7 +479,7 @@ fn fuzz_text(
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
-        writeln!(&mut stdout_cpy, "{}", s).unwrap();
+        writeln!(&mut stdout_cpy, "{s}").unwrap();
         #[cfg(windows)]
         println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();

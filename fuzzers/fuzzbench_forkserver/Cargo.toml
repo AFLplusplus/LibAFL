@@ -17,4 +17,4 @@ which = { version = "4.0.2" }
 [dependencies]
 libafl = { path = "../../libafl/" }
 clap = { version = "4.0", features = ["default"] }
-nix = "0.25"
+nix = "0.26"

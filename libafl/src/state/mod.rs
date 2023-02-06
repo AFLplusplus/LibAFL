@@ -415,7 +415,58 @@ where
             self.remaining_initial_files = Some(files);
         }
 
-        // TODO option to shuffle the initial files
+        self.continue_loading_initial_inputs_custom(fuzzer, executor, manager, forced, loader)
+    }
+
+    /// Loads initial inputs from the passed-in `in_dirs`.
+    /// If `forced` is true, will add all testcases, no matter what.
+    /// This method takes a list of files.
+    fn load_initial_inputs_custom_by_filenames<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        manager: &mut EM,
+        file_list: &[PathBuf],
+        forced: bool,
+        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
+    ) -> Result<(), Error>
+    where
+        E: UsesState<State = Self>,
+        EM: EventFirer<State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
+    {
+        if let Some(remaining) = self.remaining_initial_files.as_ref() {
+            // everything was loaded
+            if remaining.is_empty() {
+                return Ok(());
+            }
+        } else {
+            self.remaining_initial_files = Some(file_list.to_vec());
+        }
+
+        self.continue_loading_initial_inputs_custom(fuzzer, executor, manager, forced, loader)
+    }
+
+    /// Loads initial inputs from the passed-in `in_dirs`.
+    /// If `forced` is true, will add all testcases, no matter what.
+    /// This method takes a list of files.
+    fn continue_loading_initial_inputs_custom<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        manager: &mut EM,
+        forced: bool,
+        loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
+    ) -> Result<(), Error>
+    where
+        E: UsesState<State = Self>,
+        EM: EventFirer<State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
+    {
+        if self.remaining_initial_files.is_none() {
+            return Err(Error::illegal_state("No initial files were loaded, cannot continue loading. Call a `load_initial_input` fn first!"));
+        }
+
         while let Some(path) = self.remaining_initial_files.as_mut().unwrap().pop() {
             println!("Loading file {:?} ...", &path);
             let input = loader(fuzzer, self, &path)?;
@@ -443,6 +494,32 @@ where
     /// Loads all intial inputs, even if they are not considered `interesting`.
     /// This is rarely the right method, use `load_initial_inputs`,
     /// and potentially fix your `Feedback`, instead.
+    /// This method takes a list of files, instead of folders.
+    pub fn load_initial_inputs_by_filenames<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        manager: &mut EM,
+        file_list: &[PathBuf],
+    ) -> Result<(), Error>
+    where
+        E: UsesState<State = Self>,
+        EM: EventFirer<State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
+    {
+        self.load_initial_inputs_custom_by_filenames(
+            fuzzer,
+            executor,
+            manager,
+            file_list,
+            false,
+            &mut |_, _, path| I::from_file(path),
+        )
+    }
+
+    /// Loads all intial inputs, even if they are not considered `interesting`.
+    /// This is rarely the right method, use `load_initial_inputs`,
+    /// and potentially fix your `Feedback`, instead.
     pub fn load_initial_inputs_forced<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
@@ -460,6 +537,31 @@ where
             executor,
             manager,
             in_dirs,
+            true,
+            &mut |_, _, path| I::from_file(path),
+        )
+    }
+
+    /// Loads initial inputs from the passed-in `in_dirs`.
+    /// If `forced` is true, will add all testcases, no matter what.
+    /// This method takes a list of files, instead of folders.
+    pub fn load_initial_inputs_by_filenames_forced<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        manager: &mut EM,
+        file_list: &[PathBuf],
+    ) -> Result<(), Error>
+    where
+        E: UsesState<State = Self>,
+        EM: EventFirer<State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
+    {
+        self.load_initial_inputs_custom_by_filenames(
+            fuzzer,
+            executor,
+            manager,
+            file_list,
             true,
             &mut |_, _, path| I::from_file(path),
         )
