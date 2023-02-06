@@ -1,7 +1,10 @@
 //! Generates `DrCov` traces
-use std::{collections::HashMap, hash::Hasher};
+use std::{
+    collections::HashMap,
+    hash::{BuildHasher, Hasher},
+};
 
-use ahash::AHasher;
+use ahash::RandomState;
 use libafl::{
     bolts::AsSlice,
     inputs::{HasTargetBytes, Input},
@@ -43,7 +46,7 @@ impl FridaRuntime for DrCovRuntime {
     /// Called after execution, writes the trace to a unique `DrCov` file for this trace
     /// into `./coverage/<trace_hash>.drcov`
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         hasher.write(input.target_bytes().as_slice());
 
         let filename = format!("./coverage/{:016x}.drcov", hasher.finish(),);

@@ -1,7 +1,12 @@
 //! Stores and restores state when a client needs to relaunch.
 //! Uses a [`ShMem`] up to a threshold, then write to disk.
 use alloc::string::{String, ToString};
-use core::{hash::Hasher, marker::PhantomData, mem::size_of, ptr, slice};
+use core::{
+    hash::{BuildHasher, Hasher},
+    marker::PhantomData,
+    mem::size_of,
+    ptr, slice,
+};
 use std::{
     env::temp_dir,
     fs::{self, File},
@@ -10,7 +15,7 @@ use std::{
     ptr::read_volatile,
 };
 
-use ahash::AHasher;
+use ahash::RandomState;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -114,7 +119,7 @@ where
 
         if size_of::<StateShMemContent>() + serialized.len() > self.shmem.len() {
             // generate a filename
-            let mut hasher = AHasher::new_with_keys(0, 0);
+            let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
             // Using the last few k as randomness for a filename, hoping it's unique.
             hasher.write(&serialized[serialized.len().saturating_sub(4096)..]);
 

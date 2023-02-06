@@ -7,9 +7,13 @@ use alloc::string::ToString;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 #[cfg(feature = "std")]
 use core::str::from_utf8;
-use core::{cell::RefCell, convert::From, hash::Hasher};
+use core::{
+    cell::RefCell,
+    convert::From,
+    hash::{BuildHasher, Hasher},
+};
 
-use ahash::AHasher;
+use ahash::RandomState;
 use hashbrown::HashMap;
 #[cfg(feature = "std")]
 use regex::Regex;
@@ -199,7 +203,7 @@ impl Input for EncodedInput {
     /// Generate a name for this input
     #[must_use]
     fn generate_name(&self, _idx: usize) -> String {
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         for code in &self.codes {
             hasher.write(&code.to_le_bytes());
         }
