@@ -1003,7 +1003,7 @@ mod windows_exception_handler {
 
         fn exceptions(&self) -> Vec<ExceptionCode> {
             let crash_list = CRASH_EXCEPTIONS.to_vec();
-            assert!(crash_list.len() < EXCEPTION_HANDLERS_SIZE);
+            assert!(crash_list.len() < EXCEPTION_HANDLERS_SIZE - 1);
             crash_list
         }
     }
