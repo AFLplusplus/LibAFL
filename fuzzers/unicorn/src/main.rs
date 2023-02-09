@@ -41,7 +41,7 @@ fn fuzzer(should_emulate: bool) {
         },
     );
     emu.set_code_hook();
-    emu.set_memory_hook(input_addr_start, MAX_INPUT_SIZE, callback);
+    //emu.set_memory_hook(input_addr_start, MAX_INPUT_SIZE, callback);
 
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
