@@ -34,9 +34,9 @@ fn fuzzer(should_emulate: bool) {
         input_addr_start,
         MAX_INPUT_SIZE,
         match arch {
-            Arch::ARM => "libafl_unicorn_test/foo_arm",
-            Arch::ARM64 => "libafl_unicorn_test/foo_arm64",
-            Arch::X86 => "libafl_unicorn_test/foo_x86",
+            Arch::ARM => "bin/foo_arm",
+            Arch::ARM64 => "bin/foo_arm64",
+            Arch::X86 => "bin/foo_x86",
             _ => "",
         },
     );
