@@ -31,11 +31,13 @@ extern "C" fn oom_malloc_hook(ptr: *const c_void, size: usize) {
     };
 
     let total = MALLOC_SIZE.fetch_add(size, Ordering::Relaxed) + size;
-    if total > unsafe { RSS_MAX } {
+    if total > unsafe { RSS_MAX } && !OOMED.load(Ordering::Relaxed) {
         OOMED.store(true, Ordering::Relaxed);
         unsafe {
             // we need to kill the process in a way that immediately triggers the crash handler
-            libc::abort();
+            let null = core::ptr::null_mut();
+            *null = 0;
+            panic!("We somehow didn't crash on a null pointer write. Strange...");
         }
     }
 }

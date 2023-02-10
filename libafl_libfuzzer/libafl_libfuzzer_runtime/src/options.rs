@@ -11,10 +11,13 @@ enum RawOption<'a> {
 }
 
 fn parse_option(arg: &str) -> Option<RawOption> {
-    if arg.starts_with('-') {
+    if arg.starts_with("--") {
+        None
+    } else if arg.starts_with('-') {
         if let Some((name, value)) = arg.split_at(1).1.split_once('=') {
             Some(Flag { name, value })
         } else {
+            eprintln!("warning: flag {arg} provided without a value; did you mean `{arg}=1'?");
             None
         }
     } else {
@@ -100,6 +103,7 @@ pub struct LibfuzzerOptions {
     ignore_ooms: bool,
     rss_limit: usize,
     unknown: Vec<String>,
+    pub malloc_limit: usize,
 }
 
 impl LibfuzzerOptions {
@@ -185,7 +189,9 @@ struct LibfuzzerOptionsBuilder<'a> {
     ignore_crashes: bool,
     ignore_timeouts: bool,
     ignore_ooms: bool,
-    rss_limit: usize,
+    rss_limit: Option<usize>,
+    malloc_limit: Option<usize>,
+    ignore_remaining: bool,
     unknown: Vec<&'a str>,
 }
 
@@ -201,52 +207,68 @@ macro_rules! parse_or_bail {
 
 impl<'a> LibfuzzerOptionsBuilder<'a> {
     fn consume(mut self, arg: &'a str) -> Result<Self, OptionsParseError<'a>> {
-        if let Some(option) = parse_option(arg) {
-            match option {
-                Directory(dir) => {
-                    self.dirs.push(dir);
+        if !self.ignore_remaining {
+            if let Some(option) = parse_option(arg) {
+                match option {
+                    Directory(dir) => {
+                        self.dirs.push(dir);
+                    }
+                    Flag { name, value } => match name {
+                        "merge" => {
+                            if parse_or_bail!(name, value, u64) > 0
+                                && *self.mode.get_or_insert(LibfuzzerMode::Merge)
+                                    != LibfuzzerMode::Merge
+                            {
+                                return Err(OptionsParseError::MultipleModesSelected);
+                            }
+                        }
+                        "minimize_crash" => {
+                            if parse_or_bail!(name, value, u64) > 0
+                                && *self.mode.get_or_insert(LibfuzzerMode::Cmin)
+                                    != LibfuzzerMode::Cmin
+                            {
+                                return Err(OptionsParseError::MultipleModesSelected);
+                            }
+                        }
+                        "grimoire" => self.grimoire = Some(parse_or_bail!(name, value, u64) > 0),
+                        "artifact_prefix" => {
+                            self.artifact_prefix = Some(value);
+                        }
+                        "timeout" => {
+                            self.timeout =
+                                Some(value.parse().map(Duration::from_secs_f64).map_err(|_| {
+                                    OptionsParseError::OptionValueParseFailed(name, value)
+                                })?);
+                        }
+                        "dict" => self.dict = Some(value),
+                        "fork" | "jobs" => {
+                            self.forks = Some(parse_or_bail!(name, value, usize));
+                        }
+                        "ignore_crashes" => {
+                            self.ignore_crashes = parse_or_bail!(name, value, u64) > 0
+                        }
+                        "ignore_timeouts" => {
+                            self.ignore_timeouts = parse_or_bail!(name, value, u64) > 0
+                        }
+                        "ignore_ooms" => self.ignore_ooms = parse_or_bail!(name, value, u64) > 0,
+                        "rss_limit_mb" => {
+                            self.rss_limit = Some(parse_or_bail!(name, value, usize) << 20)
+                        }
+                        "malloc_limit_mb" => {
+                            self.malloc_limit = Some(parse_or_bail!(name, value, usize) << 20)
+                        }
+                        "ignore_remaining_args" => {
+                            self.ignore_remaining = parse_or_bail!(name, value, u64) > 0
+                        }
+                        _ => {
+                            eprintln!("warning: unrecognised flag {name}");
+                            self.unknown.push(arg)
+                        }
+                    },
                 }
-                Flag { name, value } => match name {
-                    "merge" => {
-                        if parse_or_bail!(name, value, u64) > 0
-                            && *self.mode.get_or_insert(LibfuzzerMode::Merge)
-                                != LibfuzzerMode::Merge
-                        {
-                            return Err(OptionsParseError::MultipleModesSelected);
-                        }
-                    }
-                    "minimize_crash" => {
-                        if parse_or_bail!(name, value, u64) > 0
-                            && *self.mode.get_or_insert(LibfuzzerMode::Cmin) != LibfuzzerMode::Cmin
-                        {
-                            return Err(OptionsParseError::MultipleModesSelected);
-                        }
-                    }
-                    "grimoire" => self.grimoire = Some(parse_or_bail!(name, value, u64) > 0),
-                    "artifact_prefix" => {
-                        self.artifact_prefix = Some(value);
-                    }
-                    "timeout" => {
-                        self.timeout =
-                            Some(value.parse().map(Duration::from_secs_f64).map_err(|_| {
-                                OptionsParseError::OptionValueParseFailed(name, value)
-                            })?);
-                    }
-                    "dict" => self.dict = Some(value),
-                    "fork" | "jobs" => {
-                        self.forks = Some(parse_or_bail!(name, value, usize));
-                    }
-                    "ignore_crashes" => self.ignore_crashes = parse_or_bail!(name, value, u64) > 0,
-                    "ignore_timeouts" => {
-                        self.ignore_timeouts = parse_or_bail!(name, value, u64) > 0
-                    }
-                    "ignore_ooms" => self.ignore_ooms = parse_or_bail!(name, value, u64) > 0,
-                    "rss_limit_mb" => self.rss_limit = parse_or_bail!(name, value, usize) << 20,
-                    _ => self.unknown.push(arg),
-                },
+            } else {
+                self.unknown.push(arg)
             }
-        } else {
-            self.unknown.push(arg);
         }
         Ok(self)
     }
@@ -266,7 +288,14 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             ignore_crashes: self.ignore_crashes,
             ignore_timeouts: self.ignore_timeouts,
             ignore_ooms: self.ignore_ooms,
-            rss_limit: self.rss_limit,
+            rss_limit: match self.rss_limit.unwrap_or(2 << 30) {
+                0 => usize::MAX,
+                value => value,
+            },
+            malloc_limit: match self.malloc_limit.or(self.rss_limit).unwrap_or(2 << 30) {
+                0 => usize::MAX,
+                value => value,
+            },
             unknown: self.unknown.into_iter().map(|s| s.to_string()).collect(),
         })
     }

@@ -428,9 +428,6 @@ pub fn LLVMFuzzerRunDriver(
             .map(|cstr| cstr.to_str().unwrap()),
     )
     .unwrap();
-    for unknown in options.unknown() {
-        eprintln!("warning: skipping unrecognised option `{unknown}'");
-    }
     let res = match options.mode() {
         LibfuzzerMode::Fuzz => fuzz::fuzz(options, harness),
         LibfuzzerMode::Merge => unimplemented!(),
