@@ -79,6 +79,17 @@ pub mod sancov_cmp;
 #[cfg(any(feature = "sancov_cmplog", feature = "sancov_value_profile"))]
 pub use sancov_cmp::*;
 
+#[cfg(feature = "sanitizer_ifaces")]
+mod sanitizer_ifaces {
+    #![allow(non_snake_case)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_upper_case_globals)]
+    #![allow(unused)]
+    #![allow(improper_ctypes)]
+    #![allow(clippy::unreadable_literal)]
+    include!(concat!(env!("OUT_DIR"), "/sanitizer_ifaces.rs"));
+}
+
 #[cfg(feature = "libfuzzer")]
 pub mod libfuzzer;
 #[cfg(feature = "libfuzzer")]

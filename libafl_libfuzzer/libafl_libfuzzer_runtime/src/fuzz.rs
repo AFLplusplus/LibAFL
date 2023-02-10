@@ -9,7 +9,7 @@ use libafl::{
     },
     events::{EventConfig, ProgressReporter, SimpleEventManager},
     inputs::UsesInput,
-    monitors::tui::TuiMonitor,
+    monitors::{tui::TuiMonitor, SimpleMonitor},
     stages::StagesTuple,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error, Fuzzer,
@@ -66,7 +66,7 @@ pub fn fuzz(
         Ok(())
     } else {
         let fuzz_single = make_fuzz_closure!(options, harness, do_fuzz);
-        let mgr = SimpleEventManager::printing();
+        let mgr = SimpleEventManager::new(SimpleMonitor::new(|s| eprintln!("{s}")));
         fuzz_single(None, mgr, 0)
     }
 }

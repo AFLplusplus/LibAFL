@@ -1,5 +1,6 @@
 #include "common.h"
 #include <stddef.h>
+#include <malloc.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -72,4 +73,16 @@ EXPORT_FN size_t libafl_targets_libfuzzer_custom_crossover(const uint8_t *Data1,
                                                            const uint8_t *Data2, size_t Size2,
                                                            uint8_t *Out, size_t MaxOutSize, unsigned int Seed) {
   return LLVMFuzzerCustomCrossOver(Data1, Size1, Data2, Size2, Out, MaxOutSize, Seed);
+}
+
+EXPORT_FN size_t libafl_check_malloc_size(void *ptr) {
+#if defined(__GNUC__)
+  return malloc_usable_size(ptr);
+#elif defined(__APPLE__)
+  return malloc_size(ptr);
+#elif defined(_WIN32)
+  return _msize(ptr);
+#else
+  return 0;
+#endif
 }

@@ -49,8 +49,8 @@ macro_rules! make_fuzz_closure {
             },
             corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
             executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
-            feedback_and_fast, feedback_or, feedback_or_fast,
-            feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
+            feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,
+            feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
             generators::RandBytesGenerator,
             inputs::{BytesInput, HasTargetBytes},
             mutators::{
@@ -69,7 +69,7 @@ macro_rules! make_fuzz_closure {
             state::{HasCorpus, StdState},
             StdFuzzer,
         };
-        use libafl_targets::{CmpLogObserver, LLVMCustomMutator, COUNTERS_MAPS};
+        use libafl_targets::{CmpLogObserver, LLVMCustomMutator, COUNTERS_MAPS, OOMFeedback, OOMObserver};
         use rand::{thread_rng, RngCore};
 
         use crate::CustomMutationStatus;
@@ -96,6 +96,10 @@ macro_rules! make_fuzz_closure {
                 false
             };
 
+            let crashes = $options.forks().is_none() || !$options.ignore_crashes();
+            let ooms = $options.forks().is_none() || !$options.ignore_ooms();
+            let timeouts = $options.forks().is_none() || !$options.ignore_timeouts();
+
             // Create an observation channel using the coverage map
             let edges = unsafe { &mut COUNTERS_MAPS };
             assert_eq!(1, edges.len());
@@ -107,6 +111,9 @@ macro_rules! make_fuzz_closure {
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
+
+            // Create an OOM observer to monitor if an OOM has occurred
+            let oom_observer = OOMObserver::new($options.rss_limit());
 
             // Create the Cmp observer
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
@@ -140,11 +147,12 @@ macro_rules! make_fuzz_closure {
 
             // A feedback to choose if an input is a solution or not
             let mut objective = feedback_or_fast!(
+                feedback_and_fast!(ConstFeedback::new(ooms), OOMFeedback),
                 feedback_and_fast!(
-                    CrashFeedback::new(),
+                    feedback_and_fast!(ConstFeedback::new(crashes), feedback_not!(OOMFeedback), CrashFeedback::new()),
                     NewHashFeedback::new(&backtrace_observer)
                 ),
-                TimeoutFeedback::new()
+                feedback_and_fast!(ConstFeedback::new(timeouts), TimeoutFeedback::new())
             );
 
             let corpus_dir = if let Some(main) = $options.dirs().first() {
@@ -317,7 +325,7 @@ macro_rules! make_fuzz_closure {
             let mut executor = TimeoutExecutor::new(
                 InProcessExecutor::new(
                     &mut harness,
-                    tuple_list!(edges_observer, time_observer, backtrace_observer),
+                    tuple_list!(oom_observer, edges_observer, time_observer, backtrace_observer),
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
@@ -388,16 +396,28 @@ macro_rules! make_fuzz_closure {
 
 pub(crate) use make_fuzz_closure;
 
+extern "C" {
+    // redeclaration against libafl_targets because the pointers in our case may be mutable
+    fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
+}
+
 #[allow(non_snake_case)]
 #[no_mangle]
 pub fn LLVMFuzzerRunDriver(
-    argc: *const c_int,
-    argv: *const *const *const c_char,
+    argc: *mut c_int,
+    argv: *mut *mut *const c_char,
     harness_fn: Option<extern "C" fn(*const u8, usize) -> c_int>,
 ) -> c_int {
     let harness = harness_fn
         .as_ref()
         .expect("Illegal harness provided to libafl.");
+
+    unsafe {
+        // it appears that no one, not even libfuzzer, uses this return value
+        // https://github.com/llvm/llvm-project/blob/llvmorg-15.0.7/compiler-rt/lib/fuzzer/FuzzerDriver.cpp#L648
+        libafl_targets_libfuzzer_init(argc, argv);
+    }
+
     let argc = unsafe { *argc } as isize;
     let argv = unsafe { *argv };
 
@@ -408,6 +428,9 @@ pub fn LLVMFuzzerRunDriver(
             .map(|cstr| cstr.to_str().unwrap()),
     )
     .unwrap();
+    for unknown in options.unknown() {
+        eprintln!("warning: skipping unrecognised option `{unknown}'");
+    }
     let res = match options.mode() {
         LibfuzzerMode::Fuzz => fuzz::fuzz(options, harness),
         LibfuzzerMode::Merge => unimplemented!(),

@@ -95,6 +95,10 @@ pub struct LibfuzzerOptions {
     forks: Option<usize>,
     dict: Option<Tokens>,
     dirs: Vec<PathBuf>,
+    ignore_crashes: bool,
+    ignore_timeouts: bool,
+    ignore_ooms: bool,
+    rss_limit: usize,
     unknown: Vec<String>,
 }
 
@@ -148,6 +152,22 @@ impl LibfuzzerOptions {
         &self.dirs
     }
 
+    pub fn ignore_crashes(&self) -> bool {
+        self.ignore_crashes
+    }
+
+    pub fn ignore_timeouts(&self) -> bool {
+        self.ignore_timeouts
+    }
+
+    pub fn ignore_ooms(&self) -> bool {
+        self.ignore_ooms
+    }
+
+    pub fn rss_limit(&self) -> usize {
+        self.rss_limit
+    }
+
     pub fn unknown(&self) -> &[String] {
         &self.unknown
     }
@@ -162,6 +182,10 @@ struct LibfuzzerOptionsBuilder<'a> {
     forks: Option<usize>,
     dict: Option<&'a str>,
     dirs: Vec<&'a str>,
+    ignore_crashes: bool,
+    ignore_timeouts: bool,
+    ignore_ooms: bool,
+    rss_limit: usize,
     unknown: Vec<&'a str>,
 }
 
@@ -212,6 +236,12 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                     "fork" | "jobs" => {
                         self.forks = Some(parse_or_bail!(name, value, usize));
                     }
+                    "ignore_crashes" => self.ignore_crashes = parse_or_bail!(name, value, u64) > 0,
+                    "ignore_timeouts" => {
+                        self.ignore_timeouts = parse_or_bail!(name, value, u64) > 0
+                    }
+                    "ignore_ooms" => self.ignore_ooms = parse_or_bail!(name, value, u64) > 0,
+                    "rss_limit_mb" => self.rss_limit = parse_or_bail!(name, value, usize) << 20,
                     _ => self.unknown.push(arg),
                 },
             }
@@ -233,6 +263,10 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                 Tokens::from_file(path).expect("Couldn't load tokens from specified dictionary")
             }),
             dirs: self.dirs.into_iter().map(PathBuf::from).collect(),
+            ignore_crashes: self.ignore_crashes,
+            ignore_timeouts: self.ignore_timeouts,
+            ignore_ooms: self.ignore_ooms,
+            rss_limit: self.rss_limit,
             unknown: self.unknown.into_iter().map(|s| s.to_string()).collect(),
         })
     }
