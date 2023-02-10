@@ -1,5 +1,8 @@
 use core::{ffi::c_void, fmt::Debug};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::{
+    ptr::{read_volatile, write_volatile},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+};
 
 use libafl::{
     bolts::tuples::Named,
@@ -20,29 +23,29 @@ extern "C" {
 }
 
 static OOMED: AtomicBool = AtomicBool::new(false);
-static mut RSS_MAX: usize = 2 << 30; // 2GB, which is a typical default
+static RSS_MAX: AtomicUsize = AtomicUsize::new(2 << 30); // 2GB, which is the default
 
 static MALLOC_SIZE: AtomicUsize = AtomicUsize::new(0);
 
-extern "C" fn oom_malloc_hook(ptr: *const c_void, size: usize) {
+pub extern "C" fn oom_malloc_hook(ptr: *const c_void, size: usize) {
     let size = match unsafe { libafl_check_malloc_size(ptr) } {
         0 => size,
         real => real,
     };
 
     let total = MALLOC_SIZE.fetch_add(size, Ordering::Relaxed) + size;
-    if total > unsafe { RSS_MAX } && !OOMED.load(Ordering::Relaxed) {
+    if total > RSS_MAX.load(Ordering::Relaxed) && !OOMED.load(Ordering::Relaxed) {
         OOMED.store(true, Ordering::Relaxed);
         unsafe {
             // we need to kill the process in a way that immediately triggers the crash handler
             let null = core::ptr::null_mut();
-            *null = 0;
+            write_volatile(null, 0);
             panic!("We somehow didn't crash on a null pointer write. Strange...");
         }
     }
 }
 
-extern "C" fn oom_free_hook(ptr: *const c_void) {
+pub extern "C" fn oom_free_hook(ptr: *const c_void) {
     let size = unsafe { libafl_check_malloc_size(ptr) };
     if MALLOC_SIZE
         .fetch_sub(size, Ordering::Relaxed)
@@ -63,8 +66,12 @@ pub struct OOMObserver {
 impl OOMObserver {
     pub fn new(rss_max: usize) -> Self {
         unsafe {
-            RSS_MAX = rss_max;
-            __sanitizer_install_malloc_and_free_hooks(Some(oom_malloc_hook), Some(oom_free_hook));
+            RSS_MAX.store(rss_max, Ordering::Relaxed);
+            if __sanitizer_install_malloc_and_free_hooks(Some(oom_malloc_hook), Some(oom_free_hook))
+                == 0
+            {
+                panic!("Could not install malloc and free hooks");
+            }
         }
         Self { oomed: false }
     }
