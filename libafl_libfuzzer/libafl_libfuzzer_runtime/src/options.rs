@@ -172,6 +172,10 @@ impl LibfuzzerOptions {
         self.rss_limit
     }
 
+    pub fn malloc_limit(&self) -> usize {
+        self.malloc_limit
+    }
+
     pub fn unknown(&self) -> &[String] {
         &self.unknown
     }

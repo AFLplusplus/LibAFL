@@ -22,37 +22,44 @@ extern "C" {
     fn libafl_check_malloc_size(ptr: *const c_void) -> usize;
 }
 
+static RUNNING: AtomicBool = AtomicBool::new(false);
 static OOMED: AtomicBool = AtomicBool::new(false);
 static RSS_MAX: AtomicUsize = AtomicUsize::new(2 << 30); // 2GB, which is the default
+static MALLOC_MAX: AtomicUsize = AtomicUsize::new(2 << 30);
 
 static MALLOC_SIZE: AtomicUsize = AtomicUsize::new(0);
 
 pub extern "C" fn oom_malloc_hook(ptr: *const c_void, size: usize) {
-    let size = match unsafe { libafl_check_malloc_size(ptr) } {
-        0 => size,
-        real => real,
-    };
+    if RUNNING.load(Ordering::Relaxed) {
+        let size = match unsafe { libafl_check_malloc_size(ptr) } {
+            0 => size, // either the malloc size function didn't work or it's really zero-sized
+            real => real,
+        };
 
-    let total = MALLOC_SIZE.fetch_add(size, Ordering::Relaxed) + size;
-    if total > RSS_MAX.load(Ordering::Relaxed) && !OOMED.load(Ordering::Relaxed) {
-        OOMED.store(true, Ordering::Relaxed);
-        unsafe {
-            // we need to kill the process in a way that immediately triggers the crash handler
-            let null = core::ptr::null_mut();
-            write_volatile(null, 0);
-            panic!("We somehow didn't crash on a null pointer write. Strange...");
+        let total = MALLOC_SIZE.fetch_add(size, Ordering::Relaxed) + size;
+        if (size > MALLOC_MAX.load(Ordering::Relaxed) || total > RSS_MAX.load(Ordering::Relaxed))
+            && !OOMED.swap(true, Ordering::Relaxed)
+        {
+            unsafe {
+                // we need to kill the process in a way that immediately triggers the crash handler
+                let null = core::ptr::null_mut();
+                write_volatile(null, 0);
+                panic!("We somehow didn't crash on a null pointer write. Strange...");
+            }
         }
     }
 }
 
 pub extern "C" fn oom_free_hook(ptr: *const c_void) {
-    let size = unsafe { libafl_check_malloc_size(ptr) };
-    if MALLOC_SIZE
-        .fetch_sub(size, Ordering::Relaxed)
-        .checked_sub(size)
-        .is_none()
-    {
-        panic!("We somehow freed more memory than was available on the system!");
+    if RUNNING.load(Ordering::Relaxed) {
+        let size = unsafe { libafl_check_malloc_size(ptr) };
+        if MALLOC_SIZE
+            .fetch_sub(size, Ordering::Relaxed)
+            .checked_sub(size)
+            .is_none()
+        {
+            panic!("We somehow freed more memory than was available!");
+        }
     }
 }
 
@@ -64,9 +71,10 @@ pub struct OOMObserver {
 }
 
 impl OOMObserver {
-    pub fn new(rss_max: usize) -> Self {
+    pub fn new(rss_max: usize, malloc_max: usize) -> Self {
+        RSS_MAX.store(rss_max, Ordering::Relaxed);
+        MALLOC_MAX.store(malloc_max, Ordering::Relaxed);
         unsafe {
-            RSS_MAX.store(rss_max, Ordering::Relaxed);
             if __sanitizer_install_malloc_and_free_hooks(Some(oom_malloc_hook), Some(oom_free_hook))
                 == 0
             {
@@ -89,6 +97,7 @@ where
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         OOMED.store(false, Ordering::Relaxed);
+        RUNNING.store(true, Ordering::Relaxed);
         Ok(())
     }
 
@@ -98,6 +107,7 @@ where
         _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
+        RUNNING.store(false, Ordering::Relaxed);
         self.oomed = OOMED.load(Ordering::Relaxed);
         Ok(())
     }

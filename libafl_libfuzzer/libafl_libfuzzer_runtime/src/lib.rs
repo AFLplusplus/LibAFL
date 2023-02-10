@@ -6,6 +6,10 @@ pub(crate) mod feedbacks;
 mod fuzz;
 mod options;
 
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 pub static mut BACKTRACE: Option<u64> = None;
 
 pub(crate) struct CustomMutationStatus {
@@ -113,7 +117,7 @@ macro_rules! make_fuzz_closure {
             let time_observer = TimeObserver::new("time");
 
             // Create an OOM observer to monitor if an OOM has occurred
-            let oom_observer = OOMObserver::new($options.rss_limit());
+            let oom_observer = OOMObserver::new($options.rss_limit(), $options.malloc_limit());
 
             // Create the Cmp observer
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
