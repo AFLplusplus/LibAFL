@@ -14,6 +14,7 @@ use libafl::{
     state::HasClientPerfMonitor,
     Error,
 };
+use libc::SIGILL;
 use serde::{Deserialize, Serialize};
 
 use crate::sanitizer_ifaces::__sanitizer_install_malloc_and_free_hooks;
@@ -42,8 +43,7 @@ pub extern "C" fn oom_malloc_hook(ptr: *const c_void, size: usize) {
         {
             unsafe {
                 // we need to kill the process in a way that immediately triggers the crash handler
-                let null = core::ptr::null_mut();
-                write_volatile(null, 0);
+                libc::raise(SIGILL);
                 panic!("We somehow didn't crash on a null pointer write. Strange...");
             }
         }
