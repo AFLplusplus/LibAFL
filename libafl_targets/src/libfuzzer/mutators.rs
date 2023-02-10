@@ -10,7 +10,9 @@ use libafl::{
     bolts::{rands::Rand, AsSlice},
     corpus::Corpus,
     inputs::{BytesInput, HasBytesVec, UsesInput},
-    mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
+    mutators::{
+        ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
+    },
     random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
@@ -262,7 +264,7 @@ where
         mutator.iterations(state, input)
     }
 
-    fn schedule(&self, state: &mut S, input: &S::Input) -> usize {
+    fn schedule(&self, state: &mut S, input: &S::Input) -> MutationId {
         let mutator = self.mutator.deref().borrow();
         mutator.schedule(state, input)
     }
@@ -337,7 +339,7 @@ where
         mutator.iterations(state, input)
     }
 
-    fn schedule(&self, state: &mut S, input: &S::Input) -> usize {
+    fn schedule(&self, state: &mut S, input: &S::Input) -> MutationId {
         let mutator = self.mutator.deref().borrow();
         mutator.schedule(state, input)
     }
