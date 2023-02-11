@@ -1384,6 +1384,13 @@ where
             description.last_message_offset,
         )
     }
+
+    /// Send information that this client is exiting.
+    /// The other side may free up all allocated memory.
+    /// We are no longer allowed to send anything afterwards.
+    pub fn send_exiting(&mut self) -> Result<(), Error> {
+        self.send_buf(LLMP_TAG_EXITING, &[0_u8; 1])
+    }
 }
 
 /// Receiving end on a (unidirectional) sharedmap channel

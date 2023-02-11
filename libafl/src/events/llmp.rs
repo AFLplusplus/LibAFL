@@ -477,6 +477,15 @@ where
     }
 }
 
+impl<S: UsesInput, SP: ShMemProvider> LlmpEventManager<S, SP> {
+    /// Send information that this client is exiting.
+    /// The other side may free up all allocated memory.
+    /// We are no longer allowed to send anything afterwards.
+    pub fn send_exiting(&mut self) -> Result<(), Error> {
+        self.llmp.sender.send_exiting()
+    }
+}
+
 impl<S, SP> UsesState for LlmpEventManager<S, SP>
 where
     S: UsesInput,
@@ -770,6 +779,13 @@ where
     /// Get the staterestorer (mutable)
     pub fn staterestorer_mut(&mut self) -> &mut StateRestorer<SP> {
         &mut self.staterestorer
+    }
+
+    /// Send information that this client is exiting.
+    /// The other side may free up all allocated memory.
+    /// We are no longer allowed to send anything afterwards.
+    pub fn send_exiting(&mut self) -> Result<(), Error> {
+        self.llmp_mgr.send_exiting()
     }
 }
 
