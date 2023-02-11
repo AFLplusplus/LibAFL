@@ -58,6 +58,18 @@ impl LLVMPasses {
     }
 }
 
+/// Link Time Optimization modes
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LTOModes {
+    /// Disabled
+    None,
+    /// Full mode
+    Full,
+    /// Thin mode
+    Thin,
+}
+
 /// Wrap Clang
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
@@ -83,6 +95,7 @@ pub struct ClangWrapper {
     link_args: Vec<String>,
     passes: Vec<LLVMPasses>,
     passes_args: Vec<String>,
+    lto_mode: LTOModes,
 }
 
 #[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
@@ -181,6 +194,8 @@ impl CompilerWrapper for ClangWrapper {
                     linking = false;
                     shared = true;
                 } // TODO dynamic list?
+                "-flto=full" => self.lto_mode = LTOModes::Full,
+                "-flto=thin" => self.lto_mode = LTOModes::Thin,
                 _ => (),
             };
             new_args.push(args[i].as_ref().to_string());
@@ -402,6 +417,7 @@ impl ClangWrapper {
             passes: vec![],
             passes_args: vec![],
             is_silent: false,
+            lto_mode: LTOModes::None,
         }
     }
 
@@ -459,6 +475,12 @@ impl ClangWrapper {
     /// Set if use new llvm pass manager.
     pub fn use_new_pm(&mut self, value: bool) -> &'_ mut Self {
         self.use_new_pm = value;
+        self
+    }
+
+    /// Set LTO mode
+    pub fn lto_mode(&mut self, value: LTOModes) -> &'_ mut Self {
+        self.lto_mode = value;
         self
     }
 }

@@ -1,6 +1,6 @@
 use std::env;
 
-use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
+use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses, LTOModes};
 
 pub fn main() {
     let mut args: Vec<String> = env::args().collect();
@@ -34,6 +34,7 @@ pub fn main() {
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "fuzzbench")
             .add_pass(LLVMPasses::CmpLogRtn)
+            .lto_mode(LTOModes::Full)
             .run()
             .expect("Failed to run the wrapped compiler")
         {
