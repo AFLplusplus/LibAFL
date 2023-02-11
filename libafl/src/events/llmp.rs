@@ -38,7 +38,7 @@ use crate::{
 };
 use crate::{
     bolts::{
-        llmp::{self, LlmpClient, LlmpClientDescription, Tag},
+        llmp::{self, ClientId, LlmpClient, LlmpClientDescription, Tag},
         shmem::ShMemProvider,
     },
     events::{
@@ -54,14 +54,14 @@ use crate::{
 };
 
 /// Forward this to the client
-const _LLMP_TAG_EVENT_TO_CLIENT: Tag = 0x2C11E471;
+const _LLMP_TAG_EVENT_TO_CLIENT: Tag = Tag(0x2C11E471);
 /// Only handle this in the broker
-const _LLMP_TAG_EVENT_TO_BROKER: Tag = 0x2B80438;
+const _LLMP_TAG_EVENT_TO_BROKER: Tag = Tag(0x2B80438);
 /// Handle in both
 ///
-const LLMP_TAG_EVENT_TO_BOTH: Tag = 0x2B0741;
-const _LLMP_TAG_RESTART: Tag = 0x8357A87;
-const _LLMP_TAG_NO_RESTART: Tag = 0x57A7EE71;
+const LLMP_TAG_EVENT_TO_BOTH: Tag = Tag(0x2B0741);
+const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
+const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
 
 /// The minimum buffer size at which to compress LLMP IPC messages.
 #[cfg(feature = "llmp_compression")]
@@ -189,7 +189,7 @@ where
                         Ok(llmp::LlmpMsgHookResult::ForwardToClients)
                     }
                 } else {
-                    monitor.display("Broker".into(), 0);
+                    monitor.display("Broker".into(), ClientId(0));
                     Ok(llmp::LlmpMsgHookResult::Handled)
                 }
             },
@@ -204,7 +204,7 @@ where
     #[allow(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         monitor: &mut MT,
-        client_id: u32,
+        client_id: ClientId,
         event: &Event<I>,
     ) -> Result<BrokerEventResult, Error> {
         match &event {
@@ -423,7 +423,7 @@ where
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut S,
-        _client_id: u32,
+        _client_id: ClientId,
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
@@ -442,7 +442,7 @@ where
                 executions: _,
             } => {
                 #[cfg(feature = "std")]
-                println!("Received new Testcase from {_client_id} ({client_config:?})");
+                println!("Received new Testcase from {_client_id:?} ({client_config:?})");
 
                 let _res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
@@ -625,9 +625,7 @@ where
 {
     /// Gets the id assigned to this staterestorer.
     fn mgr_id(&self) -> EventManagerId {
-        EventManagerId {
-            id: self.llmp.sender.id as usize,
-        }
+        EventManagerId(self.llmp.sender.id.0 as usize)
     }
 }
 
@@ -1192,7 +1190,7 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        _client_id: u32,
+        _client_id: ClientId,
         event: Event<DI>,
     ) -> Result<(), Error>
     where
@@ -1212,7 +1210,7 @@ where
                 executions: _,
             } => {
                 #[cfg(feature = "std")]
-                println!("Received new Testcase to convert from {_client_id}");
+                println!("Received new Testcase to convert from {_client_id:?}");
 
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
@@ -1413,7 +1411,7 @@ mod tests {
 
     use crate::{
         bolts::{
-            llmp::{LlmpClient, LlmpSharedMap},
+            llmp::{ClientId, LlmpClient, LlmpSharedMap},
             rands::StdRand,
             shmem::{ShMemProvider, StdShMemProvider},
             staterestore::StateRestorer,
@@ -1453,8 +1451,8 @@ mod tests {
 
         let mut llmp_client = LlmpClient::new(
             shmem_provider.clone(),
-            LlmpSharedMap::new(0, shmem_provider.new_shmem(1024).unwrap()),
-            0,
+            LlmpSharedMap::new(ClientId(0), shmem_provider.new_shmem(1024).unwrap()),
+            ClientId(0),
         )
         .unwrap();
 

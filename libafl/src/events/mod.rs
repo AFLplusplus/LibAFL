@@ -114,11 +114,12 @@ impl Handler for ShutdownSignalData {
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct EventManagerId {
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct EventManagerId(
     /// The id
-    pub id: usize,
-}
+    pub usize,
+);
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
@@ -636,7 +637,7 @@ impl<S> ProgressReporter for NopEventManager<S> where
 
 impl<S> HasEventManagerId for NopEventManager<S> {
     fn mgr_id(&self) -> EventManagerId {
-        EventManagerId { id: 0 }
+        EventManagerId(0)
     }
 }
 
