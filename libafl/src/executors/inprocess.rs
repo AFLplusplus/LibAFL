@@ -186,7 +186,7 @@ where
         OF: Feedback<S>,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
+        let handlers = InProcessHandlers::new::<Self, EM, OF, Z>()?;
         #[cfg(windows)]
         // Some initialization necessary for windows.
         unsafe {
@@ -337,14 +337,13 @@ impl InProcessHandlers {
     }
 
     /// Create new [`InProcessHandlers`].
-    pub fn new<E, EM, OF, Z, H>() -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = E::State>,
-        H: FnMut(&<E::State as UsesInput>::Input) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
         unsafe {

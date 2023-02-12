@@ -165,8 +165,7 @@ where
 {
     /// Constructor function to create a new [`FridaInstrumentationHelper`], given a `module_name`.
     #[allow(clippy::too_many_lines)]
-    #[must_use]
-    pub fn new(gum: &'a Gum, options: &'a FuzzerOptions, runtimes: RT) -> Self {
+    pub fn new(gum: &'a Gum, options: &'a FuzzerOptions, runtimes: RT) -> Result<Self, Error> {
         // workaround frida's frida-gum-allocate-near bug:
         #[cfg(unix)]
         unsafe {
@@ -179,7 +178,8 @@ where
                     -1,
                     0,
                 )
-                .expect("Failed to map dummy regions for frida workaround");
+                .map_err(|_| Error::unknown("Failed to map dummy regions for frida workaround"))?;
+
                 mmap(
                     None,
                     std::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
@@ -188,14 +188,14 @@ where
                     -1,
                     0,
                 )
-                .expect("Failed to map dummy regions for frida workaround");
+                .map_err(|_| Error::unknown("Failed to map dummy regions for frida workaround"))?;
             }
         }
 
         let mut modules_to_instrument = vec![options
             .harness
             .as_ref()
-            .unwrap()
+            .ok_or_else(|| Error::unknown("No modueles to instrument"))?
             .to_string_lossy()
             .to_string()];
         modules_to_instrument.append(&mut options.libs_to_instrument.clone());
@@ -209,14 +209,14 @@ where
                 .mode(arch::arm64::ArchMode::Arm)
                 .detail(true)
                 .build()
-                .expect("Failed to create Capstone object"),
+                .map_err(|_| Error::unknown("Failed to create Capstone object"))?,
             #[cfg(all(target_arch = "x86_64", unix))]
             capstone: Capstone::new()
                 .x86()
                 .mode(arch::x86::ArchMode::Mode64)
                 .detail(true)
                 .build()
-                .expect("Failed to create Capstone object"),
+                .map_err(|_| Error::unknown("Failed to create Capstone object"))?,
             ranges: RangeMap::new(),
             module_map: ModuleMap::new_from_names(gum, &modules_to_instrument),
             options,
@@ -235,7 +235,8 @@ where
             }
             if !options.dont_instrument.is_empty() {
                 for (module_name, offset) in options.dont_instrument.clone() {
-                    let module_details = ModuleDetails::with_name(module_name).unwrap();
+                    let module_details = ModuleDetails::with_name(module_name.clone())
+                        .ok_or_else(|| Error::unknown("Module {module_name} not found"))?;
                     let lib_start = module_details.range().base_address().0 as usize;
                     // println!("removing address: {:#x}", lib_start + offset);
                     helper
@@ -365,7 +366,7 @@ where
 
         helper.transformer = Some(transformer);
 
-        helper
+        Ok(helper)
     }
 
     /// Return the runtime
