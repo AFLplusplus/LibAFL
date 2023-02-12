@@ -10,7 +10,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{ffi::c_void, ptr::write_volatile};
+use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile};
 
 use backtrace::Backtrace;
 #[cfg(target_arch = "x86_64")]
@@ -468,8 +468,8 @@ impl AsanRuntime {
         if start != max_start {
             let mapping = unsafe {
                 mmap(
-                    max_start as *mut c_void,
-                    start - max_start,
+                    NonZeroUsize::new(max_start),
+                    NonZeroUsize::new(start - max_start).unwrap(),
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                     flags,
                     -1,
@@ -1545,8 +1545,8 @@ impl AsanRuntime {
         let blob = ops.finalize().unwrap();
         unsafe {
             let mapping = mmap(
-                std::ptr::null_mut(),
-                0x1000,
+                None,
+                std::num::NonZeroUsize::new_unchecked(0x1000),
                 ProtFlags::all(),
                 MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
                 -1,

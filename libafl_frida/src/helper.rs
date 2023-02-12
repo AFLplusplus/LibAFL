@@ -172,8 +172,8 @@ where
         unsafe {
             for _ in 0..512 {
                 mmap(
-                    std::ptr::null_mut(),
-                    128 * 1024,
+                    None,
+                    std::num::NonZeroUsize::new_unchecked(128 * 1024),
                     ProtFlags::PROT_NONE,
                     ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                     -1,
@@ -181,8 +181,8 @@ where
                 )
                 .expect("Failed to map dummy regions for frida workaround");
                 mmap(
-                    std::ptr::null_mut(),
-                    4 * 1024 * 1024,
+                    None,
+                    std::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
                     ProtFlags::PROT_NONE,
                     ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                     -1,
