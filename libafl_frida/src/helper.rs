@@ -166,7 +166,7 @@ where
     /// Constructor function to create a new [`FridaInstrumentationHelper`], given a `module_name`.
     #[allow(clippy::too_many_lines)]
     #[must_use]
-    pub fn new(gum: &'a Gum, options: &'a FuzzerOptions, runtimes: RT) -> Self {
+    pub fn new(gum: &'a Gum, options: &'a FuzzerOptions, runtimes: RT) -> Result<Self, Error> {
         // workaround frida's frida-gum-allocate-near bug:
         #[cfg(unix)]
         unsafe {
@@ -365,7 +365,7 @@ where
 
         helper.transformer = Some(transformer);
 
-        helper
+        Ok(helper)
     }
 
     /// Return the runtime
