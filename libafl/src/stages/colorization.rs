@@ -55,27 +55,25 @@ impl Ord for Earlier {
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct ColorizationStage<EM, O, TE, Z> {
-    tracer_executor: TE,
+pub struct ColorizationStage<EM, O, E, Z> {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, O, Z)>,
+    phantom: PhantomData<(E, EM, O, Z)>,
 }
 
-impl<EM, O, TE, Z> UsesState for ColorizationStage<EM, O, TE, Z>
+impl<EM, O, E, Z> UsesState for ColorizationStage<EM, O, E, Z>
 where
-    TE: UsesState,
+    E: UsesState,
 {
-    type State = TE::State;
+    type State = E::State;
 }
 
-impl<E, EM, O, TE, Z> Stage<E, EM, Z> for ColorizationStage<EM, O, TE, Z>
+impl<E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<EM, O, E, Z>
 where
-    E: UsesState<State = TE::State>,
     EM: UsesState<State = E::State> + EventFirer,
-    TE: HasObservers + Executor<EM, Z>,
-    TE::State: HasCorpus + HasMetadata + HasRand,
-    TE::Input: HasBytesVec,
+    E: HasObservers + Executor<EM, Z>,
+    E::State: HasCorpus + HasMetadata + HasRand,
+    E::Input: HasBytesVec,
     O: MapObserver,
     Z: UsesState<State = E::State>,
 {
@@ -84,55 +82,20 @@ where
     fn perform(
         &mut self,
         fuzzer: &mut Z,
-        _executor: &mut E, // don't need the *main* executor for tracing
-        state: &mut TE::State,
+        executor: &mut E, // don't need the *main* executor for tracing
+        state: &mut E::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        // Run with the un-mutated input
-
-        let input = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .load_input()?
-            .clone();
-
-        self.tracer_executor
-            .observers_mut()
-            .pre_exec_all(state, &input)?;
-
-        let exit_kind = self
-            .tracer_executor
-            .run_target(fuzzer, state, manager, &input)?;
-
-        self.tracer_executor
-            .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
-
         // Run with the mutated input
-        let mutant = {
-            Self::colorize(
-                fuzzer,
-                &mut self.tracer_executor,
-                state,
-                manager,
-                corpus_idx,
-                &self.map_observer_name,
-            )?
-        };
-
-        self.tracer_executor
-            .observers_mut()
-            .pre_exec_all(state, &mutant)?;
-
-        let exit_kind = self
-            .tracer_executor
-            .run_target(fuzzer, state, manager, &mutant)?;
-
-        self.tracer_executor
-            .observers_mut()
-            .post_exec_all(state, &mutant, &exit_kind)?;
+        Self::colorize(
+            fuzzer,
+            executor,
+            state,
+            manager,
+            corpus_idx,
+            &self.map_observer_name,
+        )?;
 
         Ok(())
     }
@@ -173,25 +136,25 @@ impl TaintMetadata {
 
 crate::impl_serdeany!(TaintMetadata);
 
-impl<EM, O, TE, Z> ColorizationStage<EM, O, TE, Z>
+impl<EM, O, E, Z> ColorizationStage<EM, O, E, Z>
 where
-    EM: UsesState<State = TE::State> + EventFirer,
+    EM: UsesState<State = E::State> + EventFirer,
     O: MapObserver,
-    TE: HasObservers + Executor<EM, Z>,
-    TE::State: HasCorpus + HasMetadata + HasRand,
-    TE::Input: HasBytesVec,
-    Z: UsesState<State = TE::State>,
+    E: HasObservers + Executor<EM, Z>,
+    E::State: HasCorpus + HasMetadata + HasRand,
+    E::Input: HasBytesVec,
+    Z: UsesState<State = E::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
     fn colorize(
         fuzzer: &mut Z,
-        executor: &mut TE,
-        state: &mut TE::State,
+        executor: &mut E,
+        state: &mut E::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
         name: &str,
-    ) -> Result<TE::Input, Error> {
+    ) -> Result<E::Input, Error> {
         let mut input = state
             .corpus()
             .get(corpus_idx)?
@@ -255,6 +218,8 @@ where
 
                 if orig_hash == changed_hash {
                     // The change in this range is safe!
+                    println!("this range is bad: {:#?}", range_start..range_end);
+
                     ok_ranges.push(Earlier(range_start..range_end));
                 } else {
                     // Seems like this range is too big that we can't keep the original hash anymore
@@ -305,6 +270,8 @@ where
 
         if let Some(meta) = state.metadata_mut().get_mut::<TaintMetadata>() {
             meta.update(input.bytes().to_vec(), res);
+
+            println!("meta: {:#?}", meta);
         } else {
             let meta = TaintMetadata::new(input.bytes().to_vec(), res);
             state.add_metadata::<TaintMetadata>(meta);
@@ -315,9 +282,8 @@ where
 
     #[must_use]
     /// Creates a new [`ColorizationStage`]
-    pub fn new(map_observer_name: &O, tracer_executor: TE) -> Self {
+    pub fn new(map_observer_name: &O) -> Self {
         Self {
-            tracer_executor,
             map_observer_name: map_observer_name.name().to_string(),
             phantom: PhantomData,
         }
@@ -326,10 +292,10 @@ where
     // Run the target and get map hash but before hitcounts's post_exec is used
     fn get_raw_map_hash_run(
         fuzzer: &mut Z,
-        executor: &mut TE,
-        state: &mut TE::State,
+        executor: &mut E,
+        state: &mut E::State,
         manager: &mut EM,
-        input: TE::Input,
+        input: E::Input,
         name: &str,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
@@ -355,7 +321,7 @@ where
 
     /// Replace bytes with random values but following certain rules
     #[allow(clippy::needless_range_loop)]
-    fn type_replace(bytes: &mut [u8], state: &mut TE::State) {
+    fn type_replace(bytes: &mut [u8], state: &mut E::State) {
         let len = bytes.len();
         for idx in 0..len {
             let c = match bytes[idx] {
