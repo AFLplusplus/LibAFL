@@ -189,6 +189,7 @@ where
         // Now replace with random values (This is type_replace)
         Self::type_replace(changed_bytes, state);
 
+        // println!("Replaced bytes: {:#?}", changed_bytes);
         // What we do is now to separate the input into smaller regions
         // And in each small regions make sure changing those bytes in the regions does not affect the coverage
         for _ in 0..input_len * 2 {
@@ -218,7 +219,7 @@ where
 
                 if orig_hash == changed_hash {
                     // The change in this range is safe!
-                    println!("this range is bad: {:#?}", range_start..range_end);
+                    // println!("this range safe to change: {:#?}", range_start..range_end);
 
                     ok_ranges.push(Earlier(range_start..range_end));
                 } else {
