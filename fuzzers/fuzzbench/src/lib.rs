@@ -41,8 +41,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, ColorizationStage,
+        StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -324,6 +324,22 @@ fn fuzz(
 
     let mut tracing_harness = harness;
 
+    // Setup a tracing stage in which we log comparisons
+    let colorization = ColorizationStage::new(
+        &edges_observer,
+        TimeoutExecutor::new(
+            InProcessExecutor::new(
+                &mut tracing_harness,
+                tuple_list!(cmplog_observer),
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+            )?,
+            // Give it more time!
+            timeout * 10,
+        ),
+    );
+
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = TimeoutExecutor::new(
         InProcessExecutor::new(
@@ -336,21 +352,8 @@ fn fuzz(
         timeout,
     );
 
-    // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(TimeoutExecutor::new(
-        InProcessExecutor::new(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?,
-        // Give it more time!
-        timeout * 10,
-    ));
-
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, i2s, power);
+    let mut stages = tuple_list!(calibration, colorization, i2s, power);
 
     // Read tokens
     if state.metadata().get::<Tokens>().is_none() {

@@ -8,19 +8,17 @@ use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
 use serde::{Deserialize, Serialize};
 
-use super::TracingStage;
 use crate::{
     bolts::{rands::Rand, tuples::MatchName},
     corpus::{Corpus, CorpusId},
     events::EventFirer,
     executors::{Executor, HasObservers},
-    fuzzer::Evaluator,
     inputs::HasBytesVec,
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
-    Error, ExecutionProcessor,
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
+    Error,
 };
 
 // Bigger range is better
@@ -57,52 +55,82 @@ impl Ord for Earlier {
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct ColorizationStage<E, EM, O, Z> {
-    tracing_stage: TracingStage<EM, E, Z>,
+pub struct ColorizationStage<EM, O, TE, Z> {
+    tracer_executor: TE,
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, O, Z)>,
+    phantom: PhantomData<(EM, O, Z)>,
 }
 
-impl<E, EM, O, Z> UsesState for ColorizationStage<E, EM, O, Z>
+impl<EM, O, TE, Z> UsesState for ColorizationStage<EM, O, TE, Z>
 where
-    E: UsesState,
+    TE: UsesState,
 {
-    type State = E::State;
+    type State = TE::State;
 }
 
-impl<E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<E, EM, O, Z>
+impl<E, EM, O, TE, Z> Stage<E, EM, Z> for ColorizationStage<EM, O, TE, Z>
 where
-    E: Executor<EM, Z> + HasObservers,
+    E: UsesState<State = TE::State>,
     EM: UsesState<State = E::State> + EventFirer,
+    TE: HasObservers + Executor<EM, Z>,
+    TE::State: HasCorpus + HasMetadata + HasRand,
+    TE::Input: HasBytesVec,
     O: MapObserver,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand + HasExecutions,
-    Z: Evaluator<E, EM, State = E::State> + ExecutionProcessor<E::Observers>,
-    E::Input: HasBytesVec,
+    Z: UsesState<State = E::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut E::State,
+        _executor: &mut E, // don't need the *main* executor for tracing
+        state: &mut TE::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        self.tracing_stage
-            .perform(fuzzer, executor, state, manager, corpus_idx)?;
-        let mutant = { self.colorize(fuzzer, executor, state, manager, corpus_idx)? };
+        // Run with the un-mutated input
 
-        let tracer_executor = self.tracing_stage.executor_mut();
+        let input = state
+            .corpus()
+            .get(corpus_idx)?
+            .borrow_mut()
+            .load_input()?
+            .clone();
 
-        tracer_executor
+        self.tracer_executor
+            .observers_mut()
+            .pre_exec_all(state, &input)?;
+
+        let exit_kind = self
+            .tracer_executor
+            .run_target(fuzzer, state, manager, &input)?;
+
+        self.tracer_executor
+            .observers_mut()
+            .post_exec_all(state, &input, &exit_kind)?;
+
+        // Run with the mutated input
+        let mutant = {
+            Self::colorize(
+                fuzzer,
+                &mut self.tracer_executor,
+                state,
+                manager,
+                corpus_idx,
+                &self.map_observer_name,
+            )?
+        };
+
+        self.tracer_executor
             .observers_mut()
             .pre_exec_all(state, &mutant)?;
 
-        let exit_kind = tracer_executor.run_target(fuzzer, state, manager, &mutant)?;
+        let exit_kind = self
+            .tracer_executor
+            .run_target(fuzzer, state, manager, &mutant)?;
 
-        tracer_executor
+        self.tracer_executor
             .observers_mut()
             .post_exec_all(state, &mutant, &exit_kind)?;
 
@@ -145,25 +173,25 @@ impl TaintMetadata {
 
 crate::impl_serdeany!(TaintMetadata);
 
-impl<E, EM, O, Z> ColorizationStage<E, EM, O, Z>
+impl<EM, O, TE, Z> ColorizationStage<EM, O, TE, Z>
 where
-    E: Executor<EM, Z> + HasObservers,
-    EM: UsesState<State = E::State> + EventFirer,
+    EM: UsesState<State = TE::State> + EventFirer,
     O: MapObserver,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
-    E::Input: HasBytesVec,
-    Z: Evaluator<E, EM, State = E::State> + ExecutionProcessor<E::Observers>,
+    TE: HasObservers + Executor<EM, Z>,
+    TE::State: HasCorpus + HasMetadata + HasRand,
+    TE::Input: HasBytesVec,
+    Z: UsesState<State = TE::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
     fn colorize(
-        &mut self,
         fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut E::State,
+        executor: &mut TE,
+        state: &mut TE::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<E::Input, Error> {
+        name: &String,
+    ) -> Result<TE::Input, Error> {
         let mut input = state
             .corpus()
             .get(corpus_idx)?
@@ -181,7 +209,7 @@ where
 
         // First, run orig_input once and get the original hash
         let orig_hash =
-            self.get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input)?;
+            Self::get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input, name)?;
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
 
@@ -216,8 +244,14 @@ where
                 );
 
                 let consumed_input = input.clone();
-                let changed_hash =
-                    self.get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input)?;
+                let changed_hash = Self::get_raw_map_hash_run(
+                    fuzzer,
+                    executor,
+                    state,
+                    manager,
+                    consumed_input,
+                    name,
+                )?;
 
                 if orig_hash == changed_hash {
                     // The change in this range is safe!
@@ -281,9 +315,9 @@ where
 
     #[must_use]
     /// Creates a new [`ColorizationStage`]
-    pub fn new(map_observer_name: &O, tracing_stage: TracingStage<EM, E, Z>) -> Self {
+    pub fn new(map_observer_name: &O, tracer_executor: TE) -> Self {
         Self {
-            tracing_stage,
+            tracer_executor,
             map_observer_name: map_observer_name.name().to_string(),
             phantom: PhantomData,
         }
@@ -291,12 +325,12 @@ where
 
     // Run the target and get map hash but before hitcounts's post_exec is used
     fn get_raw_map_hash_run(
-        &self,
         fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut E::State,
+        executor: &mut TE,
+        state: &mut TE::State,
         manager: &mut EM,
-        input: E::Input,
+        input: TE::Input,
+        name: &String,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
 
@@ -304,7 +338,7 @@ where
 
         let observer = executor
             .observers()
-            .match_name::<O>(&self.map_observer_name)
+            .match_name::<O>(name)
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
         let hash = observer.hash() as usize;
@@ -313,15 +347,15 @@ where
             .observers_mut()
             .post_exec_all(state, &input, &exit_kind)?;
 
-        let observers = executor.observers();
-        fuzzer.process_execution(state, manager, input, observers, &exit_kind, true)?;
+        // let observers = executor.observers();
+        // fuzzer.process_execution(state, manager, input, observers, &exit_kind, true)?;
 
         Ok(hash)
     }
 
     /// Replace bytes with random values but following certain rules
     #[allow(clippy::needless_range_loop)]
-    fn type_replace(bytes: &mut [u8], state: &mut E::State) {
+    fn type_replace(bytes: &mut [u8], state: &mut TE::State) {
         let len = bytes.len();
         for idx in 0..len {
             let c = match bytes[idx] {
