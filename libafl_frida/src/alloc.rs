@@ -4,7 +4,7 @@
     all(target_arch = "aarch64", target_os = "android")
 ))]
 use std::io;
-use std::{collections::BTreeMap, ffi::c_void};
+use std::{collections::BTreeMap, ffi::c_void, num::NonZeroUsize};
 
 use backtrace::Backtrace;
 use frida_gum::{PageProtection, RangeDetails};
@@ -176,8 +176,8 @@ impl Allocator {
 
                 if unsafe {
                     mmap(
-                        addr as *mut c_void,
-                        page_size,
+                        NonZeroUsize::new(addr),
+                        NonZeroUsize::new_unchecked(page_size),
                         ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                         MapFlags::MAP_PRIVATE
                             | ANONYMOUS_FLAG
@@ -202,8 +202,8 @@ impl Allocator {
         let addr: usize = 1 << shadow_bit;
         let pre_allocated_shadow = unsafe {
             mmap(
-                addr as *mut c_void,
-                addr + addr,
+                NonZeroUsize::new(addr),
+                NonZeroUsize::new_unchecked(addr + addr),
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 ANONYMOUS_FLAG
                     | MapFlags::MAP_FIXED
@@ -298,8 +298,8 @@ impl Allocator {
         } else {
             // println!("{:x}, {:x}", self.current_mapping_addr, rounded_up_size);
             let mapping = match mmap(
-                self.current_mapping_addr as *mut c_void,
-                rounded_up_size,
+                NonZeroUsize::new(self.current_mapping_addr),
+                NonZeroUsize::new_unchecked(rounded_up_size),
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 ANONYMOUS_FLAG
                     | MapFlags::MAP_PRIVATE
@@ -503,8 +503,8 @@ impl Allocator {
                 */
                 unsafe {
                     mmap(
-                        range.start as *mut c_void,
-                        range.end - range.start,
+                        NonZeroUsize::new(range.start),
+                        NonZeroUsize::new(range.end - range.start).unwrap(),
                         ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                         ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE,
                         -1,

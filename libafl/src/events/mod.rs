@@ -10,9 +10,14 @@ use alloc::{
 };
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::c_void;
-use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
+use core::{
+    fmt,
+    hash::{BuildHasher, Hasher},
+    marker::PhantomData,
+    time::Duration,
+};
 
-use ahash::AHasher;
+use ahash::RandomState;
 pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -183,7 +188,7 @@ impl EventConfig {
     /// Create a new [`EventConfig`] from a name hash
     #[must_use]
     pub fn from_name(name: &str) -> Self {
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher(); //AHasher::new_with_keys(0, 0);
         hasher.write(name.as_bytes());
         EventConfig::FromName {
             name_hash: hasher.finish(),

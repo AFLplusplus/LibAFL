@@ -189,11 +189,11 @@ where
                         Ok(llmp::LlmpMsgHookResult::ForwardToClients)
                     }
                 } else {
-                    monitor.display("Timeout".into(), 0);
+                    monitor.display("Broker".into(), 0);
                     Ok(llmp::LlmpMsgHookResult::Handled)
                 }
             },
-            Duration::from_millis(1000),
+            Duration::from_secs(30),
             Some(Duration::from_millis(5)),
         );
 

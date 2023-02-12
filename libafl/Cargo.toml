@@ -50,14 +50,14 @@ rustversion = "1.0"
 
 [dev-dependencies]
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
-serial_test = "0.9"
+serial_test = "1"
 
 [dependencies]
 libafl_derive = { version = "0.9.0", optional = true, path = "../libafl_derive" }
 
 rustversion = "1.0"
 tuple_list = { version = "0.1.3" }
-hashbrown =  { version = "0.12", features = ["serde", "ahash-compile-time-rng"], default-features=false } # A faster hashmap, nostd compatible
+hashbrown =  { version = "0.13", features = ["serde", "ahash"], default-features=false } # A faster hashmap, nostd compatible
 num-traits = { version = "0.2", default-features = false }
 xxhash-rust = { version = "0.8.5", features = ["xxh3"] } # xxh3 hashing for rust
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] } # serialization lib
@@ -65,10 +65,10 @@ erased-serde = { version = "0.3.21", default-features = false, features = ["allo
 postcard = { version = "1.0", features = ["alloc"] } # no_std compatible serde serialization fromat
 bincode = {version = "1.3", optional = true }
 static_assertions = "1.1.0"
-c2rust-bitfields = { version = "0.3", features = ["no_std"] }
+c2rust-bitfields = { version = "0.17", features = ["no_std"] }
 num_enum = { version = "0.5.7", default-features = false }
-typed-builder = "0.10.0" # Implement the builder pattern at compiletime
-ahash = { version = "0.7", default-features=false } # The hash function already used in hashbrown
+typed-builder = "0.12" # Implement the builder pattern at compiletime
+ahash = { version = "0.8", default-features=false } # The hash function already used in hashbrown
 intervaltree = { version = "0.2.7", default-features = false, features = ["serde"] }
 backtrace = {version = "0.3", optional = true} # Used to get the stacktrace in StacktraceObserver
 
@@ -77,17 +77,17 @@ serde_json = { version = "1.0", optional = true, default-features = false, featu
 miniz_oxide = { version = "0.6.2", optional = true}
 hostname = { version = "^0.3", optional = true } # Is there really no gethostname in the stdlib?
 rand_core = { version = "0.6", optional = true }
-nix = { version = "0.25", optional = true }
+nix = { version = "0.26", optional = true }
 regex = { version = "1", optional = true }
 uuid = { version = "1.1.2", optional = true, features = ["serde", "v4"] }
 byteorder = { version = "1.4", optional = true }
 once_cell = { version =  "1.13", optional = true }
 libm = "0.2.2"
 tui = { version = "0.19", default-features = false, features = ['crossterm'], optional = true }
-crossterm = { version = "0.25", optional = true }
+crossterm = { version = "0.26", optional = true }
 clap = {version = "4.0", features = ["derive", "wrap_help"], optional = true}
 
-prometheus-client = { version= "0.18.0", optional = true}
+prometheus-client = { version= "0.19", optional = true}
 tide = { version = "0.16.0", optional = true }
 async-std = { version = "1.8.0", features = ["attributes"], optional = true }
 futures = { version = "0.3.24", optional = true }
@@ -109,10 +109,10 @@ uds = { version = "0.2.6", optional = true }
 lock_api = "0.4.7"
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.42.0", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Diagnostics_Debug", "Win32_System_Kernel", "Win32_System_Memory", "Win32_Security", "Win32_System_SystemInformation"] }
+windows = { version = "0.44", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Diagnostics_Debug", "Win32_System_Kernel", "Win32_System_Memory", "Win32_Security", "Win32_System_SystemInformation"] }
 
 [target.'cfg(windows)'.build-dependencies]
-windows = "0.42.0"
+windows = "0.44"
 
 #[profile.release]
 #lto = true

@@ -216,7 +216,7 @@ where
             );
 
             // In case the corpus is empty (on first run), reset
-            if state.corpus().count() < 1 {
+            if state.must_load_initial_inputs() {
                 if self.input_dirs.is_empty() {
                     // Generator of printable bytearrays of max size 32
                     let mut generator = RandBytesGenerator::new(32);
