@@ -190,7 +190,7 @@ where
         state: &mut TE::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
-        name: &String,
+        name: &str,
     ) -> Result<TE::Input, Error> {
         let mut input = state
             .corpus()
@@ -330,7 +330,7 @@ where
         state: &mut TE::State,
         manager: &mut EM,
         input: TE::Input,
-        name: &String,
+        name: &str,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
 
