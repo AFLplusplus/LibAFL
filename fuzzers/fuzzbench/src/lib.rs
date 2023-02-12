@@ -41,8 +41,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, ColorizationStage,
-        StdMutationalStage, TracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
+        TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -324,8 +324,6 @@ fn fuzz(
 
     let mut tracing_harness = harness;
 
-    let colorization = ColorizationStage::new(&edges_observer);
-
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = TimeoutExecutor::new(
         InProcessExecutor::new(
@@ -352,7 +350,7 @@ fn fuzz(
     ));
 
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, colorization, i2s, power);
+    let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
     if state.metadata().get::<Tokens>().is_none() {
@@ -385,8 +383,8 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        // dup2(null_fd, io::stdout().as_raw_fd())?;
-        // dup2(null_fd, io::stderr().as_raw_fd())?;
+        dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stderr().as_raw_fd())?;
     }
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
