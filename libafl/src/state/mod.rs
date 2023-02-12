@@ -276,11 +276,11 @@ impl<I, C, R, SC> HasFuzzedCorpusId for StdState<I, C, R, SC> {
     }
 
     fn set_fuzzed_corpus_id(&mut self, fuzzed_corpus_id: CorpusId) {
-        self.fuzzed_corpus_id = Some(fuzzed_corpus_id)
+        self.fuzzed_corpus_id = Some(fuzzed_corpus_id);
     }
 
     fn clear_fuzzed_corpus_id(&mut self) {
-        self.fuzzed_corpus_id = None
+        self.fuzzed_corpus_id = None;
     }
 }
 

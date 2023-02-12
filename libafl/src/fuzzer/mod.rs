@@ -538,7 +538,7 @@ where
     EM: ProgressReporter + EventProcessor<E, Self, State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata,
+    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasFuzzedCorpusId,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
     fn fuzz_one(
@@ -563,8 +563,14 @@ where
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().reset_stage_index();
 
+        // Set the parent id - all new testcases will have this id as parent in the following stages.
+        state.set_fuzzed_corpus_id(idx);
+
         // Execute all stages
         stages.perform_all(self, executor, state, manager, idx)?;
+
+        // Reset the parent id
+        state.clear_fuzzed_corpus_id();
 
         // Init timer for manager
         #[cfg(feature = "introspection")]

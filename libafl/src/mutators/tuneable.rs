@@ -157,11 +157,11 @@ where
             let coin = state.rand_mut().next() as f32 / u64::MAX as f32;
 
             let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
-            1 << 1 + metadata
+            1 << (1 + metadata
                 .iter_probabilities_pow_cumulative
                 .iter()
                 .position(|i| *i >= coin)
-                .unwrap()
+                .unwrap())
         }
     }
 
