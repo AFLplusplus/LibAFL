@@ -88,8 +88,7 @@ impl Tokens {
             head += 1;
             if size > 0 {
                 self.add_token(&slice[head..head + size].to_vec());
-                #[cfg(feature = "std")]
-                println!(
+                log::info!(
                     "Token size: {} content: {:x?}",
                     size,
                     &slice[head..head + size].to_vec()
@@ -120,7 +119,7 @@ impl Tokens {
             )));
         }
         let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
-        // println!("size: {}", section_size);
+        // log::info!("size: {}", section_size);
         let slice = from_raw_parts(token_start, section_size);
 
         // Now we know the beginning and the end of the token section.. let's parse them into tokens
@@ -157,7 +156,7 @@ impl Tokens {
     where
         P: AsRef<Path>,
     {
-        // println!("Loading tokens file {:?} ...", file);
+        // log::info!("Loading tokens file {:?} ...", file);
 
         let file = File::open(file)?; // panic if not found
         let reader = BufReader::new(file);
@@ -620,8 +619,7 @@ token2="B"
         "###;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
         let tokens = Tokens::from_file("test.tkns").unwrap();
-        #[cfg(feature = "std")]
-        println!("Token file entries: {:?}", tokens.tokens());
+        log::info!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);
         let _res = fs::remove_file("test.tkns");
     }

@@ -273,7 +273,7 @@ where
 
             testcase.set_exec_time(total_time / (iter as u32));
             testcase.set_fuzz_level(fuzz_level + 1);
-            // println!("time: {:#?}", testcase.exec_time());
+            // log::trace!("time: {:#?}", testcase.exec_time());
 
             let data = testcase
                 .metadata_mut()

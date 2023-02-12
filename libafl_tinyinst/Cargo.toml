@@ -19,6 +19,7 @@ libafl = { path = "../libafl", version = "0.9.0", features = [
 ] }
 tinyinst = { git = "https://github.com/AFLplusplus/tinyinst-rs" }
 # tinyinst-rs = { path = "../../tinyinst-rs" }
+log = "0.4.17"
 
 [build-dependencies]
 cmake = "0.1"

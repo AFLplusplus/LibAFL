@@ -122,7 +122,7 @@ where
     #[allow(clippy::similar_names)] // id and fd
     fn send_receive(&mut self, request: ServedShMemRequest) -> Result<(i32, i32), Error> {
         //let bt = Backtrace::new();
-        //println!("Sending {:?} with bt:\n{:?}", request, bt);
+        //log::info!("Sending {:?} with bt:\n{:?}", request, bt);
 
         let body = postcard::to_allocvec(&request)?;
 
@@ -347,7 +347,7 @@ pub struct ShMemServiceThread {
 impl Drop for ShMemServiceThread {
     fn drop(&mut self) {
         if self.join_handle.is_some() {
-            println!("Stopping ShMemService");
+            log::info!("Stopping ShMemService");
             let Ok(mut stream) = UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
             ) else { return };
@@ -404,12 +404,12 @@ where
                     *lock.lock().unwrap() = ShMemServiceStatus::Failed;
                     cvar.notify_one();
 
-                    println!("Error creating ShMemService: {e:?}");
+                    log::error!("Error creating ShMemService: {e:?}");
                     return Err(e);
                 }
             };
             if let Err(e) = worker.listen(UNIX_SERVER_NAME, &childsyncpair) {
-                println!("Error spawning ShMemService: {e:?}");
+                log::error!("Error spawning ShMemService: {e:?}");
                 Err(e)
             } else {
                 Ok(())
@@ -430,7 +430,7 @@ where
         match status {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
             ShMemServiceStatus::Started => {
-                println!("Started ShMem Service");
+                log::info!("Started ShMem Service");
                 // We got a service
                 Self::Started {
                     bg_thread: Arc::new(Mutex::new(ShMemServiceThread {
@@ -494,7 +494,7 @@ where
     fn handle_request(&mut self, client_id: RawFd) -> Result<ServedShMemResponse<SP>, Error> {
         let request = self.read_request(client_id)?;
 
-        // println!("got ashmem client: {}, request:{:?}", client_id, request);
+        // log::trace!("got ashmem client: {}, request:{:?}", client_id, request);
 
         // Handle the client request
         let response = match request {
@@ -572,12 +572,12 @@ where
                 }
             }
             ServedShMemRequest::Exit => {
-                println!("ShMemService - Exiting");
+                log::info!("ShMemService - Exiting");
                 // stopping the server
                 return Err(Error::shutting_down());
             }
         };
-        // println!("send ashmem client: {}, response: {:?}", client_id, &response);
+        // log::info!("send ashmem client: {}, response: {:?}", client_id, &response);
 
         response
     }
@@ -659,7 +659,7 @@ where
                 Ok(num_fds) if num_fds > 0 => (),
                 Ok(_) => continue,
                 Err(e) => {
-                    println!("Error polling for activity: {e:?}");
+                    log::error!("Error polling for activity: {e:?}");
                     continue;
                 }
             };
@@ -675,7 +675,7 @@ where
                         match self.handle_client(raw_polled_fd) {
                             Ok(()) => (),
                             Err(e) => {
-                                dbg!("Ignoring failed read from client", e, poll_fd);
+                                log::info!("Ignoring failed read from client {e:?} {poll_fd:?}");
                                 continue;
                             }
                         };
@@ -683,12 +683,12 @@ where
                         let (stream, _addr) = match listener.accept_unix_addr() {
                             Ok(stream_val) => stream_val,
                             Err(e) => {
-                                println!("Error accepting client: {e:?}");
+                                log::error!("Error accepting client: {e:?}");
                                 continue;
                             }
                         };
 
-                        println!("Recieved connection from {_addr:?}");
+                        log::info!("Received connection from {_addr:?}");
                         let pollfd = PollFd::new(
                             stream.as_raw_fd(),
                             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
@@ -700,16 +700,16 @@ where
                         match self.handle_client(client_id) {
                             Ok(()) => (),
                             Err(Error::ShuttingDown) => {
-                                println!("Shutting down");
+                                log::info!("Shutting down");
                                 return Ok(());
                             }
                             Err(e) => {
-                                dbg!("Ignoring failed read from client", e);
+                                log::info!("Ignoring failed read from client {e:?}");
                             }
                         };
                     }
                 } else {
-                    //println!("Unknown revents flags: {:?}", revents);
+                    //log::warn!("Unknown revents flags: {:?}", revents);
                 }
             }
         }

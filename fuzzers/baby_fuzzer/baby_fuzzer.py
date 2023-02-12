@@ -39,6 +39,8 @@ def stage_wrapper(stage):
         return libafl.Stage.new_std_mutational(stage)
 
 # CODE WRITTEN BY USER
+import logging
+logging.basicConfig(level=logging.INFO)
 
 map_observer = libafl.OwnedMapObserverI32("signals", [0] * 16)
 
