@@ -99,10 +99,10 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 #[cfg(unix)]
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan))?;
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
                 #[cfg(windows)]
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage))?;
+                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -219,7 +219,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let cmplog = CmpLogRuntime::new();
 
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog))?;
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -348,14 +348,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let coverage = CoverageRuntime::new();
 
-                println!("Before");
-
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
 
-                println!("AAA: {:#?}", frida_helper.is_err());
-
-                let mut frida_helper = frida_helper?;
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
@@ -471,7 +466,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         .run_client(&mut run_client)
         .cores(&options.cores)
         .broker_port(options.broker_port)
-        // .stdout_file(Some(&options.stdout))
+        .stdout_file(Some(&options.stdout))
         .remote_broker_addr(options.remote_broker_addr)
         .build()
         .launch()
