@@ -272,7 +272,7 @@ where
         if let Some(meta) = state.metadata_mut().get_mut::<TaintMetadata>() {
             meta.update(input.bytes().to_vec(), res);
 
-            println!("meta: {:#?}", meta);
+            // println!("meta: {:#?}", meta);
         } else {
             let meta = TaintMetadata::new(input.bytes().to_vec(), res);
             state.add_metadata::<TaintMetadata>(meta);
