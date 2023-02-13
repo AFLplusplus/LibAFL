@@ -154,10 +154,10 @@ where
             Some(Duration::from_millis(5)),
         );
 
-        Ok(())
+        Err(Error::shutting_down())
     }
 
-    /// Run forever in the broker
+    /// Run in the broker until all clients exit
     #[cfg(feature = "llmp_broker_timeouts")]
     pub fn broker_loop(&mut self) -> Result<(), Error> {
         let monitor = &mut self.monitor;
@@ -197,7 +197,7 @@ where
             Some(Duration::from_millis(5)),
         );
 
-        Ok(())
+        Err(Error::shutting_down())
     }
 
     /// Handle arriving events in the broker
@@ -882,7 +882,9 @@ where
                     broker.connect_b2b(remote_broker_addr)?;
                 };
 
-                broker.broker_loop()
+                broker.broker_loop()?;
+                // We can only ever return a shutting_down error from broker_loop.
+                return Err(Error::shutting_down());
             };
 
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
