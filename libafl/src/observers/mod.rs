@@ -29,6 +29,8 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt::Debug, time::Duration};
+
+#[cfg(feature = "std")]
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
