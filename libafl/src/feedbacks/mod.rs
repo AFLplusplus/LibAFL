@@ -24,12 +24,12 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 use alloc::string::{String, ToString};
+#[cfg(feature = "std")]
+use core::time::Duration;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
 };
-#[cfg(feature = "std")]
-use core::time::Duration;
 
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
