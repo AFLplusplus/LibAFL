@@ -195,19 +195,28 @@ where
     pub fn send_exiting(&mut self) {
         self.reset();
 
-        assert!(size_of::<StateShMemContent>() + EXITING_MAGIC.len() <= self.shmem.len());
+        let len = EXITING_MAGIC.len();
 
-        let content_mut = self.content_mut();
-        content_mut.buf.copy_from_slice(EXITING_MAGIC);
-        content_mut.buf_len = EXITING_MAGIC.len();
+        assert!(size_of::<StateShMemContent>() + len <= self.shmem.len());
+
+        let shmem_content = self.content_mut();
+        unsafe {
+            ptr::copy_nonoverlapping(
+                EXITING_MAGIC as *const u8,
+                shmem_content.buf.as_mut_ptr(),
+                len,
+            );
+        }
+        shmem_content.buf_len = EXITING_MAGIC.len();
     }
 
     /// Returns true, if [`Self::send_exiting`] was called on this [`StateRestorer`] last.
     /// This should be checked in the parent before deciding to restore the client.
     pub fn wants_to_exit(&self) -> bool {
-        assert!(size_of::<StateShMemContent>() + EXITING_MAGIC.len() <= self.shmem.len());
-        self.content().buf_len == EXITING_MAGIC.len()
-            && &self.content().buf[..EXITING_MAGIC.len()] == EXITING_MAGIC
+        let len = EXITING_MAGIC.len();
+        assert!(size_of::<StateShMemContent>() + len <= self.shmem.len());
+        let bytes = unsafe { slice::from_raw_parts(self.content().buf.as_ptr(), len) };
+        bytes == EXITING_MAGIC
     }
 
     fn content_mut(&mut self) -> &mut StateShMemContent {
@@ -246,6 +255,13 @@ where
                 state_shmem_content.buf_len_checked(self.mapsize())?,
             )
         };
+
+        if bytes == EXITING_MAGIC {
+            return Err(Error::illegal_state(
+                "Trying to restore a state after send_exiting was called.",
+            ));
+        }
+
         let mut state = bytes;
         let mut file_content;
         if state_shmem_content.buf_len == 0 {
