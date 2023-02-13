@@ -451,7 +451,7 @@ where
         _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        self.last_runtime = self.start_time.elapsed();
+        self.last_runtime = Some(self.start_time.elapsed());
         Ok(())
     }
 }
