@@ -2026,6 +2026,7 @@ where
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
+        #[cfg(feature = "std")]
         let current_time = current_time();
         let mut new_messages = false;
         for i in 0..self.llmp_clients.len() {
@@ -2563,7 +2564,7 @@ where
                         #[cfg(feature = "std")]
                         if new_messages {
                             // set the recv time
-                            // We don't do that in recv() to keep calls to current_time to a minimum.
+                            // We don't do that in recv() to keep calls to `current_time` to a minimum.
                             self.llmp_clients[client_id.0 as usize].last_msg_time = current_time();
                         }
                         return Ok(new_messages);

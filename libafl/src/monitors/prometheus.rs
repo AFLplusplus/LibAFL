@@ -95,7 +95,7 @@ where
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn display(&mut self, event_msg: String, sender_id: u32) {
+    fn display(&mut self, event_msg: String, sender_id: ClientId) {
         // Update the prometheus metrics
         // Label each metric with the sender / client_id
         // The gauges must take signed i64's, with max value of 2^63-1 so it is

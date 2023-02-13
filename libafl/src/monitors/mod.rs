@@ -370,7 +370,7 @@ impl Monitor for SimplePrintingMonitor {
             // Print the client performance monitor.
             println!(
                 "Client {:03}:\n{}",
-                sender_id, self.client_stats[sender_id as usize].introspection_monitor
+                sender_id, self.client_stats[sender_id.0 as usize].introspection_monitor
             );
             // Separate the spacing just a bit
             println!();
@@ -449,7 +449,7 @@ where
             // Print the client performance monitor.
             let fmt = format!(
                 "Client {:03}:\n{}",
-                sender_id, self.client_stats[sender_id as usize].introspection_monitor
+                sender_id, self.client_stats[sender_id.0 as usize].introspection_monitor
             );
             (self.print_fn)(fmt);
 
@@ -1079,7 +1079,7 @@ pub mod pybind {
             unwrap_me_mut!(self.wrapper, m, { m.start_time() })
         }
 
-        fn display(&mut self, event_msg: String, sender_id: u32) {
+        fn display(&mut self, event_msg: String, sender_id: ClientId) {
             unwrap_me_mut!(self.wrapper, m, { m.display(event_msg, sender_id) });
         }
     }
