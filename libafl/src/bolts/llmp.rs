@@ -2032,8 +2032,15 @@ where
             match unsafe { self.handle_new_msgs(ClientId(i as u32), on_new_msg) } {
                 Ok(has_messages) => {
                     #[cfg(feature = "std")]
-                    if current_time - self.llmp_clients[i].last_msg_time > CLIENT_TIMEOUT {
-                        self.clients_to_remove.push(i as u32);
+                    {
+                        let last_msg_time = self.llmp_clients[i].last_msg_time;
+                        if last_msg_time < current_time
+                            && current_time - last_msg_time > CLIENT_TIMEOUT
+                        {
+                            self.clients_to_remove.push(i as u32);
+                            #[cfg(feature = "llmp_debug")]
+                            println!("Client {i} timed out. Removing.");
+                        }
                     }
                     new_messages = has_messages;
                 }
