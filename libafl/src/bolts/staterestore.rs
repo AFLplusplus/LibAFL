@@ -26,6 +26,9 @@ use crate::{
     Error,
 };
 
+/// If the saved page content equals exactly this buf, the restarted child wants to exit cleanly.
+const EXITING_MAGIC: &[u8; 16] = b"LIBAFL_EXIT_NOW\0";
+
 /// The struct stored on the shared map, containing either the data, or the filename to read contents from.
 #[repr(C)]
 struct StateShMemContent {
@@ -187,6 +190,27 @@ where
         content_mut.buf_len = 0;
     }
 
+    /// When called from a child, informs the restarter/parent process
+    /// that it should no longer respawn the child.
+    pub fn send_exiting(&mut self) {
+        self.reset();
+
+        // This will always be true, panic is fine.
+        assert!(size_of::<StateShMemContent>() + EXITING_MAGIC.len() > self.shmem.len());
+
+        let content_mut = self.content_mut();
+        content_mut.buf.copy_from_slice(EXITING_MAGIC);
+        content_mut.buf_len = EXITING_MAGIC.len();
+    }
+
+    /// Returns true, if [`Self::send_exiting`] was called on this [`StateRestorer`] last.
+    /// This should be checked in the parent before deciding to restore the client.
+    pub fn wants_to_exit(&self) -> bool {
+        assert!(size_of::<StateShMemContent>() + EXITING_MAGIC.len() > self.shmem.len());
+        self.content().buf_len == EXITING_MAGIC.len()
+            && &self.content().buf[..EXITING_MAGIC.len()] == EXITING_MAGIC
+    }
+
     fn content_mut(&mut self) -> &mut StateShMemContent {
         let ptr = self.shmem.as_slice().as_ptr();
         #[allow(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
@@ -207,7 +231,7 @@ where
         self.content().buf_len > 0
     }
 
-    /// Restores the contents saved in this [`StateRestorer`], if any are availiable.
+    /// Restores the contents saved in this [`StateRestorer`], if any are available.
     /// Can only be read once.
     pub fn restore<S>(&self) -> Result<Option<S>, Error>
     where

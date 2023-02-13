@@ -353,6 +353,11 @@ where
         self.staterestorer.reset();
         self.staterestorer.save(state)
     }
+
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        self.staterestorer.send_exiting();
+        Ok(())
+    }
 }
 
 #[cfg(feature = "std")]

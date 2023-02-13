@@ -494,6 +494,12 @@ pub trait EventRestarter: UsesState {
         Ok(())
     }
 
+    /// Send information that this client is exiting.
+    /// No need to restart us any longer, and no need to print an error, either.
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// Block until we are safe to exit.
     #[inline]
     fn await_restart_safe(&mut self) {}

@@ -718,6 +718,13 @@ where
         self.staterestorer
             .save(&(state, &self.llmp_mgr.describe()?))
     }
+
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        self.staterestorer.send_exiting();
+        // Also inform the broker that we are about to exit.
+        // This way, the broker can clean up the pages, and eventually exit.
+        self.llmp_mgr.send_exiting()
+    }
 }
 
 #[cfg(feature = "std")]
@@ -785,13 +792,6 @@ where
     /// Get the staterestorer (mutable)
     pub fn staterestorer_mut(&mut self) -> &mut StateRestorer<SP> {
         &mut self.staterestorer
-    }
-
-    /// Send information that this client is exiting.
-    /// The other side may free up all allocated memory.
-    /// We are no longer allowed to send anything afterwards.
-    pub fn send_exiting(&mut self) -> Result<(), Error> {
-        self.llmp_mgr.send_exiting()
     }
 }
 
@@ -1020,6 +1020,10 @@ where
 
                     // Storing state in the last round did not work
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
+                }
+
+                if staterestorer.wants_to_exit() {
+                    return Err(Error::shutting_down());
                 }
 
                 ctr = ctr.wrapping_add(1);
