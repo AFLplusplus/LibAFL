@@ -926,8 +926,7 @@ where
                     )?;
 
                     broker_things(event_broker, self.remote_broker_addr)?;
-
-                    return Err(Error::shutting_down());
+                    unreachable!("The broker may never return normally, only on Errors or when shutting down.");
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
