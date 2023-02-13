@@ -29,6 +29,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt::Debug, time::Duration};
+use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 pub use value::*;
@@ -408,10 +409,11 @@ where
 }
 
 /// A simple observer, just overlooking the runtime of the target.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg(feature = "std")]
+#[derive(Debug, Clone)]
 pub struct TimeObserver {
     name: String,
-    start_time: Duration,
+    start_time: Instant,
     last_runtime: Option<Duration>,
 }
 
@@ -421,7 +423,7 @@ impl TimeObserver {
     pub fn new(name: &'static str) -> Self {
         Self {
             name: name.to_string(),
-            start_time: Duration::from_secs(0),
+            start_time: Instant::now(),
             last_runtime: None,
         }
     }
@@ -439,7 +441,7 @@ where
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
-        self.start_time = current_time();
+        self.start_time = Instant::now();
         Ok(())
     }
 
@@ -449,7 +451,7 @@ where
         _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        self.last_runtime = current_time().checked_sub(self.start_time);
+        self.last_runtime = self.start_time.elapsed();
         Ok(())
     }
 }
