@@ -36,7 +36,6 @@ pub use value::*;
 
 use crate::{
     bolts::{
-        current_time,
         ownedref::OwnedMutPtr,
         tuples::{MatchName, Named},
     },
@@ -410,11 +409,37 @@ where
 
 /// A simple observer, just overlooking the runtime of the target.
 #[cfg(feature = "std")]
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
     name: String,
+
+    #[serde(with = "instant_serializer")]
     start_time: Instant,
     last_runtime: Option<Duration>,
+}
+
+mod instant_serializer {
+    use core::time::Duration;
+    use std::time::Instant;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(instant: &Instant, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let duration = instant.elapsed();
+        duration.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Instant, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let duration = Duration::deserialize(deserializer)?;
+        let instant = Instant::now() - duration;
+        Ok(instant)
+    }
 }
 
 impl TimeObserver {
