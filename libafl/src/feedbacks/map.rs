@@ -39,6 +39,9 @@ pub type MaxMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, MaxReducer, 
 /// A [`MapFeedback`] that strives to minimize the map contents.
 pub type MinMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, MinReducer, S, T>;
 
+/// A [`MapFeedback`] that always returns `true` for `is_novel`. Useful for tracing all executions.
+pub type AlwaysUniqueMapFeedback<O, S, T> = MapFeedback<AllIsNovel, O, NopReducer, S, T>;
+
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
 pub type MaxMapPow2Feedback<O, S, T> = MapFeedback<NextPow2IsNovel, O, MaxReducer, S, T>;
@@ -80,6 +83,20 @@ where
     #[inline]
     fn reduce(history: T, new: T) -> T {
         history & new
+    }
+}
+
+/// A [`NopReducer`] does nothing, and just "reduces" to the second/`new` value.
+#[derive(Clone, Debug)]
+pub struct NopReducer {}
+
+impl<T> Reducer<T> for NopReducer
+where
+    T: Default + Copy + 'static,
+{
+    #[inline]
+    fn reduce(_history: T, new: T) -> T {
+        new
     }
 }
 
