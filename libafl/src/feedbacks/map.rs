@@ -39,8 +39,8 @@ pub type MaxMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, MaxReducer, 
 /// A [`MapFeedback`] that strives to minimize the map contents.
 pub type MinMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, MinReducer, S, T>;
 
-/// A [`MapFeedback`] that always returns `true` for `is_novel`. Useful for tracing all executions.
-pub type AlwaysUniqueMapFeedback<O, S, T> = MapFeedback<AllIsNovel, O, NopReducer, S, T>;
+/// A [`MapFeedback`] that always returns `true` for `is_interesting`. Useful for tracing all executions.
+pub type AlwaysInterestingMapFeedback<O, S, T> = MapFeedback<AllIsNovel, O, NopReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
