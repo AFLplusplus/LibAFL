@@ -155,7 +155,7 @@ where
             Some(Duration::from_millis(5)),
         );
 
-        #[cfg(feature = "llmp_debug")]
+        #[cfg(all(feature = "std", feature = "llmp_debug"))]
         println!("The last client quit. Exiting.");
 
         Err(Error::shutting_down())
