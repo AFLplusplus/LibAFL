@@ -232,7 +232,7 @@ where
                 let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
                 // In case the corpus is empty (on first run), reset
-                if state.corpus().count() < 1 {
+                if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
                         let mut generator = RandBytesGenerator::new(32);
@@ -335,7 +335,7 @@ where
                 let mut executor = TimeoutExecutor::new(executor, timeout);
 
                 // In case the corpus is empty (on first run), reset
-                if state.corpus().count() < 1 {
+                if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
                         let mut generator = RandBytesGenerator::new(32);

@@ -3,16 +3,17 @@
 pub mod simple;
 pub use simple::*;
 pub mod llmp;
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::c_void;
-use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
+use core::{
+    fmt,
+    hash::{BuildHasher, Hasher},
+    marker::PhantomData,
+    time::Duration,
+};
 
-use ahash::AHasher;
+use ahash::RandomState;
 pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -28,7 +29,6 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    stages::calibrate::UnstableEntriesMetadata,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
@@ -183,7 +183,7 @@ impl EventConfig {
     /// Create a new [`EventConfig`] from a name hash
     #[must_use]
     pub fn from_name(name: &str) -> Self {
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher(); //AHasher::new_with_keys(0, 0);
         hasher.write(name.as_bytes());
         EventConfig::FromName {
             name_hash: hasher.finish(),
@@ -456,23 +456,6 @@ where
                     phantom: PhantomData,
                 },
             )?;
-
-            // Send the stability event to the broker
-            if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
-                let unstable_entries = meta.unstable_entries().len();
-                let map_len = meta.map_len();
-                self.fire(
-                    state,
-                    Event::UpdateUserStats {
-                        name: "stability".to_string(),
-                        value: UserStats::Ratio(
-                            (map_len - unstable_entries) as u64,
-                            map_len as u64,
-                        ),
-                        phantom: PhantomData,
-                    },
-                )?;
-            }
 
             // If performance monitor are requested, fire the `UpdatePerfMonitor` event
             #[cfg(feature = "introspection")]
