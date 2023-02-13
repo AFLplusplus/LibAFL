@@ -2,8 +2,7 @@
 //! with testcases only from a subset of the total corpus.
 
 use alloc::vec::Vec;
-use core::{cmp::Ordering, marker::PhantomData};
-use std::any::type_name;
+use core::{any::type_name, cmp::Ordering, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
