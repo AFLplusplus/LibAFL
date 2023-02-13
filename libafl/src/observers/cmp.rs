@@ -461,7 +461,7 @@ where
                 }
 
                 let cmpmap_idx = i;
-                let cmp_values = Vec::new();
+                let mut cmp_values = Vec::new();
                 if self.original {
                     // push into orig_cmpvals
                     for j in 0..execs {

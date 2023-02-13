@@ -685,6 +685,7 @@ where
         let orig_val = orig_cmpvals.get(&idx).unwrap();
         let new_val = new_cmpvals.get(&idx).unwrap();
 
+        /*
         match (orig_val, new_val) {
             (OperandsVec(orig), OperandsVec(new)) => {
                 // This match branch is cmp_fuzz (AFL++ RQ)
@@ -740,7 +741,7 @@ where
                 // Collision?
             }
         }
-
+        */
         Ok(MutationResult::Mutated)
     }
 }

@@ -33,7 +33,7 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage, ColorizationStage,
         TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
@@ -295,6 +295,8 @@ fn fuzz(
     )?;
 
     let power = StdPowerMutationalStage::new(mutator, &edges_observer);
+
+    // let colorization = ColorizationStage::new(&edges_observer);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
