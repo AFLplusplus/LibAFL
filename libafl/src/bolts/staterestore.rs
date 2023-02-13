@@ -195,8 +195,7 @@ where
     pub fn send_exiting(&mut self) {
         self.reset();
 
-        // This will always be true, panic is fine.
-        assert!(size_of::<StateShMemContent>() + EXITING_MAGIC.len() > self.shmem.len());
+        assert!(size_of::<StateShMemContent>() + EXITING_MAGIC.len() <= self.shmem.len());
 
         let content_mut = self.content_mut();
         content_mut.buf.copy_from_slice(EXITING_MAGIC);
@@ -206,7 +205,7 @@ where
     /// Returns true, if [`Self::send_exiting`] was called on this [`StateRestorer`] last.
     /// This should be checked in the parent before deciding to restore the client.
     pub fn wants_to_exit(&self) -> bool {
-        assert!(size_of::<StateShMemContent>() + EXITING_MAGIC.len() > self.shmem.len());
+        assert!(size_of::<StateShMemContent>() + EXITING_MAGIC.len() <= self.shmem.len());
         self.content().buf_len == EXITING_MAGIC.len()
             && &self.content().buf[..EXITING_MAGIC.len()] == EXITING_MAGIC
     }
