@@ -525,16 +525,16 @@ where
         }
 
         let initial = observer.initial();
-        if interesting {
-            if let Some(indexes) = self.indexes.as_mut() {
-                indexes.extend(
-                    observer
-                        .as_iter()
-                        .enumerate()
-                        .filter_map(|(i, &e)| (e != initial).then_some(i)),
-                );
-            }
+        if let Some(indexes) = self.indexes.as_mut() {
+            indexes.extend(
+                observer
+                    .as_iter()
+                    .enumerate()
+                    .filter_map(|(i, &e)| (e != initial).then_some(i)),
+            );
+        }
 
+        if interesting {
             let len = history_map.len();
             let filled = history_map.iter().filter(|&&i| i != initial).count();
             manager.fire(
@@ -700,16 +700,16 @@ where
         }
 
         let initial = observer.initial();
-        if interesting {
-            if let Some(indexes) = self.indexes.as_mut() {
-                indexes.extend(
-                    observer
-                        .as_iter()
-                        .enumerate()
-                        .filter_map(|(i, &e)| (e != initial).then_some(i)),
-                );
-            }
+        if let Some(indexes) = self.indexes.as_mut() {
+            indexes.extend(
+                observer
+                    .as_iter()
+                    .enumerate()
+                    .filter_map(|(i, &e)| (e != initial).then_some(i)),
+            );
+        }
 
+        if interesting {
             let len = history_map.len();
             let filled = history_map.iter().filter(|&&i| i != initial).count();
             manager.fire(

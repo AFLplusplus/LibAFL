@@ -9,7 +9,7 @@ use core::{marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
     inputs::UsesInput,
     schedulers::Scheduler,
     state::{HasCorpus, HasMetadata, UsesState},
@@ -191,9 +191,9 @@ where
             Some(parent_idx) => state
                 .corpus()
                 .get(parent_idx)?
-                .borrow_mut()
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .borrow()
+                .metadata()
+                .get::<SchedulerTestcaseMetaData>()
                 .ok_or_else(|| {
                     Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?
@@ -203,6 +203,26 @@ where
 
         // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
+        state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .add_metadata(SchedulerTestcaseMetaData::new(depth));
+        Ok(())
+    }
+
+    fn on_replace(
+        &self,
+        state: &mut Self::State,
+        idx: CorpusId,
+        prev: &Testcase<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
+        let depth = prev
+            .metadata()
+            .get::<SchedulerTestcaseMetaData>()
+            .ok_or_else(|| Error::key_not_found("SchedulerTestcaseMetaData not found".to_string()))?
+            .depth()
+            + 1;
         state
             .corpus()
             .get(idx)?

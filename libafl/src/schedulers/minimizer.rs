@@ -3,6 +3,7 @@
 
 use alloc::vec::Vec;
 use core::{cmp::Ordering, marker::PhantomData};
+use std::any::type_name;
 
 use hashbrown::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
@@ -83,8 +84,8 @@ where
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
-        self.update_score(state, idx)?;
-        self.base.on_add(state, idx)
+        self.base.on_add(state, idx)?;
+        self.update_score(state, idx)
     }
 
     /// Replaces the testcase at the given idx
@@ -94,8 +95,8 @@ where
         idx: CorpusId,
         testcase: &Testcase<<CS::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        self.update_score(state, idx)?;
-        self.base.on_replace(state, idx, testcase)
+        self.base.on_replace(state, idx, testcase)?;
+        self.update_score(state, idx)
     }
 
     /// Removes an entry from the corpus, returning M if M was present.
@@ -206,14 +207,13 @@ where
                     "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
                 ))
             })?;
+            let top_rateds = state.metadata().get::<TopRatedsMetadata>().unwrap();
             for elem in meta.as_slice() {
-                if let Some(old_idx) = state
-                    .metadata()
-                    .get::<TopRatedsMetadata>()
-                    .unwrap()
-                    .map
-                    .get(elem)
-                {
+                if let Some(old_idx) = top_rateds.map.get(elem) {
+                    if *old_idx == idx {
+                        new_favoreds.push(*elem); // always retain current; we'll drop it later otherwise
+                        continue;
+                    }
                     let mut old = state.corpus().get(*old_idx)?.borrow_mut();
                     if factor > F::compute(&mut *old, state)? {
                         continue;
@@ -222,7 +222,8 @@ where
                     let must_remove = {
                         let old_meta = old.metadata_mut().get_mut::<M>().ok_or_else(|| {
                             Error::key_not_found(format!(
-                                "Metadata needed for MinimizerScheduler not found in testcase #{old_idx}"
+                                "{} needed for MinimizerScheduler not found in testcase #{old_idx}",
+                                type_name::<M>()
                             ))
                         })?;
                         *old_meta.refcnt_mut() -= 1;
@@ -275,7 +276,8 @@ where
                 let mut entry = state.corpus().get(*idx)?.borrow_mut();
                 let meta = entry.metadata().get::<M>().ok_or_else(|| {
                     Error::key_not_found(format!(
-                        "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
+                        "{} needed for MinimizerScheduler not found in testcase #{idx}",
+                        type_name::<M>()
                     ))
                 })?;
                 for elem in meta.as_slice() {
