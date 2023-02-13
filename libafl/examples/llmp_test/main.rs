@@ -3,26 +3,28 @@ This shows how llmp can be used directly, without libafl abstractions
 */
 extern crate alloc;
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(feature = "std")]
 use core::time::Duration;
-#[cfg(all(unix, feature = "std"))]
+#[cfg(feature = "std")]
 use std::{thread, time};
 
-use libafl::bolts::llmp::Tag;
-#[cfg(all(unix, feature = "std"))]
+#[cfg(feature = "std")]
 use libafl::{
     bolts::{
-        llmp,
+        llmp::{self, ClientId, Tag},
         shmem::{ShMemProvider, StdShMemProvider},
     },
     Error,
 };
 
-const _TAG_SIMPLE_U32_V1: Tag = 0x5130_0321;
-const _TAG_MATH_RESULT_V1: Tag = 0x7747_4331;
-const _TAG_1MEG_V1: Tag = 0xB111_1161;
+#[cfg(feature = "std")]
+const _TAG_SIMPLE_U32_V1: Tag = Tag(0x5130_0321);
+#[cfg(feature = "std")]
+const _TAG_MATH_RESULT_V1: Tag = Tag(0x7747_4331);
+#[cfg(feature = "std")]
+const _TAG_1MEG_V1: Tag = Tag(0xB111_1161);
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(feature = "std")]
 fn adder_loop(port: u16) -> ! {
     let shmem_provider = StdShMemProvider::new().unwrap();
     let mut client = llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port).unwrap();
@@ -39,7 +41,7 @@ fn adder_loop(port: u16) -> ! {
                         current_result.wrapping_add(u32::from_le_bytes(buf.try_into().unwrap()));
                 }
                 _ => println!(
-                    "Adder Client ignored unknown message {:#x} from client {} with {} bytes",
+                    "Adder Client ignored unknown message {:?} from client {:?} with {} bytes",
                     tag,
                     sender,
                     buf.len()
@@ -60,7 +62,7 @@ fn adder_loop(port: u16) -> ! {
     }
 }
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(feature = "std")]
 fn large_msg_loop(port: u16) -> ! {
     let mut client =
         llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new().unwrap(), port).unwrap();
@@ -76,9 +78,9 @@ fn large_msg_loop(port: u16) -> ! {
 }
 
 #[allow(clippy::unnecessary_wraps)]
-#[cfg(all(unix, feature = "std"))]
+#[cfg(feature = "std")]
 fn broker_message_hook(
-    client_id: u32,
+    client_id: ClientId,
     tag: llmp::Tag,
     _flags: llmp::Flags,
     message: &[u8],
@@ -106,12 +108,12 @@ fn broker_message_hook(
     }
 }
 
-#[cfg(not(unix))]
+#[cfg(not(feature = "std"))]
 fn main() {
-    todo!("LLMP is not yet supported on this platform.");
+    eprintln!("LLMP example is currently not supported on no_std. Implement ShMem for no_std.");
 }
 
-#[cfg(unix)]
+#[cfg(feature = "std")]
 fn main() {
     /* The main node has a broker, and a few worker threads */
 
