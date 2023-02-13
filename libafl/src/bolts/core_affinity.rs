@@ -46,10 +46,11 @@ pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
 
 /// This represents a CPU core.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CoreId {
+#[repr(transparent)]
+pub struct CoreId(
     /// The numerical `id` of a core
-    pub id: usize,
-}
+    pub usize,
+);
 
 impl CoreId {
     /// Set the affinity of the current process to this [`CoreId`]
@@ -73,13 +74,13 @@ impl CoreId {
 
 impl From<usize> for CoreId {
     fn from(id: usize) -> Self {
-        CoreId { id }
+        CoreId(id)
     }
 }
 
 impl From<CoreId> for usize {
     fn from(core_id: CoreId) -> usize {
-        core_id.id
+        core_id.0
     }
 }
 
@@ -98,6 +99,19 @@ impl Cores {
     /// Pick all cores
     pub fn all() -> Result<Self, Error> {
         Self::from_cmdline("all")
+    }
+
+    /// Trims the number of cores to the given value, dropping additional cores
+    pub fn trim(&mut self, count: usize) -> Result<(), Error> {
+        if count > self.ids.len() {
+            return Err(Error::illegal_argument(format!(
+                "Core trim value {count} is larger than number of chosen cores of {}",
+                self.ids.len()
+            )));
+        }
+
+        self.ids.resize(count, CoreId(0));
+        Ok(())
     }
 
     /// Parses core binding args from user input.
@@ -183,11 +197,7 @@ impl TryFrom<&str> for Cores {
 #[cfg(feature = "std")]
 #[deprecated(since = "0.8.1", note = "Use Cores::from_cmdline instead")]
 pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
-    Ok(Cores::from_cmdline(args)?
-        .ids
-        .iter()
-        .map(|x| x.id)
-        .collect())
+    Ok(Cores::from_cmdline(args)?.ids.iter().map(|x| x.0).collect())
 }
 
 // Linux Section
@@ -226,7 +236,7 @@ mod linux {
 
         for i in 0..CPU_SETSIZE as usize {
             if unsafe { CPU_ISSET(i, &full_set) } {
-                core_ids.push(CoreId { id: i });
+                core_ids.push(CoreId(i));
             }
         }
 
@@ -238,7 +248,7 @@ mod linux {
         // one core active.
         let mut set = new_cpu_set();
 
-        unsafe { CPU_SET(core_id.id, &mut set) };
+        unsafe { CPU_SET(core_id.0, &mut set) };
 
         // Set the current thread's core affinity.
         let result = unsafe {
