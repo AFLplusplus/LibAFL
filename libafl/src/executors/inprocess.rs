@@ -186,7 +186,7 @@ where
         OF: Feedback<S>,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
+        let handlers = InProcessHandlers::new::<Self, EM, OF, Z>()?;
         #[cfg(windows)]
         // Some initialization necessary for windows.
         unsafe {
@@ -337,14 +337,13 @@ impl InProcessHandlers {
     }
 
     /// Create new [`InProcessHandlers`].
-    pub fn new<E, EM, OF, Z, H>() -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = E::State>,
-        H: FnMut(&<E::State as UsesInput>::Input) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
         unsafe {
@@ -929,11 +928,6 @@ pub mod windows_asan_handler {
             // Make sure we don't crash in the crash handler forever.
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-            #[cfg(feature = "std")]
-            eprintln!("Child crashed!");
-            #[cfg(feature = "std")]
-            drop(stdout().flush());
-
             run_observers_and_save_state::<E, EM, OF, Z>(
                 executor,
                 state,
@@ -971,7 +965,7 @@ mod windows_exception_handler {
 
     use crate::{
         bolts::os::windows_exceptions::{
-            ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
+            ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS,
         },
         events::{EventFirer, EventRestarter},
         executors::{
@@ -1007,7 +1001,9 @@ mod windows_exception_handler {
         }
 
         fn exceptions(&self) -> Vec<ExceptionCode> {
-            CRASH_EXCEPTIONS.to_vec()
+            let crash_list = CRASH_EXCEPTIONS.to_vec();
+            assert!(crash_list.len() < EXCEPTION_HANDLERS_SIZE - 1);
+            crash_list
         }
     }
 
@@ -1161,6 +1157,8 @@ mod windows_exception_handler {
             compiler_fence(Ordering::SeqCst);
         }
 
+        // Is this really crash?
+        let mut is_crash = true;
         #[cfg(feature = "std")]
         if let Some(exception_pointers) = exception_pointers.as_mut() {
             let code = ExceptionCode::try_from(
@@ -1172,7 +1170,14 @@ mod windows_exception_handler {
                     .0,
             )
             .unwrap();
-            eprintln!("Crashed with {code}");
+
+            let exception_list = data.exceptions();
+            if exception_list.contains(&code) {
+                eprintln!("Crashed with {code}");
+            } else {
+                // eprintln!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
+                is_crash = false;
+            }
         } else {
             eprintln!("Crashed without exception (probably due to SIGABRT)");
         };
@@ -1216,28 +1221,37 @@ mod windows_exception_handler {
             let event_mgr = data.event_mgr_mut::<EM>();
 
             #[cfg(feature = "std")]
-            eprintln!("Child crashed!");
+            if is_crash {
+                eprintln!("Child crashed!");
+            } else {
+                // eprintln!("Exception received!");
+            }
+
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
             // Make sure we don't crash in the crash handler forever.
-            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+            if is_crash {
+                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-            #[cfg(feature = "std")]
-            eprintln!("Child crashed!");
-            #[cfg(feature = "std")]
-            drop(stdout().flush());
-
-            run_observers_and_save_state::<E, EM, OF, Z>(
-                executor,
-                state,
-                input,
-                fuzzer,
-                event_mgr,
-                ExitKind::Crash,
-            );
+                run_observers_and_save_state::<E, EM, OF, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
+            } else {
+                // This is not worth saving
+            }
         }
-        ExitProcess(1);
+
+        if is_crash {
+            println!("Exiting!");
+            ExitProcess(1);
+        }
+        // println!("Not Exiting!");
     }
 }
 

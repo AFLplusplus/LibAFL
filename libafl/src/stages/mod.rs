@@ -33,6 +33,9 @@ pub use owned::StagesOwnedList;
 pub mod tuneable;
 pub use tuneable::*;
 
+pub mod colorization;
+pub use colorization::*;
+
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]

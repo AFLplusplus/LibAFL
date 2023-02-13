@@ -378,7 +378,7 @@ where
             if attr.is_file() && attr.len() > 0 {
                 files.push(path);
             } else if attr.is_dir() {
-                Self::visit_initial_directory(files, in_dir)?;
+                Self::visit_initial_directory(files, &path)?;
             }
         }
 
