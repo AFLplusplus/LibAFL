@@ -337,6 +337,8 @@ where
 /// The most common AFL-like feedback type
 #[derive(Clone, Debug)]
 pub struct MapFeedback<N, O, R, S, T> {
+    /// For tracking, always keep indexes and/or novelties, even if the map isn't considered `interesting`.
+    always_track: bool,
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
     /// New indexes observed in the last observation
@@ -595,6 +597,7 @@ where
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(map_observer.name()),
+            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -608,6 +611,7 @@ where
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(map_observer.name()),
+            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -622,7 +626,15 @@ where
             observer_name: observer_name.to_string(),
             stats_name: create_stats_name(name),
             phantom: PhantomData,
+            always_track: false,
         }
+    }
+
+    /// For tracking, enable `always_track` mode, that also adds `novelties` or `indexes`,
+    /// even if the map is not novel for this feedback.
+    /// This is useful in combination with `load_initial_inputs_forced`, or other feedbacks.
+    pub fn set_always_track(&mut self, always_track: bool) {
+        self.always_track = always_track;
     }
 
     /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
@@ -636,6 +648,7 @@ where
             name: name.to_string(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(name),
+            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -654,6 +667,7 @@ where
             observer_name: observer_name.to_string(),
             stats_name: create_stats_name(name),
             name: name.to_string(),
+            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -700,7 +714,7 @@ where
         }
 
         let initial = observer.initial();
-        if interesting {
+        if interesting || self.always_track {
             if let Some(indexes) = self.indexes.as_mut() {
                 indexes.extend(
                     observer
