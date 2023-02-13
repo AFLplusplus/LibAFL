@@ -2074,8 +2074,8 @@ where
         self.llmp_clients.len() > 1
     }
 
-    /// Loops infinitely, forwarding and handling all incoming messages from clients.
-    /// Never returns.
+    /// Loops until the last client quits,
+    /// forwarding and handling all incoming messages from clients.
     /// Will call `on_timeout` roughly after `timeout`
     /// Panics on error.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
@@ -2141,8 +2141,8 @@ where
             .expect("Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.");
     }
 
-    /// Loops infinitely, forwarding and handling all incoming messages from clients.
-    /// Never returns. Panics on error.
+    /// Loops unitl the last client quit,
+    /// forwarding and handling all incoming messages from clients.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     /// On std, if you need to run code even if no update got sent, use `Self::loop_with_timeout` (needs the `std` feature).
     pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>)
