@@ -430,6 +430,7 @@ mod instant_serializer {
 
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn serialize<S>(instant: &Instant, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
