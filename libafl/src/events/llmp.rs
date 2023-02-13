@@ -888,9 +888,7 @@ where
                     broker.connect_b2b(remote_broker_addr)?;
                 };
 
-                broker.broker_loop()?;
-                // We can only ever return a shutting_down error from broker_loop.
-                return Err(Error::shutting_down());
+                broker.broker_loop()
             };
 
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
