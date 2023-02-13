@@ -31,8 +31,16 @@ pub mod tuples;
 
 use alloc::{string::String, vec::Vec};
 use core::{iter::Iterator, time};
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// The client ID == the sender id.
+#[repr(transparent)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
+pub struct ClientId(pub u32);
 
 /// Can be converted to a slice
 pub trait AsSlice {

@@ -6,7 +6,7 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt::Write, time::Duration};
 
 use crate::{
-    bolts::{current_time, format_duration_hms, llmp::ClientId},
+    bolts::{current_time, format_duration_hms, ClientId},
     monitors::{ClientStats, Monitor},
 };
 

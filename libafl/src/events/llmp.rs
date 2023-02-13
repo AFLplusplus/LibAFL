@@ -38,8 +38,9 @@ use crate::{
 };
 use crate::{
     bolts::{
-        llmp::{self, ClientId, LlmpClient, LlmpClientDescription, Tag},
+        llmp::{self, LlmpClient, LlmpClientDescription, Tag},
         shmem::ShMemProvider,
+        ClientId,
     },
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
@@ -1436,11 +1437,12 @@ mod tests {
 
     use crate::{
         bolts::{
-            llmp::{ClientId, LlmpClient, LlmpSharedMap},
+            llmp::{LlmpClient, LlmpSharedMap},
             rands::StdRand,
             shmem::{ShMemProvider, StdShMemProvider},
             staterestore::StateRestorer,
             tuples::tuple_list,
+            ClientId,
         },
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},

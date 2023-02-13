@@ -21,8 +21,13 @@ use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, Prog
 use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use crate::bolts::os::{fork, ForkResult};
+#[cfg(all(unix, feature = "std"))]
 use crate::{
-    bolts::llmp::ClientId,
+    bolts::os::unix_signals::setup_signal_handler,
+    events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
+};
+use crate::{
+    bolts::ClientId,
     events::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
@@ -31,11 +36,6 @@ use crate::{
     monitors::Monitor,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
-};
-#[cfg(all(unix, feature = "std"))]
-use crate::{
-    bolts::os::unix_signals::setup_signal_handler,
-    events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
 };
 #[cfg(feature = "std")]
 use crate::{

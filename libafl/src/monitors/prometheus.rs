@@ -41,7 +41,7 @@ use prometheus_client::{
 use tide::Request;
 
 use crate::{
-    bolts::{current_time, format_duration_hms},
+    bolts::{current_time, format_duration_hms, ClientId},
     monitors::{ClientStats, Monitor, UserStats},
 };
 

@@ -11,8 +11,9 @@ use std::{thread, time};
 #[cfg(feature = "std")]
 use libafl::{
     bolts::{
-        llmp::{self, ClientId, Tag},
+        llmp::{self, Tag},
         shmem::{ShMemProvider, StdShMemProvider},
+        ClientId,
     },
     Error,
 };

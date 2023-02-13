@@ -23,7 +23,7 @@ pub use disk::{OnDiskJSONMonitor, OnDiskTOMLMonitor};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::bolts::{current_time, format_duration_hms, llmp::ClientId};
+use crate::bolts::{current_time, format_duration_hms, ClientId};
 
 #[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
@@ -370,7 +370,7 @@ impl Monitor for SimplePrintingMonitor {
             // Print the client performance monitor.
             println!(
                 "Client {:03}:\n{}",
-                sender_id, self.client_stats[sender_id.0 as usize].introspection_monitor
+                sender_id.0, self.client_stats[sender_id.0 as usize].introspection_monitor
             );
             // Separate the spacing just a bit
             println!();
@@ -449,7 +449,7 @@ where
             // Print the client performance monitor.
             let fmt = format!(
                 "Client {:03}:\n{}",
-                sender_id, self.client_stats[sender_id.0 as usize].introspection_monitor
+                sender_id.0, self.client_stats[sender_id.0 as usize].introspection_monitor
             );
             (self.print_fn)(fmt);
 
@@ -957,7 +957,10 @@ pub mod pybind {
     use pyo3::{prelude::*, types::PyUnicode};
 
     use super::ClientStats;
-    use crate::monitors::{Monitor, SimpleMonitor};
+    use crate::{
+        bolts::ClientId,
+        monitors::{Monitor, SimpleMonitor},
+    };
 
     // TODO create a PyObjectFnMut to pass, track stabilization of https://github.com/rust-lang/rust/issues/29625
 

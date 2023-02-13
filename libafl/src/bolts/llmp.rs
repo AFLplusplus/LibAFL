@@ -98,7 +98,10 @@ use crate::bolts::os::unix_signals::{
     setup_signal_handler, siginfo_t, ucontext_t, Handler, Signal,
 };
 use crate::{
-    bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+    bolts::{
+        shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+        ClientId,
+    },
     Error,
 };
 
@@ -188,12 +191,6 @@ impl Debug for Tag {
     }
 }
 
-/// The client ID == the sender id.
-#[repr(transparent)]
-#[derive(
-    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
-)]
-pub struct ClientId(pub u32);
 /// The broker ID, for broker 2 broker communication.
 #[repr(transparent)]
 #[derive(

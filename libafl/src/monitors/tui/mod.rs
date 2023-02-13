@@ -25,7 +25,7 @@ use tui::{backend::CrosstermBackend, Terminal};
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
 use crate::{
-    bolts::{current_time, format_duration_hms, llmp::ClientId},
+    bolts::{current_time, format_duration_hms, ClientId},
     monitors::{ClientStats, Monitor, UserStats},
 };
 
