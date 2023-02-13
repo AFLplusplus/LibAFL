@@ -28,7 +28,10 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt::Debug, time::Duration};
+use core::fmt::Debug;
+
+#[cfg(feature = "std")]
+use core::time::Duration;
 
 #[cfg(feature = "std")]
 use std::time::Instant;

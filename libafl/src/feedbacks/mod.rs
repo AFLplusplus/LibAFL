@@ -27,8 +27,9 @@ use alloc::string::{String, ToString};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    time::Duration,
 };
+#[cfg(feature = "std")]
+use core::time::Duration;
 
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
