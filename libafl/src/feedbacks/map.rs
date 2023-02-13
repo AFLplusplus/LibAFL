@@ -208,7 +208,7 @@ where
 pub struct MapIndexesMetadata {
     /// The list of indexes.
     pub list: Vec<usize>,
-    /// A refcount used to know when remove this meta
+    /// A refcount used to know when we can remove this metadata
     pub tcref: isize,
 }
 
