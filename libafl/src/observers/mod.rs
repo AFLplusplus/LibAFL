@@ -418,6 +418,7 @@ pub struct TimeObserver {
     last_runtime: Option<Duration>,
 }
 
+#[cfg(feature = "std")]
 mod instant_serializer {
     use core::time::Duration;
     use std::time::Instant;
@@ -437,11 +438,12 @@ mod instant_serializer {
         D: Deserializer<'de>,
     {
         let duration = Duration::deserialize(deserializer)?;
-        let instant = Instant::now() - duration;
+        let instant = Instant::now().checked_sub(duration).unwrap();
         Ok(instant)
     }
 }
 
+#[cfg(feature = "std")]
 impl TimeObserver {
     /// Creates a new [`TimeObserver`] with the given name.
     #[must_use]
@@ -460,6 +462,7 @@ impl TimeObserver {
     }
 }
 
+#[cfg(feature = "std")]
 impl<S> Observer<S> for TimeObserver
 where
     S: UsesInput,
@@ -481,12 +484,14 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl Named for TimeObserver {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
+#[cfg(feature = "std")]
 impl<OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for TimeObserver
 where
     OTA: ObserversTuple<S>,
