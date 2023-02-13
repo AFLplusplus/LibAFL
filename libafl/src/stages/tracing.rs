@@ -7,11 +7,12 @@ use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers, ShadowExecutor},
+    inputs::{BytesInput, UsesInput},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::Stage,
+    stages::{colorization::TaintMetadata, Stage},
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, State, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, State, UsesState},
     Error,
 };
 
@@ -81,6 +82,109 @@ where
 }
 
 impl<EM, TE, Z> TracingStage<EM, TE, Z> {
+    /// Creates a new default stage
+    pub fn new(tracer_executor: TE) -> Self {
+        Self {
+            tracer_executor,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Gets the underlying tracer executor
+    pub fn executor(&self) -> &TE {
+        &self.tracer_executor
+    }
+
+    /// Gets the underlying tracer executor (mut)
+    pub fn executor_mut(&mut self) -> &mut TE {
+        &mut self.tracer_executor
+    }
+}
+
+/// Trace with tainted input
+#[derive(Clone, Debug)]
+pub struct TaintedTracingStage<EM, TE, Z> {
+    tracer_executor: TE,
+    #[allow(clippy::type_complexity)]
+    phantom: PhantomData<(EM, TE, Z)>,
+}
+
+impl<EM, TE, Z> UsesState for TaintedTracingStage<EM, TE, Z>
+where
+    TE: UsesState,
+{
+    type State = TE::State;
+}
+
+impl<E, EM, TE, Z> Stage<E, EM, Z> for TaintedTracingStage<EM, TE, Z>
+where
+    E: UsesState<State = TE::State>,
+    TE: Executor<EM, Z> + HasObservers,
+    TE::State: HasClientPerfMonitor
+        + HasExecutions
+        + HasCorpus
+        + HasMetadata
+        + UsesInput<Input = BytesInput>,
+    EM: UsesState<State = TE::State>,
+    Z: UsesState<State = TE::State>,
+{
+    #[inline]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut TE::State,
+        manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<(), Error> {
+        // First run with the un-mutated input
+
+        let unmutated_input = state
+            .corpus()
+            .get(corpus_idx)?
+            .borrow_mut()
+            .load_input()?
+            .clone();
+
+        self.tracer_executor
+            .observers_mut()
+            .pre_exec_all(state, &unmutated_input)?;
+
+        let exit_kind =
+            self.tracer_executor
+                .run_target(fuzzer, state, manager, &unmutated_input)?;
+
+        *state.executions_mut() += 1;
+
+        self.tracer_executor
+            .observers_mut()
+            .post_exec_all(state, &unmutated_input, &exit_kind)?;
+
+        // Second run with the mutated input
+        let mutated_input = match state.metadata().get::<TaintMetadata>() {
+            Some(meta) => BytesInput::from(meta.input_vec().as_ref()),
+            None => return Err(Error::unknown("No metadata found")),
+        };
+
+        self.tracer_executor
+            .observers_mut()
+            .pre_exec_all(state, &mutated_input)?;
+
+        let exit_kind = self
+            .tracer_executor
+            .run_target(fuzzer, state, manager, &mutated_input)?;
+
+        *state.executions_mut() += 1;
+
+        self.tracer_executor
+            .observers_mut()
+            .post_exec_all(state, &mutated_input, &exit_kind)?;
+
+        Ok(())
+    }
+}
+
+impl<EM, TE, Z> TaintedTracingStage<EM, TE, Z> {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
         Self {

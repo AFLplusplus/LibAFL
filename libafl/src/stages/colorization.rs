@@ -186,10 +186,11 @@ where
         // Keep it sorted, we want the earliest ones to come first so that it's easier to sort them
         let mut ok_ranges = BinaryHeap::new();
 
+        println!("Replaced bytes: {:#?}", changed_bytes);
         // Now replace with random values (This is type_replace)
         Self::type_replace(changed_bytes, state);
 
-        // println!("Replaced bytes: {:#?}", changed_bytes);
+        println!("Replaced bytes: {:#?}", changed_bytes);
         // What we do is now to separate the input into smaller regions
         // And in each small regions make sure changing those bytes in the regions does not affect the coverage
         for _ in 0..input_len * 2 {
@@ -219,7 +220,7 @@ where
 
                 if orig_hash == changed_hash {
                     // The change in this range is safe!
-                    // println!("this range safe to change: {:#?}", range_start..range_end);
+                    println!("this range safe to change: {:#?}", range_start..range_end);
 
                     ok_ranges.push(Earlier(range_start..range_end));
                 } else {
@@ -272,7 +273,7 @@ where
         if let Some(meta) = state.metadata_mut().get_mut::<TaintMetadata>() {
             meta.update(input.bytes().to_vec(), res);
 
-            // println!("meta: {:#?}", meta);
+            println!("meta: {:#?}", meta);
         } else {
             let meta = TaintMetadata::new(input.bytes().to_vec(), res);
             state.add_metadata::<TaintMetadata>(meta);

@@ -296,8 +296,6 @@ fn fuzz(
 
     let power = StdPowerMutationalStage::new(mutator, &edges_observer);
 
-    // let colorization = ColorizationStage::new(&edges_observer);
-
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
         PowerSchedule::EXPLORE,
@@ -305,6 +303,8 @@ fn fuzz(
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
+    let colorization = ColorizationStage::new(&edges_observer);
 
     let mut tokens = Tokens::new();
     let forkserver = ForkserverExecutor::builder()
@@ -368,7 +368,7 @@ fn fuzz(
             StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, tracing, i2s, power);
+        let mut stages = tuple_list!(calibration, tracing, colorization, i2s, power);
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
     } else {
