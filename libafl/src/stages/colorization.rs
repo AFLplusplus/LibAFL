@@ -171,6 +171,8 @@ where
         let consumed_input = input.clone();
 
         // First, run orig_input once and get the original hash
+
+        // Idea: No need to do this every time
         let orig_hash =
             Self::get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input, name)?;
         let changed_bytes = changed.bytes_mut();
