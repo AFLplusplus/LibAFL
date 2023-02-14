@@ -73,7 +73,11 @@ where
         _state: &S,
         _corpus_idx: CorpusId,
     ) -> Result<Self, Error> {
-        Ok(base.input().as_ref().unwrap().clone())
+        if let Some(i) = base.input().as_ref() {
+            Ok(i.clone())
+        } else {
+            Ok(base.clone().load_input()?.clone())
+        }
     }
 
     #[inline]
