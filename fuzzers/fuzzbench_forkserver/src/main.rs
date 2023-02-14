@@ -298,6 +298,7 @@ fn fuzz(
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
+        &mut state,
         PowerSchedule::EXPLORE,
     ));
 

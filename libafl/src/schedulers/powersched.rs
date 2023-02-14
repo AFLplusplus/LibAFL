@@ -298,7 +298,7 @@ where
 {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
-    pub fn new(strat: PowerSchedule, state: &mut S) -> Self {
+    pub fn new(state: &mut S, strat: PowerSchedule) -> Self {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(strat)));
         }
