@@ -226,6 +226,8 @@ where
 
         // Use these to adjust `SchedulerMetadata`
         let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
+        let prev_bitmap_size = prev_meta.bitmap_size();
+        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
 
         let psmeta = state
             .metadata_mut()
@@ -235,9 +237,8 @@ where
         // We won't add new one because it'll get added when it gets executed in calirbation next time.
         psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
         psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
-        // we cannot make determinations about the previous bitmap size, since we do not have the
-        // ability to recompute this from the full corpus without significant slowdowns
-        // for now, we assume that any replace/removal *does not* affect the filled bitmaps
+        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
+        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
 
         state
             .corpus()
@@ -268,6 +269,8 @@ where
 
         // Use these to adjust `SchedulerMetadata`
         let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
+        let prev_bitmap_size = prev_meta.bitmap_size();
+        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
 
         let psmeta = state
             .metadata_mut()
@@ -276,9 +279,9 @@ where
 
         psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
         psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
-        // we cannot make determinations about the previous bitmap size, since we do not have the
-        // ability to recompute this from the full corpus without significant slowdowns
-        // for now, we assume that any replace/removal *does not* affect the filled bitmaps
+        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
+        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
+        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
 
         Ok(())
     }
