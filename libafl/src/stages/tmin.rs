@@ -168,7 +168,7 @@ where
             let mut testcase = Testcase::with_executions(base, *state.executions());
             fuzzer
                 .feedback_mut()
-                .append_metadata(state, &mut testcase)?;
+                .append_metadata(state, observers, &mut testcase)?;
             let prev = state.corpus_mut().replace(base_corpus_idx, testcase)?;
             fuzzer
                 .scheduler_mut()
@@ -346,7 +346,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S as UsesInput>::Input,
+        _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>

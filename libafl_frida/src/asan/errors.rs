@@ -617,11 +617,11 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &S::Input,
+        state: &mut S,
+        manager: &mut EM,
+        input: &S::Input,
         observers: &OT,
-        _exit_kind: &ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
@@ -643,11 +643,15 @@ where
         }
     }
 
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         _state: &mut S,
+        _observers: &OT,
         testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
         }
