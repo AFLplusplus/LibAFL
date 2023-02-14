@@ -658,7 +658,7 @@ mod tests {
     #[cfg(unix)]
     fn test_builder() {
         let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
-            println!("{status}");
+            log::info!("{status}");
         }));
 
         let mut executor = CommandExecutor::builder();
@@ -684,7 +684,7 @@ mod tests {
         use alloc::string::ToString;
 
         let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
-            println!("{status}");
+            log::info!("{status}");
         }));
 
         let mut executor =

@@ -114,7 +114,7 @@ where
                                         *pc as usize + block_len,
                                     ));
                                 }
-                                Err(r) => println!("{r:#?}"),
+                                Err(r) => log::info!("{r:#?}"),
                             }
                         }
                     }
@@ -151,7 +151,7 @@ where
                             drcov_vec
                                 .push(DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len));
                         }
-                        Err(r) => println!("{r:#?}"),
+                        Err(r) => log::info!("{r:#?}"),
                     }
                 }
 
