@@ -28,16 +28,16 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::fmt::Debug;
-
-#[cfg(feature = "std")]
-use core::time::Duration;
+use core::{fmt::Debug,time::Duration};
 
 #[cfg(feature = "std")]
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 pub use value::*;
+
+#[cfg(feature = "no_std")]
+use crate::bolts::current_time;
 
 use crate::{
     bolts::{
@@ -413,13 +413,18 @@ where
 }
 
 /// A simple observer, just overlooking the runtime of the target.
-#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
     name: String,
 
+    #[cfg(feature = "std")]
     #[serde(with = "instant_serializer")]
     start_time: Instant,
+
+    #[cfg(feature = "no_std")]
+    start_time: Duration,
+
+
     last_runtime: Option<Duration>,
 }
 
@@ -449,14 +454,19 @@ mod instant_serializer {
     }
 }
 
-#[cfg(feature = "std")]
 impl TimeObserver {
     /// Creates a new [`TimeObserver`] with the given name.
     #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
             name: name.to_string(),
+
+            #[cfg(feature = "std")]
             start_time: Instant::now(),
+
+            #[cfg(feature = "no_std")]
+            start_time: Duration::from_secs(0),
+
             last_runtime: None,
         }
     }
@@ -468,17 +478,25 @@ impl TimeObserver {
     }
 }
 
-#[cfg(feature = "std")]
 impl<S> Observer<S> for TimeObserver
 where
     S: UsesInput,
 {
+    #[cfg(feature = "std")]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = Instant::now();
         Ok(())
     }
 
+    #[cfg(feature = "no_std")]
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error>{
+        self.last_runtime = None;
+        self.start_time = Duration::from_secs(0);
+        Ok(())
+    }
+
+    #[cfg(feature = "std")]
     fn post_exec(
         &mut self,
         _state: &mut S,
@@ -488,16 +506,24 @@ where
         self.last_runtime = Some(self.start_time.elapsed());
         Ok(())
     }
+
+    #[cfg(feature = "no_std")]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &S::Input,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.last_runtime = current_time().checked_sub(self.start_time);
+    }
 }
 
-#[cfg(feature = "std")]
 impl Named for TimeObserver {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-#[cfg(feature = "std")]
 impl<OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for TimeObserver
 where
     OTA: ObserversTuple<S>,

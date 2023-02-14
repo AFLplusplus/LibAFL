@@ -24,19 +24,15 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 use alloc::string::{String, ToString};
-#[cfg(feature = "std")]
-use core::time::Duration;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    time::Duration,
 };
 
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "std")]
-use crate::observers::TimeObserver;
 
 use crate::{
     bolts::tuples::Named,
@@ -44,7 +40,7 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     inputs::UsesInput,
-    observers::{ListObserver, ObserversTuple},
+    observers::{ListObserver, ObserversTuple,TimeObserver},
     state::HasClientPerfMonitor,
     Error,
 };
@@ -885,14 +881,12 @@ pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
 /// Nop feedback that annotates execution time in the new testcase, if any
 /// for this Feedback, the testcase is never interesting (use with an OR).
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.
-#[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
     exec_time: Option<Duration>,
     name: String,
 }
 
-#[cfg(feature = "std")]
 impl<S> Feedback<S> for TimeFeedback
 where
     S: UsesInput + HasClientPerfMonitor,
@@ -936,7 +930,6 @@ where
     }
 }
 
-#[cfg(feature = "std")]
 impl Named for TimeFeedback {
     #[inline]
     fn name(&self) -> &str {
@@ -944,7 +937,6 @@ impl Named for TimeFeedback {
     }
 }
 
-#[cfg(feature = "std")]
 impl TimeFeedback {
     /// Creates a new [`TimeFeedback`], deciding if the value of a [`TimeObserver`] with the given `name` of a run is interesting.
     #[must_use]
