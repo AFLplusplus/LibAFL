@@ -605,7 +605,12 @@ const CMP_TYPE_RTN: usize = 2;
 
 /// AFL++ redqueen mutation
 #[derive(Debug, Default)]
-pub struct AFLRedQueen;
+pub struct AFLRedQueen {
+    cmp_start_idx: usize,
+    cmp_h_start_idx: usize,
+    cmp_buf_start_idx: usize,
+    taint_idx: usize,
+}
 
 impl AFLRedQueen {
     pub fn cmp_extend_encoding(
@@ -668,15 +673,25 @@ where
             (cmp_len, cmp_meta.unwrap(), taint_meta.unwrap())
         };
 
-        let cmp_start_idx = 0;
-        let cmp_h_start_idx = 0;
-        let cmp_buf_start_idx = 0;
+        // These idxes must saved in this mutator itself!
+        let (cmp_start_idx, cmp_h_start_idx, cmp_buf_start_idx, mut taint_idx) = if stage_idx == 0 {
+            (0, 0, 0, 0)
+        } else {
+            (
+                self.cmp_start_idx,
+                self.cmp_h_start_idx,
+                self.cmp_buf_start_idx,
+                self.taint_idx,
+            )
+        };
+
         let orig_cmpvals = cmp_meta.orig_cmpvals();
         let new_cmpvals = cmp_meta.new_cmpvals();
         let headers = cmp_meta.headers();
         let input_len = input.bytes().len();
         let mut input_bytes = input.bytes_mut();
         let orig_bytes = taint_meta.input_vec();
+        let taint = taint_meta.ranges();
 
         for cmp_idx in cmp_start_idx..cmp_len {
             let (w_idx, header) = headers[cmp_idx];
@@ -693,6 +708,23 @@ where
 
             for cmp_h_idx in cmp_h_start_idx..logged {
                 for cmp_buf_idx in cmp_buf_start_idx..input_len {
+                    let taint_len = match taint.get(taint_idx) {
+                        Some(t) => {
+                            if cmp_buf_idx < t.start {
+                                input_len - cmp_buf_idx
+                            } else {
+                                // if cmp_buf_idx == t.end go to next range
+                                if cmp_buf_idx == t.end {
+                                    taint_idx += 1;
+                                }
+
+                                // Here cmp_buf_idx >= t.start
+                                t.end - cmp_buf_idx
+                            }
+                        }
+                        None => input_len - cmp_buf_idx,
+                    };
+
                     match (&orig_val[cmp_h_idx], &new_val[cmp_h_idx]) {
                         (CmpValues::U8(orig), CmpValues::U8(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1, attribute) =
@@ -708,7 +740,7 @@ where
                                     &orig_bytes,
                                     &mut input_bytes,
                                     cmp_buf_idx,
-                                    input_len,
+                                    taint_len,
                                     input_len,
                                 );
                             }
@@ -732,7 +764,7 @@ where
                                     &orig_bytes,
                                     &mut input_bytes,
                                     cmp_buf_idx,
-                                    input_len,
+                                    taint_len,
                                     input_len,
                                 );
                             }
@@ -756,7 +788,7 @@ where
                                     &orig_bytes,
                                     &mut input_bytes,
                                     cmp_buf_idx,
-                                    input_len,
+                                    taint_len,
                                     input_len,
                                 );
                             }
@@ -780,7 +812,7 @@ where
                                     &orig_bytes,
                                     &mut input_bytes,
                                     cmp_buf_idx,
-                                    input_len,
+                                    taint_len,
                                     input_len,
                                 );
                             }
@@ -792,7 +824,7 @@ where
                         }
                         (CmpValues::Bytes(orig), CmpValues::Bytes(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1, attribute) =
-                                (orig.0, orig.1, new.0, new.1, header.attribute());
+                                (&orig.0, &orig.1, &new.0, &new.1, header.attribute());
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
                                 self.rtn_extend_encoding();
@@ -800,7 +832,7 @@ where
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                self.rtn_extend_encoding()
+                                // self.rtn_extend_encoding()
                             }
                         }
                         (_, _) => {
@@ -826,7 +858,12 @@ impl AFLRedQueen {
     /// Create a new `AFLRedQueen` Mutator
     #[must_use]
     pub fn new() -> Self {
-        Self
+        Self {
+            cmp_start_idx: 0,
+            cmp_h_start_idx: 0,
+            cmp_buf_start_idx: 0,
+            taint_idx: 0,
+        }
     }
 }
 
