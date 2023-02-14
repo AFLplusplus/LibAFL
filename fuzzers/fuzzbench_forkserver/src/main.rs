@@ -34,7 +34,7 @@ use libafl::{
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage, ColorizationStage,
-        TracingStage,
+        TracingStage, tracing::TaintTracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -361,14 +361,16 @@ fn fuzz(
             TimeoutForkserverExecutor::with_signal(cmplog_forkserver, timeout * 10, signal)
                 .expect("Failed to create the executor.");
 
-        let tracing = TracingStage::new(cmplog_executor);
+        // let tracing = TracingStage::new(cmplog_executor);
+
+        let tracing2 = TaintTracingStage::with_cmplog_observer_name(cmplog_executor, "cmplog");
 
         // Setup a randomic Input2State stage
         let i2s =
             StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, tracing, colorization, i2s, power);
+        let mut stages = tuple_list!(calibration, colorization, tracing2, i2s, power);
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
     } else {

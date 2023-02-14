@@ -2,6 +2,8 @@
 
 use core::{fmt::Debug, marker::PhantomData};
 
+use alloc::string::{String, ToString};
+
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
@@ -9,11 +11,11 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     inputs::{BytesInput, UsesInput},
     mark_feature_time,
-    observers::ObserversTuple,
+    observers::{ObserversTuple, AFLStdCmpObserver},
     stages::{colorization::TaintMetadata, Stage},
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, State, UsesState},
-    Error,
+    Error, bolts::tuples::MatchName,
 };
 
 /// A stage that runs a tracer executor
@@ -103,20 +105,21 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
 
 /// Trace with tainted input
 #[derive(Clone, Debug)]
-pub struct TaintedTracingStage<EM, TE, Z> {
+pub struct TaintTracingStage<EM, TE, Z> {
     tracer_executor: TE,
+    cmplog_observer_name: Option<String>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
 
-impl<EM, TE, Z> UsesState for TaintedTracingStage<EM, TE, Z>
+impl<EM, TE, Z> UsesState for TaintTracingStage<EM, TE, Z>
 where
     TE: UsesState,
 {
     type State = TE::State;
 }
 
-impl<E, EM, TE, Z> Stage<E, EM, Z> for TaintedTracingStage<EM, TE, Z>
+impl<E, EM, TE, Z> Stage<E, EM, Z> for TaintTracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
@@ -166,6 +169,20 @@ where
             None => return Err(Error::unknown("No metadata found")),
         };
 
+        if let Some(name) = &self.cmplog_observer_name {
+            match self.tracer_executor.observers_mut().match_name_mut::<AFLStdCmpObserver<TE::State>>(name) {
+                Some(ob) => {
+                    // This is not the original input,
+                    // Set it to false
+                    ob.set_original(false);
+                }
+                None => {
+                    // I can't think of any use of this stage if you don't use AFLStdCmpObserver
+                    // but do nothing ofcourse
+                }
+            }
+        }
+
         self.tracer_executor
             .observers_mut()
             .pre_exec_all(state, &mutated_input)?;
@@ -184,10 +201,19 @@ where
     }
 }
 
-impl<EM, TE, Z> TaintedTracingStage<EM, TE, Z> {
+impl<EM, TE, Z> TaintTracingStage<EM, TE, Z> {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
         Self {
+            cmplog_observer_name: None,
+            tracer_executor,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn with_cmplog_observer_name(tracer_executor: TE, name: &'static str) -> Self {
+        Self {
+            cmplog_observer_name: Some(name.to_string()),
             tracer_executor,
             phantom: PhantomData,
         }

@@ -351,7 +351,7 @@ struct cmp_map {
 
 /// A [`CmpObserver`] observer for AFL++ RedQueen
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AFLCmpObserver<'a, S>
+pub struct AFLStdCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
@@ -363,7 +363,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<'a, S> CmpObserver<AFLCmpMap, S> for AFLCmpObserver<'a, S>
+impl<'a, S> CmpObserver<AFLCmpMap, S> for AFLStdCmpObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -484,7 +484,7 @@ where
     }
 }
 
-impl<'a, S> Observer<S> for AFLCmpObserver<'a, S>
+impl<'a, S> Observer<S> for AFLStdCmpObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -506,7 +506,7 @@ where
     }
 }
 
-impl<'a, S> Named for AFLCmpObserver<'a, S>
+impl<'a, S> Named for AFLStdCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
@@ -515,7 +515,7 @@ where
     }
 }
 
-impl<'a, S> AFLCmpObserver<'a, S>
+impl<'a, S> AFLStdCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
@@ -531,6 +531,10 @@ where
             phantom: PhantomData,
         }
     }
+    /// Setter for the flag if the executed input is a mutated one or the original one
+    pub fn set_original(&mut self, v: bool) {
+        self.original = v;
+    } 
 
     /// Creates a new [`StdCmpObserver`] with the given name, map and reference to variable size.
     #[must_use]
@@ -564,19 +568,17 @@ pub struct AFLCmpValuesMetadata {
     /// The list of logged idx and headers retrieved by runnning the mutated input
     #[serde(skip)]
     pub headers: Vec<(usize, AFLCmpHeader)>,
-    /// The bytes of mutant retrieved by runnning the mutated input
-    pub mutant: Vec<u8>,
 }
 
 crate::impl_serdeany!(AFLCmpValuesMetadata);
 
 impl AFLCmpValuesMetadata {
+    /// Constructor for `AFLCmpValuesMetadata`
     pub fn new() -> Self {
         Self {
             orig_cmpvals: HashMap::new(),
             new_cmpvals: HashMap::new(),
             headers: Vec::new(),
-            mutant: Vec::new(),
         }
     }
 
@@ -593,11 +595,6 @@ impl AFLCmpValuesMetadata {
     /// Getter for `headers`
     pub fn headers(&self) -> &Vec<(usize, AFLCmpHeader)> {
         &self.headers
-    }
-
-    /// Getter for `mutant`
-    pub fn mutant(&self) -> &Vec<u8> {
-        &self.mutant
     }
 }
 
