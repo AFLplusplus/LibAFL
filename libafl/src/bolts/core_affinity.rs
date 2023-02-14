@@ -45,7 +45,11 @@ pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
 }
 
 /// This represents a CPU core.
+<<<<<<< HEAD
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+=======
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+>>>>>>> e6591456 (return CoreId for Launcher)
 #[repr(transparent)]
 pub struct CoreId(
     /// The numerical `id` of a core
@@ -85,7 +89,7 @@ impl From<CoreId> for usize {
 }
 
 /// A list of [`CoreId`] to use for fuzzing
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Cores {
     /// The original commandline used during parsing
     pub cmdline: String,
@@ -161,6 +165,17 @@ impl Cores {
     pub fn contains(&self, core_id: usize) -> bool {
         let core_id = CoreId::from(core_id);
         self.ids.contains(&core_id)
+    }
+
+    /// Returns the index/position of the given [`CoreId`] in this cores.ids list.
+    /// Will return `None`, if [`CoreId`] wasn't found.
+    pub fn position(&self, core_id: CoreId) -> Option<usize> {
+        // Since cores a low number, iterating is const-size,
+        // and should be faster than hashmap lookups.
+        // Prove me wrong.
+        self.ids
+            .iter()
+            .position(|&cur_core_id| cur_core_id == core_id)
     }
 }
 

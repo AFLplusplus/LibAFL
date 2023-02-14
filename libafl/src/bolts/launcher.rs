@@ -43,6 +43,8 @@ use crate::{
     Error,
 };
 
+use super::core_affinity::CoreId;
+
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
@@ -51,7 +53,7 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 #[allow(clippy::type_complexity, missing_debug_implementations)]
 pub struct Launcher<'a, CF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, usize) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
@@ -90,7 +92,7 @@ where
 
 impl<CF, MT, S, SP> Debug for Launcher<'_, CF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, usize) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned + UsesInput,
@@ -110,7 +112,7 @@ where
 #[cfg(feature = "std")]
 impl<'a, CF, MT, S, SP> Launcher<'a, CF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, usize) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: DeserializeOwned + UsesInput + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
@@ -180,7 +182,7 @@ where
                             .build()
                             .launch()?;
 
-                        return (self.run_client.take().unwrap())(state, mgr, bind_to.0);
+                        return (self.run_client.take().unwrap())(state, mgr, *bind_to);
                     }
                 };
             }
