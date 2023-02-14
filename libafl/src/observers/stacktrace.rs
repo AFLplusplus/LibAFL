@@ -36,8 +36,8 @@ pub fn collect_backtrace() -> u64 {
     }
     // will use symbols later
     // let trace = format!("{:?}", b);
-    // eprintln!("{}", trace);
-    // println!(
+    // log::trace!("{}", trace);
+    // log::info!(
     //     "backtrace collected with hash={} at pid={}",
     //     hash,
     //     std::process::id()

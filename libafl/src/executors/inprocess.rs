@@ -578,11 +578,9 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
     event_mgr.on_restart(state).unwrap();
 
-    #[cfg(feature = "std")]
-    println!("Waiting for broker...");
+    log::info!("Waiting for broker...");
     event_mgr.await_restart_safe();
-    #[cfg(feature = "std")]
-    println!("Bye!");
+    log::info!("Bye!");
 }
 
 #[cfg(unix)]
@@ -592,10 +590,7 @@ mod unix_signal_handler {
     use alloc::{boxed::Box, string::String};
     use core::mem::transmute;
     #[cfg(feature = "std")]
-    use std::{
-        io::{stdout, Write},
-        panic,
-    };
+    use std::{io::Write, panic};
 
     use libc::siginfo_t;
 
@@ -715,8 +710,7 @@ mod unix_signal_handler {
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         if !data.is_valid() {
-            #[cfg(feature = "std")]
-            println!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
+            log::warn!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
             return;
         }
 
@@ -726,10 +720,7 @@ mod unix_signal_handler {
         let fuzzer = data.fuzzer_mut::<Z>();
         let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-        #[cfg(feature = "std")]
-        println!("Timeout in fuzz run.");
-        #[cfg(feature = "std")]
-        let _res = stdout().flush();
+        log::error!("Timeout in fuzz run.");
 
         run_observers_and_save_state::<E, EM, OF, Z>(
             executor,
@@ -765,8 +756,7 @@ mod unix_signal_handler {
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
             as *mut libc::c_void as *mut ucontext_t);
 
-        #[cfg(feature = "std")]
-        eprintln!("Crashed with {signal}");
+        log::error!("Crashed with {signal}");
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor
@@ -776,16 +766,19 @@ mod unix_signal_handler {
             let fuzzer = data.fuzzer_mut::<Z>();
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-            #[cfg(feature = "std")]
-            eprintln!("Child crashed!");
+            log::error!("Child crashed!");
 
             #[cfg(all(feature = "std", unix))]
             {
-                let mut writer = std::io::BufWriter::new(std::io::stderr());
-                writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
-                crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
-                    .unwrap();
-                writer.flush().unwrap();
+                let mut bsod = Vec::new();
+                {
+                    let mut writer = std::io::BufWriter::new(&mut bsod);
+                    writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
+                    crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
+                        .unwrap();
+                    writer.flush().unwrap();
+                }
+                log::error!("{}", std::str::from_utf8(&bsod).unwrap());
             }
 
             run_observers_and_save_state::<E, EM, OF, Z>(
@@ -797,30 +790,38 @@ mod unix_signal_handler {
                 ExitKind::Crash,
             );
         } else {
-            #[cfg(feature = "std")]
             {
-                eprintln!("Double crash\n");
+                log::error!("Double crash\n");
                 #[cfg(target_os = "android")]
                 let si_addr = (_info._pad[0] as i64) | ((_info._pad[1] as i64) << 32);
                 #[cfg(not(target_os = "android"))]
                 let si_addr = { _info.si_addr() as usize };
 
-                eprintln!(
+                log::error!(
                 "We crashed at addr 0x{si_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
                 );
 
                 #[cfg(all(feature = "std", unix))]
                 {
-                    let mut writer = std::io::BufWriter::new(std::io::stderr());
-                    crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
+                    let mut bsod = Vec::new();
+                    {
+                        let mut writer = std::io::BufWriter::new(&mut bsod);
+                        crate::bolts::minibsod::generate_minibsod(
+                            &mut writer,
+                            signal,
+                            _info,
+                            _context,
+                        )
                         .unwrap();
-                    writer.flush().unwrap();
+                        writer.flush().unwrap();
+                    }
+                    log::error!("{}", std::str::from_utf8(&bsod).unwrap());
                 }
             }
 
             #[cfg(feature = "std")]
             {
-                eprintln!("Type QUIT to restart the child");
+                log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
                     std::io::stdin().read_line(&mut line).unwrap();
@@ -842,8 +843,6 @@ pub mod windows_asan_handler {
         ptr,
         sync::atomic::{compiler_fence, Ordering},
     };
-    #[cfg(feature = "std")]
-    use std::io::{stdout, Write};
 
     use windows::Win32::System::Threading::{
         EnterCriticalSection, LeaveCriticalSection, RTL_CRITICAL_SECTION,
@@ -888,19 +887,17 @@ pub mod windows_asan_handler {
             compiler_fence(Ordering::SeqCst);
         }
 
-        #[cfg(feature = "std")]
-        eprintln!("ASAN detected crash!");
+        log::error!("ASAN detected crash!");
         if data.current_input_ptr.is_null() {
-            #[cfg(feature = "std")]
             {
-                eprintln!("Double crash\n");
-                eprintln!(
+                log::error!("Double crash\n");
+                log::error!(
                 "ASAN detected crash but we're not in the target... Bug in the fuzzer? Exiting.",
                 );
             }
             #[cfg(feature = "std")]
             {
-                eprintln!("Type QUIT to restart the child");
+                log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
                     std::io::stdin().read_line(&mut line).unwrap();
@@ -920,10 +917,7 @@ pub mod windows_asan_handler {
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
 
-            #[cfg(feature = "std")]
-            eprintln!("Child crashed!");
-            #[cfg(feature = "std")]
-            drop(stdout().flush());
+            log::error!("Child crashed!");
 
             // Make sure we don't crash in the crash handler forever.
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
@@ -954,10 +948,7 @@ mod windows_exception_handler {
         sync::atomic::{compiler_fence, Ordering},
     };
     #[cfg(feature = "std")]
-    use std::{
-        io::{stdout, Write},
-        panic,
-    };
+    use std::panic;
 
     use windows::Win32::System::Threading::{
         EnterCriticalSection, ExitProcess, LeaveCriticalSection, RTL_CRITICAL_SECTION,
@@ -1093,13 +1084,9 @@ mod windows_exception_handler {
             let event_mgr = data.event_mgr_mut::<EM>();
 
             if data.timeout_input_ptr.is_null() {
-                #[cfg(feature = "std")]
-                dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
+                log::error!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
             } else {
-                #[cfg(feature = "std")]
-                eprintln!("Timeout in fuzz run.");
-                #[cfg(feature = "std")]
-                let _res = stdout().flush();
+                log::error!("Timeout in fuzz run.");
 
                 let input = (data.timeout_input_ptr as *const <E::State as UsesInput>::Input)
                     .as_ref()
@@ -1127,7 +1114,7 @@ mod windows_exception_handler {
                 .unwrap(),
         );
         compiler_fence(Ordering::SeqCst);
-        // println!("TIMER INVOKED!");
+        // log::info!("TIMER INVOKED!");
     }
 
     #[allow(clippy::too_many_lines)]
@@ -1173,19 +1160,18 @@ mod windows_exception_handler {
 
             let exception_list = data.exceptions();
             if exception_list.contains(&code) {
-                eprintln!("Crashed with {code}");
+                log::error!("Crashed with {code}");
             } else {
-                // eprintln!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
+                // log::trace!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
                 is_crash = false;
             }
         } else {
-            eprintln!("Crashed without exception (probably due to SIGABRT)");
+            log::error!("Crashed without exception (probably due to SIGABRT)");
         };
 
         if data.current_input_ptr.is_null() {
-            #[cfg(feature = "std")]
             {
-                eprintln!("Double crash\n");
+                log::error!("Double crash\n");
                 let crash_addr = exception_pointers
                     .as_mut()
                     .unwrap()
@@ -1194,13 +1180,13 @@ mod windows_exception_handler {
                     .unwrap()
                     .ExceptionAddress as usize;
 
-                eprintln!(
+                log::error!(
                 "We crashed at addr 0x{crash_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
                 );
             }
             #[cfg(feature = "std")]
             {
-                eprintln!("Type QUIT to restart the child");
+                log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
                     std::io::stdin().read_line(&mut line).unwrap();
@@ -1220,15 +1206,11 @@ mod windows_exception_handler {
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
 
-            #[cfg(feature = "std")]
             if is_crash {
-                eprintln!("Child crashed!");
+                log::error!("Child crashed!");
             } else {
-                // eprintln!("Exception received!");
+                // log::info!("Exception received!");
             }
-
-            #[cfg(feature = "std")]
-            drop(stdout().flush());
 
             // Make sure we don't crash in the crash handler forever.
             if is_crash {
@@ -1248,10 +1230,10 @@ mod windows_exception_handler {
         }
 
         if is_crash {
-            println!("Exiting!");
+            log::info!("Exiting!");
             ExitProcess(1);
         }
-        // println!("Not Exiting!");
+        // log::info!("Not Exiting!");
     }
 }
 
@@ -1560,7 +1542,7 @@ where
                 }
                 Ok(ForkResult::Parent { child }) => {
                     // Parent
-                    // println!("from parent {} child is {}", std::process::id(), child);
+                    // log::info!("from parent {} child is {}", std::process::id(), child);
                     self.shmem_provider.post_fork(false)?;
 
                     let res = waitpid(child, None)?;
@@ -1621,10 +1603,10 @@ where
                     // we can't do this from the parent, timerid is unique to each process.
                     libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
 
-                    println!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
+                    log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
                     let v =
                         libc::timer_settime(timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
-                    println!("{v:#?} {}", nix::errno::errno());
+                    log::trace!("{v:#?} {}", nix::errno::errno());
                     (self.harness_fn)(input);
 
                     self.observers
@@ -1637,11 +1619,11 @@ where
                 }
                 Ok(ForkResult::Parent { child }) => {
                     // Parent
-                    // println!("from parent {} child is {}", std::process::id(), child);
+                    // log::trace!("from parent {} child is {}", std::process::id(), child);
                     self.shmem_provider.post_fork(false)?;
 
                     let res = waitpid(child, None)?;
-                    println!("{res:#?}");
+                    log::trace!("{res:#?}");
                     match res {
                         WaitStatus::Signaled(_, signal, _) => match signal {
                             nix::sys::signal::Signal::SIGALRM
