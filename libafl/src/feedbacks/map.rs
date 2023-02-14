@@ -407,7 +407,7 @@ where
     where
         OT: ObserversTuple<S>,
     {
-        if let Some(novelties) = self.novelties.as_mut().map(|v| core::mem::take(v)) {
+        if let Some(novelties) = self.novelties.as_mut().map(core::mem::take) {
             let meta = MapNoveltiesMetadata::new(novelties);
             testcase.add_metadata(meta);
         }
