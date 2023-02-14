@@ -25,6 +25,7 @@ use crate::{
     inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{AFLCmpValuesMetadata, CmpValues, CmpValuesMetadata},
+    stages::TaintMetadata,
     state::{HasMaxSize, HasMetadata, HasRand},
     Error,
 };
@@ -614,7 +615,10 @@ impl AFLRedQueen {
         orig_pattern: u64,
         changed_val: u64,
         attribute: u32,
-        input: &mut [u8],
+        orig_buf: &[u8],
+        buf: &mut [u8],
+        buf_idx: usize,
+        taint_len: usize,
         input_len: usize,
     ) {
         // Try matching pattern with num
@@ -643,106 +647,172 @@ where
         &mut self,
         state: &mut S,
         input: &mut I,
-        _stage_idx: i32,
+        stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
 
-        let cmp_len = {
-            let meta = state.metadata().get::<AFLCmpValuesMetadata>();
-            if meta.is_none() {
+        let (cmp_len, cmp_meta, taint_meta) = {
+            let cmp_meta = state.metadata().get::<AFLCmpValuesMetadata>();
+            let taint_meta = state.metadata().get::<TaintMetadata>();
+            if cmp_meta.is_none() || taint_meta.is_none() {
                 return Ok(MutationResult::Skipped);
             }
 
-            let len = meta.unwrap().headers().len();
-            if len == 0 {
+            let cmp_len = cmp_meta.unwrap().headers().len();
+            if cmp_len == 0 {
                 return Ok(MutationResult::Skipped);
             }
-            len
+            (cmp_len, cmp_meta.unwrap(), taint_meta.unwrap())
         };
 
-        // Randomly choose one from the cmplogs, Maybe just iterate over everything
-        let r = state.rand_mut().below(cmp_len as u64) as usize;
-
-        let meta = state.metadata().get::<AFLCmpValuesMetadata>().unwrap();
-
-        let orig_cmpvals = meta.orig_cmpvals();
-        let new_cmpvals = meta.new_cmpvals();
-        let headers = meta.headers();
-
+        let cmp_start_idx = 0;
+        let cmp_h_start_idx = 0;
+        let cmp_buf_start_idx = 0;
+        let orig_cmpvals = cmp_meta.orig_cmpvals();
+        let new_cmpvals = cmp_meta.new_cmpvals();
+        let headers = cmp_meta.headers();
         let input_len = input.bytes().len();
-        let input_bytes = input.bytes_mut();
+        let mut input_bytes = input.bytes_mut();
+        let orig_bytes = taint_meta.input_vec();
 
-        let (idx, header) = headers[r];
+        for cmp_idx in cmp_start_idx..cmp_len {
+            let (w_idx, header) = headers[cmp_idx];
 
-        if orig_cmpvals.get(&idx).is_none() || new_cmpvals.get(&idx).is_none() {
-            // new_cmpvals.get(&idx) is always Some()
-            return Ok(MutationResult::Skipped);
-        }
+            if orig_cmpvals.get(&w_idx).is_none() || new_cmpvals.get(&w_idx).is_none() {
+                // new_cmpvals.get(&idx) is always Some() if orig_cmpvals.get(&idx) is Some()
+                return Ok(MutationResult::Skipped);
+            }
 
-        let orig_val = orig_cmpvals.get(&idx).unwrap();
-        let new_val = new_cmpvals.get(&idx).unwrap();
+            let orig_val = orig_cmpvals.get(&w_idx).unwrap();
+            let new_val = new_cmpvals.get(&w_idx).unwrap();
 
-        /*
-        match (orig_val, new_val) {
-            (OperandsVec(orig), OperandsVec(new)) => {
-                // This match branch is cmp_fuzz (AFL++ RQ)
-                assert!(header._type() == CMP_TYPE_INS as u32);
+            let logged = std::cmp::min(orig_val.len(), new_val.len());
 
-                let logged = std::cmp::min(orig.len(), new.len());
+            for cmp_h_idx in cmp_h_start_idx..logged {
+                for cmp_buf_idx in cmp_buf_start_idx..input_len {
+                    match (&orig_val[cmp_h_idx], &new_val[cmp_h_idx]) {
+                        (CmpValues::U8(orig), CmpValues::U8(new)) => {
+                            let (orig_v0, orig_v1, new_v0, new_v1, attribute) =
+                                (orig.0, orig.1, new.0, new.1, header.attribute());
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                // Compare v0 against v1
+                                self.cmp_extend_encoding(
+                                    new_v0.into(),
+                                    new_v1.into(),
+                                    orig_v0.into(),
+                                    orig_v1.into(),
+                                    attribute,
+                                    &orig_bytes,
+                                    &mut input_bytes,
+                                    cmp_buf_idx,
+                                    input_len,
+                                    input_len,
+                                );
+                            }
 
-                // Try to solve it!
-                for idx in 0..logged {
-                    let (orig_v0, orig_v1, new_v0, new_v1, attribute) = (
-                        orig[idx].v0(),
-                        orig[idx].v1(),
-                        new[idx].v0(),
-                        new[idx].v1(),
-                        header.attribute(),
-                    );
-                    if new_v0 != orig_v0 && orig_v0 != orig_v1 {
-                        // Compare v0 against v1
-                        self.cmp_extend_encoding(new_v0, new_v1, orig_v0, orig_v1, attribute);
-                    }
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                // Compare v1 against v0
+                                // self.cmp_extend_encoding(new_v1, new_v0, orig_v1, orig_v0, SWAPA(attribute));
+                            }
+                        }
+                        (CmpValues::U16(orig), CmpValues::U16(new)) => {
+                            let (orig_v0, orig_v1, new_v0, new_v1, attribute) =
+                                (orig.0, orig.1, new.0, new.1, header.attribute());
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                // Compare v0 against v1
+                                self.cmp_extend_encoding(
+                                    new_v0.into(),
+                                    new_v1.into(),
+                                    orig_v0.into(),
+                                    orig_v1.into(),
+                                    attribute,
+                                    &orig_bytes,
+                                    &mut input_bytes,
+                                    cmp_buf_idx,
+                                    input_len,
+                                    input_len,
+                                );
+                            }
 
-                    if new_v1 != orig_v1 && orig_v0 != orig_v1 {
-                        // Compare v1 against v0
-                        // self.cmp_extend_encoding(new_v1, new_v0, orig_v1, orig_v0, SWAPA(attribute));
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                // Compare v1 against v0
+                                // self.cmp_extend_encoding(new_v1, new_v0, orig_v1, orig_v0, SWAPA(attribute));
+                            }
+                        }
+                        (CmpValues::U32(orig), CmpValues::U32(new)) => {
+                            let (orig_v0, orig_v1, new_v0, new_v1, attribute) =
+                                (orig.0, orig.1, new.0, new.1, header.attribute());
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                // Compare v0 against v1
+                                self.cmp_extend_encoding(
+                                    new_v0.into(),
+                                    new_v1.into(),
+                                    orig_v0.into(),
+                                    orig_v1.into(),
+                                    attribute,
+                                    &orig_bytes,
+                                    &mut input_bytes,
+                                    cmp_buf_idx,
+                                    input_len,
+                                    input_len,
+                                );
+                            }
+
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                // Compare v1 against v0
+                                // self.cmp_extend_encoding(new_v1, new_v0, orig_v1, orig_v0, SWAPA(attribute));
+                            }
+                        }
+                        (CmpValues::U64(orig), CmpValues::U64(new)) => {
+                            let (orig_v0, orig_v1, new_v0, new_v1, attribute) =
+                                (orig.0, orig.1, new.0, new.1, header.attribute());
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                // Compare v0 against v1
+                                self.cmp_extend_encoding(
+                                    new_v0.into(),
+                                    new_v1.into(),
+                                    orig_v0.into(),
+                                    orig_v1.into(),
+                                    attribute,
+                                    &orig_bytes,
+                                    &mut input_bytes,
+                                    cmp_buf_idx,
+                                    input_len,
+                                    input_len,
+                                );
+                            }
+
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                // Compare v1 against v0
+                                // self.cmp_extend_encoding(new_v1, new_v0, orig_v1, orig_v0, SWAPA(attribute));
+                            }
+                        }
+                        (CmpValues::Bytes(orig), CmpValues::Bytes(new)) => {
+                            let (orig_v0, orig_v1, new_v0, new_v1, attribute) =
+                                (orig.0, orig.1, new.0, new.1, header.attribute());
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                // Compare v0 against v1
+                                self.rtn_extend_encoding();
+                            }
+
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                // Compare v1 against v0
+                                self.rtn_extend_encoding()
+                            }
+                        }
+                        (_, _) => {
+                            // It shouldn't have different shape!
+                            return Ok(MutationResult::Skipped);
+                        }
                     }
                 }
             }
-            (FnOperandsVec(orig), FnOperandsVec(new)) => {
-                // This match branch is rtn_fuzz (AFL++ RQ)
-                assert!(header._type() == CMP_TYPE_RTN as u32);
-
-                let logged = std::cmp::min(orig.len(), new.len());
-                for idx in 0..logged {
-                    let (orig_v0, orig_v1, new_v0, new_v1, attribute) = (
-                        orig[idx].v0(),
-                        orig[idx].v1(),
-                        new[idx].v0(),
-                        new[idx].v1(),
-                        header.attribute(),
-                    );
-                    if new_v0 != orig_v0 && orig_v0 != orig_v1 {
-                        // Compare v0 against v1
-                        self.rtn_extend_encoding();
-                    }
-
-                    if new_v1 != orig_v1 && orig_v0 != orig_v1 {
-                        // Compare v1 against v0
-                        self.rtn_extend_encoding()
-                    }
-                }
-            }
-            (_, _) => {
-                // Collision?
-            }
         }
-        */
-        Ok(MutationResult::Mutated)
+
+        Ok(MutationResult::Skipped)
     }
 }
 

@@ -1,21 +1,21 @@
 //! The tracing stage can trace the target and enrich a testcase with metadata, for example for `CmpLog`.
 
-use core::{fmt::Debug, marker::PhantomData};
-
 use alloc::string::{String, ToString};
+use core::{fmt::Debug, marker::PhantomData};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
+    bolts::tuples::MatchName,
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers, ShadowExecutor},
     inputs::{BytesInput, UsesInput},
     mark_feature_time,
-    observers::{ObserversTuple, AFLStdCmpObserver},
+    observers::{AFLStdCmpObserver, ObserversTuple},
     stages::{colorization::TaintMetadata, Stage},
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, State, UsesState},
-    Error, bolts::tuples::MatchName,
+    Error,
 };
 
 /// A stage that runs a tracer executor
@@ -170,7 +170,11 @@ where
         };
 
         if let Some(name) = &self.cmplog_observer_name {
-            match self.tracer_executor.observers_mut().match_name_mut::<AFLStdCmpObserver<TE::State>>(name) {
+            match self
+                .tracer_executor
+                .observers_mut()
+                .match_name_mut::<AFLStdCmpObserver<TE::State>>(name)
+            {
                 Some(ob) => {
                     // This is not the original input,
                     // Set it to false

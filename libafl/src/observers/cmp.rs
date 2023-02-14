@@ -534,7 +534,7 @@ where
     /// Setter for the flag if the executed input is a mutated one or the original one
     pub fn set_original(&mut self, v: bool) {
         self.original = v;
-    } 
+    }
 
     /// Creates a new [`StdCmpObserver`] with the given name, map and reference to variable size.
     #[must_use]
