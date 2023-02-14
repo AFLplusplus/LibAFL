@@ -28,7 +28,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt::Debug,time::Duration};
+use core::{fmt::Debug, time::Duration};
 
 #[cfg(feature = "std")]
 use std::time::Instant;
@@ -424,7 +424,6 @@ pub struct TimeObserver {
     #[cfg(feature = "no_std")]
     start_time: Duration,
 
-
     last_runtime: Option<Duration>,
 }
 
@@ -490,7 +489,7 @@ where
     }
 
     #[cfg(feature = "no_std")]
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error>{
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = Duration::from_secs(0);
         Ok(())

@@ -40,7 +40,7 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     inputs::UsesInput,
-    observers::{ListObserver, ObserversTuple,TimeObserver},
+    observers::{ListObserver, ObserversTuple, TimeObserver},
     state::HasClientPerfMonitor,
     Error,
 };
