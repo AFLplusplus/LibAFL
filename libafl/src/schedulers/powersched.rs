@@ -249,6 +249,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::cast_precision_loss)]
     fn on_remove(
         &self,
         state: &mut Self::State,
