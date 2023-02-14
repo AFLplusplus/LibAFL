@@ -462,8 +462,7 @@ mod tests {
         let mut splice = SpliceMutator::new();
         splice.mutate(&mut state, &mut input, 0).unwrap();
 
-        #[cfg(feature = "std")]
-        println!("{:?}", input.bytes());
+        log::trace!("{:?}", input.bytes());
 
         // The pre-seeded rand should have spliced at position 2.
         // TODO: Maybe have a fixed rand for this purpose?

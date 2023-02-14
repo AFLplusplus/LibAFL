@@ -3,11 +3,7 @@
 pub mod simple;
 pub use simple::*;
 pub mod llmp;
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::c_void;
 use core::{
@@ -33,7 +29,6 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    stages::calibrate::UnstableEntriesMetadata,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
@@ -76,7 +71,7 @@ pub unsafe fn shutdown_handler<SP>(
 ) where
     SP: ShMemProvider,
 {
-    println!(
+    log::info!(
         "Fuzzer shutdown by Signal: {} Pid: {}",
         signal,
         std::process::id()
@@ -88,10 +83,10 @@ pub unsafe fn shutdown_handler<SP>(
     } else {
         // The process allocated the staterestorer map must take care of it
         let sr = (ptr as *mut StateRestorer<SP>).as_mut().unwrap();
-        // println!("{:#?}", sr);
+        // log::trace!("{:#?}", sr);
         std::ptr::drop_in_place(sr);
     }
-    println!("Bye!");
+    log::info!("Bye!");
     std::process::exit(0);
 }
 
@@ -135,6 +130,17 @@ pub enum LogSeverity {
     Warn,
     /// Error
     Error,
+}
+
+impl From<LogSeverity> for log::Level {
+    fn from(value: LogSeverity) -> Self {
+        match value {
+            LogSeverity::Debug => log::Level::Debug,
+            LogSeverity::Info => log::Level::Info,
+            LogSeverity::Warn => log::Level::Trace,
+            LogSeverity::Error => log::Level::Error,
+        }
+    }
 }
 
 impl fmt::Display for LogSeverity {
@@ -461,23 +467,6 @@ where
                     phantom: PhantomData,
                 },
             )?;
-
-            // Send the stability event to the broker
-            if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
-                let unstable_entries = meta.unstable_entries().len();
-                let map_len = meta.map_len();
-                self.fire(
-                    state,
-                    Event::UpdateUserStats {
-                        name: "stability".to_string(),
-                        value: UserStats::Ratio(
-                            (map_len - unstable_entries) as u64,
-                            map_len as u64,
-                        ),
-                        phantom: PhantomData,
-                    },
-                )?;
-            }
 
             // If performance monitor are requested, fire the `UpdatePerfMonitor` event
             #[cfg(feature = "introspection")]

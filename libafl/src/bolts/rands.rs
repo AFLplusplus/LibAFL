@@ -428,7 +428,7 @@ mod tests {
             rng: StdRand::with_seed(0),
         };
 
-        println!("random value: {}", mutator.rng.next_u32());
+        log::info!("random value: {}", mutator.rng.next_u32());
     }
 }
 
