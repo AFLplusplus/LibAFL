@@ -1114,10 +1114,7 @@ pub mod pybind {
     };
     use crate::{
         bolts::tuples::Named,
-        corpus::{
-            testcase::pybind::{PythonTestcase, PythonTestcaseWrapper},
-            Testcase,
-        },
+        corpus::{testcase::pybind::PythonTestcaseWrapper, Testcase},
         events::{pybind::PythonEventManager, EventFirer},
         executors::{pybind::PythonExitKind, ExitKind},
         feedbacks::map::pybind::{
@@ -1220,9 +1217,9 @@ pub mod pybind {
 
         fn append_metadata<OT>(
             &mut self,
-            state: &mut S,
+            state: &mut PythonStdState,
             observers: &OT,
-            testcase: &mut Testcase<S::Input>,
+            testcase: &mut Testcase<BytesInput>,
         ) -> Result<(), Error>
         where
             OT: ObserversTuple<PythonStdState>,
@@ -1662,12 +1659,12 @@ pub mod pybind {
 
         fn append_metadata<OT>(
             &mut self,
-            state: &mut S,
+            state: &mut PythonStdState,
             observers: &OT,
-            testcase: &mut Testcase<S::Input>,
+            testcase: &mut Testcase<BytesInput>,
         ) -> Result<(), Error>
         where
-            OT: ObserversTuple<S>,
+            OT: ObserversTuple<PythonStdState>,
         {
             unwrap_me_mut!(self.wrapper, f, {
                 f.append_metadata(state, observers, testcase)
