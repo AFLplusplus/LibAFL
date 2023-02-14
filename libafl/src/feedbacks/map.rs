@@ -508,6 +508,7 @@ where
         let left = size % VectorType::LANES;
 
         if let Some(novelties) = self.novelties.as_mut() {
+            novelties.clear();
             for step in 0..steps {
                 let i = step * VectorType::LANES;
                 let history = VectorType::from_slice(&history_map[i..]);
@@ -727,6 +728,7 @@ where
         let initial = observer.initial();
 
         if let Some(novelties) = self.novelties.as_mut() {
+            novelties.clear();
             for (i, item) in observer
                 .as_iter()
                 .copied()
