@@ -282,6 +282,7 @@ where
                     Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?;
 
+            data.set_cycle_and_time((total_time, iter));
             data.set_bitmap_size(bitmap_size);
             data.set_handicap(handicap);
         }
