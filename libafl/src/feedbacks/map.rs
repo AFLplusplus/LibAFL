@@ -733,8 +733,9 @@ where
                 .enumerate()
                 .filter(|(_, item)| *item != initial)
             {
-                let reduced = R::reduce(history_map[i], item);
-                if N::is_novel(history_map[i], reduced) {
+                let existing = unsafe { *history_map.get_unchecked(i) };
+                let reduced = R::reduce(existing, item);
+                if N::is_novel(existing, reduced) {
                     interesting = true;
                     novelties.push(i);
                 }
@@ -746,8 +747,9 @@ where
                 .enumerate()
                 .filter(|(_, item)| *item != initial)
             {
-                let reduced = R::reduce(history_map[i], item);
-                if N::is_novel(history_map[i], reduced) {
+                let existing = unsafe { *history_map.get_unchecked(i) };
+                let reduced = R::reduce(existing, item);
+                if N::is_novel(existing, reduced) {
                     interesting = true;
                     break;
                 }

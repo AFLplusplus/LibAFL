@@ -502,6 +502,12 @@ where
         // Not a solution
         self.objective_mut().discard_metadata(state, &input)?;
 
+        // several is_interesting implementations collect some data about the run, later used in
+        // append_metadata; we *must* invoke is_interesting here to collect it
+        let _ = self
+            .feedback_mut()
+            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+
         // Add the input to the main corpus
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
         self.feedback_mut()
