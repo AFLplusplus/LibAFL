@@ -732,7 +732,7 @@ where
 
     fn post_exec(&mut self, emulator: &Emulator, _input: &S::Input, exit_kind: &mut ExitKind) {
         if self.reset(emulator) == AsanRollback::HasLeaks {
-            *exit_kind = ExitKind::Crash
+            *exit_kind = ExitKind::Crash;
         }
     }
 }
