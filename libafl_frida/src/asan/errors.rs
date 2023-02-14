@@ -617,11 +617,11 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: &S::Input,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &S::Input,
         observers: &OT,
-        exit_kind: &ExitKind,
+        _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
