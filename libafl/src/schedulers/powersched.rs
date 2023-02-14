@@ -239,6 +239,7 @@ where
         psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
         psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
         psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
+        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
 
         state
             .corpus()
