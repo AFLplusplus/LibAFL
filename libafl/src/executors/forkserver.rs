@@ -4,6 +4,7 @@ use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
 use std::{
@@ -1046,6 +1047,9 @@ where
             self.input_file.write_buf(input.target_bytes().as_slice())?;
         }
 
+        // Don't tell the forkserver to spawn a new process before clearing the cov map
+        compiler_fence(Ordering::SeqCst);
+
         let send_len = self
             .forkserver
             .write_ctl(self.forkserver().last_run_timed_out())?;
@@ -1097,6 +1101,9 @@ where
         }
 
         self.forkserver.set_child_pid(Pid::from_raw(0));
+
+        // Clear the observer map after the execution is finished
+        compiler_fence(Ordering::SeqCst);
 
         Ok(exit_kind)
     }
