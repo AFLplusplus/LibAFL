@@ -560,7 +560,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
         new_testcase.add_metadata(exitkind);
         fuzzer
             .objective_mut()
-            .append_metadata(state, &mut new_testcase)
+            .append_metadata(state, observers, &mut new_testcase)
             .expect("Failed adding metadata");
         state
             .solutions_mut()

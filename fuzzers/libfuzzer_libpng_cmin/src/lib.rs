@@ -147,7 +147,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        PowerSchedule::FAST,
+        &mut state,
+        Some(PowerSchedule::FAST),
     ));
 
     // A fuzzer with feedbacks and a corpus scheduler
