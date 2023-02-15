@@ -265,7 +265,7 @@ impl TuiUI {
             }
         }
 
-        //println!("max_x: {}, len: {}", max_x, self.graph_data.len());
+        //log::trace!("max_x: {}, len: {}", max_x, self.graph_data.len());
 
         let datasets = vec![Dataset::default()
             //.name("data")

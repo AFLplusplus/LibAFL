@@ -106,7 +106,7 @@ where
         ret_addr
     };
 
-    // eprintln!("RET @ 0x{:#x}", ret_addr);
+    // log::info!("RET @ 0x{:#x}", ret_addr);
 
     if let Some(h) = hooks
         .helpers_mut()

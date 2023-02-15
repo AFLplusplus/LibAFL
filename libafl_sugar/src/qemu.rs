@@ -127,7 +127,7 @@ where
 
         let mut out_dir = self.output_dir.clone();
         if fs::create_dir(&out_dir).is_err() {
-            println!("Out dir at {:?} already exists.", &out_dir);
+            log::info!("Out dir at {:?} already exists.", &out_dir);
             assert!(
                 out_dir.is_dir(),
                 "Out dir at {:?} is not a valid directory!",
@@ -142,7 +142,7 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let monitor = MultiMonitor::new(|s| println!("{s}"));
+        let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _>,
@@ -247,12 +247,12 @@ where
                                 8,
                             )
                             .expect("Failed to generate the initial corpus");
-                        println!(
+                        log::info!(
                             "We imported {} inputs from the generator.",
                             state.corpus().count()
                         );
                     } else {
-                        println!("Loading from {:?}", &self.input_dirs);
+                        log::info!("Loading from {:?}", &self.input_dirs);
                         // Load from disk
                         state
                             .load_initial_inputs(
@@ -264,7 +264,7 @@ where
                             .unwrap_or_else(|_| {
                                 panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
                             });
-                        println!("We imported {} inputs from disk.", state.corpus().count());
+                        log::info!("We imported {} inputs from disk.", state.corpus().count());
                     }
                 }
 
@@ -350,12 +350,12 @@ where
                                 8,
                             )
                             .expect("Failed to generate the initial corpus");
-                        println!(
+                        log::info!(
                             "We imported {} inputs from the generator.",
                             state.corpus().count()
                         );
                     } else {
-                        println!("Loading from {:?}", &self.input_dirs);
+                        log::info!("Loading from {:?}", &self.input_dirs);
                         // Load from disk
                         state
                             .load_initial_inputs(
@@ -367,7 +367,7 @@ where
                             .unwrap_or_else(|_| {
                                 panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
                             });
-                        println!("We imported {} inputs from disk.", state.corpus().count());
+                        log::info!("We imported {} inputs from disk.", state.corpus().count());
                     }
                 }
 

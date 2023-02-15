@@ -95,7 +95,7 @@ where
         #[cfg(unix)]
         unsafe {
             if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
-                println!("Crashing target as it had ASAN errors");
+                log::error!("Crashing target as it had ASAN errors");
                 libc::raise(libc::SIGABRT);
             }
         }
@@ -174,7 +174,7 @@ where
 
         if !helper.options().disable_excludes {
             for range in ranges.gaps(&(0..usize::MAX)) {
-                println!("excluding range: {:x}-{:x}", range.start, range.end);
+                log::info!("excluding range: {:x}-{:x}", range.start, range.end);
                 stalker.exclude(&MemoryRange::new(
                     NativePointer(range.start as *mut c_void),
                     range.end - range.start,

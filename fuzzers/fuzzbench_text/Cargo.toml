@@ -27,7 +27,6 @@ clap = { version = "4.0", features = ["default"] }
 nix = "0.26"
 mimalloc = { version = "*", default-features = false }
 content_inspector = "0.2.4"
-serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 
 [lib]
 name = "fuzzbench"
