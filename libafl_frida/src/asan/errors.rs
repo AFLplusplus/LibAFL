@@ -643,11 +643,15 @@ where
         }
     }
 
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         _state: &mut S,
+        _observers: &OT,
         testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
         }
