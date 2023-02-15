@@ -32,7 +32,10 @@ use crate::bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::bolts::os::{dup2, fork, ForkResult};
+use crate::bolts::{
+    core_affinity::get_core_ids,
+    os::{dup2, fork, ForkResult},
+};
 use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
@@ -121,8 +124,6 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
-        use crate::bolts::core_affinity::get_core_ids;
-
         if self.run_client.is_none() {
             return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),
@@ -161,7 +162,7 @@ where
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(std::time::Duration::from_millis(index * 100));
+                        std::thread::sleep(std::time::Duration::from_millis(index * 10));
 
                         #[cfg(feature = "std")]
                         if !debug_output {

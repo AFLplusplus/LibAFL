@@ -45,11 +45,7 @@ pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
 }
 
 /// This represents a CPU core.
-<<<<<<< HEAD
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-=======
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
->>>>>>> e6591456 (return CoreId for Launcher)
 #[repr(transparent)]
 pub struct CoreId(
     /// The numerical `id` of a core
@@ -326,7 +322,7 @@ mod linux {
             // Ensure that the system pinned the current thread
             // to the specified core.
             let mut core_mask = new_cpu_set();
-            unsafe { CPU_SET(ids[0].id, &mut core_mask) };
+            unsafe { CPU_SET(ids[0].0, &mut core_mask) };
 
             let new_mask = get_affinity_mask().unwrap();
 
@@ -376,7 +372,7 @@ mod windows {
         match get_num_logical_cpus_ex_windows() {
             Some(total_cores) => {
                 for i in 0..total_cores {
-                    core_ids.push(CoreId { id: i });
+                    core_ids.push(CoreId(i));
                 }
                 Ok(core_ids)
             }
@@ -588,7 +584,7 @@ mod apple {
     #[allow(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
-            .map(|n| CoreId { id: n })
+            .map(|n| CoreId(n))
             .collect::<Vec<_>>())
     }
 
@@ -665,7 +661,7 @@ mod freebsd {
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
-            .map(|n| CoreId { id: n })
+            .map(|n| CoreId(n))
             .collect::<Vec<_>>())
     }
 
@@ -794,7 +790,7 @@ mod netbsd {
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
-            .map(|n| CoreId { id: n })
+            .map(|n| CoreId(n))
             .collect::<Vec<_>>())
     }
 
@@ -849,7 +845,7 @@ mod openbsd {
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
-            .map(|n| CoreId { id: n })
+            .map(|n| CoreId(n))
             .collect::<Vec<_>>())
     }
 }
@@ -878,7 +874,7 @@ mod solaris {
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
-            .map(|n| CoreId { id: n })
+            .map(|n| CoreId(n))
             .collect::<Vec<_>>())
     }
 
