@@ -10,7 +10,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{ffi::c_void, ptr::write_volatile};
+use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile};
 
 use backtrace::Backtrace;
 #[cfg(target_arch = "x86_64")]
@@ -61,6 +61,7 @@ extern "C" {
     fn __register_frame(begin: *mut c_void);
 }
 
+#[cfg(not(target_os = "ios"))]
 extern "C" {
     fn tls_ptr() -> *const c_void;
 }
@@ -192,7 +193,7 @@ impl FridaRuntime for AsanRuntime {
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC,
             )
             .unwrap();
-            println!("Test0");
+            log::info!("Test0");
             /*
             0x555555916ce9 <libafl_frida::asan_rt::AsanRuntime::init+13033>    je     libafl_frida::asan_rt::AsanRuntime::init+14852 <libafl_frida::asan_rt::AsanRuntime::init+14852>
             0x555555916cef <libafl_frida::asan_rt::AsanRuntime::init+13039>    mov    rdi, r15 <0x555558392338>
@@ -201,52 +202,52 @@ impl FridaRuntime for AsanRuntime {
                 (mem as usize) as *const c_void,
                 0x00
             ));
-            println!("Test1");
+            log::info!("Test1");
             assert!((self.shadow_check_func.unwrap())(
                 (mem as usize) as *const c_void,
                 0xac
             ));
-            println!("Test2");
+            log::info!("Test2");
             assert!((self.shadow_check_func.unwrap())(
                 ((mem as usize) + 2) as *const c_void,
                 0xac
             ));
-            println!("Test3");
+            log::info!("Test3");
             assert!(!(self.shadow_check_func.unwrap())(
                 ((mem as usize) + 3) as *const c_void,
                 0xac
             ));
-            println!("Test4");
+            log::info!("Test4");
             assert!(!(self.shadow_check_func.unwrap())(
                 ((mem as isize) + -1) as *const c_void,
                 0xac
             ));
-            println!("Test5");
+            log::info!("Test5");
             assert!((self.shadow_check_func.unwrap())(
                 ((mem as usize) + 2 + 0xa4) as *const c_void,
                 8
             ));
-            println!("Test6");
+            log::info!("Test6");
             assert!((self.shadow_check_func.unwrap())(
                 ((mem as usize) + 2 + 0xa6) as *const c_void,
                 6
             ));
-            println!("Test7");
+            log::info!("Test7");
             assert!(!(self.shadow_check_func.unwrap())(
                 ((mem as usize) + 2 + 0xa8) as *const c_void,
                 6
             ));
-            println!("Test8");
+            log::info!("Test8");
             assert!(!(self.shadow_check_func.unwrap())(
                 ((mem as usize) + 2 + 0xa8) as *const c_void,
                 0xac
             ));
-            println!("Test9");
+            log::info!("Test9");
             assert!((self.shadow_check_func.unwrap())(
                 ((mem as usize) + 4 + 0xa8) as *const c_void,
                 0x1
             ));
-            println!("FIN");
+            log::info!("FIN");
 
             for i in 0..0xad {
                 assert!((self.shadow_check_func.unwrap())(
@@ -390,6 +391,7 @@ impl AsanRuntime {
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
     /// tls mappings.
     #[allow(clippy::unused_self)]
+    #[cfg(not(target_os = "ios"))]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
         self.allocator
@@ -398,9 +400,20 @@ impl AsanRuntime {
         let (tls_start, tls_end) = Self::current_tls();
         self.allocator
             .map_shadow_for_region(tls_start, tls_end, true);
-        println!(
+        log::info!(
             "registering thread with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}"
         );
+    }
+
+    /// Register the current thread with the runtime, implementing shadow memory for its stack mapping.
+    #[allow(clippy::unused_self)]
+    #[cfg(target_os = "ios")]
+    pub fn register_thread(&mut self) {
+        let (stack_start, stack_end) = Self::current_stack();
+        self.allocator
+            .map_shadow_for_region(stack_start, stack_end, true);
+
+        log::info!("registering thread with stack {stack_start:x}:{stack_end:x}");
     }
 
     /// Get the maximum stack size for the current stack
@@ -455,8 +468,8 @@ impl AsanRuntime {
         if start != max_start {
             let mapping = unsafe {
                 mmap(
-                    max_start as *mut c_void,
-                    start - max_start,
+                    NonZeroUsize::new(max_start),
+                    NonZeroUsize::new(start - max_start).unwrap(),
                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                     flags,
                     -1,
@@ -470,6 +483,7 @@ impl AsanRuntime {
 
     /// Determine the tls start, end for the currently running thread
     #[must_use]
+    #[cfg(not(target_os = "ios"))]
     fn current_tls() -> (usize, usize) {
         let tls_address = unsafe { tls_ptr() } as usize;
 
@@ -925,7 +939,7 @@ impl AsanRuntime {
             .expect("Failed to disassmeble");
 
         let insn = instructions.as_ref().first().unwrap(); // This is the very instruction that has triggered fault
-        println!("{insn:#?}");
+        log::info!("{insn:#?}");
         let operands = cs.insn_detail(insn).unwrap().arch_detail().operands();
 
         let mut access_type: Option<RegAccessType> = None;
@@ -962,7 +976,7 @@ impl AsanRuntime {
                 _ => None,
             };
 
-            // println!("{:x}", base_value);
+            // log::trace!("{:x}", base_value);
             #[allow(clippy::option_if_let_else)]
             let error = if fault_address >= stack_start && fault_address < stack_end {
                 match access_type {
@@ -1274,25 +1288,25 @@ impl AsanRuntime {
 
     #[cfg(target_arch = "x86_64")]
     fn dump_registers(&self) {
-        println!("rax: {:x}", self.regs[0]);
-        println!("rbx: {:x}", self.regs[1]);
-        println!("rcx: {:x}", self.regs[2]);
-        println!("rdx: {:x}", self.regs[3]);
-        println!("rbp: {:x}", self.regs[4]);
-        println!("rsp: {:x}", self.regs[5]);
-        println!("rsi: {:x}", self.regs[6]);
-        println!("rdi: {:x}", self.regs[7]);
-        println!("r8: {:x}", self.regs[8]);
-        println!("r9: {:x}", self.regs[9]);
-        println!("r10: {:x}", self.regs[10]);
-        println!("r11: {:x}", self.regs[11]);
-        println!("r12: {:x}", self.regs[12]);
-        println!("r13: {:x}", self.regs[13]);
-        println!("r14: {:x}", self.regs[14]);
-        println!("r15: {:x}", self.regs[15]);
-        println!("instrumented rip: {:x}", self.regs[16]);
-        println!("fault address: {:x}", self.regs[17]);
-        println!("actual rip: {:x}", self.regs[18]);
+        log::info!("rax: {:x}", self.regs[0]);
+        log::info!("rbx: {:x}", self.regs[1]);
+        log::info!("rcx: {:x}", self.regs[2]);
+        log::info!("rdx: {:x}", self.regs[3]);
+        log::info!("rbp: {:x}", self.regs[4]);
+        log::info!("rsp: {:x}", self.regs[5]);
+        log::info!("rsi: {:x}", self.regs[6]);
+        log::info!("rdi: {:x}", self.regs[7]);
+        log::info!("r8: {:x}", self.regs[8]);
+        log::info!("r9: {:x}", self.regs[9]);
+        log::info!("r10: {:x}", self.regs[10]);
+        log::info!("r11: {:x}", self.regs[11]);
+        log::info!("r12: {:x}", self.regs[12]);
+        log::info!("r13: {:x}", self.regs[13]);
+        log::info!("r14: {:x}", self.regs[14]);
+        log::info!("r15: {:x}", self.regs[15]);
+        log::info!("instrumented rip: {:x}", self.regs[16]);
+        log::info!("fault address: {:x}", self.regs[17]);
+        log::info!("actual rip: {:x}", self.regs[18]);
     }
 
     // https://godbolt.org/z/oajhcP5sv
@@ -1531,8 +1545,8 @@ impl AsanRuntime {
         let blob = ops.finalize().unwrap();
         unsafe {
             let mapping = mmap(
-                std::ptr::null_mut(),
-                0x1000,
+                None,
+                std::num::NonZeroUsize::new_unchecked(0x1000),
                 ProtFlags::all(),
                 MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
                 -1,
@@ -2255,7 +2269,7 @@ impl AsanRuntime {
             if let X86Operand(x86operand) = operand {
                 if let X86OperandType::Mem(opmem) = x86operand.op_type {
                     /*
-                    println!(
+                    log::trace!(
                         "insn: {:#?} {:#?} width: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
                         insn_id,
                         instr,

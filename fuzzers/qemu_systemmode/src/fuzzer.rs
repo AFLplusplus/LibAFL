@@ -61,12 +61,12 @@ pub fn fuzz() {
             0,
         )
         .expect("Symbol or env FUZZ_INPUT not found") as GuestPhysAddr;
-    println!("FUZZ_INPUT @ {:#x}", input_addr);
+    println!("FUZZ_INPUT @ {input_addr:#x}");
 
     let main_addr = elf
         .resolve_symbol("main", 0)
         .expect("Symbol main not found");
-    println!("main address = {:#x}", main_addr);
+    println!("main address = {main_addr:#x}");
 
     let breakpoint = elf
         .resolve_symbol(
@@ -74,7 +74,7 @@ pub fn fuzz() {
             0,
         )
         .expect("Symbol or env BREAKPOINT not found");
-    println!("Breakpoint address = {:#x}", breakpoint);
+    println!("Breakpoint address = {breakpoint:#x}");
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Initialize QEMU
@@ -204,7 +204,7 @@ pub fn fuzz() {
         // Wrap the executor to keep track of the timeout
         let mut executor = TimeoutExecutor::new(executor, timeout);
 
-        if state.corpus().count() < 1 {
+        if state.must_load_initial_inputs() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
                 .unwrap_or_else(|_| {
@@ -248,6 +248,6 @@ pub fn fuzz() {
     {
         Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
-        Err(err) => panic!("Failed to run launcher: {:?}", err),
+        Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
 }

@@ -18,6 +18,4 @@ cc = "*"
 
 [dependencies]
 libafl = { path = "../../../libafl/" }
-ahash = { version = "0.7"} # another hash
-spawn-ptrace = {version= "0.1.2"}
 

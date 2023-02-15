@@ -1,14 +1,13 @@
 [package]
 name = "nyx_libxml2_parallel"
-version = "0.1.0"
+version = "0.9.0"
 edition = "2021"
 default-run = "nyx_libxml2_parallel"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libafl = {path = "../../libafl"}
-libafl_cc = {path = "../../libafl_cc"}
-libafl_nyx = {path = "../../libafl_nyx"}
+libafl = { path = "../../libafl" }
+libafl_cc = { path = "../../libafl_cc" }
+libafl_nyx = { path = "../../libafl_nyx" }
 
 [profile.release]
 codegen-units = 1

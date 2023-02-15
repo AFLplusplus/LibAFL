@@ -1,6 +1,6 @@
 [package]
 name = "forkserver_simple"
-version = "0.8.2"
+version = "0.9.0"
 authors = ["tokatoka <tokazerkje@outlook.com>"]
 edition = "2021"
 
@@ -18,4 +18,4 @@ opt-level = 3
 [dependencies]
 libafl = { path = "../../libafl/", features = ["std", "derive"] }
 clap = { version = "4.0", features = ["derive"] }
-nix = "0.25"
+nix = "0.26"

@@ -38,16 +38,12 @@ impl Fixup for PacketData {
     Serialize, Deserialize, Debug, Copy, Clone, FuzzerObject, ToPrimitiveU32, BinarySerialize, Hash,
 )]
 #[repr(u32)]
+#[derive(Default)]
 pub enum PacketType {
+    #[default]
     Read = 0x0,
     Write = 0x1,
     Reset = 0x2,
-}
-
-impl Default for PacketType {
-    fn default() -> Self {
-        PacketType::Read
-    }
 }
 
 impl Input for PacketData {

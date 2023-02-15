@@ -6,13 +6,13 @@ use alloc::{
 };
 use core::{
     fmt::Debug,
-    hash::Hasher,
+    hash::{BuildHasher, Hasher},
     iter::Flatten,
     marker::PhantomData,
     slice::{from_raw_parts, Iter, IterMut},
 };
 
-use ahash::AHasher;
+use ahash::RandomState;
 use intervaltree::IntervalTree;
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
@@ -71,7 +71,7 @@ fn init_count_class_16() {
 
 /// Compute the hash of a slice
 fn hash_slice<T>(slice: &[T]) -> u64 {
-    let mut hasher = AHasher::new_with_keys(0, 0);
+    let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
     let ptr = slice.as_ptr() as *const u8;
     let map_size = slice.len() / core::mem::size_of::<T>();
     unsafe {
@@ -884,7 +884,7 @@ where
 {
     /// Creates a new [`MapObserver`]
     ///
-    /// # Safety
+    /// # Note
     /// Will get a pointer to the map and dereference it at any point in time.
     /// The map must not move in memory!
     #[must_use]
@@ -1757,7 +1757,7 @@ where
     }
 
     fn hash(&self) -> u64 {
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         for map in &self.maps {
             let slice = map.as_slice();
             let ptr = slice.as_ptr() as *const u8;

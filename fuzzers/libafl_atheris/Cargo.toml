@@ -1,8 +1,8 @@
 [package]
 name = "libafl_atheris"
-version = "0.8.2"
+version = "0.9.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["std"]
@@ -21,7 +21,7 @@ which = { version = "4.0.2" }
 [dependencies]
 libafl = { path = "../../libafl/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["pointer_maps", "sancov_cmplog", "libfuzzer"] }
-clap = { version = "3.2", features = ["default"] }
+clap = { version = "4.0", features = ["default"] }
 
 [lib]
 name = "afl_atheris"

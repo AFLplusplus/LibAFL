@@ -9,7 +9,7 @@ extern "C" {
 /// Hooked `exit` function
 #[no_mangle]
 pub extern "C" fn exit(status: i32) {
-    println!("DeExit: The target called exit with status code {status}");
+    log::info!("DeExit: The target called exit with status code {status}");
     unsafe {
         abort();
     }

@@ -254,7 +254,7 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                let client = &mut monitor.client_stats_mut()[0];
+                let client = monitor.client_stats_mut_for(0);
                 client.update_executions(*executions as u64, *time);
                 client.update_introspection_monitor((**introspection_monitor).clone());
                 monitor.display(event.name().to_string(), 0);
@@ -273,8 +273,7 @@ where
                 phantom: _,
             } => {
                 let (_, _) = (message, severity_level);
-                #[cfg(feature = "std")]
-                println!("[LOG {severity_level}]: {message}");
+                log::log!((*severity_level).into(), "{message}");
                 Ok(BrokerEventResult::Handled)
             }
             Event::CustomBuf { .. } => Ok(BrokerEventResult::Forward),
@@ -470,14 +469,13 @@ where
             #[cfg(unix)]
             if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
-                #[cfg(feature = "std")]
-                println!("Failed to setup signal handlers: {_e}");
+                log::error!("Failed to setup signal handlers: {_e}");
             }
 
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
-                println!("Spawning next client (id {ctr})");
+                log::info!("Spawning next client (id {ctr})");
 
                 // On Unix, we fork
                 #[cfg(all(unix, feature = "fork"))]
@@ -528,7 +526,7 @@ where
         // If we're restarting, deserialize the old state.
         let (state, mgr) = match staterestorer.restore::<S>()? {
             None => {
-                println!("First run. Let's set it all up");
+                log::info!("First run. Let's set it all up");
                 // Mgr to send and receive msgs from/to all other fuzzer instances
                 (
                     None,
@@ -537,7 +535,7 @@ where
             }
             // Restoring from a previous run, deserialize state and corpus.
             Some(state) => {
-                println!("Subsequent run. Loaded previous state.");
+                log::info!("Subsequent run. Loaded previous state.");
                 // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
                 staterestorer.reset();
 

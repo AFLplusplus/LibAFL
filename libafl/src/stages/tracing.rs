@@ -93,6 +93,11 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
     pub fn executor(&self) -> &TE {
         &self.tracer_executor
     }
+
+    /// Gets the underlying tracer executor (mut)
+    pub fn executor_mut(&mut self) -> &mut TE {
+        &mut self.tracer_executor
+    }
 }
 
 /// A stage that runs the shadow executor using also the shadow observers

@@ -537,7 +537,7 @@ where
             .field("target", &self.target)
             .field("args", &self.args)
             .field("input_file", &self.input_file)
-            .field("use_shmem_testcase", &self.uses_shmem_testcase)
+            .field("uses_shmem_testcase", &self.uses_shmem_testcase)
             .field("forkserver", &self.forkserver)
             .field("observers", &self.observers)
             .field("map", &self.map)
@@ -617,7 +617,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         let (forkserver, input_file, map) = self.build_helper()?;
 
         let target = self.program.take().unwrap();
-        println!(
+        log::info!(
             "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
             target,
             self.arguments.clone(),
@@ -655,7 +655,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         let (forkserver, input_file, map) = self.build_helper()?;
 
         let target = self.program.take().unwrap();
-        println!(
+        log::info!(
             "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}, map_size: {:?}",
             target,
             self.arguments.clone(),
@@ -732,7 +732,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         if rlen != 4 {
             return Err(Error::unknown("Failed to start a forkserver".to_string()));
         }
-        println!("All right - fork server is up.");
+        log::info!("All right - fork server is up.");
         // If forkserver is responding, we then check if there's any option enabled.
         // We'll send 4-bytes message back to the forkserver to tell which features to use
         // The forkserver is listening to our response if either shmem fuzzing is enabled or auto dict is enabled
@@ -745,7 +745,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             let mut send_status = FS_OPT_ENABLED;
 
             if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) && map.is_some() {
-                println!("Using SHARED MEMORY FUZZING feature.");
+                log::info!("Using SHARED MEMORY FUZZING feature.");
                 send_status |= FS_OPT_SHDMEM_FUZZ;
                 self.uses_shmem_testcase = true;
             }
@@ -765,9 +765,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     map_size = ((map_size + 63) >> 6) << 6;
                 }
 
+                // TODO set AFL_MAP_SIZE
                 assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
 
-                println!("Target MAP SIZE = {:#x}", self.real_map_size);
+                log::info!("Target MAP SIZE = {:#x}", self.real_map_size);
                 self.map_size = Some(map_size as usize);
             }
 
@@ -790,7 +791,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     ));
                 }
 
-                println!("Autodict size {dict_size:x}");
+                log::info!("Autodict size {dict_size:x}");
 
                 let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
 
@@ -803,7 +804,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 }
             }
         } else {
-            println!("Forkserver Options are not available.");
+            log::warn!("Forkserver Options are not available.");
         }
 
         Ok((forkserver, input_file, map))
@@ -1030,7 +1031,11 @@ where
         if self.uses_shmem_testcase {
             let map = unsafe { self.map.as_mut().unwrap_unchecked() };
             let target_bytes = input.target_bytes();
-            let size = target_bytes.as_slice().len();
+            let mut size = target_bytes.as_slice().len();
+            if size > MAX_FILE {
+                // Truncate like AFL++ does
+                size = MAX_FILE;
+            }
             let size_in_bytes = size.to_ne_bytes();
             // The first four bytes tells the size of the shmem.
             map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
