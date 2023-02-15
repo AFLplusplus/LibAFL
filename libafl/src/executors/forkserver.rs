@@ -4,7 +4,6 @@ use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
 use std::{
@@ -734,14 +733,37 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             return Err(Error::unknown("Failed to start a forkserver".to_string()));
         }
         log::info!("All right - fork server is up.");
+
+        if status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
+            let mut map_size = fs_opt_get_mapsize(status);
+            // When 0, we assume that map_size was filled by the user or const
+            /* TODO autofill map size from the observer
+
+            if map_size > 0 {
+                self.map_size = Some(map_size as usize);
+            }
+            */
+
+            self.real_map_size = map_size;
+            if map_size % 64 != 0 {
+                map_size = ((map_size + 63) >> 6) << 6;
+            }
+
+            // TODO set AFL_MAP_SIZE
+            assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
+
+            log::info!("Target MAP SIZE = {:#x}", self.real_map_size);
+            self.map_size = Some(map_size as usize);
+        }
+
+        // Only with SHMEM or AUTODICT we can send send_status back or it breaks!
         // If forkserver is responding, we then check if there's any option enabled.
         // We'll send 4-bytes message back to the forkserver to tell which features to use
         // The forkserver is listening to our response if either shmem fuzzing is enabled or auto dict is enabled
         // <https://github.com/AFLplusplus/AFLplusplus/blob/147654f8715d237fe45c1657c87b2fe36c4db22a/instrumentation/afl-compiler-rt.o.c#L1026>
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED
             && (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ
-                || status & FS_OPT_AUTODICT == FS_OPT_AUTODICT
-                || status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE)
+                || status & FS_OPT_AUTODICT == FS_OPT_AUTODICT)
         {
             let mut send_status = FS_OPT_ENABLED;
 
@@ -749,28 +771,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 log::info!("Using SHARED MEMORY FUZZING feature.");
                 send_status |= FS_OPT_SHDMEM_FUZZ;
                 self.uses_shmem_testcase = true;
-            }
-
-            if status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
-                let mut map_size = fs_opt_get_mapsize(status);
-                // When 0, we assume that map_size was filled by the user or const
-                /* TODO autofill map size from the observer
-
-                if map_size > 0 {
-                    self.map_size = Some(map_size as usize);
-                }
-                */
-
-                self.real_map_size = map_size;
-                if map_size % 64 != 0 {
-                    map_size = ((map_size + 63) >> 6) << 6;
-                }
-
-                // TODO set AFL_MAP_SIZE
-                assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
-
-                log::info!("Target MAP SIZE = {:#x}", self.real_map_size);
-                self.map_size = Some(map_size as usize);
             }
 
             let send_len = forkserver.write_ctl(send_status)?;
