@@ -7,7 +7,7 @@ use alloc::{
 };
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
-use core::{marker::PhantomData, time::Duration};
+use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 #[cfg(feature = "std")]
 use std::net::{SocketAddr, ToSocketAddrs};
 
@@ -112,6 +112,11 @@ where
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
         })
+    }
+
+    /// Exit the broker process cleanly after at least `n` clients attached and all of them disconnected again
+    pub fn set_exit_cleanly_after(&mut self, n_clients: NonZeroUsize) {
+        self.llmp.set_exit_cleanly_after(n_clients);
     }
 
     /// Connect to an llmp broker on the givien address
@@ -864,6 +869,14 @@ where
     /// The type of manager to build
     #[builder(default = ManagerKind::Any)]
     kind: ManagerKind,
+    /// The amount of external clients that should have connected (not counting our own tcp client)
+    /// before this broker quits _after the last client exited_.
+    /// If `None`, the broker will never quit when the last client exits, but run forever.
+    ///
+    /// So, if this value is `Some(2)`, the broker will not exit after client 1 connected and disconnected,
+    /// but it will quit after client 2 connected and disconnected.
+    #[builder(default = None)]
+    exit_cleanly_after: Option<NonZeroUsize>,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<S>,
 }
@@ -888,6 +901,10 @@ where
                     println!("B2b: Connecting to {:?}", &remote_broker_addr);
                     broker.connect_b2b(remote_broker_addr)?;
                 };
+
+                if let Some(exit_cleanly_after) = self.exit_cleanly_after {
+                    broker.set_exit_cleanly_after(exit_cleanly_after);
+                }
 
                 broker.broker_loop()
             };

@@ -69,6 +69,7 @@ use core::{
     fmt::Debug,
     hint,
     mem::size_of,
+    num::NonZeroUsize,
     ops::{BitAnd, BitOr, Not},
     ptr, slice,
     sync::atomic::{fence, AtomicU16, Ordering},
@@ -1836,6 +1837,14 @@ where
     /// This allows us to intercept messages right in the broker.
     /// This keeps the out map clean.
     pub llmp_clients: Vec<LlmpReceiver<SP>>,
+    /// The amount of own listeners we spawned via [`Self::launch_listener`] or [`Self::crate_attach_to_tcp`]
+    /// This count doesn't count for [`exit_cleanly_after`]
+    num_listeners: usize,
+    /// The total amount of clients we had, historically, including those that disconnected, and our listeners.
+    num_clients_total: usize,
+    /// The amount of total clients that should have connected and (and disconnected)
+    /// after which the broker loop should quit gracefully.
+    pub exit_cleanly_after: Option<NonZeroUsize>,
     /// Clients that should be removed soon, (offset into llmp_clients)
     clients_to_remove: Vec<u32>,
     /// The ShMemProvider to use
@@ -1887,6 +1896,9 @@ where
             llmp_clients: vec![],
             clients_to_remove: vec![],
             shmem_provider,
+            num_listeners: 0,
+            exit_cleanly_after: None,
+            num_clients_total: 0,
         })
     }
 
@@ -1903,6 +1915,15 @@ where
         }
     }
 
+    /// Set this broker to exit after at least `count` clients attached and all client exited.
+    /// Will ignore the own listener thread, if `create_attach_to_tcp`
+    ///
+    /// So, if the `n_client` value is `2`, the broker will not exit after client 1 connected and disconnected,
+    /// but it will quit after client 2 connected and disconnected.
+    pub fn set_exit_cleanly_after(&mut self, n_clients: NonZeroUsize) {
+        self.exit_cleanly_after = Some(n_clients);
+    }
+
     /// Allocate the next message on the outgoing map
     unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, Error> {
         self.llmp_out.alloc_next(buf_len)
@@ -1911,7 +1932,8 @@ where
     /// Registers a new client for the given sharedmap str and size.
     /// Returns the id of the new client in [`broker.client_shmem`]
     pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::ShMem>) {
-        // Tell the client it may unmap this page now.
+        // Tell the client it may unmap its initial allocated shmem page now.
+        // Since we now have a handle to it, it won't be umapped too early (only after we also unmap it)
         client_page.mark_safe_to_unmap();
 
         let id = self.llmp_clients.len() as u32;
@@ -1925,6 +1947,8 @@ where
             #[cfg(feature = "std")]
             last_msg_time: current_time(),
         });
+
+        self.num_clients_total += 1;
     }
 
     /// Connects to a broker running on another machine.
@@ -2072,11 +2096,11 @@ where
     }
 
     /// Returns if any clients are currently connected.
-    /// Ignores the client 0, which is our internal client, talking to other brokers via TCP,
-    /// and accepting new clients over this port.
+    /// Ignores listener threads that belong to the broker,
+    /// talking to other brokers via TCP, and accepting new clients over this port.
     #[inline]
     fn has_clients(&self) -> bool {
-        self.llmp_clients.len() > 1
+        self.llmp_clients.len() > self.num_listeners
     }
 
     /// Loops until the last client quits,
@@ -2105,10 +2129,6 @@ where
         let timeout = timeout.as_millis() as u64;
         let mut end_time = current_milliseconds() + timeout;
 
-        // If we ever had more than 1 client (the tcp loop we start ourselves), this is true.
-        // If we reach 1 again, all clients are gone, and we probably want to quit.
-        let mut had_clients = self.has_clients();
-
         while !self.is_shutting_down() {
             if current_milliseconds() > end_time {
                 on_new_msg_or_timeout(None).expect("An error occured in broker timeout. Exiting.");
@@ -2124,11 +2144,14 @@ where
                 end_time = current_milliseconds() + timeout;
             }
 
-            if self.has_clients() {
-                had_clients = true;
-            } else if had_clients {
-                // Our last client exited (and we had a client before)
-                break;
+            if let Some(exit_after_count) = self.exit_cleanly_after {
+                if !self.has_clients()
+                    && (self.num_clients_total - self.num_listeners) > exit_after_count.into()
+                {
+                    // No more clients connected, and the amount of clients we were waiting for was previously connected.
+                    // exit cleanly.
+                    break;
+                }
             }
 
             #[cfg(feature = "std")]
@@ -2161,17 +2184,18 @@ where
             println!("Failed to setup signal handlers: {_e}");
         }
 
-        let mut had_clients = self.has_clients();
-
         while !self.is_shutting_down() {
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
 
-            if self.has_clients() {
-                had_clients = true;
-            } else if had_clients {
-                // We no longer have any clients. Exit
-                break;
+            if let Some(exit_after_count) = self.exit_cleanly_after {
+                if !self.has_clients()
+                    && (self.num_clients_total - self.num_listeners) > exit_after_count.into()
+                {
+                    // No more clients connected, and the amount of clients we were waiting for was previously connected.
+                    // exit cleanly.
+                    break;
+                }
             }
 
             #[cfg(feature = "std")]
@@ -2532,6 +2556,8 @@ where
                 };
             }
         });
+
+        self.num_listeners += 1;
 
         Ok(ret)
     }

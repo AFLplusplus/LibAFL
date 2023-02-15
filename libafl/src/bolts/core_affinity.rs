@@ -165,6 +165,7 @@ impl Cores {
 
     /// Returns the index/position of the given [`CoreId`] in this cores.ids list.
     /// Will return `None`, if [`CoreId`] wasn't found.
+    #[must_use]
     pub fn position(&self, core_id: CoreId) -> Option<usize> {
         // Since cores a low number, iterating is const-size,
         // and should be faster than hashmap lookups.

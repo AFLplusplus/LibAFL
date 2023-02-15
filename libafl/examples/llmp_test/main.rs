@@ -25,6 +25,14 @@ const _TAG_MATH_RESULT_V1: Tag = Tag(0x7747_4331);
 #[cfg(feature = "std")]
 const _TAG_1MEG_V1: Tag = Tag(0xB111_1161);
 
+/// The time the broker will wait for things to happen before printing a message
+#[cfg(feature = "std")]
+const BROKER_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// How long the broker may sleep between forwarding a new chunk of sent messages
+#[cfg(feature = "std")]
+const SLEEP_BETWEEN_FORWARDS: Duration = Duration::from_millis(5);
+
 #[cfg(feature = "std")]
 fn adder_loop(port: u16) -> ! {
     let shmem_provider = StdShMemProvider::new().unwrap();
@@ -81,11 +89,18 @@ fn large_msg_loop(port: u16) -> ! {
 #[allow(clippy::unnecessary_wraps)]
 #[cfg(feature = "std")]
 fn broker_message_hook(
-    client_id: ClientId,
-    tag: llmp::Tag,
-    _flags: llmp::Flags,
-    message: &[u8],
+    msg_or_timeout: Option<(ClientId, llmp::Tag, llmp::Flags, &[u8])>,
 ) -> Result<llmp::LlmpMsgHookResult, Error> {
+    let (client_id, tag, _flags, message) = if let Some(msg) = msg_or_timeout {
+        msg
+    } else {
+        println!(
+            "No client did anything for {} seconds..",
+            BROKER_TIMEOUT.as_secs()
+        );
+        return Ok(llmp::LlmpMsgHookResult::Handled);
+    };
+
     match tag {
         _TAG_SIMPLE_U32_V1 => {
             println!(
@@ -103,7 +118,7 @@ fn broker_message_hook(
             Ok(llmp::LlmpMsgHookResult::Handled)
         }
         _ => {
-            println!("Unknwon message id received!");
+            println!("Unknown message id received: {tag:?}");
             Ok(llmp::LlmpMsgHookResult::ForwardToClients)
         }
     }
@@ -117,6 +132,8 @@ fn main() {
 #[cfg(feature = "std")]
 fn main() {
     /* The main node has a broker, and a few worker threads */
+
+    use std::num::NonZeroUsize;
 
     let mode = std::env::args()
         .nth(1)
@@ -138,14 +155,24 @@ fn main() {
         "broker" => {
             let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
             broker.launch_tcp_listener_on(port).unwrap();
-            broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)));
+            // Exit when we got at least _n_ nodes, and all of them quit.
+            broker.set_exit_cleanly_after(NonZeroUsize::new(2_usize).unwrap());
+            broker.loop_with_timeouts(
+                &mut broker_message_hook,
+                BROKER_TIMEOUT,
+                Some(Duration::from_millis(5)),
+            );
         }
         "b2b" => {
             let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
             broker.launch_tcp_listener_on(b2b_port).unwrap();
             // connect back to the main broker.
             broker.connect_b2b(("127.0.0.1", port)).unwrap();
-            broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)));
+            broker.loop_with_timeouts(
+                &mut broker_message_hook,
+                BROKER_TIMEOUT,
+                Some(Duration::from_millis(5)),
+            );
         }
         "ctr" => {
             let mut client =

@@ -124,6 +124,14 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        use core::num::NonZeroUsize;
+
+        if self.cores.ids.is_empty() {
+            return Err(Error::illegal_argument(
+                "No cores to spawn on given, cannot launch anything.",
+            ));
+        }
+
         if self.run_client.is_none() {
             return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),
@@ -200,6 +208,7 @@ where
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
+                .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .build()
                 .launch()?;
@@ -288,6 +297,14 @@ where
             Err(_) => panic!("Env variables are broken, received non-unicode!"),
         };
 
+        // It's fine to check this after the client spawn loop - since we won't have spawned any clients...
+        // Doing it later means one less check in each spawned process.
+        if self.cores.ids.is_empty() {
+            return Err(Error::illegal_argument(
+                "No cores to spawn on given, cannot launch anything.",
+            ));
+        }
+
         if self.spawn_broker {
             #[cfg(feature = "std")]
             println!("I am broker!!.");
@@ -298,6 +315,7 @@ where
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
+                .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .build()
                 .launch()?;
