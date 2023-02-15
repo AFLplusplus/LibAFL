@@ -106,8 +106,16 @@ where
         mgr: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        // Run this stage only once for each corpus entry
-        if state.corpus().get(corpus_idx)?.borrow_mut().fuzz_level() > 0 {
+        // Run this stage only once for each corpus entry and only if we haven't already inspected it
+        if state.corpus().get(corpus_idx)?.borrow().fuzz_level() > 0
+            || state
+                .corpus()
+                .get(corpus_idx)?
+                .borrow()
+                .metadata()
+                .get::<SchedulerTestcaseMetaData>()
+                .map_or(false, |meta| meta.bitmap_size() != 0)
+        {
             return Ok(());
         }
 
@@ -282,6 +290,7 @@ where
                     Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?;
 
+            data.set_cycle_and_time((total_time, iter));
             data.set_bitmap_size(bitmap_size);
             data.set_handicap(handicap);
         }

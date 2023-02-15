@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{CorpusId, Testcase},
     impl_serdeany,
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
@@ -23,7 +23,7 @@ pub enum GeneralizedItem {
 }
 
 /// Metadata regarding the generalised content of an input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GeneralizedInputMetadata {
     generalized: Vec<GeneralizedItem>,
 }
@@ -112,14 +112,16 @@ where
         _state: &S,
         corpus_idx: CorpusId,
     ) -> Result<Self, Error> {
-        base.metadata()
+        let meta = base
+            .metadata()
             .get::<GeneralizedInputMetadata>()
             .ok_or_else(|| {
                 Error::key_not_found(format!(
                     "Couldn't find the GeneralizedInputMetadata for corpus entry {corpus_idx}",
                 ))
             })
-            .cloned()
+            .cloned()?;
+        Ok(meta)
     }
 
     fn try_transform_into(self, _state: &S) -> Result<(BytesInput, Self::Post), Error> {
@@ -127,20 +129,4 @@ where
     }
 }
 
-impl<S> MutatedTransformPost<S> for GeneralizedInputMetadata
-where
-    S: HasCorpus,
-{
-    fn post_exec(
-        self,
-        state: &mut S,
-        _stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        if let Some(corpus_idx) = corpus_idx {
-            let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-            testcase.metadata_mut().insert(self);
-        }
-        Ok(())
-    }
-}
+impl<S> MutatedTransformPost<S> for GeneralizedInputMetadata where S: HasCorpus {}

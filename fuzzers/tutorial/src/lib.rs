@@ -132,7 +132,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = PacketLenMinimizerScheduler::new(PowerQueueScheduler::new(PowerSchedule::FAST));
+    let scheduler =
+        PacketLenMinimizerScheduler::new(PowerQueueScheduler::new(&mut state, PowerSchedule::FAST));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

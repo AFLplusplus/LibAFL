@@ -26,7 +26,7 @@ class BaseFeedback:
         pass
     def is_interesting(self, state, mgr, input, observers, exit_kind) -> bool:
         return False
-    def append_metadata(self, state, testcase):
+    def append_metadata(self, state, observers, testcase):
         pass
     def discard_metadata(self, state, input):
         pass
