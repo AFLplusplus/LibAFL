@@ -85,33 +85,36 @@ impl CoverageRuntime {
         dynasm!(ops
             ;   .arch aarch64
             // Store the context
-            ;   stp x0, x1, [sp, #-0xa0]
+            ;   b >start
+
+            ;   stp x16, x17, [sp, -0x90]!
+            ; start:
 
             // Load the previous_pc
-            ;   ldr x1, >previous_loc
-            ;   ldr x1, [x1]
+            ;   ldr x17, >previous_loc
+            ;   ldr x17, [x17]
 
             // Caltulate the edge id
-            ;   ldr x0, >loc
-            ;   eor x0, x1, x0
+            ;   ldr x16, >loc
+            ;   eor x16, x17, x16
 
             // Load the map byte address
-            ;   ldr x1, >map_addr
-            ;   add x0, x1, x0
+            ;   ldr x17, >map_addr
+            ;   add x16, x17, x16
 
             // Update the map byte
-            ;   ldrb w1, [x0]
-            ;   add w1, w1, #1
-            ;   add x1, x1, x1, lsr #8
-            ;   strb w1, [x0]
+            ;   ldrb w17, [x16]
+            ;   add w17, w17, #1
+            ;   add x17, x17, x17, lsr #8
+            ;   strb w17, [x16]
 
             // Update the previous_pc value
-            ;   ldr x0, >loc_shr
-            ;   ldr x1, >previous_loc
-            ;   str x0, [x1]
+            ;   ldr x16, >loc_shr
+            ;   ldr x17, >previous_loc
+            ;   str x16, [x17]
 
             // Restore the context
-            ;   ldp x0, x1, [sp, #-0xa0]
+            ;   ldp x16, x17, [sp], #0x90
 
             // Skip the data
             ;   b >end
@@ -184,6 +187,27 @@ impl CoverageRuntime {
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
         let h64 = xxh3_rrmxmx_mixer(address);
         let writer = output.writer();
+
+        // Since the AARCH64 instruction set requires that a register be used if
+        // performing a long branch, if the Stalker engine is unable to use a near
+        // branch to transition between branches, then it spills some registers
+        // into the stack beyond the red-zone so that it can use them to perform
+        // the branch. Accordingly each block is transparently prefixed with an
+        // instruction to restore these registers. If however a near branch can
+        // be used, then this instruction is simply skipped and Stalker simply
+        // branches to the second instruction in the block.
+        //
+        // Since we also need to spill some registers in order to update our
+        // coverage map, in the event of a long branch, we can simply re-use
+        // these spilt registers. This, however, means we need to retard the
+        // code writer so that we can overwrite the so-called "restoration
+        // prologue".
+        #[cfg(target_arch = "aarch64")]
+        {
+            let pc = writer.pc();
+            writer.reset(pc - 4);
+        }
+
         let code = self.generate_inline_code(h64 & (MAP_SIZE as u64 - 1));
         writer.put_bytes(&code);
     }

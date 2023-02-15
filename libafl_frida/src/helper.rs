@@ -172,8 +172,8 @@ where
         unsafe {
             for _ in 0..512 {
                 mmap(
-                    std::ptr::null_mut(),
-                    128 * 1024,
+                    None,
+                    std::num::NonZeroUsize::new_unchecked(128 * 1024),
                     ProtFlags::PROT_NONE,
                     ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                     -1,
@@ -181,8 +181,8 @@ where
                 )
                 .expect("Failed to map dummy regions for frida workaround");
                 mmap(
-                    std::ptr::null_mut(),
-                    4 * 1024 * 1024,
+                    None,
+                    std::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
                     ProtFlags::PROT_NONE,
                     ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                     -1,
@@ -228,7 +228,7 @@ where
             for (i, module) in helper.module_map.values().iter().enumerate() {
                 let range = module.range();
                 let start = range.base_address().0 as usize;
-                // println!("start: {:x}", start);
+                // log::trace!("start: {:x}", start);
                 helper
                     .ranges
                     .insert(start..(start + range.size()), (i as u16, module.path()));
@@ -237,7 +237,7 @@ where
                 for (module_name, offset) in options.dont_instrument.clone() {
                     let module_details = ModuleDetails::with_name(module_name).unwrap();
                     let lib_start = module_details.range().base_address().0 as usize;
-                    // println!("removing address: {:#x}", lib_start + offset);
+                    // log::info!("removing address: {:#x}", lib_start + offset);
                     helper
                         .ranges
                         .remove((lib_start + offset)..(lib_start + offset + 4));
@@ -262,19 +262,23 @@ where
                 #[cfg(unix)]
                 let instr_size = instr.bytes().len();
                 let address = instr.address();
-                //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                //log::trace!("block @ {:x} transformed to {:x}", address, output.writer().pc());
 
-                //println!(
+                //log::trace!(
                 //"address: {:x} contains: {:?}",
                 //address,
                 //self.ranges().contains_key(&(address as usize))
                 //);
 
-                // println!("Ranges: {:#?}", self.ranges());
+                //log::info!("Ranges: {:#?}", self.ranges());
                 if helper.ranges().contains_key(&(address as usize)) {
                     if first {
                         first = false;
-                        //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                        // log::info!(
+                        //     "block @ {:x} transformed to {:x}",
+                        //     address,
+                        //     output.writer().pc()
+                        // );
                         if let Some(rt) = helper.runtime_mut::<CoverageRuntime>() {
                             rt.emit_coverage_mapping(address, &output);
                         }
@@ -284,7 +288,7 @@ where
                             instruction.put_callout(|context| {
                                 let real_address = rt.real_address_for_stalked(pc(&context));
                                 //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
-                                //println!("{}:0x{:016x}", name, real_address - range.start);
+                                //log::trace!("{}:0x{:016x}", name, real_address - range.start);
                                 rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
                                     real_address,
                                     real_address + instr_size,

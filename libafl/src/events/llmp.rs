@@ -189,11 +189,11 @@ where
                         Ok(llmp::LlmpMsgHookResult::ForwardToClients)
                     }
                 } else {
-                    monitor.display("Timeout".into(), 0);
+                    monitor.display("Broker".into(), 0);
                     Ok(llmp::LlmpMsgHookResult::Handled)
                 }
             },
-            Duration::from_millis(1000),
+            Duration::from_secs(30),
             Some(Duration::from_millis(5)),
         );
 
@@ -281,8 +281,7 @@ where
             } => {
                 let (_, _) = (severity_level, message);
                 // TODO rely on Monitor
-                #[cfg(feature = "std")]
-                println!("[LOG {severity_level}]: {message}");
+                log::log!((*severity_level).into(), "{message}");
                 Ok(BrokerEventResult::Handled)
             }
             Event::CustomBuf { .. } => Ok(BrokerEventResult::Forward),
@@ -441,8 +440,7 @@ where
                 time: _,
                 executions: _,
             } => {
-                #[cfg(feature = "std")]
-                println!("Received new Testcase from {_client_id} ({client_config:?})");
+                log::info!("Received new Testcase from {_client_id} ({client_config:?})");
 
                 let _res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
@@ -455,9 +453,8 @@ where
                         state, executor, self, input, false,
                     )?
                 };
-                #[cfg(feature = "std")]
                 if let Some(item) = _res.1 {
-                    println!("Added received Testcase as item #{item}");
+                    log::info!("Added received Testcase as item #{item}");
                 }
                 Ok(())
             }
@@ -864,7 +861,7 @@ where
             let broker_things = |mut broker: LlmpEventBroker<S::Input, MT, SP>,
                                  remote_broker_addr| {
                 if let Some(remote_broker_addr) = remote_broker_addr {
-                    println!("B2b: Connecting to {:?}", &remote_broker_addr);
+                    log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
                     broker.connect_b2b(remote_broker_addr)?;
                 };
 
@@ -884,7 +881,7 @@ where
                             )?;
 
                             // Yep, broker. Just loop here.
-                            println!(
+                            log::info!(
                                 "Doing broker things. Run this tool again to start fuzzing in a client."
                             );
 
@@ -923,7 +920,7 @@ where
 
             if let Some(core_id) = core_id {
                 let core_id: CoreId = core_id;
-                println!("Setting core affinity to {core_id:?}");
+                log::info!("Setting core affinity to {core_id:?}");
                 core_id.set_affinity()?;
             }
 
@@ -957,14 +954,13 @@ where
             #[cfg(unix)]
             if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
-                #[cfg(feature = "std")]
-                println!("Failed to setup signal handlers: {_e}");
+                log::error!("Failed to setup signal handlers: {_e}");
             }
 
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
-                println!("Spawning next client (id {ctr})");
+                log::info!("Spawning next client (id {ctr})");
 
                 // On Unix, we fork (when fork feature is enabled)
                 #[cfg(all(unix, feature = "fork"))]
@@ -1035,7 +1031,7 @@ where
                 ),
             )
         } else {
-            println!("First run. Let's set it all up");
+            log::info!("First run. Let's set it all up");
             // Mgr to send and receive msgs from/to all other fuzzer instances
             let mgr = LlmpEventManager::<S, SP>::existing_client_from_env(
                 new_shmem_provider,
@@ -1211,8 +1207,7 @@ where
                 time: _,
                 executions: _,
             } => {
-                #[cfg(feature = "std")]
-                println!("Received new Testcase to convert from {_client_id}");
+                log::info!("Received new Testcase to convert from {_client_id}");
 
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
@@ -1225,9 +1220,8 @@ where
                     converter.convert(input)?,
                     false,
                 )?;
-                #[cfg(feature = "std")]
                 if let Some(item) = _res.1 {
-                    println!("Added received Testcase as item #{item}");
+                    log::info!("Added received Testcase as item #{item}");
                 }
                 Ok(())
             }

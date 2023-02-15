@@ -368,7 +368,7 @@ mod windows {
             cpu_group = total_cores / 64;
             cpu_id = id - (cpu_group * 64);
         }
-        // println!("Setting affinity to group {} and id {}", cpu_group, cpu_id);
+        // log::info!("Setting affinity to group {} and id {}", cpu_group, cpu_id);
         // Convert id to mask
         let mask: usize = 1 << cpu_id;
 
@@ -593,6 +593,7 @@ mod apple {
     }
 
     #[cfg(target_arch = "aarch64")]
+    #[allow(clippy::unnecessary_wraps)]
     pub fn set_for_current(_core_id: CoreId) -> Result<(), Error> {
         // This is the best we can do, unlike on intel architecture
         // the system does not allow to pin a process/thread to specific cpu.

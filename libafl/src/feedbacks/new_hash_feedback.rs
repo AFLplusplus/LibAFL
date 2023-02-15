@@ -45,6 +45,14 @@ impl NewHashFeedbackMetadata {
         Self::default()
     }
 
+    /// Create a new [`NewHashFeedbackMetadata`] with the given initial capacity
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            hash_set: HashSet::with_capacity(capacity),
+        }
+    }
+
     /// Reset the internal state
     pub fn reset(&mut self) -> Result<(), Error> {
         self.hash_set.clear();
@@ -61,7 +69,7 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 
     fn update_hash_set(&mut self, value: u64) -> Result<bool, Error> {
         let r = self.hash_set.insert(value);
-        // println!("Got r={}, the hashset is {:?}", r, &self.hash_set);
+        // log::trace!("Got r={}, the hashset is {:?}", r, &self.hash_set);
         Ok(r)
     }
 }
@@ -71,6 +79,8 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 pub struct NewHashFeedback<O, S> {
     name: String,
     observer_name: String,
+    /// Initial capacity of hash set
+    capacity: usize,
     o_type: PhantomData<(O, S)>,
 }
 
@@ -80,7 +90,10 @@ where
     S: UsesInput + Debug + HasNamedMetadata + HasClientPerfMonitor,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(NewHashFeedbackMetadata::default(), &self.name);
+        state.add_named_metadata(
+            NewHashFeedbackMetadata::with_capacity(self.capacity),
+            &self.name,
+        );
         Ok(())
     }
 
@@ -109,7 +122,7 @@ where
         match observer.hash() {
             Some(hash) => {
                 let res = backtrace_state
-                    .update_hash_set(*hash)
+                    .update_hash_set(hash)
                     .expect("Failed to update the hash state");
                 Ok(res)
             }
@@ -135,6 +148,12 @@ impl<O, S> HasObserverName for NewHashFeedback<O, S> {
     }
 }
 
+/// Default capacity for the [`HashSet`] in [`NewHashFeedback`].
+///
+/// This is reasonably large on the assumption that you expect there to be many
+/// runs of the target, producing many different feedbacks.
+const DEFAULT_CAPACITY: usize = 4096;
+
 impl<O, S> NewHashFeedback<O, S>
 where
     O: ObserverWithHashField + Named + Debug,
@@ -146,6 +165,7 @@ where
         Self {
             name: name.to_string(),
             observer_name: observer_name.to_string(),
+            capacity: DEFAULT_CAPACITY,
             o_type: PhantomData,
         }
     }
@@ -153,9 +173,17 @@ where
     /// Returns a new [`NewHashFeedback`].
     #[must_use]
     pub fn new(observer: &O) -> Self {
+        Self::with_capacity(observer, DEFAULT_CAPACITY)
+    }
+
+    /// Returns a new [`NewHashFeedback`] that will create a hash set with the
+    /// given initial capacity.
+    #[must_use]
+    pub fn with_capacity(observer: &O, capacity: usize) -> Self {
         Self {
             name: NEWHASHFEEDBACK_PREFIX.to_string() + observer.name(),
             observer_name: observer.name().to_string(),
+            capacity,
             o_type: PhantomData,
         }
     }
