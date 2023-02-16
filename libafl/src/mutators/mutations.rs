@@ -1402,7 +1402,7 @@ mod tests {
             }
             assert!(mutated.bytes.len() <= base.bytes.len() + 16);
             assert_eq!(
-                mutated.bytes.iter().filter(|&&v| v == inserted).count(),
+                bytecount::count(&mutated.bytes, inserted),
                 mutated.bytes.len() - base.bytes.len() + 1
             );
             counts[inserted as usize] += 1;
@@ -1447,13 +1447,9 @@ mod tests {
                 }
             }
             assert!(mutated.bytes.len() <= base.bytes.len() + 16);
-            let offset = if (inserted as usize) < base.bytes.len() {
-                1
-            } else {
-                0
-            };
+            let offset = usize::from((inserted as usize) < base.bytes.len());
             assert_eq!(
-                mutated.bytes.iter().filter(|&&v| v == inserted).count(),
+                bytecount::count(&mutated.bytes, inserted),
                 mutated.bytes.len() - base.bytes.len() + offset,
                 "{:?}",
                 mutated.bytes
