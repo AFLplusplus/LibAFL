@@ -29,13 +29,16 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt::Debug, time::Duration};
+#[cfg(feature = "std")]
+use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 pub use value::*;
 
+#[cfg(feature = "no_std")]
+use crate::bolts::current_time;
 use crate::{
     bolts::{
-        current_time,
         ownedref::OwnedMutPtr,
         tuples::{MatchName, Named},
     },
@@ -411,8 +414,41 @@ where
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
     name: String,
+
+    #[cfg(feature = "std")]
+    #[serde(with = "instant_serializer")]
+    start_time: Instant,
+
+    #[cfg(feature = "no_std")]
     start_time: Duration,
+
     last_runtime: Option<Duration>,
+}
+
+#[cfg(feature = "std")]
+mod instant_serializer {
+    use core::time::Duration;
+    use std::time::Instant;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub fn serialize<S>(instant: &Instant, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let duration = instant.elapsed();
+        duration.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Instant, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let duration = Duration::deserialize(deserializer)?;
+        let instant = Instant::now().checked_sub(duration).unwrap();
+        Ok(instant)
+    }
 }
 
 impl TimeObserver {
@@ -421,7 +457,13 @@ impl TimeObserver {
     pub fn new(name: &'static str) -> Self {
         Self {
             name: name.to_string(),
+
+            #[cfg(feature = "std")]
+            start_time: Instant::now(),
+
+            #[cfg(feature = "no_std")]
             start_time: Duration::from_secs(0),
+
             last_runtime: None,
         }
     }
@@ -437,12 +479,32 @@ impl<S> Observer<S> for TimeObserver
 where
     S: UsesInput,
 {
+    #[cfg(feature = "std")]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
-        self.start_time = current_time();
+        self.start_time = Instant::now();
         Ok(())
     }
 
+    #[cfg(feature = "no_std")]
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+        self.last_runtime = None;
+        self.start_time = Duration::from_secs(0);
+        Ok(())
+    }
+
+    #[cfg(feature = "std")]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &S::Input,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.last_runtime = Some(self.start_time.elapsed());
+        Ok(())
+    }
+
+    #[cfg(feature = "no_std")]
     fn post_exec(
         &mut self,
         _state: &mut S,
@@ -450,7 +512,6 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
-        Ok(())
     }
 }
 
@@ -1336,7 +1397,7 @@ mod tests {
             StdMapObserver::new("map", &mut MAP)
         });
         let vec = postcard::to_allocvec(&obv).unwrap();
-        println!("{vec:?}");
+        log::info!("{vec:?}");
         let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32, false>) =
             postcard::from_bytes(&vec).unwrap();
         assert_eq!(obv.0.name(), obv2.0.name());

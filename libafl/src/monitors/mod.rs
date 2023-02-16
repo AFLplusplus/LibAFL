@@ -693,8 +693,7 @@ impl ClientPerfMonitor {
         match self.timer_start {
             None => {
                 // Warning message if marking time without starting the timer first
-                #[cfg(feature = "std")]
-                eprint!("Attempted to `mark_time` without starting timer first.");
+                log::warn!("Attempted to `mark_time` without starting timer first.");
 
                 // Return 0 for no time marked
                 0

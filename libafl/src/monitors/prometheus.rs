@@ -15,7 +15,7 @@
 // as well as:
 // ```rust,ignore
 // let listener = "127.0.0.1:8080".to_string(); // point prometheus to scrape here in your prometheus.yml
-// let mon = PrometheusMonitor::new(listener, |s| println!("{s}"));
+// let mon = PrometheusMonitor::new(listener, |s| log::info!("{s}"));
 // and then like with any other monitor, pass it into the event manager like so:
 // let mut mgr = SimpleEventManager::new(mon);
 // ```
@@ -167,7 +167,7 @@ where
         for (key, val) in cur_client_clone.user_monitor {
             // Update metrics added to the user_stats hashmap by feedback event-fires
             // You can filter for each custom stat in promQL via labels of both the stat name and client id
-            println!("{key}: {val}");
+            log::info!("{key}: {val}");
             #[allow(clippy::cast_precision_loss)]
             let value: f64 = match val {
                 UserStats::Number(n) => n as f64,
@@ -218,7 +218,7 @@ where
                 clients_count_clone,
                 custom_stat_clone,
             ))
-            .map_err(|err| println!("{err:?}"))
+            .map_err(|err| log::error!("{err:?}"))
             .ok();
         });
         Self {
@@ -262,7 +262,7 @@ where
                 clients_count_clone,
                 custom_stat_clone,
             ))
-            .map_err(|err| println!("{err:?}"))
+            .map_err(|err| log::error!("{err:?}"))
             .ok();
         });
         Self {

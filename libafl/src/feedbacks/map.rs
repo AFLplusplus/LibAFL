@@ -357,7 +357,7 @@ pub struct MapFeedback<N, O, R, S, T> {
     /// For tracking, always keep indexes and/or novelties, even if the map isn't considered `interesting`.
     always_track: bool,
     /// Indexes used in the last observation
-    indexes: Option<Vec<usize>>,
+    indexes: bool,
     /// New indexes observed in the last observation
     novelties: Option<Vec<usize>>,
     /// Name identifier of this instance
@@ -373,7 +373,7 @@ pub struct MapFeedback<N, O, R, S, T> {
 impl<N, O, R, S, T> Feedback<S> for MapFeedback<N, O, R, S, T>
 where
     N: IsNovel<T> + Debug,
-    O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T> + Debug,
+    O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
     R: Reducer<T> + Debug,
     S: UsesInput + HasClientPerfMonitor + HasNamedMetadata + Debug,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
@@ -390,7 +390,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &<S as UsesInput>::Input,
+        input: &S::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -417,33 +417,50 @@ where
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
 
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
-        _state: &mut S,
-        testcase: &mut Testcase<<S as UsesInput>::Input>,
-    ) -> Result<(), Error> {
-        if let Some(v) = self.indexes.as_mut() {
-            let meta = MapIndexesMetadata::new(core::mem::take(v));
+        state: &mut S,
+        observers: &OT,
+        testcase: &mut Testcase<S::Input>,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
+        if let Some(novelties) = self.novelties.as_mut().map(core::mem::take) {
+            let meta = MapNoveltiesMetadata::new(novelties);
             testcase.add_metadata(meta);
-        };
-        if let Some(v) = self.novelties.as_mut() {
-            let meta = MapNoveltiesMetadata::new(core::mem::take(v));
-            testcase.add_metadata(meta);
-        };
-        Ok(())
-    }
-
-    /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(
-        &mut self,
-        _state: &mut S,
-        _input: &<S as UsesInput>::Input,
-    ) -> Result<(), Error> {
-        if let Some(v) = self.indexes.as_mut() {
-            v.clear();
         }
-        if let Some(v) = self.novelties.as_mut() {
-            v.clear();
+        let observer = observers.match_name::<O>(&self.observer_name).unwrap();
+        let initial = observer.initial();
+        let map_state = state
+            .named_metadata_mut()
+            .get_mut::<MapFeedbackMetadata<T>>(&self.name)
+            .unwrap();
+
+        let history_map = map_state.history_map.as_mut_slice();
+        if self.indexes {
+            let mut indices = Vec::new();
+
+            for (i, value) in observer
+                .as_iter()
+                .copied()
+                .enumerate()
+                .filter(|(_, value)| *value != initial)
+            {
+                history_map[i] = R::reduce(history_map[i], value);
+                indices.push(i);
+            }
+            let meta = MapIndexesMetadata::new(indices);
+            testcase.add_metadata(meta);
+        } else {
+            for (i, value) in observer
+                .as_iter()
+                .copied()
+                .enumerate()
+                .filter(|(_, value)| *value != initial)
+            {
+                history_map[i] = R::reduce(history_map[i], value);
+            }
         }
         Ok(())
     }
@@ -463,7 +480,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        _input: &<S as UsesInput>::Input,
+        _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -491,7 +508,7 @@ where
         let map = observer.as_slice();
         debug_assert!(map.len() >= size);
 
-        let history_map = map_state.history_map.as_mut_slice();
+        let history_map = map_state.history_map.as_slice();
 
         // Non vector implementation for reference
         /*for (i, history) in history_map.iter_mut().enumerate() {
@@ -509,35 +526,55 @@ where
         let steps = size / VectorType::LANES;
         let left = size % VectorType::LANES;
 
-        for step in 0..steps {
-            let i = step * VectorType::LANES;
-            let history = VectorType::from_slice(&history_map[i..]);
-            let items = VectorType::from_slice(&map[i..]);
+        if let Some(novelties) = self.novelties.as_mut() {
+            novelties.clear();
+            for step in 0..steps {
+                let i = step * VectorType::LANES;
+                let history = VectorType::from_slice(&history_map[i..]);
+                let items = VectorType::from_slice(&map[i..]);
 
-            if items.simd_max(history) != history {
-                interesting = true;
-                unsafe {
-                    for j in i..(i + VectorType::LANES) {
-                        let item = *map.get_unchecked(j);
-                        if item > *history_map.get_unchecked(j) {
-                            *history_map.get_unchecked_mut(j) = item;
-                            if self.novelties.is_some() {
-                                self.novelties.as_mut().unwrap().push(j);
+                if items.simd_max(history) != history {
+                    interesting = true;
+                    unsafe {
+                        for j in i..(i + VectorType::LANES) {
+                            let item = *map.get_unchecked(j);
+                            if item > *history_map.get_unchecked(j) {
+                                novelties.push(j);
                             }
                         }
                     }
                 }
             }
-        }
 
-        for j in (size - left)..size {
-            unsafe {
-                let item = *map.get_unchecked(j);
-                if item > *history_map.get_unchecked(j) {
+            for j in (size - left)..size {
+                unsafe {
+                    let item = *map.get_unchecked(j);
+                    if item > *history_map.get_unchecked(j) {
+                        interesting = true;
+                        novelties.push(j);
+                    }
+                }
+            }
+        } else {
+            for step in 0..steps {
+                let i = step * VectorType::LANES;
+                let history = VectorType::from_slice(&history_map[i..]);
+                let items = VectorType::from_slice(&map[i..]);
+
+                if items.simd_max(history) != history {
                     interesting = true;
-                    *history_map.get_unchecked_mut(j) = item;
-                    if self.novelties.is_some() {
-                        self.novelties.as_mut().unwrap().push(j);
+                    break;
+                }
+            }
+
+            if !interesting {
+                for j in (size - left)..size {
+                    unsafe {
+                        let item = *map.get_unchecked(j);
+                        if item > *history_map.get_unchecked(j) {
+                            interesting = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -545,22 +582,22 @@ where
 
         let initial = observer.initial();
         if interesting {
-            if let Some(indexes) = self.indexes.as_mut() {
-                indexes.extend(
-                    observer
-                        .as_iter()
-                        .enumerate()
-                        .filter_map(|(i, &e)| (e != initial).then_some(i)),
-                );
-            }
-
             let len = history_map.len();
             let filled = history_map.iter().filter(|&&i| i != initial).count();
+            // opt: if not tracking optimisations, we technically don't show the *current* history
+            // map but the *last* history map; this is better than walking over and allocating
+            // unnecessarily
             manager.fire(
                 state,
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
-                    value: UserStats::Ratio(filled as u64, len as u64),
+                    value: UserStats::Ratio(
+                        self.novelties
+                            .as_ref()
+                            .map_or(filled, |novelties| filled + novelties.len())
+                            as u64,
+                        len as u64,
+                    ),
                     phantom: PhantomData,
                 },
             )?;
@@ -609,7 +646,7 @@ where
     #[must_use]
     pub fn new(map_observer: &O) -> Self {
         Self {
-            indexes: None,
+            indexes: false,
             novelties: None,
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
@@ -623,7 +660,7 @@ where
     #[must_use]
     pub fn new_tracking(map_observer: &O, track_indexes: bool, track_novelties: bool) -> Self {
         Self {
-            indexes: if track_indexes { Some(vec![]) } else { None },
+            indexes: track_indexes,
             novelties: if track_novelties { Some(vec![]) } else { None },
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
@@ -637,7 +674,7 @@ where
     #[must_use]
     pub fn with_names(name: &'static str, observer_name: &'static str) -> Self {
         Self {
-            indexes: None,
+            indexes: false,
             novelties: None,
             name: name.to_string(),
             observer_name: observer_name.to_string(),
@@ -660,7 +697,7 @@ where
     #[must_use]
     pub fn with_name(name: &'static str, map_observer: &O) -> Self {
         Self {
-            indexes: None,
+            indexes: false,
             novelties: None,
             name: name.to_string(),
             observer_name: map_observer.name().to_string(),
@@ -679,7 +716,7 @@ where
         track_novelties: bool,
     ) -> Self {
         Self {
-            indexes: if track_indexes { Some(vec![]) } else { None },
+            indexes: track_indexes,
             novelties: if track_novelties { Some(vec![]) } else { None },
             observer_name: observer_name.to_string(),
             stats_name: create_stats_name(name),
@@ -717,37 +754,58 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
-        let history_map = map_state.history_map.as_mut_slice();
+        let history_map = map_state.history_map.as_slice();
 
-        for (i, (item, history)) in observer.as_iter().zip(history_map.iter_mut()).enumerate() {
-            let reduced = R::reduce(*history, *item);
-            if N::is_novel(*history, reduced) {
-                *history = reduced;
-                interesting = true;
-                if self.novelties.is_some() {
-                    self.novelties.as_mut().unwrap().push(i);
+        let initial = observer.initial();
+
+        if let Some(novelties) = self.novelties.as_mut() {
+            novelties.clear();
+            for (i, item) in observer
+                .as_iter()
+                .copied()
+                .enumerate()
+                .filter(|(_, item)| *item != initial)
+            {
+                let existing = unsafe { *history_map.get_unchecked(i) };
+                let reduced = R::reduce(existing, item);
+                if N::is_novel(existing, reduced) {
+                    interesting = true;
+                    novelties.push(i);
+                }
+            }
+        } else {
+            for (i, item) in observer
+                .as_iter()
+                .copied()
+                .enumerate()
+                .filter(|(_, item)| *item != initial)
+            {
+                let existing = unsafe { *history_map.get_unchecked(i) };
+                let reduced = R::reduce(existing, item);
+                if N::is_novel(existing, reduced) {
+                    interesting = true;
+                    break;
                 }
             }
         }
 
-        let initial = observer.initial();
         if interesting || self.always_track {
-            if let Some(indexes) = self.indexes.as_mut() {
-                indexes.extend(
-                    observer
-                        .as_iter()
-                        .enumerate()
-                        .filter_map(|(i, &e)| (e != initial).then_some(i)),
-                );
-            }
-
             let len = history_map.len();
             let filled = history_map.iter().filter(|&&i| i != initial).count();
+            // opt: if not tracking optimisations, we technically don't show the *current* history
+            // map but the *last* history map; this is better than walking over and allocating
+            // unnecessarily
             manager.fire(
                 state,
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
-                    value: UserStats::Ratio(filled as u64, len as u64),
+                    value: UserStats::Ratio(
+                        self.novelties
+                            .as_ref()
+                            .map_or(filled, |novelties| filled + novelties.len())
+                            as u64,
+                        len as u64,
+                    ),
                     phantom: PhantomData,
                 },
             )?;
@@ -802,7 +860,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S as UsesInput>::Input,
+        _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -827,11 +885,15 @@ where
         }
     }
 
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         _state: &mut S,
-        testcase: &mut Testcase<<S as UsesInput>::Input>,
-    ) -> Result<(), Error> {
+        _observers: &OT,
+        testcase: &mut Testcase<S::Input>,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
             testcase.add_metadata(meta);

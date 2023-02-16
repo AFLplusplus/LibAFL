@@ -31,9 +31,10 @@ pub mod tuples;
 
 use alloc::{string::String, vec::Vec};
 use core::{iter::Iterator, time};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
 
 /// The client ID == the sender id.
 #[repr(transparent)]

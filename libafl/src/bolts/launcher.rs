@@ -27,6 +27,7 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
+use super::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -45,8 +46,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasExecutions},
     Error,
 };
-
-use super::core_affinity::CoreId;
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
@@ -142,7 +141,7 @@ where
         let num_cores = core_ids.len();
         let mut handles = vec![];
 
-        println!("spawning on cores: {:?}", self.cores);
+        log::info!("spawning on cores: {:?}", self.cores);
 
         #[cfg(feature = "std")]
         let stdout_file = self
@@ -163,10 +162,10 @@ where
                         self.shmem_provider.post_fork(false)?;
                         handles.push(child.pid);
                         #[cfg(feature = "std")]
-                        println!("child spawned and bound to core {id}");
+                        log::info!("child spawned and bound to core {id}");
                     }
                     ForkResult::Child => {
-                        println!("{:?} PostFork", unsafe { libc::getpid() });
+                        log::info!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
@@ -199,7 +198,7 @@ where
 
         if self.spawn_broker {
             #[cfg(feature = "std")]
-            println!("I am broker!!.");
+            log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
             RestartingMgr::<MT, S, SP>::builder()
@@ -222,11 +221,11 @@ where
         } else {
             for handle in &handles {
                 let mut status = 0;
-                println!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
+                log::info!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
                 unsafe {
                     libc::waitpid(*handle, &mut status, 0);
                     if status != 0 {
-                        println!("Client with pid {handle} exited with status {status}");
+                        log::info!("Client with pid {handle} exited with status {status}");
                     }
                 }
             }
@@ -268,14 +267,14 @@ where
 
                 #[cfg(windows)]
                 if self.stdout_file.is_some() {
-                    println!("Child process file stdio is not supported on Windows yet. Dumping to stdout instead...");
+                    log::info!("Child process file stdio is not supported on Windows yet. Dumping to stdout instead...");
                 }
 
                 let core_ids = core_affinity::get_core_ids().unwrap();
                 let num_cores = core_ids.len();
                 let mut handles = vec![];
 
-                println!("spawning on cores: {:?}", self.cores);
+                log::info!("spawning on cores: {:?}", self.cores);
 
                 //spawn clients
                 for (id, _) in core_ids.iter().enumerate().take(num_cores) {
@@ -307,7 +306,7 @@ where
 
         if self.spawn_broker {
             #[cfg(feature = "std")]
-            println!("I am broker!!.");
+            log::info!("I am broker!!.");
 
             RestartingMgr::<MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
@@ -325,11 +324,11 @@ where
                 handle.kill()?;
             }
         } else {
-            println!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
+            log::info!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
             for handle in &mut handles {
                 let ecode = handle.wait()?;
                 if !ecode.success() {
-                    println!("Client with handle {handle:?} exited with {ecode:?}");
+                    log::info!("Client with handle {handle:?} exited with {ecode:?}");
                 }
             }
         }

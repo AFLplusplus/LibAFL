@@ -23,7 +23,7 @@
 //!         fuzz(parsed);
 //!     }
 //!
-//!     println!("{:?}", parsed);
+//!     log::info!("{:?}", parsed);
 //! }
 //! ```
 //!
@@ -59,7 +59,7 @@
 //!         fuzz_with_qemu(parsed);
 //!     }
 //!
-//!     println!("{:?}", parsed);
+//!     log::info!("{:?}", parsed);
 //! }
 //!```
 
@@ -342,7 +342,7 @@ impl FuzzerOptions {
     ///         custom_func(sub_matches.get_one::<String>("bar").unwrap())
     ///     }
     ///
-    ///     println!("{:?}", matches);
+    ///     log::info!("{:?}", matches);
     /// }
     /// ```
     #[must_use]

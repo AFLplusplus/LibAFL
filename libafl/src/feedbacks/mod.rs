@@ -27,7 +27,6 @@ use alloc::string::{String, ToString};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    time::Duration,
 };
 
 #[cfg(feature = "nautilus")]
@@ -108,11 +107,16 @@ where
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata(
+    #[allow(unused_variables)]
+    fn append_metadata<OT>(
         &mut self,
-        _state: &mut S,
-        _testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error> {
+        state: &mut S,
+        observers: &OT,
+        testcase: &mut Testcase<S::Input>,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
         Ok(())
     }
 
@@ -240,13 +244,17 @@ where
     }
 
     #[inline]
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         state: &mut S,
+        observers: &OT,
         testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error> {
-        self.first.append_metadata(state, testcase)?;
-        self.second.append_metadata(state, testcase)
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
+        self.first.append_metadata(state, observers, testcase)?;
+        self.second.append_metadata(state, observers, testcase)
     }
 
     #[inline]
@@ -650,12 +658,16 @@ where
     }
 
     #[inline]
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         state: &mut S,
+        observers: &OT,
         testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error> {
-        self.first.append_metadata(state, testcase)
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
+        self.first.append_metadata(state, observers, testcase)
     }
 
     #[inline]
@@ -883,7 +895,6 @@ pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
-    exec_time: Option<Duration>,
     name: String,
 }
 
@@ -897,7 +908,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         _input: &S::Input,
-        observers: &OT,
+        _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
@@ -905,27 +916,28 @@ where
         OT: ObserversTuple<S>,
     {
         // TODO Replace with match_name_type when stable
-        let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();
-        self.exec_time = *observer.last_runtime();
         Ok(false)
     }
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         _state: &mut S,
+        observers: &OT,
         testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error> {
-        *testcase.exec_time_mut() = self.exec_time;
-        self.exec_time = None;
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
+        let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();
+        *testcase.exec_time_mut() = *observer.last_runtime();
         Ok(())
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
     fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        self.exec_time = None;
         Ok(())
     }
 }
@@ -942,7 +954,6 @@ impl TimeFeedback {
     #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
-            exec_time: None,
             name: name.to_string(),
         }
     }
@@ -951,7 +962,6 @@ impl TimeFeedback {
     #[must_use]
     pub fn with_observer(observer: &TimeObserver) -> Self {
         Self {
-            exec_time: None,
             name: observer.name().to_string(),
         }
     }
@@ -1104,10 +1114,7 @@ pub mod pybind {
     };
     use crate::{
         bolts::tuples::Named,
-        corpus::{
-            testcase::pybind::{PythonTestcase, PythonTestcaseWrapper},
-            Testcase,
-        },
+        corpus::{testcase::pybind::PythonTestcaseWrapper, Testcase},
         events::{pybind::PythonEventManager, EventFirer},
         executors::{pybind::PythonExitKind, ExitKind},
         feedbacks::map::pybind::{
@@ -1208,17 +1215,25 @@ pub mod pybind {
             })?)
         }
 
-        fn append_metadata(
+        fn append_metadata<OT>(
             &mut self,
             state: &mut PythonStdState,
-            testcase: &mut PythonTestcase,
-        ) -> Result<(), Error> {
+            observers: &OT,
+            testcase: &mut Testcase<BytesInput>,
+        ) -> Result<(), Error>
+        where
+            OT: ObserversTuple<PythonStdState>,
+        {
+            // SAFETY: We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
+            let dont_look_at_this: &PythonObserversTuple =
+                unsafe { &*(observers as *const OT as *const PythonObserversTuple) };
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
                     py,
                     "append_metadata",
                     (
                         PythonStdStateWrapper::wrap(state),
+                        dont_look_at_this.clone(),
                         PythonTestcaseWrapper::wrap(testcase),
                     ),
                 )?;
@@ -1642,12 +1657,18 @@ pub mod pybind {
             })
         }
 
-        fn append_metadata(
+        fn append_metadata<OT>(
             &mut self,
             state: &mut PythonStdState,
+            observers: &OT,
             testcase: &mut Testcase<BytesInput>,
-        ) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, f, { f.append_metadata(state, testcase) })
+        ) -> Result<(), Error>
+        where
+            OT: ObserversTuple<PythonStdState>,
+        {
+            unwrap_me_mut!(self.wrapper, f, {
+                f.append_metadata(state, observers, testcase)
+            })
         }
 
         fn discard_metadata(

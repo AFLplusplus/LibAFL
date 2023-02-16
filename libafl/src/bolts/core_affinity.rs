@@ -390,7 +390,7 @@ mod windows {
             cpu_group = total_cores / 64;
             cpu_id = id - (cpu_group * 64);
         }
-        // println!("Setting affinity to group {} and id {}", cpu_group, cpu_id);
+        // log::info!("Setting affinity to group {} and id {}", cpu_group, cpu_id);
         // Convert id to mask
         let mask: usize = 1 << cpu_id;
 

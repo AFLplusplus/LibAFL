@@ -144,7 +144,7 @@ where
                 )));
             }
 
-            /*println!(
+            /*log::info!(
                 "Storing {} bytes to tmpfile {} (larger than map of {} bytes)",
                 serialized.len(),
                 &filename,
@@ -314,7 +314,7 @@ mod tests {
 
         assert!(state_restorer.has_content());
         let restored = state_restorer.restore::<String>().unwrap().unwrap();
-        println!("Restored {restored}");
+        log::info!("Restored {restored}");
         assert_eq!(restored, "hello world");
         assert!(!state_restorer.content().is_disk);
 

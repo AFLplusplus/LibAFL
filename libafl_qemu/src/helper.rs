@@ -1,6 +1,6 @@
 use core::{fmt::Debug, ops::Range};
 
-use libafl::{bolts::tuples::MatchFirstType, inputs::UsesInput};
+use libafl::{bolts::tuples::MatchFirstType, executors::ExitKind, inputs::UsesInput};
 
 use crate::{emu::Emulator, hooks::QemuHooks};
 
@@ -26,7 +26,7 @@ where
 
     fn pre_exec(&mut self, _emulator: &Emulator, _input: &S::Input) {}
 
-    fn post_exec(&mut self, _emulator: &Emulator, _input: &S::Input) {}
+    fn post_exec(&mut self, _emulator: &Emulator, _input: &S::Input, _exit_kind: &mut ExitKind) {}
 }
 
 pub trait QemuHelperTuple<S>: MatchFirstType + Debug
@@ -45,7 +45,7 @@ where
 
     fn pre_exec_all(&mut self, _emulator: &Emulator, input: &S::Input);
 
-    fn post_exec_all(&mut self, _emulator: &Emulator, input: &S::Input);
+    fn post_exec_all(&mut self, _emulator: &Emulator, input: &S::Input, _exit_kind: &mut ExitKind);
 }
 
 impl<S> QemuHelperTuple<S> for ()
@@ -68,7 +68,13 @@ where
 
     fn pre_exec_all(&mut self, _emulator: &Emulator, _input: &S::Input) {}
 
-    fn post_exec_all(&mut self, _emulator: &Emulator, _input: &S::Input) {}
+    fn post_exec_all(
+        &mut self,
+        _emulator: &Emulator,
+        _input: &S::Input,
+        _exit_kind: &mut ExitKind,
+    ) {
+    }
 }
 
 impl<Head, Tail, S> QemuHelperTuple<S> for (Head, Tail)
@@ -100,9 +106,9 @@ where
         self.1.pre_exec_all(emulator, input);
     }
 
-    fn post_exec_all(&mut self, emulator: &Emulator, input: &S::Input) {
-        self.0.post_exec(emulator, input);
-        self.1.post_exec_all(emulator, input);
+    fn post_exec_all(&mut self, emulator: &Emulator, input: &S::Input, exit_kind: &mut ExitKind) {
+        self.0.post_exec(emulator, input, exit_kind);
+        self.1.post_exec_all(emulator, input, exit_kind);
     }
 }
 

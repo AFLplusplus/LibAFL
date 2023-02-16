@@ -349,7 +349,7 @@ pub unsafe extern "system" fn handle_exception(
         .unwrap()
         .ExceptionCode;
     let exception_code = ExceptionCode::try_from(code.0).unwrap();
-    // println!("Received exception; code: {exception_code}");
+    // log::info!("Received exception; code: {}", exception_code);
     internal_handle_exception(exception_code, exception_pointers)
 }
 
@@ -359,7 +359,7 @@ extern "C" {
 }
 
 unsafe extern "C" fn handle_signal(_signum: i32) {
-    // println!("Received signal {}", _signum);
+    // log::info!("Received signal {}", _signum);
     internal_handle_exception(ExceptionCode::AssertionFailure, ptr::null_mut());
 }
 
