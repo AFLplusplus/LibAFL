@@ -108,7 +108,7 @@ where
     type Post = Self;
 
     fn try_transform_from(
-        base: &Testcase<BytesInput>,
+        base: &mut Testcase<BytesInput>,
         _state: &S,
         corpus_idx: CorpusId,
     ) -> Result<Self, Error> {
