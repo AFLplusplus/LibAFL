@@ -235,7 +235,7 @@ where
                 // setup shared memory
                 let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
                 let shmem_id = shmem.id();
-                // println!("{:#?}", shmem.id());
+                // log::trace!("{:#?}", shmem.id());
                 // shmem.write_to_env("__TINY_SHM_FUZZ_ID")?;
 
                 let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
@@ -269,7 +269,7 @@ where
                 "No input file or shmem provided".to_string(),
             ));
         }
-        println!("tinyinst args: {:#?}", &self.tinyinst_args);
+        log::info!("tinyinst args: {:#?}", &self.tinyinst_args);
 
         let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
 

@@ -387,6 +387,8 @@ where
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
                 testcase.set_parent_id_optional(state.fuzzed_corpus_id());
                 self.feedback_mut().append_metadata(state, &mut testcase)?;
+                self.feedback_mut()
+                    .append_metadata(state, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
@@ -419,7 +421,8 @@ where
                 // The input is a solution, add it to the respective corpus
                 let mut testcase = Testcase::with_executions(input, *state.executions());
                 testcase.set_parent_id_optional(state.fuzzed_corpus_id());
-                self.objective_mut().append_metadata(state, &mut testcase)?;
+                self.objective_mut()
+                    .append_metadata(state, observers, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
 
                 if send_events {
@@ -503,10 +506,17 @@ where
         // Not a solution
         self.objective_mut().discard_metadata(state, &input)?;
 
+        // several is_interesting implementations collect some data about the run, later used in
+        // append_metadata; we *must* invoke is_interesting here to collect it
+        let _ = self
+            .feedback_mut()
+            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+
         // Add the input to the main corpus
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
         testcase.set_parent_id_optional(state.fuzzed_corpus_id());
-        self.feedback_mut().append_metadata(state, &mut testcase)?;
+        self.feedback_mut()
+            .append_metadata(state, observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
 

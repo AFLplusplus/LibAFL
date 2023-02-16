@@ -313,6 +313,8 @@ pub struct SchedulerTestcaseMetaData {
     depth: u64,
     /// Offset in n_fuzz
     n_fuzz_entry: usize,
+    /// Cycles used to calibrate this (not really needed if it were not for on_replace and on_remove)
+    cycle_and_time: (Duration, usize),
 }
 
 impl SchedulerTestcaseMetaData {
@@ -324,51 +326,73 @@ impl SchedulerTestcaseMetaData {
             handicap: 0,
             depth,
             n_fuzz_entry: 0,
+            cycle_and_time: (Duration::default(), 0),
         }
     }
 
     /// Get the bitmap size
+    #[inline]
     #[must_use]
     pub fn bitmap_size(&self) -> u64 {
         self.bitmap_size
     }
 
     /// Set the bitmap size
+    #[inline]
     pub fn set_bitmap_size(&mut self, val: u64) {
         self.bitmap_size = val;
     }
 
     /// Get the handicap
+    #[inline]
     #[must_use]
     pub fn handicap(&self) -> u64 {
         self.handicap
     }
 
     /// Set the handicap
+    #[inline]
     pub fn set_handicap(&mut self, val: u64) {
         self.handicap = val;
     }
 
     /// Get the depth
+    #[inline]
     #[must_use]
     pub fn depth(&self) -> u64 {
         self.depth
     }
 
     /// Set the depth
+    #[inline]
     pub fn set_depth(&mut self, val: u64) {
         self.depth = val;
     }
 
     /// Get the `n_fuzz_entry`
+    #[inline]
     #[must_use]
     pub fn n_fuzz_entry(&self) -> usize {
         self.n_fuzz_entry
     }
 
     /// Set the `n_fuzz_entry`
+    #[inline]
     pub fn set_n_fuzz_entry(&mut self, val: usize) {
         self.n_fuzz_entry = val;
+    }
+
+    /// Get the cycles
+    #[inline]
+    #[must_use]
+    pub fn cycle_and_time(&self) -> (Duration, usize) {
+        self.cycle_and_time
+    }
+
+    #[inline]
+    /// Setter for cycles
+    pub fn set_cycle_and_time(&mut self, cycle_and_time: (Duration, usize)) {
+        self.cycle_and_time = cycle_and_time;
     }
 }
 

@@ -278,7 +278,7 @@ fn fuzz_binary(
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
-        writeln!(&mut stdout_cpy, "{}", s).unwrap();
+        writeln!(&mut stdout_cpy, "{s}").unwrap();
         #[cfg(windows)]
         println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
@@ -369,7 +369,8 @@ fn fuzz_binary(
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        PowerSchedule::EXPLORE,
+        &mut state,
+        Some(PowerSchedule::EXPLORE),
     ));
 
     // A fuzzer with feedbacks and a corpus scheduler
@@ -430,7 +431,7 @@ fn fuzz_binary(
     }
 
     // In case the corpus is empty (on first run), reset
-    if state.corpus().count() < 1 {
+    if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
             .unwrap_or_else(|_| {
@@ -479,7 +480,7 @@ fn fuzz_text(
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
-        writeln!(&mut stdout_cpy, "{}", s).unwrap();
+        writeln!(&mut stdout_cpy, "{s}").unwrap();
         #[cfg(windows)]
         println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
@@ -584,7 +585,8 @@ fn fuzz_text(
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        PowerSchedule::EXPLORE,
+        &mut state,
+        Some(PowerSchedule::EXPLORE),
     ));
 
     // A fuzzer with feedbacks and a corpus scheduler
@@ -647,7 +649,7 @@ fn fuzz_text(
     }
 
     // In case the corpus is empty (on first run), reset
-    if state.corpus().count() < 1 {
+    if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
             .unwrap_or_else(|_| {

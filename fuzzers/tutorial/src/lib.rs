@@ -132,7 +132,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = PacketLenMinimizerScheduler::new(PowerQueueScheduler::new(PowerSchedule::FAST));
+    let scheduler =
+        PacketLenMinimizerScheduler::new(PowerQueueScheduler::new(&mut state, PowerSchedule::FAST));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -158,7 +159,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // In case the corpus is empty (on first run), reset
-    if state.corpus().count() < 1 {
+    if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
             .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));

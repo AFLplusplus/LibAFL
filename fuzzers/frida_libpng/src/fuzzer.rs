@@ -17,11 +17,11 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsSlice,
     },
-    corpus::{ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus, OnDiskCorpus},
+    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
-    feedback_and_fast, feedback_or, feedback_or_fast,
-    feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedback_or, feedback_or_fast,
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -36,9 +36,12 @@ use libafl::{
     Error,
 };
 #[cfg(unix)]
-use libafl_frida::asan::asan_rt::AsanRuntime;
+use libafl::{feedback_and_fast, feedbacks::ConstFeedback};
 #[cfg(unix)]
-use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
+use libafl_frida::asan::{
+    asan_rt::AsanRuntime,
+    errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+};
 use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
@@ -193,7 +196,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 );
 
                 // In case the corpus is empty (on first run), reset
-                if state.corpus().count() < 1 {
+                if state.must_load_initial_inputs() {
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
                         .unwrap_or_else(|_| {
@@ -308,7 +311,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 );
 
                 // In case the corpus is empty (on first run), reset
-                if state.corpus().count() < 1 {
+                if state.must_load_initial_inputs() {
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
                         .unwrap_or_else(|_| {
@@ -438,7 +441,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 );
 
                 // In case the corpus is empty (on first run), reset
-                if state.corpus().count() < 1 {
+                if state.must_load_initial_inputs() {
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
                         .unwrap_or_else(|_| {

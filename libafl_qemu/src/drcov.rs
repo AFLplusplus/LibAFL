@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{inputs::UsesInput, state::HasMetadata};
+use libafl::{executors::ExitKind, inputs::UsesInput, state::HasMetadata};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
@@ -83,7 +83,7 @@ where
 
     fn pre_exec(&mut self, _emulator: &Emulator, _input: &S::Input) {}
 
-    fn post_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
+    fn post_exec(&mut self, emulator: &Emulator, _input: &S::Input, _exit_kind: &mut ExitKind) {
         if self.full_trace {
             if DRCOV_IDS.lock().unwrap().as_ref().unwrap().len() > self.drcov_len {
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
@@ -114,7 +114,7 @@ where
                                         *pc as usize + block_len,
                                     ));
                                 }
-                                Err(r) => println!("{r:#?}"),
+                                Err(r) => log::info!("{r:#?}"),
                             }
                         }
                     }
@@ -151,7 +151,7 @@ where
                             drcov_vec
                                 .push(DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len));
                         }
-                        Err(r) => println!("{r:#?}"),
+                        Err(r) => log::info!("{r:#?}"),
                     }
                 }
 

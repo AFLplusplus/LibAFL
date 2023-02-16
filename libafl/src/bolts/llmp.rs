@@ -315,7 +315,7 @@ impl Listener {
             Listener::Tcp(inner) => match inner.accept() {
                 Ok(res) => ListenerStream::Tcp(res.0, res.1),
                 Err(err) => {
-                    println!("Ignoring failed accept: {err:?}");
+                    log::warn!("Ignoring failed accept: {err:?}");
                     ListenerStream::Empty()
                 }
             },
@@ -403,14 +403,14 @@ where
     }
 
     #[cfg(feature = "llmp_debug")]
-    println!("LLMP TCP: Sending {} bytes", msg.len());
+    log::trace!("LLMP TCP: Sending {} bytes", msg.len());
 
     let size_bytes = (msg.len() as u32).to_be_bytes();
     stream.write_all(&size_bytes)?;
     stream.write_all(&msg)?;
 
     #[cfg(feature = "llmp_debug")]
-    println!("LLMP TCP: Sending {} bytes finished.", msg.len());
+    log::trace!("LLMP TCP: Sending {} bytes finished.", msg.len());
 
     Ok(())
 }
@@ -421,7 +421,7 @@ fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
     // Always receive one be u32 of size, then the command.
 
     #[cfg(feature = "llmp_debug")]
-    println!(
+    log::trace!(
         "LLMP TCP: Waiting for packet... (Timeout: {:?})",
         stream.read_timeout().unwrap_or(None)
     );
@@ -433,7 +433,7 @@ fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
     bytes.resize(size as usize, 0_u8);
 
     #[cfg(feature = "llmp_debug")]
-    println!("LLMP TCP: Receiving payload of size {size}");
+    log::trace!("LLMP TCP: Receiving payload of size {size}");
 
     stream
         .read_exact(&mut bytes)
@@ -456,12 +456,12 @@ fn next_shmem_size(max_alloc: usize) -> usize {
 /// Initialize a new `llmp_page`. The size should be relative to
 /// `llmp_page->messages`
 unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow_reinit: bool) {
-    #[cfg(all(feature = "llmp_debug", feature = "std"))]
-    println!("_llmp_page_init: shmem {:?}", &shmem);
+    #[cfg(feature = "llmp_debug")]
+    log::trace!("_llmp_page_init: shmem {:?}", &shmem);
     let map_size = shmem.len();
     let page = shmem2page_mut(shmem);
-    #[cfg(all(feature = "llmp_debug", feature = "std"))]
-    println!("_llmp_page_init: page {:?}", &(*page));
+    #[cfg(feature = "llmp_debug")]
+    log::trace!("_llmp_page_init: page {:?}", &(*page));
 
     if !allow_reinit {
         assert!(
@@ -631,7 +631,7 @@ where
         match tcp_bind(port) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
-                println!("We're the broker");
+                log::info!("We're the broker");
 
                 let mut broker = LlmpBroker::new(shmem_provider)?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
@@ -639,12 +639,15 @@ where
             }
             Err(Error::File(e, _)) if e.kind() == ErrorKind::AddrInUse => {
                 // We are the client :)
-                println!("We're the client (internal port already bound by broker, {e:#?})");
+                log::info!("We're the client (internal port already bound by broker, {e:#?})");
                 Ok(LlmpConnection::IsClient {
                     client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
                 })
             }
-            Err(e) => Err(dbg!(e)),
+            Err(e) => {
+                log::error!("{e:?}");
+                Err(e)
+            }
         }
     }
 
@@ -865,7 +868,7 @@ where
             {
                 ctr = ctr.wrapping_add(1);
                 if ctr == 0 {
-                    println!("Awaiting safe_to_unmap_blocking");
+                    log::info!("Awaiting safe_to_unmap_blocking");
                 }
             }
         }
@@ -875,7 +878,7 @@ where
     pub fn safe_to_unmap(&self) -> bool {
         let current_out_shmem = self.out_shmems.last().unwrap();
         unsafe {
-            // println!("Reading safe_to_unmap from {:?}", current_out_shmem.page() as *const _);
+            // log::info!("Reading safe_to_unmap from {:?}", current_out_shmem.page() as *const _);
             (*current_out_shmem.page())
                 .safe_to_unmap
                 .load(Ordering::Relaxed)
@@ -991,10 +994,13 @@ where
             "Called alloc without calling send inbetween"
         );
 
-        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        println!(
+        #[cfg(feature = "llmp_debug")]
+        log::info!(
             "Allocating {} bytes on page {:?} / map {:?} (last msg: {:?})",
-            buf_len, page, &map, last_msg
+            buf_len,
+            page,
+            &map,
+            last_msg
         );
 
         let msg_start = (*page).messages.as_mut_ptr() as usize + (*page).size_used;
@@ -1004,9 +1010,9 @@ where
             - msg_start
             - size_of::<LlmpMsg>();
 
-        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        dbg!(
-            page,
+        #[cfg(feature = "llmp_debug")]
+        log::trace!(
+            "{page:?} {:?} size_used={:x} buf_len_padded={:x} EOP_MSG_SIZE={:x} size_total={}",
             &(*page),
             (*page).size_used,
             buf_len_padded,
@@ -1018,8 +1024,8 @@ where
         if (*page).size_used + size_of::<LlmpMsg>() + buf_len_padded + EOP_MSG_SIZE
             > (*page).size_total
         {
-            #[cfg(all(feature = "llmp_debug", feature = "std"))]
-            println!("LLMP: Page full.");
+            #[cfg(feature = "llmp_debug")]
+            log::info!("LLMP: Page full.");
 
             /* We're full. */
             return None;
@@ -1062,7 +1068,7 @@ where
     /// If `overwrite_client_id` is `false`, the message's `sender` won't be touched (for broker forwarding)
     #[inline(never)] // Not inlined to make cpu-level reodering (hopefully?) improbable
     unsafe fn send(&mut self, msg: *mut LlmpMsg, overwrite_client_id: bool) -> Result<(), Error> {
-        // dbg!("Sending msg {:?}", msg);
+        // log::info!("Sending msg {:?}", msg);
 
         assert!(self.last_msg_sent != msg, "Message sent twice!");
         assert!(
@@ -1102,7 +1108,7 @@ where
             #[cfg(not(debug_assertions))]
             let bt = "<n/a (release)>";
             let shm = self.out_shmems.last().unwrap();
-            println!(
+            log::info!(
                 "LLMP_DEBUG: End of page reached for map {} with len {}, sending EOP, bt: {:?}",
                 shm.shmem.id(),
                 shm.shmem.len(),
@@ -1112,8 +1118,8 @@ where
 
         let old_map = self.out_shmems.last_mut().unwrap().page_mut();
 
-        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        println!(
+        #[cfg(feature = "llmp_debug")]
+        log::info!(
             "Next ShMem Size {}",
             next_shmem_size((*old_map).max_alloc_size)
         );
@@ -1126,16 +1132,16 @@ where
         );
         let mut new_map = new_map_shmem.page_mut();
 
-        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        println!("got new map at: {new_map:?}");
+        #[cfg(feature = "llmp_debug")]
+        log::info!("got new map at: {new_map:?}");
 
         (*new_map).current_msg_id.store(
             (*old_map).current_msg_id.load(Ordering::Relaxed),
             Ordering::Relaxed,
         );
 
-        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        println!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
+        #[cfg(feature = "llmp_debug")]
+        log::info!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
 
         (*new_map).max_alloc_size = (*old_map).max_alloc_size;
 
@@ -1158,8 +1164,8 @@ where
 
         // If we want to get red if old pages, (client to broker), do that now
         if !self.keep_pages_forever {
-            #[cfg(all(feature = "llmp_debug", feature = "std"))]
-            println!("pruning");
+            #[cfg(feature = "llmp_debug")]
+            log::info!("pruning");
             self.prune_old_pages();
         }
 
@@ -1177,8 +1183,8 @@ where
             self.handle_out_eop()?;
         }
 
-        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        println!("Handled out eop");
+        #[cfg(feature = "llmp_debug")]
+        log::info!("Handled out eop");
 
         match unsafe { self.alloc_next_if_space(buf_len) } {
             Some(msg) => Ok(msg),
@@ -1442,8 +1448,7 @@ where
                     return Err(Error::shutting_down());
                 }
                 LLMP_TAG_END_OF_PAGE => {
-                    #[cfg(feature = "std")]
-                    println!("Received end of page, allocating next");
+                    log::info!("Received end of page, allocating next");
                     // Handle end of page
                     assert!(
                         (*msg).buf_len >= size_of::<LlmpPayloadSharedMapInfo>() as u64,
@@ -1477,8 +1482,8 @@ where
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
                     (*page).safe_to_unmap.store(1, Ordering::Relaxed);
 
-                    #[cfg(all(feature = "llmp_debug", feature = "std"))]
-                    println!(
+                    #[cfg(feature = "llmp_debug")]
+                    log::info!(
                         "LLMP_DEBUG: Got a new recv map {} with len {:?}",
                         self.current_recv_shmem.shmem.id(),
                         self.current_recv_shmem.shmem.len()
@@ -1610,8 +1615,8 @@ where
 {
     /// Creates a new page, initializing the passed shared mem struct
     pub fn new(sender: ClientId, mut new_shmem: SHM) -> Self {
-        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        println!(
+        #[cfg(feature = "llmp_debug")]
+        log::info!(
             "LLMP_DEBUG: Initializing map on {} with size {}",
             new_shmem.id(),
             new_shmem.len()
@@ -1625,13 +1630,13 @@ where
 
     /// Maps and wraps an existing
     pub fn existing(existing_shmem: SHM) -> Self {
-        #[cfg(all(feature = "llmp_debug", feature = "std"))]
+        #[cfg(feature = "llmp_debug")]
         //{
         //#[cfg(debug_assertions)]
         //let bt = Backtrace::new();
         //#[cfg(not(debug_assertions))]
         //let bt = "<n/a (release)>";
-        println!(
+        log::info!(
             "LLMP_DEBUG: Using existing map {} with size {}",
             existing_shmem.id(),
             existing_shmem.len(),
@@ -1648,8 +1653,8 @@ where
                 "Map was not priviously initialized at {:?}",
                 &ret.shmem
             );
-            #[cfg(all(feature = "llmp_debug", feature = "std"))]
-            println!("PAGE: {:?}", &(*ret.page()));
+            #[cfg(feature = "llmp_debug")]
+            log::info!("PAGE: {:?}", &(*ret.page()));
         }
         ret
     }
@@ -1847,13 +1852,13 @@ where
         A: ToSocketAddrs,
     {
         let mut stream = TcpStream::connect(addr)?;
-        println!("B2B: Connected to {stream:?}");
+        log::info!("B2B: Connected to {stream:?}");
 
         match recv_tcp_msg(&mut stream)?.try_into()? {
             TcpResponse::BrokerConnectHello {
                 broker_shmem_description: _,
                 hostname,
-            } => println!("B2B: Connected to {hostname}"),
+            } => log::info!("B2B: Connected to {hostname}"),
             _ => {
                 return Err(Error::illegal_state(
                     "Unexpected response from B2B server received.".to_string(),
@@ -1870,7 +1875,7 @@ where
 
         let broker_id = match recv_tcp_msg(&mut stream)?.try_into()? {
             TcpResponse::RemoteBrokerAccepted { broker_id } => {
-                println!("B2B: Got Connection Ack, broker_id {broker_id}");
+                log::info!("B2B: Got Connection Ack, broker_id {broker_id}");
                 broker_id
             }
             _ => {
@@ -1881,7 +1886,7 @@ where
         };
 
         // TODO: use broker ids!
-        println!("B2B: We are broker {broker_id}");
+        log::info!("B2B: We are broker {broker_id}");
 
         // TODO: handle broker_ids properly/at all.
         let map_description = Self::b2b_thread_on(
@@ -1978,8 +1983,7 @@ where
         #[cfg(unix)]
         if let Err(_e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler. Print and ignore.
-            #[cfg(feature = "std")]
-            println!("Failed to setup signal handlers: {_e}");
+            log::info!("Failed to setup signal handlers: {_e}");
         }
 
         let timeout = timeout.as_millis() as u64;
@@ -2026,8 +2030,7 @@ where
         #[cfg(unix)]
         if let Err(_e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler. Print and ignore.
-            #[cfg(feature = "std")]
-            println!("Failed to setup signal handlers: {_e}");
+            log::info!("Failed to setup signal handlers: {_e}");
         }
 
         while !self.is_shutting_down() {
@@ -2065,7 +2068,7 @@ where
     pub fn launch_tcp_listener_on(&mut self, port: u16) -> Result<thread::JoinHandle<()>, Error> {
         let listener = tcp_bind(port)?;
         // accept connections and process them, spawning a new thread for each one
-        println!("Server listening on port {port}");
+        log::info!("Server listening on port {port}");
         self.launch_listener(Listener::Tcp(listener))
     }
 
@@ -2113,7 +2116,7 @@ where
             let shmem_provider_bg = SP::new().unwrap();
 
             #[cfg(fature = "llmp_debug")]
-            println!("B2b: Spawned proxy thread");
+            log::info!("B2b: Spawned proxy thread");
 
             // The background thread blocks on the incoming connection for 15 seconds (if no data is available), then checks if it should forward own messages, then blocks some more.
             stream
@@ -2141,8 +2144,8 @@ where
             )
             .expect("Failed to map local page in broker 2 broker thread!");
 
-            #[cfg(all(feature = "llmp_debug", feature = "std"))]
-            println!("B2B: Starting proxy loop :)");
+            #[cfg(feature = "llmp_debug")]
+            log::info!("B2B: Starting proxy loop :)");
 
             let peer_address = stream.peer_addr().unwrap();
 
@@ -2153,14 +2156,14 @@ where
                         Ok(None) => break, // no more data to forward
                         Ok(Some((client_id, tag, flags, payload))) => {
                             if client_id == b2b_client_id {
-                                println!(
+                                log::info!(
                                     "Ignored message we probably sent earlier (same id), TAG: {tag:x}"
                                 );
                                 continue;
                             }
 
-                            #[cfg(all(feature = "llmp_debug", feature = "std"))]
-                            println!(
+                            #[cfg(feature = "llmp_debug")]
+                            log::info!(
                                 "Fowarding message ({} bytes) via broker2broker connection",
                                 payload.len()
                             );
@@ -2174,12 +2177,12 @@ where
                                     payload: payload.to_vec(),
                                 },
                             ) {
-                                println!("Got error {e} while trying to forward a message to broker {peer_address}, exiting thread");
+                                log::info!("Got error {e} while trying to forward a message to broker {peer_address}, exiting thread");
                                 return;
                             }
                         }
                         Err(Error::ShuttingDown) => {
-                            println!("Local broker is shutting down, exiting thread");
+                            log::info!("Local broker is shutting down, exiting thread");
                             return;
                         }
                         Err(e) => panic!("Error reading from local page! {e}"),
@@ -2198,8 +2201,8 @@ where
                             "Illegal message received from broker 2 broker connection - shutting down.",
                         );
 
-                        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-                        println!(
+                        #[cfg(feature = "llmp_debug")]
+                        log::info!(
                             "Fowarding incoming message ({} bytes) from broker2broker connection",
                             msg.payload.len()
                         );
@@ -2217,15 +2220,15 @@ where
                     Err(e) => {
                         if let Error::File(e, _) = e {
                             if e.kind() == ErrorKind::UnexpectedEof {
-                                println!(
+                                log::info!(
                                     "Broker {peer_address} seems to have disconnected, exiting"
                                 );
                                 return;
                             }
                         }
 
-                        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-                        println!("Received no input, timeout or closed. Looping back up :)");
+                        #[cfg(feature = "llmp_debug")]
+                        log::info!("Received no input, timeout or closed. Looping back up :)");
                     }
                 }
             }
@@ -2235,8 +2238,8 @@ where
             Error::unknown("Error launching background thread for b2b communcation".to_string())
         });
 
-        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        println!("B2B: returning from loop. Success: {}", ret.is_ok());
+        #[cfg(feature = "llmp_debug")]
+        log::info!("B2B: returning from loop. Success: {}", ret.is_ok());
 
         ret
     }
@@ -2254,7 +2257,7 @@ where
             TcpRequest::LocalClientHello { shmem_description } => {
                 match Self::announce_new_client(sender, shmem_description) {
                     Ok(()) => (),
-                    Err(e) => println!("Error forwarding client on map: {e:?}"),
+                    Err(e) => log::info!("Error forwarding client on map: {e:?}"),
                 };
 
                 if let Err(e) = send_tcp_msg(
@@ -2263,12 +2266,12 @@ where
                         client_id: *current_client_id,
                     },
                 ) {
-                    println!("An error occurred sending via tcp {e}");
+                    log::info!("An error occurred sending via tcp {e}");
                 };
                 *current_client_id += 1;
             }
             TcpRequest::RemoteBrokerHello { hostname } => {
-                println!("B2B new client: {hostname}");
+                log::info!("B2B new client: {hostname}");
 
                 // TODO: Clean up broker ids.
                 if send_tcp_msg(
@@ -2279,7 +2282,7 @@ where
                 )
                 .is_err()
                 {
-                    println!("Error accepting broker, ignoring.");
+                    log::info!("Error accepting broker, ignoring.");
                     return;
                 }
 
@@ -2287,7 +2290,7 @@ where
                     Self::b2b_thread_on(stream, *current_client_id, broker_shmem_description)
                 {
                     if Self::announce_new_client(sender, &shmem_description).is_err() {
-                        println!("B2B: Error announcing client {shmem_description:?}");
+                        log::info!("B2B: Error announcing client {shmem_description:?}");
                     };
                     *current_client_id += 1;
                 }
@@ -2347,7 +2350,7 @@ where
             loop {
                 match listener.accept() {
                     ListenerStream::Tcp(mut stream, addr) => {
-                        eprintln!(
+                        log::info!(
                             "New connection: {:?}/{:?}",
                             addr,
                             stream.peer_addr().unwrap()
@@ -2358,7 +2361,7 @@ where
                         match send_tcp_msg(&mut stream, &broker_hello) {
                             Ok(()) => {}
                             Err(e) => {
-                                eprintln!("Error sending initial hello: {e:?}");
+                                log::error!("Error sending initial hello: {e:?}");
                                 continue;
                             }
                         }
@@ -2366,14 +2369,14 @@ where
                         let buf = match recv_tcp_msg(&mut stream) {
                             Ok(buf) => buf,
                             Err(e) => {
-                                eprintln!("Error receving from tcp: {e:?}");
+                                log::error!("Error receving from tcp: {e:?}");
                                 continue;
                             }
                         };
                         let req = match buf.try_into() {
                             Ok(req) => req,
                             Err(e) => {
-                                eprintln!("Could not deserialize tcp message: {e:?}");
+                                log::error!("Could not deserialize tcp message: {e:?}");
                                 continue;
                             }
                         };
@@ -2436,8 +2439,7 @@ where
                     add it to the list! Also, no need to forward this msg. */
                     let msg_buf_len_padded = (*msg).buf_len_padded;
                     if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
-                        #[cfg(feature = "std")]
-                        println!("Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
+                        log::info!("Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
                             msg_buf_len_padded,
                             size_of::<LlmpPayloadSharedMapInfo>()
                         );
@@ -2467,8 +2469,7 @@ where
                             });
                         }
                         Err(e) => {
-                            #[cfg(feature = "std")]
-                            println!("Error adding client! Ignoring: {e:?}");
+                            log::info!("Error adding client! Ignoring: {e:?}");
                             #[cfg(not(feature = "std"))]
                             return Err(Error::unknown(format!(
                                 "Error adding client! PANIC! {e:?}"
@@ -2751,7 +2752,7 @@ where
                             match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {
                                 Ok(stream) => break stream,
                                 Err(_) => {
-                                    println!("Connection Refused.. Retrying");
+                                    log::info!("Connection Refused.. Retrying");
                                 }
                             }
                         }
@@ -2760,7 +2761,7 @@ where
                 }
             }
         };
-        println!("Connected to port {port}");
+        log::info!("Connected to port {port}");
 
         let TcpResponse::BrokerConnectHello {
             broker_shmem_description,
@@ -2847,10 +2848,10 @@ mod tests {
 
         client.to_env("_ENV_TEST").unwrap();
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        dbg!(std::env::vars());
+        log::info!("{:?}", std::env::vars());
 
         for (key, value) in std::env::vars_os() {
-            println!("{key:?}: {value:?}");
+            log::info!("{key:?}: {value:?}");
         }
 
         /* recreate the client from env, check if it still works */
