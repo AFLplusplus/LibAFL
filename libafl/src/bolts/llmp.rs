@@ -1397,8 +1397,8 @@ pub struct LlmpReceiver<SP>
 where
     SP: ShMemProvider,
 {
-    /// Id of this provider
-    pub id: u32,
+    /// Client Id of this receiver
+    pub id: ClientId,
     /// Pointer to the last message received
     pub last_msg_recvd: *const LlmpMsg,
     /// Time we received the last message from this receiver
@@ -1451,7 +1451,7 @@ where
         };
 
         Ok(Self {
-            id: 0,
+            id: ClientId(0),
             current_recv_shmem,
             last_msg_recvd,
             shmem_provider,
@@ -1837,9 +1837,9 @@ where
     /// This allows us to intercept messages right in the broker.
     /// This keeps the out map clean.
     pub llmp_clients: Vec<LlmpReceiver<SP>>,
-    /// The amount of own listeners we spawned via [`Self::launch_listener`] or [`Self::crate_attach_to_tcp`]
-    /// This count doesn't count for [`exit_cleanly_after`]
-    num_listeners: usize,
+    /// The own listeners we spawned via [`Self::launch_listener`] or [`Self::crate_attach_to_tcp`]
+    /// This count doesn't count for [`exit_cleanly_after`] and they should never time out.
+    listeners: Vec<ClientId>,
     /// The total amount of clients we had, historically, including those that disconnected, and our listeners.
     num_clients_total: usize,
     /// The amount of total clients that should have connected and (and disconnected)
@@ -1896,7 +1896,7 @@ where
             llmp_clients: vec![],
             clients_to_remove: vec![],
             shmem_provider,
-            num_listeners: 0,
+            listeners: vec![],
             exit_cleanly_after: None,
             num_clients_total: 0,
         })
@@ -1931,12 +1931,12 @@ where
 
     /// Registers a new client for the given sharedmap str and size.
     /// Returns the id of the new client in [`broker.client_shmem`]
-    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::ShMem>) {
+    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::ShMem>) -> ClientId {
         // Tell the client it may unmap its initial allocated shmem page now.
         // Since we now have a handle to it, it won't be umapped too early (only after we also unmap it)
         client_page.mark_safe_to_unmap();
 
-        let id = self.llmp_clients.len() as u32;
+        let id = ClientId(self.num_clients_total.try_into().unwrap());
         self.llmp_clients.push(LlmpReceiver {
             id,
             current_recv_shmem: client_page,
@@ -1949,6 +1949,7 @@ where
         });
 
         self.num_clients_total += 1;
+        id
     }
 
     /// Connects to a broker running on another machine.
@@ -2051,10 +2052,12 @@ where
         let current_time = current_time();
         let mut new_messages = false;
         for i in 0..self.llmp_clients.len() {
-            match unsafe { self.handle_new_msgs(ClientId(i as u32), on_new_msg) } {
+            let client_id = self.llmp_clients[i].id;
+            match unsafe { self.handle_new_msgs(client_id, on_new_msg) } {
                 Ok(has_messages) => {
+                    // See if we need to remove this client, in case no new messages got brokered, and it's not a listener
                     #[cfg(feature = "std")]
-                    {
+                    if !has_messages && !self.listeners.iter().any(|&x| x == client_id) {
                         let last_msg_time = self.llmp_clients[i].last_msg_time;
                         if last_msg_time < current_time
                             && current_time - last_msg_time > CLIENT_TIMEOUT
@@ -2073,6 +2076,7 @@ where
 
         // After brokering, remove all clients we don't want to keep.
         for client_id in self.clients_to_remove.iter().rev() {
+            println!("Client {client_id} disconnected.");
             self.llmp_clients.remove((*client_id) as usize);
         }
         self.clients_to_remove.clear();
@@ -2100,7 +2104,7 @@ where
     /// talking to other brokers via TCP, and accepting new clients over this port.
     #[inline]
     fn has_clients(&self) -> bool {
-        self.llmp_clients.len() > self.num_listeners
+        self.llmp_clients.len() > self.listeners.len()
     }
 
     /// Loops until the last client quits,
@@ -2145,8 +2149,15 @@ where
             }
 
             if let Some(exit_after_count) = self.exit_cleanly_after {
+                /*println!(
+                    "{} && > {} - {} >= {}",
+                    self.has_clients(),
+                    self.num_clients_total,
+                    self.listeners.len(),
+                    exit_after_count
+                );*/
                 if !self.has_clients()
-                    && (self.num_clients_total - self.num_listeners) > exit_after_count.into()
+                    && (self.num_clients_total - self.listeners.len()) >= exit_after_count.into()
                 {
                     // No more clients connected, and the amount of clients we were waiting for was previously connected.
                     // exit cleanly.
@@ -2190,7 +2201,7 @@ where
 
             if let Some(exit_after_count) = self.exit_cleanly_after {
                 if !self.has_clients()
-                    && (self.num_clients_total - self.num_listeners) > exit_after_count.into()
+                    && (self.num_clients_total - self.listeners.len()) > exit_after_count.into()
                 {
                     // No more clients connected, and the amount of clients we were waiting for was previously connected.
                     // exit cleanly.
@@ -2486,7 +2497,7 @@ where
             self.shmem_provider.new_shmem(LLMP_CFG_INITIAL_MAP_SIZE)?,
         );
         let tcp_out_shmem_description = tcp_out_shmem.shmem.description();
-        self.register_client(tcp_out_shmem);
+        let listener_id = self.register_client(tcp_out_shmem);
 
         let ret = thread::spawn(move || {
             // Create a new ShMemProvider for this background thread.
@@ -2557,7 +2568,7 @@ where
             }
         });
 
-        self.num_listeners += 1;
+        self.listeners.push(listener_id);
 
         Ok(ret)
     }
@@ -2631,7 +2642,7 @@ where
                             next_id += 1;
                             new_page.mark_safe_to_unmap();
                             self.llmp_clients.push(LlmpReceiver {
-                                id,
+                                id: ClientId(id),
                                 current_recv_shmem: new_page,
                                 last_msg_recvd: ptr::null_mut(),
                                 shmem_provider: self.shmem_provider.clone(),
@@ -2640,6 +2651,7 @@ where
                                 #[cfg(feature = "std")]
                                 last_msg_time: current_time(),
                             });
+                            self.num_clients_total += 1;
                         }
                         Err(e) => {
                             #[cfg(feature = "std")]
@@ -2813,7 +2825,7 @@ where
             },
 
             receiver: LlmpReceiver {
-                id: 0,
+                id: ClientId(0),
                 current_recv_shmem: initial_broker_shmem,
                 last_msg_recvd: ptr::null_mut(),
                 shmem_provider,

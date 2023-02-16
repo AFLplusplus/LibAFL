@@ -156,11 +156,11 @@ fn main() {
             let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
             broker.launch_tcp_listener_on(port).unwrap();
             // Exit when we got at least _n_ nodes, and all of them quit.
-            broker.set_exit_cleanly_after(NonZeroUsize::new(2_usize).unwrap());
+            broker.set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
             broker.loop_with_timeouts(
                 &mut broker_message_hook,
                 BROKER_TIMEOUT,
-                Some(Duration::from_millis(5)),
+                Some(SLEEP_BETWEEN_FORWARDS),
             );
         }
         "b2b" => {
@@ -171,7 +171,7 @@ fn main() {
             broker.loop_with_timeouts(
                 &mut broker_message_hook,
                 BROKER_TIMEOUT,
-                Some(Duration::from_millis(5)),
+                Some(SLEEP_BETWEEN_FORWARDS),
             );
         }
         "ctr" => {
