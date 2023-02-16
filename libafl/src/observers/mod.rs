@@ -29,7 +29,6 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt::Debug, time::Duration};
-
 #[cfg(feature = "std")]
 use std::time::Instant;
 
@@ -38,7 +37,6 @@ pub use value::*;
 
 #[cfg(feature = "no_std")]
 use crate::bolts::current_time;
-
 use crate::{
     bolts::{
         ownedref::OwnedMutPtr,
