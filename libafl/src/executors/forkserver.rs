@@ -735,7 +735,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         }
         log::info!("All right - fork server is up.");
 
-        if status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
+        if status & FS_OPT_ENABLED == FS_OPT_ENABLED && status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
             let mut map_size = fs_opt_get_mapsize(status);
             // When 0, we assume that map_size was filled by the user or const
             /* TODO autofill map size from the observer
