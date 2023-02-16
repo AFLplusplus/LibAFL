@@ -91,9 +91,7 @@ fn large_msg_loop(port: u16) -> ! {
 fn broker_message_hook(
     msg_or_timeout: Option<(ClientId, llmp::Tag, llmp::Flags, &[u8])>,
 ) -> Result<llmp::LlmpMsgHookResult, Error> {
-    let (client_id, tag, _flags, message) = if let Some(msg) = msg_or_timeout {
-        msg
-    } else {
+    let Some((client_id, tag, _flags, message)) = msg_or_timeout else {
         println!(
             "No client did anything for {} seconds..",
             BROKER_TIMEOUT.as_secs()
