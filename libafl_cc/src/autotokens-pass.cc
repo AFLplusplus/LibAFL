@@ -661,7 +661,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
       ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
       // The actual dict
       GlobalVariable *dict = new GlobalVariable(
-          M, arrayTy, true, GlobalVariable::ExternalLinkage,
+          M, arrayTy, true, GlobalVariable::WeakAnyLinkage,
           ConstantDataArray::get(Ctx,
                                  *(new ArrayRef<char>(ptrhld.get(), offset))),
           "libafl_dictionary_" + M.getName());
