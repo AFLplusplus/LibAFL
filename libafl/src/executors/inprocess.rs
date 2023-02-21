@@ -1427,7 +1427,7 @@ where
 }
 
 /// Timeout executor for [`InProcessForkExecutor`]
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 pub struct TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -1459,7 +1459,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -1487,7 +1487,7 @@ where
     type State = S;
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesState for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
@@ -1566,7 +1566,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     EM: UsesState<State = S>,
@@ -1700,7 +1700,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -1803,7 +1803,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> HasObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
