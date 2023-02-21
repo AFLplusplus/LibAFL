@@ -6,7 +6,7 @@
 use alloc::boxed::Box;
 #[cfg(all(unix, feature = "std"))]
 use alloc::vec::Vec;
-#[cfg(all(unix, target_os = "linux"))]
+#[cfg(all(feature = "std", unix, target_os = "linux"))]
 use core::ptr::addr_of_mut;
 #[cfg(all(unix, feature = "std"))]
 use core::time::Duration;
