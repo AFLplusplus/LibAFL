@@ -1536,7 +1536,7 @@ where
                         .post_exec_child_all(state, input, &ExitKind::Ok)
                         .expect("Failed to run post_exec on observers");
 
-                    std::process::exit(0);
+                    libc::_exit(0);
 
                     Ok(ExitKind::Ok)
                 }
@@ -1613,7 +1613,7 @@ where
                         .post_exec_child_all(state, input, &ExitKind::Ok)
                         .expect("Failed to run post_exec on observers");
 
-                    std::process::exit(0);
+                    libc::_exit(0);
 
                     Ok(ExitKind::Ok)
                 }
