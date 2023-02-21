@@ -6,6 +6,10 @@
 use alloc::boxed::Box;
 #[cfg(all(unix, feature = "std"))]
 use alloc::vec::Vec;
+#[cfg(all(unix, target_os = "linux"))]
+use core::ptr::addr_of_mut;
+#[cfg(all(unix, feature = "std"))]
+use core::time::Duration;
 use core::{
     borrow::BorrowMut,
     ffi::c_void,
@@ -13,8 +17,6 @@ use core::{
     marker::PhantomData,
     ptr::{self, null_mut},
 };
-#[cfg(all(target_os = "linux", feature = "std"))]
-use core::{ptr::addr_of_mut, time::Duration};
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
     ptr::write_volatile,
@@ -51,22 +53,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasSolutions, UsesState},
     Error,
 };
-
-#[repr(C)]
-#[cfg(all(unix, not(target_os = "linux")))]
-#[derive(Debug)]
-struct Itimerval {
-    pub it_interval: Timeval,
-    pub it_value: Timeval,
-}
-
-#[cfg(all(unix, not(target_os = "linux")))]
-extern "C" {
-    fn setitimer(which: c_int, new_value: *mut Itimerval, old_value: *mut Itimerval) -> c_int;
-}
-
-#[cfg(all(unix, not(target_os = "linux")))]
-const ITIMER_REAL: c_int = 0;
 
 /// The process executor simply calls a target function, as mutable reference to a closure
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, OT, S>;
@@ -1426,6 +1412,47 @@ impl Handler for InProcessForkExecutorGlobalData {
     }
 }
 
+#[repr(C)]
+#[cfg(all(unix, not(target_os = "linux")))]
+struct Timeval {
+    pub tv_sec: i64,
+    pub tv_usec: i64,
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+impl Debug for Timeval {
+    #[allow(clippy::cast_sign_loss)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Timeval {{ tv_sec: {:?}, tv_usec: {:?} (tv: {:?}) }}",
+            self.tv_sec,
+            self.tv_usec,
+            Duration::new(self.tv_sec as _, (self.tv_usec * 1000) as _)
+        )
+    }
+}
+
+#[repr(C)]
+#[cfg(all(unix, not(target_os = "linux")))]
+#[derive(Debug)]
+struct Itimerval {
+    pub it_interval: Timeval,
+    pub it_value: Timeval,
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+extern "C" {
+    fn setitimer(
+        which: libc::c_int,
+        new_value: *mut Itimerval,
+        old_value: *mut Itimerval,
+    ) -> libc::c_int;
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+const ITIMER_REAL: libc::c_int = 0;
+
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, OT, S, SP>
@@ -1486,12 +1513,24 @@ where
     S: UsesInput,
     SP: ShMemProvider,
 {
+    #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutInProcessForkExecutor")
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerspec", &self.itimerspec)
             .finish()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        #[cfg(not(target_os = "linux"))]
+        return f
+            .debug_struct("TimeoutInProcessForkExecutor")
+            .field("observers", &self.observers)
+            .field("shmem_provider", &self.shmem_provider)
+            .field("itimerval", &self.itimerval)
+            .finish();
     }
 }
 
@@ -1802,7 +1841,7 @@ where
         Z: HasObjective<Objective = OF, State = S>,
     {
         let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
-        let milli_sec = exec_tmout.as_millis();
+        let milli_sec = timeout.as_millis();
         let it_value = Timeval {
             tv_sec: (milli_sec / 1000) as i64,
             tv_usec: (milli_sec % 1000) as i64,
