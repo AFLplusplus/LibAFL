@@ -561,7 +561,7 @@ impl QemuAsanHelper {
     }
 
     #[must_use]
-    pub fn must_instrument(&self, addr: u64) -> bool {
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
 
@@ -748,7 +748,7 @@ where
     QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    if h.must_instrument(pc.into()) {
+    if h.must_instrument(pc) {
         Some(pc.into())
     } else {
         None
