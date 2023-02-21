@@ -93,37 +93,37 @@ pub struct WeightedScheduler<F, S> {
     phantom: PhantomData<(F, S)>,
 }
 
-impl<F, S> Default for WeightedScheduler<F, S>
-where
-    F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<F, S> WeightedScheduler<F, S>
 where
     F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasRand,
 {
-    /// Create a new [`WeightedScheduler`] without any scheduling strategy
+    /// Create a new [`WeightedScheduler`] without any power schedule
     #[must_use]
-    pub fn new() -> Self {
-        Self {
-            strat: None,
-            phantom: PhantomData,
-        }
+    pub fn new(state: &mut S) -> Self {
+        Self::with_schedule(state, None)
     }
 
     /// Create a new [`WeightedScheduler`]
     #[must_use]
-    pub fn with_schedule(strat: PowerSchedule) -> Self {
+    pub fn with_schedule(state: &mut S, strat: Option<PowerSchedule>) -> Self {
+        if !state.has_metadata::<SchedulerMetadata>() {
+            state.add_metadata(SchedulerMetadata::new(strat));
+        }
+
+        if !state.has_metadata::<WeightedScheduleMetadata>() {
+            state.add_metadata(WeightedScheduleMetadata::new());
+        }
         Self {
-            strat: Some(strat),
+            strat,
             phantom: PhantomData,
         }
+    }
+
+    #[must_use]
+    /// Getter for `strat`
+    pub fn strat(&self) -> &Option<PowerSchedule> {
+        &self.strat
     }
 
     /// Create a new alias table when the fuzzer finds a new corpus entry
@@ -230,14 +230,6 @@ where
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
-        if !state.has_metadata::<SchedulerMetadata>() {
-            state.add_metadata(SchedulerMetadata::new(self.strat));
-        }
-
-        if !state.has_metadata::<WeightedScheduleMetadata>() {
-            state.add_metadata(WeightedScheduleMetadata::new());
-        }
-
         let current_idx = *state.corpus().current();
 
         let mut depth = match current_idx {

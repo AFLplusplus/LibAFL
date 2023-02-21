@@ -159,7 +159,7 @@ jobs:
     - name: Run a maturin build
       run: cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && maturin develop && ./test.sh
     - name: Run python test
-      run: . ./bindings/pylibafl/.env/bin/activate && cd ./fuzzers/baby_fuzzer && python3 baby_fuzzer.py | grep "Bye"
+      run: . ./bindings/pylibafl/.env/bin/activate && cd ./fuzzers/baby_fuzzer && python3 baby_fuzzer.py 2>&1 | grep "Bye"
 
   fuzzers:
     strategy:
