@@ -6,6 +6,10 @@
 use alloc::boxed::Box;
 #[cfg(all(unix, feature = "std"))]
 use alloc::vec::Vec;
+#[cfg(all(feature = "std", unix, target_os = "linux"))]
+use core::ptr::addr_of_mut;
+#[cfg(all(unix, feature = "std"))]
+use core::time::Duration;
 use core::{
     borrow::BorrowMut,
     ffi::c_void,
@@ -13,8 +17,6 @@ use core::{
     marker::PhantomData,
     ptr::{self, null_mut},
 };
-#[cfg(all(target_os = "linux", feature = "std"))]
-use core::{ptr::addr_of_mut, time::Duration};
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
     ptr::write_volatile,
@@ -1410,6 +1412,47 @@ impl Handler for InProcessForkExecutorGlobalData {
     }
 }
 
+#[repr(C)]
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+struct Timeval {
+    pub tv_sec: i64,
+    pub tv_usec: i64,
+}
+
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+impl Debug for Timeval {
+    #[allow(clippy::cast_sign_loss)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Timeval {{ tv_sec: {:?}, tv_usec: {:?} (tv: {:?}) }}",
+            self.tv_sec,
+            self.tv_usec,
+            Duration::new(self.tv_sec as _, (self.tv_usec * 1000) as _)
+        )
+    }
+}
+
+#[repr(C)]
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+#[derive(Debug)]
+struct Itimerval {
+    pub it_interval: Timeval,
+    pub it_value: Timeval,
+}
+
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+extern "C" {
+    fn setitimer(
+        which: libc::c_int,
+        new_value: *mut Itimerval,
+        old_value: *mut Itimerval,
+    ) -> libc::c_int;
+}
+
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+const ITIMER_REAL: libc::c_int = 0;
+
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, OT, S, SP>
@@ -1427,7 +1470,7 @@ where
 }
 
 /// Timeout executor for [`InProcessForkExecutor`]
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 pub struct TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -1439,7 +1482,10 @@ where
     shmem_provider: SP,
     observers: OT,
     handlers: InChildProcessHandlers,
+    #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
+    #[cfg(all(unix, not(target_os = "linux")))]
+    itimerval: Itimerval,
     phantom: PhantomData<S>,
 }
 
@@ -1459,7 +1505,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -1467,12 +1513,24 @@ where
     S: UsesInput,
     SP: ShMemProvider,
 {
+    #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutInProcessForkExecutor")
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerspec", &self.itimerspec)
             .finish()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        #[cfg(not(target_os = "linux"))]
+        return f
+            .debug_struct("TimeoutInProcessForkExecutor")
+            .field("observers", &self.observers)
+            .field("shmem_provider", &self.shmem_provider)
+            .field("itimerval", &self.itimerval)
+            .finish();
     }
 }
 
@@ -1487,7 +1545,7 @@ where
     type State = S;
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesState for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
@@ -1566,7 +1624,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     EM: UsesState<State = S>,
@@ -1598,15 +1656,30 @@ where
                         .pre_exec_child_all(state, input)
                         .expect("Failed to run post_exec on observers");
 
-                    let mut timerid: libc::timer_t = null_mut();
-                    // creates a new per-process interval timer
-                    // we can't do this from the parent, timerid is unique to each process.
-                    libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
+                    #[cfg(target_os = "linux")]
+                    {
+                        let mut timerid: libc::timer_t = null_mut();
+                        // creates a new per-process interval timer
+                        // we can't do this from the parent, timerid is unique to each process.
+                        libc::timer_create(
+                            libc::CLOCK_MONOTONIC,
+                            null_mut(),
+                            addr_of_mut!(timerid),
+                        );
 
-                    log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-                    let v =
-                        libc::timer_settime(timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
-                    log::trace!("{v:#?} {}", nix::errno::errno());
+                        // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
+                        let _ = libc::timer_settime(
+                            timerid,
+                            0,
+                            addr_of_mut!(self.itimerspec),
+                            null_mut(),
+                        );
+                    }
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+                    }
+                    // log::trace!("{v:#?} {}", nix::errno::errno());
                     (self.harness_fn)(input);
 
                     self.observers
@@ -1700,7 +1773,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -1709,6 +1782,7 @@ where
     SP: ShMemProvider,
 {
     /// Creates a new [`TimeoutInProcessForkExecutor`]
+    #[cfg(target_os = "linux")]
     pub fn new<EM, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,
@@ -1749,6 +1823,48 @@ where
         })
     }
 
+    /// Creates a new [`TimeoutInProcessForkExecutor`], non linux
+    #[cfg(not(target_os = "linux"))]
+    pub fn new<EM, OF, Z>(
+        harness_fn: &'a mut H,
+        observers: OT,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        timeout: Duration,
+        shmem_provider: SP,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<S>,
+        S: HasSolutions + HasClientPerfMonitor,
+        Z: HasObjective<Objective = OF, State = S>,
+    {
+        let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
+        let milli_sec = timeout.as_millis();
+        let it_value = Timeval {
+            tv_sec: (milli_sec / 1000) as i64,
+            tv_usec: (milli_sec % 1000) as i64,
+        };
+        let it_interval = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let itimerval = Itimerval {
+            it_interval,
+            it_value,
+        };
+
+        Ok(Self {
+            harness_fn,
+            shmem_provider,
+            observers,
+            handlers,
+            itimerval,
+            phantom: PhantomData,
+        })
+    }
+
     /// Retrieve the harness function.
     #[inline]
     pub fn harness(&self) -> &H {
@@ -1773,7 +1889,7 @@ where
     type Observers = OT;
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
@@ -1803,7 +1919,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> HasObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
