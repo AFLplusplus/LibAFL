@@ -1419,7 +1419,7 @@ struct Timeval {
     pub tv_usec: i64,
 }
 
-#[cfg(all(unix, not(target_os = "linux")))]
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
 impl Debug for Timeval {
     #[allow(clippy::cast_sign_loss)]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
