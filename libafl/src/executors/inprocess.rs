@@ -1413,6 +1413,7 @@ impl Handler for InProcessForkExecutorGlobalData {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 #[cfg(all(unix, not(target_os = "linux")))]
 struct Timeval {
     pub tv_sec: i64,
