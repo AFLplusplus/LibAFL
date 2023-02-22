@@ -455,13 +455,13 @@ fn next_shmem_size(max_alloc: usize) -> usize {
 
 /// Initialize a new `llmp_page`. The size should be relative to
 /// `llmp_page->messages`
-unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow_reinit: bool) {
+unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow_reinit: bool) {
     #[cfg(feature = "llmp_debug")]
-    log::trace!("_llmp_page_init: shmem {:?}", &shmem);
+    log::trace!("llmp_page_init: shmem {:?}", &shmem);
     let map_size = shmem.len();
     let page = shmem2page_mut(shmem);
     #[cfg(feature = "llmp_debug")]
-    log::trace!("_llmp_page_init: page {:?}", &(*page));
+    log::trace!("llmp_page_init: page {:?}", &(*page));
 
     if !allow_reinit {
         assert!(
@@ -810,7 +810,7 @@ where
     /// Only safe if you really really restart the page on everything connected
     /// No receiver should read from this page at a different location.
     pub unsafe fn reset(&mut self) {
-        _llmp_page_init(
+        llmp_page_init(
             &mut self.out_shmems.last_mut().unwrap().shmem,
             self.id,
             true,
@@ -1120,14 +1120,20 @@ where
         sender_id: ClientId,
         next_min_shmem_size: usize,
     ) -> Result<LlmpSharedMap<<SP>::ShMem>, Error> {
-        if !self.unused_shmem_cache.is_empty() {
+        if self.unused_shmem_cache.is_empty() {
+            // No cached maps that fit our need, let's allocate a new one.
+            Ok(LlmpSharedMap::new(
+                sender_id,
+                self.shmem_provider.new_shmem(next_min_shmem_size)?,
+            ))
+        } else {
             // We got cached shmems laying around, hand it out, if they are large enough.
-            let cached_shmem = self
+            let mut cached_shmem = self
                 .unused_shmem_cache
                 .remove(self.unused_shmem_cache.len() - 1);
 
             if cached_shmem.shmem.len() < next_min_shmem_size {
-                // This map is too small, we will never need it again (llmp allocation sizes always increase). Drop it.
+                // This map is too small, we will never need it again (llmp allocation sizes always increase). Drop it, then call this function again..
                 #[cfg(feature = "llmp_debug")]
                 log::info!("Dropping too small shmem {cached_shmem}");
                 drop(cached_shmem);
@@ -1135,14 +1141,11 @@ where
             } else {
                 #[cfg(feature = "llmp_debug")]
                 log::info!("Returning cached shmem {cached_shmem}");
+                unsafe {
+                    llmp_page_init(&mut cached_shmem.shmem, sender_id, true);
+                }
                 Ok(cached_shmem)
             }
-        } else {
-            // No cached maps that fit our need, let's allocate a new one.
-            Ok(LlmpSharedMap::new(
-                sender_id,
-                self.shmem_provider.new_shmem(next_min_shmem_size)?,
-            ))
         }
     }
 
@@ -1667,7 +1670,7 @@ where
         );
 
         unsafe {
-            _llmp_page_init(&mut new_shmem, sender, false);
+            llmp_page_init(&mut new_shmem, sender, false);
         }
         Self { shmem: new_shmem }
     }
