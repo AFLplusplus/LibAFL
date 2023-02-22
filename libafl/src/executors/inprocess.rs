@@ -1413,7 +1413,7 @@ impl Handler for InProcessForkExecutorGlobalData {
 }
 
 #[repr(C)]
-#[cfg(all(unix, not(target_os = "linux")))]
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
 struct Timeval {
     pub tv_sec: i64,
     pub tv_usec: i64,
@@ -1434,14 +1434,14 @@ impl Debug for Timeval {
 }
 
 #[repr(C)]
-#[cfg(all(unix, not(target_os = "linux")))]
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
 #[derive(Debug)]
 struct Itimerval {
     pub it_interval: Timeval,
     pub it_value: Timeval,
 }
 
-#[cfg(all(unix, not(target_os = "linux")))]
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
 extern "C" {
     fn setitimer(
         which: libc::c_int,
@@ -1450,7 +1450,7 @@ extern "C" {
     ) -> libc::c_int;
 }
 
-#[cfg(all(unix, not(target_os = "linux")))]
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
 const ITIMER_REAL: libc::c_int = 0;
 
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
