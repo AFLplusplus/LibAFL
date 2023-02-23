@@ -7,6 +7,11 @@ pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
 
 #[cfg(feature = "std")]
+pub mod inmemory_ondisk;
+#[cfg(feature = "std")]
+pub use inmemory_ondisk::InMemoryOnDiskCorpus;
+
+#[cfg(feature = "std")]
 pub mod ondisk;
 #[cfg(feature = "std")]
 pub use ondisk::OnDiskCorpus;
