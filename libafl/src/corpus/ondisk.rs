@@ -230,8 +230,7 @@ where
 
             let filename_str = filename.to_str().expect("Invalid Path");
             testcase
-                .set_filename(filename_str.into())
-                .expect("Could not save testcase to disk");
+                .set_filename(filename_str.into())?;
         };
         if self.meta_format.is_some() {
             let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
