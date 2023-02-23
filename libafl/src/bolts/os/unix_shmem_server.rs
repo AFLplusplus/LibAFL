@@ -130,15 +130,16 @@ where
         let mut message = header.to_vec();
         message.extend(body);
 
-        self.stream
-            .write_all(&message)
-            .expect("Failed to send message");
+        self.stream.write_all(&message)?;
+        //.expect("Failed to send message");
 
         let mut shm_slice = [0_u8; 20];
         let mut fd_buf = [-1; 1];
-        self.stream
-            .recv_fds(&mut shm_slice, &mut fd_buf)
-            .expect("Did not receive a response");
+        let (slice_size, fd_count) = self.stream.recv_fds(&mut shm_slice, &mut fd_buf)?;
+        //.expect("Did not receive a response");
+        if slice_size == 0 && fd_count == 0 {
+            return Err(Error::illegal_state(format!("Tried to receive 20 bytes and one fd via unix shmem socket, but got {slice_size} bytes and {fd_count} fds.")));
+        }
 
         let server_id = ShMemId::from_array(&shm_slice);
         let server_fd: i32 = server_id.into();
