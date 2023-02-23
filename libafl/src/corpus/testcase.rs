@@ -123,8 +123,18 @@ where
 
     /// Set the filename
     #[inline]
-    pub fn set_filename(&mut self, filename: String) {
+    pub fn set_filename(&mut self, filename: String) -> Result<(), Error> {
+        let old_filename = self.filename.clone();
+
         self.filename = Some(filename);
+
+        match self.store_input() {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                self.filename = old_filename;
+                return Err(e);
+            }
+        }
     }
 
     /// Get the execution time of the testcase
