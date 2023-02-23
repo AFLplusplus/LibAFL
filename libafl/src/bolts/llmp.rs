@@ -1135,12 +1135,12 @@ where
             if cached_shmem.shmem.len() < next_min_shmem_size {
                 // This map is too small, we will never need it again (llmp allocation sizes always increase). Drop it, then call this function again..
                 #[cfg(feature = "llmp_debug")]
-                log::info!("Dropping too small shmem {cached_shmem}");
+                log::info!("Dropping too small shmem {cached_shmem:?}");
                 drop(cached_shmem);
                 self.new_or_unused_shmem(sender_id, next_min_shmem_size)
             } else {
                 #[cfg(feature = "llmp_debug")]
-                log::info!("Returning cached shmem {cached_shmem}");
+                log::info!("Returning cached shmem {cached_shmem:?}");
                 unsafe {
                     llmp_page_init(&mut cached_shmem.shmem, sender_id, true);
                 }
