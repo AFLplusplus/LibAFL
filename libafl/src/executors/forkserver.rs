@@ -26,7 +26,7 @@ use nix::{
 
 use crate::{
     bolts::{
-        fs::{InputFile, INPUTFILE_STD},
+        fs::{InputFile, get_unique_std_input_file},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::Prepend,
@@ -691,7 +691,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     {
         let input_filename = match &self.input_filename {
             Some(name) => name.clone(),
-            None => OsString::from(INPUTFILE_STD),
+            None => OsString::from(get_unique_std_input_file()),
         };
 
         let input_file = InputFile::create(input_filename)?;
@@ -950,7 +950,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Place the input at this position and set the default filename for the input.
     /// The filename includes the PID of the fuzzer to ensure that no two fuzzers write to the same file
     pub fn arg_input_file_std(self) -> Self {
-        self.arg_input_file(format!("{}_{}", INPUTFILE_STD, std::process::id()))
+        self.arg_input_file(get_unique_std_input_file())
     }
 
     #[must_use]
@@ -986,7 +986,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
-    /// Else this forkserver will try to write the input to a file. The default name is [`INPUTFILE_STD`]
+    /// Else this forkserver will try to write the input to a file. The default name is derived by [`get_unique_std_input_file`](get_unique_std_input_file)
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[must_use]
     pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
