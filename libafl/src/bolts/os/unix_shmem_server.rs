@@ -179,7 +179,11 @@ where
         let service = ShMemService::<SP>::start();
 
         let mut res = Self {
-            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?,
+            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?).map_err(|err| Error::illegal_state(if cfg!(target_vendor = "apple") {
+                format!("The ServedShMemProvider was not started or is no longer running. You may need to remove the './libafl_unix_shmem_server' file and retry. Error details: {err:?}")
+            } else {
+                format!("The ServedShMemProvider was not started or is no longer running. Error details: {err:?}")
+            }))?,
             inner: SP::new()?,
             id: -1,
             service,
@@ -536,7 +540,12 @@ where
             }
             ServedShMemRequest::ExistingMap(description) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
-                let description_id: i32 = description.id.into();
+
+                if description.id.is_empty() {
+                    return Err(Error::illegal_state("Received empty ShMemId from unix shmem client. Are the shmem limits set correctly? Did a client crash?"));
+                }
+
+                let description_id: i32 = description.id.try_into().unwrap();
 
                 if !self.all_shmems.contains_key(&description_id) {
                     // We should never get here, but it may happen if the OS ran out of shmem pages at some point//reached limits.
