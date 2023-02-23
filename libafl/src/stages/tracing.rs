@@ -149,6 +149,24 @@ where
             .load_input()?
             .clone();
 
+        if let Some(name) = &self.cmplog_observer_name {
+            match self
+                .tracer_executor
+                .observers_mut()
+                .match_name_mut::<AFLStdCmpObserver<TE::State>>(name)
+            {
+                Some(ob) => {
+                    // This is not the original input,
+                    // Set it to false
+                    ob.set_original(true);
+                }
+                None => {
+                    // I can't think of any use of this stage if you don't use AFLStdCmpObserver
+                    // but do nothing ofcourse
+                }
+            }
+        }
+
         self.tracer_executor
             .observers_mut()
             .pre_exec_all(state, &unmutated_input)?;

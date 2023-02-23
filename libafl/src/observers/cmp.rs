@@ -464,6 +464,7 @@ where
                 let mut cmp_values = Vec::new();
                 if self.original {
                     // push into orig_cmpvals
+                    // println!("Adding to orig_cmpvals");
                     for j in 0..execs {
                         if let Some(val) = self.cmp_map().values_of(i, j) {
                             cmp_values.push(val)
@@ -472,6 +473,7 @@ where
                     meta.orig_cmpvals.insert(cmpmap_idx, cmp_values);
                 } else {
                     // push into new_cmpvals
+                    // println!("Adding to new_cmpvals");
                     for j in 0..execs {
                         if let Some(val) = self.cmp_map().values_of(i, j) {
                             cmp_values.push(val)
@@ -521,13 +523,13 @@ where
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut AFLCmpMap, add_meta: bool, original: bool) -> Self {
+    pub fn new(name: &'static str, map: &'a mut AFLCmpMap, add_meta: bool) -> Self {
         Self {
             name: name.to_string(),
             size: None,
             cmp_map: OwnedRefMut::Ref(map),
             add_meta,
-            original,
+            original: false,
             phantom: PhantomData,
         }
     }

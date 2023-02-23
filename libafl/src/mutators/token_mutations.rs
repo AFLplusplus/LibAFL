@@ -637,6 +637,10 @@ impl AFLRedQueen {
         // Try Lowercase
 
         // Try Uppercase
+
+        // Try normal matching
+
+        // Try swapped matching
     }
 
     pub fn rtn_extend_encoding(&self) {}

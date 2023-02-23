@@ -28,7 +28,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{AFLCmpMap, HitcountsMapObserver, StdCmpObserver, StdMapObserver, TimeObserver},
+    observers::{AFLCmpMap, HitcountsMapObserver, StdCmpObserver, AFLStdCmpObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -346,7 +346,7 @@ fn fuzz(
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
         let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLCmpMap>() };
 
-        let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AFLStdCmpObserver::new("cmplog", cmpmap, true);
 
         let cmplog_forkserver = ForkserverExecutor::builder()
             .program(exec)
