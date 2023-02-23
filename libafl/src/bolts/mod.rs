@@ -34,6 +34,8 @@ use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use log::{Level, Metadata, Record};
+
 /// Can be converted to a slice
 pub trait AsSlice {
     /// Type of the entries in this slice
@@ -202,6 +204,65 @@ pub fn current_milliseconds() -> u64 {
 pub fn format_duration_hms(duration: &time::Duration) -> String {
     let secs = duration.as_secs();
     format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
+}
+
+/// A simple logger struct that logs to stderr when used with [`log::set_logger`].
+#[derive(Debug)]
+#[cfg(feature = "std")]
+pub struct SimpleStdErrLogger {
+    /// The min log level for which this logger will write messages.
+    pub log_level: Level,
+}
+
+impl SimpleStdErrLogger {
+    /// Create a new [`log::Log`] logger that will log [`Level::Trace`] and above
+    pub const fn trace() -> Self {
+        Self {
+            log_level: Level::Trace,
+        }
+    }
+
+    /// Create a new [`log::Log`] logger that will log [`Level::Debug`] and above
+    pub const fn debug() -> Self {
+        Self {
+            log_level: Level::Debug,
+        }
+    }
+
+    /// Create a new [`log::Log`] logger that will log [`Level::Info`] and above
+    pub const fn info() -> Self {
+        Self {
+            log_level: Level::Info,
+        }
+    }
+
+    /// Create a new [`log::Log`] logger that will log [`Level::Warn`] and above
+    pub const fn warn() -> Self {
+        Self {
+            log_level: Level::Warn,
+        }
+    }
+
+    /// Create a new [`log::Log`] logger that will log [`Level::Error`]
+    pub const fn error() -> Self {
+        Self {
+            log_level: Level::Error,
+        }
+    }
+}
+
+impl log::Log for SimpleStdErrLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= self.log_level
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            eprintln!("{}: {}", record.level(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
 }
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
