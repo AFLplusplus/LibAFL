@@ -23,7 +23,7 @@ use crate::{
     Error,
 };
 
-use super::ondisk::{OnDiskMetadataFormat, OnDiskMetadata};
+use super::ondisk::{OnDiskMetadata, OnDiskMetadataFormat};
 
 /// The [`Testcase`] metadata that'll be stored to disk
 #[cfg(feature = "std")]

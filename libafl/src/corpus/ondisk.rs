@@ -4,7 +4,7 @@
 //! For any other occasions, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which stores a certain number of testcases in memory and removes additional ones in a FIFO manner.
 
-use core::{cell::RefCell, time::Duration, marker::PhantomData};
+use core::{cell::RefCell, marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
 use std::{
@@ -122,7 +122,7 @@ where
         let Some(testcase) = self.testcases.remove(&idx) else {
             return Err(Error::key_not_found("CorpusId {idx} not found in corpus"));
         };
-        
+
         if let Some(filename) = testcase.borrow().filename() {
             fs::remove_file(filename)?;
         }
@@ -173,23 +173,27 @@ where
 
     #[inline]
     fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.testcases.keys().take_while(|&x| *x != idx).last().map(|x| *x)
+        self.testcases
+            .keys()
+            .take_while(|&x| *x != idx)
+            .last()
+            .copied()
     }
 
     #[inline]
     fn first(&self) -> Option<CorpusId> {
-        self.testcases.keys().next().map(|x| *x)
+        self.testcases.keys().next().copied()
     }
 
     #[inline]
     fn last(&self) -> Option<CorpusId> {
-        self.testcases.keys().next_back().map(|x| *x)
+        self.testcases.keys().next_back().copied()
     }
 
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         let nth = nth % self.testcases.len();
-        self.testcases.keys().nth(nth).map(|x| *x).unwrap()
+        *self.testcases.keys().nth(nth).unwrap()
     }
 }
 
@@ -308,7 +312,6 @@ where
         self.testcases.insert(idx, RefCell::new(testcase));
         Ok(())
     }
-
 }
 
 #[cfg(feature = "python")]
