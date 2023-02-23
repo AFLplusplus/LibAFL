@@ -833,7 +833,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         IT: IntoIterator<Item = O>,
         O: AsRef<OsStr>,
     {
-        let mut moved= self;
+        let mut moved = self;
 
         let mut use_arg_0_as_program = false;
         if moved.program.is_none() {
@@ -866,8 +866,8 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// The harness
     #[must_use]
     pub fn program<O>(mut self, program: O) -> Self
-        where
-            O: AsRef<OsStr>,
+    where
+        O: AsRef<OsStr>,
     {
         self.program = Some(program.as_ref().to_owned());
         self
@@ -876,8 +876,8 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Adds an argument to the harness's commandline
     #[must_use]
     pub fn arg<O>(mut self, arg: O) -> Self
-        where
-            O: AsRef<OsStr>,
+    where
+        O: AsRef<OsStr>,
     {
         self.arguments.push(arg.as_ref().to_owned());
         self
@@ -886,9 +886,9 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Adds arguments to the harness's commandline
     #[must_use]
     pub fn args<IT, O>(mut self, args: IT) -> Self
-        where
-            IT: IntoIterator<Item = O>,
-            O: AsRef<OsStr>,
+    where
+        IT: IntoIterator<Item = O>,
+        O: AsRef<OsStr>,
     {
         let mut res = vec![];
         for arg in args {
@@ -901,9 +901,9 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Adds an environmental var to the harness's commandline
     #[must_use]
     pub fn env<K, V>(mut self, key: K, val: V) -> Self
-        where
-            K: AsRef<OsStr>,
-            V: AsRef<OsStr>,
+    where
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
     {
         self.envs
             .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
@@ -913,10 +913,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Adds environmental vars to the harness's commandline
     #[must_use]
     pub fn envs<IT, K, V>(mut self, vars: IT) -> Self
-        where
-            IT: IntoIterator<Item = (K, V)>,
-            K: AsRef<OsStr>,
-            V: AsRef<OsStr>,
+    where
+        IT: IntoIterator<Item = (K, V)>,
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
     {
         let mut res = vec![];
         for (ref key, ref val) in vars {
@@ -950,7 +950,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Place the input at this position and set the default filename for the input.
     /// The filename includes the PID of the fuzzer to ensure that no two fuzzers write to the same file
     pub fn arg_input_file_std(self) -> Self {
-        self.arg_input_file(format!("{}_{}",INPUTFILE_STD, std::process::id()))
+        self.arg_input_file(format!("{}_{}", INPUTFILE_STD, std::process::id()))
     }
 
     #[must_use]
