@@ -305,7 +305,7 @@ pub mod pybind {
         }
 
         fn as_corpus(slf: Py<Self>) -> PythonCorpus {
-            PythonCorpus::new_on_disk(slf)
+            PythonCorpus::new_in_memory_on_disk(slf)
         }
     }
     /// Register the classes to the python module
