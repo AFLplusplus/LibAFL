@@ -22,7 +22,7 @@ use super::HasObservers;
 use crate::executors::{Executor, ExitKind};
 use crate::{
     bolts::{
-        fs::{InputFile, get_unique_std_input_file},
+        fs::{get_unique_std_input_file, InputFile},
         tuples::MatchName,
         AsSlice,
     },

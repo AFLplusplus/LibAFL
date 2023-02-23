@@ -21,7 +21,7 @@ pub const INPUTFILE_STD: &str = ".cur_input";
 #[must_use]
 /// Derives a filename from [`INPUTFILE_STD`] that may be used to deliver testcases to the target.
 /// It ensures the filename is unique to the fuzzer process.
-pub fn get_unique_std_input_file() -> String{
+pub fn get_unique_std_input_file() -> String {
     format!("{}_{}", INPUTFILE_STD, std::process::id())
 }
 

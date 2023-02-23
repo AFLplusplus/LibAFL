@@ -26,7 +26,7 @@ use nix::{
 
 use crate::{
     bolts::{
-        fs::{InputFile, get_unique_std_input_file},
+        fs::{get_unique_std_input_file, InputFile},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::Prepend,
@@ -695,7 +695,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     {
         let input_filename = match &self.input_filename {
             Some(name) => name.clone(),
-            None => {self.use_stdin = true; OsString::from(get_unique_std_input_file())},
+            None => {
+                self.use_stdin = true;
+                OsString::from(get_unique_std_input_file())
+            }
         };
 
         let input_file = InputFile::create(input_filename)?;
