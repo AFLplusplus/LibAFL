@@ -849,38 +849,12 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         self.use_stdin = use_stdin;
         self
     }
-}
-
-impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
-    /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
-    /// This is the builder for `ForkserverExecutor`
-    /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
-    /// Else this forkserver will try to write the input to a file. The default name is [`INPUTFILE_STD`]
-    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    #[must_use]
-    pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
-        ForkserverExecutorBuilder {
-            program: None,
-            arguments: vec![],
-            envs: vec![],
-            debug_child: false,
-            use_stdin: false,
-            uses_shmem_testcase: false,
-            is_persistent: false,
-            is_deferred_frksrv: false,
-            autotokens: None,
-            input_filename: None,
-            shmem_provider: None,
-            map_size: None,
-            real_map_size: 0,
-        }
-    }
 
     /// The harness
     #[must_use]
     pub fn program<O>(mut self, program: O) -> Self
-    where
-        O: AsRef<OsStr>,
+        where
+            O: AsRef<OsStr>,
     {
         self.program = Some(program.as_ref().to_owned());
         self
@@ -889,8 +863,8 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Adds an argument to the harness's commandline
     #[must_use]
     pub fn arg<O>(mut self, arg: O) -> Self
-    where
-        O: AsRef<OsStr>,
+        where
+            O: AsRef<OsStr>,
     {
         self.arguments.push(arg.as_ref().to_owned());
         self
@@ -899,9 +873,9 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Adds arguments to the harness's commandline
     #[must_use]
     pub fn args<IT, O>(mut self, args: IT) -> Self
-    where
-        IT: IntoIterator<Item = O>,
-        O: AsRef<OsStr>,
+        where
+            IT: IntoIterator<Item = O>,
+            O: AsRef<OsStr>,
     {
         let mut res = vec![];
         for arg in args {
@@ -914,9 +888,9 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Adds an environmental var to the harness's commandline
     #[must_use]
     pub fn env<K, V>(mut self, key: K, val: V) -> Self
-    where
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
+        where
+            K: AsRef<OsStr>,
+            V: AsRef<OsStr>,
     {
         self.envs
             .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
@@ -926,10 +900,10 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Adds environmental vars to the harness's commandline
     #[must_use]
     pub fn envs<IT, K, V>(mut self, vars: IT) -> Self
-    where
-        IT: IntoIterator<Item = (K, V)>,
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
+        where
+            IT: IntoIterator<Item = (K, V)>,
+            K: AsRef<OsStr>,
+            V: AsRef<OsStr>,
     {
         let mut res = vec![];
         for (ref key, ref val) in vars {
@@ -992,6 +966,32 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     pub fn coverage_map_size(mut self, size: usize) -> Self {
         self.map_size = Some(size);
         self
+    }
+}
+
+impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
+    /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
+    /// This is the builder for `ForkserverExecutor`
+    /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
+    /// Else this forkserver will try to write the input to a file. The default name is [`INPUTFILE_STD`]
+    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
+    #[must_use]
+    pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
+        ForkserverExecutorBuilder {
+            program: None,
+            arguments: vec![],
+            envs: vec![],
+            debug_child: false,
+            use_stdin: false,
+            uses_shmem_testcase: false,
+            is_persistent: false,
+            is_deferred_frksrv: false,
+            autotokens: None,
+            input_filename: None,
+            shmem_provider: None,
+            map_size: None,
+            real_map_size: 0,
+        }
     }
 
     /// Shmem provider for forkserver's shared memory testcase feature.
