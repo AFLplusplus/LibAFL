@@ -943,7 +943,16 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Place the input at this position and set the filename for the input.
     pub fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
         let mut moved = self.arg(path.as_ref());
-        moved.input_filename = Some(path.as_ref().as_os_str().to_os_string());
+
+        let path_as_string = path.as_ref().as_os_str().to_os_string();
+
+        assert!(
+            // It's only save to set the input_filename, if it does not overwrite an existing one.
+            (moved.input_filename.is_none() || moved.input_filename.unwrap() == path_as_string),
+            "Already specified an input file under a different name. This is not supported"
+        );
+
+        moved.input_filename = Some(path_as_string);
         moved
     }
 
