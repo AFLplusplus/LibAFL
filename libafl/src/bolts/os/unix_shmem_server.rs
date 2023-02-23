@@ -537,6 +537,12 @@ where
             ServedShMemRequest::ExistingMap(description) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
                 let description_id: i32 = description.id.into();
+
+                if !self.all_shmems.contains_key(&description_id) {
+                    // We should never get here, but it may happen if the OS ran out of shmem pages at some point//reached limits.
+                    return Err(Error::illegal_state(format!("Client wanted to read from existing map with id {description_id}/{description:?}, but it was not allocated by this shmem server. Are the shmem limits set correctly? Did a client crash?")));
+                }
+
                 if client.maps.contains_key(&description_id) {
                     // Using let else here as self needs to be accessed in the else branch.
                     #[allow(clippy::option_if_let_else)]
