@@ -129,10 +129,10 @@ where
         self.filename = Some(filename);
 
         match self.store_input() {
-            Ok(_) => return Ok(()),
+            Ok(_) => Ok(()),
             Err(e) => {
                 self.filename = old_filename;
-                return Err(e);
+                Err(e)
             }
         }
     }
