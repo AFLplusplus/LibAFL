@@ -958,8 +958,9 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
 
     #[must_use]
     /// Place the input at this position and set the default filename for the input.
+    /// The filename includes the PID of the fuzzer to ensure that no two fuzzers write to the same file
     pub fn arg_input_file_std(self) -> Self {
-        self.arg_input_file(INPUTFILE_STD)
+        self.arg_input_file(format!("{}_{}",INPUTFILE_STD, std::process::id()))
     }
 
     #[must_use]
