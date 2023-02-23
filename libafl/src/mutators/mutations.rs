@@ -1,10 +1,7 @@
 //! A wide variety of mutations used during fuzzing.
 
 use alloc::{borrow::ToOwned, vec::Vec};
-use core::{
-    cmp::{max, min},
-    mem::size_of,
-};
+use core::{cmp::min, mem::size_of, ops::Range};
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
@@ -55,6 +52,23 @@ pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
     for p in &mut data[from..(from + len)] {
         *p = val.clone();
     }
+}
+
+/// Generate a range of values where (upon repeated calls) each index is likely to appear in the
+/// provided range as likely as any other value
+///
+/// The solution for this is to specify a window length, then pretend we can start at indices that
+/// would lead to invalid ranges. Then, clamp the values.
+///
+/// This problem corresponds to: <https://oeis.org/A059036>
+#[inline]
+pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: usize) -> Range<usize> {
+    let len = state.rand_mut().next() as usize % max_len + 1;
+    let offset2 = state.rand_mut().next() as usize % (upper + len);
+    let offset1 = offset2.saturating_sub(len);
+    let offset2 = offset2.clamp(0, upper);
+
+    offset1..offset2
 }
 
 /// The max value that will be added or subtracted during add mutations
@@ -475,9 +489,12 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let off = state.rand_mut().below(size as u64) as usize;
-        let len = state.rand_mut().below((size - off) as u64) as usize;
-        input.bytes_mut().drain(off..off + len);
+        let range = rand_range(state, size, size);
+        if range.is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
+
+        input.bytes_mut().drain(range);
 
         Ok(MutationResult::Mutated)
     }
@@ -514,19 +531,21 @@ where
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.bytes().len();
-        let off = state.rand_mut().below((size + 1) as u64) as usize;
-        let mut len = 1 + state.rand_mut().below(16) as usize;
-
-        if size + len > max_size {
-            if max_size > size {
-                len = max_size - size;
-            } else {
-                return Ok(MutationResult::Skipped);
-            }
+        if size == 0 || size >= max_size {
+            return Ok(MutationResult::Skipped);
         }
 
-        input.bytes_mut().resize(size + len, 0);
-        buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
+        let mut range = rand_range(state, size, min(max_size - size, 16));
+        if range.is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
+        let new_size = range.len() + size;
+
+        let mut target = size;
+        core::mem::swap(&mut target, &mut range.end);
+
+        input.bytes_mut().resize(new_size, 0);
+        input.bytes_mut().copy_within(range, target);
 
         Ok(MutationResult::Mutated)
     }
@@ -563,25 +582,18 @@ where
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.bytes().len();
-        if size == 0 {
+        if size == 0 || size >= max_size {
             return Ok(MutationResult::Skipped);
         }
-        let off = state.rand_mut().below((size + 1) as u64) as usize;
-        let mut len = 1 + state.rand_mut().below(16) as usize;
 
-        if size + len > max_size {
-            if max_size > size {
-                len = max_size - size;
-            } else {
-                return Ok(MutationResult::Skipped);
-            }
-        }
+        let amount = 1 + state.rand_mut().below(min(max_size - size, 16) as u64) as usize;
+        let offset = state.rand_mut().below(size as u64 + 1) as usize;
 
         let val = input.bytes()[state.rand_mut().below(size as u64) as usize];
 
-        input.bytes_mut().resize(size + len, 0);
-        buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
-        buffer_set(input.bytes_mut(), off, len, val);
+        input
+            .bytes_mut()
+            .splice(offset..offset, core::iter::repeat(val).take(amount));
 
         Ok(MutationResult::Mutated)
     }
@@ -618,22 +630,18 @@ where
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.bytes().len();
-        let off = state.rand_mut().below((size + 1) as u64) as usize;
-        let mut len = 1 + state.rand_mut().below(16) as usize;
-
-        if size + len > max_size {
-            if max_size > size {
-                len = max_size - size;
-            } else {
-                return Ok(MutationResult::Skipped);
-            }
+        if size >= max_size {
+            return Ok(MutationResult::Skipped);
         }
+
+        let amount = 1 + state.rand_mut().below(min(max_size - size, 16) as u64) as usize;
+        let offset = state.rand_mut().below(size as u64 + 1) as usize;
 
         let val = state.rand_mut().next() as u8;
 
-        input.bytes_mut().resize(size + len, 0);
-        buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
-        buffer_set(input.bytes_mut(), off, len, val);
+        input
+            .bytes_mut()
+            .splice(offset..offset, core::iter::repeat(val).take(amount));
 
         Ok(MutationResult::Mutated)
     }
@@ -672,12 +680,16 @@ where
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
-        let off = state.rand_mut().below(size as u64) as usize;
-        let len = 1 + state.rand_mut().below(min(16, size - off) as u64) as usize;
+        let range = rand_range(state, size, min(size, 16));
+        if range.is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
 
         let val = *state.rand_mut().choose(input.bytes());
-
-        buffer_set(input.bytes_mut(), off, len, val);
+        let quantity = range.len();
+        input
+            .bytes_mut()
+            .splice(range, core::iter::repeat(val).take(quantity));
 
         Ok(MutationResult::Mutated)
     }
@@ -716,12 +728,16 @@ where
         if size == 0 {
             return Ok(MutationResult::Skipped);
         }
-        let off = state.rand_mut().below(size as u64) as usize;
-        let len = 1 + state.rand_mut().below(min(16, size - off) as u64) as usize;
+        let range = rand_range(state, size, min(size, 16));
+        if range.is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
 
         let val = state.rand_mut().next() as u8;
-
-        buffer_set(input.bytes_mut(), off, len, val);
+        let quantity = range.len();
+        input
+            .bytes_mut()
+            .splice(range, core::iter::repeat(val).take(quantity));
 
         Ok(MutationResult::Mutated)
     }
@@ -761,11 +777,10 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let from = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        let to = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        let len = 1 + state.rand_mut().below((size - max(from, to)) as u64) as usize;
+        let target = state.rand_mut().below(size as u64) as usize;
+        let range = rand_range(state, size, size - target);
 
-        buffer_self_copy(input.bytes_mut(), from, to, len);
+        input.bytes_mut().copy_within(range, target);
 
         Ok(MutationResult::Mutated)
     }
@@ -802,34 +817,20 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let max_size = state.max_size();
         let size = input.bytes().len();
-        if size == 0 {
+        if size <= 1 {
             return Ok(MutationResult::Skipped);
         }
-        let off = state.rand_mut().below((size + 1) as u64) as usize;
-        let mut len = 1 + state.rand_mut().below(min(16, size as u64)) as usize;
 
-        if size + len > max_size {
-            if max_size > size {
-                len = max_size - size;
-            } else {
-                return Ok(MutationResult::Skipped);
-            }
-        }
+        let target = state.rand_mut().below(size as u64) as usize;
+        let range = rand_range(state, size, size - target);
 
-        let from = if size == len {
-            0
-        } else {
-            state.rand_mut().below((size - len) as u64) as usize
-        };
+        self.tmp_buf.clear();
+        self.tmp_buf.extend(input.bytes()[range].iter().copied());
 
-        input.bytes_mut().resize(size + len, 0);
-        self.tmp_buf.resize(len, 0);
-        buffer_copy(&mut self.tmp_buf, input.bytes(), from, 0, len);
-
-        buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
-        buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, off, len);
+        input
+            .bytes_mut()
+            .splice(target..target, self.tmp_buf.drain(..));
 
         Ok(MutationResult::Mutated)
     }
@@ -851,7 +852,9 @@ impl BytesInsertCopyMutator {
 
 /// Bytes swap mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
-pub struct BytesSwapMutator;
+pub struct BytesSwapMutator {
+    tmp_buf: Vec<u8>,
+}
 
 impl<I, S> Mutator<I, S> for BytesSwapMutator
 where
@@ -869,15 +872,35 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let first = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        let second = state.rand_mut().below(input.bytes().len() as u64) as usize;
-        let len = 1 + state.rand_mut().below((size - max(first, second)) as u64) as usize;
+        self.tmp_buf.clear();
 
-        let tmp = input.bytes()[first..(first + len)].to_vec();
-        buffer_self_copy(input.bytes_mut(), second, first, len);
-        buffer_copy(input.bytes_mut(), &tmp, 0, second, len);
-
-        Ok(MutationResult::Mutated)
+        let first = rand_range(state, size, size);
+        if state.rand_mut().next() & 1 == 0 && first.start != 0 {
+            let second = rand_range(state, first.start, first.start);
+            self.tmp_buf.extend(input.bytes_mut().drain(first.clone()));
+            self.tmp_buf
+                .extend(input.bytes()[second.clone()].iter().copied());
+            input
+                .bytes_mut()
+                .splice(first.start..first.start, self.tmp_buf.drain(first.len()..));
+            input.bytes_mut().splice(second, self.tmp_buf.drain(..));
+            Ok(MutationResult::Mutated)
+        } else if first.end != size {
+            let mut second = rand_range(state, size - first.end, size - first.end);
+            second.start += first.end;
+            second.end += first.end;
+            self.tmp_buf.extend(input.bytes_mut().drain(second.clone()));
+            self.tmp_buf
+                .extend(input.bytes()[first.clone()].iter().copied());
+            input.bytes_mut().splice(
+                second.start..second.start,
+                self.tmp_buf.drain(second.len()..),
+            );
+            input.bytes_mut().splice(first, self.tmp_buf.drain(..));
+            Ok(MutationResult::Mutated)
+        } else {
+            Ok(MutationResult::Skipped)
+        }
     }
 }
 
@@ -891,7 +914,7 @@ impl BytesSwapMutator {
     /// Creates a new [`BytesSwapMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self
+        Self::default()
     }
 }
 
@@ -911,6 +934,10 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
+        let max_size = state.max_size();
+        if size >= max_size {
+            return Ok(MutationResult::Skipped);
+        }
 
         // We don't want to use the testcase we're already using for splicing
         let idx = random_corpus_id!(state.corpus(), state.rand_mut());
@@ -932,25 +959,15 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let max_size = state.max_size();
-        let from = state.rand_mut().below(other_size as u64) as usize;
-        let to = state.rand_mut().below(size as u64) as usize;
-        let mut len = 1 + state.rand_mut().below((other_size - from) as u64) as usize;
+        let range = rand_range(state, other_size, min(other_size, max_size - size + 1));
+        let target = state.rand_mut().below(size as u64) as usize;
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input()?;
 
-        if size + len > max_size {
-            if max_size > size {
-                len = max_size - size;
-            } else {
-                return Ok(MutationResult::Skipped);
-            }
-        }
-
-        input.bytes_mut().resize(size + len, 0);
-        buffer_self_copy(input.bytes_mut(), to, to + len, size - to);
-        buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
+        input
+            .bytes_mut()
+            .splice(target..target, other.bytes()[range].iter().copied());
 
         Ok(MutationResult::Mutated)
     }
@@ -1009,14 +1026,16 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let from = state.rand_mut().below(other_size as u64) as usize;
-        let len = state.rand_mut().below(min(other_size - from, size) as u64) as usize;
-        let to = state.rand_mut().below((size - len) as u64) as usize;
+        let target = state.rand_mut().below(size as u64) as usize;
+        let range = rand_range(state, other_size, min(other_size, size - target));
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input()?;
 
-        buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
+        input.bytes_mut().splice(
+            target..(target + range.len()),
+            other.bytes()[range].iter().copied(),
+        );
 
         Ok(MutationResult::Mutated)
     }
@@ -1164,7 +1183,6 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::{
         bolts::{
@@ -1211,6 +1229,27 @@ mod tests {
         )
     }
 
+    fn test_state() -> impl HasCorpus + HasMetadata + HasRand + HasMaxSize {
+        let rand = StdRand::with_seed(1337);
+        let mut corpus = InMemoryCorpus::new();
+
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
+
+        corpus
+            .add(BytesInput::new(vec![0x42; 0x1337]).into())
+            .unwrap();
+
+        StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap()
+    }
+
     #[test]
     fn test_mutators() {
         let mut inputs = vec![
@@ -1223,24 +1262,7 @@ mod tests {
             BytesInput::new(vec![1; 4]),
         ];
 
-        let rand = StdRand::with_seed(1337);
-        let mut corpus = InMemoryCorpus::new();
-
-        let mut feedback = ConstFeedback::new(false);
-        let mut objective = ConstFeedback::new(false);
-
-        corpus
-            .add(BytesInput::new(vec![0x42; 0x1337]).into())
-            .unwrap();
-
-        let mut state = StdState::new(
-            rand,
-            corpus,
-            InMemoryCorpus::new(),
-            &mut feedback,
-            &mut objective,
-        )
-        .unwrap();
+        let mut state = test_state();
 
         let mut mutations = test_mutations();
         for _ in 0..2 {
@@ -1259,5 +1281,195 @@ mod tests {
             }
             inputs.append(&mut new_testcases);
         }
+    }
+
+    /// This test guarantees that the deletion of each byte is equally likely
+    #[test]
+    fn test_delete() -> Result<(), Error> {
+        let base = BytesInput::new((0..10).collect());
+        let mut counts = [0usize; 10];
+
+        let mut state = test_state();
+        let mut mutator = BytesDeleteMutator::new();
+
+        for _ in 0..100000 {
+            let mut mutated = base.clone();
+            if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
+                continue;
+            }
+            let mut gaps = 0;
+            let mut range = 0..10;
+            let mut iter = mutated.bytes.iter().copied();
+            while let Some(expected) = range.next() {
+                if let Some(last) = iter.next() {
+                    if expected != last {
+                        gaps += 1;
+                        counts[expected as usize] += 1;
+                        for i in (&mut range).take_while(|expected| *expected < last) {
+                            counts[i as usize] += 1;
+                        }
+                    }
+                } else {
+                    gaps += 1;
+                    for i in expected..10 {
+                        counts[i as usize] += 1;
+                    }
+                    break;
+                }
+            }
+            assert_eq!(
+                gaps, 1,
+                "{:?} should have exactly one gap, found {}",
+                mutated.bytes, gaps
+            );
+        }
+
+        let average = counts.iter().copied().sum::<usize>() / counts.len();
+        assert!(counts.into_iter().all(|count| count
+            .checked_sub(average)
+            .or_else(|| average.checked_sub(count))
+            .unwrap()
+            < 500));
+        Ok(())
+    }
+
+    /// This test guarantees that the likelihood of a byte being involved in an expansion is equally
+    /// likely for all indices
+    #[test]
+    fn test_expand() -> Result<(), Error> {
+        let base = BytesInput::new((0..10).collect());
+        let mut counts = [0usize; 10];
+
+        let mut state = test_state();
+        let mut mutator = BytesExpandMutator::new();
+
+        for _ in 0..100000 {
+            let mut mutated = base.clone();
+            if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
+                continue;
+            }
+            let mut expansion = 0;
+            let mut expansion_len = base.bytes.len();
+            for (i, value) in mutated.bytes.iter().copied().enumerate() {
+                if i as u8 != value {
+                    expansion = value as usize;
+                    expansion_len = i - expansion;
+                    break;
+                }
+            }
+            assert_eq!(mutated.bytes.len(), base.bytes.len() + expansion_len);
+            for (expected, value) in (0..(expansion + expansion_len))
+                .chain(expansion..base.bytes.len())
+                .zip(mutated.bytes)
+            {
+                assert_eq!(expected as u8, value);
+            }
+            for i in (expansion..).take(expansion_len) {
+                counts[i] += 1;
+            }
+        }
+
+        let average = counts.iter().copied().sum::<usize>() / counts.len();
+        assert!(counts.into_iter().all(|count| count
+            .checked_sub(average)
+            .or_else(|| average.checked_sub(count))
+            .unwrap()
+            < 500));
+        Ok(())
+    }
+
+    /// This test guarantees that the likelihood of a byte being re-inserted is equally likely
+    #[test]
+    fn test_insert() -> Result<(), Error> {
+        let base = BytesInput::new((0..10).collect());
+        let mut counts = [0usize; 10];
+        let mut insertions = [0usize; 16];
+
+        let mut state = test_state();
+        let mut mutator = BytesInsertMutator::new();
+
+        for _ in 0..100000 {
+            let mut mutated = base.clone();
+            if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
+                continue;
+            }
+            let mut inserted = 0;
+            for (i, value) in mutated.bytes.iter().copied().enumerate() {
+                if i as u8 != value {
+                    inserted = value;
+                    break;
+                }
+            }
+            assert!(mutated.bytes.len() <= base.bytes.len() + 16);
+            assert_eq!(
+                bytecount::count(&mutated.bytes, inserted),
+                mutated.bytes.len() - base.bytes.len() + 1
+            );
+            counts[inserted as usize] += 1;
+            insertions[mutated.bytes.len() - base.bytes.len() - 1] += 1;
+        }
+
+        let average = counts.iter().copied().sum::<usize>() / counts.len();
+        assert!(counts.into_iter().all(|count| count
+            .checked_sub(average)
+            .or_else(|| average.checked_sub(count))
+            .unwrap()
+            < 500));
+        let average = insertions.iter().copied().sum::<usize>() / insertions.len();
+        assert!(insertions.into_iter().all(|count| count
+            .checked_sub(average)
+            .or_else(|| average.checked_sub(count))
+            .unwrap()
+            < 500));
+        Ok(())
+    }
+
+    /// This test guarantees that the likelihood of a random byte being inserted is equally likely
+    #[test]
+    fn test_rand_insert() -> Result<(), Error> {
+        let base = BytesInput::new((0..10).collect());
+        let mut counts = [0usize; 256];
+        let mut insertions = [0usize; 16];
+
+        let mut state = test_state();
+        let mut mutator = BytesRandInsertMutator::new();
+
+        for _ in 0..100000 {
+            let mut mutated = base.clone();
+            if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
+                continue;
+            }
+            let mut inserted = 10;
+            for (i, value) in mutated.bytes.iter().copied().enumerate() {
+                if i as u8 != value {
+                    inserted = value;
+                    break;
+                }
+            }
+            assert!(mutated.bytes.len() <= base.bytes.len() + 16);
+            let offset = usize::from((inserted as usize) < base.bytes.len());
+            assert_eq!(
+                bytecount::count(&mutated.bytes, inserted),
+                mutated.bytes.len() - base.bytes.len() + offset,
+                "{:?}",
+                mutated.bytes
+            );
+            counts[inserted as usize] += 1;
+            insertions[mutated.bytes.len() - base.bytes.len() - 1] += 1;
+        }
+
+        let average = counts.iter().copied().sum::<usize>() / counts.len();
+        assert!(counts.iter().all(|&count| count
+            .checked_sub(average)
+            .or_else(|| average.checked_sub(count))
+            .unwrap()
+            < 500),);
+        let average = insertions.iter().copied().sum::<usize>() / insertions.len();
+        assert!(insertions.into_iter().all(|count| count
+            .checked_sub(average)
+            .or_else(|| average.checked_sub(count))
+            .unwrap()
+            < 500));
+        Ok(())
     }
 }

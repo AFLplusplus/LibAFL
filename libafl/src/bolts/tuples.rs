@@ -477,11 +477,11 @@ pub fn test_macros() {
     let mut t = tuple_list!(1, "a");
 
     tuple_for_each!(f1, std::fmt::Display, t, |x| {
-        println!("{x}");
+        log::info!("{x}");
     });
 
     tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
-        println!("{x}");
+        log::info!("{x}");
     });
 }
 

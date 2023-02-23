@@ -71,7 +71,7 @@ pub unsafe fn shutdown_handler<SP>(
 ) where
     SP: ShMemProvider,
 {
-    println!(
+    log::info!(
         "Fuzzer shutdown by Signal: {} Pid: {}",
         signal,
         std::process::id()
@@ -83,11 +83,11 @@ pub unsafe fn shutdown_handler<SP>(
     } else {
         // The process allocated the staterestorer map must take care of it
         let sr = (ptr as *mut StateRestorer<SP>).as_mut().unwrap();
-        // println!("{:#?}", sr);
+        // log::trace!("{:#?}", sr);
         std::ptr::drop_in_place(sr);
     }
-    println!("Bye!");
-    std::process::exit(0);
+    log::info!("Bye!");
+    libc::_exit(0);
 }
 
 #[cfg(all(unix, feature = "std"))]
@@ -130,6 +130,17 @@ pub enum LogSeverity {
     Warn,
     /// Error
     Error,
+}
+
+impl From<LogSeverity> for log::Level {
+    fn from(value: LogSeverity) -> Self {
+        match value {
+            LogSeverity::Debug => log::Level::Debug,
+            LogSeverity::Info => log::Level::Info,
+            LogSeverity::Warn => log::Level::Trace,
+            LogSeverity::Error => log::Level::Error,
+        }
+    }
 }
 
 impl fmt::Display for LogSeverity {

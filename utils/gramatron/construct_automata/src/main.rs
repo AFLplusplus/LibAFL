@@ -110,7 +110,7 @@ fn prepare_transitions(
         let (terminal, ss, is_regex) = tokenize(rule);
         let dest = *state_count;
 
-        // println!("Rule \"{}\", {} over {}", &rule, i, rules.len());
+        // log::trace!("Rule \"{}\", {} over {}", &rule, i, rules.len());
 
         // Creating a state stack for the new state
         let mut state_stack = state_stacks
@@ -165,7 +165,7 @@ fn prepare_transitions(
         state_stacks.s.insert(dest, state_stack_sorted);
         pda.push(transition);
 
-        println!("worklist size: {}", worklist.len());
+        log::info!("worklist size: {}", worklist.len());
 
         *state_count += 1;
         // i += 1;
@@ -193,10 +193,10 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
 
     assert!(initial.len() == 1);
 
-    println!("# transitions: {}", pda.len());
-    println!("# states: {}", states.len());
-    println!("initial state: {:?}", &initial);
-    println!("final states: {:?}", &finals);
+    log::info!("# transitions: {}", pda.len());
+    log::info!("# states: {}", states.len());
+    log::info!("initial state: {:?}", &initial);
+    log::info!("final states: {:?}", &finals);
 
     let mut memoized = Vec::with_capacity(states.len());
     //let mut memoized_unique = Vec::with_capacity(states.len());
@@ -218,7 +218,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
             }
         }
 
-        // println!("culled_pda size: {} pda size: {}", culled_pda.len(), pda.len());
+        // log::trace!("culled_pda size: {} pda size: {}", culled_pda.len(), pda.len());
 
         let culled_finals: HashSet<usize> = finals.difference(&blocklist).copied().collect();
         assert!(culled_finals.len() == 1);
@@ -238,7 +238,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
             });
 
             if num_transition % 4096 == 0 {
-                println!(
+                log::info!(
                     "processed {} transitions over {}",
                     num_transition,
                     culled_pda.len()
@@ -279,7 +279,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
             });
 
             if num_transition % 4096 == 0 {
-                println!(
+                log::info!(
                     "processed {} transitions over {}",
                     num_transition,
                     pda.len()
