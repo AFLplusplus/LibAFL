@@ -607,6 +607,10 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Builds `ForkserverExecutor`.
+    /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
+    /// Else this forkserver will pass the input to the target via `stdin`
+    /// in case no input file is specified.
+    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[allow(clippy::pedantic)]
     pub fn build<OT, S>(&mut self, observers: OT) -> Result<ForkserverExecutor<OT, S, SP>, Error>
     where
@@ -691,7 +695,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     {
         let input_filename = match &self.input_filename {
             Some(name) => name.clone(),
-            None => OsString::from(get_unique_std_input_file()),
+            None => {self.use_stdin = true; OsString::from(get_unique_std_input_file())},
         };
 
         let input_file = InputFile::create(input_filename)?;
@@ -986,7 +990,8 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
-    /// Else this forkserver will try to write the input to a file. The default name is derived by [`get_unique_std_input_file`](get_unique_std_input_file)
+    /// Else this forkserver will pass the input to the target via `stdin`
+    /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[must_use]
     pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
