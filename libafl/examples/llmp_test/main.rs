@@ -65,15 +65,14 @@ fn large_msg_loop(port: u16) -> ! {
     let mut client =
         llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new().unwrap(), port).unwrap();
 
-    #[allow(clippy::large_stack_arrays)]
     #[cfg(not(target_vendor = "apple"))]
-    let meg_buf = [1u8; 1 << 20];
+    let meg_buf = vec![1u8; 1 << 20];
     #[cfg(target_vendor = "apple")]
-    let meg_buf = [1u8; 1 << 19];
+    let meg_buf = vec![1u8; 1 << 19];
 
     loop {
         client.send_buf(_TAG_1MEG_V1, &meg_buf).unwrap();
-        #[cfg(target_vendor = "apple")]
+        #[cfg(not(target_vendor = "apple"))]
         println!("Sending the next megabyte");
         #[cfg(target_vendor = "apple")]
         println!("Sending the next half megabyte (Apple had issues with >1 meg)");
