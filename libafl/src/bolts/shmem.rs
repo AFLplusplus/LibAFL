@@ -123,8 +123,8 @@ impl ShMemId {
         Self { id: slice }
     }
 
-    /// Returns `true` if this ShMemId has an empty backing slice.
-    /// If this is the case something went wrong, and this ShMemId may not be read from.
+    /// Returns `true` if this `ShMemId` has an empty backing slice.
+    /// If this is the case something went wrong, and this `ShMemId` may not be read from.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.id[0] == 0
