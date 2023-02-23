@@ -197,6 +197,14 @@ jobs:
       uses: baptiste0928/cargo-install@v1.3.0
       with:
         crate: cargo-make
+    - name: install wasm-pack
+      uses: baptiste0928/cargo-install@v1.3.0
+      with:
+        crate: wasm-pack
+    - name: install chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
     - uses: actions/checkout@v3
       with:
         submodules: true # recursively checkout submodules
