@@ -941,6 +941,9 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
 
     #[must_use]
     /// Place the input at this position and set the filename for the input.
+    ///
+    /// Note: If you use this, you should ensure that there is only one instance using this
+    /// file at any given time.
     pub fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
         let mut moved = self.arg(path.as_ref());
 
