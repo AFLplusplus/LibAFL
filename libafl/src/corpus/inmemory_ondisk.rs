@@ -1,6 +1,6 @@
 //! The ondisk corpus stores [`Testcase`]s to disk.
 //! Additionally, all of them are kept in memory.
-//! For a lower memory footprint, consider using [`crate::corpus::CachedInMemoryOnDiskCorpus`]
+//! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of testcases and removes additional ones in a FIFO manner.
 
 use core::{cell::RefCell, time::Duration};
