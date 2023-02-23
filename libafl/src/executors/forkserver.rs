@@ -691,7 +691,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     {
         let input_filename = match &self.input_filename {
             Some(name) => name.clone(),
-            None => OsString::from(".cur_input"),
+            None => OsString::from(INPUTFILE_STD),
         };
 
         let input_file = InputFile::create(input_filename)?;
@@ -832,7 +832,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         for item in args {
             if item.as_ref() == "@@" && use_stdin {
                 use_stdin = false;
-                res.push(OsString::from(".cur_input"));
+                res.push(OsString::from(INPUTFILE_STD));
             } else if let Some(name) = &self.input_filename {
                 if name == item.as_ref() && use_stdin {
                     use_stdin = false;
@@ -855,7 +855,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
-    /// Else this forkserver will try to write the input to `.cur_input` file.
+    /// Else this forkserver will try to write the input to a file. The default name is [`INPUTFILE_STD`]
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[must_use]
     pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
