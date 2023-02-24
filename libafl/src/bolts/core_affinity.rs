@@ -158,8 +158,7 @@ impl Cores {
 
     /// Checks if this [`Cores`] instance contains a given ``core_id``
     #[must_use]
-    pub fn contains(&self, core_id: usize) -> bool {
-        let core_id = CoreId::from(core_id);
+    pub fn contains(&self, core_id: CoreId) -> bool {
         self.ids.contains(&core_id)
     }
 
@@ -740,7 +739,7 @@ mod freebsd {
             // Ensure that the system pinned the current thread
             // to the specified core.
             let mut core_mask = new_cpuset();
-            unsafe { CPU_SET(ids[0].id, &mut core_mask) };
+            unsafe { CPU_SET(ids[0].0, &mut core_mask) };
 
             let new_mask = get_affinity_mask().unwrap();
 
