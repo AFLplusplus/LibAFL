@@ -6,6 +6,10 @@
 use alloc::boxed::Box;
 #[cfg(all(unix, feature = "std"))]
 use alloc::vec::Vec;
+#[cfg(all(feature = "std", unix, target_os = "linux"))]
+use core::ptr::addr_of_mut;
+#[cfg(all(unix, feature = "std"))]
+use core::time::Duration;
 use core::{
     borrow::BorrowMut,
     ffi::c_void,
@@ -13,8 +17,6 @@ use core::{
     marker::PhantomData,
     ptr::{self, null_mut},
 };
-#[cfg(all(target_os = "linux", feature = "std"))]
-use core::{ptr::addr_of_mut, time::Duration};
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
     ptr::write_volatile,
@@ -186,7 +188,7 @@ where
         OF: Feedback<S>,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
+        let handlers = InProcessHandlers::new::<Self, EM, OF, Z>()?;
         #[cfg(windows)]
         // Some initialization necessary for windows.
         unsafe {
@@ -337,14 +339,13 @@ impl InProcessHandlers {
     }
 
     /// Create new [`InProcessHandlers`].
-    pub fn new<E, EM, OF, Z, H>() -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = E::State>,
-        H: FnMut(&<E::State as UsesInput>::Input) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
         unsafe {
@@ -561,7 +562,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
         new_testcase.add_metadata(exitkind);
         fuzzer
             .objective_mut()
-            .append_metadata(state, &mut new_testcase)
+            .append_metadata(state, observers, &mut new_testcase)
             .expect("Failed adding metadata");
         state
             .solutions_mut()
@@ -579,11 +580,9 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
     event_mgr.on_restart(state).unwrap();
 
-    #[cfg(feature = "std")]
-    println!("Waiting for broker...");
+    log::info!("Waiting for broker...");
     event_mgr.await_restart_safe();
-    #[cfg(feature = "std")]
-    println!("Bye!");
+    log::info!("Bye!");
 }
 
 #[cfg(unix)]
@@ -593,10 +592,7 @@ mod unix_signal_handler {
     use alloc::{boxed::Box, string::String};
     use core::mem::transmute;
     #[cfg(feature = "std")]
-    use std::{
-        io::{stdout, Write},
-        panic,
-    };
+    use std::{io::Write, panic};
 
     use libc::siginfo_t;
 
@@ -716,8 +712,7 @@ mod unix_signal_handler {
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         if !data.is_valid() {
-            #[cfg(feature = "std")]
-            println!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
+            log::warn!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
             return;
         }
 
@@ -727,10 +722,7 @@ mod unix_signal_handler {
         let fuzzer = data.fuzzer_mut::<Z>();
         let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-        #[cfg(feature = "std")]
-        println!("Timeout in fuzz run.");
-        #[cfg(feature = "std")]
-        let _res = stdout().flush();
+        log::error!("Timeout in fuzz run.");
 
         run_observers_and_save_state::<E, EM, OF, Z>(
             executor,
@@ -766,8 +758,7 @@ mod unix_signal_handler {
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
             as *mut libc::c_void as *mut ucontext_t);
 
-        #[cfg(feature = "std")]
-        eprintln!("Crashed with {signal}");
+        log::error!("Crashed with {signal}");
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor
@@ -777,16 +768,19 @@ mod unix_signal_handler {
             let fuzzer = data.fuzzer_mut::<Z>();
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-            #[cfg(feature = "std")]
-            eprintln!("Child crashed!");
+            log::error!("Child crashed!");
 
             #[cfg(all(feature = "std", unix))]
             {
-                let mut writer = std::io::BufWriter::new(std::io::stderr());
-                writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
-                crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
-                    .unwrap();
-                writer.flush().unwrap();
+                let mut bsod = Vec::new();
+                {
+                    let mut writer = std::io::BufWriter::new(&mut bsod);
+                    writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
+                    crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
+                        .unwrap();
+                    writer.flush().unwrap();
+                }
+                log::error!("{}", std::str::from_utf8(&bsod).unwrap());
             }
 
             run_observers_and_save_state::<E, EM, OF, Z>(
@@ -798,30 +792,38 @@ mod unix_signal_handler {
                 ExitKind::Crash,
             );
         } else {
-            #[cfg(feature = "std")]
             {
-                eprintln!("Double crash\n");
+                log::error!("Double crash\n");
                 #[cfg(target_os = "android")]
                 let si_addr = (_info._pad[0] as i64) | ((_info._pad[1] as i64) << 32);
                 #[cfg(not(target_os = "android"))]
                 let si_addr = { _info.si_addr() as usize };
 
-                eprintln!(
+                log::error!(
                 "We crashed at addr 0x{si_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
                 );
 
                 #[cfg(all(feature = "std", unix))]
                 {
-                    let mut writer = std::io::BufWriter::new(std::io::stderr());
-                    crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
+                    let mut bsod = Vec::new();
+                    {
+                        let mut writer = std::io::BufWriter::new(&mut bsod);
+                        crate::bolts::minibsod::generate_minibsod(
+                            &mut writer,
+                            signal,
+                            _info,
+                            _context,
+                        )
                         .unwrap();
-                    writer.flush().unwrap();
+                        writer.flush().unwrap();
+                    }
+                    log::error!("{}", std::str::from_utf8(&bsod).unwrap());
                 }
             }
 
             #[cfg(feature = "std")]
             {
-                eprintln!("Type QUIT to restart the child");
+                log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
                     std::io::stdin().read_line(&mut line).unwrap();
@@ -843,8 +845,6 @@ pub mod windows_asan_handler {
         ptr,
         sync::atomic::{compiler_fence, Ordering},
     };
-    #[cfg(feature = "std")]
-    use std::io::{stdout, Write};
 
     use windows::Win32::System::Threading::{
         EnterCriticalSection, LeaveCriticalSection, RTL_CRITICAL_SECTION,
@@ -889,19 +889,17 @@ pub mod windows_asan_handler {
             compiler_fence(Ordering::SeqCst);
         }
 
-        #[cfg(feature = "std")]
-        eprintln!("ASAN detected crash!");
+        log::error!("ASAN detected crash!");
         if data.current_input_ptr.is_null() {
-            #[cfg(feature = "std")]
             {
-                eprintln!("Double crash\n");
-                eprintln!(
+                log::error!("Double crash\n");
+                log::error!(
                 "ASAN detected crash but we're not in the target... Bug in the fuzzer? Exiting.",
                 );
             }
             #[cfg(feature = "std")]
             {
-                eprintln!("Type QUIT to restart the child");
+                log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
                     std::io::stdin().read_line(&mut line).unwrap();
@@ -921,10 +919,7 @@ pub mod windows_asan_handler {
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
 
-            #[cfg(feature = "std")]
-            eprintln!("Child crashed!");
-            #[cfg(feature = "std")]
-            drop(stdout().flush());
+            log::error!("Child crashed!");
 
             // Make sure we don't crash in the crash handler forever.
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
@@ -955,10 +950,7 @@ mod windows_exception_handler {
         sync::atomic::{compiler_fence, Ordering},
     };
     #[cfg(feature = "std")]
-    use std::{
-        io::{stdout, Write},
-        panic,
-    };
+    use std::panic;
 
     use windows::Win32::System::Threading::{
         EnterCriticalSection, ExitProcess, LeaveCriticalSection, RTL_CRITICAL_SECTION,
@@ -1094,13 +1086,9 @@ mod windows_exception_handler {
             let event_mgr = data.event_mgr_mut::<EM>();
 
             if data.timeout_input_ptr.is_null() {
-                #[cfg(feature = "std")]
-                dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
+                log::error!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
             } else {
-                #[cfg(feature = "std")]
-                eprintln!("Timeout in fuzz run.");
-                #[cfg(feature = "std")]
-                let _res = stdout().flush();
+                log::error!("Timeout in fuzz run.");
 
                 let input = (data.timeout_input_ptr as *const <E::State as UsesInput>::Input)
                     .as_ref()
@@ -1128,7 +1116,7 @@ mod windows_exception_handler {
                 .unwrap(),
         );
         compiler_fence(Ordering::SeqCst);
-        // println!("TIMER INVOKED!");
+        // log::info!("TIMER INVOKED!");
     }
 
     #[allow(clippy::too_many_lines)]
@@ -1174,19 +1162,18 @@ mod windows_exception_handler {
 
             let exception_list = data.exceptions();
             if exception_list.contains(&code) {
-                eprintln!("Crashed with {code}");
+                log::error!("Crashed with {code}");
             } else {
-                // eprintln!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
+                // log::trace!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
                 is_crash = false;
             }
         } else {
-            eprintln!("Crashed without exception (probably due to SIGABRT)");
+            log::error!("Crashed without exception (probably due to SIGABRT)");
         };
 
         if data.current_input_ptr.is_null() {
-            #[cfg(feature = "std")]
             {
-                eprintln!("Double crash\n");
+                log::error!("Double crash\n");
                 let crash_addr = exception_pointers
                     .as_mut()
                     .unwrap()
@@ -1195,13 +1182,13 @@ mod windows_exception_handler {
                     .unwrap()
                     .ExceptionAddress as usize;
 
-                eprintln!(
+                log::error!(
                 "We crashed at addr 0x{crash_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
                 );
             }
             #[cfg(feature = "std")]
             {
-                eprintln!("Type QUIT to restart the child");
+                log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
                     std::io::stdin().read_line(&mut line).unwrap();
@@ -1221,15 +1208,11 @@ mod windows_exception_handler {
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
 
-            #[cfg(feature = "std")]
             if is_crash {
-                eprintln!("Child crashed!");
+                log::error!("Child crashed!");
             } else {
-                // eprintln!("Exception received!");
+                // log::info!("Exception received!");
             }
-
-            #[cfg(feature = "std")]
-            drop(stdout().flush());
 
             // Make sure we don't crash in the crash handler forever.
             if is_crash {
@@ -1249,10 +1232,10 @@ mod windows_exception_handler {
         }
 
         if is_crash {
-            println!("Exiting!");
+            log::info!("Exiting!");
             ExitProcess(1);
         }
-        // println!("Not Exiting!");
+        // log::info!("Not Exiting!");
     }
 }
 
@@ -1429,6 +1412,47 @@ impl Handler for InProcessForkExecutorGlobalData {
     }
 }
 
+#[repr(C)]
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+struct Timeval {
+    pub tv_sec: i64,
+    pub tv_usec: i64,
+}
+
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+impl Debug for Timeval {
+    #[allow(clippy::cast_sign_loss)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Timeval {{ tv_sec: {:?}, tv_usec: {:?} (tv: {:?}) }}",
+            self.tv_sec,
+            self.tv_usec,
+            Duration::new(self.tv_sec as _, (self.tv_usec * 1000) as _)
+        )
+    }
+}
+
+#[repr(C)]
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+#[derive(Debug)]
+struct Itimerval {
+    pub it_interval: Timeval,
+    pub it_value: Timeval,
+}
+
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+extern "C" {
+    fn setitimer(
+        which: libc::c_int,
+        new_value: *mut Itimerval,
+        old_value: *mut Itimerval,
+    ) -> libc::c_int;
+}
+
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+const ITIMER_REAL: libc::c_int = 0;
+
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, OT, S, SP>
@@ -1446,7 +1470,7 @@ where
 }
 
 /// Timeout executor for [`InProcessForkExecutor`]
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 pub struct TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -1458,7 +1482,10 @@ where
     shmem_provider: SP,
     observers: OT,
     handlers: InChildProcessHandlers,
+    #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
+    #[cfg(all(unix, not(target_os = "linux")))]
+    itimerval: Itimerval,
     phantom: PhantomData<S>,
 }
 
@@ -1478,7 +1505,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -1486,12 +1513,24 @@ where
     S: UsesInput,
     SP: ShMemProvider,
 {
+    #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutInProcessForkExecutor")
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerspec", &self.itimerspec)
             .finish()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        #[cfg(not(target_os = "linux"))]
+        return f
+            .debug_struct("TimeoutInProcessForkExecutor")
+            .field("observers", &self.observers)
+            .field("shmem_provider", &self.shmem_provider)
+            .field("itimerval", &self.itimerval)
+            .finish();
     }
 }
 
@@ -1506,7 +1545,7 @@ where
     type State = S;
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesState for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
@@ -1555,13 +1594,13 @@ where
                         .post_exec_child_all(state, input, &ExitKind::Ok)
                         .expect("Failed to run post_exec on observers");
 
-                    std::process::exit(0);
+                    libc::_exit(0);
 
                     Ok(ExitKind::Ok)
                 }
                 Ok(ForkResult::Parent { child }) => {
                     // Parent
-                    // println!("from parent {} child is {}", std::process::id(), child);
+                    // log::info!("from parent {} child is {}", std::process::id(), child);
                     self.shmem_provider.post_fork(false)?;
 
                     let res = waitpid(child, None)?;
@@ -1585,7 +1624,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     EM: UsesState<State = S>,
@@ -1617,32 +1656,47 @@ where
                         .pre_exec_child_all(state, input)
                         .expect("Failed to run post_exec on observers");
 
-                    let mut timerid: libc::timer_t = null_mut();
-                    // creates a new per-process interval timer
-                    // we can't do this from the parent, timerid is unique to each process.
-                    libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
+                    #[cfg(target_os = "linux")]
+                    {
+                        let mut timerid: libc::timer_t = null_mut();
+                        // creates a new per-process interval timer
+                        // we can't do this from the parent, timerid is unique to each process.
+                        libc::timer_create(
+                            libc::CLOCK_MONOTONIC,
+                            null_mut(),
+                            addr_of_mut!(timerid),
+                        );
 
-                    println!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-                    let v =
-                        libc::timer_settime(timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
-                    println!("{v:#?} {}", nix::errno::errno());
+                        // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
+                        let _ = libc::timer_settime(
+                            timerid,
+                            0,
+                            addr_of_mut!(self.itimerspec),
+                            null_mut(),
+                        );
+                    }
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+                    }
+                    // log::trace!("{v:#?} {}", nix::errno::errno());
                     (self.harness_fn)(input);
 
                     self.observers
                         .post_exec_child_all(state, input, &ExitKind::Ok)
                         .expect("Failed to run post_exec on observers");
 
-                    std::process::exit(0);
+                    libc::_exit(0);
 
                     Ok(ExitKind::Ok)
                 }
                 Ok(ForkResult::Parent { child }) => {
                     // Parent
-                    // println!("from parent {} child is {}", std::process::id(), child);
+                    // log::trace!("from parent {} child is {}", std::process::id(), child);
                     self.shmem_provider.post_fork(false)?;
 
                     let res = waitpid(child, None)?;
-                    println!("{res:#?}");
+                    log::trace!("{res:#?}");
                     match res {
                         WaitStatus::Signaled(_, signal, _) => match signal {
                             nix::sys::signal::Signal::SIGALRM
@@ -1719,7 +1773,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -1728,6 +1782,7 @@ where
     SP: ShMemProvider,
 {
     /// Creates a new [`TimeoutInProcessForkExecutor`]
+    #[cfg(target_os = "linux")]
     pub fn new<EM, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,
@@ -1768,6 +1823,48 @@ where
         })
     }
 
+    /// Creates a new [`TimeoutInProcessForkExecutor`], non linux
+    #[cfg(not(target_os = "linux"))]
+    pub fn new<EM, OF, Z>(
+        harness_fn: &'a mut H,
+        observers: OT,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        timeout: Duration,
+        shmem_provider: SP,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<S>,
+        S: HasSolutions + HasClientPerfMonitor,
+        Z: HasObjective<Objective = OF, State = S>,
+    {
+        let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
+        let milli_sec = timeout.as_millis();
+        let it_value = Timeval {
+            tv_sec: (milli_sec / 1000) as i64,
+            tv_usec: (milli_sec % 1000) as i64,
+        };
+        let it_interval = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let itimerval = Itimerval {
+            it_interval,
+            it_value,
+        };
+
+        Ok(Self {
+            harness_fn,
+            shmem_provider,
+            observers,
+            handlers,
+            itimerval,
+            phantom: PhantomData,
+        })
+    }
+
     /// Retrieve the harness function.
     #[inline]
     pub fn harness(&self) -> &H {
@@ -1792,7 +1889,7 @@ where
     type Observers = OT;
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
@@ -1822,7 +1919,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> HasObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,

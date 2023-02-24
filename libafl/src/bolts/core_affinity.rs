@@ -45,11 +45,12 @@ pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
 }
 
 /// This represents a CPU core.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CoreId {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[repr(transparent)]
+pub struct CoreId(
     /// The numerical `id` of a core
-    pub id: usize,
-}
+    pub usize,
+);
 
 impl CoreId {
     /// Set the affinity of the current process to this [`CoreId`]
@@ -73,18 +74,18 @@ impl CoreId {
 
 impl From<usize> for CoreId {
     fn from(id: usize) -> Self {
-        CoreId { id }
+        CoreId(id)
     }
 }
 
 impl From<CoreId> for usize {
     fn from(core_id: CoreId) -> usize {
-        core_id.id
+        core_id.0
     }
 }
 
 /// A list of [`CoreId`] to use for fuzzing
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Cores {
     /// The original commandline used during parsing
     pub cmdline: String,
@@ -98,6 +99,19 @@ impl Cores {
     /// Pick all cores
     pub fn all() -> Result<Self, Error> {
         Self::from_cmdline("all")
+    }
+
+    /// Trims the number of cores to the given value, dropping additional cores
+    pub fn trim(&mut self, count: usize) -> Result<(), Error> {
+        if count > self.ids.len() {
+            return Err(Error::illegal_argument(format!(
+                "Core trim value {count} is larger than number of chosen cores of {}",
+                self.ids.len()
+            )));
+        }
+
+        self.ids.resize(count, CoreId(0));
+        Ok(())
     }
 
     /// Parses core binding args from user input.
@@ -144,9 +158,20 @@ impl Cores {
 
     /// Checks if this [`Cores`] instance contains a given ``core_id``
     #[must_use]
-    pub fn contains(&self, core_id: usize) -> bool {
-        let core_id = CoreId::from(core_id);
+    pub fn contains(&self, core_id: CoreId) -> bool {
         self.ids.contains(&core_id)
+    }
+
+    /// Returns the index/position of the given [`CoreId`] in this cores.ids list.
+    /// Will return `None`, if [`CoreId`] wasn't found.
+    #[must_use]
+    pub fn position(&self, core_id: CoreId) -> Option<usize> {
+        // Since cores a low number, iterating is const-size,
+        // and should be faster than hashmap lookups.
+        // Prove me wrong.
+        self.ids
+            .iter()
+            .position(|&cur_core_id| cur_core_id == core_id)
     }
 }
 
@@ -183,11 +208,7 @@ impl TryFrom<&str> for Cores {
 #[cfg(feature = "std")]
 #[deprecated(since = "0.8.1", note = "Use Cores::from_cmdline instead")]
 pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
-    Ok(Cores::from_cmdline(args)?
-        .ids
-        .iter()
-        .map(|x| x.id)
-        .collect())
+    Ok(Cores::from_cmdline(args)?.ids.iter().map(|x| x.0).collect())
 }
 
 // Linux Section
@@ -226,7 +247,7 @@ mod linux {
 
         for i in 0..CPU_SETSIZE as usize {
             if unsafe { CPU_ISSET(i, &full_set) } {
-                core_ids.push(CoreId { id: i });
+                core_ids.push(CoreId(i));
             }
         }
 
@@ -238,7 +259,7 @@ mod linux {
         // one core active.
         let mut set = new_cpu_set();
 
-        unsafe { CPU_SET(core_id.id, &mut set) };
+        unsafe { CPU_SET(core_id.0, &mut set) };
 
         // Set the current thread's core affinity.
         let result = unsafe {
@@ -301,7 +322,7 @@ mod linux {
             // Ensure that the system pinned the current thread
             // to the specified core.
             let mut core_mask = new_cpu_set();
-            unsafe { CPU_SET(ids[0].id, &mut core_mask) };
+            unsafe { CPU_SET(ids[0].0, &mut core_mask) };
 
             let new_mask = get_affinity_mask().unwrap();
 
@@ -351,7 +372,7 @@ mod windows {
         match get_num_logical_cpus_ex_windows() {
             Some(total_cores) => {
                 for i in 0..total_cores {
-                    core_ids.push(CoreId { id: i });
+                    core_ids.push(CoreId(i));
                 }
                 Ok(core_ids)
             }
@@ -368,7 +389,7 @@ mod windows {
             cpu_group = total_cores / 64;
             cpu_id = id - (cpu_group * 64);
         }
-        // println!("Setting affinity to group {} and id {}", cpu_group, cpu_id);
+        // log::info!("Setting affinity to group {} and id {}", cpu_group, cpu_id);
         // Convert id to mask
         let mask: usize = 1 << cpu_id;
 
@@ -563,14 +584,14 @@ mod apple {
     #[allow(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
-            .map(|n| CoreId { id: n })
+            .map(CoreId)
             .collect::<Vec<_>>())
     }
 
     #[cfg(target_arch = "x86_64")]
     pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
         let mut info = thread_affinity_policy_data_t {
-            affinity_tag: core_id.id.try_into().unwrap(),
+            affinity_tag: core_id.0.try_into().unwrap(),
         };
 
         unsafe {
@@ -640,7 +661,7 @@ mod freebsd {
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
-            .map(|n| CoreId { id: n })
+            .map(|n| CoreId(n))
             .collect::<Vec<_>>())
     }
 
@@ -648,7 +669,7 @@ mod freebsd {
         // Turn `core_id` into a `libc::cpuset_t` with only
         let mut set = new_cpuset();
 
-        unsafe { CPU_SET(core_id.id, &mut set) };
+        unsafe { CPU_SET(core_id.0, &mut set) };
 
         // Set the current thread's core affinity.
         let result = unsafe {
@@ -718,7 +739,7 @@ mod freebsd {
             // Ensure that the system pinned the current thread
             // to the specified core.
             let mut core_mask = new_cpuset();
-            unsafe { CPU_SET(ids[0].id, &mut core_mask) };
+            unsafe { CPU_SET(ids[0].0, &mut core_mask) };
 
             let new_mask = get_affinity_mask().unwrap();
 
@@ -769,14 +790,14 @@ mod netbsd {
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
-            .map(|n| CoreId { id: n })
+            .map(|n| CoreId(n))
             .collect::<Vec<_>>())
     }
 
     pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
         let set = new_cpuset();
 
-        unsafe { _cpuset_set(core_id.id as u64, set) };
+        unsafe { _cpuset_set(core_id.0 as u64, set) };
         // Set the current thread's core affinity.
         let result = unsafe {
             pthread_setaffinity_np(
@@ -824,7 +845,7 @@ mod openbsd {
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
-            .map(|n| CoreId { id: n })
+            .map(|n| CoreId(n))
             .collect::<Vec<_>>())
     }
 }
@@ -853,7 +874,7 @@ mod solaris {
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
-            .map(|n| CoreId { id: n })
+            .map(|n| CoreId(n))
             .collect::<Vec<_>>())
     }
 
@@ -862,7 +883,7 @@ mod solaris {
             libc::processor_bind(
                 libc::P_PID,
                 libc::PS_MYID,
-                core_id.id as i32,
+                core_id.0 as i32,
                 std::ptr::null_mut(),
             )
         };

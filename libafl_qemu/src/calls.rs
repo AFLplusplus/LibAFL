@@ -26,7 +26,7 @@ impl QemuCallTracerHelper {
     }
 
     #[must_use]
-    pub fn must_instrument(&self, addr: u64) -> bool {
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
 
@@ -106,7 +106,7 @@ where
         ret_addr
     };
 
-    // eprintln!("RET @ 0x{:#x}", ret_addr);
+    // log::info!("RET @ 0x{:#x}", ret_addr);
 
     if let Some(h) = hooks
         .helpers_mut()
@@ -131,7 +131,7 @@ where
 {
     let emu = hooks.emulator();
     if let Some(h) = hooks.helpers().match_first_type::<QemuCallTracerHelper>() {
-        if !h.must_instrument(pc.into()) {
+        if !h.must_instrument(pc) {
             return None;
         }
 

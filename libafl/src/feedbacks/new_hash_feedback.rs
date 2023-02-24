@@ -69,7 +69,7 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 
     fn update_hash_set(&mut self, value: u64) -> Result<bool, Error> {
         let r = self.hash_set.insert(value);
-        // println!("Got r={}, the hashset is {:?}", r, &self.hash_set);
+        // log::trace!("Got r={}, the hashset is {:?}", r, &self.hash_set);
         Ok(r)
     }
 }

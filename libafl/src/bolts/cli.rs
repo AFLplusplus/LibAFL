@@ -23,7 +23,7 @@
 //!         fuzz(parsed);
 //!     }
 //!
-//!     println!("{:?}", parsed);
+//!     log::info!("{:?}", parsed);
 //! }
 //! ```
 //!
@@ -59,7 +59,7 @@
 //!         fuzz_with_qemu(parsed);
 //!     }
 //!
-//!     println!("{:?}", parsed);
+//!     log::info!("{:?}", parsed);
 //! }
 //!```
 
@@ -137,7 +137,7 @@ pub struct FuzzerOptions {
     /// cores. 'none' to run a client without binding to any core.
     /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
     #[cfg(feature = "frida_cli")]
-    #[arg(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "ASAN Options")]
+    #[arg(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "Cores that should use ASAN")]
     pub asan_cores: Cores,
 
     /// number of fuzz iterations to perform
@@ -342,7 +342,7 @@ impl FuzzerOptions {
     ///         custom_func(sub_matches.get_one::<String>("bar").unwrap())
     ///     }
     ///
-    ///     println!("{:?}", matches);
+    ///     log::info!("{:?}", matches);
     /// }
     /// ```
     #[must_use]

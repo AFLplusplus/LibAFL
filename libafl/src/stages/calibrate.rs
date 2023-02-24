@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::{current_time, tuples::Named, AsIter},
     corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
-    events::{EventFirer, LogSeverity},
+    events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{
         map::{IsNovel, MapFeedback, MapFeedbackMetadata, Reducer},
@@ -21,6 +21,7 @@ use crate::{
     },
     fuzzer::Evaluator,
     inputs::UsesInput,
+    monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
@@ -105,8 +106,16 @@ where
         mgr: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        // Run this stage only once for each corpus entry
-        if state.corpus().get(corpus_idx)?.borrow_mut().fuzz_level() > 0 {
+        // Run this stage only once for each corpus entry and only if we haven't already inspected it
+        if state.corpus().get(corpus_idx)?.borrow().fuzz_level() > 0
+            || state
+                .corpus()
+                .get(corpus_idx)?
+                .borrow()
+                .metadata()
+                .get::<SchedulerTestcaseMetaData>()
+                .map_or(false, |meta| meta.bitmap_size() != 0)
+        {
             return Ok(());
         }
 
@@ -272,7 +281,7 @@ where
 
             testcase.set_exec_time(total_time / (iter as u32));
             testcase.set_fuzz_level(fuzz_level + 1);
-            // println!("time: {:#?}", testcase.exec_time());
+            // log::trace!("time: {:#?}", testcase.exec_time());
 
             let data = testcase
                 .metadata_mut()
@@ -281,8 +290,23 @@ where
                     Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?;
 
+            data.set_cycle_and_time((total_time, iter));
             data.set_bitmap_size(bitmap_size);
             data.set_handicap(handicap);
+        }
+
+        // Send the stability event to the broker
+        if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
+            let unstable_entries = meta.unstable_entries().len();
+            let map_len = meta.map_len();
+            mgr.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: "stability".to_string(),
+                    value: UserStats::Ratio((map_len - unstable_entries) as u64, map_len as u64),
+                    phantom: PhantomData,
+                },
+            )?;
         }
 
         Ok(())

@@ -51,7 +51,7 @@ impl Named for StdOutObserver {
 
 /// An observer that captures stderr of a target.
 /// Only works for supported executors.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StdErrObserver {
     /// The name of the observer.
     pub name: String,
