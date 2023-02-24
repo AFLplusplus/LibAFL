@@ -27,24 +27,18 @@ use crate::{
 
 /// Options for the the format of the on-disk metadata
 #[cfg(feature = "std")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub enum OnDiskMetadataFormat {
     /// A binary-encoded postcard
     Postcard,
     /// JSON
     Json,
     /// JSON formatted for readability
+    #[default]
     JsonPretty,
-    #[cfg(feature = "gzip")]
     /// The same as [`OnDiskMetadataFormat::JsonPretty`], but compressed
+    #[cfg(feature = "gzip")]
     JsonGzip,
-}
-
-#[cfg(feature = "std")]
-impl Default for OnDiskMetadataFormat {
-    fn default() -> Self {
-        OnDiskMetadataFormat::JsonPretty
-    }
 }
 
 /// The [`Testcase`] metadata that'll be stored to disk
