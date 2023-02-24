@@ -28,13 +28,16 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{AFLCmpMap, HitcountsMapObserver, StdCmpObserver, AFLStdCmpObserver, StdMapObserver, TimeObserver},
+    observers::{
+        AFLCmpMap, AFLStdCmpObserver, HitcountsMapObserver, StdCmpObserver, StdMapObserver,
+        TimeObserver,
+    },
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage, ColorizationStage,
-        TracingStage, tracing::TaintTracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, tracing::TaintTracingStage,
+        ColorizationStage, StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
