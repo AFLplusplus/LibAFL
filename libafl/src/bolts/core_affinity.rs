@@ -592,7 +592,7 @@ mod apple {
     #[cfg(target_arch = "x86_64")]
     pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
         let mut info = thread_affinity_policy_data_t {
-            affinity_tag: core_id.id.try_into().unwrap(),
+            affinity_tag: core_id.0.try_into().unwrap(),
         };
 
         unsafe {
@@ -670,7 +670,7 @@ mod freebsd {
         // Turn `core_id` into a `libc::cpuset_t` with only
         let mut set = new_cpuset();
 
-        unsafe { CPU_SET(core_id.id, &mut set) };
+        unsafe { CPU_SET(core_id.0, &mut set) };
 
         // Set the current thread's core affinity.
         let result = unsafe {
@@ -798,7 +798,7 @@ mod netbsd {
     pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
         let set = new_cpuset();
 
-        unsafe { _cpuset_set(core_id.id as u64, set) };
+        unsafe { _cpuset_set(core_id.0 as u64, set) };
         // Set the current thread's core affinity.
         let result = unsafe {
             pthread_setaffinity_np(
@@ -884,7 +884,7 @@ mod solaris {
             libc::processor_bind(
                 libc::P_PID,
                 libc::PS_MYID,
-                core_id.id as i32,
+                core_id.0 as i32,
                 std::ptr::null_mut(),
             )
         };
