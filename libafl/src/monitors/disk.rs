@@ -11,7 +11,7 @@ use std::{
 use serde_json::json;
 
 use crate::{
-    bolts::{current_time, format_duration_hms},
+    bolts::{current_time, format_duration_hms, ClientId},
     monitors::{ClientStats, Monitor, NopMonitor},
 };
 
@@ -45,7 +45,7 @@ where
         self.base.start_time()
     }
 
-    fn display(&mut self, event_msg: String, sender_id: u32) {
+    fn display(&mut self, event_msg: String, sender_id: ClientId) {
         let cur_time = current_time();
 
         if (cur_time - self.last_update).as_secs() >= 60 {
@@ -190,7 +190,7 @@ where
         self.base.start_time()
     }
 
-    fn display(&mut self, event_msg: String, sender_id: u32) {
+    fn display(&mut self, event_msg: String, sender_id: ClientId) {
         if (self.log_record)(&mut self.base) {
             let file = OpenOptions::new()
                 .append(true)
