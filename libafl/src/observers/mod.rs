@@ -11,9 +11,9 @@ pub mod stdio;
 #[cfg(feature = "std")]
 pub use stdio::{StdErrObserver, StdOutObserver};
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 pub mod stacktrace;
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 pub use stacktrace::*;
 
 pub mod concolic;
