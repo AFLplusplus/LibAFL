@@ -16,10 +16,7 @@ use core::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{
-    CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, HasLocalEventHandlers,
-    LocalEventHandlerFn, ProgressReporter,
-};
+use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", feature = "fork", unix))]
@@ -65,8 +62,6 @@ where
     events: Vec<Event<S::Input>>,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
-    /// A list of local events that will fire before the event gets sent to the broker.
-    local_event_handlers: Vec<Box<LocalEventHandlerFn<S, S::Input>>>,
     phantom: PhantomData<S>,
 }
 
@@ -91,19 +86,6 @@ where
     type State = S;
 }
 
-impl<MT, S> HasLocalEventHandlers for SimpleEventManager<MT, S>
-where
-    MT: Monitor,
-    S: UsesInput,
-{
-    fn add_local_event_handler(
-        &mut self,
-        event_handler_fn: Box<LocalEventHandlerFn<Self::State, Self::Input>>,
-    ) {
-        self.local_event_handlers.push(event_handler_fn);
-    }
-}
-
 impl<MT, S> EventFirer for SimpleEventManager<MT, S>
 where
     MT: Monitor,
@@ -111,13 +93,9 @@ where
 {
     fn fire(
         &mut self,
-        state: &mut Self::State,
+        _state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        for local_event_handler in &mut self.local_event_handlers {
-            local_event_handler(state, &event);
-        }
-
         match Self::handle_in_broker(&mut self.monitor, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
@@ -217,7 +195,6 @@ where
             events: vec![],
             custom_buf_handlers: vec![],
             phantom: PhantomData,
-            local_event_handlers: vec![],
         }
     }
 
@@ -345,22 +322,6 @@ where
     SP: ShMemProvider,
 {
     type State = S;
-}
-
-#[cfg(feature = "std")]
-impl<MT, S, SP> HasLocalEventHandlers for SimpleRestartingEventManager<MT, S, SP>
-where
-    MT: Monitor,
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    fn add_local_event_handler(
-        &mut self,
-        event_handler_fn: Box<LocalEventHandlerFn<Self::State, Self::Input>>,
-    ) {
-        self.simple_event_mgr
-            .add_local_event_handler(event_handler_fn);
-    }
 }
 
 #[cfg(feature = "std")]
