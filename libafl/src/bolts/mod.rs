@@ -34,6 +34,15 @@ use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde::{Deserialize, Serialize};
+
+/// The client ID == the sender id.
+#[repr(transparent)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
+pub struct ClientId(pub u32);
+
 #[cfg(feature = "std")]
 use log::{Level, Metadata, Record};
 

@@ -69,6 +69,8 @@ use core::{
     fmt::Debug,
     hint,
     mem::size_of,
+    num::NonZeroUsize,
+    ops::{BitAnd, BitOr, Not},
     ptr, slice,
     sync::atomic::{fence, AtomicU16, Ordering},
     time::Duration,
@@ -92,14 +94,23 @@ use backtrace::Backtrace;
 use nix::sys::socket::{self, sockopt::ReusePort};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "std")]
+use crate::bolts::current_time;
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::{
     setup_signal_handler, siginfo_t, ucontext_t, Handler, Signal,
 };
 use crate::{
-    bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+    bolts::{
+        shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+        ClientId,
+    },
     Error,
 };
+
+/// The timeout after which a client will be considered stale, and removed.
+#[cfg(feature = "std")]
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
@@ -116,25 +127,25 @@ const LLMP_CFG_INITIAL_MAP_SIZE: usize = 1 << 20;
 const LLMP_CFG_ALIGNNMENT: usize = 64;
 
 /// A msg fresh from the press: No tag got sent by the user yet
-const LLMP_TAG_UNSET: Tag = 0xDEADAF;
+const LLMP_TAG_UNSET: Tag = Tag(0xDEADAF);
 /// This message should not exist yet. Some bug in unsafe code!
-const LLMP_TAG_UNINITIALIZED: Tag = 0xA143AF11;
+const LLMP_TAG_UNINITIALIZED: Tag = Tag(0xA143AF11);
 /// The end of page message
 /// When receiving this, a new sharedmap needs to be allocated.
-const LLMP_TAG_END_OF_PAGE: Tag = 0xAF1E0F1;
+const LLMP_TAG_END_OF_PAGE: Tag = Tag(0xAF1E0F1);
 /// A new client for this broker got added.
-const LLMP_TAG_NEW_SHM_CLIENT: Tag = 0xC11E471;
+const LLMP_TAG_NEW_SHM_CLIENT: Tag = Tag(0xC11E471);
 /// The sender on this map is exiting (if broker exits, clients should exit gracefully);
-const LLMP_TAG_EXITING: Tag = 0x13C5171;
+const LLMP_TAG_EXITING: Tag = Tag(0x13C5171);
 /// Client gave up as the receiver/broker was too slow
-const LLMP_SLOW_RECEIVER_PANIC: Tag = 0x70051041;
+const LLMP_SLOW_RECEIVER_PANIC: Tag = Tag(0x70051041);
 
 /// Unused...
-pub const LLMP_FLAG_INITIALIZED: Flags = 0x0;
+pub const LLMP_FLAG_INITIALIZED: Flags = Flags(0x0);
 /// This message was compressed in transit
-pub const LLMP_FLAG_COMPRESSED: Flags = 0x1;
+pub const LLMP_FLAG_COMPRESSED: Flags = Flags(0x1);
 /// From another broker.
-pub const LLMP_FLAG_FROM_B2B: Flags = 0x2;
+pub const LLMP_FLAG_FROM_B2B: Flags = Flags(0x2);
 
 /// Timt the broker 2 broker connection waits for incoming data,
 /// before checking for own data to forward again.
@@ -170,19 +181,75 @@ static mut LLMP_SIGHANDLER_STATE: LlmpShutdownSignalHandler = LlmpShutdownSignal
 };
 
 /// TAGs used throughout llmp
-pub type Tag = u32;
-/// The client ID == the sender id.
-pub type ClientId = u32;
+#[repr(transparent)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Tag(pub u32);
+
+impl Debug for Tag {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_fmt(format_args!("Tag({:X})", self.0))
+    }
+}
+
 /// The broker ID, for broker 2 broker communication.
-pub type BrokerId = u32;
+#[repr(transparent)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
+pub struct BrokerId(pub u32);
 /// The flags, indicating, for example, enabled compression.
-pub type Flags = u32;
+#[repr(transparent)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Flags(u32);
+
+impl Debug for Flags {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_fmt(format_args!("Flags{:x}( ", self.0))?;
+        // Initialized is the default value, no need to print.
+        if *self & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+            f.write_str("COMPRESSED")?;
+        }
+        if *self & LLMP_FLAG_FROM_B2B == LLMP_FLAG_FROM_B2B {
+            f.write_str("FROM_B2B")?;
+        }
+        f.write_str(" )")
+    }
+}
+
+impl BitAnd for Flags {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self(self.0 & rhs.0)
+    }
+}
+
+impl BitOr for Flags {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl Not for Flags {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        Self(!self.0)
+    }
+}
+
 /// The message ID, an ever-increasing number, unique only to a sharedmap/page.
 #[cfg(target_pointer_width = "64")]
-pub type MessageId = u64;
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct MessageId(u64);
 /// The message ID, an ever-increasing number, unique only to a sharedmap/page.
 #[cfg(not(target_pointer_width = "64"))]
-pub type MessageId = u32;
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct MessageId(u32);
 
 /// This is for the server the broker will spawn.
 /// If an llmp connection is local - use sharedmaps
@@ -477,7 +544,7 @@ unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow
     // Don't forget to subtract our own header size
     (*page).size_total = map_size - LLMP_PAGE_HEADER_LEN;
     (*page).size_used = 0;
-    (*(*page).messages.as_mut_ptr()).message_id = 0;
+    (*(*page).messages.as_mut_ptr()).message_id = MessageId(0);
     (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
     (*page).safe_to_unmap.store(0, Ordering::Relaxed);
     (*page).sender_dead.store(0, Ordering::Relaxed);
@@ -827,14 +894,14 @@ where
         Ok(if client_id_str == _NULL_ENV_STR {
             None
         } else {
-            Some(client_id_str.parse()?)
+            Some(ClientId(client_id_str.parse()?))
         })
     }
 
     /// Writes the `id` to an env var
     #[cfg(feature = "std")]
     fn client_id_to_env(env_name: &str, id: ClientId) {
-        env::set_var(format!("{env_name}_CLIENT_ID"), format!("{id}"));
+        env::set_var(format!("{env_name}_CLIENT_ID"), format!("{}", id.0));
     }
 
     /// Reattach to a vacant `out_shmem`, to with a previous sender stored the information in an env before.
@@ -986,9 +1053,9 @@ where
         // We don't need to pad the EOP message: it'll always be the last in this page.
         (*ret).buf_len_padded = (*ret).buf_len;
         (*ret).message_id = if last_msg.is_null() {
-            1
+            MessageId(1)
         } else {
-            (*last_msg).message_id + 1
+            MessageId((*last_msg).message_id.0 + 1)
         };
         (*ret).tag = LLMP_TAG_END_OF_PAGE;
         (*page).size_used += EOP_MSG_SIZE;
@@ -1050,12 +1117,12 @@ where
         /* We need to start with 1 for ids, as current message id is initialized
          * with 0... */
         (*ret).message_id = if last_msg.is_null() {
-            1
-        } else if (*page).current_msg_id.load(Ordering::Relaxed) == (*last_msg).message_id {
-            (*last_msg).message_id + 1
+            MessageId(1)
+        } else if (*page).current_msg_id.load(Ordering::Relaxed) == (*last_msg).message_id.0 {
+            MessageId((*last_msg).message_id.0 + 1)
         } else {
             /* Oops, wrong usage! */
-            panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {})", ptr::addr_of!((*page).current_msg_id), (*last_msg).message_id);
+            panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {:?})", ptr::addr_of!((*page).current_msg_id), (*last_msg).message_id);
         };
 
         (*ret).buf_len = buf_len as u64;
@@ -1087,7 +1154,7 @@ where
         assert!(self.last_msg_sent != msg, "Message sent twice!");
         assert!(
             (*msg).tag != LLMP_TAG_UNSET,
-            "No tag set on message with id {}",
+            "No tag set on message with id {:?}",
             (*msg).message_id
         );
         // A client gets the sender id assigned to by the broker during the initial handshake.
@@ -1101,12 +1168,12 @@ where
             )));
         }
 
-        (*msg).message_id = (*page).current_msg_id.load(Ordering::Relaxed) + 1;
+        (*msg).message_id.0 = (*page).current_msg_id.load(Ordering::Relaxed) + 1;
 
         // Make sure all things have been written to the page, and commit the message to the page
         (*page)
             .current_msg_id
-            .store((*msg).message_id, Ordering::Release);
+            .store((*msg).message_id.0, Ordering::Release);
 
         self.last_msg_sent = msg;
         self.has_unsent_message = false;
@@ -1169,7 +1236,7 @@ where
         // If we want to get red if old pages, (client to broker), do that now
         if !self.keep_pages_forever {
             #[cfg(feature = "llmp_debug")]
-            log::info!("pruning");
+            log::debug!("LLMP DEBUG: pruning old pages");
             self.prune_old_pages();
         }
 
@@ -1231,7 +1298,7 @@ where
         }
 
         #[cfg(feature = "llmp_debug")]
-        log::info!("Handled out eop");
+        log::debug!("Handled out eop");
 
         match unsafe { self.alloc_next_if_space(buf_len) } {
             Some(msg) => Ok(msg),
@@ -1304,7 +1371,7 @@ where
             || tag == LLMP_TAG_UNSET
         {
             return Err(Error::unknown(format!(
-                "Reserved tag supplied to send_buf ({tag:#X})"
+                "Reserved tag supplied to send_buf ({tag:?})"
             )));
         }
 
@@ -1327,7 +1394,7 @@ where
             || tag == LLMP_TAG_UNSET
         {
             return Err(Error::unknown(format!(
-                "Reserved tag supplied to send_buf ({tag:#X})"
+                "Reserved tag supplied to send_buf ({tag:?})"
             )));
         }
 
@@ -1367,6 +1434,13 @@ where
             description.last_message_offset,
         )
     }
+
+    /// Send information that this client is exiting.
+    /// The other side may free up all allocated memory.
+    /// We are no longer allowed to send anything afterwards.
+    pub fn send_exiting(&mut self) -> Result<(), Error> {
+        self.send_buf(LLMP_TAG_EXITING, &[])
+    }
 }
 
 /// Receiving end on a (unidirectional) sharedmap channel
@@ -1375,10 +1449,13 @@ pub struct LlmpReceiver<SP>
 where
     SP: ShMemProvider,
 {
-    /// Id of this provider
-    pub id: u32,
+    /// Client Id of this receiver
+    pub id: ClientId,
     /// Pointer to the last message received
     pub last_msg_recvd: *const LlmpMsg,
+    /// Time we received the last message from this receiver
+    #[cfg(feature = "std")]
+    last_msg_time: Duration,
     /// The shmem provider
     pub shmem_provider: SP,
     /// current page. After EOP, this gets replaced with the new one
@@ -1426,16 +1503,22 @@ where
         };
 
         Ok(Self {
-            id: 0,
+            id: ClientId(0),
             current_recv_shmem,
             last_msg_recvd,
             shmem_provider,
-            highest_msg_id: 0,
+            highest_msg_id: MessageId(0),
+            // We don't know the last received time, just assume the current time.
+            #[cfg(feature = "std")]
+            last_msg_time: current_time(),
         })
     }
 
     // Never inline, to not get some strange effects
     /// Read next message.
+    /// Returns a pointer to the [`LlmpMsg`], `None` of no message exists, or an [`Error`].
+    ///
+    /// Will *not* update `self.last_msg_time`.
     #[inline(never)]
     unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, Error> {
         /* DBG("recv %p %p\n", page, last_msg); */
@@ -1449,12 +1532,12 @@ where
             } else {
                 // read the msg_id from shared map
                 let current_msg_id = (*page).current_msg_id.load(Ordering::Relaxed);
-                self.highest_msg_id = current_msg_id;
-                (current_msg_id, true)
+                self.highest_msg_id = MessageId(current_msg_id);
+                (MessageId(current_msg_id), true)
             };
 
         // Read the message from the page
-        let ret = if current_msg_id == 0 {
+        let ret = if current_msg_id.0 == 0 {
             /* No messages yet */
             None
         } else if last_msg.is_null() {
@@ -1485,7 +1568,7 @@ where
             // Handle special, LLMP internal, messages.
             match (*msg).tag {
                 LLMP_TAG_UNSET => panic!(
-                    "BUG: Read unallocated msg (tag was {:x} - msg header: {:?}",
+                    "BUG: Read unallocated msg (tag was {:?} - msg header: {:?}",
                     LLMP_TAG_UNSET,
                     &(*msg)
                 ),
@@ -1495,7 +1578,7 @@ where
                     return Err(Error::shutting_down());
                 }
                 LLMP_TAG_END_OF_PAGE => {
-                    log::info!("Received end of page, allocating next");
+                    log::debug!("Received end of page, allocating next");
                     // Handle end of page
                     assert!(
                         (*msg).buf_len >= size_of::<LlmpPayloadSharedMapInfo>() as u64,
@@ -1514,7 +1597,7 @@ where
 
                     // Set last msg we received to null (as the map may no longer exist)
                     self.last_msg_recvd = ptr::null();
-                    self.highest_msg_id = 0;
+                    self.highest_msg_id = MessageId(0);
 
                     // Mark the old page save to unmap, in case we didn't do so earlier.
                     (*page).safe_to_unmap.store(1, Ordering::Relaxed);
@@ -1552,7 +1635,7 @@ where
     /// # Safety
     /// Returns a raw ptr, on the recv map. Should be safe in general
     pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, Error> {
-        let mut current_msg_id = 0;
+        let mut current_msg_id = MessageId(0);
         let page = self.current_recv_shmem.page_mut();
         let last_msg = self.last_msg_recvd;
         if !last_msg.is_null() {
@@ -1564,7 +1647,7 @@ where
             current_msg_id = (*last_msg).message_id;
         }
         loop {
-            if (*page).current_msg_id.load(Ordering::Relaxed) != current_msg_id {
+            if (*page).current_msg_id.load(Ordering::Relaxed) != current_msg_id.0 {
                 return match self.recv()? {
                     Some(msg) => Ok(msg),
                     None => panic!("BUG: blocking llmp message should never be NULL"),
@@ -1805,6 +1888,16 @@ where
     /// This allows us to intercept messages right in the broker.
     /// This keeps the out map clean.
     pub llmp_clients: Vec<LlmpReceiver<SP>>,
+    /// The own listeners we spawned via `launch_listener` or `crate_attach_to_tcp`.
+    /// Listeners will be ignored for `exit_cleanly_after` and they are never considered to have timed out.
+    listeners: Vec<ClientId>,
+    /// The total amount of clients we had, historically, including those that disconnected, and our listeners.
+    num_clients_total: usize,
+    /// The amount of total clients that should have connected and (and disconnected)
+    /// after which the broker loop should quit gracefully.
+    pub exit_cleanly_after: Option<NonZeroUsize>,
+    /// Clients that should be removed soon, (offset into llmp_clients)
+    clients_to_remove: Vec<u32>,
     /// The ShMemProvider to use
     shmem_provider: SP,
 }
@@ -1839,10 +1932,10 @@ where
     pub fn new(mut shmem_provider: SP) -> Result<Self, Error> {
         Ok(LlmpBroker {
             llmp_out: LlmpSender {
-                id: 0,
+                id: ClientId(0),
                 last_msg_sent: ptr::null_mut(),
                 out_shmems: vec![LlmpSharedMap::new(
-                    0,
+                    ClientId(0),
                     shmem_provider.new_shmem(next_shmem_size(0))?,
                 )],
                 // Broker never cleans up the pages so that new
@@ -1853,7 +1946,11 @@ where
                 unused_shmem_cache: vec![],
             },
             llmp_clients: vec![],
+            clients_to_remove: vec![],
             shmem_provider,
+            listeners: vec![],
+            exit_cleanly_after: None,
+            num_clients_total: 0,
         })
     }
 
@@ -1870,6 +1967,15 @@ where
         }
     }
 
+    /// Set this broker to exit after at least `count` clients attached and all client exited.
+    /// Will ignore the own listener thread, if `create_attach_to_tcp`
+    ///
+    /// So, if the `n_client` value is `2`, the broker will not exit after client 1 connected and disconnected,
+    /// but it will quit after client 2 connected and disconnected.
+    pub fn set_exit_cleanly_after(&mut self, n_clients: NonZeroUsize) {
+        self.exit_cleanly_after = Some(n_clients);
+    }
+
     /// Allocate the next message on the outgoing map
     unsafe fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, Error> {
         self.llmp_out.alloc_next(buf_len)
@@ -1877,18 +1983,25 @@ where
 
     /// Registers a new client for the given sharedmap str and size.
     /// Returns the id of the new client in [`broker.client_shmem`]
-    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::ShMem>) {
-        // Tell the client it may unmap this page now.
+    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::ShMem>) -> ClientId {
+        // Tell the client it may unmap its initial allocated shmem page now.
+        // Since we now have a handle to it, it won't be umapped too early (only after we also unmap it)
         client_page.mark_safe_to_unmap();
 
-        let id = self.llmp_clients.len() as u32;
+        let id = ClientId(self.num_clients_total.try_into().unwrap());
         self.llmp_clients.push(LlmpReceiver {
             id,
             current_recv_shmem: client_page,
             last_msg_recvd: ptr::null_mut(),
             shmem_provider: self.shmem_provider.clone(),
-            highest_msg_id: 0,
+            highest_msg_id: MessageId(0),
+            // We don't know the last received time, just assume the current time.
+            #[cfg(feature = "std")]
+            last_msg_time: current_time(),
         });
+
+        self.num_clients_total += 1;
+        id
     }
 
     /// Connects to a broker running on another machine.
@@ -1923,7 +2036,7 @@ where
 
         let broker_id = match recv_tcp_msg(&mut stream)?.try_into()? {
             TcpResponse::RemoteBrokerAccepted { broker_id } => {
-                log::info!("B2B: Got Connection Ack, broker_id {broker_id}");
+                log::info!("B2B: Got Connection Ack, broker_id {broker_id:?}");
                 broker_id
             }
             _ => {
@@ -1934,12 +2047,12 @@ where
         };
 
         // TODO: use broker ids!
-        log::info!("B2B: We are broker {broker_id}");
+        log::info!("B2B: We are broker {broker_id:?}");
 
         // TODO: handle broker_ids properly/at all.
         let map_description = Self::b2b_thread_on(
             stream,
-            self.llmp_clients.len() as ClientId,
+            ClientId(self.llmp_clients.len() as u32),
             &self
                 .llmp_out
                 .out_shmems
@@ -1987,12 +2100,38 @@ where
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
+        #[cfg(feature = "std")]
+        let current_time = current_time();
         let mut new_messages = false;
         for i in 0..self.llmp_clients.len() {
-            unsafe {
-                new_messages |= self.handle_new_msgs(i as u32, on_new_msg)?;
+            let client_id = self.llmp_clients[i].id;
+            match unsafe { self.handle_new_msgs(client_id, on_new_msg) } {
+                Ok(has_messages) => {
+                    // See if we need to remove this client, in case no new messages got brokered, and it's not a listener
+                    #[cfg(feature = "std")]
+                    if !has_messages && !self.listeners.iter().any(|&x| x == client_id) {
+                        let last_msg_time = self.llmp_clients[i].last_msg_time;
+                        if last_msg_time < current_time
+                            && current_time - last_msg_time > CLIENT_TIMEOUT
+                        {
+                            self.clients_to_remove.push(i as u32);
+                            #[cfg(feature = "llmp_debug")]
+                            println!("Client {i} timed out. Removing.");
+                        }
+                    }
+                    new_messages = has_messages;
+                }
+                Err(Error::ShuttingDown) => self.clients_to_remove.push(i as u32),
+                Err(err) => return Err(err),
             }
         }
+
+        // After brokering, remove all clients we don't want to keep.
+        for client_id in self.clients_to_remove.iter().rev() {
+            log::debug!("Client {client_id} disconnected.");
+            self.llmp_clients.remove((*client_id) as usize);
+        }
+        self.clients_to_remove.clear();
         Ok(new_messages)
     }
 
@@ -2012,8 +2151,16 @@ where
         false
     }
 
-    /// Loops infinitely, forwarding and handling all incoming messages from clients.
-    /// Never returns.
+    /// Returns if any clients are currently connected.
+    /// Ignores listener threads that belong to the broker,
+    /// talking to other brokers via TCP, and accepting new clients over this port.
+    #[inline]
+    fn has_clients(&self) -> bool {
+        self.llmp_clients.len() > self.listeners.len()
+    }
+
+    /// Loops until the last client quits,
+    /// forwarding and handling all incoming messages from clients.
     /// Will call `on_timeout` roughly after `timeout`
     /// Panics on error.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
@@ -2052,6 +2199,23 @@ where
                 end_time = current_milliseconds() + timeout;
             }
 
+            if let Some(exit_after_count) = self.exit_cleanly_after {
+                log::trace!(
+                    "Clients connected: {} && > {} - {} >= {}",
+                    self.has_clients(),
+                    self.num_clients_total,
+                    self.listeners.len(),
+                    exit_after_count
+                );
+                if !self.has_clients()
+                    && (self.num_clients_total - self.listeners.len()) >= exit_after_count.into()
+                {
+                    // No more clients connected, and the amount of clients we were waiting for was previously connected.
+                    // exit cleanly.
+                    break;
+                }
+            }
+
             #[cfg(feature = "std")]
             if let Some(time) = sleep_time {
                 thread::sleep(time);
@@ -2059,7 +2223,7 @@ where
 
             #[cfg(not(feature = "std"))]
             if let Some(time) = sleep_time {
-                panic!("Cannot sleep on no_std platform (requested {:?})", time);
+                panic!("Cannot sleep on no_std platform (requested {time:?})");
             }
         }
         self.llmp_out
@@ -2067,8 +2231,8 @@ where
             .expect("Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.");
     }
 
-    /// Loops infinitely, forwarding and handling all incoming messages from clients.
-    /// Never returns. Panics on error.
+    /// Loops unitl the last client quit,
+    /// forwarding and handling all incoming messages from clients.
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     /// On std, if you need to run code even if no update got sent, use `Self::loop_with_timeout` (needs the `std` feature).
     pub fn loop_forever<F>(&mut self, on_new_msg: &mut F, sleep_time: Option<Duration>)
@@ -2085,6 +2249,16 @@ where
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
 
+            if let Some(exit_after_count) = self.exit_cleanly_after {
+                if !self.has_clients()
+                    && (self.num_clients_total - self.listeners.len()) > exit_after_count.into()
+                {
+                    // No more clients connected, and the amount of clients we were waiting for was previously connected.
+                    // exit cleanly.
+                    break;
+                }
+            }
+
             #[cfg(feature = "std")]
             if let Some(time) = sleep_time {
                 thread::sleep(time);
@@ -2092,7 +2266,7 @@ where
 
             #[cfg(not(feature = "std"))]
             if let Some(time) = sleep_time {
-                panic!("Cannot sleep on no_std platform (requested {:?})", time);
+                panic!("Cannot sleep on no_std platform (requested {time:?})");
             }
         }
         self.llmp_out
@@ -2205,7 +2379,7 @@ where
                         Ok(Some((client_id, tag, flags, payload))) => {
                             if client_id == b2b_client_id {
                                 log::info!(
-                                    "Ignored message we probably sent earlier (same id), TAG: {tag:x}"
+                                    "Ignored message we probably sent earlier (same id), TAG: {tag:?}"
                                 );
                                 continue;
                             }
@@ -2297,7 +2471,7 @@ where
     fn handle_tcp_request(
         mut stream: TcpStream,
         request: &TcpRequest,
-        current_client_id: &mut u32,
+        current_client_id: &mut ClientId,
         sender: &mut LlmpSender<SP>,
         broker_shmem_description: &ShMemDescription,
     ) {
@@ -2316,7 +2490,7 @@ where
                 ) {
                     log::info!("An error occurred sending via tcp {e}");
                 };
-                *current_client_id += 1;
+                current_client_id.0 += 1;
             }
             TcpRequest::RemoteBrokerHello { hostname } => {
                 log::info!("B2B new client: {hostname}");
@@ -2325,7 +2499,7 @@ where
                 if send_tcp_msg(
                     &mut stream,
                     &TcpResponse::RemoteBrokerAccepted {
-                        broker_id: *current_client_id,
+                        broker_id: BrokerId(current_client_id.0),
                     },
                 )
                 .is_err()
@@ -2340,7 +2514,7 @@ where
                     if Self::announce_new_client(sender, &shmem_description).is_err() {
                         log::info!("B2B: Error announcing client {shmem_description:?}");
                     };
-                    *current_client_id += 1;
+                    current_client_id.0 += 1;
                 }
             }
         };
@@ -2365,7 +2539,7 @@ where
             hostname,
         };
 
-        let llmp_tcp_id = self.llmp_clients.len() as ClientId;
+        let llmp_tcp_id = ClientId(self.llmp_clients.len() as u32);
 
         // Tcp out map sends messages from background thread tcp server to foreground client
         let tcp_out_shmem = LlmpSharedMap::new(
@@ -2373,13 +2547,13 @@ where
             self.shmem_provider.new_shmem(LLMP_CFG_INITIAL_MAP_SIZE)?,
         );
         let tcp_out_shmem_description = tcp_out_shmem.shmem.description();
-        self.register_client(tcp_out_shmem);
+        let listener_id = self.register_client(tcp_out_shmem);
 
         let ret = thread::spawn(move || {
             // Create a new ShMemProvider for this background thread.
             let mut shmem_provider_bg = SP::new().unwrap();
 
-            let mut current_client_id = llmp_tcp_id + 1;
+            let mut current_client_id = ClientId(llmp_tcp_id.0 + 1);
 
             let mut tcp_incoming_sender = LlmpSender {
                 id: llmp_tcp_id,
@@ -2445,6 +2619,8 @@ where
             }
         });
 
+        self.listeners.push(listener_id);
+
         Ok(ret)
     }
 
@@ -2454,34 +2630,40 @@ where
     #[allow(clippy::cast_ptr_alignment)]
     unsafe fn handle_new_msgs<F>(
         &mut self,
-        client_id: u32,
+        client_id: ClientId,
         on_new_msg: &mut F,
     ) -> Result<bool, Error>
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-        let mut new_mesages = false;
+        let mut new_messages = false;
         let mut next_id = self.llmp_clients.len() as u32;
 
         // TODO: We could memcpy a range of pending messages, instead of one by one.
         loop {
             let msg = {
-                let client = &mut self.llmp_clients[client_id as usize];
+                let client = &mut self.llmp_clients[client_id.0 as usize];
                 match client.recv()? {
                     None => {
                         // We're done handling this client
-                        return Ok(new_mesages);
+                        #[cfg(feature = "std")]
+                        if new_messages {
+                            // set the recv time
+                            // We don't do that in recv() to keep calls to `current_time` to a minimum.
+                            self.llmp_clients[client_id.0 as usize].last_msg_time = current_time();
+                        }
+                        return Ok(new_messages);
                     }
                     Some(msg) => msg,
                 }
             };
             // We got a new message
-            new_mesages = true;
+            new_messages = true;
 
             match (*msg).tag {
                 // first, handle the special, llmp-internal messages
                 LLMP_SLOW_RECEIVER_PANIC => {
-                    return Err(Error::unknown(format!("The broker was too slow to handle messages of client {client_id} in time, so it quit. Either the client sent messages too fast, or we (the broker) got stuck!")));
+                    return Err(Error::unknown(format!("The broker was too slow to handle messages of client {client_id:?} in time, so it quit. Either the client sent messages too fast, or we (the broker) got stuck!")));
                 }
                 LLMP_TAG_NEW_SHM_CLIENT => {
                     /* This client informs us about yet another new client
@@ -2510,12 +2692,16 @@ where
                             next_id += 1;
                             new_page.mark_safe_to_unmap();
                             self.llmp_clients.push(LlmpReceiver {
-                                id,
+                                id: ClientId(id),
                                 current_recv_shmem: new_page,
                                 last_msg_recvd: ptr::null_mut(),
                                 shmem_provider: self.shmem_provider.clone(),
-                                highest_msg_id: 0,
+                                highest_msg_id: MessageId(0),
+                                // We don't know the last received time, just assume the current time.
+                                #[cfg(feature = "std")]
+                                last_msg_time: current_time(),
                             });
+                            self.num_clients_total += 1;
                         }
                         Err(e) => {
                             log::info!("Error adding client! Ignoring: {e:?}");
@@ -2531,7 +2717,7 @@ where
                     // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
                     let mut should_forward_msg = true;
 
-                    let map = &mut self.llmp_clients[client_id as usize].current_recv_shmem;
+                    let map = &mut self.llmp_clients[client_id.0 as usize].current_recv_shmem;
                     let msg_buf = (*msg).try_as_slice(map)?;
                     if let LlmpMsgHookResult::Handled =
                         (on_new_msg)(client_id, (*msg).tag, (*msg).flags, msg_buf)?
@@ -2689,11 +2875,14 @@ where
             },
 
             receiver: LlmpReceiver {
-                id: 0,
+                id: ClientId(0),
                 current_recv_shmem: initial_broker_shmem,
                 last_msg_recvd: ptr::null_mut(),
                 shmem_provider,
-                highest_msg_id: 0,
+                highest_msg_id: MessageId(0),
+                // We don't know the last received time, just assume the current time.
+                #[cfg(feature = "std")]
+                last_msg_time: current_time(),
             },
         })
     }
@@ -2827,7 +3016,7 @@ where
         );
 
         // We'll set `sender_id` later
-        let mut ret = Self::new(shmem_provider, map, 0)?;
+        let mut ret = Self::new(shmem_provider, map, ClientId(0))?;
 
         let client_hello_req = TcpRequest::LocalClientHello {
             shmem_description: ret.sender.out_shmems.first().unwrap().shmem.description(),
@@ -2891,7 +3080,7 @@ mod tests {
             .once(&mut |_sender_id, _tag, _flags, _msg| Ok(ForwardToClients))
             .unwrap();
 
-        let tag: Tag = 0x1337;
+        let tag: Tag = Tag(0x1337);
         let arr: [u8; 1] = [1_u8];
         // Send stuff
         client.send_buf(tag, &arr).unwrap();
