@@ -818,12 +818,14 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
-        if size <= 1 {
+        if size <= 1 || size == state.max_size() {
             return Ok(MutationResult::Skipped);
         }
 
         let target = state.rand_mut().below(size as u64) as usize;
-        let range = rand_range(state, size, size - target);
+        // make sure that the sampled range is both in bounds and of an acceptable size
+        let max_insert_len = min(size - target, state.max_size() - size);
+        let range = rand_range(state, size, max_insert_len);
 
         self.tmp_buf.clear();
         self.tmp_buf.extend(input.bytes()[range].iter().copied());
@@ -959,7 +961,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let range = rand_range(state, other_size, min(other_size, max_size - size + 1));
+        let range = rand_range(state, other_size, min(other_size, max_size - size));
         let target = state.rand_mut().below(size as u64) as usize;
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
