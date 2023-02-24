@@ -52,6 +52,8 @@ pub enum HarnessType {
     InProcess,
     /// Harness type when the target is a child process
     Child,
+    /// Harness type with an external component filling the backtrace hash (e.g. `CrashBacktraceCollector` in `libafl_qemu`)
+    External,
 }
 
 /// An observer looking at the backtrace after the harness crashes
@@ -87,6 +89,17 @@ impl<'a> BacktraceObserver<'a> {
     fn clear_hash(&mut self) {
         *self.hash.as_mut() = None;
     }
+    
+    /// Fill the hash value if the harness type is external
+    pub fn fill_external(&mut self, hash: u64, exit_kind: &ExitKind) {
+        if self.harness_type == HarnessType::External {
+            if *exit_kind == ExitKind::Crash {
+                self.update_hash(hash);
+            } else {
+                self.clear_hash();
+            }
+        }
+    }
 }
 
 impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
@@ -108,7 +121,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         if self.harness_type == HarnessType::InProcess {
-            if exit_kind == &ExitKind::Crash {
+            if *exit_kind == ExitKind::Crash {
                 self.update_hash(collect_backtrace());
             } else {
                 self.clear_hash();
@@ -124,7 +137,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         if self.harness_type == HarnessType::Child {
-            if exit_kind == &ExitKind::Crash {
+            if *exit_kind == ExitKind::Crash {
                 self.update_hash(collect_backtrace());
             } else {
                 self.clear_hash();

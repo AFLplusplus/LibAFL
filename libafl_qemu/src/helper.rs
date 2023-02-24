@@ -1,6 +1,9 @@
 use core::{fmt::Debug, ops::Range};
 
-use libafl::{bolts::tuples::MatchFirstType, executors::ExitKind, inputs::UsesInput};
+use libafl::{
+    bolts::tuples::MatchFirstType, executors::ExitKind, inputs::UsesInput,
+    observers::ObserversTuple,
+};
 
 use crate::{
     emu::{Emulator, GuestAddr},
@@ -29,7 +32,16 @@ where
 
     fn pre_exec(&mut self, _emulator: &Emulator, _input: &S::Input) {}
 
-    fn post_exec(&mut self, _emulator: &Emulator, _input: &S::Input, _exit_kind: &mut ExitKind) {}
+    fn post_exec<OT>(
+        &mut self,
+        _emulator: &Emulator,
+        _input: &S::Input,
+        _observers: &mut OT,
+        _exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+    {
+    }
 }
 
 pub trait QemuHelperTuple<S>: MatchFirstType + Debug
@@ -48,7 +60,14 @@ where
 
     fn pre_exec_all(&mut self, _emulator: &Emulator, input: &S::Input);
 
-    fn post_exec_all(&mut self, _emulator: &Emulator, input: &S::Input, _exit_kind: &mut ExitKind);
+    fn post_exec_all<OT>(
+        &mut self,
+        _emulator: &Emulator,
+        input: &S::Input,
+        _observers: &mut OT,
+        _exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>;
 }
 
 impl<S> QemuHelperTuple<S> for ()
@@ -71,12 +90,15 @@ where
 
     fn pre_exec_all(&mut self, _emulator: &Emulator, _input: &S::Input) {}
 
-    fn post_exec_all(
+    fn post_exec_all<OT>(
         &mut self,
         _emulator: &Emulator,
         _input: &S::Input,
+        _observers: &mut OT,
         _exit_kind: &mut ExitKind,
-    ) {
+    ) where
+        OT: ObserversTuple<S>,
+    {
     }
 }
 
@@ -109,9 +131,17 @@ where
         self.1.pre_exec_all(emulator, input);
     }
 
-    fn post_exec_all(&mut self, emulator: &Emulator, input: &S::Input, exit_kind: &mut ExitKind) {
-        self.0.post_exec(emulator, input, exit_kind);
-        self.1.post_exec_all(emulator, input, exit_kind);
+    fn post_exec_all<OT>(
+        &mut self,
+        emulator: &Emulator,
+        input: &S::Input,
+        observers: &mut OT,
+        exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+    {
+        self.0.post_exec(emulator, input, observers, exit_kind);
+        self.1.post_exec_all(emulator, input, observers, exit_kind);
     }
 }
 
