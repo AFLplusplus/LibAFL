@@ -599,9 +599,6 @@ impl I2SRandReplace {
     }
 }
 
-const CMP_TYPE_INS: usize = 1;
-const CMP_TYPE_RTN: usize = 2;
-
 const CMP_ATTTRIBUTE_IS_EQUAL: u8 = 1;
 const CMP_ATTRIBUTE_IS_GREATER: u8 = 2;
 const CMP_ATTRIBUTE_IS_LESSER: u8 = 4;
@@ -622,38 +619,12 @@ pub struct AFLRedQueen {
 }
 
 impl AFLRedQueen {
-    // I don't want additional overhead so just do it manually (instead of byteorder crate)
-    #[inline]
-    fn to_u64_le(buf: &[u8], idx: usize) -> u64 {
-        (buf[idx] as u64)
-            << 0 + (buf[idx + 1] as u64)
-            << 8 + (buf[idx + 2] as u64)
-            << 16 + (buf[idx + 3] as u64)
-            << 24 + (buf[idx + 4] as u64)
-            << 32 + (buf[idx + 5] as u64)
-            << 40 + (buf[idx + 6] as u64)
-            << 48 + (buf[idx + 7] as u64)
-    }
-
-    #[inline]
-    fn to_u32_le(buf: &[u8], idx: usize) -> u32 {
-        (buf[idx] as u32)
-            << 0 + (buf[idx + 1] as u32)
-            << 8 + (buf[idx + 2] as u32)
-            << 16 + (buf[idx + 3] as u32)
-            << 24
-    }
-
-    #[inline]
-    fn to_u16_le(buf: &[u8], idx: usize) -> u16 {
-        (buf[idx] as u16) << 0 + (buf[idx + 1] as u16) << 8
-    }
-
     #[inline]
     fn swapa(x: u8) -> u8 {
         (x & 0xf8) + ((x & 7) ^ 0x07)
     }
 
+    // Cmplog Pattern Matching
     pub fn cmp_extend_encoding(
         &self,
         pattern: u64,
@@ -693,18 +664,18 @@ impl AFLRedQueen {
                 }
                 1 => (buf[buf_idx] as u64, o_buf[buf_idx] as u64, 0xff),
                 2 | 3 => (
-                    Self::to_u16_le(buf, buf_idx) as u64,
-                    Self::to_u16_le(o_buf, buf_idx) as u64,
+                    u16::from_be_bytes(buf[buf_idx..buf_idx+2].try_into().unwrap()) as u64,
+                    u16::from_be_bytes(o_buf[buf_idx..buf_idx+2].try_into().unwrap()) as u64,
                     0xffff,
                 ),
                 4 | 5 | 6 | 7 => (
-                    Self::to_u32_le(buf, buf_idx) as u64,
-                    Self::to_u32_le(o_buf, buf_idx) as u64,
+                    u32::from_be_bytes(buf[buf_idx..buf_idx+4].try_into().unwrap()) as u64,
+                    u32::from_be_bytes(o_buf[buf_idx..buf_idx+4].try_into().unwrap()) as u64,
                     0xffffffff,
                 ),
                 _ => (
-                    Self::to_u64_le(buf, buf_idx),
-                    Self::to_u64_le(o_buf, buf_idx),
+                    u64::from_be_bytes(buf[buf_idx..buf_idx+8].try_into().unwrap()),
+                    u64::from_be_bytes(o_buf[buf_idx..buf_idx+8].try_into().unwrap()),
                     0xffffffff_ffffffff,
                 ),
             };
@@ -848,8 +819,8 @@ impl AFLRedQueen {
             }
             2 | 3 => {
                 if its_len >= 2 {
-                    let buf_16 = Self::to_u16_le(buf, buf_idx);
-                    let o_buf_16 = Self::to_u16_le(buf, buf_idx);
+                    let buf_16 = u16::from_be_bytes(buf[buf_idx..buf_idx+2].try_into().unwrap());
+                    let o_buf_16 = u16::from_be_bytes(o_buf[buf_idx..buf_idx+2].try_into().unwrap());
 
                     if buf_16 == pattern as u16 && o_buf_16 == o_pattern as u16 {
                         buf[buf_idx] = (repl & 0xff) as u8;
@@ -860,8 +831,8 @@ impl AFLRedQueen {
             }
             4 | 5 | 6 | 7 => {
                 if its_len >= 4 {
-                    let buf_32 = Self::to_u32_le(buf, buf_idx);
-                    let o_buf_32 = Self::to_u32_le(buf, buf_idx);
+                    let buf_32 = u32::from_be_bytes(buf[buf_idx..buf_idx+4].try_into().unwrap());
+                    let o_buf_32 = u32::from_be_bytes(o_buf[buf_idx..buf_idx+4].try_into().unwrap());
 
                     if buf_32 == pattern as u32 && o_buf_32 == o_pattern as u32 {
                         buf[buf_idx] = (repl & 0xff) as u8;
@@ -875,8 +846,8 @@ impl AFLRedQueen {
             }
             _ => {
                 if its_len >= 8 {
-                    let buf_64 = Self::to_u64_le(buf, buf_idx);
-                    let o_buf_64 = Self::to_u64_le(buf, buf_idx);
+                    let buf_64 = u64::from_be_bytes(buf[buf_idx..buf_idx+8].try_into().unwrap());
+                    let o_buf_64 = u64::from_be_bytes(o_buf[buf_idx..buf_idx+8].try_into().unwrap());
 
                     if buf_64 == pattern && o_buf_64 == o_pattern {
                         buf[buf_idx] = (repl & 0xff) as u8;
@@ -894,8 +865,134 @@ impl AFLRedQueen {
         }
 
         // Try arith
-        if self.enable_arith {
+        if self.enable_arith || attr != CMP_ATTRIBUTE_IS_TRANSFORM {
             if (attr & (CMP_ATTRIBUTE_IS_GREATER | CMP_ATTRIBUTE_IS_LESSER)) == 0 || hshape < 4 {
+                return false;
+            }
+
+            // Transform >= to < and <= to >
+            let attr = if (attr & CMP_ATTTRIBUTE_IS_EQUAL) != 0
+                && (attr & (CMP_ATTRIBUTE_IS_GREATER | CMP_ATTRIBUTE_IS_LESSER)) != 0
+            {
+                if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
+                    attr + 2
+                } else {
+                    attr - 2
+                }
+            } else {
+                attr
+            };
+
+            // FP
+            if attr >= CMP_ATTRIBUTE_IS_FP && attr < CMP_ATTRIBUTE_IS_FP_MOD {
+                let mut repl_new: u64 = 0;
+
+                if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
+                    if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
+                        if hshape == 4 && its_len >= 4 {
+                            let mut g = repl as f32;
+                            g = g + 1.0;
+                            repl_new = (g as u32) as u64;
+                        }
+                    } else if hshape == 8 && its_len >= 8 {
+                        let mut g = repl as f64;
+                        g = g + 1.0;
+                        repl_new = g as u64;
+                    } else {
+                        return false;
+                    }
+
+                    let ret = self.cmp_extend_encoding(
+                        pattern,
+                        repl,
+                        o_pattern,
+                        repl_new,
+                        CMP_ATTRIBUTE_IS_FP_MOD,
+                        o_buf,
+                        buf,
+                        buf_idx,
+                        taint_len,
+                        input_len,
+                        hshape,
+                    );
+                    if ret {
+                        return true;
+                    }
+                } else {
+                    if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
+                        if hshape == 4 && its_len >= 4 {
+                            let mut g = repl as f32;
+                            g = g - 1.0;
+                            repl_new = (g as u32) as u64;
+                        }
+                    } else if hshape == 8 && its_len >= 8 {
+                        let mut g = repl as f64;
+                        g = g - 1.0;
+                        repl_new = g as u64;
+                    } else {
+                        return false;
+                    }
+
+                    let ret = self.cmp_extend_encoding(
+                        pattern,
+                        repl,
+                        o_pattern,
+                        repl_new,
+                        CMP_ATTRIBUTE_IS_FP_MOD,
+                        o_buf,
+                        buf,
+                        buf_idx,
+                        taint_len,
+                        input_len,
+                        hshape,
+                    );
+                    if ret {
+                        return true;
+                    }
+                }
+            } else if attr < CMP_ATTRIBUTE_IS_FP {
+                if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
+                    let repl_new = repl + 1;
+
+                    let ret = self.cmp_extend_encoding(
+                        pattern,
+                        repl,
+                        o_pattern,
+                        repl_new,
+                        CMP_ATTRIBUTE_IS_INT_MOD,
+                        o_buf,
+                        buf,
+                        buf_idx,
+                        taint_len,
+                        input_len,
+                        hshape,
+                    );
+
+                    if ret {
+                        return true;
+                    }
+                } else {
+                    let repl_new = repl - 1;
+
+                    let ret = self.cmp_extend_encoding(
+                        pattern,
+                        repl,
+                        o_pattern,
+                        repl_new,
+                        CMP_ATTRIBUTE_IS_INT_MOD,
+                        o_buf,
+                        buf,
+                        buf_idx,
+                        taint_len,
+                        input_len,
+                        hshape,
+                    );
+
+                    if ret {
+                        return true;
+                    }
+                }
+            } else {
                 return false;
             }
         }
