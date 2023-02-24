@@ -255,6 +255,7 @@ impl SimpleStdErrLogger {
 
 #[cfg(feature = "std")]
 impl log::Log for SimpleStdErrLogger {
+    #[inline]
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= self.log_level
     }
