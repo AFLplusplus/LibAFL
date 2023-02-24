@@ -87,7 +87,7 @@ pub unsafe fn shutdown_handler<SP>(
         std::ptr::drop_in_place(sr);
     }
     log::info!("Bye!");
-    std::process::exit(0);
+    libc::_exit(0);
 }
 
 #[cfg(all(unix, feature = "std"))]

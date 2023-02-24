@@ -62,7 +62,7 @@ impl QemuDrCovHelper {
     }
 
     #[must_use]
-    pub fn must_instrument(&self, addr: u64) -> bool {
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
 }
@@ -178,7 +178,7 @@ where
         .helpers()
         .match_first_type::<QemuDrCovHelper>()
         .unwrap();
-    if !drcov_helper.must_instrument(pc.into()) {
+    if !drcov_helper.must_instrument(pc) {
         return None;
     }
 
