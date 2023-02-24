@@ -29,14 +29,8 @@ use crate::{
     bolts::os::unix_signals::setup_signal_handler,
     events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
 };
-#[cfg(feature = "std")]
 use crate::{
-    bolts::{shmem::ShMemProvider, staterestore::StateRestorer},
-    corpus::Corpus,
-    monitors::SimplePrintingMonitor,
-    state::{HasCorpus, HasSolutions},
-};
-use crate::{
+    bolts::ClientId,
     events::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
@@ -45,6 +39,13 @@ use crate::{
     monitors::Monitor,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
+};
+#[cfg(feature = "std")]
+use crate::{
+    bolts::{shmem::ShMemProvider, staterestore::StateRestorer},
+    corpus::Corpus,
+    monitors::SimplePrintingMonitor,
+    state::{HasCorpus, HasSolutions},
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it
@@ -188,7 +189,7 @@ where
     S: UsesInput,
 {
     fn mgr_id(&self) -> EventManagerId {
-        EventManagerId { id: 0 }
+        EventManagerId(0)
     }
 }
 
@@ -237,12 +238,12 @@ where
                 executions,
             } => {
                 monitor
-                    .client_stats_mut_for(0)
+                    .client_stats_mut_for(ClientId(0))
                     .update_corpus_size(*corpus_size as u64);
                 monitor
-                    .client_stats_mut_for(0)
+                    .client_stats_mut_for(ClientId(0))
                     .update_executions(*executions as u64, *time);
-                monitor.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateExecStats {
@@ -251,11 +252,11 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                let client = monitor.client_stats_mut_for(0);
+                let client = monitor.client_stats_mut_for(ClientId(0));
 
                 client.update_executions(*executions as u64, *time);
 
-                monitor.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats {
@@ -264,9 +265,9 @@ where
                 phantom: _,
             } => {
                 monitor
-                    .client_stats_mut_for(0)
+                    .client_stats_mut_for(ClientId(0))
                     .update_user_stats(name.clone(), value.clone());
-                monitor.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
@@ -277,17 +278,17 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                let client = monitor.client_stats_mut_for(0);
+                let client = monitor.client_stats_mut_for(ClientId(0));
                 client.update_executions(*executions as u64, *time);
                 client.update_introspection_monitor((**introspection_monitor).clone());
-                monitor.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
                 monitor
-                    .client_stats_mut_for(0)
+                    .client_stats_mut_for(ClientId(0))
                     .update_objective_size(*objective_size as u64);
-                monitor.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -389,6 +390,11 @@ where
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(state)
+    }
+
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        self.staterestorer.send_exiting();
+        Ok(())
     }
 }
 
@@ -579,7 +585,7 @@ where
                 staterestorer.reset();
 
                 // load the corpus size into monitor to still display the correct numbers after restart.
-                let client_stats = monitor.client_stats_mut_for(0);
+                let client_stats = monitor.client_stats_mut_for(ClientId(0));
                 client_stats.update_corpus_size(state.corpus().count().try_into()?);
                 client_stats.update_objective_size(state.solutions().count().try_into()?);
 

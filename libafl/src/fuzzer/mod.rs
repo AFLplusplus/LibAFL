@@ -386,7 +386,6 @@ where
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
                 testcase.set_parent_id_optional(state.fuzzed_corpus_id());
-                self.feedback_mut().append_metadata(state, &mut testcase)?;
                 self.feedback_mut()
                     .append_metadata(state, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;

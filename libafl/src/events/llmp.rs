@@ -7,7 +7,7 @@ use alloc::{
 };
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
-use core::{marker::PhantomData, time::Duration};
+use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 #[cfg(feature = "std")]
 use std::net::{SocketAddr, ToSocketAddrs};
 
@@ -40,6 +40,7 @@ use crate::{
     bolts::{
         llmp::{self, LlmpClient, LlmpClientDescription, Tag},
         shmem::ShMemProvider,
+        ClientId,
     },
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
@@ -54,14 +55,14 @@ use crate::{
 };
 
 /// Forward this to the client
-const _LLMP_TAG_EVENT_TO_CLIENT: Tag = 0x2C11E471;
+const _LLMP_TAG_EVENT_TO_CLIENT: Tag = Tag(0x2C11E471);
 /// Only handle this in the broker
-const _LLMP_TAG_EVENT_TO_BROKER: Tag = 0x2B80438;
+const _LLMP_TAG_EVENT_TO_BROKER: Tag = Tag(0x2B80438);
 /// Handle in both
 ///
-const LLMP_TAG_EVENT_TO_BOTH: Tag = 0x2B0741;
-const _LLMP_TAG_RESTART: Tag = 0x8357A87;
-const _LLMP_TAG_NO_RESTART: Tag = 0x57A7EE71;
+const LLMP_TAG_EVENT_TO_BOTH: Tag = Tag(0x2B0741);
+const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
+const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
 
 /// The minimum buffer size at which to compress LLMP IPC messages.
 #[cfg(feature = "llmp_compression")]
@@ -113,6 +114,11 @@ where
         })
     }
 
+    /// Exit the broker process cleanly after at least `n` clients attached and all of them disconnected again
+    pub fn set_exit_cleanly_after(&mut self, n_clients: NonZeroUsize) {
+        self.llmp.set_exit_cleanly_after(n_clients);
+    }
+
     /// Connect to an llmp broker on the givien address
     #[cfg(feature = "std")]
     pub fn connect_b2b<A>(&mut self, addr: A) -> Result<(), Error>
@@ -154,10 +160,13 @@ where
             Some(Duration::from_millis(5)),
         );
 
-        Ok(())
+        #[cfg(all(feature = "std", feature = "llmp_debug"))]
+        println!("The last client quit. Exiting.");
+
+        Err(Error::shutting_down())
     }
 
-    /// Run forever in the broker
+    /// Run in the broker until all clients exit
     #[cfg(feature = "llmp_broker_timeouts")]
     pub fn broker_loop(&mut self) -> Result<(), Error> {
         let monitor = &mut self.monitor;
@@ -189,7 +198,7 @@ where
                         Ok(llmp::LlmpMsgHookResult::ForwardToClients)
                     }
                 } else {
-                    monitor.display("Broker".into(), 0);
+                    monitor.display("Broker".into(), ClientId(0));
                     Ok(llmp::LlmpMsgHookResult::Handled)
                 }
             },
@@ -197,14 +206,17 @@ where
             Some(Duration::from_millis(5)),
         );
 
-        Ok(())
+        #[cfg(feature = "llmp_debug")]
+        println!("The last client quit. Exiting.");
+
+        Err(Error::shutting_down())
     }
 
     /// Handle arriving events in the broker
     #[allow(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         monitor: &mut MT,
-        client_id: u32,
+        client_id: ClientId,
         event: &Event<I>,
     ) -> Result<BrokerEventResult, Error> {
         match &event {
@@ -432,7 +444,7 @@ where
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut S,
-        _client_id: u32,
+        client_id: ClientId,
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
@@ -450,7 +462,7 @@ where
                 time: _,
                 executions: _,
             } => {
-                log::info!("Received new Testcase from {_client_id} ({client_config:?})");
+                log::info!("Received new Testcase from {client_id:?} ({client_config:?})");
 
                 let _res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
@@ -481,6 +493,15 @@ where
                 event.name()
             ))),
         }
+    }
+}
+
+impl<S: UsesInput, SP: ShMemProvider> LlmpEventManager<S, SP> {
+    /// Send information that this client is exiting.
+    /// The other side may free up all allocated memory.
+    /// We are no longer allowed to send anything afterwards.
+    pub fn send_exiting(&mut self) -> Result<(), Error> {
+        self.llmp.sender.send_exiting()
     }
 }
 
@@ -653,9 +674,7 @@ where
 {
     /// Gets the id assigned to this staterestorer.
     fn mgr_id(&self) -> EventManagerId {
-        EventManagerId {
-            id: self.llmp.sender.id as usize,
-        }
+        EventManagerId(self.llmp.sender.id.0 as usize)
     }
 }
 
@@ -746,6 +765,13 @@ where
         self.staterestorer.reset();
         self.staterestorer
             .save(&(state, &self.llmp_mgr.describe()?))
+    }
+
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        self.staterestorer.send_exiting();
+        // Also inform the broker that we are about to exit.
+        // This way, the broker can clean up the pages, and eventually exit.
+        self.llmp_mgr.send_exiting()
     }
 }
 
@@ -885,6 +911,14 @@ where
     /// The type of manager to build
     #[builder(default = ManagerKind::Any)]
     kind: ManagerKind,
+    /// The amount of external clients that should have connected (not counting our own tcp client)
+    /// before this broker quits _after the last client exited_.
+    /// If `None`, the broker will never quit when the last client exits, but run forever.
+    ///
+    /// So, if this value is `Some(2)`, the broker will not exit after client 1 connected and disconnected,
+    /// but it will quit after client 2 connected and disconnected.
+    #[builder(default = None)]
+    exit_cleanly_after: Option<NonZeroUsize>,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<S>,
 }
@@ -909,6 +943,10 @@ where
                     log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
                     broker.connect_b2b(remote_broker_addr)?;
                 };
+
+                if let Some(exit_cleanly_after) = self.exit_cleanly_after {
+                    broker.set_exit_cleanly_after(exit_cleanly_after);
+                }
 
                 broker.broker_loop()
             };
@@ -948,8 +986,7 @@ where
                     )?;
 
                     broker_things(event_broker, self.remote_broker_addr)?;
-
-                    return Err(Error::shutting_down());
+                    unreachable!("The broker may never return normally, only on Errors or when shutting down.");
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
@@ -1042,6 +1079,10 @@ where
 
                     // Storing state in the last round did not work
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
+                }
+
+                if staterestorer.wants_to_exit() {
+                    return Err(Error::shutting_down());
                 }
 
                 ctr = ctr.wrapping_add(1);
@@ -1233,7 +1274,7 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        _client_id: u32,
+        _client_id: ClientId,
         event: Event<DI>,
     ) -> Result<(), Error>
     where
@@ -1252,7 +1293,7 @@ where
                 time: _,
                 executions: _,
             } => {
-                log::info!("Received new Testcase to convert from {_client_id}");
+                log::info!("Received new Testcase to convert from {_client_id:?}");
 
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
@@ -1457,6 +1498,7 @@ mod tests {
             shmem::{ShMemProvider, StdShMemProvider},
             staterestore::StateRestorer,
             tuples::tuple_list,
+            ClientId,
         },
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
@@ -1492,8 +1534,8 @@ mod tests {
 
         let mut llmp_client = LlmpClient::new(
             shmem_provider.clone(),
-            LlmpSharedMap::new(0, shmem_provider.new_shmem(1024).unwrap()),
-            0,
+            LlmpSharedMap::new(ClientId(0), shmem_provider.new_shmem(1024).unwrap()),
+            ClientId(0),
         )
         .unwrap();
 
