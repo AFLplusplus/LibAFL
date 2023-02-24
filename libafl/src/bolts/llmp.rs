@@ -1841,8 +1841,8 @@ where
     /// This allows us to intercept messages right in the broker.
     /// This keeps the out map clean.
     pub llmp_clients: Vec<LlmpReceiver<SP>>,
-    /// The own listeners we spawned via [`Self::launch_listener`] or [`Self::crate_attach_to_tcp`]
-    /// This count doesn't count for [`exit_cleanly_after`] and they should never time out.
+    /// The own listeners we spawned via `launch_listener` or `crate_attach_to_tcp`.
+    /// Listeners will be ignored for [`exit_cleanly_after`] and they are never considered to have timed out.
     listeners: Vec<ClientId>,
     /// The total amount of clients we had, historically, including those that disconnected, and our listeners.
     num_clients_total: usize,
