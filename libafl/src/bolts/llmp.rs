@@ -455,13 +455,13 @@ fn next_shmem_size(max_alloc: usize) -> usize {
 
 /// Initialize a new `llmp_page`. The size should be relative to
 /// `llmp_page->messages`
-unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow_reinit: bool) {
+unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow_reinit: bool) {
     #[cfg(feature = "llmp_debug")]
-    log::trace!("_llmp_page_init: shmem {:?}", &shmem);
+    log::trace!("llmp_page_init: shmem {:?}", &shmem);
     let map_size = shmem.len();
     let page = shmem2page_mut(shmem);
     #[cfg(feature = "llmp_debug")]
-    log::trace!("_llmp_page_init: page {:?}", &(*page));
+    log::trace!("llmp_page_init: page {:?}", &(*page));
 
     if !allow_reinit {
         assert!(
@@ -758,6 +758,12 @@ where
     pub last_msg_sent: *const LlmpMsg,
     /// A vec of page wrappers, each containing an initialized [`ShMem`]
     pub out_shmems: Vec<LlmpSharedMap<SP::ShMem>>,
+    /// A vec of pages that we previously used, but that have served its purpose
+    /// (no potential readers are left).
+    /// Instead of freeing them, we keep them around to potentially reuse them later,
+    /// if they are still large enough.
+    /// This way, the OS doesn't have to spend time zeroing pages, and getting rid of our old pages
+    unused_shmem_cache: Vec<LlmpSharedMap<SP::ShMem>>,
     /// If true, pages will never be pruned.
     /// The broker uses this feature.
     /// By keeping the message history around,
@@ -793,6 +799,7 @@ where
             keep_pages_forever,
             has_unsent_message: false,
             shmem_provider,
+            unused_shmem_cache: vec![],
         })
     }
 
@@ -803,7 +810,7 @@ where
     /// Only safe if you really really restart the page on everything connected
     /// No receiver should read from this page at a different location.
     pub unsafe fn reset(&mut self) {
-        _llmp_page_init(
+        llmp_page_init(
             &mut self.out_shmems.last_mut().unwrap().shmem,
             self.id,
             true,
@@ -917,11 +924,12 @@ where
             keep_pages_forever: false,
             has_unsent_message: false,
             shmem_provider,
+            unused_shmem_cache: vec![],
         })
     }
 
     /// For non zero-copy, we want to get rid of old pages with duplicate messages in the client
-    /// eventually. This function This funtion sees if we can unallocate older pages.
+    /// eventually. This function This function sees if we can deallocate older pages.
     /// The broker would have informed us by setting the safe_to_unmap-flag.
     unsafe fn prune_old_pages(&mut self) {
         // Exclude the current page by splitting of the last element for this iter
@@ -940,9 +948,15 @@ where
             panic!("The receiver/broker could not process our sent llmp messages in time. Either we're sending too many messages too fast, the broker got stuck, or it crashed. Giving up.");
         }
 
-        // Remove all maps that the broker already mapped
-        // simply removing them from the vec should then call drop and unmap them.
-        self.out_shmems.drain(0..unmap_until_excl);
+        // Remove all maps that the broker already mapped, move them to our unused pages cache
+        self.out_shmems.reserve(unmap_until_excl);
+        for _ in 0..unmap_until_excl {
+            let shmem = self.out_shmems.remove(0);
+            #[cfg(feature = "llmp_debug")]
+            log::debug!("Moving unused map to cache: {shmem:?}");
+            self.unused_shmem_cache
+                .insert(self.unused_shmem_cache.len(), shmem);
+        }
     }
 
     /// Intern: Special allocation function for `EOP` messages (and nothing else!)
@@ -1099,6 +1113,42 @@ where
         Ok(())
     }
 
+    /// Grab an unused `LlmpSharedMap` from `unused_shmem_cache` or allocate a new map,
+    /// if no suitable maps could be found.
+    unsafe fn new_or_unused_shmem(
+        &mut self,
+        sender_id: ClientId,
+        next_min_shmem_size: usize,
+    ) -> Result<LlmpSharedMap<<SP>::ShMem>, Error> {
+        if self.unused_shmem_cache.is_empty() {
+            // No cached maps that fit our need, let's allocate a new one.
+            Ok(LlmpSharedMap::new(
+                sender_id,
+                self.shmem_provider.new_shmem(next_min_shmem_size)?,
+            ))
+        } else {
+            // We got cached shmems laying around, hand it out, if they are large enough.
+            let mut cached_shmem = self
+                .unused_shmem_cache
+                .remove(self.unused_shmem_cache.len() - 1);
+
+            if cached_shmem.shmem.len() < next_min_shmem_size {
+                // This map is too small, we will never need it again (llmp allocation sizes always increase). Drop it, then call this function again..
+                #[cfg(feature = "llmp_debug")]
+                log::info!("Dropping too small shmem {cached_shmem:?}");
+                drop(cached_shmem);
+                self.new_or_unused_shmem(sender_id, next_min_shmem_size)
+            } else {
+                #[cfg(feature = "llmp_debug")]
+                log::info!("Returning cached shmem {cached_shmem:?}");
+                unsafe {
+                    llmp_page_init(&mut cached_shmem.shmem, sender_id, true);
+                }
+                Ok(cached_shmem)
+            }
+        }
+    }
+
     /// listener about it using a EOP message.
     unsafe fn handle_out_eop(&mut self) -> Result<(), Error> {
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
@@ -1116,33 +1166,37 @@ where
             );
         }
 
+        // If we want to get red if old pages, (client to broker), do that now
+        if !self.keep_pages_forever {
+            #[cfg(feature = "llmp_debug")]
+            log::info!("pruning");
+            self.prune_old_pages();
+        }
+
         let old_map = self.out_shmems.last_mut().unwrap().page_mut();
 
-        #[cfg(feature = "llmp_debug")]
-        log::info!(
-            "Next ShMem Size {}",
-            next_shmem_size((*old_map).max_alloc_size)
-        );
+        let next_min_shmem_size = next_shmem_size((*old_map).max_alloc_size);
 
-        // Create a new shard page.
-        let mut new_map_shmem = LlmpSharedMap::new(
-            (*old_map).sender_id,
-            self.shmem_provider
-                .new_shmem(next_shmem_size((*old_map).max_alloc_size))?,
-        );
+        #[cfg(feature = "llmp_debug")]
+        log::info!("Next min ShMem Size {next_min_shmem_size}",);
+
+        // Get a new shared page, or reuse an old one, if available.
+        let mut new_map_shmem =
+            self.new_or_unused_shmem((*old_map).sender_id, next_min_shmem_size)?;
+
         let mut new_map = new_map_shmem.page_mut();
 
         #[cfg(feature = "llmp_debug")]
         log::info!("got new map at: {new_map:?}");
 
-        (*new_map).current_msg_id.store(
-            (*old_map).current_msg_id.load(Ordering::Relaxed),
-            Ordering::Relaxed,
-        );
+        // New maps always start with 0 as message id -> No messages yet.
+        (*new_map).current_msg_id.store(0, Ordering::Relaxed);
 
         #[cfg(feature = "llmp_debug")]
         log::info!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
 
+        // Allocations may never shrink:
+        // keep track of the max message size we allocated across maps.
         (*new_map).max_alloc_size = (*old_map).max_alloc_size;
 
         /* On the old map, place a last message linking to the new map for the clients
@@ -1154,20 +1208,13 @@ where
         (*end_of_page_msg).map_size = new_map_shmem.shmem.len();
         (*end_of_page_msg).shm_str = *new_map_shmem.shmem.id().as_array();
 
-        /* Send the last msg on the old buf */
+        /* Send the last msg (the EOP message) on the old buf */
         self.send(out, true)?;
 
         // Set the new page as current page.
         self.out_shmems.push(new_map_shmem);
         // We never sent a msg on the new buf */
         self.last_msg_sent = ptr::null_mut();
-
-        // If we want to get red if old pages, (client to broker), do that now
-        if !self.keep_pages_forever {
-            #[cfg(feature = "llmp_debug")]
-            log::info!("pruning");
-            self.prune_old_pages();
-        }
 
         Ok(())
     }
@@ -1469,7 +1516,7 @@ where
                     self.last_msg_recvd = ptr::null();
                     self.highest_msg_id = 0;
 
-                    // Mark the old page save to unmap, in case we didn't so earlier.
+                    // Mark the old page save to unmap, in case we didn't do so earlier.
                     (*page).safe_to_unmap.store(1, Ordering::Relaxed);
 
                     // Map the new page. The old one should be unmapped by Drop
@@ -1623,7 +1670,7 @@ where
         );
 
         unsafe {
-            _llmp_page_init(&mut new_shmem, sender, false);
+            llmp_page_init(&mut new_shmem, sender, false);
         }
         Self { shmem: new_shmem }
     }
@@ -1803,6 +1850,7 @@ where
                 keep_pages_forever: true,
                 has_unsent_message: false,
                 shmem_provider: shmem_provider.clone(),
+                unused_shmem_cache: vec![],
             },
             llmp_clients: vec![],
             shmem_provider,
@@ -2345,6 +2393,7 @@ where
                 keep_pages_forever: false,
                 has_unsent_message: false,
                 shmem_provider: shmem_provider_bg.clone(),
+                unused_shmem_cache: vec![],
             };
 
             loop {
@@ -2636,6 +2685,7 @@ where
                 keep_pages_forever: false,
                 has_unsent_message: false,
                 shmem_provider: shmem_provider.clone(),
+                unused_shmem_cache: vec![],
             },
 
             receiver: LlmpReceiver {
