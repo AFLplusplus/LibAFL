@@ -585,7 +585,7 @@ mod apple {
     #[allow(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
-            .map(|n| CoreId(n))
+            .map(CoreId)
             .collect::<Vec<_>>())
     }
 

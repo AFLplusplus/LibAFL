@@ -12,9 +12,12 @@
 
 #[cfg(all(feature = "std"))]
 use alloc::string::ToString;
-use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
+use core::{
+    fmt::{self, Debug, Formatter},
+    num::NonZeroUsize,
+};
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -28,8 +31,6 @@ use serde::de::DeserializeOwned;
 use typed_builder::TypedBuilder;
 
 use super::core_affinity::CoreId;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -123,8 +124,6 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
-        use core::num::NonZeroUsize;
-
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
                 "No cores to spawn on given, cannot launch anything.",
@@ -253,13 +252,13 @@ where
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
-                        cpu_core: Some(CoreId { id: core_id }),
+                        cpu_core: Some(CoreId(core_id)),
                     })
                     .configuration(self.configuration)
                     .build()
                     .launch()?;
 
-                return (self.run_client.take().unwrap())(state, mgr, core_id);
+                return (self.run_client.take().unwrap())(state, mgr, CoreId(core_id));
             }
             Err(std::env::VarError::NotPresent) => {
                 // I am a broker

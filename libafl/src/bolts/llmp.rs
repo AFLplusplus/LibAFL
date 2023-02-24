@@ -1232,7 +1232,7 @@ where
         // If we want to get red if old pages, (client to broker), do that now
         if !self.keep_pages_forever {
             #[cfg(feature = "llmp_debug")]
-            log::info!("pruning");
+            log::debug!("LLMP DEBUG: pruning old pages");
             self.prune_old_pages();
         }
 
@@ -1251,7 +1251,7 @@ where
         }
 
         #[cfg(feature = "llmp_debug")]
-        log::info!("Handled out eop");
+        log::debug!("Handled out eop");
 
         match unsafe { self.alloc_next_if_space(buf_len) } {
             Some(msg) => Ok(msg),
@@ -1531,7 +1531,7 @@ where
                     return Err(Error::shutting_down());
                 }
                 LLMP_TAG_END_OF_PAGE => {
-                    log::info!("Received end of page, allocating next");
+                    log::debug!("Received end of page, allocating next");
                     // Handle end of page
                     assert!(
                         (*msg).buf_len >= size_of::<LlmpPayloadSharedMapInfo>() as u64,
@@ -2080,7 +2080,7 @@ where
 
         // After brokering, remove all clients we don't want to keep.
         for client_id in self.clients_to_remove.iter().rev() {
-            println!("Client {client_id} disconnected.");
+            log::debug!("Client {client_id} disconnected.");
             self.llmp_clients.remove((*client_id) as usize);
         }
         self.clients_to_remove.clear();
