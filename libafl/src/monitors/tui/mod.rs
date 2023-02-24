@@ -25,7 +25,7 @@ use tui::{backend::CrosstermBackend, Terminal};
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
 use crate::{
-    bolts::{current_time, format_duration_hms},
+    bolts::{current_time, format_duration_hms, ClientId},
     monitors::{ClientStats, Monitor, UserStats},
 };
 
@@ -258,7 +258,7 @@ impl Monitor for TuiMonitor {
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn display(&mut self, event_msg: String, sender_id: u32) {
+    fn display(&mut self, event_msg: String, sender_id: ClientId) {
         let cur_time = current_time();
 
         {
@@ -279,7 +279,7 @@ impl Monitor for TuiMonitor {
         let client = self.client_stats_mut_for(sender_id);
         let exec_sec = client.execs_per_sec_pretty(cur_time);
 
-        let sender = format!("#{sender_id}");
+        let sender = format!("#{}", sender_id.0);
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
         } else {
@@ -295,10 +295,10 @@ impl Monitor for TuiMonitor {
         }
 
         {
-            let client = &self.client_stats()[sender_id as usize];
+            let client = &self.client_stats()[sender_id.0 as usize];
             let mut ctx = self.context.write().unwrap();
             ctx.clients
-                .entry(sender_id as usize)
+                .entry(sender_id.0 as usize)
                 .or_default()
                 .grab_data(client, exec_sec);
             while ctx.client_logs.len() >= DEFAULT_LOGS_NUMBER {
