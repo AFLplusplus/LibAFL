@@ -2200,13 +2200,13 @@ where
             }
 
             if let Some(exit_after_count) = self.exit_cleanly_after {
-                /*println!(
-                    "{} && > {} - {} >= {}",
+                log::trace!(
+                    "Clients connected: {} && > {} - {} >= {}",
                     self.has_clients(),
                     self.num_clients_total,
                     self.listeners.len(),
                     exit_after_count
-                );*/
+                );
                 if !self.has_clients()
                     && (self.num_clients_total - self.listeners.len()) >= exit_after_count.into()
                 {
