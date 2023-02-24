@@ -34,6 +34,7 @@ use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[cfg(feature = "std")]
 use log::{Level, Metadata, Record};
 
 /// Can be converted to a slice
@@ -214,6 +215,7 @@ pub struct SimpleStdErrLogger {
     pub log_level: Level,
 }
 
+#[cfg(feature = "std")]
 impl SimpleStdErrLogger {
     /// Create a new [`log::Log`] logger that will log [`Level::Trace`] and above
     pub const fn trace() -> Self {
@@ -251,6 +253,7 @@ impl SimpleStdErrLogger {
     }
 }
 
+#[cfg(feature = "std")]
 impl log::Log for SimpleStdErrLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= self.log_level
