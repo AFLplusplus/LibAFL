@@ -470,7 +470,7 @@ pub mod pybind {
 
         #[getter]
         fn parent_id(&self) -> Option<usize> {
-            *self.inner.as_ref().parent_id().map(|x| x.into())
+            self.inner.as_ref().parent_id().map(|x| x.0)
         }
 
         #[getter]

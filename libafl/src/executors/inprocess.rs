@@ -50,8 +50,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    prelude::HasFuzzedCorpusId,
-    state::{HasClientPerfMonitor, HasSolutions, UsesState},
+    state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions, UsesState},
     Error,
 };
 
