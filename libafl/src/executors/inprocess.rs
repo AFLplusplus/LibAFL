@@ -873,7 +873,7 @@ pub mod windows_asan_handler {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let mut data = &mut GLOBAL_STATE;
@@ -1011,7 +1011,7 @@ mod windows_exception_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
@@ -1070,7 +1070,7 @@ mod windows_exception_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let data: &mut InProcessExecutorHandlerData =
@@ -1131,7 +1131,7 @@ mod windows_exception_handler {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         // Have we set a timer_before?
