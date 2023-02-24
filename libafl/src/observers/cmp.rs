@@ -20,7 +20,7 @@ use crate::{
 };
 
 /// Compare values collected during a run
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum CmpValues {
     /// Two u8 values
     U8((u8, u8)),
@@ -782,10 +782,10 @@ impl CmpMap for AFLCmpMap {
             unsafe {
                 Some(CmpValues::Bytes((
                     self.vals.fn_operands[idx][execution].v0
-                        [..=(self.headers[idx].shape() as usize)]
+                        [..(self.vals.fn_operands[idx][execution].v0_len as usize)]
                         .to_vec(),
                     self.vals.fn_operands[idx][execution].v1
-                        [..=(self.headers[idx].shape() as usize)]
+                        [..(self.vals.fn_operands[idx][execution].v1_len as usize)]
                         .to_vec(),
                 )))
             }

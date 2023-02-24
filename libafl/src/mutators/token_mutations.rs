@@ -664,18 +664,18 @@ impl AFLRedQueen {
                 }
                 1 => (buf[buf_idx] as u64, o_buf[buf_idx] as u64, 0xff),
                 2 | 3 => (
-                    u16::from_be_bytes(buf[buf_idx..buf_idx+2].try_into().unwrap()) as u64,
-                    u16::from_be_bytes(o_buf[buf_idx..buf_idx+2].try_into().unwrap()) as u64,
+                    u16::from_be_bytes(buf[buf_idx..buf_idx + 2].try_into().unwrap()) as u64,
+                    u16::from_be_bytes(o_buf[buf_idx..buf_idx + 2].try_into().unwrap()) as u64,
                     0xffff,
                 ),
                 4 | 5 | 6 | 7 => (
-                    u32::from_be_bytes(buf[buf_idx..buf_idx+4].try_into().unwrap()) as u64,
-                    u32::from_be_bytes(o_buf[buf_idx..buf_idx+4].try_into().unwrap()) as u64,
+                    u32::from_be_bytes(buf[buf_idx..buf_idx + 4].try_into().unwrap()) as u64,
+                    u32::from_be_bytes(o_buf[buf_idx..buf_idx + 4].try_into().unwrap()) as u64,
                     0xffffffff,
                 ),
                 _ => (
-                    u64::from_be_bytes(buf[buf_idx..buf_idx+8].try_into().unwrap()),
-                    u64::from_be_bytes(o_buf[buf_idx..buf_idx+8].try_into().unwrap()),
+                    u64::from_be_bytes(buf[buf_idx..buf_idx + 8].try_into().unwrap()),
+                    u64::from_be_bytes(o_buf[buf_idx..buf_idx + 8].try_into().unwrap()),
                     0xffffffff_ffffffff,
                 ),
             };
@@ -819,8 +819,9 @@ impl AFLRedQueen {
             }
             2 | 3 => {
                 if its_len >= 2 {
-                    let buf_16 = u16::from_be_bytes(buf[buf_idx..buf_idx+2].try_into().unwrap());
-                    let o_buf_16 = u16::from_be_bytes(o_buf[buf_idx..buf_idx+2].try_into().unwrap());
+                    let buf_16 = u16::from_be_bytes(buf[buf_idx..buf_idx + 2].try_into().unwrap());
+                    let o_buf_16 =
+                        u16::from_be_bytes(o_buf[buf_idx..buf_idx + 2].try_into().unwrap());
 
                     if buf_16 == pattern as u16 && o_buf_16 == o_pattern as u16 {
                         buf[buf_idx] = (repl & 0xff) as u8;
@@ -831,8 +832,9 @@ impl AFLRedQueen {
             }
             4 | 5 | 6 | 7 => {
                 if its_len >= 4 {
-                    let buf_32 = u32::from_be_bytes(buf[buf_idx..buf_idx+4].try_into().unwrap());
-                    let o_buf_32 = u32::from_be_bytes(o_buf[buf_idx..buf_idx+4].try_into().unwrap());
+                    let buf_32 = u32::from_be_bytes(buf[buf_idx..buf_idx + 4].try_into().unwrap());
+                    let o_buf_32 =
+                        u32::from_be_bytes(o_buf[buf_idx..buf_idx + 4].try_into().unwrap());
 
                     if buf_32 == pattern as u32 && o_buf_32 == o_pattern as u32 {
                         buf[buf_idx] = (repl & 0xff) as u8;
@@ -846,8 +848,9 @@ impl AFLRedQueen {
             }
             _ => {
                 if its_len >= 8 {
-                    let buf_64 = u64::from_be_bytes(buf[buf_idx..buf_idx+8].try_into().unwrap());
-                    let o_buf_64 = u64::from_be_bytes(o_buf[buf_idx..buf_idx+8].try_into().unwrap());
+                    let buf_64 = u64::from_be_bytes(buf[buf_idx..buf_idx + 8].try_into().unwrap());
+                    let o_buf_64 =
+                        u64::from_be_bytes(o_buf[buf_idx..buf_idx + 8].try_into().unwrap());
 
                     if buf_64 == pattern && o_buf_64 == o_pattern {
                         buf[buf_idx] = (repl & 0xff) as u8;
@@ -1000,7 +1003,29 @@ impl AFLRedQueen {
         return false;
     }
 
-    pub fn rtn_extend_encoding(&self) {}
+    pub fn rtn_extend_encoding(
+        &self,
+        pattern: &Vec<u8>,
+        repl: &Vec<u8>,
+        o_pattern: &Vec<u8>,
+        changed_val: &Vec<u8>,
+        o_buf: &[u8],
+        buf: &mut [u8],
+        buf_idx: usize,
+        taint_len: usize,
+        input_len: usize,
+    ) -> bool {
+        let (l0, ol0, l1, ol1) = (
+            pattern.len(),
+            repl.len(),
+            o_pattern.len(),
+            changed_val.len(),
+        );
+
+        if l0 >= 0x80 || 
+
+        true
+    }
 }
 
 impl<I, S> Mutator<I, S> for AFLRedQueen
@@ -1072,6 +1097,17 @@ where
             let logged = std::cmp::min(orig_val.len(), new_val.len());
 
             for cmp_h_idx in cmp_h_start_idx..logged {
+                let mut skip_opt = false;
+                for prev_idx in 0..cmp_h_idx {
+                    if new_val[prev_idx] == new_val[cmp_h_idx] {
+                        skip_opt = true;
+                    }
+                }
+                // Opt not in the paper
+                if skip_opt {
+                    continue;
+                }
+
                 for cmp_buf_idx in cmp_buf_start_idx..input_len {
                     let taint_len = match taint.get(taint_idx) {
                         Some(t) => {
