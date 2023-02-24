@@ -89,7 +89,7 @@ impl<'a> BacktraceObserver<'a> {
     fn clear_hash(&mut self) {
         *self.hash.as_mut() = None;
     }
-    
+
     /// Fill the hash value if the harness type is external
     pub fn fill_external(&mut self, hash: u64, exit_kind: &ExitKind) {
         if self.harness_type == HarnessType::External {
