@@ -218,6 +218,7 @@ pub struct SimpleStdErrLogger {
 #[cfg(feature = "std")]
 impl SimpleStdErrLogger {
     /// Create a new [`log::Log`] logger that will log [`Level::Trace`] and above
+    #[must_use]
     pub const fn trace() -> Self {
         Self {
             log_level: Level::Trace,
@@ -225,6 +226,7 @@ impl SimpleStdErrLogger {
     }
 
     /// Create a new [`log::Log`] logger that will log [`Level::Debug`] and above
+    #[must_use]
     pub const fn debug() -> Self {
         Self {
             log_level: Level::Debug,
@@ -232,6 +234,7 @@ impl SimpleStdErrLogger {
     }
 
     /// Create a new [`log::Log`] logger that will log [`Level::Info`] and above
+    #[must_use]
     pub const fn info() -> Self {
         Self {
             log_level: Level::Info,
@@ -239,6 +242,7 @@ impl SimpleStdErrLogger {
     }
 
     /// Create a new [`log::Log`] logger that will log [`Level::Warn`] and above
+    #[must_use]
     pub const fn warn() -> Self {
         Self {
             log_level: Level::Warn,
@@ -246,6 +250,7 @@ impl SimpleStdErrLogger {
     }
 
     /// Create a new [`log::Log`] logger that will log [`Level::Error`]
+    #[must_use]
     pub const fn error() -> Self {
         Self {
             log_level: Level::Error,
