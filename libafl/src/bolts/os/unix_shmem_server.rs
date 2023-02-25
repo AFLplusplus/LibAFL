@@ -130,15 +130,16 @@ where
         let mut message = header.to_vec();
         message.extend(body);
 
-        self.stream
-            .write_all(&message)
-            .expect("Failed to send message");
+        self.stream.write_all(&message)?;
+        //.expect("Failed to send message");
 
         let mut shm_slice = [0_u8; 20];
         let mut fd_buf = [-1; 1];
-        self.stream
-            .recv_fds(&mut shm_slice, &mut fd_buf)
-            .expect("Did not receive a response");
+        let (slice_size, fd_count) = self.stream.recv_fds(&mut shm_slice, &mut fd_buf)?;
+        //.expect("Did not receive a response");
+        if slice_size == 0 && fd_count == 0 {
+            return Err(Error::illegal_state(format!("Tried to receive 20 bytes and one fd via unix shmem socket, but got {slice_size} bytes and {fd_count} fds.")));
+        }
 
         let server_id = ShMemId::from_array(&shm_slice);
         let server_fd: i32 = server_id.into();
@@ -179,7 +180,11 @@ where
         let service = ShMemService::<SP>::start();
 
         let mut res = Self {
-            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?,
+            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?).map_err(|err| Error::illegal_state(if cfg!(target_vendor = "apple") {
+                format!("The ServedShMemProvider was not started or is no longer running. You may need to remove the './libafl_unix_shmem_server' file and retry. Error details: {err:?}")
+            } else {
+                format!("The ServedShMemProvider was not started or is no longer running. Error details: {err:?}")
+            }))?,
             inner: SP::new()?,
             id: -1,
             service,
@@ -536,7 +541,18 @@ where
             }
             ServedShMemRequest::ExistingMap(description) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
-                let description_id: i32 = description.id.into();
+
+                if description.id.is_empty() {
+                    return Err(Error::illegal_state("Received empty ShMemId from unix shmem client. Are the shmem limits set correctly? Did a client crash?"));
+                }
+
+                let description_id: i32 = description.id.try_into().unwrap();
+
+                if !self.all_shmems.contains_key(&description_id) {
+                    // We should never get here, but it may happen if the OS ran out of shmem pages at some point//reached limits.
+                    return Err(Error::illegal_state(format!("Client wanted to read from existing map with id {description_id}/{description:?}, but it was not allocated by this shmem server. Are the shmem limits set correctly? Did a client crash?")));
+                }
+
                 if client.maps.contains_key(&description_id) {
                     // Using let else here as self needs to be accessed in the else branch.
                     #[allow(clippy::option_if_let_else)]

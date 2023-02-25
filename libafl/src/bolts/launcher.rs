@@ -12,9 +12,12 @@
 
 #[cfg(all(feature = "std"))]
 use alloc::string::ToString;
-use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
+use core::{
+    fmt::{self, Debug, Formatter},
+    num::NonZeroUsize,
+};
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -27,12 +30,14 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::bolts::core_affinity::CoreId;
+use super::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::bolts::os::{dup2, fork, ForkResult};
+use crate::bolts::{
+    core_affinity::get_core_ids,
+    os::{dup2, fork, ForkResult},
+};
 use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
@@ -51,7 +56,7 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 #[allow(clippy::type_complexity, missing_debug_implementations)]
 pub struct Launcher<'a, CF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, usize) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
@@ -90,7 +95,7 @@ where
 
 impl<CF, MT, S, SP> Debug for Launcher<'_, CF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, usize) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned + UsesInput,
@@ -110,7 +115,7 @@ where
 #[cfg(feature = "std")]
 impl<'a, CF, MT, S, SP> Launcher<'a, CF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, usize) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
     S: DeserializeOwned + UsesInput + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
@@ -119,7 +124,11 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
-        use crate::bolts::core_affinity::get_core_ids;
+        if self.cores.ids.is_empty() {
+            return Err(Error::illegal_argument(
+                "No cores to spawn on given, cannot launch anything.",
+            ));
+        }
 
         if self.run_client.is_none() {
             return Err(Error::illegal_argument(
@@ -159,7 +168,7 @@ where
                         self.shmem_provider.post_fork(true)?;
 
                         #[cfg(feature = "std")]
-                        std::thread::sleep(std::time::Duration::from_millis(index * 100));
+                        std::thread::sleep(std::time::Duration::from_millis(index * 10));
 
                         #[cfg(feature = "std")]
                         if !debug_output {
@@ -180,7 +189,7 @@ where
                             .build()
                             .launch()?;
 
-                        return (self.run_client.take().unwrap())(state, mgr, bind_to.id);
+                        return (self.run_client.take().unwrap())(state, mgr, *bind_to);
                     }
                 };
             }
@@ -197,6 +206,7 @@ where
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
+                .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .build()
                 .launch()?;
@@ -242,13 +252,13 @@ where
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
-                        cpu_core: Some(CoreId { id: core_id }),
+                        cpu_core: Some(CoreId(core_id)),
                     })
                     .configuration(self.configuration)
                     .build()
                     .launch()?;
 
-                return (self.run_client.take().unwrap())(state, mgr, core_id);
+                return (self.run_client.take().unwrap())(state, mgr, CoreId(core_id));
             }
             Err(std::env::VarError::NotPresent) => {
                 // I am a broker
@@ -285,6 +295,14 @@ where
             Err(_) => panic!("Env variables are broken, received non-unicode!"),
         };
 
+        // It's fine to check this after the client spawn loop - since we won't have spawned any clients...
+        // Doing it later means one less check in each spawned process.
+        if self.cores.ids.is_empty() {
+            return Err(Error::illegal_argument(
+                "No cores to spawn on given, cannot launch anything.",
+            ));
+        }
+
         if self.spawn_broker {
             #[cfg(feature = "std")]
             log::info!("I am broker!!.");
@@ -295,6 +313,7 @@ where
                 .broker_port(self.broker_port)
                 .kind(ManagerKind::Broker)
                 .remote_broker_addr(self.remote_broker_addr)
+                .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
                 .build()
                 .launch()?;

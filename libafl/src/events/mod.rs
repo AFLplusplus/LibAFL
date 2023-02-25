@@ -87,7 +87,7 @@ pub unsafe fn shutdown_handler<SP>(
         std::ptr::drop_in_place(sr);
     }
     log::info!("Bye!");
-    std::process::exit(0);
+    libc::_exit(0);
 }
 
 #[cfg(all(unix, feature = "std"))]
@@ -109,11 +109,12 @@ impl Handler for ShutdownSignalData {
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct EventManagerId {
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct EventManagerId(
     /// The id
-    pub id: usize,
-}
+    pub usize,
+);
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
@@ -504,6 +505,12 @@ pub trait EventRestarter: UsesState {
         Ok(())
     }
 
+    /// Send information that this client is exiting.
+    /// No need to restart us any longer, and no need to print an error, either.
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// Block until we are safe to exit.
     #[inline]
     fn await_restart_safe(&mut self) {}
@@ -625,7 +632,7 @@ impl<S> ProgressReporter for NopEventManager<S> where
 
 impl<S> HasEventManagerId for NopEventManager<S> {
     fn mgr_id(&self) -> EventManagerId {
-        EventManagerId { id: 0 }
+        EventManagerId(0)
     }
 }
 

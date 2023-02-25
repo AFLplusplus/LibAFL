@@ -2,7 +2,10 @@ use core::{fmt::Debug, ops::Range};
 
 use libafl::{bolts::tuples::MatchFirstType, executors::ExitKind, inputs::UsesInput};
 
-use crate::{emu::Emulator, hooks::QemuHooks};
+use crate::{
+    emu::{Emulator, GuestAddr},
+    hooks::QemuHooks,
+};
 
 /// A helper for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
@@ -114,14 +117,14 @@ where
 
 #[derive(Debug)]
 pub enum QemuInstrumentationFilter {
-    AllowList(Vec<Range<u64>>),
-    DenyList(Vec<Range<u64>>),
+    AllowList(Vec<Range<GuestAddr>>),
+    DenyList(Vec<Range<GuestAddr>>),
     None,
 }
 
 impl QemuInstrumentationFilter {
     #[must_use]
-    pub fn allowed(&self, addr: u64) -> bool {
+    pub fn allowed(&self, addr: GuestAddr) -> bool {
         match self {
             QemuInstrumentationFilter::AllowList(l) => {
                 for rng in l {
