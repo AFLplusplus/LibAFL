@@ -122,7 +122,7 @@ where
     #[allow(clippy::similar_names)] // id and fd
     fn send_receive(&mut self, request: ServedShMemRequest) -> Result<(i32, i32), Error> {
         //let bt = Backtrace::new();
-        //println!("Sending {:?} with bt:\n{:?}", request, bt);
+        //log::info!("Sending {:?} with bt:\n{:?}", request, bt);
 
         let body = postcard::to_allocvec(&request)?;
 
@@ -130,15 +130,16 @@ where
         let mut message = header.to_vec();
         message.extend(body);
 
-        self.stream
-            .write_all(&message)
-            .expect("Failed to send message");
+        self.stream.write_all(&message)?;
+        //.expect("Failed to send message");
 
         let mut shm_slice = [0_u8; 20];
         let mut fd_buf = [-1; 1];
-        self.stream
-            .recv_fds(&mut shm_slice, &mut fd_buf)
-            .expect("Did not receive a response");
+        let (slice_size, fd_count) = self.stream.recv_fds(&mut shm_slice, &mut fd_buf)?;
+        //.expect("Did not receive a response");
+        if slice_size == 0 && fd_count == 0 {
+            return Err(Error::illegal_state(format!("Tried to receive 20 bytes and one fd via unix shmem socket, but got {slice_size} bytes and {fd_count} fds.")));
+        }
 
         let server_id = ShMemId::from_array(&shm_slice);
         let server_fd: i32 = server_id.into();
@@ -179,7 +180,11 @@ where
         let service = ShMemService::<SP>::start();
 
         let mut res = Self {
-            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?,
+            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?).map_err(|err| Error::illegal_state(if cfg!(target_vendor = "apple") {
+                format!("The ServedShMemProvider was not started or is no longer running. You may need to remove the './libafl_unix_shmem_server' file and retry. Error details: {err:?}")
+            } else {
+                format!("The ServedShMemProvider was not started or is no longer running. Error details: {err:?}")
+            }))?,
             inner: SP::new()?,
             id: -1,
             service,
@@ -347,7 +352,7 @@ pub struct ShMemServiceThread {
 impl Drop for ShMemServiceThread {
     fn drop(&mut self) {
         if self.join_handle.is_some() {
-            println!("Stopping ShMemService");
+            log::info!("Stopping ShMemService");
             let Ok(mut stream) = UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
             ) else { return };
@@ -404,12 +409,12 @@ where
                     *lock.lock().unwrap() = ShMemServiceStatus::Failed;
                     cvar.notify_one();
 
-                    println!("Error creating ShMemService: {e:?}");
+                    log::error!("Error creating ShMemService: {e:?}");
                     return Err(e);
                 }
             };
             if let Err(e) = worker.listen(UNIX_SERVER_NAME, &childsyncpair) {
-                println!("Error spawning ShMemService: {e:?}");
+                log::error!("Error spawning ShMemService: {e:?}");
                 Err(e)
             } else {
                 Ok(())
@@ -430,7 +435,7 @@ where
         match status {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
             ShMemServiceStatus::Started => {
-                println!("Started ShMem Service");
+                log::info!("Started ShMem Service");
                 // We got a service
                 Self::Started {
                     bg_thread: Arc::new(Mutex::new(ShMemServiceThread {
@@ -494,7 +499,7 @@ where
     fn handle_request(&mut self, client_id: RawFd) -> Result<ServedShMemResponse<SP>, Error> {
         let request = self.read_request(client_id)?;
 
-        // println!("got ashmem client: {}, request:{:?}", client_id, request);
+        // log::trace!("got ashmem client: {}, request:{:?}", client_id, request);
 
         // Handle the client request
         let response = match request {
@@ -536,7 +541,18 @@ where
             }
             ServedShMemRequest::ExistingMap(description) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
-                let description_id: i32 = description.id.into();
+
+                if description.id.is_empty() {
+                    return Err(Error::illegal_state("Received empty ShMemId from unix shmem client. Are the shmem limits set correctly? Did a client crash?"));
+                }
+
+                let description_id: i32 = description.id.try_into().unwrap();
+
+                if !self.all_shmems.contains_key(&description_id) {
+                    // We should never get here, but it may happen if the OS ran out of shmem pages at some point//reached limits.
+                    return Err(Error::illegal_state(format!("Client wanted to read from existing map with id {description_id}/{description:?}, but it was not allocated by this shmem server. Are the shmem limits set correctly? Did a client crash?")));
+                }
+
                 if client.maps.contains_key(&description_id) {
                     // Using let else here as self needs to be accessed in the else branch.
                     #[allow(clippy::option_if_let_else)]
@@ -572,12 +588,12 @@ where
                 }
             }
             ServedShMemRequest::Exit => {
-                println!("ShMemService - Exiting");
+                log::info!("ShMemService - Exiting");
                 // stopping the server
                 return Err(Error::shutting_down());
             }
         };
-        // println!("send ashmem client: {}, response: {:?}", client_id, &response);
+        // log::info!("send ashmem client: {}, response: {:?}", client_id, &response);
 
         response
     }
@@ -659,7 +675,7 @@ where
                 Ok(num_fds) if num_fds > 0 => (),
                 Ok(_) => continue,
                 Err(e) => {
-                    println!("Error polling for activity: {e:?}");
+                    log::error!("Error polling for activity: {e:?}");
                     continue;
                 }
             };
@@ -675,7 +691,7 @@ where
                         match self.handle_client(raw_polled_fd) {
                             Ok(()) => (),
                             Err(e) => {
-                                dbg!("Ignoring failed read from client", e, poll_fd);
+                                log::info!("Ignoring failed read from client {e:?} {poll_fd:?}");
                                 continue;
                             }
                         };
@@ -683,12 +699,12 @@ where
                         let (stream, _addr) = match listener.accept_unix_addr() {
                             Ok(stream_val) => stream_val,
                             Err(e) => {
-                                println!("Error accepting client: {e:?}");
+                                log::error!("Error accepting client: {e:?}");
                                 continue;
                             }
                         };
 
-                        println!("Recieved connection from {_addr:?}");
+                        log::info!("Received connection from {_addr:?}");
                         let pollfd = PollFd::new(
                             stream.as_raw_fd(),
                             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
@@ -700,16 +716,16 @@ where
                         match self.handle_client(client_id) {
                             Ok(()) => (),
                             Err(Error::ShuttingDown) => {
-                                println!("Shutting down");
+                                log::info!("Shutting down");
                                 return Ok(());
                             }
                             Err(e) => {
-                                dbg!("Ignoring failed read from client", e);
+                                log::info!("Ignoring failed read from client {e:?}");
                             }
                         };
                     }
                 } else {
-                    //println!("Unknown revents flags: {:?}", revents);
+                    //log::warn!("Unknown revents flags: {:?}", revents);
                 }
             }
         }

@@ -142,12 +142,14 @@ where
             // Store coverage, mapping coverage map indices to hit counts (if present) and the
             // associated seeds for the map indices with those hit counts.
             for (i, e) in obs.as_iter().copied().enumerate() {
-                cov_map
-                    .entry(i)
-                    .or_insert_with(HashMap::new)
-                    .entry(e)
-                    .or_insert_with(HashSet::new)
-                    .insert(seed_expr.clone());
+                if e != obs.initial() {
+                    cov_map
+                        .entry(i)
+                        .or_insert_with(HashMap::new)
+                        .entry(e)
+                        .or_insert_with(HashSet::new)
+                        .insert(seed_expr.clone());
+                }
             }
 
             // Keep track of that seed's index and weight

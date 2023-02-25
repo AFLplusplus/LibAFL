@@ -369,7 +369,8 @@ fn fuzz_binary(
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        PowerSchedule::EXPLORE,
+        &mut state,
+        Some(PowerSchedule::EXPLORE),
     ));
 
     // A fuzzer with feedbacks and a corpus scheduler
@@ -584,7 +585,8 @@ fn fuzz_text(
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        PowerSchedule::EXPLORE,
+        &mut state,
+        Some(PowerSchedule::EXPLORE),
     ));
 
     // A fuzzer with feedbacks and a corpus scheduler
