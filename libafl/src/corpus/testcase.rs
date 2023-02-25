@@ -3,6 +3,8 @@
 
 use alloc::string::String;
 use core::{default::Default, option::Option, time::Duration};
+
+#[cfg(feature = "std")]
 use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
@@ -124,6 +126,7 @@ where
 
     /// Set the filename
     #[inline]
+    #[cfg(feature = "std")]
     pub fn set_filename(&mut self, filename: String) -> Result<(), Error> {
         if self.filename.is_some() {
             let f = self.filename.clone().unwrap();
