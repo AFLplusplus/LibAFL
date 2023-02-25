@@ -41,7 +41,7 @@ use prometheus_client::{
 use tide::Request;
 
 use crate::{
-    bolts::{current_time, format_duration_hms},
+    bolts::{current_time, format_duration_hms, ClientId},
     monitors::{ClientStats, Monitor, UserStats},
 };
 
@@ -95,7 +95,7 @@ where
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn display(&mut self, event_msg: String, sender_id: u32) {
+    fn display(&mut self, event_msg: String, sender_id: ClientId) {
         // Update the prometheus metrics
         // Label each metric with the sender / client_id
         // The gauges must take signed i64's, with max value of 2^63-1 so it is
@@ -107,42 +107,42 @@ where
         let corpus_size = self.corpus_size();
         self.corpus_count
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
             .set(corpus_size.try_into().unwrap());
         let objective_size = self.objective_size();
         self.objective_count
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
             .set(objective_size.try_into().unwrap());
         let total_execs = self.total_execs();
         self.executions
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
             .set(total_execs.try_into().unwrap());
         let execs_per_sec = self.execs_per_sec();
         self.exec_rate
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
             .set(execs_per_sec);
         let run_time = (current_time() - self.start_time).as_secs();
         self.runtime
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
             .set(run_time.try_into().unwrap()); // run time in seconds, which can be converted to a time format by Grafana or similar
         let total_clients = self.client_stats().len().try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
         self.clients_count
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
             .set(total_clients);
@@ -151,7 +151,7 @@ where
         let fmt = format!(
             "[Prometheus] [{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
-            sender_id,
+            sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
             self.corpus_size(),
@@ -177,7 +177,7 @@ where
             };
             self.custom_stat
                 .get_or_create(&Labels {
-                    client: sender_id,
+                    client: sender_id.0,
                     stat: key.clone(),
                 })
                 .set(value);

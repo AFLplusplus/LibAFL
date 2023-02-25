@@ -39,6 +39,9 @@ pub type MaxMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, MaxReducer, 
 /// A [`MapFeedback`] that strives to minimize the map contents.
 pub type MinMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, MinReducer, S, T>;
 
+/// A [`MapFeedback`] that always returns `true` for `is_interesting`. Useful for tracing all executions.
+pub type AlwaysInterestingMapFeedback<O, S, T> = MapFeedback<AllIsNovel, O, NopReducer, S, T>;
+
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
 pub type MaxMapPow2Feedback<O, S, T> = MapFeedback<NextPow2IsNovel, O, MaxReducer, S, T>;
@@ -80,6 +83,20 @@ where
     #[inline]
     fn reduce(history: T, new: T) -> T {
         history & new
+    }
+}
+
+/// A [`NopReducer`] does nothing, and just "reduces" to the second/`new` value.
+#[derive(Clone, Debug)]
+pub struct NopReducer {}
+
+impl<T> Reducer<T> for NopReducer
+where
+    T: Default + Copy + 'static,
+{
+    #[inline]
+    fn reduce(_history: T, new: T) -> T {
+        new
     }
 }
 
@@ -208,7 +225,7 @@ where
 pub struct MapIndexesMetadata {
     /// The list of indexes.
     pub list: Vec<usize>,
-    /// A refcount used to know when remove this meta
+    /// A refcount used to know when we can remove this metadata
     pub tcref: isize,
 }
 
@@ -337,6 +354,8 @@ where
 /// The most common AFL-like feedback type
 #[derive(Clone, Debug)]
 pub struct MapFeedback<N, O, R, S, T> {
+    /// For tracking, always keep indexes and/or novelties, even if the map isn't considered `interesting`.
+    always_track: bool,
     /// Indexes used in the last observation
     indexes: bool,
     /// New indexes observed in the last observation
@@ -632,6 +651,7 @@ where
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(map_observer.name()),
+            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -645,6 +665,7 @@ where
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(map_observer.name()),
+            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -659,7 +680,15 @@ where
             observer_name: observer_name.to_string(),
             stats_name: create_stats_name(name),
             phantom: PhantomData,
+            always_track: false,
         }
+    }
+
+    /// For tracking, enable `always_track` mode, that also adds `novelties` or `indexes`,
+    /// even if the map is not novel for this feedback.
+    /// This is useful in combination with `load_initial_inputs_forced`, or other feedbacks.
+    pub fn set_always_track(&mut self, always_track: bool) {
+        self.always_track = always_track;
     }
 
     /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
@@ -673,6 +702,7 @@ where
             name: name.to_string(),
             observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(name),
+            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -691,6 +721,7 @@ where
             observer_name: observer_name.to_string(),
             stats_name: create_stats_name(name),
             name: name.to_string(),
+            always_track: false,
             phantom: PhantomData,
         }
     }
@@ -758,7 +789,7 @@ where
             }
         }
 
-        if interesting {
+        if interesting || self.always_track {
             let len = history_map.len();
             let filled = history_map.iter().filter(|&&i| i != initial).count();
             // opt: if not tracking optimisations, we technically don't show the *current* history
