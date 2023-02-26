@@ -48,7 +48,7 @@ use crate::{
     Error,
 };
 
-/// Something that uses observer like feedbacks
+/// Something that uses observer like mapfeedbacks
 pub trait UsesObserver<S>
 where
     S: UsesInput,
