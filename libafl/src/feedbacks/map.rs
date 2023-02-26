@@ -23,8 +23,8 @@ use crate::{
     feedbacks::{Feedback, HasObserverName},
     inputs::UsesInput,
     monitors::UserStats,
-    observers::{MapObserver, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
+    observers::{MapObserver, Observer, ObserversTuple, UsesObserver},
+    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata, UsesState},
     Error,
 };
 
@@ -370,10 +370,18 @@ pub struct MapFeedback<N, O, R, S, T> {
     phantom: PhantomData<(N, O, R, S, T)>,
 }
 
+impl<N, O, R, S, T> UsesObserver<S> for MapFeedback<N, O, R, S, T>
+where
+    S: UsesInput,
+    O: Observer<S>,
+{
+    type Observer = O;
+}
+
 impl<N, O, R, S, T> Feedback<S> for MapFeedback<N, O, R, S, T>
 where
     N: IsNovel<T> + Debug,
-    O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
+    O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T> + Observer<S>,
     R: Reducer<T> + Debug,
     S: UsesInput + HasClientPerfMonitor + HasNamedMetadata + Debug,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
@@ -470,7 +478,7 @@ where
 #[rustversion::nightly]
 impl<O, S> Feedback<S> for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
-    O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
+    O: MapObserver<Entry = u8> + AsSlice<Entry = u8> + Observer<S>,
     for<'it> O: AsIter<'it, Item = u8>,
     S: UsesInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
