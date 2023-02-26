@@ -24,7 +24,7 @@ use crate::{
     inputs::UsesInput,
     monitors::UserStats,
     observers::{MapObserver, Observer, ObserversTuple, UsesObserver},
-    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata, UsesState},
+    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
     Error,
 };
 
