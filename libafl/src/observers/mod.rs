@@ -48,6 +48,15 @@ use crate::{
     Error,
 };
 
+/// Something that uses observer like mapfeedbacks
+pub trait UsesObserver<S>
+where
+    S: UsesInput,
+{
+    /// The observer type used
+    type Observer: Observer<S>;
+}
+
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
 pub trait Observer<S>: Named + Debug
