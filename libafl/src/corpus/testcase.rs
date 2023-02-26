@@ -152,14 +152,28 @@ where
             }
 
             // Try to create lock files for old/new testcases
-            if OpenOptions::new().create(true).write(true).open(&old_lock_filename).is_err() {
-                return Err(Error::illegal_state("unable to create lock file for old testcase"));
+            if OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&old_lock_filename)
+                .is_err()
+            {
+                return Err(Error::illegal_state(
+                    "unable to create lock file for old testcase",
+                ));
             }
-            if OpenOptions::new().create(true).write(true).open(&new_lock_filename).is_err() {
-                return Err(Error::illegal_state("unable to create lock file for new testcase"));
+            if OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&new_lock_filename)
+                .is_err()
+            {
+                return Err(Error::illegal_state(
+                    "unable to create lock file for new testcase",
+                ));
             }
 
-            fs::rename(&old_filename,& new_filename)?;
+            fs::rename(&old_filename, &new_filename)?;
 
             let old_metadata_filename = format!(".{old_filename}.metadata");
             let new_metadata_filename = format!(".{new_filename}.metadata");

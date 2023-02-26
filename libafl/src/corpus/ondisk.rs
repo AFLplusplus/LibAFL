@@ -215,7 +215,7 @@ where
                 let lockfile = format!(".{file}.lafl_lock");
 
                 if !Path::new(&lockfile).exists() {
-                    break self.dir_path.join(file)
+                    break self.dir_path.join(file);
                 }
 
                 file = format!("{file_orig}-{ctr}");
