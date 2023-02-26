@@ -863,7 +863,7 @@ pub mod windows_asan_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasSolutions},
+        state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions},
     };
 
     /// # Safety
@@ -972,7 +972,7 @@ mod windows_exception_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasSolutions},
+        state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
