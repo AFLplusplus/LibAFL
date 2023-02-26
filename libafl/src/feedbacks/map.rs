@@ -381,7 +381,7 @@ where
 impl<N, O, R, S, T> Feedback<S> for MapFeedback<N, O, R, S, T>
 where
     N: IsNovel<T> + Debug,
-    O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T> + Observer<S>,
+    O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
     R: Reducer<T> + Debug,
     S: UsesInput + HasClientPerfMonitor + HasNamedMetadata + Debug,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
@@ -478,7 +478,7 @@ where
 #[rustversion::nightly]
 impl<O, S> Feedback<S> for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
-    O: MapObserver<Entry = u8> + AsSlice<Entry = u8> + Observer<S>,
+    O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
     S: UsesInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
