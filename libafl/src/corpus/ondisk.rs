@@ -6,10 +6,7 @@
 use core::{cell::RefCell, time::Duration};
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
-use std::{
-    fs::OpenOptions,
-    path::{Path, PathBuf},
-};
+use std::{path::{Path, PathBuf}};
 
 use serde::{Deserialize, Serialize};
 
