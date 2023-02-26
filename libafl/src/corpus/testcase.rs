@@ -128,16 +128,20 @@ where
     #[inline]
     #[cfg(feature = "std")]
     pub fn set_filename(&mut self, filename: String) -> Result<(), Error> {
+        use std::fs::OpenOptions;
+
         if self.filename.is_some() {
             let f = self.filename.clone().unwrap();
             let old_filename = f.as_str();
 
             let new_filename = filename.as_str();
 
-            if old_filename.eq(&filename) {
+            // Do operations below when new filename is specified
+            if old_filename.eq(new_filename) {
                 return Ok(());
             }
 
+            // Swap file only when both lock files dont exist
             let old_lock_filename = format!(".{old_filename}.lafl_lock");
             if Path::new(&old_lock_filename).exists() {
                 return Err(Error::illegal_state("old lockfile exist"));
@@ -146,11 +150,23 @@ where
             if Path::new(&new_lock_filename).exists() {
                 return Err(Error::illegal_state("new lockfile exist"));
             }
-            fs::rename(old_filename, new_filename)?;
+
+            // Try to create lock files for old/new testcases
+            if OpenOptions::new().create(true).write(true).open(&old_lock_filename).is_err() {
+                return Err(Error::illegal_state("unable to create lock file for old testcase"));
+            }
+            if OpenOptions::new().create(true).write(true).open(&new_lock_filename).is_err() {
+                return Err(Error::illegal_state("unable to create lock file for new testcase"));
+            }
+
+            fs::rename(&old_filename,& new_filename)?;
 
             let old_metadata_filename = format!(".{old_filename}.metadata");
             let new_metadata_filename = format!(".{new_filename}.metadata");
-            fs::rename(old_metadata_filename, new_metadata_filename)?;
+            fs::rename(&old_metadata_filename, &new_metadata_filename)?;
+
+            fs::remove_file(&old_lock_filename)?;
+            fs::remove_file(&new_lock_filename)?;
         }
 
         self.filename = Some(filename);

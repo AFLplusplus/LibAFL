@@ -213,15 +213,9 @@ where
             let mut ctr = 2;
             let filename = loop {
                 let lockfile = format!(".{file}.lafl_lock");
-                // try to create lockfile.
 
-                if OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(self.dir_path.join(lockfile))
-                    .is_ok()
-                {
-                    break self.dir_path.join(file);
+                if !Path::new(&lockfile).exists() {
+                    break self.dir_path.join(file)
                 }
 
                 file = format!("{file_orig}-{ctr}");
