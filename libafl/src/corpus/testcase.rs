@@ -157,6 +157,13 @@ where
         Ok(())
     }
 
+    #[inline]
+    #[cfg(feature = "no_std")]
+    pub fn set_filename(&mut self, filename: String) -> Result<(), Error> {
+        self.filename = Some(filename);
+        Ok(())
+    }
+
     /// Get the execution time of the testcase
     #[inline]
     pub fn exec_time(&self) -> &Option<Duration> {
