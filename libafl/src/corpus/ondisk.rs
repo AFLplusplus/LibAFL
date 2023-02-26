@@ -4,9 +4,9 @@
 //! which only stores a certain number of testcases and removes additional ones in a FIFO manner.
 
 use core::{cell::RefCell, time::Duration};
+use std::path::{Path, PathBuf};
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
-use std::{path::{Path, PathBuf}};
 
 use serde::{Deserialize, Serialize};
 
