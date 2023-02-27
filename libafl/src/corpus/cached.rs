@@ -71,7 +71,7 @@ where
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let testcase = { self.inner.get(idx)? };
         if testcase.borrow().input().is_none() {
-            let _ = testcase.borrow_mut().load_input()?;
+            let _: &I = testcase.borrow_mut().load_input()?;
             let mut borrowed_num = 0;
             while self.cached_indexes.borrow().len() >= self.cache_max_len {
                 let removed = self.cached_indexes.borrow_mut().pop_front().unwrap();

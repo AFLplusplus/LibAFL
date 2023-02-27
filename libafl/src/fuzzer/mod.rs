@@ -504,7 +504,7 @@ where
 
         // several is_interesting implementations collect some data about the run, later used in
         // append_metadata; we *must* invoke is_interesting here to collect it
-        let _ = self
+        let _: bool = self
             .feedback_mut()
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
 

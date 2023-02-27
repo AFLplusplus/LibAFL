@@ -39,7 +39,7 @@ impl<'a, T> DownsizeSlice for &'a mut [T] {
     fn downsize(&mut self, len: usize) {
         let mut value = core::mem::take(self);
         value = unsafe { value.get_unchecked_mut(..len) };
-        let _ = core::mem::replace(self, value);
+        let _: &mut [T] = core::mem::replace(self, value);
     }
 }
 
