@@ -804,6 +804,7 @@ impl AFLRedQueen {
         let its_len = core::cmp::min(input_len - buf_idx, taint_len);
 
         // Try pattern matching
+        // println!("Pattern match");
         match hshape {
             0 => (), // NEVER HAPPEN, Do nothing
             1 => {
@@ -833,8 +834,9 @@ impl AFLRedQueen {
                     let buf_32 = u32::from_be_bytes(buf[buf_idx..buf_idx + 4].try_into().unwrap());
                     let o_buf_32 =
                         u32::from_be_bytes(o_buf[buf_idx..buf_idx + 4].try_into().unwrap());
-
+                    println!("buf: {buf_32} {o_buf_32} {pattern} {o_pattern}");
                     if buf_32 == pattern as u32 && o_buf_32 == o_pattern as u32 {
+                        println!("Matched!");
                         buf[buf_idx] = (repl & 0xff) as u8;
                         buf[buf_idx + 1] = (repl >> 8 & 0xff) as u8;
                         buf[buf_idx + 2] = (repl >> 16 & 0xff) as u8;
@@ -1103,13 +1105,15 @@ where
         let input_bytes = input.bytes_mut();
         let orig_bytes = taint_meta.input_vec();
         let taint = taint_meta.ranges();
-
+        // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
         for cmp_idx in cmp_start_idx..cmp_len {
             let (w_idx, header) = headers[cmp_idx];
 
             if orig_cmpvals.get(&w_idx).is_none() || new_cmpvals.get(&w_idx).is_none() {
-                // new_cmpvals.get(&idx) is always Some() if orig_cmpvals.get(&idx) is Some()
-                return Ok(MutationResult::Skipped);
+                // These two should have same boolean value
+
+                // so there's nothing interesting at cmp_idx, then just skip!
+                continue;
             }
 
             let orig_val = orig_cmpvals.get(&w_idx).unwrap();

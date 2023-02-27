@@ -464,21 +464,23 @@ where
                 let mut cmp_values = Vec::new();
                 if self.original {
                     // push into orig_cmpvals
-                    // println!("Adding to orig_cmpvals");
+                    println!("Adding to orig_cmpvals");
                     for j in 0..execs {
                         if let Some(val) = self.cmp_map().values_of(i, j) {
                             cmp_values.push(val);
                         }
                     }
+                    // println!("idx: {cmpmap_idx} cmp_values: {:#?}", cmp_values);
                     meta.orig_cmpvals.insert(cmpmap_idx, cmp_values);
                 } else {
                     // push into new_cmpvals
-                    // println!("Adding to new_cmpvals");
+                    println!("Adding to new_cmpvals");
                     for j in 0..execs {
                         if let Some(val) = self.cmp_map().values_of(i, j) {
                             cmp_values.push(val);
                         }
                     }
+                    // println!("idx: {cmpmap_idx} cmp_values: {:#?}", cmp_values);
                     meta.new_cmpvals.insert(cmpmap_idx, cmp_values);
                 }
             }
