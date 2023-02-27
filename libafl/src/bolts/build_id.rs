@@ -58,7 +58,7 @@ fn from_exe<H: Hasher>(mut hasher: H) -> Result<H, ()> {
             return Err(());
         }
         let file = File::open(env::current_exe().map_err(drop)?).map_err(drop)?;
-        let _ = io::copy(&mut &file, &mut HashWriter(&mut hasher)).map_err(drop)?;
+        let _: u64 = io::copy(&mut &file, &mut HashWriter(&mut hasher)).map_err(drop)?;
         Ok(hasher)
     }
     #[cfg(target_arch = "wasm32")]

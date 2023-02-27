@@ -384,7 +384,8 @@ where
                     input_copy.bytes_mut()[index] = new_byte;
                 }
                 // Time is measured directly the `evaluate_input` function
-                let _ = fuzzer.evaluate_input(state, executor, manager, input_copy)?;
+                let _: (crate::ExecuteInputResult, Option<CorpusId>) =
+                    fuzzer.evaluate_input(state, executor, manager, input_copy)?;
             }
         }
         Ok(())
