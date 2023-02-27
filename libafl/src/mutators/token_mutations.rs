@@ -1115,7 +1115,7 @@ where
             let orig_val = orig_cmpvals.get(&w_idx).unwrap();
             let new_val = new_cmpvals.get(&w_idx).unwrap();
 
-            let logged = std::cmp::min(orig_val.len(), new_val.len());
+            let logged = core::cmp::min(orig_val.len(), new_val.len());
 
             for cmp_h_idx in cmp_h_start_idx..logged {
                 let mut skip_opt = false;
