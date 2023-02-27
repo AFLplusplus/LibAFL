@@ -1104,6 +1104,7 @@ where
         let input_len = input.bytes().len();
         let input_bytes = input.bytes_mut();
         let orig_bytes = taint_meta.input_vec();
+        // TODO: Swap this.
         let taint = taint_meta.ranges();
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
         for cmp_idx in cmp_start_idx..cmp_len {
