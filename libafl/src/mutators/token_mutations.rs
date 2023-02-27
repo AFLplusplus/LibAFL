@@ -1012,7 +1012,6 @@ impl AFLRedQueen {
         input_len: usize,
         hshape: usize,
     ) -> bool {
-        // TODO: transform solving
         let l0 = pattern.len();
         let ol0 = repl.len();
         // let l1 = o_pattern.len();
@@ -1024,6 +1023,7 @@ impl AFLRedQueen {
             core::cmp::min(lmax, hshape),
         );
 
+        // TODO: Match before (This: https://github.com/AFLplusplus/AFLplusplus/blob/ea14f3fd40e32234989043a525e3853fcb33c1b6/src/afl-fuzz-redqueen.c#L2047)
         let mut copy_len = 0;
         for i in 0..its_len {
             if pattern[i] != buf[buf_idx + i] && o_pattern[i] != o_buf[buf_idx + i] {
@@ -1038,6 +1038,11 @@ impl AFLRedQueen {
         } else {
             false
         }
+
+        // TODO: Transform (This: https://github.com/AFLplusplus/AFLplusplus/blob/stable/src/afl-fuzz-redqueen.c#L2089)
+        // It's hard to implement this naively
+        // because AFL++ redqueen does not check any pattern, but it calls its_fuzz() instead.
+        // we can't execute the harness inside a mutator
 
         // Direct matching
     }
