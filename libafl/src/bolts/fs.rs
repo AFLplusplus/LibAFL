@@ -10,12 +10,20 @@ use std::{
     fs::{self, remove_file, File, OpenOptions},
     io::{Seek, Write},
     path::{Path, PathBuf},
+    string::String,
 };
 
 use crate::Error;
 
 /// The default filename to use to deliver testcases to the target
 pub const INPUTFILE_STD: &str = ".cur_input";
+
+#[must_use]
+/// Derives a filename from [`INPUTFILE_STD`] that may be used to deliver testcases to the target.
+/// It ensures the filename is unique to the fuzzer process.
+pub fn get_unique_std_input_file() -> String {
+    format!("{}_{}", INPUTFILE_STD, std::process::id())
+}
 
 /// Creates a `.{file_name}.tmp` file, and writes all bytes to it.
 /// After all bytes have been written, the tmp-file is moved to it's original `path`.

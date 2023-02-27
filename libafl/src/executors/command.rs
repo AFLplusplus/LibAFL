@@ -22,7 +22,7 @@ use super::HasObservers;
 use crate::executors::{Executor, ExitKind};
 use crate::{
     bolts::{
-        fs::{InputFile, INPUTFILE_STD},
+        fs::{get_unique_std_input_file, InputFile},
         tuples::MatchName,
         AsSlice,
     },
@@ -456,7 +456,7 @@ impl CommandExecutorBuilder {
     /// Uses a default filename.
     /// Use [`Self::arg_input_file`] to specify a custom filename.
     pub fn arg_input_file_std(&mut self) -> &mut Self {
-        self.arg_input_file(INPUTFILE_STD);
+        self.arg_input_file(get_unique_std_input_file());
         self
     }
 
