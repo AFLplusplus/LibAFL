@@ -463,6 +463,7 @@ impl OnCrashBacktraceCollector {
 }
 
 impl CallTraceCollector for OnCrashBacktraceCollector {
+    #[allow(clippy::unnecessary_cast)]
     fn on_call<QT, S>(
         &mut self,
         _hooks: &mut QemuHooks<'_, QT, S>,
@@ -476,6 +477,7 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
         self.callstack_hash ^= pc as u64 + call_len as u64;
     }
 
+    #[allow(clippy::unnecessary_cast)]
     fn on_ret<QT, S>(
         &mut self,
         _hooks: &mut QemuHooks<'_, QT, S>,
