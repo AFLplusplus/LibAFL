@@ -65,6 +65,11 @@ pub trait Scheduler: UsesState {
     ) -> Result<(), Error> {
         Ok(())
     }
+    
+    /// An input has been evaluated
+    fn on_evaluation(&self, _state: &mut Self::State, _input: &<Self::State as UsesInput>::Input) -> Result<(), Error> {
+        Ok(())
+    }
 
     /// Gets the next entry
     fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error>;

@@ -459,6 +459,9 @@ where
         EM: EventFirer<State = Self::State>,
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
+        
+        self.scheduler.on_evaluation(state, &input)?;
+        
         let observers = executor.observers();
         self.process_execution(state, manager, input, observers, &exit_kind, send_events)
     }
