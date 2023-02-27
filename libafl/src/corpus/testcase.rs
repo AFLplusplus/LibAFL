@@ -173,11 +173,11 @@ where
                 ));
             }
 
-            fs::rename(&old_filename, &new_filename)?;
+            fs::rename(old_filename, new_filename)?;
 
             let old_metadata_filename = format!(".{old_filename}.metadata");
             let new_metadata_filename = format!(".{new_filename}.metadata");
-            fs::rename(&old_metadata_filename, &new_metadata_filename)?;
+            fs::rename(old_metadata_filename, new_metadata_filename)?;
 
             fs::remove_file(&old_lock_filename)?;
             fs::remove_file(&new_lock_filename)?;
