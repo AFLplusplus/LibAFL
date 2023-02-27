@@ -55,6 +55,7 @@ pub fn libafl_main() {
     );
     fuzz(
         &[PathBuf::from("./corpus")],
+        PathBuf::from("./testcases"),
         PathBuf::from("./crashes"),
         1337,
     )
@@ -63,8 +64,10 @@ pub fn libafl_main() {
 
 /// The actual fuzzer
 #[cfg(not(test))]
-fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
+fn fuzz(corpus_dirs: &[PathBuf], testcases_dir: PathBuf, objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
+
+    use libafl::prelude::CachedOnDiskCorpus;
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
@@ -111,7 +114,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
-            InMemoryCorpus::new(),
+            CachedOnDiskCorpus::new(testcases_dir, 64).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
