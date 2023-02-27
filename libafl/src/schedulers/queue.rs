@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn test_queuecorpus() {
         let rand = StdRand::with_seed(4);
-        let scheduler = QueueScheduler::new();
+        let mut scheduler = QueueScheduler::new();
 
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();

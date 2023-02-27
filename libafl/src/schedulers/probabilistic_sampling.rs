@@ -182,7 +182,7 @@ mod tests {
         // the first 3 probabilities will be .69, .86, .44
         let rand = StdRand::with_seed(12);
 
-        let scheduler = UniformProbabilitySamplingScheduler::new();
+        let mut scheduler = UniformProbabilitySamplingScheduler::new();
 
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);
