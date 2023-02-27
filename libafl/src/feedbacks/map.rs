@@ -23,7 +23,7 @@ use crate::{
     feedbacks::{Feedback, HasObserverName},
     inputs::UsesInput,
     monitors::UserStats,
-    observers::{MapObserver, ObserversTuple},
+    observers::{MapObserver, Observer, ObserversTuple, UsesObserver},
     state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
     Error,
 };
@@ -368,6 +368,14 @@ pub struct MapFeedback<N, O, R, S, T> {
     stats_name: String,
     /// Phantom Data of Reducer
     phantom: PhantomData<(N, O, R, S, T)>,
+}
+
+impl<N, O, R, S, T> UsesObserver<S> for MapFeedback<N, O, R, S, T>
+where
+    S: UsesInput,
+    O: Observer<S>,
+{
+    type Observer = O;
 }
 
 impl<N, O, R, S, T> Feedback<S> for MapFeedback<N, O, R, S, T>
