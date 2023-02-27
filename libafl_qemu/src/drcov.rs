@@ -42,6 +42,7 @@ pub struct QemuDrCovHelper {
 
 impl QemuDrCovHelper {
     #[must_use]
+    #[allow(clippy::let_underscore_untyped)]
     pub fn new(
         filter: QemuInstrumentationFilter,
         module_mapping: RangeMap<usize, (u16, String)>,
