@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
     inputs::UsesInput,
+    observers::{MapObserver, ObserversTuple},
     schedulers::Scheduler,
     state::{HasCorpus, HasMetadata, UsesState},
     Error,
@@ -163,21 +164,24 @@ pub enum PowerSchedule {
 
 /// A corpus scheduler using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerQueueScheduler<S> {
+pub struct PowerQueueScheduler<O, S> {
     strat: PowerSchedule,
-    phantom: PhantomData<S>,
+    map_observer_name: String,
+    last_hash: usize,
+    phantom: PhantomData<(O, S)>,
 }
 
-impl<S> UsesState for PowerQueueScheduler<S>
+impl<O, S> UsesState for PowerQueueScheduler<O, S>
 where
     S: UsesInput,
 {
     type State = S;
 }
 
-impl<S> Scheduler for PowerQueueScheduler<S>
+impl<O, S> Scheduler for PowerQueueScheduler<O, S>
 where
     S: HasCorpus + HasMetadata,
+    O: MapObserver,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
@@ -199,11 +203,9 @@ where
 
         // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
-        state
-            .corpus()
-            .get(idx)?
-            .borrow_mut()
-            .add_metadata(SchedulerTestcaseMetaData::new(depth));
+        state.corpus().get(idx)?.borrow_mut().add_metadata(
+            SchedulerTestcaseMetaData::with_n_fuzz_entry(depth, self.last_hash),
+        );
         Ok(())
     }
 
@@ -288,6 +290,35 @@ where
         Ok(())
     }
 
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut Self::State,
+        _input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<Self::State>,
+    {
+        let observer = observers
+            .match_name::<O>(&self.map_observer_name)
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
+
+        let mut hash = observer.hash() as usize;
+
+        let psmeta = state
+            .metadata_mut()
+            .get_mut::<SchedulerMetadata>()
+            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+
+        hash %= psmeta.n_fuzz().len();
+        // Update the path frequency
+        psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
+
+        self.last_hash = hash;
+
+        Ok(())
+    }
+
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
@@ -331,18 +362,21 @@ where
     }
 }
 
-impl<S> PowerQueueScheduler<S>
+impl<O, S> PowerQueueScheduler<O, S>
 where
     S: HasMetadata,
+    O: MapObserver,
 {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
-    pub fn new(state: &mut S, strat: PowerSchedule) -> Self {
+    pub fn new(state: &mut S, map_observer: &O, strat: PowerSchedule) -> Self {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(strat)));
         }
         PowerQueueScheduler {
             strat,
+            map_observer_name: map_observer.name().to_string(),
+            last_hash: 0,
             phantom: PhantomData,
         }
     }

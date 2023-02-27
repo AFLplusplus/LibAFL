@@ -292,11 +292,12 @@ fn fuzz(
         5,
     )?;
 
-    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
+    let power = StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(
         &mut state,
+        &edges_observer,
         PowerSchedule::FAST,
     ));
 
