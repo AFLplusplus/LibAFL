@@ -36,7 +36,7 @@ use libafl::{
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
-    Error,
+    Error, prelude::CachedOnDiskCorpus,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
@@ -83,6 +83,15 @@ struct Opt {
         default_value = "./out"
     )]
     output: PathBuf,
+
+    #[arg(
+        short,
+        long,
+        help = "Set the testcases directory, default is ./testcases"
+        name = "TESTCASES",
+        default_value = "./testcases"
+    )]
+    testcases: PathBuf,
 
     #[arg(
         short,
@@ -152,7 +161,7 @@ pub fn libafl_main() {
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
-                InMemoryCorpus::new(),
+                CachedOnDiskCorpus::new(opt.testcases.clone(), 64).unwrap(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(opt.output.clone()).unwrap(),
