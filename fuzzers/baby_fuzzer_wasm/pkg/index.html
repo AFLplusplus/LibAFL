@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>libafl_wasm test</title>
+</head>
+<body>
+<script type="module">
+    import libafl_wasm from './libafl_wasm.js'
+
+    libafl_wasm().then(wasm => wasm.fuzz())
+</script>
+</body>
+</html>
