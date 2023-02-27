@@ -115,7 +115,7 @@ impl ClientStats {
             .checked_sub(self.last_window_time)
             .map_or(0, |d| d.as_secs());
         if diff > CLIENT_STATS_TIME_WINDOW_SECS {
-            let _ = self.execs_per_sec(cur_time);
+            let _: f64 = self.execs_per_sec(cur_time);
             self.last_window_time = cur_time;
             self.last_window_executions = self.executions;
         }

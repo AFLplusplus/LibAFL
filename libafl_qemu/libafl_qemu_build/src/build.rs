@@ -398,7 +398,8 @@ pub fn build(
     println!("cargo:rustc-link-lib=z");
     // if keyutils is available, qemu meson script will compile code with keyutils.
     // therefore, we need to link with keyutils if our system have libkeyutils.
-    let _ = pkg_config::Config::new().probe("libkeyutils");
+    let _: Result<pkg_config::Library, pkg_config::Error> =
+        pkg_config::Config::new().probe("libkeyutils");
 
     if !is_usermode {
         println!("cargo:rustc-link-lib=pixman-1");
