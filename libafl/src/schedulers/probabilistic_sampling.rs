@@ -99,7 +99,7 @@ where
     F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasRand,
 {
-    fn on_add(&self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         if state.metadata().get::<ProbabilityMetadata>().is_none() {
             state.add_metadata(ProbabilityMetadata::new());
         }
@@ -108,7 +108,7 @@ where
 
     /// Gets the next entry
     #[allow(clippy::cast_precision_loss)]
-    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {

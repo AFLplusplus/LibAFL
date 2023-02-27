@@ -116,7 +116,7 @@ where
         self.current_corpus_idx = Some(if let Some(corpus_idx) = self.current_corpus_idx {
             corpus_idx
         } else {
-            fuzzer.scheduler().next(state)?
+            fuzzer.scheduler_mut().next(state)?
         });
 
         self.testcases_to_do = self.iterations(state, self.current_corpus_idx.unwrap())?;

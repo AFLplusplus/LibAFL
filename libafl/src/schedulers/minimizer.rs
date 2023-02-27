@@ -82,14 +82,14 @@ where
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
         self.base.on_add(state, idx)?;
         self.update_score(state, idx)
     }
 
     /// Replaces the testcase at the given idx
     fn on_replace(
-        &self,
+        &mut self,
         state: &mut CS::State,
         idx: CorpusId,
         testcase: &Testcase<<CS::State as UsesInput>::Input>,
@@ -100,7 +100,7 @@ where
 
     /// Removes an entry from the corpus, returning M if M was present.
     fn on_remove(
-        &self,
+        &mut self,
         state: &mut CS::State,
         idx: CorpusId,
         testcase: &Option<Testcase<<CS::State as UsesInput>::Input>>,
@@ -163,7 +163,7 @@ where
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut CS::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut CS::State) -> Result<CorpusId, Error> {
         self.cull(state)?;
         let mut idx = self.base.next(state)?;
         while {
@@ -293,6 +293,11 @@ where
     /// Get a reference to the base scheduler
     pub fn base(&self) -> &CS {
         &self.base
+    }
+
+    /// Get a reference to the base scheduler (mut)
+    pub fn base_mut(&mut self) -> &mut CS {
+        &mut self.base
     }
 
     /// Creates a new [`MinimizerScheduler`] that wraps a `base` [`Scheduler`]

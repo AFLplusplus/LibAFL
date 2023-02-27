@@ -33,6 +33,7 @@ use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, CorpusId, Testcase},
     inputs::UsesInput,
+    observers::ObserversTuple,
     random_corpus_id,
     state::{HasCorpus, HasRand, UsesState},
     Error,
@@ -42,13 +43,13 @@ use crate::{
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
 pub trait Scheduler: UsesState {
     /// Added an entry to the corpus at the given index
-    fn on_add(&self, _state: &mut Self::State, _idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, _state: &mut Self::State, _idx: CorpusId) -> Result<(), Error> {
         Ok(())
     }
 
     /// Replaced the given testcase at the given idx
     fn on_replace(
-        &self,
+        &mut self,
         _state: &mut Self::State,
         _idx: CorpusId,
         _prev: &Testcase<<Self::State as UsesInput>::Input>,
@@ -58,21 +59,29 @@ pub trait Scheduler: UsesState {
 
     /// Removed the given entry from the corpus at the given index
     fn on_remove(
-        &self,
+        &mut self,
         _state: &mut Self::State,
         _idx: CorpusId,
         _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         Ok(())
     }
-    
+
     /// An input has been evaluated
-    fn on_evaluation(&self, _state: &mut Self::State, _input: &<Self::State as UsesInput>::Input) -> Result<(), Error> {
+    fn on_evaluation<OT>(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &<Self::State as UsesInput>::Input,
+        _observers: &OT,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<Self::State>,
+    {
         Ok(())
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error>;
+    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error>;
 }
 
 /// Feed the fuzzer simply with a random testcase on request
@@ -93,7 +102,7 @@ where
     S: HasCorpus + HasRand,
 {
     /// Gets the next entry at random
-    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {

@@ -180,7 +180,7 @@ where
     S: HasCorpus + HasMetadata,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
 
         let mut depth = match current_idx {
@@ -209,7 +209,7 @@ where
 
     #[allow(clippy::cast_precision_loss)]
     fn on_replace(
-        &self,
+        &mut self,
         state: &mut Self::State,
         idx: CorpusId,
         prev: &Testcase<<Self::State as UsesInput>::Input>,
@@ -251,7 +251,7 @@ where
 
     #[allow(clippy::cast_precision_loss)]
     fn on_remove(
-        &self,
+        &mut self,
         state: &mut Self::State,
         _idx: CorpusId,
         prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
@@ -288,7 +288,7 @@ where
         Ok(())
     }
 
-    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
