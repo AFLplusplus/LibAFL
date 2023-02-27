@@ -1003,6 +1003,7 @@ impl AFLRedQueen {
         return false;
     }
 
+    /// rtn_extend_encoding from AFL++
     pub fn rtn_extend_encoding(
         &self,
         pattern: &Vec<u8>,
@@ -1014,17 +1015,36 @@ impl AFLRedQueen {
         buf_idx: usize,
         taint_len: usize,
         input_len: usize,
+        hshape: usize,
     ) -> bool {
-        let (l0, ol0, l1, ol1) = (
-            pattern.len(),
-            repl.len(),
-            o_pattern.len(),
-            changed_val.len(),
+        // TODO: transform solving
+        let l0 = pattern.len();
+        let ol0 = repl.len();
+        // let l1 = o_pattern.len();
+        // let ol1 = changed_val.len();
+
+        let lmax = core::cmp::max(l0, ol0);
+        let its_len = core::cmp::min(
+            core::cmp::min(input_len - buf_idx, taint_len),
+            core::cmp::min(lmax, hshape),
         );
 
-        if l0 >= 0x80 || 
+        let mut copy_len = 0;
+        for i in 0..its_len {
+            if pattern[i] != buf[buf_idx + i] && o_pattern[i] != o_buf[buf_idx + i] {
+                break;
+            }
+            copy_len += 1;
+        }
 
-        true
+        if copy_len > 0 {
+            buffer_copy(buf, &repl, 0, buf_idx, copy_len);
+            true
+        } else {
+            false
+        }
+
+        // Direct matching
     }
 }
 
@@ -1127,6 +1147,7 @@ where
                     };
 
                     let hshape = (header.shape() + 1) as usize;
+                    let mut matched = false;
                     match (&orig_val[cmp_h_idx], &new_val[cmp_h_idx]) {
                         (CmpValues::U8(orig), CmpValues::U8(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
@@ -1134,7 +1155,7 @@ where
                             let attribute = header.attribute() as u8;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v0.into(),
                                     new_v1.into(),
                                     orig_v0.into(),
@@ -1146,10 +1167,12 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
 
                                 // Swapped
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
@@ -1161,12 +1184,14 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v1.into(),
                                     new_v0.into(),
                                     orig_v1.into(),
@@ -1178,10 +1203,12 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
 
                                 // Swapped
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
@@ -1193,7 +1220,9 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
                             }
                         }
                         (CmpValues::U16(orig), CmpValues::U16(new)) => {
@@ -1201,7 +1230,7 @@ where
                             let attribute: u8 = header.attribute() as u8;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v0.into(),
                                     new_v1.into(),
                                     orig_v0.into(),
@@ -1213,11 +1242,13 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
 
                                 // Swapped
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
@@ -1229,12 +1260,14 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v1.into(),
                                     new_v0.into(),
                                     orig_v1.into(),
@@ -1246,10 +1279,12 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
 
                                 // Swapped
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
@@ -1261,7 +1296,9 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
                             }
                         }
                         (CmpValues::U32(orig), CmpValues::U32(new)) => {
@@ -1269,7 +1306,7 @@ where
                             let attribute = header.attribute() as u8;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v0.into(),
                                     new_v1.into(),
                                     orig_v0.into(),
@@ -1281,11 +1318,13 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
 
                                 // swapped
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
@@ -1297,12 +1336,14 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v1.into(),
                                     new_v0.into(),
                                     orig_v1.into(),
@@ -1314,11 +1355,13 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
 
                                 // Swapped
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
@@ -1330,7 +1373,9 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
                             }
                         }
                         (CmpValues::U64(orig), CmpValues::U64(new)) => {
@@ -1338,7 +1383,7 @@ where
                             let attribute = header.attribute() as u8;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v0.into(),
                                     new_v1.into(),
                                     orig_v0.into(),
@@ -1350,11 +1395,13 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
 
                                 // Swapped
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
@@ -1366,12 +1413,14 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v1.into(),
                                     new_v0.into(),
                                     orig_v1.into(),
@@ -1383,11 +1432,13 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
 
                                 // Swapped
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                if self.cmp_extend_encoding(
                                     new_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
@@ -1399,28 +1450,67 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                );
+                                ) {
+                                    matched = true;
+                                }
                             }
                         }
                         (CmpValues::Bytes(orig), CmpValues::Bytes(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) =
                                 (&orig.0, &orig.1, &new.0, &new.1);
-                            let attribute = header.attribute() as u8;
+                            // let attribute = header.attribute() as u8;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                self.rtn_extend_encoding();
+                                if self.rtn_extend_encoding(
+                                    new_v0,
+                                    new_v1,
+                                    orig_v0,
+                                    orig_v1,
+                                    &orig_bytes,
+                                    &mut input_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                // self.rtn_extend_encoding()
+                                if self.rtn_extend_encoding(
+                                    new_v1,
+                                    new_v0,
+                                    orig_v1,
+                                    orig_v0,
+                                    &orig_bytes,
+                                    &mut input_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
                             }
                         }
                         (_, _) => {
                             // It shouldn't have different shape!
-                            return Ok(MutationResult::Skipped);
                         }
                     }
+
+                    if matched {
+                        // before returning the result
+                        // save indexes
+                        self.cmp_start_idx = cmp_start_idx;
+                        self.cmp_h_start_idx = cmp_h_start_idx;
+                        self.cmp_buf_start_idx = cmp_buf_start_idx + 1; // next
+                        self.taint_idx = taint_idx;
+
+                        return Ok(MutationResult::Mutated);
+                    }
+                    // if no match then go to next round
                 }
             }
         }
