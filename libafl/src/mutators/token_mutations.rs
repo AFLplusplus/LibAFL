@@ -624,7 +624,13 @@ impl AFLRedQueen {
         (x & 0xf8) + ((x & 7) ^ 0x07)
     }
 
-    // Cmplog Pattern Matching
+    /// Cmplog Pattern Matching
+    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::if_not_else)]
+    #[allow(clippy::cast_precision_loss)]
     pub fn cmp_extend_encoding(
         &self,
         pattern: u64,
@@ -639,7 +645,7 @@ impl AFLRedQueen {
         input_len: usize,
         hshape: usize,
     ) -> bool {
-        // TODO: ascii2num
+        // TODO: ascii2num (we need check q->is_ascii (in calibration stage(?)))
 
         // try Transform
         if self.enable_transform
@@ -662,21 +668,29 @@ impl AFLRedQueen {
                 0 => {
                     (0, 0, 0) // cannot happen
                 }
-                1 => (buf[buf_idx] as u64, o_buf[buf_idx] as u64, 0xff),
+                1 => (u64::from(buf[buf_idx]), u64::from(o_buf[buf_idx]), 0xff),
                 2 | 3 => (
-                    u16::from_be_bytes(buf[buf_idx..buf_idx + 2].try_into().unwrap()) as u64,
-                    u16::from_be_bytes(o_buf[buf_idx..buf_idx + 2].try_into().unwrap()) as u64,
+                    u64::from(u16::from_be_bytes(
+                        buf[buf_idx..buf_idx + 2].try_into().unwrap(),
+                    )),
+                    u64::from(u16::from_be_bytes(
+                        o_buf[buf_idx..buf_idx + 2].try_into().unwrap(),
+                    )),
                     0xffff,
                 ),
                 4 | 5 | 6 | 7 => (
-                    u32::from_be_bytes(buf[buf_idx..buf_idx + 4].try_into().unwrap()) as u64,
-                    u32::from_be_bytes(o_buf[buf_idx..buf_idx + 4].try_into().unwrap()) as u64,
-                    0xffffffff,
+                    u64::from(u32::from_be_bytes(
+                        buf[buf_idx..buf_idx + 4].try_into().unwrap(),
+                    )),
+                    u64::from(u32::from_be_bytes(
+                        o_buf[buf_idx..buf_idx + 4].try_into().unwrap(),
+                    )),
+                    0xffff_ffff,
                 ),
                 _ => (
                     u64::from_be_bytes(buf[buf_idx..buf_idx + 8].try_into().unwrap()),
                     u64::from_be_bytes(o_buf[buf_idx..buf_idx + 8].try_into().unwrap()),
-                    0xffffffff_ffffffff,
+                    0xffff_ffff_ffff_ffff,
                 ),
             };
 
@@ -734,20 +748,12 @@ impl AFLRedQueen {
 
             // Try Lowercase
             // Shadowing
-            let diff = if (b_val | 0x20202020_20202020 & mask) == (pattern & mask) {
-                true
-            } else {
-                false
-            };
+            let diff = (b_val | 0x2020_2020_2020_2020 & mask) == (pattern & mask);
 
-            let o_diff = if (b_val | 0x20202020_20202020 & mask) == (pattern & mask) {
-                true
-            } else {
-                false
-            };
+            let o_diff = (b_val | 0x2020_2020_2020_2020 & mask) == (pattern & mask);
 
             if o_diff && diff {
-                let new_repl: u64 = repl & (0x5f5f5f5f_5f5f5f5f & mask);
+                let new_repl: u64 = repl & (0x5f5f_5f5f_5f5f_5f5f & mask);
                 let ret = self.cmp_extend_encoding(
                     pattern,
                     new_repl,
@@ -769,20 +775,12 @@ impl AFLRedQueen {
 
             // Try Uppercase
             // Shadowing
-            let diff = if (b_val | 0x5f5f5f5f_5f5f5f5f & mask) == (pattern & mask) {
-                true
-            } else {
-                false
-            };
+            let diff = (b_val | 0x5f5f_5f5f_5f5f_5f5f & mask) == (pattern & mask);
 
-            let o_diff = if (b_val | 0x5f5f5f5f_5f5f5f5f & mask) == (pattern & mask) {
-                true
-            } else {
-                false
-            };
+            let o_diff = (b_val | 0x5f5f_5f5f_5f5f_5f5f & mask) == (pattern & mask);
 
             if o_diff && diff {
-                let new_repl: u64 = repl & (0x20202020_20202020 & mask);
+                let new_repl: u64 = repl & (0x2020_2020_2020_2020 & mask);
                 let ret = self.cmp_extend_encoding(
                     pattern,
                     new_repl,
@@ -887,19 +885,17 @@ impl AFLRedQueen {
             };
 
             // FP
-            if attr >= CMP_ATTRIBUTE_IS_FP && attr < CMP_ATTRIBUTE_IS_FP_MOD {
-                let mut repl_new: u64 = 0;
+            if (CMP_ATTRIBUTE_IS_FP..CMP_ATTRIBUTE_IS_FP_MOD).contains(&attr) {
+                let repl_new: u64;
 
                 if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
-                    if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
-                        if hshape == 4 && its_len >= 4 {
-                            let mut g = repl as f32;
-                            g = g + 1.0;
-                            repl_new = (g as u32) as u64;
-                        }
+                    if hshape == 4 && its_len >= 4 {
+                        let mut g = repl as f32;
+                        g += 1.0;
+                        repl_new = u64::from(g as u32);
                     } else if hshape == 8 && its_len >= 8 {
                         let mut g = repl as f64;
-                        g = g + 1.0;
+                        g += 1.0;
                         repl_new = g as u64;
                     } else {
                         return false;
@@ -922,15 +918,13 @@ impl AFLRedQueen {
                         return true;
                     }
                 } else {
-                    if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
-                        if hshape == 4 && its_len >= 4 {
-                            let mut g = repl as f32;
-                            g = g - 1.0;
-                            repl_new = (g as u32) as u64;
-                        }
+                    if hshape == 4 && its_len >= 4 {
+                        let mut g = repl as f32;
+                        g -= 1.0;
+                        repl_new = u64::from(g as u32);
                     } else if hshape == 8 && its_len >= 8 {
                         let mut g = repl as f64;
-                        g = g - 1.0;
+                        g -= 1.0;
                         repl_new = g as u64;
                     } else {
                         return false;
@@ -1000,16 +994,17 @@ impl AFLRedQueen {
             }
         }
 
-        return false;
+        false
     }
 
-    /// rtn_extend_encoding from AFL++
+    /// rtn part from AFL++
+    #[allow(clippy::too_many_arguments)]
     pub fn rtn_extend_encoding(
         &self,
-        pattern: &Vec<u8>,
-        repl: &Vec<u8>,
-        o_pattern: &Vec<u8>,
-        changed_val: &Vec<u8>,
+        pattern: &[u8],
+        repl: &[u8],
+        o_pattern: &[u8],
+        _changed_val: &[u8],
         o_buf: &[u8],
         buf: &mut [u8],
         buf_idx: usize,
@@ -1038,7 +1033,7 @@ impl AFLRedQueen {
         }
 
         if copy_len > 0 {
-            buffer_copy(buf, &repl, 0, buf_idx, copy_len);
+            buffer_copy(buf, repl, 0, buf_idx, copy_len);
             true
         } else {
             false
@@ -1053,6 +1048,7 @@ where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize,
     I: HasBytesVec,
 {
+    #[allow(clippy::needless_range_loop)]
     #[allow(clippy::too_many_lines)]
     fn mutate(
         &mut self,
@@ -1099,7 +1095,7 @@ where
         let new_cmpvals = cmp_meta.new_cmpvals();
         let headers = cmp_meta.headers();
         let input_len = input.bytes().len();
-        let mut input_bytes = input.bytes_mut();
+        let input_bytes = input.bytes_mut();
         let orig_bytes = taint_meta.input_vec();
         let taint = taint_meta.ranges();
 
@@ -1161,8 +1157,8 @@ where
                                     orig_v0.into(),
                                     orig_v1.into(),
                                     attribute,
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1178,8 +1174,8 @@ where
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     attribute,
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1197,8 +1193,8 @@ where
                                     orig_v1.into(),
                                     orig_v0.into(),
                                     Self::swapa(attribute),
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1214,8 +1210,8 @@ where
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     Self::swapa(attribute),
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1236,8 +1232,8 @@ where
                                     orig_v0.into(),
                                     orig_v1.into(),
                                     attribute,
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1254,8 +1250,8 @@ where
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     attribute,
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1273,8 +1269,8 @@ where
                                     orig_v1.into(),
                                     orig_v0.into(),
                                     Self::swapa(attribute),
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1290,8 +1286,8 @@ where
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     Self::swapa(attribute),
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1312,8 +1308,8 @@ where
                                     orig_v0.into(),
                                     orig_v1.into(),
                                     attribute,
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1330,8 +1326,8 @@ where
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     attribute,
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1349,8 +1345,8 @@ where
                                     orig_v1.into(),
                                     orig_v0.into(),
                                     Self::swapa(attribute),
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1367,8 +1363,8 @@ where
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     Self::swapa(attribute),
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1384,13 +1380,13 @@ where
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
                                 if self.cmp_extend_encoding(
-                                    new_v0.into(),
-                                    new_v1.into(),
-                                    orig_v0.into(),
-                                    orig_v1.into(),
+                                    new_v0,
+                                    new_v1,
+                                    orig_v0,
+                                    orig_v1,
                                     attribute,
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1402,13 +1398,13 @@ where
                                 // Swapped
                                 // Compare v0 against v1
                                 if self.cmp_extend_encoding(
-                                    new_v0.swap_bytes().into(),
-                                    new_v1.swap_bytes().into(),
-                                    orig_v0.swap_bytes().into(),
-                                    orig_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes(),
+                                    new_v1.swap_bytes(),
+                                    orig_v0.swap_bytes(),
+                                    orig_v1.swap_bytes(),
                                     attribute,
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1421,13 +1417,13 @@ where
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
                                 if self.cmp_extend_encoding(
-                                    new_v1.into(),
-                                    new_v0.into(),
-                                    orig_v1.into(),
-                                    orig_v0.into(),
+                                    new_v1,
+                                    new_v0,
+                                    orig_v1,
+                                    orig_v0,
                                     Self::swapa(attribute),
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1439,13 +1435,13 @@ where
                                 // Swapped
                                 // Compare v1 against v0
                                 if self.cmp_extend_encoding(
-                                    new_v1.swap_bytes().into(),
-                                    new_v0.swap_bytes().into(),
-                                    orig_v1.swap_bytes().into(),
-                                    orig_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes(),
+                                    new_v0.swap_bytes(),
+                                    orig_v1.swap_bytes(),
+                                    orig_v0.swap_bytes(),
                                     Self::swapa(attribute),
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1466,8 +1462,8 @@ where
                                     new_v1,
                                     orig_v0,
                                     orig_v1,
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1484,8 +1480,8 @@ where
                                     new_v0,
                                     orig_v1,
                                     orig_v0,
-                                    &orig_bytes,
-                                    &mut input_bytes,
+                                    orig_bytes,
+                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,

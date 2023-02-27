@@ -349,7 +349,7 @@ struct cmp_map {
 };
 */
 
-/// A [`CmpObserver`] observer for AFL++ RedQueen
+/// A [`CmpObserver`] observer for AFL++ redqueen
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AFLStdCmpObserver<'a, S>
 where
@@ -415,7 +415,7 @@ where
         for i in 0..count {
             if self.original {
                 // Update header
-                meta.headers.push((i, self.cmp_map().headers[i]))
+                meta.headers.push((i, self.cmp_map().headers[i]));
             }
 
             let execs = self.cmp_map().usable_executions_for(i);
@@ -467,7 +467,7 @@ where
                     // println!("Adding to orig_cmpvals");
                     for j in 0..execs {
                         if let Some(val) = self.cmp_map().values_of(i, j) {
-                            cmp_values.push(val)
+                            cmp_values.push(val);
                         }
                     }
                     meta.orig_cmpvals.insert(cmpmap_idx, cmp_values);
@@ -476,7 +476,7 @@ where
                     // println!("Adding to new_cmpvals");
                     for j in 0..execs {
                         if let Some(val) = self.cmp_map().values_of(i, j) {
-                            cmp_values.push(val)
+                            cmp_values.push(val);
                         }
                     }
                     meta.new_cmpvals.insert(cmpmap_idx, cmp_values);
@@ -576,6 +576,7 @@ crate::impl_serdeany!(AFLCmpValuesMetadata);
 
 impl AFLCmpValuesMetadata {
     /// Constructor for `AFLCmpValuesMetadata`
+    #[must_use]
     pub fn new() -> Self {
         Self {
             orig_cmpvals: HashMap::new(),
@@ -585,16 +586,19 @@ impl AFLCmpValuesMetadata {
     }
 
     /// Getter for `orig_cmpvals`
+    #[must_use]
     pub fn orig_cmpvals(&self) -> &HashMap<usize, Vec<CmpValues>> {
         &self.orig_cmpvals
     }
 
     /// Getter for `new_cmpvals`
+    #[must_use]
     pub fn new_cmpvals(&self) -> &HashMap<usize, Vec<CmpValues>> {
         &self.new_cmpvals
     }
 
     /// Getter for `headers`
+    #[must_use]
     pub fn headers(&self) -> &Vec<(usize, AFLCmpHeader)> {
         &self.headers
     }
@@ -637,18 +641,26 @@ pub struct AFLCmpOperands {
 }
 
 impl AFLCmpOperands {
+    #[must_use]
+    /// 64bit first cmp operand
     pub fn v0(&self) -> u64 {
         self.v0
     }
 
+    #[must_use]
+    /// 64bit second cmp operand
     pub fn v1(&self) -> u64 {
         self.v1
     }
 
+    #[must_use]
+    /// 128bit first cmp operand
     pub fn v0_128(&self) -> u64 {
         self.v0_128
     }
 
+    #[must_use]
+    /// 128bit second cmp operand
     pub fn v1_128(&self) -> u64 {
         self.v1_128
     }
@@ -665,18 +677,26 @@ pub struct AFLCmpFnOperands {
 }
 
 impl AFLCmpFnOperands {
+    #[must_use]
+    /// first rtn operand
     pub fn v0(&self) -> &[u8; 31] {
         &self.v0
     }
 
+    #[must_use]
+    /// second rtn operand
     pub fn v0_len(&self) -> u8 {
         self.v0_len
     }
 
+    #[must_use]
+    /// first rtn operand len
     pub fn v1(&self) -> &[u8; 31] {
         &self.v1
     }
 
+    #[must_use]
+    /// second rtn operand len
     pub fn v1_len(&self) -> u8 {
         self.v1_len
     }
