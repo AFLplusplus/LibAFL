@@ -36,6 +36,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "std")]
+use crate::Error;
+
 /// The client ID == the sender id.
 #[repr(transparent)]
 #[derive(
@@ -216,61 +219,91 @@ pub fn format_duration_hms(duration: &time::Duration) -> String {
     format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
 }
 
-#[derive(Debug, Copy, Clone)]
-#[cfg(feature = "std")]
-enum Target {
-    Stdout,
-    Stderr,
-}
+/// Stderr logger
+pub static LIBAFL_STDERR_LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
+
+/// Stdout logger
+pub static LIBAFL_STDOUT_LOGGER: SimpleStdoutLogger = SimpleStdoutLogger::new();
 
 /// A simple logger struct that logs to stderr when used with [`log::set_logger`].
 #[derive(Debug)]
 #[cfg(feature = "std")]
-pub struct SimpleLogger {
-    /// Where the log goes
-    target: Target,
-}
+pub struct SimpleStdoutLogger {}
 
-#[cfg(feature = "std")]
-impl SimpleLogger {
-    /// Create a new [`log::Log`] logger that will wrte log to stdout
-    #[must_use]
-    pub const fn stdout() -> Self {
-        Self {
-            target: Target::Stdout,
-        }
-    }
-
-    /// Create a new [`log::Log`] logger that will wrte log to stdout
-    #[must_use]
-    pub const fn stderr() -> Self {
-        Self {
-            target: Target::Stderr,
-        }
+impl Default for SimpleStdoutLogger {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 #[cfg(feature = "std")]
-impl log::Log for SimpleLogger {
+impl SimpleStdoutLogger {
+    /// Create a new [`log::Log`] logger that will wrte log to stdout
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {}
+    }
+
+    /// register stdout logger
+    pub fn register_logger() -> Result<(), Error> {
+        log::set_logger(&LIBAFL_STDOUT_LOGGER)
+            .map_err(|_| Error::unknown("Failed to register logger"))
+    }
+}
+
+#[cfg(feature = "std")]
+impl log::Log for SimpleStdoutLogger {
     #[inline]
     fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }
 
     fn log(&self, record: &Record) {
-        match self.target {
-            Target::Stdout => {
-                println!("{}: {}", record.level(), record.args());
-            }
-            Target::Stderr => {
-                eprintln!("{}: {}", record.level(), record.args());
-            }
-        }
+        println!("{}: {}", record.level(), record.args());
     }
 
     fn flush(&self) {}
 }
 
+/// A simple logger struct that logs to stderr when used with [`log::set_logger`].
+#[derive(Debug)]
+#[cfg(feature = "std")]
+pub struct SimpleStderrLogger {}
+
+impl Default for SimpleStderrLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "std")]
+impl SimpleStderrLogger {
+    /// Create a new [`log::Log`] logger that will wrte log to stdout
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {}
+    }
+
+    /// register stderr logger
+    pub fn register_logger() -> Result<(), Error> {
+        log::set_logger(&LIBAFL_STDERR_LOGGER)
+            .map_err(|_| Error::unknown("Failed to register logger"))
+    }
+}
+
+#[cfg(feature = "std")]
+impl log::Log for SimpleStderrLogger {
+    #[inline]
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        eprintln!("{}: {}", record.level(), record.args());
+    }
+
+    fn flush(&self) {}
+}
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod bolts_prelude {

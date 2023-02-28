@@ -13,7 +13,7 @@ use libafl::{
     bolts::{
         llmp::{self, Tag},
         shmem::{ShMemProvider, StdShMemProvider},
-        ClientId, SimpleLogger,
+        ClientId, SimpleStderrLogger,
     },
     Error,
 };
@@ -34,7 +34,7 @@ const BROKER_TIMEOUT: Duration = Duration::from_secs(10);
 const SLEEP_BETWEEN_FORWARDS: Duration = Duration::from_millis(5);
 
 #[cfg(feature = "std")]
-static LOGGER: SimpleLogger = SimpleLogger::stderr();
+static LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
 
 #[cfg(feature = "std")]
 fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
