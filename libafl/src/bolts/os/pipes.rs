@@ -34,7 +34,7 @@ impl Pipe {
     /// Close the read end of a pipe
     pub fn close_read_end(&mut self) {
         if let Some(read_end) = self.read_end {
-            let _ = close(read_end);
+            let _: Result<(), nix::errno::Errno> = close(read_end);
             self.read_end = None;
         }
     }
@@ -42,7 +42,7 @@ impl Pipe {
     /// Close the write end of a pipe
     pub fn close_write_end(&mut self) {
         if let Some(write_end) = self.write_end {
-            let _ = close(write_end);
+            let _: Result<(), nix::errno::Errno> = close(write_end);
             self.write_end = None;
         }
     }
@@ -102,10 +102,10 @@ impl Write for Pipe {
 impl Drop for Pipe {
     fn drop(&mut self) {
         if let Some(read_end) = self.read_end {
-            let _ = close(read_end);
+            let _: Result<(), nix::errno::Errno> = close(read_end);
         }
         if let Some(write_end) = self.write_end {
-            let _ = close(write_end);
+            let _: Result<(), nix::errno::Errno> = close(write_end);
         }
     }
 }

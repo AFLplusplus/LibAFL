@@ -56,7 +56,7 @@ pub fn main() -> Result<(), Error> {
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
-        OnDiskCorpus::new(&corpus_dir).unwrap(),
+        InMemoryOnDiskCorpus::new(&corpus_dir).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(&solution_dir).unwrap(),
@@ -108,7 +108,7 @@ pub fn main() -> Result<(), Error> {
 
     let mut state = StdState::new(
         StdRand::with_seed(current_nanos()),
-        OnDiskCorpus::new(&minimized_dir).unwrap(),
+        InMemoryOnDiskCorpus::new(&minimized_dir).unwrap(),
         InMemoryCorpus::new(),
         &mut (),
         &mut (),

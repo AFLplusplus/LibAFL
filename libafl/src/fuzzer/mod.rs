@@ -465,6 +465,9 @@ where
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
+
+        self.scheduler.on_evaluation(state, &input, observers)?;
+
         self.process_execution(state, manager, input, observers, &exit_kind, send_events)
     }
 }
@@ -509,7 +512,7 @@ where
 
         // several is_interesting implementations collect some data about the run, later used in
         // append_metadata; we *must* invoke is_interesting here to collect it
-        let _ = self
+        let _: bool = self
             .feedback_mut()
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
 

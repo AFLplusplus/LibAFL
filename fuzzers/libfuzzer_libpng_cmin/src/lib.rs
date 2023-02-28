@@ -141,13 +141,14 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
-    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
+    let power = StdPowerMutationalStage::new(mutator);
 
     let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
         &mut state,
+        &edges_observer,
         Some(PowerSchedule::FAST),
     ));
 

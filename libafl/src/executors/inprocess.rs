@@ -1672,7 +1672,7 @@ where
                         );
 
                         // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-                        let _ = libc::timer_settime(
+                        let _: i32 = libc::timer_settime(
                             timerid,
                             0,
                             addr_of_mut!(self.itimerspec),
