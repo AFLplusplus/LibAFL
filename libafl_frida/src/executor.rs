@@ -14,7 +14,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
+    state::{HasFuzzedCorpusId, UsesState},
     Error,
 };
 
@@ -200,7 +200,7 @@ impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHandlers
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: UsesInput + HasClientPerfMonitor + HasSolutions,
+    S: UsesInput + HasClientPerfMonitor + HasSolutions + HasFuzzedCorpusId,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,
