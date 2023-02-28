@@ -2642,7 +2642,13 @@ where
         // TODO: We could memcpy a range of pending messages, instead of one by one.
         loop {
             let msg = {
-                let client = &mut self.llmp_clients[client_id.0 as usize];
+                // TODO faster search (e.g. binary search)
+                let pos = self
+                    .llmp_clients
+                    .iter()
+                    .position(|x| x.id == client_id)
+                    .expect("Fatal error, client ID not found");
+                let client = &mut self.llmp_clients[pos];
                 match client.recv()? {
                     None => {
                         // We're done handling this client
@@ -2650,7 +2656,7 @@ where
                         if new_messages {
                             // set the recv time
                             // We don't do that in recv() to keep calls to `current_time` to a minimum.
-                            self.llmp_clients[client_id.0 as usize].last_msg_time = current_time();
+                            self.llmp_clients[pos].last_msg_time = current_time();
                         }
                         return Ok(new_messages);
                     }
@@ -2717,7 +2723,13 @@ where
                     // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
                     let mut should_forward_msg = true;
 
-                    let map = &mut self.llmp_clients[client_id.0 as usize].current_recv_shmem;
+                    // TODO faster search (e.g. binary search)
+                    let pos = self
+                        .llmp_clients
+                        .iter()
+                        .position(|x| x.id == client_id)
+                        .expect("Fatal error, client ID not found");
+                    let map = &mut self.llmp_clients[pos].current_recv_shmem;
                     let msg_buf = (*msg).try_as_slice(map)?;
                     if let LlmpMsgHookResult::Handled =
                         (on_new_msg)(client_id, (*msg).tag, (*msg).flags, msg_buf)?
