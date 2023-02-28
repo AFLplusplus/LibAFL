@@ -249,7 +249,6 @@ pub fn build(
                 .arg("--disable-vhost-vdpa")
                 .arg("--disable-virglrenderer")
                 .arg("--disable-virtfs")
-                .arg("--disable-virtiofsd")
                 .arg("--disable-vmnet")
                 .arg("--disable-vnc")
                 .arg("--disable-vnc-jpeg")
