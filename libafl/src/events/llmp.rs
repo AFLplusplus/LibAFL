@@ -309,11 +309,15 @@ where
     S: UsesInput,
     SP: ShMemProvider + 'static,
 {
+    /// The llmp client for inter process communication
     llmp: LlmpClient<SP>,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
+    /// The configuration defines this specific fuzzer.
+    /// A node will not re-use the observer values sent over `LLMP`
+    /// from nodes with other configurations.
     configuration: EventConfig,
     phantom: PhantomData<S>,
 }
@@ -1015,7 +1019,7 @@ where
                     }
                 };
 
-                // On windows (or in any case without fork), we spawn ourself again
+                // On Windows (or in any case without fork), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = startable_self()?.status()?;
                 #[cfg(all(unix, not(feature = "fork")))]

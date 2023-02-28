@@ -113,7 +113,7 @@ impl CommandConfigurator for StdCommandConfigurator {
                         debug_assert_eq!(arg, "DUMMY");
                         #[cfg(unix)]
                         cmd.arg(OsStr::from_bytes(input.target_bytes().as_slice()));
-                        // There is an issue here that the chars on windows are 16 bit wide.
+                        // There is an issue here that the chars on Windows are 16 bit wide.
                         // I can't really test it. Please open a PR if this goes wrong.
                         #[cfg(not(unix))]
                         cmd.arg(OsString::from_vec(input.target_bytes().as_vec()));
