@@ -14,7 +14,7 @@ use libafl::{
         current_nanos,
         rands::StdRand,
         tuples::{tuple_list, Merge},
-        AsSlice, SimpleLogger,
+        AsSlice, SimpleLogger, LIBAFL_STDOUT_LOGGER
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
