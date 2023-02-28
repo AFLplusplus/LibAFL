@@ -1213,7 +1213,7 @@ pub mod win32_shmem {
         },
     };
 
-    /// The default Sharedmap impl for windows using shmctl & shmget
+    /// The default [`ShMem`] impl for Windows using `shmctl` & `shmget`
     #[derive(Clone)]
     pub struct Win32ShMem {
         id: ShMemId,

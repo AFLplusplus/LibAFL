@@ -2,7 +2,7 @@
 
 LibAFL offers a standard mechanism for message passing between processes and machines with a low overhead.
 We use message passing to inform the other connected clients/fuzzers/nodes about new testcases, metadata, and statistics about the current run.
-Depending on individual needs, LibAFL can also write testcase contents to disk, while still using events to notify other fuzzers, using an `OnDiskCorpus`.
+Depending on individual needs, LibAFL can also write testcase contents to disk, while still using events to notify other fuzzers, using the `CachedOnDiskCorpus` or similar.
 
 In our tests, message passing scales very well to share new testcases and metadata between multiple running fuzzer instances for multi-core fuzzing.
 Specifically, it scales _a lot_ better than using memory locks on a shared corpus, and _a lot_ better than sharing the testcases via the filesystem, as AFL traditionally does.
@@ -12,7 +12,7 @@ The `EventManager` interface is used to send Events over the wire using `Low Lev
 
 ## Low Level Message Passing (LLMP)
 
-LibAFL comes with a reasonably lock-free message passing mechanism that scales well across cores and, using its *broker2broker* mechanism, even to connected machines via TCP.
+LibAFL comes with a reasonably lock-free message passing mechanism that scales well across cores and, using its _broker2broker_ mechanism, even to connected machines via TCP.
 Most example fuzzers use this mechanism, and it is the best `EventManager` if you want to fuzz on more than a single core.
 In the following, we will describe the inner workings of `LLMP`.
 
