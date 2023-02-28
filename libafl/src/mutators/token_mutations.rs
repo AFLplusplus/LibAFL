@@ -635,11 +635,11 @@ impl AFLRedQueen {
         &self,
         pattern: u64,
         repl: u64,
-        o_pattern: u64,
+        another_pattern: u64,
         changed_val: u64,
         attr: u8,
-        o_buf: &[u8],
-        buf: &mut [u8],
+        another_buf: &[u8],
+        buf: &mut [u8], // Unlike AFL++ we change the original buf (it's named buf here)
         buf_idx: usize,
         taint_len: usize,
         input_len: usize,
@@ -649,7 +649,7 @@ impl AFLRedQueen {
 
         // try Transform
         if self.enable_transform
-            && pattern != o_pattern
+            && pattern != another_pattern
             && repl == changed_val
             && attr <= CMP_ATTTRIBUTE_IS_EQUAL
         {
@@ -668,13 +668,17 @@ impl AFLRedQueen {
                 0 => {
                     (0, 0, 0) // cannot happen
                 }
-                1 => (u64::from(buf[buf_idx]), u64::from(o_buf[buf_idx]), 0xff),
+                1 => (
+                    u64::from(buf[buf_idx]),
+                    u64::from(another_buf[buf_idx]),
+                    0xff,
+                ),
                 2 | 3 => (
                     u64::from(u16::from_be_bytes(
-                        buf[buf_idx..buf_idx + 2].try_into().unwrap(),
+                        another_buf[buf_idx..buf_idx + 2].try_into().unwrap(),
                     )),
                     u64::from(u16::from_be_bytes(
-                        o_buf[buf_idx..buf_idx + 2].try_into().unwrap(),
+                        another_buf[buf_idx..buf_idx + 2].try_into().unwrap(),
                     )),
                     0xffff,
                 ),
@@ -683,31 +687,31 @@ impl AFLRedQueen {
                         buf[buf_idx..buf_idx + 4].try_into().unwrap(),
                     )),
                     u64::from(u32::from_be_bytes(
-                        o_buf[buf_idx..buf_idx + 4].try_into().unwrap(),
+                        another_buf[buf_idx..buf_idx + 4].try_into().unwrap(),
                     )),
                     0xffff_ffff,
                 ),
                 _ => (
                     u64::from_be_bytes(buf[buf_idx..buf_idx + 8].try_into().unwrap()),
-                    u64::from_be_bytes(o_buf[buf_idx..buf_idx + 8].try_into().unwrap()),
+                    u64::from_be_bytes(another_buf[buf_idx..buf_idx + 8].try_into().unwrap()),
                     0xffff_ffff_ffff_ffff,
                 ),
             };
 
             // Try arith
             let diff: i64 = (pattern - b_val) as i64;
-            let o_diff: i64 = (o_pattern - o_b_val) as i64;
+            let new_diff: i64 = (another_pattern - o_b_val) as i64;
 
-            if diff == o_diff && diff != 0 {
+            if diff == new_diff && diff != 0 {
                 let new_repl: u64 = (repl as i64 - diff) as u64;
 
                 let ret = self.cmp_extend_encoding(
                     pattern,
                     new_repl,
-                    o_pattern,
+                    another_pattern,
                     repl,
                     CMP_ATTRIBUTE_IS_TRANSFORM,
-                    o_buf,
+                    another_buf,
                     buf,
                     buf_idx,
                     taint_len,
@@ -723,17 +727,17 @@ impl AFLRedQueen {
 
             // Shadowing
             let diff: i64 = (pattern ^ b_val) as i64;
-            let o_diff: i64 = (o_pattern ^ o_b_val) as i64;
+            let new_diff: i64 = (another_pattern ^ o_b_val) as i64;
 
-            if diff == o_diff && diff != 0 {
+            if diff == new_diff && diff != 0 {
                 let new_repl: u64 = (repl as i64 ^ diff) as u64;
                 let ret = self.cmp_extend_encoding(
                     pattern,
                     new_repl,
-                    o_pattern,
+                    another_pattern,
                     repl,
                     CMP_ATTRIBUTE_IS_TRANSFORM,
-                    o_buf,
+                    another_buf,
                     buf,
                     buf_idx,
                     taint_len,
@@ -750,17 +754,17 @@ impl AFLRedQueen {
             // Shadowing
             let diff = (b_val | 0x2020_2020_2020_2020 & mask) == (pattern & mask);
 
-            let o_diff = (b_val | 0x2020_2020_2020_2020 & mask) == (pattern & mask);
+            let new_diff = (b_val | 0x2020_2020_2020_2020 & mask) == (another_pattern & mask);
 
-            if o_diff && diff {
+            if new_diff && diff {
                 let new_repl: u64 = repl & (0x5f5f_5f5f_5f5f_5f5f & mask);
                 let ret = self.cmp_extend_encoding(
                     pattern,
                     new_repl,
-                    o_pattern,
+                    another_pattern,
                     repl,
                     CMP_ATTRIBUTE_IS_TRANSFORM,
-                    o_buf,
+                    another_buf,
                     buf,
                     buf_idx,
                     taint_len,
@@ -777,17 +781,17 @@ impl AFLRedQueen {
             // Shadowing
             let diff = (b_val | 0x5f5f_5f5f_5f5f_5f5f & mask) == (pattern & mask);
 
-            let o_diff = (b_val | 0x5f5f_5f5f_5f5f_5f5f & mask) == (pattern & mask);
+            let o_diff = (b_val | 0x5f5f_5f5f_5f5f_5f5f & mask) == (another_pattern & mask);
 
             if o_diff && diff {
                 let new_repl: u64 = repl & (0x2020_2020_2020_2020 & mask);
                 let ret = self.cmp_extend_encoding(
                     pattern,
                     new_repl,
-                    o_pattern,
+                    another_pattern,
                     repl,
                     CMP_ATTRIBUTE_IS_TRANSFORM,
-                    o_buf,
+                    another_buf,
                     buf,
                     buf_idx,
                     taint_len,
@@ -810,8 +814,8 @@ impl AFLRedQueen {
             1 => {
                 // 1 byte pattern match
                 let buf_8 = buf[buf_idx];
-                let o_buf_8 = o_buf[buf_idx];
-                if buf_8 == pattern as u8 && o_buf_8 == o_pattern as u8 {
+                let another_buf_8 = another_buf[buf_idx];
+                if buf_8 == pattern as u8 && another_buf_8 == another_pattern as u8 {
                     buf[buf_idx] = repl as u8;
                     return true;
                 }
@@ -819,10 +823,10 @@ impl AFLRedQueen {
             2 | 3 => {
                 if its_len >= 2 {
                     let buf_16 = u16::from_be_bytes(buf[buf_idx..buf_idx + 2].try_into().unwrap());
-                    let o_buf_16 =
-                        u16::from_be_bytes(o_buf[buf_idx..buf_idx + 2].try_into().unwrap());
+                    let another_buf_16 =
+                        u16::from_be_bytes(another_buf[buf_idx..buf_idx + 2].try_into().unwrap());
 
-                    if buf_16 == pattern as u16 && o_buf_16 == o_pattern as u16 {
+                    if buf_16 == pattern as u16 && another_buf_16 == another_pattern as u16 {
                         buf[buf_idx] = (repl & 0xff) as u8;
                         buf[buf_idx + 1] = (repl >> 8 & 0xff) as u8;
                         return true;
@@ -832,11 +836,11 @@ impl AFLRedQueen {
             4 | 5 | 6 | 7 => {
                 if its_len >= 4 {
                     let buf_32 = u32::from_be_bytes(buf[buf_idx..buf_idx + 4].try_into().unwrap());
-                    let o_buf_32 =
-                        u32::from_be_bytes(o_buf[buf_idx..buf_idx + 4].try_into().unwrap());
-                    println!("buf: {buf_32} {o_buf_32} {pattern} {o_pattern}");
-                    if buf_32 == pattern as u32 && o_buf_32 == o_pattern as u32 {
-                        println!("Matched!");
+                    let another_buf_32 =
+                        u32::from_be_bytes(another_buf[buf_idx..buf_idx + 4].try_into().unwrap());
+                    // println!("buf: {buf_32} {another_buf_32} {pattern} {another_pattern}");
+                    if buf_32 == pattern as u32 && another_buf_32 == another_pattern as u32 {
+                        // println!("Matched!");
                         buf[buf_idx] = (repl & 0xff) as u8;
                         buf[buf_idx + 1] = (repl >> 8 & 0xff) as u8;
                         buf[buf_idx + 2] = (repl >> 16 & 0xff) as u8;
@@ -849,10 +853,10 @@ impl AFLRedQueen {
             _ => {
                 if its_len >= 8 {
                     let buf_64 = u64::from_be_bytes(buf[buf_idx..buf_idx + 8].try_into().unwrap());
-                    let o_buf_64 =
-                        u64::from_be_bytes(o_buf[buf_idx..buf_idx + 8].try_into().unwrap());
+                    let another_buf_64 =
+                        u64::from_be_bytes(another_buf[buf_idx..buf_idx + 8].try_into().unwrap());
 
-                    if buf_64 == pattern && o_buf_64 == o_pattern {
+                    if buf_64 == pattern && another_buf_64 == another_pattern {
                         buf[buf_idx] = (repl & 0xff) as u8;
                         buf[buf_idx + 1] = (repl >> 8 & 0xff) as u8;
                         buf[buf_idx + 2] = (repl >> 16 & 0xff) as u8;
@@ -906,10 +910,10 @@ impl AFLRedQueen {
                     let ret = self.cmp_extend_encoding(
                         pattern,
                         repl,
-                        o_pattern,
+                        another_pattern,
                         repl_new,
                         CMP_ATTRIBUTE_IS_FP_MOD,
-                        o_buf,
+                        another_buf,
                         buf,
                         buf_idx,
                         taint_len,
@@ -935,10 +939,10 @@ impl AFLRedQueen {
                     let ret = self.cmp_extend_encoding(
                         pattern,
                         repl,
-                        o_pattern,
+                        another_pattern,
                         repl_new,
                         CMP_ATTRIBUTE_IS_FP_MOD,
-                        o_buf,
+                        another_buf,
                         buf,
                         buf_idx,
                         taint_len,
@@ -956,10 +960,10 @@ impl AFLRedQueen {
                     let ret = self.cmp_extend_encoding(
                         pattern,
                         repl,
-                        o_pattern,
+                        another_pattern,
                         repl_new,
                         CMP_ATTRIBUTE_IS_INT_MOD,
-                        o_buf,
+                        another_buf,
                         buf,
                         buf_idx,
                         taint_len,
@@ -976,10 +980,10 @@ impl AFLRedQueen {
                     let ret = self.cmp_extend_encoding(
                         pattern,
                         repl,
-                        o_pattern,
+                        another_pattern,
                         repl_new,
                         CMP_ATTRIBUTE_IS_INT_MOD,
-                        o_buf,
+                        another_buf,
                         buf,
                         buf_idx,
                         taint_len,
@@ -1102,8 +1106,8 @@ where
         let new_cmpvals = cmp_meta.new_cmpvals();
         let headers = cmp_meta.headers();
         let input_len = input.bytes().len();
-        let input_bytes = input.bytes_mut();
-        let orig_bytes = taint_meta.input_vec();
+        let new_bytes = taint_meta.input_vec();
+        let orig_bytes = input.bytes_mut();
         // TODO: Swap this.
         let taint = taint_meta.ranges();
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
@@ -1162,13 +1166,13 @@ where
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
                                 if self.cmp_extend_encoding(
-                                    new_v0.into(),
-                                    new_v1.into(),
                                     orig_v0.into(),
                                     orig_v1.into(),
+                                    new_v0.into(),
+                                    new_v1.into(),
                                     attribute,
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1179,13 +1183,13 @@ where
 
                                 // Swapped
                                 if self.cmp_extend_encoding(
-                                    new_v0.swap_bytes().into(),
-                                    new_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
                                     attribute,
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1198,13 +1202,13 @@ where
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
                                 if self.cmp_extend_encoding(
-                                    new_v1.into(),
-                                    new_v0.into(),
                                     orig_v1.into(),
                                     orig_v0.into(),
+                                    new_v1.into(),
+                                    new_v0.into(),
                                     Self::swapa(attribute),
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1215,13 +1219,13 @@ where
 
                                 // Swapped
                                 if self.cmp_extend_encoding(
-                                    new_v1.swap_bytes().into(),
-                                    new_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
                                     Self::swapa(attribute),
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1237,13 +1241,13 @@ where
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
                                 if self.cmp_extend_encoding(
-                                    new_v0.into(),
-                                    new_v1.into(),
                                     orig_v0.into(),
                                     orig_v1.into(),
+                                    new_v0.into(),
+                                    new_v1.into(),
                                     attribute,
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1255,13 +1259,13 @@ where
                                 // Swapped
                                 // Compare v0 against v1
                                 if self.cmp_extend_encoding(
-                                    new_v0.swap_bytes().into(),
-                                    new_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
                                     attribute,
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1274,13 +1278,13 @@ where
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
                                 if self.cmp_extend_encoding(
-                                    new_v1.into(),
-                                    new_v0.into(),
                                     orig_v1.into(),
                                     orig_v0.into(),
+                                    new_v1.into(),
+                                    new_v0.into(),
                                     Self::swapa(attribute),
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1291,13 +1295,13 @@ where
 
                                 // Swapped
                                 if self.cmp_extend_encoding(
-                                    new_v1.swap_bytes().into(),
-                                    new_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
                                     Self::swapa(attribute),
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1313,13 +1317,13 @@ where
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
                                 if self.cmp_extend_encoding(
-                                    new_v0.into(),
-                                    new_v1.into(),
                                     orig_v0.into(),
                                     orig_v1.into(),
+                                    new_v0.into(),
+                                    new_v1.into(),
                                     attribute,
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1331,13 +1335,13 @@ where
                                 // swapped
                                 // Compare v0 against v1
                                 if self.cmp_extend_encoding(
-                                    new_v0.swap_bytes().into(),
-                                    new_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
                                     attribute,
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1350,13 +1354,13 @@ where
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
                                 if self.cmp_extend_encoding(
-                                    new_v1.into(),
-                                    new_v0.into(),
                                     orig_v1.into(),
                                     orig_v0.into(),
+                                    new_v1.into(),
+                                    new_v0.into(),
                                     Self::swapa(attribute),
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1368,13 +1372,13 @@ where
                                 // Swapped
                                 // Compare v1 against v0
                                 if self.cmp_extend_encoding(
-                                    new_v1.swap_bytes().into(),
-                                    new_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
                                     Self::swapa(attribute),
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1390,13 +1394,13 @@ where
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
                                 if self.cmp_extend_encoding(
-                                    new_v0,
-                                    new_v1,
                                     orig_v0,
                                     orig_v1,
+                                    new_v0,
+                                    new_v1,
                                     attribute,
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1408,13 +1412,13 @@ where
                                 // Swapped
                                 // Compare v0 against v1
                                 if self.cmp_extend_encoding(
-                                    new_v0.swap_bytes(),
-                                    new_v1.swap_bytes(),
                                     orig_v0.swap_bytes(),
                                     orig_v1.swap_bytes(),
+                                    new_v0.swap_bytes(),
+                                    new_v1.swap_bytes(),
                                     attribute,
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1427,13 +1431,13 @@ where
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
                                 if self.cmp_extend_encoding(
-                                    new_v1,
-                                    new_v0,
                                     orig_v1,
                                     orig_v0,
+                                    new_v1,
+                                    new_v0,
                                     Self::swapa(attribute),
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1445,13 +1449,13 @@ where
                                 // Swapped
                                 // Compare v1 against v0
                                 if self.cmp_extend_encoding(
-                                    new_v1.swap_bytes(),
-                                    new_v0.swap_bytes(),
                                     orig_v1.swap_bytes(),
                                     orig_v0.swap_bytes(),
+                                    new_v1.swap_bytes(),
+                                    new_v0.swap_bytes(),
                                     Self::swapa(attribute),
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1468,12 +1472,12 @@ where
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
                                 if self.rtn_extend_encoding(
-                                    new_v0,
-                                    new_v1,
                                     orig_v0,
                                     orig_v1,
+                                    new_v0,
+                                    new_v1,
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,
@@ -1486,12 +1490,12 @@ where
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
                                 if self.rtn_extend_encoding(
-                                    new_v1,
-                                    new_v0,
                                     orig_v1,
                                     orig_v0,
+                                    new_v1,
+                                    new_v0,
+                                    new_bytes,
                                     orig_bytes,
-                                    input_bytes,
                                     cmp_buf_idx,
                                     taint_len,
                                     input_len,

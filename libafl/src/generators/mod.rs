@@ -1,7 +1,6 @@
 //! Generators may generate bytes or, in general, data, for inputs.
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::marker::PhantomData;
 
 use crate::{

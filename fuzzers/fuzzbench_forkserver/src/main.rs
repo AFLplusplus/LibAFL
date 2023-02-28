@@ -25,8 +25,9 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens, token_mutations::AFLRedQueen,
+        scheduled::havoc_mutations,
+        token_mutations::{AFLRedQueen, I2SRandReplace},
+        tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{
         AFLCmpMap, AFLStdCmpObserver, HitcountsMapObserver, StdCmpObserver, StdMapObserver,
