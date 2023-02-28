@@ -16,7 +16,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsMutSlice,
     },
-    corpus::{Corpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_or,
@@ -272,7 +272,7 @@ fn fuzz(
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
-        OnDiskCorpus::<BytesInput>::new(corpus_dir).unwrap(),
+        InMemoryOnDiskCorpus::<BytesInput>::new(corpus_dir).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(objective_dir).unwrap(),
@@ -294,11 +294,12 @@ fn fuzz(
         5,
     )?;
 
-    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
+    let power = StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
         &mut state,
+        &edges_observer,
         Some(PowerSchedule::EXPLORE),
     ));
 
