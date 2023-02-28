@@ -7,6 +7,11 @@ pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
 
 #[cfg(feature = "std")]
+pub mod inmemory_ondisk;
+#[cfg(feature = "std")]
+pub use inmemory_ondisk::InMemoryOnDiskCorpus;
+
+#[cfg(feature = "std")]
 pub mod ondisk;
 #[cfg(feature = "std")]
 pub use ondisk::OnDiskCorpus;
@@ -173,6 +178,7 @@ pub mod pybind {
     use crate::{
         corpus::{
             cached::pybind::PythonCachedOnDiskCorpus, inmemory::pybind::PythonInMemoryCorpus,
+            inmemory_ondisk::pybind::PythonInMemoryOnDiskCorpus,
             ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
             CorpusId, Testcase,
         },
@@ -185,6 +191,7 @@ pub mod pybind {
         InMemory(Py<PythonInMemoryCorpus>),
         CachedOnDisk(Py<PythonCachedOnDiskCorpus>),
         OnDisk(Py<PythonOnDiskCorpus>),
+        InMemoryOnDisk(Py<PythonInMemoryOnDiskCorpus>),
     }
 
     /// Corpus Trait binding
@@ -204,6 +211,7 @@ pub mod pybind {
                 PythonCorpusWrapper,
                 {
                     InMemory,
+                    InMemoryOnDisk,
                     CachedOnDisk,
                     OnDisk
                 }
@@ -220,6 +228,7 @@ pub mod pybind {
                 PythonCorpusWrapper,
                 {
                     InMemory,
+                    InMemoryOnDisk,
                     CachedOnDisk,
                     OnDisk
                 }
@@ -250,6 +259,16 @@ pub mod pybind {
         pub fn new_on_disk(py_on_disk_corpus: Py<PythonOnDiskCorpus>) -> Self {
             Self {
                 wrapper: PythonCorpusWrapper::OnDisk(py_on_disk_corpus),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_in_memory_on_disk(
+            py_in_memory_on_disk_corpus: Py<PythonInMemoryOnDiskCorpus>,
+        ) -> Self {
+            Self {
+                wrapper: PythonCorpusWrapper::InMemoryOnDisk(py_in_memory_on_disk_corpus),
             }
         }
 

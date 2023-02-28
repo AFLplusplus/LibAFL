@@ -1,4 +1,4 @@
-//! The cached ondisk corpus stores testcases to disk keeping a part of them in memory.
+//! The [`CachedOnDiskCorpus`] stores [`Testcase`]s to disk, keeping a subset of them in memory/cache, evicting in a FIFO manner.
 
 use alloc::collections::vec_deque::VecDeque;
 use core::cell::RefCell;
@@ -8,14 +8,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{
-        ondisk::{OnDiskCorpus, OnDiskMetadataFormat},
-        Corpus, CorpusId, Testcase,
+        inmemory_ondisk::InMemoryOnDiskCorpus, ondisk::OnDiskMetadataFormat, Corpus, CorpusId,
+        Testcase,
     },
     inputs::{Input, UsesInput},
     Error,
 };
 
-/// A corpus that keeps a maximum number of [`Testcase`]s in memory. The eviction policy is FIFO.
+/// A corpus that keeps a maximum number of [`Testcase`]s in memory
+/// and load them from disk, when they are being used
+/// The eviction policy is FIFO.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -23,7 +25,7 @@ pub struct CachedOnDiskCorpus<I>
 where
     I: Input,
 {
-    inner: OnDiskCorpus<I>,
+    inner: InMemoryOnDiskCorpus<I>,
     cached_indexes: RefCell<VecDeque<CorpusId>>,
     cache_max_len: usize,
 }
@@ -148,7 +150,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(OnDiskCorpus::new(dir_path)?, cache_max_len)
+        Self::_new(InMemoryOnDiskCorpus::new(dir_path)?, cache_max_len)
     }
 
     /// Creates an [`CachedOnDiskCorpus`] that does not store [`Testcase`] metadata to disk.
@@ -156,7 +158,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(OnDiskCorpus::no_meta(dir_path)?, cache_max_len)
+        Self::_new(InMemoryOnDiskCorpus::no_meta(dir_path)?, cache_max_len)
     }
 
     /// Creates the [`CachedOnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk.
@@ -171,13 +173,13 @@ where
         P: AsRef<Path>,
     {
         Self::_new(
-            OnDiskCorpus::with_meta_format(dir_path, meta_format)?,
+            InMemoryOnDiskCorpus::with_meta_format(dir_path, meta_format)?,
             cache_max_len,
         )
     }
 
     /// Internal constructor `fn`
-    fn _new(on_disk_corpus: OnDiskCorpus<I>, cache_max_len: usize) -> Result<Self, Error> {
+    fn _new(on_disk_corpus: InMemoryOnDiskCorpus<I>, cache_max_len: usize) -> Result<Self, Error> {
         if cache_max_len == 0 {
             return Err(Error::illegal_argument(
                 "The max cache len in CachedOnDiskCorpus cannot be 0",
