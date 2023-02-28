@@ -11,6 +11,7 @@ use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
     inputs::UsesInput,
+    observers::{MapObserver, ObserversTuple},
     random_corpus_id,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
@@ -88,25 +89,28 @@ crate::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
-pub struct WeightedScheduler<F, S> {
+pub struct WeightedScheduler<F, O, S> {
     strat: Option<PowerSchedule>,
-    phantom: PhantomData<(F, S)>,
+    map_observer_name: String,
+    last_hash: usize,
+    phantom: PhantomData<(F, O, S)>,
 }
 
-impl<F, S> WeightedScheduler<F, S>
+impl<F, O, S> WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
+    O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand,
 {
     /// Create a new [`WeightedScheduler`] without any power schedule
     #[must_use]
-    pub fn new(state: &mut S) -> Self {
-        Self::with_schedule(state, None)
+    pub fn new(state: &mut S, map_observer: &O) -> Self {
+        Self::with_schedule(state, map_observer, None)
     }
 
     /// Create a new [`WeightedScheduler`]
     #[must_use]
-    pub fn with_schedule(state: &mut S, strat: Option<PowerSchedule>) -> Self {
+    pub fn with_schedule(state: &mut S, map_observer: &O, strat: Option<PowerSchedule>) -> Self {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata(SchedulerMetadata::new(strat));
         }
@@ -116,6 +120,8 @@ where
         }
         Self {
             strat,
+            map_observer_name: map_observer.name().to_string(),
+            last_hash: 0,
             phantom: PhantomData,
         }
     }
@@ -216,20 +222,21 @@ where
     }
 }
 
-impl<F, S> UsesState for WeightedScheduler<F, S>
+impl<F, O, S> UsesState for WeightedScheduler<F, O, S>
 where
     S: UsesInput,
 {
     type State = S;
 }
 
-impl<F, S> Scheduler for WeightedScheduler<F, S>
+impl<F, O, S> Scheduler for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
+    O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
 
         let mut depth = match current_idx {
@@ -248,11 +255,9 @@ where
 
         // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
-        state
-            .corpus()
-            .get(idx)?
-            .borrow_mut()
-            .add_metadata(SchedulerTestcaseMetaData::new(depth));
+        state.corpus().get(idx)?.borrow_mut().add_metadata(
+            SchedulerTestcaseMetaData::with_n_fuzz_entry(depth, self.last_hash),
+        );
 
         // Recreate the alias table
         self.create_alias_table(state)?;
@@ -260,7 +265,7 @@ where
     }
 
     fn on_replace(
-        &self,
+        &mut self,
         state: &mut S,
         idx: CorpusId,
         _testcase: &Testcase<S::Input>,
@@ -270,7 +275,7 @@ where
     }
 
     fn on_remove(
-        &self,
+        &mut self,
         state: &mut S,
         _idx: CorpusId,
         _testcase: &Option<Testcase<S::Input>>,
@@ -280,8 +285,37 @@ where
         Ok(())
     }
 
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut Self::State,
+        _input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<Self::State>,
+    {
+        let observer = observers
+            .match_name::<O>(&self.map_observer_name)
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
+
+        let mut hash = observer.hash() as usize;
+
+        let psmeta = state
+            .metadata_mut()
+            .get_mut::<SchedulerMetadata>()
+            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+
+        hash %= psmeta.n_fuzz().len();
+        // Update the path frequency
+        psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
+
+        self.last_hash = hash;
+
+        Ok(())
+    }
+
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
-    fn next(&self, state: &mut S) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         let corpus_counts = state.corpus().count();
         if corpus_counts == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
@@ -345,4 +379,4 @@ where
 }
 
 /// The standard corpus weight, same as aflpp
-pub type StdWeightedScheduler<S> = WeightedScheduler<CorpusWeightTestcaseScore<S>, S>;
+pub type StdWeightedScheduler<O, S> = WeightedScheduler<CorpusWeightTestcaseScore<S>, O, S>;

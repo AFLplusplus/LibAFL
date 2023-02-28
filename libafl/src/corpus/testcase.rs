@@ -300,6 +300,18 @@ impl SchedulerTestcaseMetaData {
         }
     }
 
+    /// Create new [`struct@SchedulerTestcaseMetaData`] given `n_fuzz_entry`
+    #[must_use]
+    pub fn with_n_fuzz_entry(depth: u64, n_fuzz_entry: usize) -> Self {
+        Self {
+            bitmap_size: 0,
+            handicap: 0,
+            depth,
+            n_fuzz_entry,
+            cycle_and_time: (Duration::default(), 0),
+        }
+    }
+
     /// Get the bitmap size
     #[inline]
     #[must_use]
