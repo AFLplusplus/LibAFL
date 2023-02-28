@@ -166,9 +166,9 @@ pub fn main() {
     let mut tokens = Tokens::new();
     let mut forkserver = ForkserverExecutor::builder()
         .program(opt.executable)
-        .debug_child(debug_child)
+        .debug_child(true)
         .shmem_provider(&mut shmem_provider)
-        .autotokens(&mut tokens)
+        // .autotokens(&mut tokens)
         .parse_afl_cmdline(args)
         .coverage_map_size(MAP_SIZE)
         .build(tuple_list!(time_observer, edges_observer))

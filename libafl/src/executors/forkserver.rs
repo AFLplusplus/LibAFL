@@ -430,6 +430,8 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        println!("RUN_TARGET from LIBAFL");
+
         let mut exit_kind = ExitKind::Ok;
 
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
@@ -761,7 +763,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             // TODO set AFL_MAP_SIZE
             assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
 
-            log::info!("Target MAP SIZE = {:#x}", self.real_map_size);
+            println!("Target MAP SIZE = {:#x}", self.real_map_size);
             self.map_size = Some(map_size as usize);
         }
 
@@ -782,11 +784,17 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 self.uses_shmem_testcase = true;
             }
 
+            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
+                println!("Using AUTODICT feature");
+                send_status |= FS_OPT_AUTODICT;
+            }
+
             let send_len = forkserver.write_ctl(send_status)?;
             if send_len != 4 {
                 return Err(Error::unknown("Writing to forkserver failed.".to_string()));
             }
 
+            println!("{} {}", send_status & FS_OPT_AUTODICT, FS_OPT_AUTODICT);
             if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
                 let (read_len, dict_size) = forkserver.read_st()?;
                 if read_len != 4 {
@@ -808,7 +816,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 if rlen != dict_size as usize {
                     return Err(Error::unknown("Failed to load autodictionary".to_string()));
                 }
-
+                println!("rlen {}", rlen);
                 if let Some(t) = &mut self.autotokens {
                     t.parse_autodict(&buf, dict_size as usize);
                 }
@@ -817,6 +825,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             log::warn!("Forkserver Options are not available.");
         }
 
+        println!("Handshake DONE from LIBAFL");
         Ok((forkserver, input_file, map))
     }
 
