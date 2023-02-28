@@ -44,7 +44,7 @@ use serde::{Deserialize, Serialize};
 pub struct ClientId(pub u32);
 
 #[cfg(feature = "std")]
-use log::{Level, Metadata, Record};
+use log::{Metadata, Record};
 
 /// Can be converted to a slice
 pub trait AsSlice {
@@ -216,67 +216,55 @@ pub fn format_duration_hms(duration: &time::Duration) -> String {
     format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
 }
 
+#[derive(Debug, Copy, Clone)]
+#[cfg(feature = "std")]
+enum Target {
+    Stdout,
+    Stderr,
+}
+
 /// A simple logger struct that logs to stderr when used with [`log::set_logger`].
 #[derive(Debug)]
 #[cfg(feature = "std")]
-pub struct SimpleStdErrLogger {
-    /// The min log level for which this logger will write messages.
-    pub log_level: Level,
+pub struct SimpleLogger {
+    /// Where the log goes
+    target: Target,
 }
 
 #[cfg(feature = "std")]
-impl SimpleStdErrLogger {
-    /// Create a new [`log::Log`] logger that will log [`Level::Trace`] and above
+impl SimpleLogger {
+    /// Create a new [`log::Log`] logger that will wrte log to stdout
     #[must_use]
-    pub const fn trace() -> Self {
+    pub const fn stdout() -> Self {
         Self {
-            log_level: Level::Trace,
+            target: Target::Stdout,
         }
     }
 
-    /// Create a new [`log::Log`] logger that will log [`Level::Debug`] and above
+    /// Create a new [`log::Log`] logger that will wrte log to stdout
     #[must_use]
-    pub const fn debug() -> Self {
+    pub const fn stderr() -> Self {
         Self {
-            log_level: Level::Debug,
-        }
-    }
-
-    /// Create a new [`log::Log`] logger that will log [`Level::Info`] and above
-    #[must_use]
-    pub const fn info() -> Self {
-        Self {
-            log_level: Level::Info,
-        }
-    }
-
-    /// Create a new [`log::Log`] logger that will log [`Level::Warn`] and above
-    #[must_use]
-    pub const fn warn() -> Self {
-        Self {
-            log_level: Level::Warn,
-        }
-    }
-
-    /// Create a new [`log::Log`] logger that will log [`Level::Error`]
-    #[must_use]
-    pub const fn error() -> Self {
-        Self {
-            log_level: Level::Error,
+            target: Target::Stderr,
         }
     }
 }
 
 #[cfg(feature = "std")]
-impl log::Log for SimpleStdErrLogger {
+impl log::Log for SimpleLogger {
     #[inline]
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= self.log_level
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
     }
 
     fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            eprintln!("{}: {}", record.level(), record.args());
+        match self.target {
+            Target::Stdout => {
+                println!("{}: {}", record.level(), record.args());
+            }
+            Target::Stderr => {
+                eprintln!("{}: {}", record.level(), record.args());
+            }
         }
     }
 

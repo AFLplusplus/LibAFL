@@ -14,7 +14,7 @@ use libafl::{
         current_nanos,
         rands::StdRand,
         tuples::{tuple_list, Merge},
-        AsSlice,
+        AsSlice, SimpleLogger,
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
@@ -38,6 +38,7 @@ use libafl::{
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
+static LOGGER: SimpleLogger = SimpleLogger::stdout();
 /// The main fn, `no_mangle` as it is a C main
 #[cfg(not(test))]
 #[no_mangle]
@@ -45,6 +46,9 @@ pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
+
+    log::set_logger(&LOGGER);
+    log::set_max_level(log::LevelFilter::Info);
 
     println!(
         "Workdir: {:?}",
