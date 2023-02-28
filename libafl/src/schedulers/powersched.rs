@@ -201,6 +201,9 @@ where
             None => 0,
         };
 
+        // TODO increase perf_score when finding new things like in AFL
+        // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
+
         // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
         state.corpus().get(idx)?.borrow_mut().add_metadata(
