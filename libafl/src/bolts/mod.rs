@@ -250,12 +250,6 @@ impl SimpleLogger {
     }
 }
 
-/// Default stderr logger
-pub static LIBAFL_STDERR_LOGGER: SimpleLogger = SimpleLogger::stderr();
-
-/// Default stdout logger
-pub static LIBAFL_STDOUT_LOGGER: SimpleLogger = SimpleLogger::stdout();
-
 #[cfg(feature = "std")]
 impl log::Log for SimpleLogger {
     #[inline]
