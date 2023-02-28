@@ -106,7 +106,7 @@ where
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
             let corpus = state.corpus().get(corpus_idx)?.borrow();
-            if corpus.fuzz_level() > 0 || corpus.metadata().get::<SchedulerTestcaseMetaData>().map_or(false, |meta| meta.bitmap_size() != 0) {
+            if corpus.fuzz_level() > 0 {
                 return Ok(());
             }
         }
