@@ -1,7 +1,7 @@
-//! The ondisk corpus stores [`Testcase`]s to disk.
-//! Additionally, all of them are kept in memory.
+//! The [`InMemoryOnDiskCorpus`] stores [`Testcase`]s to disk.
+//! Additionally, _all_ of them are kept in memory.
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
-//! which only stores a certain number of testcases and removes additional ones in a FIFO manner.
+//! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
 use core::{cell::RefCell, time::Duration};
 #[cfg(feature = "std")]
@@ -34,7 +34,7 @@ pub struct InMemoryOnDiskMetadata<'a> {
     executions: &'a usize,
 }
 
-/// A corpus able to store [`Testcase`]s to disk, and load them from disk, when they are being used.
+/// A corpus able to store [`Testcase`]s to disk, while also keeping all of them in memory.
 ///
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
 #[cfg(feature = "std")]

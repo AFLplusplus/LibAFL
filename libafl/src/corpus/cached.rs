@@ -1,4 +1,4 @@
-//! The cached ondisk corpus stores testcases to disk keeping a part of them in memory.
+//! The [`CachedOnDiskCorpus`] stores [`Testcase`]s to disk, keeping a subset of them in memory/cache, evicting in a FIFO manner.
 
 use alloc::collections::vec_deque::VecDeque;
 use core::cell::RefCell;
@@ -15,7 +15,9 @@ use crate::{
     Error,
 };
 
-/// A corpus that keeps a maximum number of [`Testcase`]s in memory. The eviction policy is FIFO.
+/// A corpus that keeps a maximum number of [`Testcase`]s in memory
+/// and load them from disk, when they are being used
+/// The eviction policy is FIFO.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
