@@ -266,7 +266,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     if cfg!(windows) {
         cxxflags.push(String::from("-fuse-ld=lld"));
         cxxflags.push(String::from("/LD"));
-        /* clang on windows links against the libcmt.lib runtime
+        /* clang on Windows links against the libcmt.lib runtime
          * however, the distributed binaries are compiled against msvcrt.lib
          * we need to also use msvcrt.lib instead of libcmt.lib when building the optimization passes
          * first, we tell clang-cl (and indirectly link) to ignore libcmt.lib via -nodefaultlib:libcmt

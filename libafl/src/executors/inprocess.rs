@@ -50,7 +50,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasClientPerfMonitor, HasSolutions, UsesState},
+    state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions, UsesState},
     Error,
 };
 
@@ -167,7 +167,7 @@ where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: HasSolutions + HasClientPerfMonitor,
+    S: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -344,7 +344,7 @@ impl InProcessHandlers {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(unix)]
@@ -543,7 +543,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     E: HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
-    E::State: HasSolutions + HasClientPerfMonitor,
+    E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
     let observers = executor.observers_mut();
@@ -559,6 +559,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
     if interesting {
         let mut new_testcase = Testcase::new(input.clone());
+        new_testcase.set_parent_id_optional(state.fuzzed_corpus_id());
         new_testcase.add_metadata(exitkind);
         fuzzer
             .objective_mut()
@@ -577,6 +578,9 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
             )
             .expect("Could not save state in run_observers_and_save_state");
     }
+
+    // We will start mutators from scratch after restart.
+    state.clear_fuzzed_corpus_id();
 
     event_mgr.on_restart(state).unwrap();
 
@@ -608,7 +612,7 @@ mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasSolutions},
+        state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -667,7 +671,7 @@ mod unix_signal_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
@@ -708,7 +712,7 @@ mod unix_signal_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         if !data.is_valid() {
@@ -751,7 +755,7 @@ mod unix_signal_handler {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
@@ -859,7 +863,7 @@ pub mod windows_asan_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasSolutions},
+        state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions},
     };
 
     /// # Safety
@@ -869,7 +873,7 @@ pub mod windows_asan_handler {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let mut data = &mut GLOBAL_STATE;
@@ -968,7 +972,7 @@ mod windows_exception_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasSolutions},
+        state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -1007,7 +1011,7 @@ mod windows_exception_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
@@ -1066,7 +1070,7 @@ mod windows_exception_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let data: &mut InProcessExecutorHandlerData =
@@ -1127,7 +1131,7 @@ mod windows_exception_handler {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         // Have we set a timer_before?
@@ -1668,7 +1672,7 @@ where
                         );
 
                         // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-                        let _ = libc::timer_settime(
+                        let _: i32 = libc::timer_settime(
                             timerid,
                             0,
                             addr_of_mut!(self.itimerspec),

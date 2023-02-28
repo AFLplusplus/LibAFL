@@ -93,7 +93,7 @@ where
     S: HasCorpus + HasMetadata,
 {
     /// Gets the next entry in the queue
-    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             return Err(Error::empty("No entries in corpus".to_owned()));
         }
