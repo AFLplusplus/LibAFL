@@ -5,22 +5,17 @@
 //! which stores a certain number of testcases in memory and removes additional ones in a FIFO manner.
 
 use core::{cell::RefCell, time::Duration};
-
-use std::{
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-
+use super::CachedOnDiskCorpus;
 use crate::{
     bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, CorpusId, Testcase},
     inputs::{Input, UsesInput},
     Error,
 };
-
-use super::CachedOnDiskCorpus;
 
 /// Options for the the format of the on-disk metadata
 #[cfg(feature = "std")]

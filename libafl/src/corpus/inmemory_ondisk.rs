@@ -13,6 +13,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+use super::ondisk::{OnDiskMetadata, OnDiskMetadataFormat};
 #[cfg(feature = "gzip")]
 use crate::bolts::compress::GzipCompressor;
 use crate::{
@@ -22,8 +23,6 @@ use crate::{
     state::HasMetadata,
     Error,
 };
-
-use super::ondisk::{OnDiskMetadata, OnDiskMetadataFormat};
 
 /// The [`Testcase`] metadata that'll be stored to disk
 #[cfg(feature = "std")]
