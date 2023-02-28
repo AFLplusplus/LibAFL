@@ -15,14 +15,17 @@ extern "C" {
     fn __sanitizer_set_death_callback(cb: CB);
 }
 
+/// Setup `ASan` callback on windows
+///
+/// See https://github.com/AFLplusplus/LibAFL/issues/769
+/// This is needed to intercept `ASan` error exit
+/// When we use AddressSanitizer on windows, the crash handler is not called when `ASan` detects an error
+/// This is because, on linux, `ASan` runtime raises `SIGABRT` so we can rely on the signal handler
+/// but on windows it simply calls `TerminateProcess`.
+/// so we need to call the API by `ASan` to register the callback when ASan is about to finish the process.
+///
 /// # Safety
-/// Setup ASan callback on windows
-// See https://github.com/AFLplusplus/LibAFL/issues/769
-// This is needed to intercept ASan error exit
-// When we use AddressSanitizer on windows, the crash handler is not called when ASan detects an error
-// This is because, on linux, ASan runtime raises SIGABRT so we can rely on the signal handler
-// but on windows it simply calls TerminateProcess.
-// so we need to call the api by ASan to register the callback when ASan is about to finish the process.
+/// Calls the unsafe `__sanitizer_set_death_callback` symbol, but should be safe to call otherwise.
 pub unsafe fn setup_asan_callback<E, EM, OF, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
 where
     E: Executor<EM, Z> + HasObservers,
