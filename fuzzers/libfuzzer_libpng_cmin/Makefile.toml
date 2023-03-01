@@ -5,8 +5,6 @@ CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set 
 LIBAFL_CC = '${CARGO_TARGET_DIR}/release/libafl_cc'
 LIBAFL_CXX = '${CARGO_TARGET_DIR}/release/libafl_cxx'
 FUZZER = '${CARGO_TARGET_DIR}/release/${FUZZER_NAME}'
-TESTCASES_DIR = '${PROJECT_DIR}/testcases'
-OBJECTIVE_DIR = '${PROJECT_DIR}/crashes'
 PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
@@ -161,10 +159,10 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 11s ./${FUZZER_NAME} &
+timeout 11s ./${FUZZER_NAME} >fuzz_stdout.log &
 sleep 0.2
 timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
-if [ -z "$(ls -A $TESTCASES_DIR)" ] && [ -z "$(ls -A $OBJECTIVE_DIR)" ]; then
+if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1
 else
