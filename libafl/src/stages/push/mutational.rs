@@ -21,7 +21,9 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasFuzzedCorpusId, HasMetadata, HasRand,
+    },
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -88,8 +90,14 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State:
-        HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
+    CS::State: HasFuzzedCorpusId
+        + HasClientPerfMonitor
+        + HasCorpus
+        + HasRand
+        + HasExecutions
+        + HasMetadata
+        + Clone
+        + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -136,6 +144,8 @@ where
             return None;
         }
 
+        let idx = self.current_corpus_idx.unwrap();
+        state.set_fuzzed_corpus_id(idx);
         start_timer!(state);
         let mut input = state
             .corpus()
@@ -169,7 +179,7 @@ where
         last_input: <CS::State as UsesInput>::Input,
         exit_kind: ExitKind,
     ) -> Result<(), Error> {
-        // todo: isintersting, etc.
+        // todo: is_interesting, etc.
 
         fuzzer.process_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
 
@@ -178,6 +188,7 @@ where
             .post_exec(state, self.stage_idx, self.current_corpus_idx)?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
         self.testcases_done += 1;
+        state.clear_fuzzed_corpus_id();
 
         Ok(())
     }
@@ -201,8 +212,14 @@ where
     EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter<State = CS::State>,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State:
-        HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
+    CS::State: HasClientPerfMonitor
+        + HasCorpus
+        + HasRand
+        + HasExecutions
+        + HasMetadata
+        + Clone
+        + Debug
+        + HasFuzzedCorpusId,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
