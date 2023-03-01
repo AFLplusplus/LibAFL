@@ -26,6 +26,9 @@ pub use accounting::CoverageAccountingScheduler;
 pub mod weighted;
 pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
+pub mod ecofuzz;
+pub use ecofuzz::{EcoMetadata, EcoScheduler, EcoState, EcoTestcaseMetadata, EcoTestcaseScore};
+
 pub mod tuneable;
 pub use tuneable::*;
 

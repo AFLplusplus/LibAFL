@@ -259,6 +259,9 @@ where
             SchedulerTestcaseMetaData::with_n_fuzz_entry(depth, self.last_hash),
         );
 
+        // TODO increase perf_score when finding new things like in AFL
+        // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
+
         // Recreate the alias table
         self.create_alias_table(state)?;
         Ok(())
