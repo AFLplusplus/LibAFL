@@ -496,6 +496,9 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
+        // 128 bits vectors
+        type VectorType = core::simd::u8x16;
+
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
@@ -504,57 +507,89 @@ where
             .named_metadata_mut()
             .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
             .unwrap();
+        let size = observer.usable_count();
         let len = observer.len();
         if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, observer.initial());
+            map_state.history_map.resize(len, u8::default());
         }
+
+        let map = observer.as_slice();
+        debug_assert!(map.len() >= size);
 
         let history_map = map_state.history_map.as_slice();
 
-        let initial = observer.initial();
-        let mut non_trivial = 0;
+        // Non vector implementation for reference
+        /*for (i, history) in history_map.iter_mut().enumerate() {
+            let item = map[i];
+            let reduced = MaxReducer::reduce(*history, item);
+            if DifferentIsNovel::is_novel(*history, reduced) {
+                *history = reduced;
+                interesting = true;
+                if self.novelties.is_some() {
+                    self.novelties.as_mut().unwrap().push(i);
+                }
+            }
+        }*/
+
+        let steps = size / VectorType::LANES;
+        let left = size % VectorType::LANES;
 
         if let Some(novelties) = self.novelties.as_mut() {
             novelties.clear();
-            for (i, item) in observer
-                .as_iter()
-                .copied()
-                .enumerate()
-                .filter(|(_, item)| *item != initial)
-            {
-                non_trivial += 1;
-                let existing = unsafe { *history_map.get_unchecked(i) };
-                let reduced = MaxReducer::reduce(existing, item);
-                if DifferentIsNovel::is_novel(existing, reduced) {
+            for step in 0..steps {
+                let i = step * VectorType::LANES;
+                let history = VectorType::from_slice(&history_map[i..]);
+                let items = VectorType::from_slice(&map[i..]);
+
+                if items.simd_max(history) != history {
                     interesting = true;
-                    novelties.push(i);
+                    unsafe {
+                        for j in i..(i + VectorType::LANES) {
+                            let item = *map.get_unchecked(j);
+                            if item > *history_map.get_unchecked(j) {
+                                novelties.push(j);
+                            }
+                        }
+                    }
+                }
+            }
+
+            for j in (size - left)..size {
+                unsafe {
+                    let item = *map.get_unchecked(j);
+                    if item > *history_map.get_unchecked(j) {
+                        interesting = true;
+                        novelties.push(j);
+                    }
                 }
             }
         } else {
-            for (i, item) in observer
-                .as_iter()
-                .copied()
-                .enumerate()
-                .filter(|(_, item)| *item != initial)
-            {
-                non_trivial += 1;
-                let existing = unsafe { *history_map.get_unchecked(i) };
-                let reduced = MaxReducer::reduce(existing, item);
-                if DifferentIsNovel::is_novel(existing, reduced) {
+            for step in 0..steps {
+                let i = step * VectorType::LANES;
+                let history = VectorType::from_slice(&history_map[i..]);
+                let items = VectorType::from_slice(&map[i..]);
+
+                if items.simd_max(history) != history {
                     interesting = true;
                     break;
                 }
             }
+
+            if !interesting {
+                for j in (size - left)..size {
+                    unsafe {
+                        let item = *map.get_unchecked(j);
+                        if item > *history_map.get_unchecked(j) {
+                            interesting = true;
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
-        if non_trivial == 0 {
-            panic!("AAA");
-        }
-        else{
-            println!("Non panic!");
-        }
-
-        if interesting || self.always_track {
+        let initial = observer.initial();
+        if interesting {
             let len = history_map.len();
             let filled = history_map.iter().filter(|&&i| i != initial).count();
             // opt: if not tracking optimisations, we technically don't show the *current* history
