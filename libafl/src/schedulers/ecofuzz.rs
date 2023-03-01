@@ -24,21 +24,16 @@ fn integer_sqrt(val: u64) -> u64 {
     i - 1
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Copy, Default)]
 /// The state of the EcoFuzz scheduling algorithm
 pub enum EcoState {
     /// Initial state
+    #[default]
     None = 0,
     /// Same probability scheduling
     Exploration = 1,
     /// Focused fuzzing scheduling
     Exploitation = 2,
-}
-
-impl Default for EcoState {
-    fn default() -> Self {
-        EcoState::None
-    }
 }
 
 /// The testcase Metadata for `EcoScheduler`
@@ -73,7 +68,7 @@ pub struct EcoMetadata {
 
 crate::impl_serdeany!(EcoMetadata);
 
-/// A corpus scheduler usiimplementing EcoFuzz (`https://www.usenix.org/conference/usenixsecurity20/presentation/yue`)
+/// A corpus scheduler implementing `EcoFuzz` (`https://www.usenix.org/conference/usenixsecurity20/presentation/yue`)
 #[derive(Clone, Debug)]
 pub struct EcoScheduler<O, S> {
     map_observer_name: String,
@@ -102,7 +97,8 @@ where
         }
     }
 
-    fn handle_previous(&mut self, id: CorpusId, state: &mut S) -> Result<(), Error> {
+    #[allow(clippy::cast_precision_loss)]
+    fn handle_previous(id: CorpusId, state: &mut S) -> Result<(), Error> {
         let count = state.corpus().count();
 
         let (last_mutation_num, last_corpus_count) = {
@@ -154,7 +150,7 @@ where
         Ok(())
     }
 
-    fn first_iteration(&mut self, state: &mut S) -> Result<(), Error> {
+    fn first_iteration(state: &mut S) -> Result<(), Error> {
         let count = state.corpus().count();
         state
             .metadata_mut()
@@ -337,6 +333,7 @@ where
         self.on_add(state, idx)
     }
 
+    #[allow(clippy::unused_self)]
     fn on_remove(
         &mut self,
         _state: &mut S,
@@ -370,7 +367,7 @@ where
         // Update the path frequency
         psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
 
-        if let Some(id) = state.corpus().current().clone() {
+        if let Some(id) = *state.corpus().current() {
             state
                 .corpus()
                 .get(id)?
@@ -410,10 +407,10 @@ where
     }
 
     fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
-        if let Some(id) = state.corpus().current().clone() {
-            self.handle_previous(id, state)?;
+        if let Some(id) = *state.corpus().current() {
+            Self::handle_previous(id, state)?;
         } else {
-            self.first_iteration(state)?;
+            Self::first_iteration(state)?;
         }
 
         let id = Self::schedule(state)?;
