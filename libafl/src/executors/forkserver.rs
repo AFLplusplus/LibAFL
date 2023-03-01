@@ -762,7 +762,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             // TODO set AFL_MAP_SIZE
             assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
 
-            println!("Target MAP SIZE = {:#x}", self.real_map_size);
             self.map_size = Some(map_size as usize);
         }
 
@@ -789,6 +788,9 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             }
 
             if send_status != FS_OPT_ENABLED {
+                // if send_status is not changed (Options are available but we didn't use any), then don't send the next write_ctl message.
+                // This is important
+
                 let send_len = forkserver.write_ctl(send_status)?;
                 if send_len != 4 {
                     return Err(Error::unknown("Writing to forkserver failed.".to_string()));
