@@ -255,6 +255,7 @@ pub static LIBAFL_STDOUT_LOGGER: SimpleStdoutLogger = SimpleStdoutLogger::new();
 #[cfg(feature = "std")]
 pub struct SimpleStdoutLogger {}
 
+#[cfg(feature = "std")]
 impl Default for SimpleStdoutLogger {
     fn default() -> Self {
         Self::new()
@@ -300,6 +301,7 @@ impl log::Log for SimpleStdoutLogger {
 #[cfg(feature = "std")]
 pub struct SimpleStderrLogger {}
 
+#[cfg(feature = "std")]
 impl Default for SimpleStderrLogger {
     fn default() -> Self {
         Self::new()
