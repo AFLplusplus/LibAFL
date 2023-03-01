@@ -270,7 +270,7 @@ impl SimpleStdoutLogger {
     }
 
     /// register stdout logger
-    pub fn register_logger() -> Result<(), Error> {
+    pub fn set_logger() -> Result<(), Error> {
         log::set_logger(&LIBAFL_STDOUT_LOGGER)
             .map_err(|_| Error::unknown("Failed to register logger"))
     }
@@ -284,7 +284,12 @@ impl log::Log for SimpleStdoutLogger {
     }
 
     fn log(&self, record: &Record) {
-        println!("{}: {}", record.level(), record.args());
+        println!(
+            "[{:?}] {}: {}",
+            std::time::SystemTime::now(),
+            record.level(),
+            record.args()
+        );
     }
 
     fn flush(&self) {}
@@ -310,7 +315,7 @@ impl SimpleStderrLogger {
     }
 
     /// register stderr logger
-    pub fn register_logger() -> Result<(), Error> {
+    pub fn set_logger() -> Result<(), Error> {
         log::set_logger(&LIBAFL_STDERR_LOGGER)
             .map_err(|_| Error::unknown("Failed to register logger"))
     }
@@ -324,7 +329,12 @@ impl log::Log for SimpleStderrLogger {
     }
 
     fn log(&self, record: &Record) {
-        eprintln!("{}: {}", record.level(), record.args());
+        eprintln!(
+            "[{:?}] {}: {}",
+            std::time::SystemTime::now(),
+            record.level(),
+            record.args()
+        );
     }
 
     fn flush(&self) {}
