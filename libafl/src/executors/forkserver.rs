@@ -430,7 +430,6 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-
         let mut exit_kind = ExitKind::Ok;
 
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
