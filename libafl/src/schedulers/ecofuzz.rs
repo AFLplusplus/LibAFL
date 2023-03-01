@@ -25,7 +25,7 @@ fn integer_sqrt(val: u64) -> u64 {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Copy, Default)]
-/// The state of the EcoFuzz scheduling algorithm
+/// The state of the `EcoFuzz` scheduling algorithm
 pub enum EcoState {
     /// Initial state
     #[default]
