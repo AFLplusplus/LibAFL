@@ -94,6 +94,7 @@ tide = { version = "0.16.0", optional = true }
 async-std = { version = "1.8.0", features = ["attributes"], optional = true }
 futures = { version = "0.3.24", optional = true }
 log = "0.4.17"
+chrono = "0.4.23"
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 

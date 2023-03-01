@@ -286,7 +286,7 @@ impl log::Log for SimpleStdoutLogger {
     fn log(&self, record: &Record) {
         println!(
             "[{:?}] {}: {}",
-            std::time::SystemTime::now(),
+            chrono::Local::now(),
             record.level(),
             record.args()
         );
@@ -331,7 +331,7 @@ impl log::Log for SimpleStderrLogger {
     fn log(&self, record: &Record) {
         eprintln!(
             "[{:?}] {}: {}",
-            std::time::SystemTime::now(),
+            chrono::Local::now(),
             record.level(),
             record.args()
         );
