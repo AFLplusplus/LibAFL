@@ -87,15 +87,6 @@ struct Opt {
     #[arg(
         short,
         long,
-        help = "Set the testcases directory, default is ./testcases"
-        name = "TESTCASES",
-        default_value = "./testcases"
-    )]
-    testcases: PathBuf,
-
-    #[arg(
-        short,
-        long,
         value_parser = timeout_from_millis_str,
         help = "Set the exeucution timeout in milliseconds, default is 10000",
         name = "TIMEOUT",
@@ -161,7 +152,7 @@ pub fn libafl_main() {
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
-                CachedOnDiskCorpus::new(opt.testcases.clone(), 64).unwrap(),
+                InMemoryCorpus::new(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(opt.output.clone()).unwrap(),
