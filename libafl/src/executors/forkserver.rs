@@ -430,7 +430,6 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        println!("RUN_TARGET from LIBAFL");
 
         let mut exit_kind = ExitKind::Ok;
 
@@ -785,47 +784,46 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             }
 
             if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
-                println!("Using AUTODICT feature");
+                log::info!("Using AUTODICT feature");
                 send_status |= FS_OPT_AUTODICT;
             }
 
-            let send_len = forkserver.write_ctl(send_status)?;
-            if send_len != 4 {
-                return Err(Error::unknown("Writing to forkserver failed.".to_string()));
-            }
-
-            println!("{} {}", send_status & FS_OPT_AUTODICT, FS_OPT_AUTODICT);
-            if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
-                let (read_len, dict_size) = forkserver.read_st()?;
-                if read_len != 4 {
-                    return Err(Error::unknown(
-                        "Reading from forkserver failed.".to_string(),
-                    ));
+            if send_status != FS_OPT_ENABLED {
+                let send_len = forkserver.write_ctl(send_status)?;
+                if send_len != 4 {
+                    return Err(Error::unknown("Writing to forkserver failed.".to_string()));
                 }
 
-                if !(2..=0xffffff).contains(&dict_size) {
-                    return Err(Error::illegal_state(
-                        "Dictionary has an illegal size".to_string(),
-                    ));
-                }
+                if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
+                    let (read_len, dict_size) = forkserver.read_st()?;
+                    if read_len != 4 {
+                        return Err(Error::unknown(
+                            "Reading from forkserver failed.".to_string(),
+                        ));
+                    }
 
-                log::info!("Autodict size {dict_size:x}");
+                    if !(2..=0xffffff).contains(&dict_size) {
+                        return Err(Error::illegal_state(
+                            "Dictionary has an illegal size".to_string(),
+                        ));
+                    }
 
-                let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
+                    log::info!("Autodict size {dict_size:x}");
 
-                if rlen != dict_size as usize {
-                    return Err(Error::unknown("Failed to load autodictionary".to_string()));
-                }
-                println!("rlen {}", rlen);
-                if let Some(t) = &mut self.autotokens {
-                    t.parse_autodict(&buf, dict_size as usize);
+                    let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
+
+                    if rlen != dict_size as usize {
+                        return Err(Error::unknown("Failed to load autodictionary".to_string()));
+                    }
+                    if let Some(t) = &mut self.autotokens {
+                        t.parse_autodict(&buf, dict_size as usize);
+                    }
                 }
             }
         } else {
             log::warn!("Forkserver Options are not available.");
         }
 
-        println!("Handshake DONE from LIBAFL");
         Ok((forkserver, input_file, map))
     }
 
