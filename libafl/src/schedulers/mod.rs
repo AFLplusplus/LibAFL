@@ -47,6 +47,7 @@ use crate::{
 pub trait Scheduler: UsesState {
     /// Added an entry to the corpus at the given index
     fn on_add(&mut self, _state: &mut Self::State, _idx: CorpusId) -> Result<(), Error> {
+        // Add parent_id here if it has no inner
         Ok(())
     }
 
@@ -85,6 +86,7 @@ pub trait Scheduler: UsesState {
 
     /// Gets the next entry
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error>;
+    // Increment corpus.current() here if it has no inner
 }
 
 /// Feed the fuzzer simply with a random testcase on request

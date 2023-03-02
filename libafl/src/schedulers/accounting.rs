@@ -170,6 +170,9 @@ where
         {
             idx = self.inner.base_mut().next(state)?;
         }
+
+        // Don't add corpus.curret(). The inner scheduler will take care of it
+
         Ok(idx)
     }
 }

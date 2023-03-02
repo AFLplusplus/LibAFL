@@ -50,7 +50,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions, UsesState},
+    state::{HasClientPerfMonitor, HasSolutions, UsesState},
     Error,
 };
 
@@ -167,7 +167,7 @@ where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+    S: HasSolutions + HasClientPerfMonitor,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -344,7 +344,7 @@ impl InProcessHandlers {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(unix)]
@@ -543,7 +543,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     E: HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
-    E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+    E::State: HasSolutions + HasClientPerfMonitor,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
     let observers = executor.observers_mut();
@@ -559,7 +559,6 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
     if interesting {
         let mut new_testcase = Testcase::new(input.clone());
-        new_testcase.set_parent_id_optional(state.fuzzed_corpus_id());
         new_testcase.add_metadata(exitkind);
         fuzzer
             .objective_mut()
@@ -580,8 +579,6 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     }
 
     // We will start mutators from scratch after restart.
-    state.clear_fuzzed_corpus_id();
-
     event_mgr.on_restart(state).unwrap();
 
     log::info!("Waiting for broker...");
@@ -612,7 +609,7 @@ mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions},
+        state::{HasClientPerfMonitor, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -671,7 +668,7 @@ mod unix_signal_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
@@ -712,7 +709,7 @@ mod unix_signal_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         if !data.is_valid() {
@@ -755,7 +752,7 @@ mod unix_signal_handler {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
