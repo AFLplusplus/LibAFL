@@ -36,6 +36,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "std")]
+use crate::Error;
+
 /// The client ID == the sender id.
 #[repr(transparent)]
 #[derive(
@@ -44,7 +47,7 @@ use serde::{Deserialize, Serialize};
 pub struct ClientId(pub u32);
 
 #[cfg(feature = "std")]
-use log::{Level, Metadata, Record};
+use log::{Metadata, Record};
 
 /// Can be converted to a slice
 pub trait AsSlice {
@@ -239,73 +242,105 @@ where
     }
 }
 
+/// Stderr logger
+#[cfg(feature = "std")]
+pub static LIBAFL_STDERR_LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
+
+/// Stdout logger
+#[cfg(feature = "std")]
+pub static LIBAFL_STDOUT_LOGGER: SimpleStdoutLogger = SimpleStdoutLogger::new();
+
 /// A simple logger struct that logs to stderr when used with [`log::set_logger`].
 #[derive(Debug)]
 #[cfg(feature = "std")]
-pub struct SimpleStdErrLogger {
-    /// The min log level for which this logger will write messages.
-    pub log_level: Level,
-}
+pub struct SimpleStdoutLogger {}
 
 #[cfg(feature = "std")]
-impl SimpleStdErrLogger {
-    /// Create a new [`log::Log`] logger that will log [`Level::Trace`] and above
-    #[must_use]
-    pub const fn trace() -> Self {
-        Self {
-            log_level: Level::Trace,
-        }
-    }
-
-    /// Create a new [`log::Log`] logger that will log [`Level::Debug`] and above
-    #[must_use]
-    pub const fn debug() -> Self {
-        Self {
-            log_level: Level::Debug,
-        }
-    }
-
-    /// Create a new [`log::Log`] logger that will log [`Level::Info`] and above
-    #[must_use]
-    pub const fn info() -> Self {
-        Self {
-            log_level: Level::Info,
-        }
-    }
-
-    /// Create a new [`log::Log`] logger that will log [`Level::Warn`] and above
-    #[must_use]
-    pub const fn warn() -> Self {
-        Self {
-            log_level: Level::Warn,
-        }
-    }
-
-    /// Create a new [`log::Log`] logger that will log [`Level::Error`]
-    #[must_use]
-    pub const fn error() -> Self {
-        Self {
-            log_level: Level::Error,
-        }
+impl Default for SimpleStdoutLogger {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 #[cfg(feature = "std")]
-impl log::Log for SimpleStdErrLogger {
+impl SimpleStdoutLogger {
+    /// Create a new [`log::Log`] logger that will wrte log to stdout
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {}
+    }
+
+    /// register stdout logger
+    pub fn set_logger() -> Result<(), Error> {
+        log::set_logger(&LIBAFL_STDOUT_LOGGER)
+            .map_err(|_| Error::unknown("Failed to register logger"))
+    }
+}
+
+#[cfg(feature = "std")]
+impl log::Log for SimpleStdoutLogger {
     #[inline]
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= self.log_level
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
     }
 
     fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            eprintln!("{}: {}", record.level(), record.args());
-        }
+        println!(
+            "[{:?}] {}: {}",
+            current_time(),
+            record.level(),
+            record.args()
+        );
     }
 
     fn flush(&self) {}
 }
 
+/// A simple logger struct that logs to stderr when used with [`log::set_logger`].
+#[derive(Debug)]
+#[cfg(feature = "std")]
+pub struct SimpleStderrLogger {}
+
+#[cfg(feature = "std")]
+impl Default for SimpleStderrLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "std")]
+impl SimpleStderrLogger {
+    /// Create a new [`log::Log`] logger that will wrte log to stdout
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {}
+    }
+
+    /// register stderr logger
+    pub fn set_logger() -> Result<(), Error> {
+        log::set_logger(&LIBAFL_STDERR_LOGGER)
+            .map_err(|_| Error::unknown("Failed to register logger"))
+    }
+}
+
+#[cfg(feature = "std")]
+impl log::Log for SimpleStderrLogger {
+    #[inline]
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        eprintln!(
+            "[{:?}] {}: {}",
+            current_time(),
+            record.level(),
+            record.args()
+        );
+    }
+
+    fn flush(&self) {}
+}
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod bolts_prelude {

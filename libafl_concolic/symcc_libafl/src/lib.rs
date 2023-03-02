@@ -34,7 +34,7 @@ mod clone {
             cmd.arg("checkout").arg(commit).current_dir(path);
             let output = cmd.output().expect("failed to execute git checkout");
             if !output.status.success() {
-                log::error!("failed to checkout symcc git repository commit:");
+                eprintln!("failed to checkout symcc git repository commit:");
                 let mut stdout = stdout();
                 stdout
                     .write_all(&output.stderr)
@@ -42,7 +42,7 @@ mod clone {
                 panic!();
             }
         } else {
-            log::error!("failed to clone symcc git repository:");
+            eprintln!("failed to clone symcc git repository:");
             let mut stdout = stdout();
             stdout
                 .write_all(&output.stderr)
