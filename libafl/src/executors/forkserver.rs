@@ -761,7 +761,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             // TODO set AFL_MAP_SIZE
             assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
 
-            log::info!("Target MAP SIZE = {:#x}", self.real_map_size);
             self.map_size = Some(map_size as usize);
         }
 
@@ -782,35 +781,44 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 self.uses_shmem_testcase = true;
             }
 
-            let send_len = forkserver.write_ctl(send_status)?;
-            if send_len != 4 {
-                return Err(Error::unknown("Writing to forkserver failed.".to_string()));
+            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
+                log::info!("Using AUTODICT feature");
+                send_status |= FS_OPT_AUTODICT;
             }
 
-            if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
-                let (read_len, dict_size) = forkserver.read_st()?;
-                if read_len != 4 {
-                    return Err(Error::unknown(
-                        "Reading from forkserver failed.".to_string(),
-                    ));
+            if send_status != FS_OPT_ENABLED {
+                // if send_status is not changed (Options are available but we didn't use any), then don't send the next write_ctl message.
+                // This is important
+
+                let send_len = forkserver.write_ctl(send_status)?;
+                if send_len != 4 {
+                    return Err(Error::unknown("Writing to forkserver failed.".to_string()));
                 }
 
-                if !(2..=0xffffff).contains(&dict_size) {
-                    return Err(Error::illegal_state(
-                        "Dictionary has an illegal size".to_string(),
-                    ));
-                }
+                if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
+                    let (read_len, dict_size) = forkserver.read_st()?;
+                    if read_len != 4 {
+                        return Err(Error::unknown(
+                            "Reading from forkserver failed.".to_string(),
+                        ));
+                    }
 
-                log::info!("Autodict size {dict_size:x}");
+                    if !(2..=0xffffff).contains(&dict_size) {
+                        return Err(Error::illegal_state(
+                            "Dictionary has an illegal size".to_string(),
+                        ));
+                    }
 
-                let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
+                    log::info!("Autodict size {dict_size:x}");
 
-                if rlen != dict_size as usize {
-                    return Err(Error::unknown("Failed to load autodictionary".to_string()));
-                }
+                    let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
 
-                if let Some(t) = &mut self.autotokens {
-                    t.parse_autodict(&buf, dict_size as usize);
+                    if rlen != dict_size as usize {
+                        return Err(Error::unknown("Failed to load autodictionary".to_string()));
+                    }
+                    if let Some(t) = &mut self.autotokens {
+                        t.parse_autodict(&buf, dict_size as usize);
+                    }
                 }
             }
         } else {
