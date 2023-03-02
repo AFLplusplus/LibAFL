@@ -399,7 +399,7 @@ where
         }
 
         let id = Self::schedule(state)?;
-        *state.corpus_mut().current_mut() = Some(id);
+        self.set_current_scheduled(state, Some(id))?;
 
         let mutation_num = state
             .corpus()
@@ -423,6 +423,16 @@ where
         meta.last_executions = executions;
 
         Ok(id)
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 

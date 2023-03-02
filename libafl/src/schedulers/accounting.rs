@@ -157,6 +157,16 @@ where
 
         Ok(idx)
     }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        _state: &mut Self::State,
+        _next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        // We do nothing here, the inner scheduler will take care of it
+        Ok(())
+    }
 }
 
 impl<'a, CS> CoverageAccountingScheduler<'a, CS>
@@ -256,7 +266,7 @@ where
 
         for (_key, idx) in &top_rated.map {
             let mut entry = state.corpus().get(*idx)?.borrow_mut();
-            if entry.fuzz_count() > 0 {
+            if entry.scheduled_count() > 0 {
                 continue;
             }
 

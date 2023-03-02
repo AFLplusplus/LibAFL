@@ -88,6 +88,13 @@ pub trait Scheduler: UsesState {
     /// Gets the next entry
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error>;
     // Increment corpus.current() here if it has no inner
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error>;
 }
 
 /// Feed the fuzzer simply with a random testcase on request
@@ -125,9 +132,19 @@ where
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
             let id = random_corpus_id!(state.corpus(), state.rand_mut());
-            *state.corpus_mut().current_mut() = Some(id);
+            self.set_current_scheduled(state, Some(id))?;
             Ok(id)
         }
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`. You should call this from `next`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 

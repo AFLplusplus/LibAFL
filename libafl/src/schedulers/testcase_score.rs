@@ -205,7 +205,7 @@ where
                     }
                 }
                 PowerSchedule::FAST => {
-                    if entry.fuzz_count() != 0 {
+                    if entry.scheduled_count() != 0 {
                         let lg = libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()]));
 
                         match lg {
@@ -244,11 +244,11 @@ where
                     }
                 }
                 PowerSchedule::LIN => {
-                    factor = (entry.fuzz_count() as f64)
+                    factor = (entry.scheduled_count() as f64)
                         / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
                 }
                 PowerSchedule::QUAD => {
-                    factor = ((entry.fuzz_count() * entry.fuzz_count()) as f64)
+                    factor = ((entry.scheduled_count() * entry.scheduled_count()) as f64)
                         / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
                 }
             }
@@ -310,7 +310,7 @@ where
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
         // This methoud is called in corpus's on_add() method. Fuzz_level is zero at that time.
-        if entry.fuzz_count() == 0 || psmeta.cycles() == 0 {
+        if entry.scheduled_count() == 0 || psmeta.cycles() == 0 {
             return Ok(weight);
         }
 
@@ -362,7 +362,7 @@ where
         }
 
         // was it fuzzed before?
-        if entry.fuzz_count() == 0 {
+        if entry.scheduled_count() == 0 {
             weight *= 2.0;
         }
 

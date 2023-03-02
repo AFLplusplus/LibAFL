@@ -131,9 +131,19 @@ where
                     break;
                 }
             }
-            *state.corpus_mut().current_mut() = Some(ret);
+            self.set_current_scheduled(state, Some(ret))?;
             Ok(ret)
         }
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 

@@ -294,13 +294,11 @@ where
         // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
         let mut testcase = state.corpus().get(idx)?.borrow_mut();
-        let fuzz_count = testcase.fuzz_count();
         testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
             depth,
             self.last_hash,
         ));
         testcase.set_parent_id_optional(current_idx);
-        testcase.set_fuzz_count(fuzz_count + 1);
         Ok(())
     }
 
@@ -354,10 +352,27 @@ where
                 }
                 None => state.corpus().first().unwrap(),
             };
-            *state.corpus_mut().current_mut() = Some(id);
+            self.set_current_scheduled(state, Some(id))?;
 
-            // Update the handicap
-            let mut testcase = state.corpus().get(id)?.borrow_mut();
+            Ok(id)
+        }
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        let current_idx = *state.corpus().current();
+
+        if let Some(idx) = current_idx {
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            let scheduled_count = testcase.scheduled_count();
+
+            // increase scheduled count, this was fuzz_level in afl
+            testcase.set_scheduled_count(scheduled_count + 1);
+
             let tcmeta = testcase
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
@@ -370,9 +385,10 @@ where
             } else if tcmeta.handicap() > 0 {
                 tcmeta.set_handicap(tcmeta.handicap() - 1);
             }
-
-            Ok(id)
         }
+
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 

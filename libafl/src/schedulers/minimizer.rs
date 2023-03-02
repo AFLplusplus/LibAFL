@@ -12,12 +12,10 @@ use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
-    schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
+    schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
-
-use super::RemovableScheduler;
 
 /// Default probability to skip the non-favored values
 pub const DEFAULT_SKIP_NON_FAVORED_PROB: u64 = 95;
@@ -78,7 +76,7 @@ where
 
 impl<CS, F, M> RemovableScheduler for MinimizerScheduler<CS, F, M>
 where
-    CS: Scheduler,
+    CS: RemovableScheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
@@ -188,6 +186,16 @@ where
             idx = self.base.next(state)?;
         }
         Ok(idx)
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        _state: &mut Self::State,
+        _next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        // We do nothing here, the inner scheduler will take care of it
+        Ok(())
     }
 }
 

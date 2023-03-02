@@ -34,7 +34,7 @@ where
     /// Number of executions done at discovery time
     executions: usize,
     /// Number of fuzzing iterations of this particular input updated in perform_mutational
-    fuzz_count: usize,
+    scheduled_count: usize,
     /// Parent [`CorpusId`], if known
     parent_id: Option<CorpusId>,
 }
@@ -158,16 +158,16 @@ where
         &mut self.executions
     }
 
-    /// Get the `fuzz_count`
+    /// Get the `scheduled_count`
     #[inline]
-    pub fn fuzz_count(&self) -> usize {
-        self.fuzz_count
+    pub fn scheduled_count(&self) -> usize {
+        self.scheduled_count
     }
 
-    /// Set the `fuzz_count`
+    /// Set the `scheduled_count`
     #[inline]
-    pub fn set_fuzz_count(&mut self, fuzz_count: usize) {
-        self.fuzz_count = fuzz_count;
+    pub fn set_scheduled_count(&mut self, scheduled_count: usize) {
+        self.scheduled_count = scheduled_count;
     }
 
     /// Create a new Testcase instance given an input
@@ -243,7 +243,7 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
-            fuzz_count: 0,
+            scheduled_count: 0,
             executions: 0,
             parent_id: None,
         }
@@ -471,8 +471,8 @@ pub mod pybind {
         }
 
         #[getter]
-        fn fuzz_count(&self) -> usize {
-            self.inner.as_ref().fuzz_count()
+        fn scheduled_count(&self) -> usize {
+            self.inner.as_ref().scheduled_count()
         }
 
         fn metadata(&mut self) -> PyObject {

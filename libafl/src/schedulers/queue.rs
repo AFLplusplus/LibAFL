@@ -51,9 +51,19 @@ where
                 .map(|id| state.corpus().next(id))
                 .flatten()
                 .unwrap_or_else(|| state.corpus().first().unwrap());
-            *state.corpus_mut().current_mut() = Some(id);
+            self.set_current_scheduled(state, Some(id))?;
             Ok(id)
         }
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 
