@@ -42,12 +42,15 @@ use crate::{
     Error,
 };
 
-/// The scheduler define how the fuzzer requests a testcase from the corpus.
-/// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
-pub trait Scheduler: UsesState {
-    /// Added an entry to the corpus at the given index
-    fn on_add(&mut self, _state: &mut Self::State, _idx: CorpusId) -> Result<(), Error> {
-        // Add parent_id here if it has no inner
+/// The scheduler also implemnts `on_remove` and `on_replace` if it implements this stage.
+pub trait RemovableScheduler: Scheduler {
+    /// Removed the given entry from the corpus at the given index
+    fn on_remove(
+        &mut self,
+        _state: &mut Self::State,
+        _idx: CorpusId,
+        _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 
@@ -60,16 +63,14 @@ pub trait Scheduler: UsesState {
     ) -> Result<(), Error> {
         Ok(())
     }
+}
 
-    /// Removed the given entry from the corpus at the given index
-    fn on_remove(
-        &mut self,
-        _state: &mut Self::State,
-        _idx: CorpusId,
-        _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
+/// The scheduler define how the fuzzer requests a testcase from the corpus.
+/// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
+pub trait Scheduler: UsesState {
+    /// Added an entry to the corpus at the given index
+    fn on_add(&mut self, _state: &mut Self::State, _idx: CorpusId) -> Result<(), Error>;
+    // Add parent_id here if it has no inner
 
     /// An input has been evaluated
     fn on_evaluation<OT>(
@@ -106,6 +107,18 @@ impl<S> Scheduler for RandScheduler<S>
 where
     S: HasCorpus + HasRand,
 {
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+        // Set parent id
+        let current_idx = *state.corpus().current();
+        state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .set_parent_id_optional(current_idx);
+
+        Ok(())
+    }
+
     /// Gets the next entry at random
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {

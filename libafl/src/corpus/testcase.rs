@@ -34,9 +34,7 @@ where
     /// Number of executions done at discovery time
     executions: usize,
     /// Number of fuzzing iterations of this particular input updated in perform_mutational
-    fuzz_level: usize,
-    /// If it has been fuzzed
-    fuzzed: bool,
+    fuzz_count: usize,
     /// Parent [`CorpusId`], if known
     parent_id: Option<CorpusId>,
 }
@@ -160,28 +158,16 @@ where
         &mut self.executions
     }
 
-    /// Get the `fuzz_level`
+    /// Get the `fuzz_count`
     #[inline]
-    pub fn fuzz_level(&self) -> usize {
-        self.fuzz_level
+    pub fn fuzz_count(&self) -> usize {
+        self.fuzz_count
     }
 
-    /// Set the `fuzz_level`
+    /// Set the `fuzz_count`
     #[inline]
-    pub fn set_fuzz_level(&mut self, fuzz_level: usize) {
-        self.fuzz_level = fuzz_level;
-    }
-
-    /// Get if it was fuzzed
-    #[inline]
-    pub fn fuzzed(&self) -> bool {
-        self.fuzzed
-    }
-
-    /// Set if it was fuzzed
-    #[inline]
-    pub fn set_fuzzed(&mut self, fuzzed: bool) {
-        self.fuzzed = fuzzed;
+    pub fn set_fuzz_count(&mut self, fuzz_count: usize) {
+        self.fuzz_count = fuzz_count;
     }
 
     /// Create a new Testcase instance given an input
@@ -257,9 +243,8 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
-            fuzz_level: 0,
+            fuzz_count: 0,
             executions: 0,
-            fuzzed: false,
             parent_id: None,
         }
     }
@@ -486,13 +471,8 @@ pub mod pybind {
         }
 
         #[getter]
-        fn fuzz_level(&self) -> usize {
-            self.inner.as_ref().fuzz_level()
-        }
-
-        #[getter]
-        fn fuzzed(&self) -> bool {
-            self.inner.as_ref().fuzzed()
+        fn fuzz_count(&self) -> usize {
+            self.inner.as_ref().fuzz_count()
         }
 
         fn metadata(&mut self) -> PyObject {

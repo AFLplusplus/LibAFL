@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
     schedulers::{
@@ -128,24 +128,6 @@ where
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
         self.inner.on_add(state, idx)
-    }
-
-    fn on_replace(
-        &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        testcase: &Testcase<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
-        self.inner.on_replace(state, idx, testcase)
-    }
-
-    fn on_remove(
-        &mut self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
-    ) -> Result<(), Error> {
-        self.inner.on_remove(state, idx, testcase)
     }
 
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
@@ -274,7 +256,7 @@ where
 
         for (_key, idx) in &top_rated.map {
             let mut entry = state.corpus().get(*idx)?.borrow_mut();
-            if entry.fuzzed() {
+            if entry.fuzz_count() > 0 {
                 continue;
             }
 

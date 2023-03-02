@@ -301,10 +301,14 @@ where
 
         // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
-        state.corpus().get(idx)?.borrow_mut().add_metadata(
-            SchedulerTestcaseMetaData::with_n_fuzz_entry(depth, self.last_hash),
-        );
-
+        {
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+                depth,
+                self.last_hash,
+            ));
+            testcase.set_parent_id_optional(current_idx);
+        }
         // Add the testcase metadata for this scheduler
         state
             .corpus()
@@ -321,25 +325,6 @@ where
         let last_find_iteration = executions - meta.last_executions + 1;
         meta.last_find_iteration = last_find_iteration;
 
-        Ok(())
-    }
-
-    fn on_replace(
-        &mut self,
-        state: &mut S,
-        idx: CorpusId,
-        _testcase: &Testcase<S::Input>,
-    ) -> Result<(), Error> {
-        self.on_add(state, idx)
-    }
-
-    #[allow(clippy::unused_self)]
-    fn on_remove(
-        &mut self,
-        _state: &mut S,
-        _idx: CorpusId,
-        _testcase: &Option<Testcase<S::Input>>,
-    ) -> Result<(), Error> {
         Ok(())
     }
 

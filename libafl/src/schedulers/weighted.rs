@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
@@ -255,34 +255,20 @@ where
 
         // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
-        state.corpus().get(idx)?.borrow_mut().add_metadata(
-            SchedulerTestcaseMetaData::with_n_fuzz_entry(depth, self.last_hash),
-        );
+        {
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            let fuzz_count = testcase.fuzz_count();
+            testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+                depth,
+                self.last_hash,
+            ));
+            testcase.set_parent_id_optional(current_idx);
+            testcase.set_fuzz_count(fuzz_count + 1);
+        }
 
         // TODO increase perf_score when finding new things like in AFL
         // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
 
-        // Recreate the alias table
-        self.create_alias_table(state)?;
-        Ok(())
-    }
-
-    fn on_replace(
-        &mut self,
-        state: &mut S,
-        idx: CorpusId,
-        _testcase: &Testcase<S::Input>,
-    ) -> Result<(), Error> {
-        // Recreate the alias table
-        self.on_add(state, idx)
-    }
-
-    fn on_remove(
-        &mut self,
-        state: &mut S,
-        _idx: CorpusId,
-        _testcase: &Option<Testcase<S::Input>>,
-    ) -> Result<(), Error> {
         // Recreate the alias table
         self.create_alias_table(state)?;
         Ok(())

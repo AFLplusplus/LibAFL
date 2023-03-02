@@ -17,6 +17,8 @@ use crate::{
     Error,
 };
 
+use super::RemovableScheduler;
+
 /// Default probability to skip the non-favored values
 pub const DEFAULT_SKIP_NON_FAVORED_PROB: u64 = 95;
 
@@ -74,19 +76,13 @@ where
     type State = CS::State;
 }
 
-impl<CS, F, M> Scheduler for MinimizerScheduler<CS, F, M>
+impl<CS, F, M> RemovableScheduler for MinimizerScheduler<CS, F, M>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
-    /// Add an entry to the corpus and return its index
-    fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
-        self.base.on_add(state, idx)?;
-        self.update_score(state, idx)
-    }
-
     /// Replaces the testcase at the given idx
     fn on_replace(
         &mut self,
@@ -160,6 +156,20 @@ where
                 .extend(map.into_iter().map(|(entry, (_, idx))| (entry, idx)));
         }
         Ok(())
+    }
+}
+
+impl<CS, F, M> Scheduler for MinimizerScheduler<CS, F, M>
+where
+    CS: Scheduler,
+    F: TestcaseScore<CS::State>,
+    M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
+    CS::State: HasCorpus + HasMetadata + HasRand,
+{
+    /// Add an entry to the corpus and return its index
+    fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
+        self.base.on_add(state, idx)?;
+        self.update_score(state, idx)
     }
 
     /// Gets the next entry

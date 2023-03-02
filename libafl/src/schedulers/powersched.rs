@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
-    schedulers::Scheduler,
+    schedulers::{RemovableScheduler, Scheduler},
     state::{HasCorpus, HasMetadata, UsesState},
     Error,
 };
@@ -178,40 +178,11 @@ where
     type State = S;
 }
 
-impl<O, S> Scheduler for PowerQueueScheduler<O, S>
+impl<O, S> RemovableScheduler for PowerQueueScheduler<O, S>
 where
     S: HasCorpus + HasMetadata,
     O: MapObserver,
 {
-    /// Add an entry to the corpus and return its index
-    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
-        let current_idx = *state.corpus().current();
-
-        let mut depth = match current_idx {
-            Some(parent_idx) => state
-                .corpus()
-                .get(parent_idx)?
-                .borrow()
-                .metadata()
-                .get::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?
-                .depth(),
-            None => 0,
-        };
-
-        // TODO increase perf_score when finding new things like in AFL
-        // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
-
-        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
-        depth += 1;
-        state.corpus().get(idx)?.borrow_mut().add_metadata(
-            SchedulerTestcaseMetaData::with_n_fuzz_entry(depth, self.last_hash),
-        );
-        Ok(())
-    }
-
     #[allow(clippy::cast_precision_loss)]
     fn on_replace(
         &mut self,
@@ -290,6 +261,46 @@ where
         psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
         psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
 
+        Ok(())
+    }
+}
+
+impl<O, S> Scheduler for PowerQueueScheduler<O, S>
+where
+    S: HasCorpus + HasMetadata,
+    O: MapObserver,
+{
+    /// Add an entry to the corpus and return its index
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+        let current_idx = *state.corpus().current();
+
+        let mut depth = match current_idx {
+            Some(parent_idx) => state
+                .corpus()
+                .get(parent_idx)?
+                .borrow()
+                .metadata()
+                .get::<SchedulerTestcaseMetaData>()
+                .ok_or_else(|| {
+                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                })?
+                .depth(),
+            None => 0,
+        };
+
+        // TODO increase perf_score when finding new things like in AFL
+        // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
+
+        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
+        depth += 1;
+        let mut testcase = state.corpus().get(idx)?.borrow_mut();
+        let fuzz_count = testcase.fuzz_count();
+        testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+            depth,
+            self.last_hash,
+        ));
+        testcase.set_parent_id_optional(current_idx);
+        testcase.set_fuzz_count(fuzz_count + 1);
         Ok(())
     }
 

@@ -13,10 +13,7 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasFuzzedCorpusId, HasSolutions, State,
-        UsesState,
-    },
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
 
@@ -67,12 +64,7 @@ where
     where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<S>,
-        S: State
-            + HasExecutions
-            + HasCorpus
-            + HasSolutions
-            + HasClientPerfMonitor
-            + HasFuzzedCorpusId,
+        S: State + HasExecutions + HasCorpus + HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = S>,
     {
         Ok(Self {

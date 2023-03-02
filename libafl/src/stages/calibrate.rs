@@ -106,7 +106,7 @@ where
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
             let corpus = state.corpus().get(corpus_idx)?.borrow();
-            if corpus.fuzz_level() > 0 {
+            if corpus.fuzz_count() > 0 {
                 return Ok(());
             }
         }
@@ -269,10 +269,10 @@ where
             psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
             let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-            let fuzz_level = testcase.fuzz_level();
+            let fuzz_count = testcase.fuzz_count();
 
             testcase.set_exec_time(total_time / (iter as u32));
-            testcase.set_fuzz_level(fuzz_level + 1);
+            testcase.set_fuzz_count(fuzz_count + 1);
             // log::trace!("time: {:#?}", testcase.exec_time());
 
             let data = testcase
