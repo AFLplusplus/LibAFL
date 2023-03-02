@@ -333,7 +333,7 @@ where
                 | PowerSchedule::QUAD => {
                     let hits = psmeta.n_fuzz()[tcmeta.n_fuzz_entry()];
                     if hits > 0 {
-                        weight *= libm::log10(f64::from(hits)) + 1.0;
+                        weight /= libm::log10(f64::from(hits)) + 1.0;
                     }
                 }
                 // EXPLORE and EXPLOIT fall into this
