@@ -277,7 +277,7 @@ where
     }
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
-    /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
+    /// and has a default probability to skip non-faved Testcases of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     pub fn new(state: &mut CS::State, base: CS, accounting_map: &'a [u32]) -> Self {
         match state.metadata().get::<TopAccountingMetadata>() {
             Some(meta) => {
@@ -297,7 +297,7 @@ where
     }
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
-    /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
+    /// and has a non-default probability to skip non-faved Testcases using (`skip_non_favored_prob`).
     pub fn with_skip_prob(
         state: &mut CS::State,
         base: CS,
