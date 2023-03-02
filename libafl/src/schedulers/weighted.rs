@@ -257,13 +257,11 @@ where
         depth += 1;
         {
             let mut testcase = state.corpus().get(idx)?.borrow_mut();
-            let scheduled_count = testcase.scheduled_count();
             testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
                 depth,
                 self.last_hash,
             ));
             testcase.set_parent_id_optional(current_idx);
-            testcase.set_scheduled_count(scheduled_count + 1);
         }
 
         // TODO increase perf_score when finding new things like in AFL

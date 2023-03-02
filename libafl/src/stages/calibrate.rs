@@ -106,6 +106,8 @@ where
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
             let corpus = state.corpus().get(corpus_idx)?.borrow();
+            // println!("calibration; corpus.scheduled_count() : {}", corpus.scheduled_count());
+
             if corpus.scheduled_count() > 0 {
                 return Ok(());
             }
