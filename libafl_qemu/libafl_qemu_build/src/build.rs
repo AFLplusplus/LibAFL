@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "8794d3fdc8392f181381e544c0ebdc6b483ff419";
+const QEMU_REVISION: &str = "0dc52ed6f3915f727aaec8648706760f278f0571";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -249,7 +249,6 @@ pub fn build(
                 .arg("--disable-vhost-vdpa")
                 .arg("--disable-virglrenderer")
                 .arg("--disable-virtfs")
-                .arg("--disable-virtiofsd")
                 .arg("--disable-vmnet")
                 .arg("--disable-vnc")
                 .arg("--disable-vnc-jpeg")
