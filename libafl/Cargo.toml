@@ -31,7 +31,7 @@ errors_backtrace = ["backtrace"] # Create backtraces at Error creation
 cmin = ["z3"] # for corpus minimisation
 corpus_btreemap = [] # Switches from HashMap to BTreeMap for CorpusId
 gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
-timestamp = ["chrono"]
+logger_timestamp = ["chrono"] # Logger uses chrono to print timestamp
 
 # features hiding dependencies licensed under GPL
 gpl = []
