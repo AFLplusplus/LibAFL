@@ -982,9 +982,31 @@ pub mod pybind {
     }
 }
 
-/// Macro to reduce the amount of code necessary to get the metadata from State or Testcase
+/// Macro to reduce the amount of code necessary to get metadata from State
 #[macro_export]
-macro_rules! get_metadata {
+macro_rules! get_state_metadata {
+    ($name:ident, $struct_name:ident) => {
+        $name
+            .metadata()
+            .get::<$struct_name>()
+            .ok_or_else(|| Error::key_not_found(stringify!($struct_name not found).to_string()))?
+    };
+}
+
+/// Macro to reduce the amount of code necessary to get mutable metadata from State
+#[macro_export]
+macro_rules! get_mut_state_metadata {
+    ($name:ident, $struct_name:ident) => {
+        $name
+            .metadata_mut()
+            .get_mut::<$struct_name>()
+            .ok_or_else(|| Error::key_not_found(stringify!($struct_name not found).to_string()))?
+    };
+}
+
+/// Macro to reduce the amount of code necessary to get metadata from Testcase
+#[macro_export]
+macro_rules! get_testcase_metadata {
     ($name:ident, $corpus_id:ident, $struct_name:ident) => {
         $name
             .corpus()
@@ -992,6 +1014,20 @@ macro_rules! get_metadata {
             .borrow()
             .metadata()
             .get::<$struct_name>()
+            .ok_or_else(|| Error::key_not_found(stringify!($struct_name not found).to_string()))?
+    };
+}
+
+/// Macro to reduce the amount of code necessary to get mutable metadata from Testcase
+#[macro_export]
+macro_rules! get_mut_testcase_metadata {
+    ($name:ident, $corpus_id:ident, $struct_name:ident) => {
+        $name
+            .corpus()
+            .get($corpus_id)?
+            .borrow_mut()
+            .metadata_mut()
+            .get_mut::<$struct_name>()
             .ok_or_else(|| Error::key_not_found(stringify!($struct_name not found).to_string()))?
     };
 }
