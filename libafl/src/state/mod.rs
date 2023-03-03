@@ -981,3 +981,17 @@ pub mod pybind {
         Ok(())
     }
 }
+
+/// Macro to reduce the amount of code necessary to get the metadata from State or Testcase
+#[macro_export]
+macro_rules! get_metadata {
+    ($name:ident, $corpus_id:ident, $struct_name:ident) => {
+        $name
+            .corpus()
+            .get($corpus_id)?
+            .borrow()
+            .metadata()
+            .get::<$struct_name>()
+            .ok_or_else(|| Error::key_not_found(stringify!($struct_name not found).to_string()))?
+    };
+}
