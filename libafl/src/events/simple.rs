@@ -499,7 +499,7 @@ where
                     }
                 };
 
-                // On windows (or in any case without forks), we spawn ourself again
+                // On Windows (or in any case without forks), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = startable_self()?.status()?;
                 #[cfg(all(unix, not(feature = "fork")))]

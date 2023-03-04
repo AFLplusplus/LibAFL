@@ -15,14 +15,11 @@ use crate::{
     corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{
-        map::{IsNovel, MapFeedback, MapFeedbackMetadata, Reducer},
-        HasObserverName,
-    },
+    feedbacks::{map::MapFeedbackMetadata, HasObserverName},
     fuzzer::Evaluator,
     inputs::UsesInput,
     monitors::UserStats,
-    observers::{MapObserver, ObserversTuple},
+    observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, UsesState},
@@ -107,16 +104,11 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
-        if state.corpus().get(corpus_idx)?.borrow().fuzz_level() > 0
-            || state
-                .corpus()
-                .get(corpus_idx)?
-                .borrow()
-                .metadata()
-                .get::<SchedulerTestcaseMetaData>()
-                .map_or(false, |meta| meta.bitmap_size() != 0)
         {
-            return Ok(());
+            let corpus = state.corpus().get(corpus_idx)?.borrow();
+            if corpus.fuzz_level() > 0 {
+                return Ok(());
+            }
         }
 
         let mut iter = self.stage_max;
@@ -321,13 +313,10 @@ where
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
-    pub fn new<N, R>(map_feedback: &MapFeedback<N, O, R, S, O::Entry>) -> Self
+    pub fn new<F>(map_feedback: &F) -> Self
     where
-        O::Entry:
-            PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-        R: Reducer<O::Entry>,
+        F: HasObserverName + Named + UsesObserver<S, Observer = O>,
         for<'it> O: AsIter<'it, Item = O::Entry>,
-        N: IsNovel<O::Entry>,
     {
         Self {
             map_observer_name: map_feedback.observer_name().to_string(),
@@ -340,13 +329,10 @@ where
 
     /// Create a new [`CalibrationStage`], but without checking stability.
     #[must_use]
-    pub fn ignore_stability<N, R>(map_feedback: &MapFeedback<N, O, R, S, O::Entry>) -> Self
+    pub fn ignore_stability<F>(map_feedback: &F) -> Self
     where
-        O::Entry:
-            PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-        R: Reducer<O::Entry>,
+        F: HasObserverName + Named + UsesObserver<S, Observer = O>,
         for<'it> O: AsIter<'it, Item = O::Entry>,
-        N: IsNovel<O::Entry>,
     {
         Self {
             map_observer_name: map_feedback.observer_name().to_string(),

@@ -22,7 +22,7 @@ use super::HasObservers;
 use crate::executors::{Executor, ExitKind};
 use crate::{
     bolts::{
-        fs::{InputFile, INPUTFILE_STD},
+        fs::{get_unique_std_input_file, InputFile},
         tuples::MatchName,
         AsSlice,
     },
@@ -113,7 +113,7 @@ impl CommandConfigurator for StdCommandConfigurator {
                         debug_assert_eq!(arg, "DUMMY");
                         #[cfg(unix)]
                         cmd.arg(OsStr::from_bytes(input.target_bytes().as_slice()));
-                        // There is an issue here that the chars on windows are 16 bit wide.
+                        // There is an issue here that the chars on Windows are 16 bit wide.
                         // I can't really test it. Please open a PR if this goes wrong.
                         #[cfg(not(unix))]
                         cmd.arg(OsString::from_vec(input.target_bytes().as_vec()));
@@ -456,7 +456,7 @@ impl CommandExecutorBuilder {
     /// Uses a default filename.
     /// Use [`Self::arg_input_file`] to specify a custom filename.
     pub fn arg_input_file_std(&mut self) -> &mut Self {
-        self.arg_input_file(INPUTFILE_STD);
+        self.arg_input_file(get_unique_std_input_file());
         self
     }
 

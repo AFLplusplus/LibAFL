@@ -51,10 +51,6 @@ where
         self.append_generated_terminals(&mut input, state);
         Ok(input)
     }
-
-    fn generate_dummy(&self, _state: &mut S) -> GramatronInput {
-        GramatronInput::new(vec![])
-    }
 }
 
 impl<'a, S> GramatronGenerator<'a, S>

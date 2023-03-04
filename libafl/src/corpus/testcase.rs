@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{serdeany::SerdeAnyMap, HasLen},
+    corpus::CorpusId,
     inputs::Input,
     state::HasMetadata,
     Error,
@@ -36,6 +37,8 @@ where
     fuzz_level: usize,
     /// If it has been fuzzed
     fuzzed: bool,
+    /// Parent [`CorpusId`], if known
+    parent_id: Option<CorpusId>,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -183,20 +186,30 @@ where
 
     /// Create a new Testcase instance given an input
     #[inline]
-    pub fn new(input: I) -> Self {
-        let mut slf = Testcase {
+    pub fn new(mut input: I) -> Self {
+        input.wrapped_as_testcase();
+        Self {
             input: Some(input),
             ..Testcase::default()
-        };
-        slf.input.as_mut().unwrap().wrapped_as_testcase();
-        slf
+        }
+    }
+
+    /// Creates a testcase, attaching the id of the parent
+    /// that this [`Testcase`] was derived from on creation
+    pub fn with_parent_id(mut input: I, parent_id: CorpusId) -> Self {
+        input.wrapped_as_testcase();
+        Self {
+            input: Some(input),
+            parent_id: Some(parent_id),
+            ..Testcase::default()
+        }
     }
 
     /// Create a new Testcase instance given an [`Input`] and a `filename`
     #[inline]
     pub fn with_filename(mut input: I, filename: String) -> Self {
         input.wrapped_as_testcase();
-        Testcase {
+        Self {
             input: Some(input),
             filename: Some(filename),
             ..Testcase::default()
@@ -207,11 +220,27 @@ where
     #[inline]
     pub fn with_executions(mut input: I, executions: usize) -> Self {
         input.wrapped_as_testcase();
-        Testcase {
+        Self {
             input: Some(input),
             executions,
             ..Testcase::default()
         }
+    }
+
+    /// Get the id of the parent, that this testcase was derived from
+    #[must_use]
+    pub fn parent_id(&self) -> Option<CorpusId> {
+        self.parent_id
+    }
+
+    /// Sets the id of the parent, that this testcase was derived from
+    pub fn set_parent_id(&mut self, parent_id: CorpusId) {
+        self.parent_id = Some(parent_id);
+    }
+
+    /// Sets the id of the parent, that this testcase was derived from
+    pub fn set_parent_id_optional(&mut self, parent_id: Option<CorpusId>) {
+        self.parent_id = parent_id;
     }
 }
 
@@ -231,6 +260,7 @@ where
             fuzz_level: 0,
             executions: 0,
             fuzzed: false,
+            parent_id: None,
         }
     }
 }
@@ -296,6 +326,18 @@ impl SchedulerTestcaseMetaData {
             handicap: 0,
             depth,
             n_fuzz_entry: 0,
+            cycle_and_time: (Duration::default(), 0),
+        }
+    }
+
+    /// Create new [`struct@SchedulerTestcaseMetaData`] given `n_fuzz_entry`
+    #[must_use]
+    pub fn with_n_fuzz_entry(depth: u64, n_fuzz_entry: usize) -> Self {
+        Self {
+            bitmap_size: 0,
+            handicap: 0,
+            depth,
+            n_fuzz_entry,
             cycle_and_time: (Duration::default(), 0),
         }
     }
@@ -436,6 +478,11 @@ pub mod pybind {
         #[getter]
         fn executions(&self) -> usize {
             *self.inner.as_ref().executions()
+        }
+
+        #[getter]
+        fn parent_id(&self) -> Option<usize> {
+            self.inner.as_ref().parent_id().map(|x| x.0)
         }
 
         #[getter]
