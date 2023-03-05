@@ -50,6 +50,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
+    prelude::HasCorpus,
     state::{HasClientPerfMonitor, HasSolutions, UsesState},
     Error,
 };
@@ -167,7 +168,7 @@ where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: HasSolutions + HasClientPerfMonitor,
+    S: HasSolutions + HasClientPerfMonitor + HasCorpus,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -344,7 +345,7 @@ impl InProcessHandlers {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(unix)]
@@ -543,7 +544,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     E: HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
-    E::State: HasSolutions + HasClientPerfMonitor,
+    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
     let observers = executor.observers_mut();
@@ -610,7 +611,7 @@ mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasSolutions},
+        state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -669,7 +670,7 @@ mod unix_signal_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
@@ -710,7 +711,7 @@ mod unix_signal_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         if !data.is_valid() {
@@ -753,7 +754,7 @@ mod unix_signal_handler {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
