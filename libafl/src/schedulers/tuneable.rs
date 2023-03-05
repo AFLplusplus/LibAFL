@@ -16,6 +16,8 @@ use crate::{
     Error,
 };
 
+use super::RemovableScheduler;
+
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
 struct TuneableSchedulerMetadata {
     next: Option<CorpusId>,
@@ -86,6 +88,13 @@ where
     S: UsesInput,
 {
     type State = S;
+}
+
+impl<S> RemovableScheduler for TuneableScheduler<S>
+where
+    S: HasCorpus + HasMetadata,
+{
+
 }
 
 impl<S> Scheduler for TuneableScheduler<S>

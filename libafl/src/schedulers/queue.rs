@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use crate::{
     corpus::{Corpus, CorpusId},
     inputs::UsesInput,
-    schedulers::Scheduler,
+    schedulers::{Scheduler, RemovableScheduler},
     state::{HasCorpus, UsesState},
     Error,
 };
@@ -22,6 +22,13 @@ where
     S: UsesInput,
 {
     type State = S;
+}
+
+impl<S> RemovableScheduler for QueueScheduler<S> 
+where
+    S: HasCorpus,
+{
+
 }
 
 impl<S> Scheduler for QueueScheduler<S>

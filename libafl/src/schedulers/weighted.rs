@@ -16,7 +16,7 @@ use crate::{
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
-        Scheduler,
+        RemovableScheduler, Scheduler,
     },
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
@@ -227,6 +227,92 @@ where
     S: UsesInput,
 {
     type State = S;
+}
+
+impl<F, O, S> RemovableScheduler for WeightedScheduler<F, O, S>
+where
+    F: TestcaseScore<S>,
+    O: MapObserver,
+    S: HasCorpus + HasMetadata + HasRand,
+{
+    fn on_remove(
+        &mut self,
+        state: &mut Self::State,
+        _idx: CorpusId,
+        prev: &Option<crate::corpus::Testcase<<Self::State as UsesInput>::Input>>,
+    ) -> Result<(), Error> {
+        let prev = prev.as_ref().ok_or_else(|| {
+            Error::illegal_argument(
+                "Power schedulers must be aware of the removed corpus entry for reweighting.",
+            )
+        })?;
+
+        let prev_meta = prev
+            .metadata()
+            .get::<SchedulerTestcaseMetaData>()
+            .ok_or_else(|| {
+                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+            })?;
+
+        // Use these to adjust `SchedulerMetadata`
+        let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
+        let prev_bitmap_size = prev_meta.bitmap_size();
+        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
+
+        let psmeta = state
+            .metadata_mut()
+            .get_mut::<SchedulerMetadata>()
+            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+
+        psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
+        psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
+        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
+        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
+        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
+
+        Ok(())
+    }
+
+    fn on_replace(
+        &mut self,
+        state: &mut Self::State,
+        idx: CorpusId,
+        prev: &crate::corpus::Testcase<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
+        let prev_meta = prev
+            .metadata()
+            .get::<SchedulerTestcaseMetaData>()
+            .ok_or_else(|| {
+                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+            })?;
+
+        // Next depth is + 1
+        let prev_depth = prev_meta.depth() + 1;
+
+        // Use these to adjust `SchedulerMetadata`
+        let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
+        let prev_bitmap_size = prev_meta.bitmap_size();
+        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
+
+        let psmeta = state
+            .metadata_mut()
+            .get_mut::<SchedulerMetadata>()
+            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+
+        // We won't add new one because it'll get added when it gets executed in calirbation next time.
+        psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
+        psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
+        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
+        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
+        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
+
+        state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .add_metadata(SchedulerTestcaseMetaData::new(prev_depth));
+        Ok(())
+    }
 }
 
 impl<F, O, S> Scheduler for WeightedScheduler<F, O, S>
