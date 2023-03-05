@@ -5,7 +5,7 @@ use alloc::string::String;
 use core::{default::Default, option::Option, time::Duration};
 
 #[cfg(feature = "std")]
-use std::{fs, path::Path};
+use std::fs;
 
 use serde::{Deserialize, Serialize};
 
