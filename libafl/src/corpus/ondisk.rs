@@ -4,7 +4,7 @@
 //! which only stores a certain number of testcases and removes additional ones in a FIFO manner.
 
 use core::{cell::RefCell, time::Duration};
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, fs::OpenOptions};
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
 
@@ -211,16 +211,24 @@ where
             let filename = loop {
                 let lockfile = format!(".{file}.lafl_lock");
 
-                if !Path::new(&lockfile).exists() {
-                    break self.dir_path.join(file);
+                if OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(self.dir_path.join(lockfile))
+                    .is_ok()
+                {
+                    break file;
                 }
 
                 file = format!("{file_orig}-{ctr}");
                 ctr += 1;
             };
 
-            let filename_str = filename.to_str().expect("Invalid Path");
+            let file_path = self.dir_path.join(filename.clone());
+            let filename_str = file_path.to_str().expect("Invalid Path");
             testcase.set_filename(filename_str.into())?;
+
+            fs::remove_file(format!(".{filename}.lafl_lock"))?;
         };
         if self.meta_format.is_some() {
             let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());

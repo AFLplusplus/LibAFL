@@ -141,27 +141,9 @@ where
                 return Ok(());
             }
 
-            // Swap file only when both lock files dont exist
-            let old_lock_filename = format!(".{old_filename}.lafl_lock");
-            if Path::new(&old_lock_filename).exists() {
-                return Err(Error::illegal_state("old lockfile exist"));
-            }
             let new_lock_filename = format!(".{new_filename}.lafl_lock");
-            if Path::new(&new_lock_filename).exists() {
-                return Err(Error::illegal_state("new lockfile exist"));
-            }
 
-            // Try to create lock files for old/new testcases
-            if OpenOptions::new()
-                .create(true)
-                .write(true)
-                .open(&old_lock_filename)
-                .is_err()
-            {
-                return Err(Error::illegal_state(
-                    "unable to create lock file for old testcase",
-                ));
-            }
+            // Try to create lock file for new testcases
             if OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -179,7 +161,6 @@ where
             let new_metadata_filename = format!(".{new_filename}.metadata");
             fs::rename(old_metadata_filename, new_metadata_filename)?;
 
-            fs::remove_file(&old_lock_filename)?;
             fs::remove_file(&new_lock_filename)?;
         }
 
