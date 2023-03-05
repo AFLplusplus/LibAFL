@@ -172,7 +172,7 @@ where
     }
 
     /// An input has been evaluated
-    fn on_evaluation<OT>(
+    fn on_execution<OT>(
         &mut self,
         state: &mut Self::State,
         input: &<Self::State as UsesInput>::Input,
@@ -181,7 +181,7 @@ where
     where
         OT: ObserversTuple<Self::State>,
     {
-        self.base.on_evaluation(state, input, observers)
+        self.base.on_execution(state, input, observers)
     }
 
     /// Gets the next entry

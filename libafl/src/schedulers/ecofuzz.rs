@@ -312,7 +312,7 @@ where
         Ok(())
     }
 
-    fn on_evaluation<OT>(
+    fn on_execution<OT>(
         &mut self,
         state: &mut S,
         _input: &S::Input,

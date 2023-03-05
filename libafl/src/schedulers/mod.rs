@@ -73,7 +73,7 @@ pub trait Scheduler: UsesState {
     // Add parent_id here if it has no inner
 
     /// An input has been evaluated
-    fn on_evaluation<OT>(
+    fn on_execution<OT>(
         &mut self,
         _state: &mut Self::State,
         _input: &<Self::State as UsesInput>::Input,
