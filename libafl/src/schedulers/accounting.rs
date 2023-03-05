@@ -125,13 +125,13 @@ where
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as UsesInput>::Input: HasLen,
 {
-    fn on_add(&self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
         self.inner.on_add(state, idx)
     }
 
     fn on_replace(
-        &self,
+        &mut self,
         state: &mut Self::State,
         idx: CorpusId,
         testcase: &Testcase<<Self::State as UsesInput>::Input>,
@@ -140,7 +140,7 @@ where
     }
 
     fn on_remove(
-        &self,
+        &mut self,
         state: &mut Self::State,
         idx: CorpusId,
         testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
@@ -148,7 +148,7 @@ where
         self.inner.on_remove(state, idx, testcase)
     }
 
-    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state
             .metadata()
             .get::<TopAccountingMetadata>()
@@ -158,7 +158,7 @@ where
         } else {
             self.inner.cull(state)?;
         }
-        let mut idx = self.inner.base().next(state)?;
+        let mut idx = self.inner.base_mut().next(state)?;
         while {
             let has = !state
                 .corpus()
@@ -168,7 +168,7 @@ where
             has
         } && state.rand_mut().below(100) < self.skip_non_favored_prob
         {
-            idx = self.inner.base().next(state)?;
+            idx = self.inner.base_mut().next(state)?;
         }
         Ok(idx)
     }

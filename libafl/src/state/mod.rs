@@ -17,7 +17,7 @@ use crate::{
         rands::Rand,
         serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     },
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -58,6 +58,21 @@ pub trait HasCorpus: UsesInput {
     fn corpus(&self) -> &Self::Corpus;
     /// The testcase corpus (mutable)
     fn corpus_mut(&mut self) -> &mut Self::Corpus;
+}
+
+/// Trait for a state that has information about which [`CorpusId`]
+/// is currently being fuzzed.
+/// When a new interesting input was found, this value becomes the `parent_id`.
+pub trait HasFuzzedCorpusId {
+    /// The currently fuzzed [`CorpusId`], if known.
+    /// If a new interesting testcase was found, this should usually become the `parent_id`.
+    fn fuzzed_corpus_id(&self) -> Option<CorpusId>;
+
+    /// Sets the currently fuzzed [`CorpusId`].
+    fn set_fuzzed_corpus_id(&mut self, corpus_id: CorpusId);
+
+    /// Resets the currently fuzzed [`CorpusId`].
+    fn clear_fuzzed_corpus_id(&mut self);
 }
 
 /// Interact with the maximum size
@@ -192,6 +207,8 @@ pub struct StdState<I, C, R, SC> {
     named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
+    /// The [`CorpusId`] of the testcase we're currently fuzzing.
+    fuzzed_corpus_id: Option<CorpusId>,
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
@@ -254,6 +271,20 @@ where
     #[inline]
     fn corpus_mut(&mut self) -> &mut Self::Corpus {
         &mut self.corpus
+    }
+}
+
+impl<I, C, R, SC> HasFuzzedCorpusId for StdState<I, C, R, SC> {
+    fn fuzzed_corpus_id(&self) -> Option<CorpusId> {
+        self.fuzzed_corpus_id
+    }
+
+    fn set_fuzzed_corpus_id(&mut self, fuzzed_corpus_id: CorpusId) {
+        self.fuzzed_corpus_id = Some(fuzzed_corpus_id);
+    }
+
+    fn clear_fuzzed_corpus_id(&mut self) {
+        self.fuzzed_corpus_id = None;
     }
 }
 
@@ -471,7 +502,7 @@ where
             log::info!("Loading file {:?} ...", &path);
             let input = loader(fuzzer, self, &path)?;
             if forced {
-                let _ = fuzzer.add_input(self, executor, manager, input)?;
+                let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
             } else {
                 let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
                 if res == ExecuteInputResult::None {
@@ -617,7 +648,7 @@ where
         for _ in 0..num {
             let input = generator.generate(self)?;
             if forced {
-                let _ = fuzzer.add_input(self, executor, manager, input)?;
+                let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
                 added += 1;
             } else {
                 let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
@@ -694,6 +725,7 @@ where
             corpus,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
+            fuzzed_corpus_id: None,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "std")]
