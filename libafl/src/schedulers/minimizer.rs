@@ -12,6 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
+    observers::ObserversTuple,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
@@ -168,6 +169,19 @@ where
     fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
         self.base.on_add(state, idx)?;
         self.update_score(state, idx)
+    }
+
+    /// An input has been evaluated
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut Self::State,
+        input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<Self::State>,
+    {
+        self.base.on_evaluation(state, input, observers)
     }
 
     /// Gets the next entry

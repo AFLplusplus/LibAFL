@@ -3,7 +3,6 @@
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
-
 use serde::{Deserialize, Serialize};
 
 use crate::{
