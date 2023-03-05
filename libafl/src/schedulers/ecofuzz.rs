@@ -1,7 +1,10 @@
 //! The corpus scheduler from `EcoFuzz` (`https://www.usenix.org/conference/usenixsecurity20/presentation/yue`)
 
 use alloc::string::{String, ToString};
-use core::marker::PhantomData;
+use core::{
+    borrow::{Borrow, BorrowMut},
+    marker::PhantomData,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -47,7 +50,6 @@ pub struct EcoTestcaseMetadata {
     last_energy: u64,
     state: EcoState,
     serial: u64,
-    was_fuzzed: bool,
     computed_score: f64,
 }
 
@@ -117,7 +119,6 @@ where
                 .get_mut::<EcoTestcaseMetadata>()
                 .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?;
             // Set was_fuzzed for the old current
-            meta.was_fuzzed = true;
             meta.last_found = count - last_corpus_count;
             meta.last_energy = meta.mutation_num - last_mutation_num;
             meta.computed_score
@@ -165,29 +166,15 @@ where
     fn schedule(state: &mut S) -> Result<CorpusId, Error> {
         let mut selection = None;
         for id in state.corpus().ids() {
-            let was_fuzzed = state
-                .corpus()
-                .get(id)?
-                .borrow()
-                .metadata()
-                .get::<EcoTestcaseMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
-                .was_fuzzed;
-            if !was_fuzzed {
+            let was_fuzzed = state.corpus().get(id)?.borrow().scheduled_count() > 0;
+            if was_fuzzed {
                 selection = Some(id);
                 break;
             }
         }
 
         for id in state.corpus().ids() {
-            let was_fuzzed = state
-                .corpus()
-                .get(id)?
-                .borrow()
-                .metadata()
-                .get::<EcoTestcaseMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
-                .was_fuzzed;
+            let was_fuzzed = state.corpus().get(id)?.borrow().scheduled_count() > 0;
             if was_fuzzed {
                 state
                     .metadata_mut()
@@ -431,6 +418,16 @@ where
         state: &mut Self::State,
         next_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
+        let current_idx = *state.corpus().current();
+
+        if let Some(idx) = current_idx {
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            let scheduled_count = testcase.scheduled_count();
+
+            // increase scheduled count, this was fuzz_level in afl
+            testcase.set_scheduled_count(scheduled_count + 1);
+        }
+
         *state.corpus_mut().current_mut() = next_idx;
         Ok(())
     }
