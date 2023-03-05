@@ -560,6 +560,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     if interesting {
         let mut new_testcase = Testcase::new(input.clone());
         new_testcase.add_metadata(exitkind);
+        new_testcase.set_parent_id_optional(*state.corpus().current());
         fuzzer
             .objective_mut()
             .append_metadata(state, observers, &mut new_testcase)
