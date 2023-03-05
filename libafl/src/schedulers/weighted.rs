@@ -235,6 +235,7 @@ where
     O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand,
 {
+    #[allow(clippy::cast_precision_loss)]
     fn on_remove(
         &mut self,
         state: &mut Self::State,
@@ -273,6 +274,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::cast_precision_loss)]
     fn on_replace(
         &mut self,
         state: &mut Self::State,
