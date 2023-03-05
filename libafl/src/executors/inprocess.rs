@@ -50,7 +50,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasClientPerfMonitor, HasSolutions, UsesState, HasCorpus},
+    state::{HasClientPerfMonitor, HasCorpus, HasSolutions, UsesState},
     Error,
 };
 
@@ -861,7 +861,7 @@ pub mod windows_asan_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasSolutions},
+        state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     };
 
     /// # Safety
@@ -970,7 +970,7 @@ mod windows_exception_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasSolutions},
+        state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
