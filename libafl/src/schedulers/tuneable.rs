@@ -7,6 +7,7 @@ use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
 
+use super::RemovableScheduler;
 use crate::{
     corpus::{Corpus, CorpusId},
     impl_serdeany,
@@ -15,8 +16,6 @@ use crate::{
     state::{HasCorpus, HasMetadata, UsesState},
     Error,
 };
-
-use super::RemovableScheduler;
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
 struct TuneableSchedulerMetadata {
@@ -90,12 +89,7 @@ where
     type State = S;
 }
 
-impl<S> RemovableScheduler for TuneableScheduler<S>
-where
-    S: HasCorpus + HasMetadata,
-{
-
-}
+impl<S> RemovableScheduler for TuneableScheduler<S> where S: HasCorpus + HasMetadata {}
 
 impl<S> Scheduler for TuneableScheduler<S>
 where
