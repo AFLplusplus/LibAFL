@@ -1,10 +1,8 @@
 //! The corpus scheduler from `EcoFuzz` (`https://www.usenix.org/conference/usenixsecurity20/presentation/yue`)
 
 use alloc::string::{String, ToString};
-use core::{
-    borrow::{Borrow, BorrowMut},
-    marker::PhantomData,
-};
+use core::marker::PhantomData;
+
 
 use serde::{Deserialize, Serialize};
 
