@@ -4,7 +4,7 @@ use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{inprocess::windows_asan_handler::asan_death_handler, Executor, HasObservers},
     feedbacks::Feedback,
-    state::{HasClientPerfMonitor, HasSolutions, HasCorpus},
+    state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     HasObjective,
 };
 
