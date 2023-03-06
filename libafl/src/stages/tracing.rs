@@ -105,21 +105,21 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
 
 /// Trace with tainted input
 #[derive(Clone, Debug)]
-pub struct TaintTracingStage<EM, TE, Z> {
+pub struct AFLCmplogTracingStage<EM, TE, Z> {
     tracer_executor: TE,
     cmplog_observer_name: Option<String>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
 
-impl<EM, TE, Z> UsesState for TaintTracingStage<EM, TE, Z>
+impl<EM, TE, Z> UsesState for AFLCmplogTracingStage<EM, TE, Z>
 where
     TE: UsesState,
 {
     type State = TE::State;
 }
 
-impl<E, EM, TE, Z> Stage<E, EM, Z> for TaintTracingStage<EM, TE, Z>
+impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLCmplogTracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
@@ -215,7 +215,7 @@ where
     }
 }
 
-impl<EM, TE, Z> TaintTracingStage<EM, TE, Z> {
+impl<EM, TE, Z> AFLCmplogTracingStage<EM, TE, Z> {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
         Self {
