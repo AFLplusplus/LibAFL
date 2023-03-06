@@ -137,6 +137,31 @@ pub trait HasMetadata {
     {
         self.metadata().get::<M>().is_some()
     }
+
+    /// To get metadata
+    fn get_metadata<M>(&self) -> Result<&M, Error>
+    where
+        M: SerdeAny,
+    {
+        self.metadata()
+            .get::<M>()
+            .ok_or_else(|| { 
+                Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        })
+    }
+
+    /// To get mutable metadata
+    fn get_mut_metadata<M>(&mut self) -> Result<&mut M, Error>
+    where
+        M: SerdeAny,
+    {
+        self.metadata_mut()
+            .get_mut::<M>()
+            .ok_or_else(|| { 
+                Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        })
+    }
+
 }
 
 /// Trait for elements offering named metadata
@@ -163,6 +188,31 @@ pub trait HasNamedMetadata {
     {
         self.named_metadata().contains::<M>(name)
     }
+
+    /// To get named metadata
+    fn get_named_metadata<M>(&self, name: &str) -> Result<&M, Error>
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata()
+            .get::<M>(name)
+            .ok_or_else(|| { 
+                Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        })
+    }
+
+    /// To get mutable named metadata
+    fn get_mut_named_metadata<M>(&mut self, name: &str) -> Result<&mut M, Error>
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_mut()
+            .get_mut::<M>(name)
+            .ok_or_else(|| { 
+                Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        })
+    }
+
 }
 
 /// Trait for the execution counter
@@ -320,6 +370,7 @@ impl<I, C, R, SC> HasMetadata for StdState<I, C, R, SC> {
     fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
+
 }
 
 impl<I, C, R, SC> HasNamedMetadata for StdState<I, C, R, SC> {
@@ -982,52 +1033,4 @@ pub mod pybind {
     }
 }
 
-/// Macro to reduce the amount of code necessary to get metadata from State
-#[macro_export]
-macro_rules! get_state_metadata {
-    ($name:ident, $struct_name:ident) => {
-        $name
-            .metadata()
-            .get::<$struct_name>()
-            .ok_or_else(|| Error::key_not_found(stringify!($struct_name not found).to_string()))?
-    };
-}
 
-/// Macro to reduce the amount of code necessary to get mutable metadata from State
-#[macro_export]
-macro_rules! get_mut_state_metadata {
-    ($name:ident, $struct_name:ident) => {
-        $name
-            .metadata_mut()
-            .get_mut::<$struct_name>()
-            .ok_or_else(|| Error::key_not_found(stringify!($struct_name not found).to_string()))?
-    };
-}
-
-/// Macro to reduce the amount of code necessary to get metadata from Testcase
-#[macro_export]
-macro_rules! get_testcase_metadata {
-    ($name:ident, $corpus_id:ident, $struct_name:ident) => {
-        $name
-            .corpus()
-            .get($corpus_id)?
-            .borrow()
-            .metadata()
-            .get::<$struct_name>()
-            .ok_or_else(|| Error::key_not_found(stringify!($struct_name not found).to_string()))?
-    };
-}
-
-/// Macro to reduce the amount of code necessary to get mutable metadata from Testcase
-#[macro_export]
-macro_rules! get_mut_testcase_metadata {
-    ($name:ident, $corpus_id:ident, $struct_name:ident) => {
-        $name
-            .corpus()
-            .get($corpus_id)?
-            .borrow_mut()
-            .metadata_mut()
-            .get_mut::<$struct_name>()
-            .ok_or_else(|| Error::key_not_found(stringify!($struct_name not found).to_string()))?
-    };
-}
