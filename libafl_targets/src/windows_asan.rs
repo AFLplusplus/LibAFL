@@ -32,7 +32,7 @@ where
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
-    E::State: HasSolutions + HasClientPerfMonitor,
+    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
     __sanitizer_set_death_callback(asan_death_handler::<E, EM, OF, Z>);

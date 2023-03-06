@@ -462,7 +462,6 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
 
-
         self.process_execution(state, manager, input, observers, &exit_kind, send_events)
     }
 }
@@ -629,7 +628,8 @@ where
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
-        self.scheduler.on_execution(state, &input, executor.observers())?;
+        self.scheduler
+            .on_execution(state, input, executor.observers())?;
 
         start_timer!(state);
         executor
