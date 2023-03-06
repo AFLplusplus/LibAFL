@@ -143,10 +143,8 @@ pub trait HasMetadata {
     where
         M: SerdeAny,
     {
-        self.metadata()
-            .get::<M>()
-            .ok_or_else(|| { 
-                Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        self.metadata().get::<M>().ok_or_else(|| {
+            Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
         })
     }
 
@@ -155,13 +153,10 @@ pub trait HasMetadata {
     where
         M: SerdeAny,
     {
-        self.metadata_mut()
-            .get_mut::<M>()
-            .ok_or_else(|| { 
-                Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        self.metadata_mut().get_mut::<M>().ok_or_else(|| {
+            Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
         })
     }
-
 }
 
 /// Trait for elements offering named metadata
@@ -194,10 +189,8 @@ pub trait HasNamedMetadata {
     where
         M: SerdeAny,
     {
-        self.named_metadata()
-            .get::<M>(name)
-            .ok_or_else(|| { 
-                Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        self.named_metadata().get::<M>(name).ok_or_else(|| {
+            Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
         })
     }
 
@@ -206,13 +199,10 @@ pub trait HasNamedMetadata {
     where
         M: SerdeAny,
     {
-        self.named_metadata_mut()
-            .get_mut::<M>(name)
-            .ok_or_else(|| { 
-                Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        self.named_metadata_mut().get_mut::<M>(name).ok_or_else(|| {
+            Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
         })
     }
-
 }
 
 /// Trait for the execution counter
@@ -370,7 +360,6 @@ impl<I, C, R, SC> HasMetadata for StdState<I, C, R, SC> {
     fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
-
 }
 
 impl<I, C, R, SC> HasNamedMetadata for StdState<I, C, R, SC> {
@@ -1032,5 +1021,3 @@ pub mod pybind {
         Ok(())
     }
 }
-
-
