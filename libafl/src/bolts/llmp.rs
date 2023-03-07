@@ -110,7 +110,7 @@ use crate::{
 
 /// The timeout after which a client will be considered stale, and removed.
 #[cfg(feature = "std")]
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(60);
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(60 * 5);
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
