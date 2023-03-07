@@ -139,6 +139,7 @@ pub trait HasMetadata {
     }
 
     /// To get metadata
+    #[inline]
     fn get_metadata<M>(&self) -> Result<&M, Error>
     where
         M: SerdeAny,
@@ -149,7 +150,8 @@ pub trait HasMetadata {
     }
 
     /// To get mutable metadata
-    fn get_mut_metadata<M>(&mut self) -> Result<&mut M, Error>
+    #[inline]
+    fn get_metadata_mut<M>(&mut self) -> Result<&mut M, Error>
     where
         M: SerdeAny,
     {
@@ -185,6 +187,7 @@ pub trait HasNamedMetadata {
     }
 
     /// To get named metadata
+    #[inline]
     fn get_named_metadata<M>(&self, name: &str) -> Result<&M, Error>
     where
         M: SerdeAny,
@@ -195,7 +198,8 @@ pub trait HasNamedMetadata {
     }
 
     /// To get mutable named metadata
-    fn get_mut_named_metadata<M>(&mut self, name: &str) -> Result<&mut M, Error>
+    #[inline]
+    fn get_named_metadata_mut<M>(&mut self, name: &str) -> Result<&mut M, Error>
     where
         M: SerdeAny,
     {
