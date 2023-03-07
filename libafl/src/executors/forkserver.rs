@@ -35,13 +35,13 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
-    observers::{
-        get_asan_runtime_flags_with_log_path, AsanBacktraceObserver, MapObserver, Observer,
-        ObserversTuple, UsesObservers,
-    },
+    observers::{MapObserver, Observer, ObserversTuple, UsesObservers},
     state::UsesState,
     Error,
 };
+
+#[cfg(feature = "regex")]
+use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
 
 const FORKSRV_FD: i32 = 198;
 #[allow(clippy::cast_possible_wrap)]
@@ -232,9 +232,11 @@ impl Forkserver {
             command.env("__AFL_DEFER_FORKSRV", "1");
         }
 
+        #[cfg(feature = "regex")]
+        command.env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path());
+
         match command
             .env("LD_BIND_NOW", "1")
-            .env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path())
             .envs(envs)
             .setlimit(memlimit)
             .setsid()
@@ -1129,6 +1131,7 @@ where
 
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
+            #[cfg(feature = "regex")]
             if self.has_asan_observer.is_none() {
                 self.has_asan_observer = Some(
                     self.observers()
@@ -1136,6 +1139,7 @@ where
                         .is_some(),
                 );
             }
+            #[cfg(feature = "regex")]
             if self.has_asan_observer.unwrap() {
                 self.observers_mut()
                     .match_name_mut::<AsanBacktraceObserver>("AsanBacktraceObserver")
