@@ -12,6 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
+    observers::ObserversTuple,
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
@@ -160,6 +161,19 @@ where
                 .extend(map.into_iter().map(|(entry, (_, idx))| (entry, idx)));
         }
         Ok(())
+    }
+
+    /// An input has been evaluated
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut Self::State,
+        input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<Self::State>,
+    {
+        self.base.on_evaluation(state, input, observers)
     }
 
     /// Gets the next entry

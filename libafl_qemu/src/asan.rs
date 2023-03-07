@@ -6,7 +6,9 @@ use std::{
     sync::Mutex,
 };
 
-use libafl::{executors::ExitKind, inputs::UsesInput, state::HasMetadata};
+use libafl::{
+    executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, state::HasMetadata,
+};
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
@@ -730,7 +732,15 @@ where
         }
     }
 
-    fn post_exec(&mut self, emulator: &Emulator, _input: &S::Input, exit_kind: &mut ExitKind) {
+    fn post_exec<OT>(
+        &mut self,
+        emulator: &Emulator,
+        _input: &S::Input,
+        _observers: &mut OT,
+        exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+    {
         if self.reset(emulator) == AsanRollback::HasLeaks {
             *exit_kind = ExitKind::Crash;
         }
