@@ -15,7 +15,7 @@ use core::{
 
 use ahash::RandomState;
 use hashbrown::HashMap;
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -108,7 +108,7 @@ impl Default for TokenInputEncoderDecoder {
 }
 
 /// A naive tokenizer struct
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 #[derive(Clone, Debug)]
 pub struct NaiveTokenizer {
     /// Ident regex
@@ -119,7 +119,7 @@ pub struct NaiveTokenizer {
     string_re: Regex,
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 impl NaiveTokenizer {
     /// Creates a new [`NaiveTokenizer`]
     #[must_use]
@@ -132,7 +132,7 @@ impl NaiveTokenizer {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 impl Default for NaiveTokenizer {
     fn default() -> Self {
         Self {
@@ -146,7 +146,7 @@ impl Default for NaiveTokenizer {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 impl Tokenizer for NaiveTokenizer {
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error> {
         let mut tokens = vec![];
@@ -259,7 +259,7 @@ impl EncodedInput {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 #[cfg(test)]
 mod tests {
     use alloc::borrow::ToOwned;

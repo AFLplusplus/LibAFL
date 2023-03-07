@@ -110,7 +110,7 @@ use crate::{
 
 /// The timeout after which a client will be considered stale, and removed.
 #[cfg(feature = "std")]
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(60);
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(60 * 5);
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
@@ -1897,7 +1897,7 @@ where
     /// after which the broker loop should quit gracefully.
     pub exit_cleanly_after: Option<NonZeroUsize>,
     /// Clients that should be removed soon, (offset into llmp_clients)
-    clients_to_remove: Vec<u32>,
+    clients_to_remove: Vec<usize>,
     /// The ShMemProvider to use
     shmem_provider: SP,
 }
@@ -2114,22 +2114,22 @@ where
                         if last_msg_time < current_time
                             && current_time - last_msg_time > CLIENT_TIMEOUT
                         {
-                            self.clients_to_remove.push(i as u32);
+                            self.clients_to_remove.push(i);
                             #[cfg(feature = "llmp_debug")]
-                            println!("Client {i} timed out. Removing.");
+                            println!("Client #{i} timed out. Removing.");
                         }
                     }
                     new_messages = has_messages;
                 }
-                Err(Error::ShuttingDown) => self.clients_to_remove.push(i as u32),
+                Err(Error::ShuttingDown) => self.clients_to_remove.push(i),
                 Err(err) => return Err(err),
             }
         }
 
         // After brokering, remove all clients we don't want to keep.
-        for client_id in self.clients_to_remove.iter().rev() {
-            log::debug!("Client {client_id} disconnected.");
-            self.llmp_clients.remove((*client_id) as usize);
+        for i in self.clients_to_remove.iter().rev() {
+            log::debug!("Client #{i} disconnected.");
+            self.llmp_clients.remove(*i);
         }
         self.clients_to_remove.clear();
         Ok(new_messages)
@@ -2642,12 +2642,18 @@ where
         // TODO: We could memcpy a range of pending messages, instead of one by one.
         loop {
             let msg = {
-                // TODO faster search (e.g. binary search)
-                let pos = self
-                    .llmp_clients
-                    .iter()
-                    .position(|x| x.id == client_id)
-                    .expect("Fatal error, client ID not found");
+                let pos = if (client_id.0 as usize) < self.llmp_clients.len()
+                    && self.llmp_clients[client_id.0 as usize].id == client_id
+                {
+                    // Fast path when no client was removed
+                    client_id.0 as usize
+                } else {
+                    // TODO binary search
+                    self.llmp_clients
+                        .iter()
+                        .position(|x| x.id == client_id)
+                        .expect("Fatal error, client ID not found")
+                };
                 let client = &mut self.llmp_clients[pos];
                 match client.recv()? {
                     None => {
@@ -2723,12 +2729,19 @@ where
                     // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
                     let mut should_forward_msg = true;
 
-                    // TODO faster search (e.g. binary search)
-                    let pos = self
-                        .llmp_clients
-                        .iter()
-                        .position(|x| x.id == client_id)
-                        .expect("Fatal error, client ID not found");
+                    let pos = if (client_id.0 as usize) < self.llmp_clients.len()
+                        && self.llmp_clients[client_id.0 as usize].id == client_id
+                    {
+                        // Fast path when no client was removed
+                        client_id.0 as usize
+                    } else {
+                        // TODO binary search
+                        self.llmp_clients
+                            .iter()
+                            .position(|x| x.id == client_id)
+                            .expect("Fatal error, client ID not found")
+                    };
+
                     let map = &mut self.llmp_clients[pos].current_recv_shmem;
                     let msg_buf = (*msg).try_as_slice(map)?;
                     if let LlmpMsgHookResult::Handled =

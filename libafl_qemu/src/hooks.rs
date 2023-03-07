@@ -19,8 +19,8 @@ use crate::{
 };
 
 // all kinds of hooks
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Hook {
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Hook {
     Function(*const c_void),
     Closure(FatPtr),
     #[cfg(emulation_mode = "usermode")]
