@@ -24,6 +24,8 @@ use nix::{
     unistd::Pid,
 };
 
+#[cfg(feature = "regex")]
+use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
 use crate::{
     bolts::{
         fs::{get_unique_std_input_file, InputFile},
@@ -39,9 +41,6 @@ use crate::{
     state::UsesState,
     Error,
 };
-
-#[cfg(feature = "regex")]
-use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
 
 const FORKSRV_FD: i32 = 198;
 #[allow(clippy::cast_possible_wrap)]
