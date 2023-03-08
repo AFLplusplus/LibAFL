@@ -35,7 +35,7 @@ use nix::{
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
-#[cfg(unix)]
+#[cfg(all(unix, not(miri)))]
 use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::os::unix_signals::{ucontext_t, Handler, Signal};
@@ -348,10 +348,12 @@ impl InProcessHandlers {
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(unix)]
+        #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut GLOBAL_STATE;
             #[cfg(feature = "std")]
             unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
+            #[cfg(not(miri))]
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
@@ -1282,9 +1284,11 @@ impl InChildProcessHandlers {
     where
         E: HasObservers,
     {
+        #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
             // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
+            #[cfg(not(miri))]
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
@@ -1299,9 +1303,11 @@ impl InChildProcessHandlers {
     where
         E: HasObservers,
     {
+        #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
             // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
+            #[cfg(not(miri))]
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
@@ -2073,6 +2079,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg_attr(miri, ignore)]
     #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
         use crate::{

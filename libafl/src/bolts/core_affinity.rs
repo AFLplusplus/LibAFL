@@ -5,14 +5,15 @@
 //! This example shows how create a thread for each available processor and pin each thread to its corresponding processor.
 //!
 //! ```rust
+//! # use std::thread;
 //! use libafl::bolts::core_affinity;
 //!
-//! use std::thread;
-//!
 //! // Retrieve the IDs of all active CPU cores.
+//! # #[cfg(not(miri))]
 //! let core_ids = core_affinity::get_core_ids().unwrap();
 //!
 //! // Create a thread for each active CPU core.
+//! # #[cfg(not(miri))]
 //! let handles = core_ids.into_iter().map(|id| {
 //!     thread::spawn(move || {
 //!         // Pin this thread to a single CPU core.
@@ -21,6 +22,7 @@
 //!     })
 //! }).collect::<Vec<_>>();
 //!
+//! # #[cfg(not(miri))]
 //! for handle in handles.into_iter() {
 //!     handle.join().unwrap();
 //! }
@@ -307,11 +309,13 @@ mod linux {
         use super::*;
 
         #[test]
+        #[cfg_attr(miri, ignore)]
         fn test_linux_get_affinity_mask() {
             get_affinity_mask().unwrap();
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)]
         fn test_linux_set_for_current() {
             let ids = get_core_ids().unwrap();
 
@@ -558,7 +562,7 @@ mod apple {
         thread_policy_flavor_t, thread_policy_t, thread_t, KERN_SUCCESS, THREAD_AFFINITY_POLICY,
         THREAD_AFFINITY_POLICY_COUNT,
     };
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", not(miri)))]
     use libc::{pthread_set_qos_class_self_np, qos_class_t::QOS_CLASS_USER_INITIATED};
 
     use super::CoreId;
@@ -622,6 +626,7 @@ mod apple {
         //
         // Furthermore, this seems to fail on background threads, so we ignore errors (result != 0).
 
+        #[cfg(not(miri))]
         unsafe {
             let _result = pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
         }
@@ -902,12 +907,14 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_get_core_ids() {
         let set = get_core_ids().unwrap();
         assert_eq!(set.len(), usize::from(available_parallelism().unwrap()));
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_set_affinity() {
         let ids = get_core_ids().unwrap();
 

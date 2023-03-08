@@ -380,7 +380,9 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
 /// This will allocate a signal stack and set the signal handlers accordingly.
 /// It is, for example, used in the [`type@crate::executors::InProcessExecutor`] to restart the fuzzer in case of a crash,
 /// or to handle `SIGINT` in the broker process.
+///
 /// # Safety
+///
 /// The signal handlers will be called on any signal. They should (tm) be async safe.
 /// A lot can go south in signal handling. Be sure you know what you are doing.
 pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {

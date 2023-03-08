@@ -118,9 +118,12 @@ where
         }
         self.hooks.helpers_mut().pre_exec_all(&emu, input);
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
-        self.hooks
-            .helpers_mut()
-            .post_exec_all(&emu, input, &mut exit_kind);
+        self.hooks.helpers_mut().post_exec_all(
+            &emu,
+            input,
+            self.inner.observers_mut(),
+            &mut exit_kind,
+        );
         Ok(exit_kind)
     }
 }
@@ -280,9 +283,12 @@ where
         }
         self.hooks.helpers_mut().pre_exec_all(&emu, input);
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
-        self.hooks
-            .helpers_mut()
-            .post_exec_all(&emu, input, &mut exit_kind);
+        self.hooks.helpers_mut().post_exec_all(
+            &emu,
+            input,
+            self.inner.observers_mut(),
+            &mut exit_kind,
+        );
         Ok(exit_kind)
     }
 }
