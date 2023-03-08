@@ -25,9 +25,11 @@ use libafl::{
     state::{HasSolutions, StdState},
 };
 use libafl_targets::{DifferentialAFLMapSwapObserver, MAX_EDGES_NUM};
+#[cfg(not(miri))]
 use mimalloc::MiMalloc;
 
 #[global_allocator]
+#[cfg(not(miri))]
 static GLOBAL: MiMalloc = MiMalloc;
 
 // bindings to the functions defined in the target
