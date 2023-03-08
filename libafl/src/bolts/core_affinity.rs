@@ -307,11 +307,13 @@ mod linux {
         use super::*;
 
         #[test]
+        #[cfg_attr(miri, ignore)]
         fn test_linux_get_affinity_mask() {
             get_affinity_mask().unwrap();
         }
 
         #[test]
+        #[cfg_attr(miri, ignore)]
         fn test_linux_set_for_current() {
             let ids = get_core_ids().unwrap();
 
@@ -903,12 +905,14 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_get_core_ids() {
         let set = get_core_ids().unwrap();
         assert_eq!(set.len(), usize::from(available_parallelism().unwrap()));
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_set_affinity() {
         let ids = get_core_ids().unwrap();
 

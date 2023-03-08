@@ -1473,7 +1473,7 @@ mod tests {
 
     #[test]
     #[serial]
-    #[cfg_attr(all(miri, target_vendor = "apple"), ignore)]
+    #[cfg_attr(miri, ignore)]
     fn test_mgr_state_restore() {
         let rand = StdRand::with_seed(0);
 

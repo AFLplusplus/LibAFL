@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     #[serial]
-    #[cfg_attr(all(miri, target_vendor = "apple"), ignore)]
+    #[cfg_attr(miri, ignore)]
     fn test_state_restore() {
         const TESTMAP_SIZE: usize = 1024;
 
