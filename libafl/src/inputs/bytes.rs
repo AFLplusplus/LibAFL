@@ -108,4 +108,9 @@ impl BytesInput {
     pub fn new(bytes: Vec<u8>) -> Self {
         Self { bytes }
     }
+
+    /// Take the ownership of the inner bytes, consume self
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
 }
