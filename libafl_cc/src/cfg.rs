@@ -362,6 +362,7 @@ mod tests {
     const TEST_GRAPH_STR: &str = "$$main+41864\n$$_ZN7MyClass1VEi+50306\n%%_ZN7MyClass1VEi+50306\n->19123\n%%main+41864\n->52706\n->26911\n%%main+52706\n%%main+26911\n->52706\n->41925\n";
 
     #[test]
+    #[cfg_attr(miri, ignore)] // Testcase takes long in miri.
     fn test_basic_cfg_from_str() {
         let cfg: ControlFlowGraph<TestMetaData> = ControlFlowGraph::from_content(TEST_GRAPH_STR);
         let entry = cfg.get_entry("main").unwrap();
@@ -391,6 +392,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // Testcase takes too long in miri. :/
     fn test_shortest_path() {
         let cfg: ControlFlowGraph<TestMetaData> = ControlFlowGraph::from_content(TEST_GRAPH_STR);
         let distances = cfg.calculate_distances_to_all_edges((41864 >> 1) ^ 26911);

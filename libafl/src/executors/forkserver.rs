@@ -1283,6 +1283,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg_attr(miri, ignore)]
     fn test_forkserver() {
         const MAP_SIZE: usize = 65536;
         let bin = OsString::from("echo");

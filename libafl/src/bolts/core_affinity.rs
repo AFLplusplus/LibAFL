@@ -558,7 +558,7 @@ mod apple {
         thread_policy_flavor_t, thread_policy_t, thread_t, KERN_SUCCESS, THREAD_AFFINITY_POLICY,
         THREAD_AFFINITY_POLICY_COUNT,
     };
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", not(miri)))]
     use libc::{pthread_set_qos_class_self_np, qos_class_t::QOS_CLASS_USER_INITIATED};
 
     use super::CoreId;
@@ -622,6 +622,7 @@ mod apple {
         //
         // Furthermore, this seems to fail on background threads, so we ignore errors (result != 0).
 
+        #[cfg(not(miri))]
         unsafe {
             let _result = pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
         }
