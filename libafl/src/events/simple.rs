@@ -19,13 +19,12 @@ use serde::{de::DeserializeOwned, Serialize};
 use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
+#[cfg(all(unix, feature = "std", not(miri)))]
+use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use crate::bolts::os::{fork, ForkResult};
 #[cfg(all(unix, feature = "std"))]
-use crate::{
-    bolts::os::unix_signals::setup_signal_handler,
-    events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
-};
+use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
 use crate::{
     bolts::ClientId,
     events::{
@@ -472,7 +471,7 @@ where
             }
 
             // We setup signal handlers to clean up shmem segments used by state restorer
-            #[cfg(unix)]
+            #[cfg(all(unix, not(miri)))]
             if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");

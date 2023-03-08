@@ -96,10 +96,10 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::bolts::current_time;
+#[cfg(all(unix, not(miri)))]
+use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
-use crate::bolts::os::unix_signals::{
-    setup_signal_handler, siginfo_t, ucontext_t, Handler, Signal,
-};
+use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use crate::{
     bolts::{
         shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
@@ -2190,7 +2190,7 @@ where
     {
         use super::current_milliseconds;
 
-        #[cfg(unix)]
+        #[cfg(all(unix, not(miri)))]
         if let Err(_e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler. Print and ignore.
             log::info!("Failed to setup signal handlers: {_e}");
@@ -2254,7 +2254,7 @@ where
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-        #[cfg(unix)]
+        #[cfg(all(unix, not(miri)))]
         if let Err(_e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler. Print and ignore.
             log::info!("Failed to setup signal handlers: {_e}");
@@ -3100,6 +3100,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg_attr(miri, ignore)]
     pub fn test_llmp_connection() {
         #[allow(unused_variables)]
         let shmem_provider = StdShMemProvider::new().unwrap();
