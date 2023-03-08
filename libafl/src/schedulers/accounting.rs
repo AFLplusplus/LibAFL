@@ -130,6 +130,18 @@ where
         self.inner.on_add(state, idx)
     }
 
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut Self::State,
+        input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<Self::State>,
+    {
+        self.inner.on_evaluation(state, input, observers)
+    }
+
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state
             .metadata()

@@ -302,7 +302,7 @@ where
         Ok(())
     }
 
-    fn on_execution<OT>(
+    fn on_evaluation<OT>(
         &mut self,
         state: &mut Self::State,
         _input: &<Self::State as UsesInput>::Input,
