@@ -50,5 +50,10 @@ impl IntoPy<PyObject> for Regs {
 
 /// Return an ARM ArchCapstoneBuilder
 pub fn capstone() -> capstone::arch::arm::ArchCapstoneBuilder {
-    capstone::Capstone::new().arm()
+    capstone::Capstone::new().arm().mode(arch::arm::ArchMode::Arm)
+}
+
+/// Return an ARM Thumb ArchCapstoneBuilder
+pub fn capstone_thumb() -> capstone::arch::arm::ArchCapstoneBuilder {
+    capstone::Capstone::new().arm().mode(arch::arm::ArchMode::Thumb)
 }

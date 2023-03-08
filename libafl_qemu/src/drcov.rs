@@ -114,6 +114,13 @@ where
                             continue 'pcs_full;
                         }
                         if *idm == *id {
+            h.cs.set_mode(let mode = if pc & 1 == 1 {
+                    arch::arm::ArchMode::Thumb
+                } else {
+                    arch::arm::ArchMode::Arm
+                }
+            ).unwrap();
+    
                             match pc2basicblock(*pc, emulator) {
                                 Ok(block) => {
                                     let mut block_len = 0;

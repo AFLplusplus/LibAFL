@@ -322,6 +322,14 @@ where
             }; // TODO handle faults
 
             let mut iaddr = pc;
+            
+            #[cfg(cpu_target = "arm")]
+            h.cs.set_mode(let mode = if pc & 1 == 1 {
+                    arch::arm::ArchMode::Thumb
+                } else {
+                    arch::arm::ArchMode::Arm
+                }
+            ).unwrap();
 
             'disasm: while let Ok(insns) = h.cs.disasm_count(code, iaddr.into(), 1) {
                 if insns.is_empty() {
