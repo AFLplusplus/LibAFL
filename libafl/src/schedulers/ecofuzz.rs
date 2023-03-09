@@ -47,7 +47,6 @@ pub struct EcoTestcaseMetadata {
     last_energy: u64,
     state: EcoState,
     serial: u64,
-    was_fuzzed: bool,
     computed_score: f64,
 }
 
@@ -117,7 +116,6 @@ where
                 .get_mut::<EcoTestcaseMetadata>()
                 .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?;
             // Set was_fuzzed for the old current
-            meta.was_fuzzed = true;
             meta.last_found = count - last_corpus_count;
             meta.last_energy = meta.mutation_num - last_mutation_num;
             meta.computed_score
@@ -165,29 +163,15 @@ where
     fn schedule(state: &mut S) -> Result<CorpusId, Error> {
         let mut selection = None;
         for id in state.corpus().ids() {
-            let was_fuzzed = state
-                .corpus()
-                .get(id)?
-                .borrow()
-                .metadata()
-                .get::<EcoTestcaseMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
-                .was_fuzzed;
-            if !was_fuzzed {
+            let was_fuzzed = state.corpus().get(id)?.borrow().scheduled_count() > 0;
+            if was_fuzzed {
                 selection = Some(id);
                 break;
             }
         }
 
         for id in state.corpus().ids() {
-            let was_fuzzed = state
-                .corpus()
-                .get(id)?
-                .borrow()
-                .metadata()
-                .get::<EcoTestcaseMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
-                .was_fuzzed;
+            let was_fuzzed = state.corpus().get(id)?.borrow().scheduled_count() > 0;
             if was_fuzzed {
                 state
                     .metadata_mut()
@@ -301,10 +285,14 @@ where
 
         // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
-        state.corpus().get(idx)?.borrow_mut().add_metadata(
-            SchedulerTestcaseMetaData::with_n_fuzz_entry(depth, self.last_hash),
-        );
-
+        {
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+                depth,
+                self.last_hash,
+            ));
+            testcase.set_parent_id_optional(current_idx);
+        }
         // Add the testcase metadata for this scheduler
         state
             .corpus()
@@ -321,25 +309,6 @@ where
         let last_find_iteration = executions - meta.last_executions + 1;
         meta.last_find_iteration = last_find_iteration;
 
-        Ok(())
-    }
-
-    fn on_replace(
-        &mut self,
-        state: &mut S,
-        idx: CorpusId,
-        _testcase: &Testcase<S::Input>,
-    ) -> Result<(), Error> {
-        self.on_add(state, idx)
-    }
-
-    #[allow(clippy::unused_self)]
-    fn on_remove(
-        &mut self,
-        _state: &mut S,
-        _idx: CorpusId,
-        _testcase: &Option<Testcase<S::Input>>,
-    ) -> Result<(), Error> {
         Ok(())
     }
 
@@ -414,7 +383,7 @@ where
         }
 
         let id = Self::schedule(state)?;
-        *state.corpus_mut().current_mut() = Some(id);
+        self.set_current_scheduled(state, Some(id))?;
 
         let mutation_num = state
             .corpus()
@@ -438,6 +407,26 @@ where
         meta.last_executions = executions;
 
         Ok(id)
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        let current_idx = *state.corpus().current();
+
+        if let Some(idx) = current_idx {
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            let scheduled_count = testcase.scheduled_count();
+
+            // increase scheduled count, this was fuzz_level in afl
+            testcase.set_scheduled_count(scheduled_count + 1);
+        }
+
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 

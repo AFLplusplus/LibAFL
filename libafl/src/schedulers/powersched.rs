@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
-    schedulers::Scheduler,
+    schedulers::{RemovableScheduler, Scheduler},
     state::{HasCorpus, HasMetadata, UsesState},
     Error,
 };
@@ -178,40 +178,11 @@ where
     type State = S;
 }
 
-impl<O, S> Scheduler for PowerQueueScheduler<O, S>
+impl<O, S> RemovableScheduler for PowerQueueScheduler<O, S>
 where
     S: HasCorpus + HasMetadata,
     O: MapObserver,
 {
-    /// Add an entry to the corpus and return its index
-    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
-        let current_idx = *state.corpus().current();
-
-        let mut depth = match current_idx {
-            Some(parent_idx) => state
-                .corpus()
-                .get(parent_idx)?
-                .borrow()
-                .metadata()
-                .get::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?
-                .depth(),
-            None => 0,
-        };
-
-        // TODO increase perf_score when finding new things like in AFL
-        // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
-
-        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
-        depth += 1;
-        state.corpus().get(idx)?.borrow_mut().add_metadata(
-            SchedulerTestcaseMetaData::with_n_fuzz_entry(depth, self.last_hash),
-        );
-        Ok(())
-    }
-
     #[allow(clippy::cast_precision_loss)]
     fn on_replace(
         &mut self,
@@ -292,6 +263,44 @@ where
 
         Ok(())
     }
+}
+
+impl<O, S> Scheduler for PowerQueueScheduler<O, S>
+where
+    S: HasCorpus + HasMetadata,
+    O: MapObserver,
+{
+    /// Add an entry to the corpus and return its index
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+        let current_idx = *state.corpus().current();
+
+        let mut depth = match current_idx {
+            Some(parent_idx) => state
+                .corpus()
+                .get(parent_idx)?
+                .borrow()
+                .metadata()
+                .get::<SchedulerTestcaseMetaData>()
+                .ok_or_else(|| {
+                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                })?
+                .depth(),
+            None => 0,
+        };
+
+        // TODO increase perf_score when finding new things like in AFL
+        // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
+
+        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
+        depth += 1;
+        let mut testcase = state.corpus().get(idx)?.borrow_mut();
+        testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+            depth,
+            self.last_hash,
+        ));
+        testcase.set_parent_id_optional(current_idx);
+        Ok(())
+    }
 
     fn on_evaluation<OT>(
         &mut self,
@@ -343,10 +352,27 @@ where
                 }
                 None => state.corpus().first().unwrap(),
             };
-            *state.corpus_mut().current_mut() = Some(id);
+            self.set_current_scheduled(state, Some(id))?;
 
-            // Update the handicap
-            let mut testcase = state.corpus().get(id)?.borrow_mut();
+            Ok(id)
+        }
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        let current_idx = *state.corpus().current();
+
+        if let Some(idx) = current_idx {
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            let scheduled_count = testcase.scheduled_count();
+
+            // increase scheduled count, this was fuzz_level in afl
+            testcase.set_scheduled_count(scheduled_count + 1);
+
             let tcmeta = testcase
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
@@ -359,9 +385,10 @@ where
             } else if tcmeta.handicap() > 0 {
                 tcmeta.set_handicap(tcmeta.handicap() - 1);
             }
-
-            Ok(id)
         }
+
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 

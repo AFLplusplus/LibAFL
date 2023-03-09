@@ -8,7 +8,7 @@ use frida_gum::{
 #[cfg(windows)]
 use libafl::{
     executors::inprocess::{HasInProcessHandlers, InProcessHandlers},
-    state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
 };
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
@@ -200,7 +200,7 @@ impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHandlers
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: UsesInput + HasClientPerfMonitor + HasSolutions + HasFuzzedCorpusId,
+    S: UsesInput + HasClientPerfMonitor + HasSolutions + HasCorpus,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,

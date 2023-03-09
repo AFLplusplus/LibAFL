@@ -463,7 +463,7 @@ impl Drop for GuestMaps {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FatPtr(pub *const c_void, pub *const c_void);
 
 static mut GDB_COMMANDS: Vec<FatPtr> = vec![];

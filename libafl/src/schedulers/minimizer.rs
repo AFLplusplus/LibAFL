@@ -12,7 +12,8 @@ use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
-    schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
+    observers::ObserversTuple,
+    schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
@@ -74,19 +75,13 @@ where
     type State = CS::State;
 }
 
-impl<CS, F, M> Scheduler for MinimizerScheduler<CS, F, M>
+impl<CS, F, M> RemovableScheduler for MinimizerScheduler<CS, F, M>
 where
-    CS: Scheduler,
+    CS: RemovableScheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
-    /// Add an entry to the corpus and return its index
-    fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
-        self.base.on_add(state, idx)?;
-        self.update_score(state, idx)
-    }
-
     /// Replaces the testcase at the given idx
     fn on_replace(
         &mut self,
@@ -161,6 +156,33 @@ where
         }
         Ok(())
     }
+}
+
+impl<CS, F, M> Scheduler for MinimizerScheduler<CS, F, M>
+where
+    CS: Scheduler,
+    F: TestcaseScore<CS::State>,
+    M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
+    CS::State: HasCorpus + HasMetadata + HasRand,
+{
+    /// Add an entry to the corpus and return its index
+    fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
+        self.base.on_add(state, idx)?;
+        self.update_score(state, idx)
+    }
+
+    /// An input has been evaluated
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut Self::State,
+        input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<Self::State>,
+    {
+        self.base.on_evaluation(state, input, observers)
+    }
 
     /// Gets the next entry
     fn next(&mut self, state: &mut CS::State) -> Result<CorpusId, Error> {
@@ -178,6 +200,16 @@ where
             idx = self.base.next(state)?;
         }
         Ok(idx)
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        _state: &mut Self::State,
+        _next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        // We do nothing here, the inner scheduler will take care of it
+        Ok(())
     }
 }
 

@@ -21,7 +21,7 @@ use crate::{
     mark_feature_time,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
-    schedulers::Scheduler,
+    schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, HasSolutions, UsesState},
@@ -36,7 +36,7 @@ pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
 where
     Self::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor,
     <Self::State as UsesInput>::Input: HasLen + Hash,
-    CS: Scheduler<State = Self::State>,
+    CS: Scheduler<State = Self::State> + RemovableScheduler,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
     EM: EventFirer<State = Self::State>,
     F1: Feedback<Self::State>,
@@ -204,7 +204,7 @@ where
 impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
-    CS: Scheduler,
+    CS: Scheduler + RemovableScheduler,
     CS::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor,
     <CS::State as UsesInput>::Input: HasLen + Hash,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
@@ -252,7 +252,7 @@ where
 impl<CS, E, EM, F1, F2, FF, M, OT, Z> TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
-    CS: Scheduler,
+    CS: Scheduler + RemovableScheduler,
     E: HasObservers<Observers = OT, State = CS::State> + Executor<EM, Z>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,

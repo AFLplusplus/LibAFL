@@ -301,6 +301,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg_attr(miri, ignore)]
     fn test_state_restore() {
         const TESTMAP_SIZE: usize = 1024;
 

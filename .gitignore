@@ -21,6 +21,7 @@ vendor
 *.obj
 
 .cur_input
+.cur_input_*
 .venv
 
 crashes

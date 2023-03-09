@@ -470,6 +470,7 @@ mod tests {
     use crate::{ClangWrapper, CompilerWrapper};
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_clang_version() {
         if let Err(res) = ClangWrapper::new()
             .parse_args(&["my-clang", "-v"])
