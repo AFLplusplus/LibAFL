@@ -102,6 +102,12 @@ impl From<&[u8]> for BytesInput {
     }
 }
 
+impl From<BytesInput> for Vec<u8> {
+    fn from(value: BytesInput) -> Vec<u8> {
+        value.bytes
+    }
+}
+
 impl BytesInput {
     /// Creates a new bytes input using the given bytes
     #[must_use]
