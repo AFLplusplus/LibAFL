@@ -114,14 +114,16 @@ where
                             continue 'pcs_full;
                         }
                         if *idm == *id {
-            h.cs.set_mode(let mode = if pc & 1 == 1 {
-                    arch::arm::ArchMode::Thumb
-                } else {
-                    arch::arm::ArchMode::Arm
-                }
-            ).unwrap();
-    
-                            match pc2basicblock(*pc, emulator) {
+                            #[cfg(cpu_target = "arm")]
+                            let mode = if pc & 1 == 1 {
+                                Some(arch::arm::ArchMode::Thumb)
+                            } else {
+                                Some(arch::arm::ArchMode::Arm)
+                            };
+                            #[cfg(not(cpu_target = "arm"))]
+                            let mode = None;
+
+                            match pc2basicblock(*pc, emulator, mode) {
                                 Ok(block) => {
                                     let mut block_len = 0;
                                     for instr in &block {

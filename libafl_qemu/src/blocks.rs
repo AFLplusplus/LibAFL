@@ -21,7 +21,11 @@ pub struct Instruction {
  *      - operand string
  *      - instruction length
  */
-pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator, mode: Option<capstone::Mode>) -> Result<Vec<Instruction>, String> {
+pub fn pc2basicblock(
+    pc: GuestAddr,
+    emu: &Emulator,
+    mode: Option<capstone::Mode>,
+) -> Result<Vec<Instruction>, String> {
     #[allow(unused_mut)]
     let mut code = {
         #[cfg(emulation_mode = "usermode")]
