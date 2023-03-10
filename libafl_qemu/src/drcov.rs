@@ -116,9 +116,9 @@ where
                         if *idm == *id {
                             #[cfg(cpu_target = "arm")]
                             let mode = if pc & 1 == 1 {
-                                Some(arch::arm::ArchMode::Thumb)
+                                Some(capstone::arch::arm::ArchMode::Thumb.into())
                             } else {
-                                Some(arch::arm::ArchMode::Arm)
+                                Some(capstone::arch::arm::ArchMode::Arm.into())
                             };
                             #[cfg(not(cpu_target = "arm"))]
                             let mode = None;
@@ -162,7 +162,17 @@ where
                     if !module_found {
                         continue 'pcs;
                     }
-                    match pc2basicblock(*pc, emulator) {
+
+                    #[cfg(cpu_target = "arm")]
+                    let mode = if pc & 1 == 1 {
+                        Some(capstone::arch::arm::ArchMode::Thumb.into())
+                    } else {
+                        Some(capstone::arch::arm::ArchMode::Arm.into())
+                    };
+                    #[cfg(not(cpu_target = "arm"))]
+                    let mode = None;
+
+                    match pc2basicblock(*pc, emulator, mode) {
                         Ok(block) => {
                             let mut block_len = 0;
                             for instr in &block {
