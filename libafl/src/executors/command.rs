@@ -656,6 +656,7 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
+    #[cfg_attr(miri, ignore)]
     fn test_builder() {
         let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
             log::info!("{status}");
@@ -680,6 +681,7 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
+    #[cfg_attr(miri, ignore)]
     fn test_parse_afl_cmdline() {
         use alloc::string::ToString;
 

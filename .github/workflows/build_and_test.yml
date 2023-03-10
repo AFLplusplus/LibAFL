@@ -68,7 +68,7 @@ jobs:
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+      run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
 
@@ -98,6 +98,10 @@ jobs:
       run: cargo build --verbose
     - name: Build examples
       run: cargo build --examples --verbose
+    
+    # --- miri undefined behavior test --
+    - name: Run miri tests
+      run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
 
   ubuntu-check:
     runs-on: ubuntu-22.04

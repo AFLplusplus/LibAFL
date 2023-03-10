@@ -23,10 +23,7 @@ use crate::{
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasFuzzedCorpusId, HasMetadata,
-        HasSolutions, UsesState,
-    },
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions, UsesState},
     Error,
 };
 
@@ -330,7 +327,7 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasFuzzedCorpusId,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -387,7 +384,6 @@ where
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-                testcase.set_parent_id_optional(state.fuzzed_corpus_id());
                 self.feedback_mut()
                     .append_metadata(state, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
@@ -421,7 +417,7 @@ where
 
                 // The input is a solution, add it to the respective corpus
                 let mut testcase = Testcase::with_executions(input, *state.executions());
-                testcase.set_parent_id_optional(state.fuzzed_corpus_id());
+                testcase.set_parent_id_optional(*state.corpus().current());
                 self.objective_mut()
                     .append_metadata(state, observers, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
@@ -447,7 +443,7 @@ where
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasFuzzedCorpusId,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -480,7 +476,7 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasFuzzedCorpusId,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -518,7 +514,6 @@ where
 
         // Add the input to the main corpus
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-        testcase.set_parent_id_optional(state.fuzzed_corpus_id());
         self.feedback_mut()
             .append_metadata(state, observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
@@ -552,7 +547,7 @@ where
     EM: ProgressReporter + EventProcessor<E, Self, State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasFuzzedCorpusId,
+    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
     fn fuzz_one(
@@ -577,14 +572,8 @@ where
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().reset_stage_index();
 
-        // Set the parent id - all new testcases will have this id as parent in the following stages.
-        state.set_fuzzed_corpus_id(idx);
-
         // Execute all stages
         stages.perform_all(self, executor, state, manager, idx)?;
-
-        // Reset the parent id
-        state.clear_fuzzed_corpus_id();
 
         // Init timer for manager
         #[cfg(feature = "introspection")]

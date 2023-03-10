@@ -1472,6 +1472,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg_attr(miri, ignore)]
     fn test_shmem_service() {
         let mut provider = StdShMemProvider::new().unwrap();
         let mut map = provider.new_shmem(1024).unwrap();

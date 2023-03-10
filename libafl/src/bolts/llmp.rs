@@ -96,10 +96,10 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::bolts::current_time;
+#[cfg(all(unix, not(miri)))]
+use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
-use crate::bolts::os::unix_signals::{
-    setup_signal_handler, siginfo_t, ucontext_t, Handler, Signal,
-};
+use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use crate::{
     bolts::{
         shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
@@ -167,6 +167,9 @@ const _NULL_ENV_STR: &str = "_NULL";
 
 /// Magic indicating that a got initialized correctly
 const PAGE_INITIALIZED_MAGIC: u64 = 0x1A1A1A1A1A1A1AF1;
+
+/// Magic indicating that a got deinitialized correctly, after use
+const PAGE_DEINITIALIZED_MAGIC: u64 = 0xDEADC0FEAF1BEEF1;
 
 /// Size of a new page message, header, payload, and alignment
 const EOP_MSG_SIZE: usize =
@@ -546,7 +549,7 @@ unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow
     (*page).size_used = 0;
     (*(*page).messages.as_mut_ptr()).message_id = MessageId(0);
     (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
-    (*page).safe_to_unmap.store(0, Ordering::Relaxed);
+    (*page).safe_to_unmap.store(0, Ordering::Release);
     (*page).sender_dead.store(0, Ordering::Relaxed);
     assert!((*page).size_total != 0);
 }
@@ -873,6 +876,7 @@ where
     /// Completely reset the current sender map.
     /// Afterwards, no receiver should read from it at a different location.
     /// This is only useful if all connected llmp parties start over, for example after a crash.
+    ///
     /// # Safety
     /// Only safe if you really really restart the page on everything connected
     /// No receiver should read from this page at a different location.
@@ -1002,7 +1006,7 @@ where
         // Exclude the current page by splitting of the last element for this iter
         let mut unmap_until_excl = 0;
         for map in self.out_shmems.split_last_mut().unwrap().1 {
-            if (*map.page()).safe_to_unmap.load(Ordering::Relaxed) == 0 {
+            if (*map.page()).safe_to_unmap.load(Ordering::Acquire) == 0 {
                 // The broker didn't read this page yet, no more pages to unmap.
                 break;
             }
@@ -1010,6 +1014,8 @@ where
         }
 
         if unmap_until_excl == 0 && self.out_shmems.len() > LLMP_CFG_MAX_PENDING_UNREAD_PAGES {
+            // Looks like nobody is listening to our pages anymore! :/
+            // The n old pages have not been touched yet.
             // We send one last information to the broker before quitting.
             self.send_buf(LLMP_SLOW_RECEIVER_PANIC, &[]).unwrap();
             panic!("The receiver/broker could not process our sent llmp messages in time. Either we're sending too many messages too fast, the broker got stuck, or it crashed. Giving up.");
@@ -1018,11 +1024,20 @@ where
         // Remove all maps that the broker already mapped, move them to our unused pages cache
         self.out_shmems.reserve(unmap_until_excl);
         for _ in 0..unmap_until_excl {
-            let shmem = self.out_shmems.remove(0);
+            let mut map = self.out_shmems.remove(0);
+
+            let page = shmem2page_mut(&mut map.shmem);
+            assert!(
+                (*page).magic == PAGE_INITIALIZED_MAGIC,
+                "LLMP: Tried to free uninitialized shared map at addr {:#}!",
+                page as usize
+            );
+            (*page).magic = PAGE_DEINITIALIZED_MAGIC;
+
             #[cfg(feature = "llmp_debug")]
-            log::debug!("Moving unused map to cache: {shmem:?}");
+            log::debug!("Moving unused map to cache: {map:?}");
             self.unused_shmem_cache
-                .insert(self.unused_shmem_cache.len(), shmem);
+                .insert(self.unused_shmem_cache.len(), map);
         }
     }
 
@@ -1209,7 +1224,7 @@ where
                 #[cfg(feature = "llmp_debug")]
                 log::info!("Returning cached shmem {cached_shmem:?}");
                 unsafe {
-                    llmp_page_init(&mut cached_shmem.shmem, sender_id, true);
+                    llmp_page_init(&mut cached_shmem.shmem, sender_id, false);
                 }
                 Ok(cached_shmem)
             }
@@ -1257,7 +1272,7 @@ where
         log::info!("got new map at: {new_map:?}");
 
         // New maps always start with 0 as message id -> No messages yet.
-        (*new_map).current_msg_id.store(0, Ordering::Relaxed);
+        (*new_map).current_msg_id.store(0, Ordering::Release);
 
         #[cfg(feature = "llmp_debug")]
         log::info!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
@@ -1563,7 +1578,7 @@ where
         // Let's see what we got.
         if let Some(msg) = ret {
             if !(*msg).in_shmem(&mut self.current_recv_shmem) {
-                return Err(Error::illegal_state("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!"));
+                return Err(Error::illegal_state("Unexpected message in map (out of map bounds) - buggy client or tampered shared map detected!"));
             }
             // Handle special, LLMP internal, messages.
             match (*msg).tag {
@@ -2175,7 +2190,7 @@ where
     {
         use super::current_milliseconds;
 
-        #[cfg(unix)]
+        #[cfg(all(unix, not(miri)))]
         if let Err(_e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler. Print and ignore.
             log::info!("Failed to setup signal handlers: {_e}");
@@ -2239,7 +2254,7 @@ where
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-        #[cfg(unix)]
+        #[cfg(all(unix, not(miri)))]
         if let Err(_e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler. Print and ignore.
             log::info!("Failed to setup signal handlers: {_e}");
@@ -3085,6 +3100,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg_attr(miri, ignore)]
     pub fn test_llmp_connection() {
         #[allow(unused_variables)]
         let shmem_provider = StdShMemProvider::new().unwrap();

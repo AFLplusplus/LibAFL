@@ -14,9 +14,8 @@ use crate::{
     executors::ExitKind,
     feedbacks::Feedback,
     generators::NautilusContext,
-    inputs::NautilusInput,
+    inputs::{NautilusInput, UsesInput},
     observers::ObserversTuple,
-    prelude::UsesInput,
     state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
