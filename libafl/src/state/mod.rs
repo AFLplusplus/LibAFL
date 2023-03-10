@@ -227,6 +227,18 @@ pub trait HasStartTime {
     fn start_time_mut(&mut self) -> &mut Duration;
 }
 
+use std::cell::Ref;
+use crate::corpus::Testcase;
+
+pub trait HasTestcase: HasCorpus {
+
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+        let testcase = self.corpus().get(id)?.borrow();
+
+        Ok(testcase)
+    }   
+}
+
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "
