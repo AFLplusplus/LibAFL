@@ -4,7 +4,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use std::{path::PathBuf, ptr::null};
+use std::{path::PathBuf, ptr::null, process::{ExitCode, exit}};
 
 use frida_gum::Gum;
 use libafl::{
@@ -50,7 +50,7 @@ use libafl_frida::{
 };
 use libafl_targets::cmplog::CmpLogObserver;
 
-pub unsafe fn lib(main: extern "C" fn(isize, *const *const char) -> isize) {
+pub unsafe fn lib(main: extern "C" fn(isize, *const *const u8) -> isize) {
     color_backtrace::install();
 
     let options = parse_args();
@@ -58,10 +58,11 @@ pub unsafe fn lib(main: extern "C" fn(isize, *const *const char) -> isize) {
     let mut frida_harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
+        let len = buf.len().to_string();
 
-        let argv: [*const char; 3] = [
+        let argv: [*const u8; 3] = [
             null(), // dummy value
-            buf.len() as *const char,
+            len.as_ptr() as _,
             buf.as_ptr() as _
         ];
 
