@@ -74,7 +74,7 @@ windows_alias = "unsupported"
 [tasks.run_unix]
 script_runner = "@shell"
 script='''
-./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so
+LD_PRELOAD=./target/release/libfrida_fuzzer.so ./libpng-harness -i corpus -o out
 '''
 dependencies = [ "fuzzer", "harness" ]
 
@@ -88,7 +88,7 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 10s ./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so &
+#LD_PRELOAD=./target/release/libfrida_fuzzer.so timeout 10s ./libpng-harness -i corpus -o out
 '''
 dependencies = [ "fuzzer", "harness" ]
 
