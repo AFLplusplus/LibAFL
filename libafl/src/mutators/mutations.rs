@@ -1015,7 +1015,7 @@ where
             second.end += first.end;
 
             self.tmp_buf.resize(second.len(), 0);
-            if second.len() >= second.len() {
+            if second.len() >= first.len() {
                 let diff_in_size = second.len() - first.len();
                 // copy second range to tmp
                 buffer_copy(&mut self.tmp_buf, input.bytes(), second.start, 0, second.len());
