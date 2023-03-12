@@ -54,7 +54,7 @@ struct PngObjectHandler {
   png_structp png_ptr = nullptr;
   png_infop   end_info_ptr = nullptr;
   png_voidp   row_ptr = nullptr;
-  BufState *  buf_state = nullptr;
+  BufState   *buf_state = nullptr;
 
   ~PngObjectHandler() {
     if (row_ptr) { png_free(png_ptr, row_ptr); }
