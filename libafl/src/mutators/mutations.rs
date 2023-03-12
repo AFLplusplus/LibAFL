@@ -2,6 +2,7 @@
 
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{cmp::min, mem::size_of, ops::Range};
+use std::time::Instant;
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
@@ -963,36 +964,86 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        self.tmp_buf.clear();
-
         let first = rand_range(state, size, size);
         if state.rand_mut().next() & 1 == 0 && first.start != 0 {
+            // The second range comes before first.
+
             let second = rand_range(state, first.start, first.start);
-            self.tmp_buf.extend(input.bytes_mut().drain(first.clone()));
-            self.tmp_buf
-                .extend(input.bytes()[second.clone()].iter().copied());
-            input
-                .bytes_mut()
-                .splice(first.start..first.start, self.tmp_buf.drain(first.len()..));
-            input.bytes_mut().splice(second, self.tmp_buf.drain(..));
-            let end = std::time::Instant::now();
+            self.tmp_buf.resize(first.len(), 0);
+            // If range first is larger
+            if first.len() >= second.len() {
+                let diff_in_size = first.len() - second.len();
+                
+                // copy first range to tmp
+                buffer_copy(&mut self.tmp_buf, input.bytes(), first.start, 0, first.len());
+
+                // adjust second.end..first.start, move them by diff_in_size to the right
+                buffer_self_copy(input.bytes_mut(), second.end, second.end + diff_in_size, first.start - second.end);
+
+                // copy second to where first was
+                buffer_self_copy(input.bytes_mut(), second.start, first.start + diff_in_size, second.len());
+
+                // copy first back
+                buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, second.start, first.len());
+            }
+            else {
+                let diff_in_size = second.len() - first.len();
+
+                // copy first range to tmp
+                buffer_copy(&mut self.tmp_buf, input.bytes(), first.start, 0, first.len());
+
+                // adjust second.end..first.start, move them by diff_in_size to the left
+                buffer_self_copy(input.bytes_mut(), second.end, second.end - diff_in_size, first.start - second.end);
+
+                // copy second to where first was
+                buffer_self_copy(input.bytes_mut(), second.start, first.start - diff_in_size, second.len());
+
+                // copy first back
+                buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, second.start, first.len());  
+            }
+            let end = Instant::now();
             unsafe {
                 BYTE_SWAP_DURATION += end - start;
                 BYTE_SWAP_N += 1;
             }
             Ok(MutationResult::Mutated)
         } else if first.end != size {
+
+            // The first range comes before the second range
             let mut second = rand_range(state, size - first.end, size - first.end);
             second.start += first.end;
             second.end += first.end;
-            self.tmp_buf.extend(input.bytes_mut().drain(second.clone()));
-            self.tmp_buf
-                .extend(input.bytes()[first.clone()].iter().copied());
-            input.bytes_mut().splice(
-                second.start..second.start,
-                self.tmp_buf.drain(second.len()..),
-            );
-            input.bytes_mut().splice(first, self.tmp_buf.drain(..));
+
+            self.tmp_buf.resize(second.len(), 0);
+            if second.len() >= second.len() {
+                let diff_in_size = second.len() - first.len();
+                // copy second range to tmp
+                buffer_copy(&mut self.tmp_buf, input.bytes(), second.start, 0, second.len());
+
+                // adjust first.end..second.start, move them by diff_in_size to the right
+                buffer_self_copy(input.bytes_mut(), first.end, first.end + diff_in_size, second.start - first.end);
+
+                // copy first to where second was
+                buffer_self_copy(input.bytes_mut(), first.start, second.start + diff_in_size, first.len());
+
+                // copy second back
+                buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, first.start, second.len());
+            }
+            else {
+                let diff_in_size = first.len() - second.len();
+                // copy second range to tmp
+                buffer_copy(&mut self.tmp_buf, input.bytes(), second.start, 0, second.len());
+
+                // adjust first.end..second.start, move them by diff_in_size to the left
+                buffer_self_copy(input.bytes_mut(), first.end, first.end - diff_in_size, second.start - first.end);
+
+                // copy first to where second was
+                buffer_self_copy(input.bytes_mut(), first.start, second.start - diff_in_size, first.len());
+
+                // copy second back
+                buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, first.start, second.len());
+            }
+
             let end = std::time::Instant::now();
             unsafe {
                 BYTE_SWAP_DURATION += end - start;
