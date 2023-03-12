@@ -4,8 +4,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use libc::{size_t, uint8_t};
-use std::path::PathBuf;
+use std::{path::PathBuf, ptr::null};
 
 use frida_gum::Gum;
 use libafl::{
@@ -51,31 +50,6 @@ use libafl_frida::{
 };
 use libafl_targets::cmplog::CmpLogObserver;
 
-/// The main fn, usually parsing parameters, and starting the fuzzer
-pub unsafe fn main() {
-    color_backtrace::install();
-
-    let options = parse_args();
-
-    let lib = libloading::Library::new(options.clone().harness.unwrap()).unwrap();
-    let target_func: libloading::Symbol<unsafe extern "C" fn(data: *const u8, size: usize) -> i32> =
-        lib.get(options.harness_function.as_bytes()).unwrap();
-
-    let mut frida_harness = |input: &BytesInput| {
-        let target = input.target_bytes();
-        let buf = target.as_slice();
-        (target_func)(buf.as_ptr(), buf.len());
-        ExitKind::Ok
-    };
-
-    unsafe {
-        match fuzz(&options, &mut frida_harness) {
-            Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
-            Err(e) => panic!("Error during fuzzing: {e:?}"),
-        }
-    }
-}
-
 pub unsafe fn lib(main: extern "C" fn(isize, *const *const char) -> isize) {
     color_backtrace::install();
 
@@ -85,10 +59,12 @@ pub unsafe fn lib(main: extern "C" fn(isize, *const *const char) -> isize) {
         let target = input.target_bytes();
         let buf = target.as_slice();
 
-        let argv: [*const char; 2] = [buf.len() as *const char, buf.as_ptr() as _];
+        let argv: [*const char; 3] = [
+            null(), // dummy value
+            buf.len() as *const char,
+            buf.as_ptr() as _
+        ];
 
-        //let array: [*const char; 2] = [buf.len(), buf];
-        //println!("{:#?} {:#?}", buf.len(), array);
         main(3, argv.as_ptr());
         ExitKind::Ok
     };

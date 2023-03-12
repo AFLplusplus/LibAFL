@@ -48,8 +48,8 @@ windows_alias = "unsupported"
 [tasks.harness_unix]
 script_runner="@shell"
 script='''
-clang++ -O3 -c -fPIC harness.cc -o harness.o
-clang++ -O3 harness.cc libpng-1.6.37/.libs/libpng16.a -lz -o libpng-harness
+clang++ -O0 -c -fPIC harness.cc -o harness.o
+clang++ -O0 harness.cc libpng-1.6.37/.libs/libpng16.a -lz -o libpng-harness -g
 '''
 dependencies = [ "lib" ]
 
