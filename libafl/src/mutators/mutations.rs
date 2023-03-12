@@ -64,9 +64,11 @@ pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
 #[inline]
 pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: usize) -> Range<usize> {
     let len = state.rand_mut().next() as usize % max_len + 1;
-    let offset2 = state.rand_mut().next() as usize % (upper + len);
+    let mut offset2 = state.rand_mut().next() as usize % (upper + len);
     let offset1 = offset2.saturating_sub(len);
-    let offset2 = offset2.clamp(0, upper);
+    if offset2 > upper {
+        offset2 = upper;
+    }
 
     offset1..offset2
 }
@@ -544,21 +546,18 @@ where
         let start = std::time::Instant::now();
         let max_size = state.max_size();
         let size = input.bytes().len();
-        if size == 0 || size >= max_size {
+        let remain = max_size - size;
+        if size == 0 || remain <= 0 {
             return Ok(MutationResult::Skipped);
         }
 
-        let mut range = rand_range(state, size, min(max_size - size, 16));
+        let range = rand_range(state, size, min(16, remain));
         if range.is_empty() {
             return Ok(MutationResult::Skipped);
         }
-        let new_size = range.len() + size;
 
-        let mut target = size;
-        core::mem::swap(&mut target, &mut range.end);
-
-        input.bytes_mut().resize(new_size, 0);
-        input.bytes_mut().copy_within(range, target);
+        input.bytes_mut().resize(size + range.len(), 0);
+        buffer_self_copy(input.bytes_mut(), range.start, range.start + range.len(), size - range.start);
 
         let end = std::time::Instant::now();
         unsafe {
@@ -608,14 +607,22 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let amount = 1 + state.rand_mut().below(min(max_size - size, 16) as u64) as usize;
+        let mut amount = 1 + state.rand_mut().below(16) as usize;
         let offset = state.rand_mut().below(size as u64 + 1) as usize;
+
+        if size + amount > max_size {
+            if max_size > size {
+                amount = max_size - size;
+            } else {
+                return Ok(MutationResult::Skipped);
+            }
+        }
 
         let val = input.bytes()[state.rand_mut().below(size as u64) as usize];
 
-        input
-            .bytes_mut()
-            .splice(offset..offset, core::iter::repeat(val).take(amount));
+        input.bytes_mut().resize(size + amount, 0);
+        buffer_self_copy(input.bytes_mut(), offset, offset + amount, size - offset);
+        buffer_set(input.bytes_mut(), offset, amount, val);
 
         let end = std::time::Instant::now();
         unsafe {
@@ -665,14 +672,22 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let amount = 1 + state.rand_mut().below(min(max_size - size, 16) as u64) as usize;
+        let mut amount = 1 + state.rand_mut().below(16) as usize;
         let offset = state.rand_mut().below(size as u64 + 1) as usize;
+
+        if size + amount > max_size {
+            if max_size > size {
+                amount = max_size - size;
+            } else {
+                return Ok(MutationResult::Skipped);
+            }
+        }
 
         let val = state.rand_mut().next() as u8;
 
-        input
-            .bytes_mut()
-            .splice(offset..offset, core::iter::repeat(val).take(amount));
+        input.bytes_mut().resize(size + amount, 0);
+        buffer_self_copy(input.bytes_mut(), offset, offset + amount, size - offset);
+        buffer_set(input.bytes_mut(), offset, amount, val);
 
         let end = std::time::Instant::now();
         unsafe {
@@ -728,9 +743,7 @@ where
 
         let val = *state.rand_mut().choose(input.bytes());
         let quantity = range.len();
-        input
-            .bytes_mut()
-            .splice(range, core::iter::repeat(val).take(quantity));
+        buffer_set(input.bytes_mut(), range.start, quantity, val);
 
         let end = std::time::Instant::now();
         unsafe {
@@ -786,9 +799,8 @@ where
 
         let val = state.rand_mut().next() as u8;
         let quantity = range.len();
-        input
-            .bytes_mut()
-            .splice(range, core::iter::repeat(val).take(quantity));
+        buffer_set(input.bytes_mut(), range.start, quantity, val);
+
 
         let end = std::time::Instant::now();
         unsafe {
@@ -840,7 +852,7 @@ where
         let target = state.rand_mut().below(size as u64) as usize;
         let range = rand_range(state, size, size - target);
 
-        input.bytes_mut().copy_within(range, target);
+        buffer_self_copy(input.bytes_mut(), range.start, target, range.len());
 
         let end = std::time::Instant::now();
         unsafe {
@@ -887,21 +899,21 @@ where
     ) -> Result<MutationResult, Error> {
         let start = std::time::Instant::now();
         let size = input.bytes().len();
-        if size <= 1 || size == state.max_size() {
+        if size <= 1 || size >= state.max_size() {
             return Ok(MutationResult::Skipped);
         }
 
         let target = state.rand_mut().below(size as u64) as usize;
         // make sure that the sampled range is both in bounds and of an acceptable size
         let max_insert_len = min(size - target, state.max_size() - size);
-        let range = rand_range(state, size, max_insert_len);
+        let range = rand_range(state, size, min(16, max_insert_len));
 
-        self.tmp_buf.clear();
-        self.tmp_buf.extend(input.bytes()[range].iter().copied());
+        input.bytes_mut().resize(size + range.len(), 0);
+        self.tmp_buf.resize(range.len(), 0);
+        buffer_copy(&mut self.tmp_buf, input.bytes(), range.start, 0, range.len());
 
-        input
-            .bytes_mut()
-            .splice(target..target, self.tmp_buf.drain(..));
+        buffer_self_copy(input.bytes_mut(), target, target + range.len(), size - target);
+        buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, target, range.len());
         let end = std::time::Instant::now();
         unsafe {
             BYTE_INSERT_COPY_DURATION += end - start;
@@ -1058,9 +1070,9 @@ where
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input()?;
 
-        input
-            .bytes_mut()
-            .splice(target..target, other.bytes()[range].iter().copied());
+        input.bytes_mut().resize(size + range.len(), 0);
+        buffer_self_copy(input.bytes_mut(), target, target + range.len(), size - target);
+        buffer_copy(input.bytes_mut(), other.bytes(), range.start, target, range.len());
         let end = std::time::Instant::now();
         unsafe {
             CROSSOVER_INSERT_DURATION += end - start;
@@ -1133,10 +1145,7 @@ where
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input()?;
 
-        input.bytes_mut().splice(
-            target..(target + range.len()),
-            other.bytes()[range].iter().copied(),
-        );
+        buffer_copy(input.bytes_mut(), other.bytes(), range.start, target, range.len());
         let end = std::time::Instant::now();
         unsafe {
             CROSSOVER_REPLACE_DURATION += end - start;
