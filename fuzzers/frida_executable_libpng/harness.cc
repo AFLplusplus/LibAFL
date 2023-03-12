@@ -54,7 +54,7 @@ struct PngObjectHandler {
   png_structp png_ptr = nullptr;
   png_infop   end_info_ptr = nullptr;
   png_voidp   row_ptr = nullptr;
-  BufState   *buf_state = nullptr;
+  BufState *  buf_state = nullptr;
 
   ~PngObjectHandler() {
     if (row_ptr) { png_free(png_ptr, row_ptr); }
@@ -86,7 +86,7 @@ extern "C" int afl_libfuzzer_init() {
 static char *allocation = NULL;
 
 __attribute__((noinline)) void func3(char *alloc) {
-// printf("func3\n");
+  // printf("func3\n");
   if (random() == 0) {
     alloc[0x1ff] = 0xde;
     printf("alloc[0x200]: %d\n", alloc[0x200]);
@@ -111,7 +111,7 @@ __attribute__((noinline)) void func1() {
 
 int main(int argc, char **argv) {
   if (argc != 3) { abort(); }
-  size_t size = atoi(argv[1]);
+  size_t   size = atoi(argv[1]);
   uint8_t *data = (uint8_t *)argv[2];
 
   if (size >= 8 && *(uint64_t *)data == 0xABCDEFAA8F1324AA) { abort(); }
