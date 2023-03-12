@@ -4,7 +4,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use std::{path::PathBuf, ptr::null, process::{ExitCode, exit}};
+use std::{path::PathBuf, ptr::null};
 
 use frida_gum::Gum;
 use libafl::{

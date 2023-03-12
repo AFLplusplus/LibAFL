@@ -32,5 +32,5 @@ By restarting the actual fuzzer, it can recover from these exit conditions.
 After building the libpng-harness, you can run `find . -name libpng-harness` to find the location of your harness, then run
 
 ```
-LD_PRELOAD=./target/release/libfrida_fuzzer.so ./libpng-harness --in corpus -out out
+LD_PRELOAD=./target/release/libfrida_fuzzer.so ./libpng-harness -i corpus -o out -l ./libpng-harness.so
 ```

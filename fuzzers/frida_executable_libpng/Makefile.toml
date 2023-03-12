@@ -1,7 +1,6 @@
 # Variables
 [env]
 CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-FUZZER_NAME={ source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "frida_fuzzer", mapping = {"linux" = "frida_fuzzer", "macos" = "frida_fuzzer"} }
 
 
 [tasks.unsupported]
@@ -74,7 +73,7 @@ windows_alias = "unsupported"
 [tasks.run_unix]
 script_runner = "@shell"
 script='''
-LD_PRELOAD=./target/release/libfrida_fuzzer.so ./libpng-harness -i corpus -o out
+LD_PRELOAD=./target/release/libfrida_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness
 '''
 dependencies = [ "fuzzer", "harness" ]
 
@@ -88,7 +87,14 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-#LD_PRELOAD=./target/release/libfrida_fuzzer.so timeout 10s ./libpng-harness -i corpus -o out
+LD_PRELOAD=./target/release/libfrida_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness > fuzz_stdout.log &
+sleep 10s && pkill libpng-harness
+if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+else
+    echo "Fuzzer is working"
+fi
 '''
 dependencies = [ "fuzzer", "harness" ]
 
@@ -103,7 +109,7 @@ windows_alias = "unsupported"
 clear = true
 script_runner="@shell"
 script='''
-rm -f ./${FUZZER_NAME}
+rm -f ./libpng-harness
 make -C libpng-1.6.37 clean
 cargo clean
 '''
