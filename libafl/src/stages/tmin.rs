@@ -21,10 +21,10 @@ use crate::{
     mark_feature_time,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
-    schedulers::Scheduler,
+    schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, HasSolutions, UsesState},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
 
@@ -34,9 +34,9 @@ use crate::{
 pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F2, CS::State, OT>
 where
-    Self::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    Self::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor,
     <Self::State as UsesInput>::Input: HasLen + Hash,
-    CS: Scheduler<State = Self::State>,
+    CS: Scheduler<State = Self::State> + RemovableScheduler,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
     EM: EventFirer<State = Self::State>,
     F1: Feedback<Self::State>,
@@ -112,6 +112,11 @@ where
 
                 // let the fuzzer process this execution -- it's possible that we find something
                 // interesting, or even a solution
+
+                // TODO replace if process_execution adds a return value for solution index
+                let solution_count = state.solutions().count();
+                let corpus_count = state.corpus().count();
+                *state.executions_mut() += 1;
                 let (_, corpus_idx) = fuzzer.process_execution(
                     state,
                     manager,
@@ -121,12 +126,17 @@ where
                     false,
                 )?;
 
-                if feedback.is_interesting(state, manager, &input, observers, &exit_kind)? {
-                    // we found a reduced corpus entry! use the smaller base
-                    base = input;
+                if state.corpus().count() == corpus_count
+                    && state.solutions().count() == solution_count
+                {
+                    // we do not care about interesting inputs!
+                    if feedback.is_interesting(state, manager, &input, observers, &exit_kind)? {
+                        // we found a reduced corpus entry! use the smaller base
+                        base = input;
 
-                    // do more runs! maybe we can minify further
-                    next_i = 0;
+                        // do more runs! maybe we can minify further
+                        next_i = 0;
+                    }
                 }
 
                 corpus_idx
@@ -147,10 +157,18 @@ where
         base.hash(&mut hasher);
         let new_hash = hasher.finish();
         if base_hash != new_hash {
+            let exit_kind = fuzzer.execute_input(state, executor, manager, &base)?;
+            let observers = executor.observers();
+            *state.executions_mut() += 1;
+            // assumption: this input should not be marked interesting because it was not
+            // marked as interesting above; similarly, it should not trigger objectives
+            fuzzer
+                .feedback_mut()
+                .is_interesting(state, manager, &base, observers, &exit_kind)?;
             let mut testcase = Testcase::with_executions(base, *state.executions());
             fuzzer
                 .feedback_mut()
-                .append_metadata(state, &mut testcase)?;
+                .append_metadata(state, observers, &mut testcase)?;
             let prev = state.corpus_mut().replace(base_corpus_idx, testcase)?;
             fuzzer
                 .scheduler_mut()
@@ -186,8 +204,8 @@ where
 impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
-    CS: Scheduler,
-    CS::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    CS: Scheduler + RemovableScheduler,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor,
     <CS::State as UsesInput>::Input: HasLen + Hash,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
@@ -234,7 +252,7 @@ where
 impl<CS, E, EM, F1, F2, FF, M, OT, Z> TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
-    CS: Scheduler,
+    CS: Scheduler + RemovableScheduler,
     E: HasObservers<Observers = OT, State = CS::State> + Executor<EM, Z>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,
@@ -243,7 +261,7 @@ where
     <CS::State as UsesInput>::Input: HasLen + Hash,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasSolutions + HasExecutions + HasMaxSize,
     Z: ExecutionProcessor<OT, State = CS::State>
         + ExecutesInput<E, EM>
         + HasFeedback<Feedback = F1>
@@ -328,7 +346,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S as UsesInput>::Input,
+        _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>

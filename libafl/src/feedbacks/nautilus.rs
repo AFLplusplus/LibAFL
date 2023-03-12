@@ -14,9 +14,8 @@ use crate::{
     executors::ExitKind,
     feedbacks::Feedback,
     generators::NautilusContext,
-    inputs::NautilusInput,
+    inputs::{NautilusInput, UsesInput},
     observers::ObserversTuple,
-    prelude::UsesInput,
     state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
@@ -101,11 +100,15 @@ where
         Ok(false)
     }
 
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         state: &mut S,
-        testcase: &mut Testcase<NautilusInput>,
-    ) -> Result<(), Error> {
+        _observers: &OT,
+        testcase: &mut Testcase<S::Input>,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
         let input = testcase.load_input()?.clone();
         let meta = state
             .metadata_mut()

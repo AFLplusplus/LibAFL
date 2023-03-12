@@ -8,9 +8,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
+    observers::ObserversTuple,
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
@@ -125,30 +126,24 @@ where
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as UsesInput>::Input: HasLen,
 {
-    fn on_add(&self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
         self.inner.on_add(state, idx)
     }
 
-    fn on_replace(
-        &self,
+    fn on_evaluation<OT>(
+        &mut self,
         state: &mut Self::State,
-        idx: CorpusId,
-        testcase: &Testcase<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
-        self.inner.on_replace(state, idx, testcase)
+        input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<Self::State>,
+    {
+        self.inner.on_evaluation(state, input, observers)
     }
 
-    fn on_remove(
-        &self,
-        state: &mut Self::State,
-        idx: CorpusId,
-        testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
-    ) -> Result<(), Error> {
-        self.inner.on_remove(state, idx, testcase)
-    }
-
-    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state
             .metadata()
             .get::<TopAccountingMetadata>()
@@ -158,7 +153,7 @@ where
         } else {
             self.inner.cull(state)?;
         }
-        let mut idx = self.inner.base().next(state)?;
+        let mut idx = self.inner.base_mut().next(state)?;
         while {
             let has = !state
                 .corpus()
@@ -168,9 +163,22 @@ where
             has
         } && state.rand_mut().below(100) < self.skip_non_favored_prob
         {
-            idx = self.inner.base().next(state)?;
+            idx = self.inner.base_mut().next(state)?;
         }
+
+        // Don't add corpus.curret(). The inner scheduler will take care of it
+
         Ok(idx)
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        _state: &mut Self::State,
+        _next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        // We do nothing here, the inner scheduler will take care of it
+        Ok(())
     }
 }
 
@@ -271,7 +279,7 @@ where
 
         for (_key, idx) in &top_rated.map {
             let mut entry = state.corpus().get(*idx)?.borrow_mut();
-            if entry.fuzzed() {
+            if entry.scheduled_count() > 0 {
                 continue;
             }
 
@@ -282,7 +290,7 @@ where
     }
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
-    /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
+    /// and has a default probability to skip non-faved Testcases of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     pub fn new(state: &mut CS::State, base: CS, accounting_map: &'a [u32]) -> Self {
         match state.metadata().get::<TopAccountingMetadata>() {
             Some(meta) => {
@@ -302,7 +310,7 @@ where
     }
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
-    /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
+    /// and has a non-default probability to skip non-faved Testcases using (`skip_non_favored_prob`).
     pub fn with_skip_prob(
         state: &mut CS::State,
         base: CS,

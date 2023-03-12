@@ -17,7 +17,7 @@ use crate::{
         rands::Rand,
         serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     },
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -468,14 +468,14 @@ where
         }
 
         while let Some(path) = self.remaining_initial_files.as_mut().unwrap().pop() {
-            println!("Loading file {:?} ...", &path);
+            log::info!("Loading file {:?} ...", &path);
             let input = loader(fuzzer, self, &path)?;
             if forced {
-                let _ = fuzzer.add_input(self, executor, manager, input)?;
+                let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
             } else {
                 let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
                 if res == ExecuteInputResult::None {
-                    println!("File {:?} was not interesting, skipped.", &path);
+                    log::warn!("File {:?} was not interesting, skipped.", &path);
                 }
             }
         }
@@ -617,7 +617,7 @@ where
         for _ in 0..num {
             let input = generator.generate(self)?;
             if forced {
-                let _ = fuzzer.add_input(self, executor, manager, input)?;
+                let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
                 added += 1;
             } else {
                 let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;

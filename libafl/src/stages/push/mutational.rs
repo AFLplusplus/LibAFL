@@ -116,7 +116,7 @@ where
         self.current_corpus_idx = Some(if let Some(corpus_idx) = self.current_corpus_idx {
             corpus_idx
         } else {
-            fuzzer.scheduler().next(state)?
+            fuzzer.scheduler_mut().next(state)?
         });
 
         self.testcases_to_do = self.iterations(state, self.current_corpus_idx.unwrap())?;
@@ -169,7 +169,7 @@ where
         last_input: <CS::State as UsesInput>::Input,
         exit_kind: ExitKind,
     ) -> Result<(), Error> {
-        // todo: isintersting, etc.
+        // todo: is_interesting, etc.
 
         fuzzer.process_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
 

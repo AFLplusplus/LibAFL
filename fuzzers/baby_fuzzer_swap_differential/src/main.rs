@@ -11,7 +11,7 @@ use libafl::monitors::tui::TuiMonitor;
 use libafl::monitors::SimpleMonitor;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, InMemoryOnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, DiffExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
@@ -25,9 +25,11 @@ use libafl::{
     state::{HasSolutions, StdState},
 };
 use libafl_targets::{DifferentialAFLMapSwapObserver, MAX_EDGES_NUM};
+#[cfg(not(miri))]
 use mimalloc::MiMalloc;
 
 #[global_allocator]
+#[cfg(not(miri))]
 static GLOBAL: MiMalloc = MiMalloc;
 
 // bindings to the functions defined in the target
@@ -180,7 +182,7 @@ pub fn main() {
         InMemoryCorpus::new(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
-        OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
+        InMemoryOnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
         // The feedbacks can report the data that should persist in the State.
         &mut feedback,

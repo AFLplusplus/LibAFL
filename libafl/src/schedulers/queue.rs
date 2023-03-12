@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use crate::{
     corpus::{Corpus, CorpusId},
     inputs::UsesInput,
-    schedulers::Scheduler,
+    schedulers::{RemovableScheduler, Scheduler},
     state::{HasCorpus, UsesState},
     Error,
 };
@@ -24,12 +24,26 @@ where
     type State = S;
 }
 
+impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus {}
+
 impl<S> Scheduler for QueueScheduler<S>
 where
     S: HasCorpus,
 {
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+        // Set parent id
+        let current_idx = *state.corpus().current();
+        state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .set_parent_id_optional(current_idx);
+
+        Ok(())
+    }
+
     /// Gets the next entry in the queue
-    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
@@ -39,9 +53,19 @@ where
                 .map(|id| state.corpus().next(id))
                 .flatten()
                 .unwrap_or_else(|| state.corpus().first().unwrap());
-            *state.corpus_mut().current_mut() = Some(id);
+            self.set_current_scheduled(state, Some(id))?;
             Ok(id)
         }
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 
@@ -79,7 +103,7 @@ mod tests {
     #[test]
     fn test_queuecorpus() {
         let rand = StdRand::with_seed(4);
-        let scheduler = QueueScheduler::new();
+        let mut scheduler = QueueScheduler::new();
 
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();

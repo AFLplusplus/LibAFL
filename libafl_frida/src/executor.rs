@@ -8,7 +8,7 @@ use frida_gum::{
 #[cfg(windows)]
 use libafl::{
     executors::inprocess::{HasInProcessHandlers, InProcessHandlers},
-    state::{HasClientPerfMonitor, HasSolutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
 };
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
@@ -95,7 +95,7 @@ where
         #[cfg(unix)]
         unsafe {
             if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
-                println!("Crashing target as it had ASAN errors");
+                log::error!("Crashing target as it had ASAN errors");
                 libc::raise(libc::SIGABRT);
             }
         }
@@ -174,7 +174,7 @@ where
 
         if !helper.options().disable_excludes {
             for range in ranges.gaps(&(0..usize::MAX)) {
-                println!("excluding range: {:x}-{:x}", range.start, range.end);
+                log::info!("excluding range: {:x}-{:x}", range.start, range.end);
                 stalker.exclude(&MemoryRange::new(
                     NativePointer(range.start as *mut c_void),
                     range.end - range.start,
@@ -200,7 +200,7 @@ impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHandlers
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: UsesInput + HasClientPerfMonitor + HasSolutions,
+    S: UsesInput + HasClientPerfMonitor + HasSolutions + HasCorpus,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,

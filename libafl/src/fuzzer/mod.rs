@@ -384,7 +384,8 @@ where
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-                self.feedback_mut().append_metadata(state, &mut testcase)?;
+                self.feedback_mut()
+                    .append_metadata(state, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
@@ -416,7 +417,9 @@ where
 
                 // The input is a solution, add it to the respective corpus
                 let mut testcase = Testcase::with_executions(input, *state.executions());
-                self.objective_mut().append_metadata(state, &mut testcase)?;
+                testcase.set_parent_id_optional(*state.corpus().current());
+                self.objective_mut()
+                    .append_metadata(state, observers, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
 
                 if send_events {
@@ -458,6 +461,9 @@ where
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
+
+        self.scheduler.on_evaluation(state, &input, observers)?;
+
         self.process_execution(state, manager, input, observers, &exit_kind, send_events)
     }
 }
@@ -500,9 +506,16 @@ where
         // Not a solution
         self.objective_mut().discard_metadata(state, &input)?;
 
+        // several is_interesting implementations collect some data about the run, later used in
+        // append_metadata; we *must* invoke is_interesting here to collect it
+        let _: bool = self
+            .feedback_mut()
+            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+
         // Add the input to the main corpus
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-        self.feedback_mut().append_metadata(state, &mut testcase)?;
+        self.feedback_mut()
+            .append_metadata(state, observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
 

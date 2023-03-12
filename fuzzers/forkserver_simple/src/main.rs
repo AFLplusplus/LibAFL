@@ -123,8 +123,9 @@ pub fn main() {
     let mut objective = feedback_and_fast!(
         // Must be a crash
         CrashFeedback::new(),
-        // Take it onlt if trigger new coverage over crashes
-        MaxMapFeedback::new(&edges_observer)
+        // Take it only if trigger new coverage over crashes
+        // Uses `with_name` to create a different history from the `MaxMapFeedback` in `feedback` above
+        MaxMapFeedback::with_name("mapfeedback_metadata_objective", &edges_observer)
     );
 
     // create a State from scratch

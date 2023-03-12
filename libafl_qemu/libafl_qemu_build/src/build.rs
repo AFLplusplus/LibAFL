@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "f6a2e732e8e225ebb8d1a9399561af7330af31b3";
+const QEMU_REVISION: &str = "0dc52ed6f3915f727aaec8648706760f278f0571";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -249,7 +249,6 @@ pub fn build(
                 .arg("--disable-vhost-vdpa")
                 .arg("--disable-virglrenderer")
                 .arg("--disable-virtfs")
-                .arg("--disable-virtiofsd")
                 .arg("--disable-vmnet")
                 .arg("--disable-vnc")
                 .arg("--disable-vnc-jpeg")
@@ -398,7 +397,8 @@ pub fn build(
     println!("cargo:rustc-link-lib=z");
     // if keyutils is available, qemu meson script will compile code with keyutils.
     // therefore, we need to link with keyutils if our system have libkeyutils.
-    let _ = pkg_config::Config::new().probe("libkeyutils");
+    let _: Result<pkg_config::Library, pkg_config::Error> =
+        pkg_config::Config::new().probe("libkeyutils");
 
     if !is_usermode {
         println!("cargo:rustc-link-lib=pixman-1");

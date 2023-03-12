@@ -39,14 +39,23 @@ fn find_llvm_config_brew() -> Result<PathBuf, String> {
             if brew_cellar_location.is_empty() {
                 return Err("Empty return from brew --cellar".to_string());
             }
-            let cellar_glob = format!("{brew_cellar_location}/llvm/*/bin/llvm-config");
-            let glob_results = glob(&cellar_glob).unwrap_or_else(|err| {
-                panic!("Could not read glob path {} ({err})", &cellar_glob);
+            let location_suffix = "*/bin/llvm-config";
+            let cellar_glob = vec![
+                // location for explicitly versioned brew formulae
+                format!("{brew_cellar_location}/llvm@*/{location_suffix}"),
+                // location for current release brew formulae
+                format!("{brew_cellar_location}/llvm/{location_suffix}"),
+            ];
+            let glob_results = cellar_glob.iter().flat_map(|location| {
+                glob(location).unwrap_or_else(|err| {
+                    panic!("Could not read glob path {location} ({err})");
+                })
             });
             match glob_results.last() {
                 Some(path) => Ok(path.unwrap()),
                 None => Err(format!(
-                    "No llvm-config found in brew cellar with pattern {cellar_glob}"
+                    "No llvm-config found in brew cellar with patterns {}",
+                    cellar_glob.join(" ")
                 )),
             }
         }
@@ -266,7 +275,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     if cfg!(windows) {
         cxxflags.push(String::from("-fuse-ld=lld"));
         cxxflags.push(String::from("/LD"));
-        /* clang on windows links against the libcmt.lib runtime
+        /* clang on Windows links against the libcmt.lib runtime
          * however, the distributed binaries are compiled against msvcrt.lib
          * we need to also use msvcrt.lib instead of libcmt.lib when building the optimization passes
          * first, we tell clang-cl (and indirectly link) to ignore libcmt.lib via -nodefaultlib:libcmt

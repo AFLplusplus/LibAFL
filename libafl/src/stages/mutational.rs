@@ -51,7 +51,7 @@ where
 
     /// Transform the provided testcase into this type
     fn try_transform_from(
-        base: &Testcase<I>,
+        base: &mut Testcase<I>,
         state: &S,
         corpus_idx: CorpusId,
     ) -> Result<Self, Error>;
@@ -69,11 +69,11 @@ where
 
     #[inline]
     fn try_transform_from(
-        base: &Testcase<I>,
+        base: &mut Testcase<I>,
         _state: &S,
         _corpus_idx: CorpusId,
     ) -> Result<Self, Error> {
-        Ok(base.input().as_ref().unwrap().clone())
+        Ok(base.load_input()?.clone())
     }
 
     #[inline]
@@ -116,8 +116,8 @@ where
         let num = self.iterations(state, corpus_idx)?;
 
         start_timer!(state);
-        let testcase = state.corpus().get(corpus_idx)?.borrow();
-        let Ok(input) = I::try_transform_from(&testcase, state, corpus_idx) else { return Ok(()); };
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else { return Ok(()); };
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 

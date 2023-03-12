@@ -1,50 +1,39 @@
 //! The power schedules. This stage should be invoked after the calibration stage.
 
-use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    bolts::tuples::MatchName,
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
+    corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mutators::Mutator,
-    observers::MapObserver,
-    schedulers::{
-        powersched::SchedulerMetadata, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
-    },
-    stages::{
-        mutational::{MutatedTransform, MutatedTransformPost},
-        MutationalStage, Stage,
-    },
+    schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
+    stages::{mutational::MutatedTransform, MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerMutationalStage<E, F, EM, I, M, O, Z> {
-    map_observer_name: String,
+pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
     mutator: M,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, F, EM, I, O, Z)>,
+    phantom: PhantomData<(E, F, EM, I, Z)>,
 }
 
-impl<E, F, EM, I, M, O, Z> UsesState for PowerMutationalStage<E, F, EM, I, M, O, Z>
+impl<E, F, EM, I, M, Z> UsesState for PowerMutationalStage<E, F, EM, I, M, Z>
 where
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E, F, EM, I, M, O, Z> MutationalStage<E, EM, I, M, Z>
-    for PowerMutationalStage<E, F, EM, I, M, O, Z>
+impl<E, F, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    O: MapObserver,
     E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
@@ -70,74 +59,14 @@ where
 
         Ok(score)
     }
-
-    #[allow(clippy::cast_possible_wrap)]
-    fn perform_mutational(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut E::State,
-        manager: &mut EM,
-        corpus_idx: CorpusId,
-    ) -> Result<(), Error> {
-        let num = self.iterations(state, corpus_idx)?;
-
-        let testcase = state.corpus().get(corpus_idx)?.borrow();
-        let Ok(input) = I::try_transform_from(&testcase, state, corpus_idx) else { return Ok(()); };
-        drop(testcase);
-
-        for i in 0..num {
-            let mut input = input.clone();
-
-            self.mutator_mut().mutate(state, &mut input, i as i32)?;
-
-            let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-
-            let observer = executor
-                .observers()
-                .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
-
-            let mut hash = observer.hash() as usize;
-
-            let psmeta = state
-                .metadata_mut()
-                .get_mut::<SchedulerMetadata>()
-                .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
-
-            hash %= psmeta.n_fuzz().len();
-            // Update the path frequency
-            psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
-
-            if let Some(idx) = corpus_idx {
-                state
-                    .corpus()
-                    .get(idx)?
-                    .borrow_mut()
-                    .metadata_mut()
-                    .get_mut::<SchedulerTestcaseMetaData>()
-                    .ok_or_else(|| {
-                        Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                    })?
-                    .set_n_fuzz_entry(hash);
-            }
-
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
-            post.post_exec(state, i as i32, corpus_idx)?;
-        }
-
-        Ok(())
-    }
 }
 
-impl<E, F, EM, I, M, O, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, I, M, O, Z>
+impl<E, F, EM, I, M, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    O: MapObserver,
     E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
@@ -157,36 +86,33 @@ where
     }
 }
 
-impl<E, F, EM, M, O, Z> PowerMutationalStage<E, F, EM, E::Input, M, O, Z>
+impl<E, F, EM, M, Z> PowerMutationalStage<E, F, EM, E::Input, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::Input, E::State>,
-    O: MapObserver,
     E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
-    pub fn new(mutator: M, map_observer_name: &O) -> Self {
-        Self::transforming(mutator, map_observer_name)
+    pub fn new(mutator: M) -> Self {
+        Self::transforming(mutator)
     }
 }
 
-impl<E, F, EM, I, M, O, Z> PowerMutationalStage<E, F, EM, I, M, O, Z>
+impl<E, F, EM, I, M, Z> PowerMutationalStage<E, F, EM, I, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    O: MapObserver,
     E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new transforming [`PowerMutationalStage`]
-    pub fn transforming(mutator: M, map_observer_name: &O) -> Self {
+    pub fn transforming(mutator: M) -> Self {
         Self {
-            map_observer_name: map_observer_name.name().to_string(),
             mutator,
             phantom: PhantomData,
         }
@@ -194,5 +120,5 @@ where
 }
 
 /// The standard powerscheduling stage
-pub type StdPowerMutationalStage<E, EM, I, M, O, Z> =
-    PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, I, M, O, Z>;
+pub type StdPowerMutationalStage<E, EM, I, M, Z> =
+    PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;

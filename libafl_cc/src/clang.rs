@@ -167,8 +167,10 @@ impl CompilerWrapper for ClangWrapper {
                     i += 1;
                     continue;
                 }
-                "-z" => {
-                    if i + 1 < args.len() && args[i + 1].as_ref() == "defs" {
+                "-z" | "-Wl,-z" => {
+                    if i + 1 < args.len()
+                        && (args[i + 1].as_ref() == "defs" || args[i + 1].as_ref() == "-Wl,defs")
+                    {
                         i += 2;
                         continue;
                     }
@@ -468,6 +470,7 @@ mod tests {
     use crate::{ClangWrapper, CompilerWrapper};
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_clang_version() {
         if let Err(res) = ClangWrapper::new()
             .parse_args(&["my-clang", "-v"])

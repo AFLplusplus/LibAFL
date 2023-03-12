@@ -68,7 +68,7 @@ jobs:
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+      run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
 
@@ -78,6 +78,8 @@ jobs:
       run: cargo check --features=sancov_pcguard_edges
     - name: Format
       run: cargo fmt -- --check
+    - name: Cleanup
+      run: cargo clean
     - name: Run clang-format style check for C/C++ programs.
       run: clang-format-13 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
     - name: run shellcheck
@@ -96,6 +98,10 @@ jobs:
       run: cargo build --verbose
     - name: Build examples
       run: cargo build --examples --verbose
+    
+    # --- miri undefined behavior test --
+    - name: Run miri tests
+      run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
 
   ubuntu-check:
     runs-on: ubuntu-22.04
@@ -159,7 +165,7 @@ jobs:
     - name: Run a maturin build
       run: cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && maturin develop && ./test.sh
     - name: Run python test
-      run: . ./bindings/pylibafl/.env/bin/activate && cd ./fuzzers/baby_fuzzer && python3 baby_fuzzer.py | grep "Bye"
+      run: . ./bindings/pylibafl/.env/bin/activate && cd ./fuzzers/baby_fuzzer && python3 baby_fuzzer.py 2>&1 | grep "Bye"
 
   fuzzers:
     strategy:
@@ -197,6 +203,14 @@ jobs:
       uses: baptiste0928/cargo-install@v1.3.0
       with:
         crate: cargo-make
+    - name: install wasm-pack
+      uses: baptiste0928/cargo-install@v1.3.0
+      with:
+        crate: wasm-pack
+    - name: install chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
     - uses: actions/checkout@v3
       with:
         submodules: true # recursively checkout submodules
