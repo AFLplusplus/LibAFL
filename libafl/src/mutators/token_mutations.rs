@@ -24,7 +24,7 @@ use crate::{
     bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
-    observers::cmp::{AFLCmpValuesMetadata, CmpValues, CmpValuesMetadata},
+    observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
     state::{HasMaxSize, HasMetadata, HasRand},
     Error,
@@ -609,7 +609,7 @@ const CMP_ATTRIBUTE_IS_TRANSFORM: u8 = 64;
 
 /// AFL++ redqueen mutation
 #[derive(Debug, Default)]
-pub struct AFLRedQueen {
+pub struct AFLppRedQueen {
     cmp_start_idx: usize,
     cmp_h_start_idx: usize,
     cmp_buf_start_idx: usize,
@@ -618,7 +618,7 @@ pub struct AFLRedQueen {
     enable_arith: bool,
 }
 
-impl AFLRedQueen {
+impl AFLppRedQueen {
     #[inline]
     fn swapa(x: u8) -> u8 {
         (x & 0xf8) + ((x & 7) ^ 0x07)
@@ -1054,7 +1054,7 @@ impl AFLRedQueen {
     }
 }
 
-impl<I, S> Mutator<I, S> for AFLRedQueen
+impl<I, S> Mutator<I, S> for AFLppRedQueen
 where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize,
     I: HasBytesVec,
@@ -1077,7 +1077,7 @@ where
         }
 
         let (cmp_len, cmp_meta, taint_meta) = {
-            let cmp_meta = state.metadata().get::<AFLCmpValuesMetadata>();
+            let cmp_meta = state.metadata().get::<AFLppCmpValuesMetadata>();
             let taint_meta = state.metadata().get::<TaintMetadata>();
             if cmp_meta.is_none() || taint_meta.is_none() {
                 return Ok(MutationResult::Skipped);
@@ -1529,14 +1529,14 @@ where
     }
 }
 
-impl Named for AFLRedQueen {
+impl Named for AFLppRedQueen {
     fn name(&self) -> &str {
-        "AFLRedQueen"
+        "AFLppRedQueen"
     }
 }
 
-impl AFLRedQueen {
-    /// Create a new `AFLRedQueen` Mutator
+impl AFLppRedQueen {
+    /// Create a new `AFLppRedQueen` Mutator
     #[must_use]
     pub fn new() -> Self {
         Self {

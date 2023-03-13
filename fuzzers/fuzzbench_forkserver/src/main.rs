@@ -26,18 +26,18 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations,
-        token_mutations::{AFLRedQueen, I2SRandReplace},
+        token_mutations::{AFLppRedQueen, I2SRandReplace},
         tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{
-        AFLCmpMap, AFLStdCmpObserver, HitcountsMapObserver, StdCmpObserver, StdMapObserver,
+        AFLppCmpMap, AFLppStdCmpObserver, HitcountsMapObserver, StdCmpObserver, StdMapObserver,
         TimeObserver,
     },
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, tracing::TaintTracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, tracing::AFLppCmplogTracingStage,
         ColorizationStage, StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
@@ -346,13 +346,13 @@ fn fuzz(
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
         let mut cmplog_shmem = shmem_provider
-            .new_shmem(core::mem::size_of::<AFLCmpMap>())
+            .new_shmem(core::mem::size_of::<AFLppCmpMap>())
             .unwrap();
         // let the forkserver know the shmid
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
-        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLCmpMap>() };
+        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpMap>() };
 
-        let cmplog_observer = AFLStdCmpObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AFLppStdCmpObserver::new("cmplog", cmpmap, true);
 
         let cmplog_forkserver = ForkserverExecutor::builder()
             .program(exec)
@@ -369,12 +369,12 @@ fn fuzz(
 
         // let tracing = TracingStage::new(cmplog_executor);
 
-        let tracing2 = TaintTracingStage::with_cmplog_observer_name(cmplog_executor, "cmplog");
+        let tracing2 = AFLppCmplogTracingStage::with_cmplog_observer_name(cmplog_executor, "cmplog");
 
         // Setup a randomic Input2State stage
         let i2s =
             // StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
-            StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(AFLRedQueen::with_cmplog_options(false, false))));
+            StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(AFLppRedQueen::with_cmplog_options(false, false))));
 
         // The order of the stages matter!
         let mut stages = tuple_list!(calibration, colorization, tracing2, i2s, power);

@@ -351,11 +351,11 @@ struct cmp_map {
 
 /// A [`CmpObserver`] observer for AFL++ redqueen
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AFLStdCmpObserver<'a, S>
+pub struct AFLppStdCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
-    cmp_map: OwnedRefMut<'a, AFLCmpMap>,
+    cmp_map: OwnedRefMut<'a, AFLppCmpMap>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: String,
     add_meta: bool,
@@ -363,7 +363,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<'a, S> CmpObserver<AFLCmpMap, S> for AFLStdCmpObserver<'a, S>
+impl<'a, S> CmpObserver<AFLppCmpMap, S> for AFLppStdCmpObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -375,11 +375,11 @@ where
         }
     }
 
-    fn cmp_map(&self) -> &AFLCmpMap {
+    fn cmp_map(&self) -> &AFLppCmpMap {
         self.cmp_map.as_ref()
     }
 
-    fn cmp_map_mut(&mut self) -> &mut AFLCmpMap {
+    fn cmp_map_mut(&mut self) -> &mut AFLppCmpMap {
         self.cmp_map.as_mut()
     }
 
@@ -390,13 +390,13 @@ where
         S: HasMetadata,
     {
         #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-        let meta = if let Some(meta) = state.metadata_mut().get_mut::<AFLCmpValuesMetadata>() {
+        let meta = if let Some(meta) = state.metadata_mut().get_mut::<AFLppCmpValuesMetadata>() {
             meta
         } else {
-            state.add_metadata(AFLCmpValuesMetadata::new());
+            state.add_metadata(AFLppCmpValuesMetadata::new());
             state
                 .metadata_mut()
-                .get_mut::<AFLCmpValuesMetadata>()
+                .get_mut::<AFLppCmpValuesMetadata>()
                 .unwrap()
         };
 
@@ -488,7 +488,7 @@ where
     }
 }
 
-impl<'a, S> Observer<S> for AFLStdCmpObserver<'a, S>
+impl<'a, S> Observer<S> for AFLppStdCmpObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -510,7 +510,7 @@ where
     }
 }
 
-impl<'a, S> Named for AFLStdCmpObserver<'a, S>
+impl<'a, S> Named for AFLppStdCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
@@ -519,13 +519,13 @@ where
     }
 }
 
-impl<'a, S> AFLStdCmpObserver<'a, S>
+impl<'a, S> AFLppStdCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut AFLCmpMap, add_meta: bool) -> Self {
+    pub fn new(name: &'static str, map: &'a mut AFLppCmpMap, add_meta: bool) -> Self {
         Self {
             name: name.to_string(),
             size: None,
@@ -544,7 +544,7 @@ where
     #[must_use]
     pub fn with_size(
         name: &'static str,
-        map: &'a mut AFLCmpMap,
+        map: &'a mut AFLppCmpMap,
         add_meta: bool,
         original: bool,
         size: &'a mut usize,
@@ -562,22 +562,22 @@ where
 
 /// A state metadata holding a list of values logged from comparisons. AFL++ RQ version.
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct AFLCmpValuesMetadata {
-    /// The first map of AFLCmpVals retrieved by running the un-mutated input
+pub struct AFLppCmpValuesMetadata {
+    /// The first map of AFLppCmpVals retrieved by running the un-mutated input
     #[serde(skip)]
     pub orig_cmpvals: HashMap<usize, Vec<CmpValues>>,
-    /// The second map of AFLCmpVals retrieved by runnning the mutated input
+    /// The second map of AFLppCmpVals retrieved by runnning the mutated input
     #[serde(skip)]
     pub new_cmpvals: HashMap<usize, Vec<CmpValues>>,
     /// The list of logged idx and headers retrieved by runnning the mutated input
     #[serde(skip)]
-    pub headers: Vec<(usize, AFLCmpHeader)>,
+    pub headers: Vec<(usize, AFLppCmpHeader)>,
 }
 
-crate::impl_serdeany!(AFLCmpValuesMetadata);
+crate::impl_serdeany!(AFLppCmpValuesMetadata);
 
-impl AFLCmpValuesMetadata {
-    /// Constructor for `AFLCmpValuesMetadata`
+impl AFLppCmpValuesMetadata {
+    /// Constructor for `AFLppCmpValuesMetadata`
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -601,7 +601,7 @@ impl AFLCmpValuesMetadata {
 
     /// Getter for `headers`
     #[must_use]
-    pub fn headers(&self) -> &Vec<(usize, AFLCmpHeader)> {
+    pub fn headers(&self) -> &Vec<(usize, AFLppCmpHeader)> {
         &self.headers
     }
 }
@@ -621,7 +621,7 @@ pub const AFL_CMP_TYPE_RTN: u32 = 2;
 /// The AFL++ `cmp_header` struct
 #[derive(Debug, Copy, Clone, BitfieldStruct)]
 #[repr(C, packed)]
-pub struct AFLCmpHeader {
+pub struct AFLppCmpHeader {
     #[bitfield(name = "hits", ty = "u32", bits = "0..=23")]
     #[bitfield(name = "id", ty = "u32", bits = "24..=47")]
     #[bitfield(name = "shape", ty = "u32", bits = "48..=52")]
@@ -635,14 +635,14 @@ pub struct AFLCmpHeader {
 /// The AFL++ `cmp_operands` struct
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C, packed)]
-pub struct AFLCmpOperands {
+pub struct AFLppCmpOperands {
     v0: u64,
     v1: u64,
     v0_128: u64,
     v1_128: u64,
 }
 
-impl AFLCmpOperands {
+impl AFLppCmpOperands {
     #[must_use]
     /// 64bit first cmp operand
     pub fn v0(&self) -> u64 {
@@ -671,14 +671,14 @@ impl AFLCmpOperands {
 /// The AFL++ `cmpfn_operands` struct
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C, packed)]
-pub struct AFLCmpFnOperands {
+pub struct AFLppCmpFnOperands {
     v0: [u8; 31],
     v0_len: u8,
     v1: [u8; 31],
     v1_len: u8,
 }
 
-impl AFLCmpFnOperands {
+impl AFLppCmpFnOperands {
     #[must_use]
     /// first rtn operand
     pub fn v0(&self) -> &[u8; 31] {
@@ -707,26 +707,26 @@ impl AFLCmpFnOperands {
 /// A proxy union to avoid casting operands as in AFL++
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
-pub union AFLCmpVals {
-    operands: [[AFLCmpOperands; AFL_CMP_MAP_H]; AFL_CMP_MAP_W],
-    fn_operands: [[AFLCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFL_CMP_MAP_W],
+pub union AFLppCmpVals {
+    operands: [[AFLppCmpOperands; AFL_CMP_MAP_H]; AFL_CMP_MAP_W],
+    fn_operands: [[AFLppCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFL_CMP_MAP_W],
 }
 
-impl Debug for AFLCmpVals {
+impl Debug for AFLppCmpVals {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AFLCmpVals").finish_non_exhaustive()
+        f.debug_struct("AFLppCmpVals").finish_non_exhaustive()
     }
 }
 
 /// The AFL++ `cmp_map` struct, use with `StdCmpObserver`
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
-pub struct AFLCmpMap {
-    headers: [AFLCmpHeader; AFL_CMP_MAP_W],
-    vals: AFLCmpVals,
+pub struct AFLppCmpMap {
+    headers: [AFLppCmpHeader; AFL_CMP_MAP_W],
+    vals: AFLppCmpVals,
 }
 
-impl Serialize for AFLCmpMap {
+impl Serialize for AFLppCmpMap {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -741,7 +741,7 @@ impl Serialize for AFLCmpMap {
     }
 }
 
-impl<'de> Deserialize<'de> for AFLCmpMap {
+impl<'de> Deserialize<'de> for AFLppCmpMap {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -752,7 +752,7 @@ impl<'de> Deserialize<'de> for AFLCmpMap {
     }
 }
 
-impl CmpMap for AFLCmpMap {
+impl CmpMap for AFLppCmpMap {
     fn len(&self) -> usize {
         AFL_CMP_MAP_W
     }

@@ -11,7 +11,7 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     inputs::{BytesInput, UsesInput},
     mark_feature_time,
-    observers::{AFLStdCmpObserver, ObserversTuple},
+    observers::{AFLppStdCmpObserver, ObserversTuple},
     stages::{colorization::TaintMetadata, Stage},
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, State, UsesState},
@@ -105,21 +105,21 @@ impl<EM, TE, Z> TracingStage<EM, TE, Z> {
 
 /// Trace with tainted input
 #[derive(Clone, Debug)]
-pub struct AFLCmplogTracingStage<EM, TE, Z> {
+pub struct AFLppCmplogTracingStage<EM, TE, Z> {
     tracer_executor: TE,
     cmplog_observer_name: Option<String>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
 
-impl<EM, TE, Z> UsesState for AFLCmplogTracingStage<EM, TE, Z>
+impl<EM, TE, Z> UsesState for AFLppCmplogTracingStage<EM, TE, Z>
 where
     TE: UsesState,
 {
     type State = TE::State;
 }
 
-impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLCmplogTracingStage<EM, TE, Z>
+impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
@@ -153,7 +153,7 @@ where
             if let Some(ob) = self
                 .tracer_executor
                 .observers_mut()
-                .match_name_mut::<AFLStdCmpObserver<TE::State>>(name)
+                .match_name_mut::<AFLppStdCmpObserver<TE::State>>(name)
             {
                 // This is not the original input,
                 // Set it to false
@@ -187,7 +187,7 @@ where
             if let Some(ob) = self
                 .tracer_executor
                 .observers_mut()
-                .match_name_mut::<AFLStdCmpObserver<TE::State>>(name)
+                .match_name_mut::<AFLppStdCmpObserver<TE::State>>(name)
             {
                 // This is not the original input,
                 // Set it to false
@@ -215,7 +215,7 @@ where
     }
 }
 
-impl<EM, TE, Z> AFLCmplogTracingStage<EM, TE, Z> {
+impl<EM, TE, Z> AFLppCmplogTracingStage<EM, TE, Z> {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
         Self {
