@@ -64,11 +64,13 @@ pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
 #[inline]
 pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: usize) -> Range<usize> {
     let len = state.rand_mut().next() as usize % max_len + 1;
-    let mut offset2 = state.rand_mut().next() as usize % (upper + len);
+    // sample from [1..upper + len]
+    let mut offset2 = 1 + state.rand_mut().next() as usize % (upper + len - 1);
     let offset1 = offset2.saturating_sub(len);
     if offset2 > upper {
         offset2 = upper;
     }
+    debug_assert!(!(offset1..offset2).is_empty());
 
     offset1..offset2
 }
@@ -492,9 +494,6 @@ where
         }
 
         let range = rand_range(state, size, size);
-        if range.is_empty() {
-            return Ok(MutationResult::Skipped);
-        }
 
         input.bytes_mut().drain(range);
 
@@ -538,9 +537,6 @@ where
         }
 
         let range = rand_range(state, size, min(16, max_size - size));
-        if range.is_empty() {
-            return Ok(MutationResult::Skipped);
-        }
 
         input.bytes_mut().resize(size + range.len(), 0);
         buffer_self_copy(
@@ -700,9 +696,6 @@ where
             return Ok(MutationResult::Skipped);
         }
         let range = rand_range(state, size, min(size, 16));
-        if range.is_empty() {
-            return Ok(MutationResult::Skipped);
-        }
 
         let val = *state.rand_mut().choose(input.bytes());
         let quantity = range.len();
@@ -746,9 +739,6 @@ where
             return Ok(MutationResult::Skipped);
         }
         let range = rand_range(state, size, min(size, 16));
-        if range.is_empty() {
-            return Ok(MutationResult::Skipped);
-        }
 
         let val = state.rand_mut().next() as u8;
         let quantity = range.len();
