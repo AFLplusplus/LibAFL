@@ -25,20 +25,16 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::havoc_mutations,
-        token_mutations::{AFLppRedQueen, I2SRandReplace},
-        tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
+        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
+        StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{
-        AFLppCmpMap, AFLppStdCmpObserver, HitcountsMapObserver, StdCmpObserver, StdMapObserver,
-        TimeObserver,
-    },
+    observers::{AFLCmpMap, HitcountsMapObserver, StdCmpObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, tracing::AFLppCmplogTracingStage,
-        ColorizationStage, StdMutationalStage, TracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
+        TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -310,8 +306,6 @@ fn fuzz(
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let colorization = ColorizationStage::new(&edges_observer);
-
     let mut tokens = Tokens::new();
     let forkserver = ForkserverExecutor::builder()
         .program(executable)
@@ -346,13 +340,13 @@ fn fuzz(
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
         let mut cmplog_shmem = shmem_provider
-            .new_shmem(core::mem::size_of::<AFLppCmpMap>())
+            .new_shmem(core::mem::size_of::<AFLCmpMap>())
             .unwrap();
         // let the forkserver know the shmid
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
-        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpMap>() };
+        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLCmpMap>() };
 
-        let cmplog_observer = AFLppStdCmpObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
 
         let cmplog_forkserver = ForkserverExecutor::builder()
             .program(exec)
@@ -367,17 +361,14 @@ fn fuzz(
             TimeoutForkserverExecutor::with_signal(cmplog_forkserver, timeout * 10, signal)
                 .expect("Failed to create the executor.");
 
-        // let tracing = TracingStage::new(cmplog_executor);
-
-        let tracing2 = AFLppCmplogTracingStage::with_cmplog_observer_name(cmplog_executor, "cmplog");
+        let tracing = TracingStage::new(cmplog_executor);
 
         // Setup a randomic Input2State stage
         let i2s =
-            // StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
-            StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(AFLppRedQueen::with_cmplog_options(false, false))));
+            StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, colorization, tracing2, i2s, power);
+        let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
     } else {
