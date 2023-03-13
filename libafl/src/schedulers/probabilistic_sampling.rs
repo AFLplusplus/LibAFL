@@ -100,6 +100,13 @@ where
     S: HasCorpus + HasMetadata + HasRand,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+        let current_idx = *state.corpus().current();
+        state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .set_parent_id_optional(current_idx);
+
         if state.metadata().get::<ProbabilityMetadata>().is_none() {
             state.add_metadata(ProbabilityMetadata::new());
         }
@@ -124,9 +131,19 @@ where
                     break;
                 }
             }
-            *state.corpus_mut().current_mut() = Some(ret);
+            self.set_current_scheduled(state, Some(ret))?;
             Ok(ret)
         }
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 

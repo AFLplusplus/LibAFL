@@ -635,6 +635,7 @@ mod tests {
     use crate::bolts::{minibsod::dump_registers, os::unix_signals::ucontext};
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     pub fn test_dump_registers() {
         let ucontext = ucontext().unwrap();
         let mut writer = BufWriter::new(stdout());

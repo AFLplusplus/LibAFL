@@ -9,14 +9,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
-        Scheduler,
+        RemovableScheduler, Scheduler,
     },
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
@@ -229,6 +229,94 @@ where
     type State = S;
 }
 
+impl<F, O, S> RemovableScheduler for WeightedScheduler<F, O, S>
+where
+    F: TestcaseScore<S>,
+    O: MapObserver,
+    S: HasCorpus + HasMetadata + HasRand,
+{
+    #[allow(clippy::cast_precision_loss)]
+    fn on_remove(
+        &mut self,
+        state: &mut Self::State,
+        _idx: CorpusId,
+        prev: &Option<crate::corpus::Testcase<<Self::State as UsesInput>::Input>>,
+    ) -> Result<(), Error> {
+        let prev = prev.as_ref().ok_or_else(|| {
+            Error::illegal_argument(
+                "Power schedulers must be aware of the removed corpus entry for reweighting.",
+            )
+        })?;
+
+        let prev_meta = prev
+            .metadata()
+            .get::<SchedulerTestcaseMetaData>()
+            .ok_or_else(|| {
+                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+            })?;
+
+        // Use these to adjust `SchedulerMetadata`
+        let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
+        let prev_bitmap_size = prev_meta.bitmap_size();
+        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
+
+        let psmeta = state
+            .metadata_mut()
+            .get_mut::<SchedulerMetadata>()
+            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+
+        psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
+        psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
+        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
+        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
+        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
+
+        Ok(())
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    fn on_replace(
+        &mut self,
+        state: &mut Self::State,
+        idx: CorpusId,
+        prev: &crate::corpus::Testcase<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
+        let prev_meta = prev
+            .metadata()
+            .get::<SchedulerTestcaseMetaData>()
+            .ok_or_else(|| {
+                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+            })?;
+
+        // Next depth is + 1
+        let prev_depth = prev_meta.depth() + 1;
+
+        // Use these to adjust `SchedulerMetadata`
+        let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
+        let prev_bitmap_size = prev_meta.bitmap_size();
+        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
+
+        let psmeta = state
+            .metadata_mut()
+            .get_mut::<SchedulerMetadata>()
+            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+
+        // We won't add new one because it'll get added when it gets executed in calirbation next time.
+        psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
+        psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
+        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
+        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
+        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
+
+        state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .add_metadata(SchedulerTestcaseMetaData::new(prev_depth));
+        Ok(())
+    }
+}
+
 impl<F, O, S> Scheduler for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
@@ -255,34 +343,18 @@ where
 
         // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
-        state.corpus().get(idx)?.borrow_mut().add_metadata(
-            SchedulerTestcaseMetaData::with_n_fuzz_entry(depth, self.last_hash),
-        );
+        {
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+                depth,
+                self.last_hash,
+            ));
+            testcase.set_parent_id_optional(current_idx);
+        }
 
         // TODO increase perf_score when finding new things like in AFL
         // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
 
-        // Recreate the alias table
-        self.create_alias_table(state)?;
-        Ok(())
-    }
-
-    fn on_replace(
-        &mut self,
-        state: &mut S,
-        idx: CorpusId,
-        _testcase: &Testcase<S::Input>,
-    ) -> Result<(), Error> {
-        // Recreate the alias table
-        self.on_add(state, idx)
-    }
-
-    fn on_remove(
-        &mut self,
-        state: &mut S,
-        _idx: CorpusId,
-        _testcase: &Option<Testcase<S::Input>>,
-    ) -> Result<(), Error> {
         // Recreate the alias table
         self.create_alias_table(state)?;
         Ok(())
@@ -360,10 +432,27 @@ where
                     })?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }
-            *state.corpus_mut().current_mut() = Some(idx);
 
-            // Update the handicap
+            self.set_current_scheduled(state, Some(idx))?;
+            Ok(idx)
+        }
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        let current_idx = *state.corpus().current();
+
+        if let Some(idx) = current_idx {
             let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            let scheduled_count = testcase.scheduled_count();
+
+            // increase scheduled count, this was fuzz_level in afl
+            testcase.set_scheduled_count(scheduled_count + 1);
+
             let tcmeta = testcase
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
@@ -376,8 +465,10 @@ where
             } else if tcmeta.handicap() > 0 {
                 tcmeta.set_handicap(tcmeta.handicap() - 1);
             }
-            Ok(idx)
         }
+
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 

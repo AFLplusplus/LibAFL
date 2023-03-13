@@ -60,21 +60,6 @@ pub trait HasCorpus: UsesInput {
     fn corpus_mut(&mut self) -> &mut Self::Corpus;
 }
 
-/// Trait for a state that has information about which [`CorpusId`]
-/// is currently being fuzzed.
-/// When a new interesting input was found, this value becomes the `parent_id`.
-pub trait HasFuzzedCorpusId {
-    /// The currently fuzzed [`CorpusId`], if known.
-    /// If a new interesting testcase was found, this should usually become the `parent_id`.
-    fn fuzzed_corpus_id(&self) -> Option<CorpusId>;
-
-    /// Sets the currently fuzzed [`CorpusId`].
-    fn set_fuzzed_corpus_id(&mut self, corpus_id: CorpusId);
-
-    /// Resets the currently fuzzed [`CorpusId`].
-    fn clear_fuzzed_corpus_id(&mut self);
-}
-
 /// Interact with the maximum size
 pub trait HasMaxSize {
     /// The maximum size hint for items and mutations returned
@@ -263,8 +248,6 @@ pub struct StdState<I, C, R, SC> {
     named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
-    /// The [`CorpusId`] of the testcase we're currently fuzzing.
-    fuzzed_corpus_id: Option<CorpusId>,
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
@@ -327,20 +310,6 @@ where
     #[inline]
     fn corpus_mut(&mut self) -> &mut Self::Corpus {
         &mut self.corpus
-    }
-}
-
-impl<I, C, R, SC> HasFuzzedCorpusId for StdState<I, C, R, SC> {
-    fn fuzzed_corpus_id(&self) -> Option<CorpusId> {
-        self.fuzzed_corpus_id
-    }
-
-    fn set_fuzzed_corpus_id(&mut self, fuzzed_corpus_id: CorpusId) {
-        self.fuzzed_corpus_id = Some(fuzzed_corpus_id);
-    }
-
-    fn clear_fuzzed_corpus_id(&mut self) {
-        self.fuzzed_corpus_id = None;
     }
 }
 
@@ -781,7 +750,6 @@ where
             corpus,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
-            fuzzed_corpus_id: None,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "std")]

@@ -24,10 +24,12 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasSolutions, StdState},
 };
-use libafl_targets::{DifferentialAFLMapSwapObserver, MAX_EDGES_NUM};
+use libafl_targets::{edges_max_num, DifferentialAFLMapSwapObserver};
+#[cfg(not(miri))]
 use mimalloc::MiMalloc;
 
 #[global_allocator]
+#[cfg(not(miri))]
 static GLOBAL: MiMalloc = MiMalloc;
 
 // bindings to the functions defined in the target
@@ -87,13 +89,15 @@ pub fn main() {
         }
     };
 
+    let num_edges: usize = edges_max_num();
+
     #[cfg(feature = "multimap")]
     let (first_map_observer, second_map_observer, map_swapper, map_observer) = {
         // initialize the maps
         unsafe {
-            let layout = Layout::from_size_align(MAX_EDGES_NUM, 64).unwrap();
-            FIRST_EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), MAX_EDGES_NUM);
-            SECOND_EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), MAX_EDGES_NUM);
+            let layout = Layout::from_size_align(num_edges, 64).unwrap();
+            FIRST_EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), num_edges);
+            SECOND_EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), num_edges);
             COMBINED_EDGES = [&mut FIRST_EDGES, &mut SECOND_EDGES];
         }
 
@@ -126,19 +130,18 @@ pub fn main() {
     let (first_map_observer, second_map_observer, map_swapper, map_observer) = {
         // initialize the map
         unsafe {
-            let layout = Layout::from_size_align(MAX_EDGES_NUM * 2, 64).unwrap();
-            EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), MAX_EDGES_NUM * 2);
+            let layout = Layout::from_size_align(num_edges * 2, 64).unwrap();
+            EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), num_edges * 2);
         }
 
         // create the base maps used to observe the different executors by splitting a slice
-        let mut first_map_observer = unsafe {
-            StdMapObserver::from_mut_ptr("first-edges", EDGES.as_mut_ptr(), MAX_EDGES_NUM)
-        };
+        let mut first_map_observer =
+            unsafe { StdMapObserver::from_mut_ptr("first-edges", EDGES.as_mut_ptr(), num_edges) };
         let mut second_map_observer = unsafe {
             StdMapObserver::from_mut_ptr(
                 "second-edges",
-                EDGES.as_mut_ptr().add(MAX_EDGES_NUM),
-                MAX_EDGES_NUM,
+                EDGES.as_mut_ptr().add(num_edges),
+                num_edges,
             )
         };
 
@@ -153,7 +156,7 @@ pub fn main() {
             HitcountsMapObserver::new(StdMapObserver::differential_from_mut_ptr(
                 "combined-edges",
                 EDGES.as_mut_ptr(),
-                MAX_EDGES_NUM * 2,
+                num_edges * 2,
             ))
         };
 

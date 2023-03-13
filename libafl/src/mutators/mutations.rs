@@ -1253,6 +1253,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // testing all mutators would be good but is way too slow. :/
     fn test_mutators() {
         let mut inputs = vec![
             BytesInput::new(vec![0x13, 0x37]),
@@ -1267,6 +1268,7 @@ mod tests {
         let mut state = test_state();
 
         let mut mutations = test_mutations();
+
         for _ in 0..2 {
             let mut new_testcases = vec![];
             for idx in 0..(mutations.len()) {
@@ -1294,7 +1296,10 @@ mod tests {
         let mut state = test_state();
         let mut mutator = BytesDeleteMutator::new();
 
-        for _ in 0..100000 {
+        // If we're running in miri, we have to make this test a _lot_ shorter.
+        let iters = if cfg!(miri) { 100 } else { 100_000 };
+
+        for _ in 0..iters {
             let mut mutated = base.clone();
             if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
                 continue;
@@ -1345,7 +1350,10 @@ mod tests {
         let mut state = test_state();
         let mut mutator = BytesExpandMutator::new();
 
-        for _ in 0..100000 {
+        // If we're running in miri, we have to make this test a _lot_ shorter.
+        let iters = if cfg!(miri) { 100 } else { 100_000 };
+
+        for _ in 0..iters {
             let mut mutated = base.clone();
             if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
                 continue;
@@ -1390,7 +1398,10 @@ mod tests {
         let mut state = test_state();
         let mut mutator = BytesInsertMutator::new();
 
-        for _ in 0..100000 {
+        // If we're running in miri, we have to make this test a _lot_ shorter.
+        let iters = if cfg!(miri) { 100 } else { 100_000 };
+
+        for _ in 0..iters {
             let mut mutated = base.clone();
             if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
                 continue;
@@ -1436,7 +1447,10 @@ mod tests {
         let mut state = test_state();
         let mut mutator = BytesRandInsertMutator::new();
 
-        for _ in 0..100000 {
+        // If we're running in miri, we have to make this test a _lot_ shorter.
+        let iters = if cfg!(miri) { 100 } else { 100_000 };
+
+        for _ in 0..iters {
             let mut mutated = base.clone();
             if mutator.mutate(&mut state, &mut mutated, 0)? == MutationResult::Skipped {
                 continue;
