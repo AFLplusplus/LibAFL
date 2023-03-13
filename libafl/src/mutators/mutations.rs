@@ -2,7 +2,6 @@
 
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{cmp::min, mem::size_of, ops::Range};
-use std::time::Instant;
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
@@ -472,8 +471,6 @@ interesting_mutator_impl!(ByteInterestingMutator, u8, INTERESTING_8);
 interesting_mutator_impl!(WordInterestingMutator, u16, INTERESTING_16);
 interesting_mutator_impl!(DwordInterestingMutator, u32, INTERESTING_32);
 
-pub static mut BYTE_DELETE_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut BYTE_DELETE_N : usize = 0;
 /// Bytes delete mutation for inputs with a bytes vector
 #[derive(Default, Debug)]
 pub struct BytesDeleteMutator;
@@ -489,7 +486,6 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let size = input.bytes().len();
         if size <= 2 {
             return Ok(MutationResult::Skipped);
@@ -501,12 +497,6 @@ where
         }
 
         input.bytes_mut().drain(range);
-
-        let end = std::time::Instant::now();
-        unsafe {
-            BYTE_DELETE_DURATION += end - start;
-            BYTE_DELETE_N += 1;
-        }
 
         Ok(MutationResult::Mutated)
     }
@@ -526,9 +516,6 @@ impl BytesDeleteMutator {
     }
 }
 
-pub static mut BYTE_EXPAND_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut BYTE_EXPAND_N: usize = 0;
-
 /// Bytes expand mutation for inputs with a bytes vector
 #[derive(Default, Debug)]
 pub struct BytesExpandMutator;
@@ -544,7 +531,6 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let max_size = state.max_size();
         let size = input.bytes().len();
         let remain = max_size - size;
@@ -560,11 +546,6 @@ where
         input.bytes_mut().resize(size + range.len(), 0);
         buffer_self_copy(input.bytes_mut(), range.start, range.start + range.len(), size - range.start);
 
-        let end = std::time::Instant::now();
-        unsafe {
-            BYTE_EXPAND_DURATION += end - start;
-            BYTE_EXPAND_N += 1;
-        }
         Ok(MutationResult::Mutated)
     }
 }
@@ -583,9 +564,6 @@ impl BytesExpandMutator {
     }
 }
 
-pub static mut BYTE_INSERT_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut BYTE_INSERT_N: usize = 0;
-
 /// Bytes insert mutation for inputs with a bytes vector
 #[derive(Default, Debug)]
 pub struct BytesInsertMutator;
@@ -601,7 +579,6 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let max_size = state.max_size();
         let size = input.bytes().len();
         if size == 0 || size >= max_size {
@@ -625,11 +602,6 @@ where
         buffer_self_copy(input.bytes_mut(), offset, offset + amount, size - offset);
         buffer_set(input.bytes_mut(), offset, amount, val);
 
-        let end = std::time::Instant::now();
-        unsafe {
-            BYTE_INSERT_DURATION += end - start;
-            BYTE_INSERT_N += 1;
-        }
         Ok(MutationResult::Mutated)
     }
 }
@@ -648,9 +620,6 @@ impl BytesInsertMutator {
     }
 }
 
-pub static mut BYTE_RAND_INSERT_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut BYTE_RAND_INSERT_N: usize = 0;
-
 /// Bytes random insert mutation for inputs with a bytes vector
 #[derive(Default, Debug)]
 pub struct BytesRandInsertMutator;
@@ -666,7 +635,6 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let max_size = state.max_size();
         let size = input.bytes().len();
         if size >= max_size {
@@ -690,12 +658,6 @@ where
         buffer_self_copy(input.bytes_mut(), offset, offset + amount, size - offset);
         buffer_set(input.bytes_mut(), offset, amount, val);
 
-        let end = std::time::Instant::now();
-        unsafe {
-            BYTE_RAND_INSERT_DURATION += end - start;
-            BYTE_RAND_INSERT_N += 1;
-        }
-
         Ok(MutationResult::Mutated)
     }
 }
@@ -714,9 +676,6 @@ impl BytesRandInsertMutator {
     }
 }
 
-pub static mut BYTE_SET_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut BYTE_SET_N: usize = 0;
-
 /// Bytes set mutation for inputs with a bytes vector
 #[derive(Default, Debug)]
 pub struct BytesSetMutator;
@@ -732,7 +691,6 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -745,12 +703,6 @@ where
         let val = *state.rand_mut().choose(input.bytes());
         let quantity = range.len();
         buffer_set(input.bytes_mut(), range.start, quantity, val);
-
-        let end = std::time::Instant::now();
-        unsafe {
-            BYTE_SET_DURATION += end - start;
-            BYTE_SET_N += 1;
-        }
 
         Ok(MutationResult::Mutated)
     }
@@ -770,9 +722,6 @@ impl BytesSetMutator {
     }
 }
 
-pub static mut BYTE_RAND_SET_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut BYTE_RAND_SET_N: usize = 0;
-
 /// Bytes random set mutation for inputs with a bytes vector
 #[derive(Default, Debug)]
 pub struct BytesRandSetMutator;
@@ -788,7 +737,6 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -802,12 +750,6 @@ where
         let quantity = range.len();
         buffer_set(input.bytes_mut(), range.start, quantity, val);
 
-
-        let end = std::time::Instant::now();
-        unsafe {
-            BYTE_RAND_SET_DURATION += end - start;
-            BYTE_RAND_SET_N += 1;
-        }
         Ok(MutationResult::Mutated)
     }
 }
@@ -826,9 +768,6 @@ impl BytesRandSetMutator {
     }
 }
 
-pub static mut BYTE_COPY_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut BYTE_COPY_N: usize = 0;
-
 /// Bytes copy mutation for inputs with a bytes vector
 #[derive(Default, Debug)]
 pub struct BytesCopyMutator;
@@ -844,7 +783,6 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let size = input.bytes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
@@ -855,11 +793,6 @@ where
 
         buffer_self_copy(input.bytes_mut(), range.start, target, range.len());
 
-        let end = std::time::Instant::now();
-        unsafe {
-            BYTE_COPY_DURATION += end - start;
-            BYTE_COPY_N += 1;
-        }
         Ok(MutationResult::Mutated)
     }
 }
@@ -878,9 +811,6 @@ impl BytesCopyMutator {
     }
 }
 
-pub static mut BYTE_INSERT_COPY_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut BYTE_INSERT_COPY_N: usize = 0;
-
 /// Bytes insert and self copy mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
 pub struct BytesInsertCopyMutator {
@@ -898,7 +828,6 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let size = input.bytes().len();
         if size <= 1 || size >= state.max_size() {
             return Ok(MutationResult::Skipped);
@@ -915,11 +844,6 @@ where
 
         buffer_self_copy(input.bytes_mut(), target, target + range.len(), size - target);
         buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, target, range.len());
-        let end = std::time::Instant::now();
-        unsafe {
-            BYTE_INSERT_COPY_DURATION += end - start;
-            BYTE_INSERT_COPY_N += 1;
-        }
         Ok(MutationResult::Mutated)
     }
 }
@@ -938,9 +862,6 @@ impl BytesInsertCopyMutator {
     }
 }
 
-pub static mut BYTE_SWAP_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut BYTE_SWAP_N: usize = 0;
-
 /// Bytes swap mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
 pub struct BytesSwapMutator {
@@ -958,7 +879,6 @@ where
         input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let size = input.bytes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
@@ -1001,11 +921,6 @@ where
                 // copy first back
                 buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, second.start, first.len());  
             }
-            let end = Instant::now();
-            unsafe {
-                BYTE_SWAP_DURATION += end - start;
-                BYTE_SWAP_N += 1;
-            }
             Ok(MutationResult::Mutated)
         } else if first.end != size {
 
@@ -1044,11 +959,6 @@ where
                 buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, first.start, second.len());
             }
 
-            let end = std::time::Instant::now();
-            unsafe {
-                BYTE_SWAP_DURATION += end - start;
-                BYTE_SWAP_N += 1;
-            }
             Ok(MutationResult::Mutated)
         } else {
             Ok(MutationResult::Skipped)
@@ -1070,9 +980,6 @@ impl BytesSwapMutator {
     }
 }
 
-pub static mut CROSSOVER_INSERT_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut CROSSOVER_INSERT_N: usize = 0;
-
 /// Crossover insert mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
 pub struct CrossoverInsertMutator;
@@ -1088,7 +995,6 @@ where
         input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let size = input.bytes().len();
         let max_size = state.max_size();
         if size >= max_size {
@@ -1124,11 +1030,6 @@ where
         input.bytes_mut().resize(size + range.len(), 0);
         buffer_self_copy(input.bytes_mut(), target, target + range.len(), size - target);
         buffer_copy(input.bytes_mut(), other.bytes(), range.start, target, range.len());
-        let end = std::time::Instant::now();
-        unsafe {
-            CROSSOVER_INSERT_DURATION += end - start;
-            CROSSOVER_INSERT_N += 1;
-        }
         Ok(MutationResult::Mutated)
     }
 }
@@ -1147,9 +1048,6 @@ impl CrossoverInsertMutator {
     }
 }
 
-pub static mut CROSSOVER_REPLACE_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut CROSSOVER_REPLACE_N: usize = 0;
-
 /// Crossover replace mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
 pub struct CrossoverReplaceMutator;
@@ -1165,7 +1063,6 @@ where
         input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let start = std::time::Instant::now();
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -1197,12 +1094,6 @@ where
         let other = other_testcase.load_input()?;
 
         buffer_copy(input.bytes_mut(), other.bytes(), range.start, target, range.len());
-        let end = std::time::Instant::now();
-        unsafe {
-            CROSSOVER_REPLACE_DURATION += end - start;
-            CROSSOVER_REPLACE_N += 1;
-        }
-
         Ok(MutationResult::Mutated)
     }
 }

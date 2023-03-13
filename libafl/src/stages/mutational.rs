@@ -11,17 +11,7 @@ use crate::{
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
-    mutators::{
-        mutations::{
-            BYTE_COPY_DURATION, BYTE_COPY_N, BYTE_DELETE_DURATION, BYTE_DELETE_N,
-            BYTE_EXPAND_DURATION, BYTE_EXPAND_N, BYTE_INSERT_COPY_DURATION, BYTE_INSERT_COPY_N,
-            BYTE_INSERT_DURATION, BYTE_INSERT_N, BYTE_RAND_INSERT_DURATION, BYTE_RAND_INSERT_N,
-            BYTE_RAND_SET_DURATION, BYTE_RAND_SET_N, BYTE_SET_DURATION, BYTE_SET_N,
-            BYTE_SWAP_DURATION, BYTE_SWAP_N, CROSSOVER_INSERT_DURATION, CROSSOVER_INSERT_N,
-            CROSSOVER_REPLACE_DURATION, CROSSOVER_REPLACE_N,
-        },
-        Mutator,
-    },
+    mutators::Mutator,
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
@@ -147,26 +137,6 @@ where
             post.post_exec(state, i as i32, corpus_idx)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
         }
-        unsafe {
-            if state.corpus().count() > 400 {
-                // dump all
-                println!("delete {:#?}", BYTE_DELETE_DURATION / BYTE_DELETE_N as u32);
-                println!("expand {:#?}", BYTE_EXPAND_DURATION / BYTE_EXPAND_N as u32);
-                println!("insert {:#?}", BYTE_INSERT_DURATION / BYTE_INSERT_N as u32);
-                println!("rand insert {:#?}", BYTE_RAND_INSERT_DURATION / BYTE_RAND_INSERT_N as u32);
-                println!("set {:#?}", BYTE_SET_DURATION / BYTE_SET_N as u32 );
-                println!("rand set {:#?}", BYTE_RAND_SET_DURATION / BYTE_RAND_SET_N as u32);
-                println!("copy {:#?}", BYTE_COPY_DURATION / BYTE_COPY_N as u32);
-                println!("insert copy {:#?}", BYTE_INSERT_COPY_DURATION / BYTE_INSERT_COPY_N as u32);
-                println!("swap {:#?}", BYTE_SWAP_DURATION / BYTE_SWAP_N as u32);
-                println!("crossover insert {:#?}", CROSSOVER_INSERT_DURATION / CROSSOVER_INSERT_N as u32);
-                println!("crossover replace {:#?}", CROSSOVER_REPLACE_DURATION / CROSSOVER_REPLACE_N as u32);
-                println!("");
-                panic!("dead");
-            }
-        }
-
-
         Ok(())
     }
 }
