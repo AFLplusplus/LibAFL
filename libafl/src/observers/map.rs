@@ -1814,14 +1814,12 @@ where
     #[must_use]
     fn new_maybe_differential(name: &'static str, maps: Vec<OwnedMutSlice<'a, T>>) -> Self {
         let mut idx = 0;
-        let mut v = 0;
         let mut builder = vec![];
-        for x in &maps {
+        for (v, x) in maps.iter().enumerate() {
             let l = x.as_slice().len();
             let r = (idx..(idx + l), v);
             idx += l;
             builder.push(r);
-            v += 1;
         }
         Self {
             maps,
