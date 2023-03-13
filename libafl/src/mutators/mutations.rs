@@ -2,7 +2,7 @@
 
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{cmp::min, mem::size_of, ops::Range};
-use std::{cmp::max, time::Instant};
+use std::time::Instant;
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
@@ -473,7 +473,7 @@ interesting_mutator_impl!(WordInterestingMutator, u16, INTERESTING_16);
 interesting_mutator_impl!(DwordInterestingMutator, u32, INTERESTING_32);
 
 pub static mut BYTE_DELETE_DURATION: std::time::Duration = std::time::Duration::new(0, 0);
-pub static mut BYTE_DELETE_N: usize = 0;
+pub static mut BYTE_DELETE_N : usize = 0;
 /// Bytes delete mutation for inputs with a bytes vector
 #[derive(Default, Debug)]
 pub struct BytesDeleteMutator;
@@ -558,12 +558,7 @@ where
         }
 
         input.bytes_mut().resize(size + range.len(), 0);
-        buffer_self_copy(
-            input.bytes_mut(),
-            range.start,
-            range.start + range.len(),
-            size - range.start,
-        );
+        buffer_self_copy(input.bytes_mut(), range.start, range.start + range.len(), size - range.start);
 
         let end = std::time::Instant::now();
         unsafe {
@@ -807,6 +802,7 @@ where
         let quantity = range.len();
         buffer_set(input.bytes_mut(), range.start, quantity, val);
 
+
         let end = std::time::Instant::now();
         unsafe {
             BYTE_RAND_SET_DURATION += end - start;
@@ -915,20 +911,9 @@ where
 
         input.bytes_mut().resize(size + range.len(), 0);
         self.tmp_buf.resize(range.len(), 0);
-        buffer_copy(
-            &mut self.tmp_buf,
-            input.bytes(),
-            range.start,
-            0,
-            range.len(),
-        );
+        buffer_copy(&mut self.tmp_buf, input.bytes(), range.start, 0, range.len());
 
-        buffer_self_copy(
-            input.bytes_mut(),
-            target,
-            target + range.len(),
-            size - target,
-        );
+        buffer_self_copy(input.bytes_mut(), target, target + range.len(), size - target);
         buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, target, range.len());
         let end = std::time::Instant::now();
         unsafe {
@@ -958,7 +943,9 @@ pub static mut BYTE_SWAP_N: usize = 0;
 
 /// Bytes swap mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
-pub struct BytesSwapMutator {}
+pub struct BytesSwapMutator {
+    tmp_buf: Vec<u8>,
+}
 
 impl<I, S> Mutator<I, S> for BytesSwapMutator
 where
@@ -978,41 +965,94 @@ where
         }
 
         let first = rand_range(state, size, size);
-        let second = if state.rand_mut().next() & 1 == 0 && first.start != 0 {
+        if state.rand_mut().next() & 1 == 0 && first.start != 0 {
             // The second range comes before first.
-            rand_range(state, first.start, first.start)
-        } else if first.end != size {
-            // The first range comes before the second range
-            let unshifted = rand_range(state, size - first.end, size - first.end);
-            (unshifted.start + first.end)..(unshifted.end + first.end)
-        } else {
-            return Ok(MutationResult::Skipped);
-        };
 
-        if first.len() != second.len() {
-            let between = min(first.end, second.end)..max(first.start, second.start);
-            input.bytes_mut()[first.clone()].reverse();
-            input.bytes_mut()[between].reverse();
-            input.bytes_mut()[second.clone()].reverse();
-            input.bytes_mut()[min(first.start, second.start)..max(first.end, second.end)].reverse();
-        } else {
-            let len = first.len();
-            // they are equal; we can do a direct swap
-            unsafe {
-                core::ptr::swap_nonoverlapping(
-                    input.bytes_mut()[first].as_mut_ptr(),
-                    input.bytes_mut()[second].as_mut_ptr(),
-                    len,
-                );
+            let second = rand_range(state, first.start, first.start);
+            self.tmp_buf.resize(first.len(), 0);
+            // If range first is larger
+            if first.len() >= second.len() {
+                let diff_in_size = first.len() - second.len();
+                
+                // copy first range to tmp
+                buffer_copy(&mut self.tmp_buf, input.bytes(), first.start, 0, first.len());
+
+                // adjust second.end..first.start, move them by diff_in_size to the right
+                buffer_self_copy(input.bytes_mut(), second.end, second.end + diff_in_size, first.start - second.end);
+
+                // copy second to where first was
+                buffer_self_copy(input.bytes_mut(), second.start, first.start + diff_in_size, second.len());
+
+                // copy first back
+                buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, second.start, first.len());
             }
-        }
+            else {
+                let diff_in_size = second.len() - first.len();
 
-        let end = Instant::now();
-        unsafe {
-            BYTE_SWAP_DURATION += end - start;
-            BYTE_SWAP_N += 1;
+                // copy first range to tmp
+                buffer_copy(&mut self.tmp_buf, input.bytes(), first.start, 0, first.len());
+
+                // adjust second.end..first.start, move them by diff_in_size to the left
+                buffer_self_copy(input.bytes_mut(), second.end, second.end - diff_in_size, first.start - second.end);
+
+                // copy second to where first was
+                buffer_self_copy(input.bytes_mut(), second.start, first.start - diff_in_size, second.len());
+
+                // copy first back
+                buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, second.start, first.len());  
+            }
+            let end = Instant::now();
+            unsafe {
+                BYTE_SWAP_DURATION += end - start;
+                BYTE_SWAP_N += 1;
+            }
+            Ok(MutationResult::Mutated)
+        } else if first.end != size {
+
+            // The first range comes before the second range
+            let mut second = rand_range(state, size - first.end, size - first.end);
+            second.start += first.end;
+            second.end += first.end;
+
+            self.tmp_buf.resize(second.len(), 0);
+            if second.len() >= first.len() {
+                let diff_in_size = second.len() - first.len();
+                // copy second range to tmp
+                buffer_copy(&mut self.tmp_buf, input.bytes(), second.start, 0, second.len());
+
+                // adjust first.end..second.start, move them by diff_in_size to the right
+                buffer_self_copy(input.bytes_mut(), first.end, first.end + diff_in_size, second.start - first.end);
+
+                // copy first to where second was
+                buffer_self_copy(input.bytes_mut(), first.start, second.start + diff_in_size, first.len());
+
+                // copy second back
+                buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, first.start, second.len());
+            }
+            else {
+                let diff_in_size = first.len() - second.len();
+                // copy second range to tmp
+                buffer_copy(&mut self.tmp_buf, input.bytes(), second.start, 0, second.len());
+
+                // adjust first.end..second.start, move them by diff_in_size to the left
+                buffer_self_copy(input.bytes_mut(), first.end, first.end - diff_in_size, second.start - first.end);
+
+                // copy first to where second was
+                buffer_self_copy(input.bytes_mut(), first.start, second.start - diff_in_size, first.len());
+
+                // copy second back
+                buffer_copy(input.bytes_mut(), &self.tmp_buf, 0, first.start, second.len());
+            }
+
+            let end = std::time::Instant::now();
+            unsafe {
+                BYTE_SWAP_DURATION += end - start;
+                BYTE_SWAP_N += 1;
+            }
+            Ok(MutationResult::Mutated)
+        } else {
+            Ok(MutationResult::Skipped)
         }
-        Ok(MutationResult::Mutated)
     }
 }
 
@@ -1082,19 +1122,8 @@ where
         let other = other_testcase.load_input()?;
 
         input.bytes_mut().resize(size + range.len(), 0);
-        buffer_self_copy(
-            input.bytes_mut(),
-            target,
-            target + range.len(),
-            size - target,
-        );
-        buffer_copy(
-            input.bytes_mut(),
-            other.bytes(),
-            range.start,
-            target,
-            range.len(),
-        );
+        buffer_self_copy(input.bytes_mut(), target, target + range.len(), size - target);
+        buffer_copy(input.bytes_mut(), other.bytes(), range.start, target, range.len());
         let end = std::time::Instant::now();
         unsafe {
             CROSSOVER_INSERT_DURATION += end - start;
@@ -1167,13 +1196,7 @@ where
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input()?;
 
-        buffer_copy(
-            input.bytes_mut(),
-            other.bytes(),
-            range.start,
-            target,
-            range.len(),
-        );
+        buffer_copy(input.bytes_mut(), other.bytes(), range.start, target, range.len());
         let end = std::time::Instant::now();
         unsafe {
             CROSSOVER_REPLACE_DURATION += end - start;
