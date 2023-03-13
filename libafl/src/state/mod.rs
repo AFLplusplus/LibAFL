@@ -1,9 +1,8 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use core::{cell::Ref, fmt::Debug, marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::{
-    cell::Ref,
     fs,
     path::{Path, PathBuf},
     vec::Vec,
