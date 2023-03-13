@@ -63,7 +63,7 @@ pub unsafe fn lib(main: extern "C" fn(isize, *const *const u8) -> isize) {
         let argv: [*const u8; 3] = [
             null(), // dummy value
             len.as_ptr() as _,
-            buf.as_ptr() as _
+            buf.as_ptr() as _,
         ];
 
         main(3, argv.as_ptr());
