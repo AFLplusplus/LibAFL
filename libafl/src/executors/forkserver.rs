@@ -32,7 +32,7 @@ use crate::{
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::Prepend,
-        AsMutSlice, AsSlice,
+        AsMutSlice, AsSlice, Truncate,
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, UsesInput},
@@ -653,7 +653,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         other_observers: OT,
     ) -> Result<ForkserverExecutor<(MO, OT), S, SP>, Error>
     where
-        MO: Observer<S> + MapObserver, // TODO maybe enforce Entry = u8 for the cov map
+        MO: Observer<S> + MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
         OT: ObserversTuple<S> + Prepend<MO, PreprendResult = OT>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
@@ -671,7 +671,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         );
 
         if let Some(dynamic_map_size) = self.map_size {
-            map_observer.downsize_map(dynamic_map_size);
+            map_observer.truncate(dynamic_map_size);
         }
 
         let observers: (MO, OT) = other_observers.prepend(map_observer);

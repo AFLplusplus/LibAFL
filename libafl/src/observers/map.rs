@@ -21,7 +21,7 @@ use crate::{
     bolts::{
         ownedref::{OwnedMutPtr, OwnedMutSlice},
         tuples::Named,
-        AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen,
+        AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Truncate,
     },
     executors::ExitKind,
     inputs::UsesInput,
@@ -116,12 +116,6 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
 
     /// Get the number of set entries with the specified indexes
     fn how_many_set(&self, indexes: &[usize]) -> usize;
-
-    /// Resize the inner map to be smaller (and thus faster to process)
-    /// It returns Some(old size) on success, None on failure
-    fn downsize_map(&mut self, _new_len: usize) -> Option<usize> {
-        None
-    }
 }
 
 /// A Simple iterator calling `MapObserver::get`
@@ -410,9 +404,21 @@ where
         }
         res
     }
+}
 
-    fn downsize_map(&mut self, new_len: usize) -> Option<usize> {
-        self.map.downsize(new_len)
+impl<'a, T, const DIFFERENTIAL: bool> Truncate for StdMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    fn truncate(&mut self, new_len: usize) {
+        self.map.truncate(new_len);
     }
 }
 
@@ -1316,9 +1322,14 @@ where
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         self.base.how_many_set(indexes)
     }
+}
 
-    fn downsize_map(&mut self, new_len: usize) -> Option<usize> {
-        self.base.downsize_map(new_len)
+impl<M> Truncate for HitcountsMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned + Truncate,
+{
+    fn truncate(&mut self, new_len: usize) {
+        self.base.truncate(new_len);
     }
 }
 
@@ -1539,9 +1550,14 @@ where
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         self.base.how_many_set(indexes)
     }
+}
 
-    fn downsize_map(&mut self, new_len: usize) -> Option<usize> {
-        self.base.downsize_map(new_len)
+impl<M> Truncate for HitcountsIterableMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned + Truncate,
+{
+    fn truncate(&mut self, new_len: usize) {
+        self.base.truncate(new_len);
     }
 }
 
