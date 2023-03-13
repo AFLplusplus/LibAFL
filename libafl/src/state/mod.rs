@@ -3,6 +3,7 @@
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::{
+    cell::Ref,
     fs,
     path::{Path, PathBuf},
     vec::Vec,
@@ -17,7 +18,7 @@ use crate::{
         rands::Rand,
         serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     },
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -212,16 +213,12 @@ pub trait HasStartTime {
     fn start_time_mut(&mut self) -> &mut Duration;
 }
 
-use std::cell::Ref;
-use crate::corpus::Testcase;
-
+/// Trait for the testcase
 pub trait HasTestcase: HasCorpus {
-
+    /// To get the testcase
     fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
-        let testcase = self.corpus().get(id)?.borrow();
-
-        Ok(testcase)
-    }   
+        Ok(self.corpus().get(id)?.borrow())
+    }
 }
 
 /// The state a fuzz run.
