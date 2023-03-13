@@ -12,7 +12,7 @@ echo "Cargo-make not integrated yet on this"
 # libpng
 [tasks.libpng]
 linux_alias = "libpng_unix"
-mac_alias = "libpng_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.libpng_unix]
@@ -26,7 +26,7 @@ tar -xvf libpng-1.6.37.tar.xz
 # Library
 [tasks.lib]
 linux_alias = "lib_unix"
-mac_alias = "lib_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.lib_unix]
@@ -41,7 +41,7 @@ dependencies = [ "libpng" ]
 # Harness
 [tasks.harness]
 linux_alias = "harness_unix"
-mac_alias = "harness_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.harness_unix]
@@ -55,7 +55,7 @@ dependencies = [ "lib" ]
 # Fuzzer
 [tasks.fuzzer]
 linux_alias = "fuzzer_unix"
-mac_alias = "fuzzer_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
@@ -67,7 +67,7 @@ cargo build --release
 # Run the fuzzer
 [tasks.run]
 linux_alias = "run_unix"
-mac_alias = "run_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.run_unix]
@@ -80,7 +80,7 @@ dependencies = [ "fuzzer", "harness" ]
 # Test
 [tasks.test]
 linux_alias = "test_unix"
-mac_alias = "test_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
@@ -101,7 +101,7 @@ dependencies = [ "fuzzer", "harness" ]
 # Clean up
 [tasks.clean]
 linux_alias = "clean_unix"
-mac_alias = "clean_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.clean_unix]
