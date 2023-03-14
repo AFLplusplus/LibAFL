@@ -10,7 +10,7 @@ use core::{clone::Clone, fmt::Debug, slice};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::bolts::{AsMutSlice, AsSlice};
+use crate::bolts::{AsMutSlice, AsSlice, Truncate};
 
 /// Trait to convert into an Owned type
 pub trait IntoOwned {
@@ -23,20 +23,14 @@ pub trait IntoOwned {
     fn into_owned(self) -> Self;
 }
 
-/// Trait to downsize slice references
-pub trait DownsizeSlice {
-    /// Reduce the size of the slice
-    fn downsize(&mut self, len: usize);
-}
-
-impl<'a, T> DownsizeSlice for &'a [T] {
-    fn downsize(&mut self, len: usize) {
+impl<'a, T> Truncate for &'a [T] {
+    fn truncate(&mut self, len: usize) {
         *self = &self[..len];
     }
 }
 
-impl<'a, T> DownsizeSlice for &'a mut [T] {
-    fn downsize(&mut self, len: usize) {
+impl<'a, T> Truncate for &'a mut [T] {
+    fn truncate(&mut self, len: usize) {
         let mut value = core::mem::take(self);
         value = unsafe { value.get_unchecked_mut(..len) };
         let _: &mut [T] = core::mem::replace(self, value);
@@ -260,8 +254,8 @@ impl<'a, T> OwnedSlice<'a, T> {
         }
     }
 
-    /// Downsize the inner slice or vec returning the old size on success or `None` on failure
-    pub fn downsize(&mut self, new_len: usize) -> Option<usize> {
+    /// Truncate the inner slice or vec returning the old size on success or `None` on failure
+    pub fn truncate(&mut self, new_len: usize) -> Option<usize> {
         match &mut self.inner {
             OwnedSliceInner::RefRaw(_rr, len) => {
                 let tmp = *len;
@@ -275,7 +269,7 @@ impl<'a, T> OwnedSlice<'a, T> {
             OwnedSliceInner::Ref(r) => {
                 let tmp = r.len();
                 if new_len <= tmp {
-                    r.downsize(new_len);
+                    r.truncate(new_len);
                     Some(tmp)
                 } else {
                     None
@@ -483,8 +477,8 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
         }
     }
 
-    /// Downsize the inner slice or vec returning the old size on success or `None` on failure
-    pub fn downsize(&mut self, new_len: usize) -> Option<usize> {
+    /// Truncate the inner slice or vec returning the old size on success or `None` on failure
+    pub fn truncate(&mut self, new_len: usize) -> Option<usize> {
         match &mut self.inner {
             OwnedMutSliceInner::RefRaw(_rr, len) => {
                 let tmp = *len;
@@ -498,7 +492,7 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
             OwnedMutSliceInner::Ref(r) => {
                 let tmp = r.len();
                 if new_len <= tmp {
-                    r.downsize(new_len);
+                    r.truncate(new_len);
                     Some(tmp)
                 } else {
                     None
