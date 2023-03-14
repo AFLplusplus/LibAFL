@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{current_time, tuples::Named, AsIter},
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverName},
@@ -251,7 +251,7 @@ where
                 .corpus()
                 .get(corpus_idx)?
                 .borrow()
-                .has_metadata::<SchedulerTestcaseMetaData>();
+                .has_metadata::<SchedulerTestcaseMetadata>();
 
         if use_powerschedule {
             let map = executor
@@ -279,9 +279,9 @@ where
 
             let data = testcase
                 .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .get_mut::<SchedulerTestcaseMetadata>()
                 .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
                 })?;
 
             data.set_cycle_and_time((total_time, iter));

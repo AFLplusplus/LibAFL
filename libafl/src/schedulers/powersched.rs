@@ -9,7 +9,7 @@ use core::{marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::{RemovableScheduler, Scheduler},
@@ -192,9 +192,9 @@ where
     ) -> Result<(), Error> {
         let prev_meta = prev
             .metadata()
-            .get::<SchedulerTestcaseMetaData>()
+            .get::<SchedulerTestcaseMetadata>()
             .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
             })?;
 
         // Next depth is + 1
@@ -221,7 +221,7 @@ where
             .corpus()
             .get(idx)?
             .borrow_mut()
-            .add_metadata(SchedulerTestcaseMetaData::new(prev_depth));
+            .add_metadata(SchedulerTestcaseMetadata::new(prev_depth));
         Ok(())
     }
 
@@ -240,9 +240,9 @@ where
 
         let prev_meta = prev
             .metadata()
-            .get::<SchedulerTestcaseMetaData>()
+            .get::<SchedulerTestcaseMetadata>()
             .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
             })?;
 
         // Use these to adjust `SchedulerMetadata`
@@ -280,9 +280,9 @@ where
                 .get(parent_idx)?
                 .borrow()
                 .metadata()
-                .get::<SchedulerTestcaseMetaData>()
+                .get::<SchedulerTestcaseMetadata>()
                 .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
                 })?
                 .depth(),
             None => 0,
@@ -291,10 +291,10 @@ where
         // TODO increase perf_score when finding new things like in AFL
         // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
 
-        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
+        // Attach a `SchedulerTestcaseMetadata` to the queue entry.
         depth += 1;
         let mut testcase = state.corpus().get(idx)?.borrow_mut();
-        testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+        testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
             depth,
             self.last_hash,
         ));
@@ -375,9 +375,9 @@ where
 
             let tcmeta = testcase
                 .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .get_mut::<SchedulerTestcaseMetadata>()
                 .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
                 })?;
 
             if tcmeta.handicap() >= 4 {

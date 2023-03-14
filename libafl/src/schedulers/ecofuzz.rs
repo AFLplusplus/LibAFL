@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::{powersched::SchedulerMetadata, testcase_score::TestcaseScore, Scheduler},
@@ -275,19 +275,19 @@ where
                 .get(parent_idx)?
                 .borrow_mut()
                 .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .get_mut::<SchedulerTestcaseMetadata>()
                 .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
                 })?
                 .depth(),
             None => 0,
         };
 
-        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
+        // Attach a `SchedulerTestcaseMetadata` to the queue entry.
         depth += 1;
         {
             let mut testcase = state.corpus().get(idx)?.borrow_mut();
-            testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+            testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
                 depth,
                 self.last_hash,
             ));
@@ -351,9 +351,9 @@ where
                 .get(id)?
                 .borrow()
                 .metadata()
-                .get::<SchedulerTestcaseMetaData>()
+                .get::<SchedulerTestcaseMetadata>()
                 .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
                 })?
                 .n_fuzz_entry();
             if entry == hash {
