@@ -145,7 +145,7 @@ where
 
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state
-            .metadata()
+            .metadata_map()
             .get::<TopAccountingMetadata>()
             .map_or(false, |x| x.changed)
         {
@@ -207,7 +207,7 @@ where
 
                 let mut equal_score = false;
                 {
-                    let top_acc = state.metadata().get::<TopAccountingMetadata>().unwrap();
+                    let top_acc = state.metadata_map().get::<TopAccountingMetadata>().unwrap();
 
                     if let Some(old_idx) = top_acc.map.get(&idx) {
                         if top_acc.max_accounting[idx] > self.accounting_map[idx] {
@@ -220,7 +220,7 @@ where
 
                         let mut old = state.corpus().get(*old_idx)?.borrow_mut();
                         let must_remove = {
-                            let old_meta = old.metadata_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
+                            let old_meta = old.metadata_map_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
                                 Error::key_not_found(format!(
                                     "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{old_idx}"
                                 ))
@@ -230,13 +230,13 @@ where
                         };
 
                         if must_remove {
-                            drop(old.metadata_mut().remove::<AccountingIndexesMetadata>());
+                            drop(old.metadata_map_mut().remove::<AccountingIndexesMetadata>());
                         }
                     }
                 }
 
                 let top_acc = state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<TopAccountingMetadata>()
                     .unwrap();
 
@@ -255,12 +255,18 @@ where
             return Ok(());
         }
 
-        state.corpus().get(idx)?.borrow_mut().metadata_mut().insert(
-            AccountingIndexesMetadata::with_tcref(indexes, new_favoreds.len() as isize),
-        );
+        state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .metadata_map_mut()
+            .insert(AccountingIndexesMetadata::with_tcref(
+                indexes,
+                new_favoreds.len() as isize,
+            ));
 
         let top_acc = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<TopAccountingMetadata>()
             .unwrap();
         top_acc.changed = true;
@@ -275,7 +281,7 @@ where
     /// Cull the `Corpus`
     #[allow(clippy::unused_self)]
     pub fn accounting_cull(&self, state: &mut CS::State) -> Result<(), Error> {
-        let Some(top_rated) = state.metadata().get::<TopAccountingMetadata>() else { return Ok(()) };
+        let Some(top_rated) = state.metadata_map().get::<TopAccountingMetadata>() else { return Ok(()) };
 
         for (_key, idx) in &top_rated.map {
             let mut entry = state.corpus().get(*idx)?.borrow_mut();
@@ -292,7 +298,7 @@ where
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved Testcases of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     pub fn new(state: &mut CS::State, base: CS, accounting_map: &'a [u32]) -> Self {
-        match state.metadata().get::<TopAccountingMetadata>() {
+        match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
                     state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
@@ -317,7 +323,7 @@ where
         skip_non_favored_prob: u64,
         accounting_map: &'a [u32],
     ) -> Self {
-        match state.metadata().get::<TopAccountingMetadata>() {
+        match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
                     state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));

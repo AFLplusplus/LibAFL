@@ -138,11 +138,14 @@ where
         S: HasMetadata,
     {
         #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-        let meta = if let Some(meta) = state.metadata_mut().get_mut::<CmpValuesMetadata>() {
+        let meta = if let Some(meta) = state.metadata_map_mut().get_mut::<CmpValuesMetadata>() {
             meta
         } else {
             state.add_metadata(CmpValuesMetadata::new());
-            state.metadata_mut().get_mut::<CmpValuesMetadata>().unwrap()
+            state
+                .metadata_map_mut()
+                .get_mut::<CmpValuesMetadata>()
+                .unwrap()
         };
         meta.list.clear();
         let count = self.usable_count();
@@ -390,12 +393,13 @@ where
         S: HasMetadata,
     {
         #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-        let meta = if let Some(meta) = state.metadata_mut().get_mut::<AFLppCmpValuesMetadata>() {
+        let meta = if let Some(meta) = state.metadata_map_mut().get_mut::<AFLppCmpValuesMetadata>()
+        {
             meta
         } else {
             state.add_metadata(AFLppCmpValuesMetadata::new());
             state
-                .metadata_mut()
+                .metadata_map_mut()
                 .get_mut::<AFLppCmpValuesMetadata>()
                 .unwrap()
         };

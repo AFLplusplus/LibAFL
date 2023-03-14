@@ -61,7 +61,7 @@ where
                 .get(corpus_idx)
                 .unwrap()
                 .borrow_mut()
-                .metadata_mut()
+                .metadata_map_mut()
                 .insert(metadata);
         }
         Ok(())
@@ -367,14 +367,15 @@ where
         let testcase = state.corpus().get(corpus_idx)?.clone();
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
-        let mutations = if let Some(meta) = testcase.borrow().metadata().get::<ConcolicMetadata>() {
-            start_timer!(state);
-            let mutations = generate_mutations(meta.iter_messages());
-            mark_feature_time!(state, PerfFeature::Mutate);
-            Some(mutations)
-        } else {
-            None
-        };
+        let mutations =
+            if let Some(meta) = testcase.borrow().metadata_map().get::<ConcolicMetadata>() {
+                start_timer!(state);
+                let mutations = generate_mutations(meta.iter_messages());
+                mark_feature_time!(state, PerfFeature::Mutate);
+                Some(mutations)
+            } else {
+                None
+            };
 
         if let Some(mutations) = mutations {
             let input = { testcase.borrow().input().as_ref().unwrap().clone() };

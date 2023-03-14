@@ -304,7 +304,7 @@ where
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let tokens_len = {
-            let meta = state.metadata().get::<Tokens>();
+            let meta = state.metadata_map().get::<Tokens>();
             if meta.is_none() {
                 return Ok(MutationResult::Skipped);
             }
@@ -318,7 +318,7 @@ where
         let size = input.bytes().len();
         let off = state.rand_mut().below((size + 1) as u64) as usize;
 
-        let meta = state.metadata().get::<Tokens>().unwrap();
+        let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
         let mut len = token.len();
 
@@ -374,7 +374,7 @@ where
         }
 
         let tokens_len = {
-            let meta = state.metadata().get::<Tokens>();
+            let meta = state.metadata_map().get::<Tokens>();
             if meta.is_none() {
                 return Ok(MutationResult::Skipped);
             }
@@ -387,7 +387,7 @@ where
 
         let off = state.rand_mut().below(size as u64) as usize;
 
-        let meta = state.metadata().get::<Tokens>().unwrap();
+        let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
         let mut len = token.len();
         if off + len > size {
@@ -437,7 +437,7 @@ where
         }
 
         let cmps_len = {
-            let meta = state.metadata().get::<CmpValuesMetadata>();
+            let meta = state.metadata_map().get::<CmpValuesMetadata>();
             if meta.is_none() {
                 return Ok(MutationResult::Skipped);
             }
@@ -452,7 +452,7 @@ where
         let len = input.bytes().len();
         let bytes = input.bytes_mut();
 
-        let meta = state.metadata().get::<CmpValuesMetadata>().unwrap();
+        let meta = state.metadata_map().get::<CmpValuesMetadata>().unwrap();
         let cmp_values = &meta.list[idx];
 
         let mut result = MutationResult::Skipped;
@@ -1077,8 +1077,8 @@ where
         }
 
         let (cmp_len, cmp_meta, taint_meta) = {
-            let cmp_meta = state.metadata().get::<AFLppCmpValuesMetadata>();
-            let taint_meta = state.metadata().get::<TaintMetadata>();
+            let cmp_meta = state.metadata_map().get::<AFLppCmpValuesMetadata>();
+            let taint_meta = state.metadata_map().get::<TaintMetadata>();
             if cmp_meta.is_none() || taint_meta.is_none() {
                 return Ok(MutationResult::Skipped);
             }

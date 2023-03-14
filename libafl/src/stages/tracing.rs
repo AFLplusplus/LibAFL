@@ -178,7 +178,7 @@ where
             .post_exec_all(state, &unmutated_input, &exit_kind)?;
 
         // Second run with the mutated input
-        let mutated_input = match state.metadata().get::<TaintMetadata>() {
+        let mutated_input = match state.metadata_map().get::<TaintMetadata>() {
             Some(meta) => BytesInput::from(meta.input_vec().as_ref()),
             None => return Err(Error::unknown("No metadata found")),
         };
