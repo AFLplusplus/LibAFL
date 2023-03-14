@@ -838,11 +838,11 @@ impl<I> HasExecutions for NopState<I> {
 
 #[cfg(test)]
 impl<I> HasMetadata for NopState<I> {
-    fn metadata(&self) -> &SerdeAnyMap {
+    fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
 }
