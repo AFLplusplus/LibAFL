@@ -34,7 +34,10 @@ where
             let rand2 = state.rand_mut().next() as usize;
 
             let other_testcase = state.corpus().get(idx)?.borrow();
-            if let Some(other) = other_testcase.metadata().get::<GeneralizedInputMetadata>() {
+            if let Some(other) = other_testcase
+                .metadata_map()
+                .get::<GeneralizedInputMetadata>()
+            {
                 let gen = other.generalized();
 
                 for (i, _) in gen
@@ -64,7 +67,7 @@ where
 
         let rand1 = state.rand_mut().next() as usize;
 
-        if let Some(meta) = state.metadata().get::<Tokens>() {
+        if let Some(meta) = state.metadata_map().get::<Tokens>() {
             if !meta.tokens().is_empty() {
                 let tok = &meta.tokens()[rand1 % meta.tokens().len()];
                 if items.last() != Some(&GeneralizedItem::Gap) {
@@ -82,7 +85,10 @@ where
     }
 
     let other_testcase = state.corpus().get(idx)?.borrow();
-    if let Some(other) = other_testcase.metadata().get::<GeneralizedInputMetadata>() {
+    if let Some(other) = other_testcase
+        .metadata_map()
+        .get::<GeneralizedInputMetadata>()
+    {
         let gen = other.generalized();
 
         if items.last() == Some(&GeneralizedItem::Gap) && gen.first() == Some(&GeneralizedItem::Gap)
@@ -232,7 +238,7 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let tokens_len = {
-            let meta = state.metadata().get::<Tokens>();
+            let meta = state.metadata_map().get::<Tokens>();
             if let Some(tokens) = meta {
                 if tokens.is_empty() {
                     return Ok(MutationResult::Skipped);
@@ -252,7 +258,7 @@ where
         let stop_at_first = state.rand_mut().below(100) > 50;
         let mut rand_idx = state.rand_mut().next() as usize;
 
-        let meta = state.metadata().get::<Tokens>().unwrap();
+        let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token_1 = &meta.tokens()[token_find];
         let token_2 = &meta.tokens()[token_replace];
 
