@@ -1,7 +1,7 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
 pub mod testcase;
-pub use testcase::{SchedulerTestcaseMetaData, Testcase};
+pub use testcase::{SchedulerTestcaseMetadata, Testcase};
 
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;

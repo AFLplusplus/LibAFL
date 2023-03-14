@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 
 use crate::{
     bolts::{HasLen, HasRefCnt},
-    corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, SchedulerTestcaseMetadata, Testcase},
     feedbacks::MapIndexesMetadata,
     schedulers::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
@@ -81,10 +81,10 @@ where
                     let n_fuzz_entry = if cur_index == idx {
                         entry
                             .metadata_map()
-                            .get::<SchedulerTestcaseMetaData>()
+                            .get::<SchedulerTestcaseMetadata>()
                             .ok_or_else(|| {
                                 Error::key_not_found(
-                                    "SchedulerTestcaseMetaData not found".to_string(),
+                                    "SchedulerTestcaseMetadata not found".to_string(),
                                 )
                             })?
                             .n_fuzz_entry()
@@ -93,10 +93,10 @@ where
                             .get(idx)?
                             .borrow()
                             .metadata_map()
-                            .get::<SchedulerTestcaseMetaData>()
+                            .get::<SchedulerTestcaseMetadata>()
                             .ok_or_else(|| {
                                 Error::key_not_found(
-                                    "SchedulerTestcaseMetaData not found".to_string(),
+                                    "SchedulerTestcaseMetadata not found".to_string(),
                                 )
                             })?
                             .n_fuzz_entry()
@@ -130,9 +130,9 @@ where
         let favored = entry.has_metadata::<IsFavoredMetadata>();
         let tcmeta = entry
             .metadata_map()
-            .get::<SchedulerTestcaseMetaData>()
+            .get::<SchedulerTestcaseMetadata>()
             .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
             })?;
 
         if q_exec_us * 0.1 > avg_exec_us {
@@ -302,9 +302,9 @@ where
 
         let tcmeta = entry
             .metadata_map()
-            .get::<SchedulerTestcaseMetaData>()
+            .get::<SchedulerTestcaseMetadata>()
             .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
             })?;
 
         // This means that this testcase has never gone through the calibration stage before1,
