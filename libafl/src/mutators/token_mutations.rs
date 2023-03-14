@@ -1077,8 +1077,8 @@ where
         }
 
         let (cmp_len, cmp_meta, taint_meta) = {
-            let cmp_meta = state.metadata().get::<AFLppCmpValuesMetadata>();
-            let taint_meta = state.metadata().get::<TaintMetadata>();
+            let cmp_meta = state.metadata_map().get::<AFLppCmpValuesMetadata>();
+            let taint_meta = state.metadata_map().get::<TaintMetadata>();
             if cmp_meta.is_none() || taint_meta.is_none() {
                 return Ok(MutationResult::Skipped);
             }
