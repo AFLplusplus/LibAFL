@@ -269,7 +269,7 @@ where
             }
         }
 
-        if let Some(meta) = state.metadata_mut().get_mut::<TaintMetadata>() {
+        if let Some(meta) = state.metadata_map_mut().get_mut::<TaintMetadata>() {
             meta.update(input.bytes().to_vec(), res);
 
             // println!("meta: {:#?}", meta);

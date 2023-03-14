@@ -351,7 +351,7 @@ fn fuzz(
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
-        if state.metadata().get::<Tokens>().is_none() {
+        if state.metadata_map().get::<Tokens>().is_none() {
             state.add_metadata(Tokens::from_file(tokenfile)?);
         }
     }

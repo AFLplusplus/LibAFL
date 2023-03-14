@@ -214,13 +214,16 @@ where
 
     let state = state.expect("The gen_unique_block_ids hook works only for in-process fuzzing");
     if state
-        .metadata_mut()
+        .metadata_map_mut()
         .get_mut::<QemuDrCovMetadata>()
         .is_none()
     {
         state.add_metadata(QemuDrCovMetadata::new());
     }
-    let meta = state.metadata_mut().get_mut::<QemuDrCovMetadata>().unwrap();
+    let meta = state
+        .metadata_map_mut()
+        .get_mut::<QemuDrCovMetadata>()
+        .unwrap();
 
     match DRCOV_MAP.lock().unwrap().as_mut().unwrap().entry(pc) {
         Entry::Occupied(e) => {

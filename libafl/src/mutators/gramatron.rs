@@ -125,7 +125,7 @@ where
             other_testcase.add_metadata(meta);
         }
         let meta = other_testcase
-            .metadata()
+            .metadata_map()
             .get::<GramatronIdxMapMetadata>()
             .unwrap();
         let other = other_testcase.input().as_ref().unwrap();

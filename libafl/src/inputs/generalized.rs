@@ -113,7 +113,7 @@ where
         corpus_idx: CorpusId,
     ) -> Result<Self, Error> {
         let meta = base
-            .metadata()
+            .metadata_map()
             .get::<GeneralizedInputMetadata>()
             .ok_or_else(|| {
                 Error::key_not_found(format!(
@@ -121,6 +121,7 @@ where
                 ))
             })
             .cloned()?;
+
         Ok(meta)
     }
 

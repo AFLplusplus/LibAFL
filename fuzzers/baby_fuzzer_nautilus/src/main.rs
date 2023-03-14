@@ -74,7 +74,7 @@ pub fn main() {
     )
     .unwrap();
 
-    if state.metadata().get::<NautilusChunksMetadata>().is_none() {
+    if state.metadata_map().get::<NautilusChunksMetadata>().is_none() {
         state.add_metadata(NautilusChunksMetadata::new("/tmp/".into()));
     }
 

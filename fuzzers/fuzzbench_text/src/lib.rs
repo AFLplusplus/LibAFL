@@ -416,7 +416,7 @@ fn fuzz_binary(
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;
@@ -635,7 +635,7 @@ fn fuzz_text(
     let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);
 
     // Read tokens
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;

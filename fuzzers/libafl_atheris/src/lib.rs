@@ -236,7 +236,7 @@ pub fn LLVMFuzzerRunDriver(
         });
 
         // Create a dictionary if not existing
-        if state.metadata().get::<Tokens>().is_none() {
+        if state.metadata_map().get::<Tokens>().is_none() {
             for tokens_file in &token_files {
                 state.add_metadata(Tokens::from_file(tokens_file)?);
             }

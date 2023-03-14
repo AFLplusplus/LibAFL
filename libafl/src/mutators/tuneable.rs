@@ -57,7 +57,7 @@ impl TuneableScheduledMutatorMetadata {
     /// Gets the stored metadata, used to alter the [`TuneableScheduledMutator`] behavior
     pub fn get<S: HasMetadata>(state: &S) -> Result<&Self, Error> {
         state
-            .metadata()
+            .metadata_map()
             .get::<Self>()
             .ok_or_else(|| Error::illegal_state("TuneableScheduledMutator not in use"))
     }
@@ -65,7 +65,7 @@ impl TuneableScheduledMutatorMetadata {
     /// Gets the stored metadata, used to alter the [`TuneableScheduledMutator`] behavior, mut
     pub fn get_mut<S: HasMetadata>(state: &mut S) -> Result<&mut Self, Error> {
         state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<Self>()
             .ok_or_else(|| Error::illegal_state("TuneableScheduledMutator not in use"))
     }
@@ -228,14 +228,14 @@ where
 {
     fn metadata_mut(state: &mut S) -> &mut TuneableScheduledMutatorMetadata {
         state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<TuneableScheduledMutatorMetadata>()
             .unwrap()
     }
 
     fn metadata(state: &S) -> &TuneableScheduledMutatorMetadata {
         state
-            .metadata()
+            .metadata_map()
             .get::<TuneableScheduledMutatorMetadata>()
             .unwrap()
     }

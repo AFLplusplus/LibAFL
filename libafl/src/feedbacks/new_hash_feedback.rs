@@ -115,7 +115,7 @@ where
             .expect("A NewHashFeedback needs a BacktraceObserver");
 
         let backtrace_state = state
-            .named_metadata_mut()
+            .named_metadata_map_mut()
             .get_mut::<NewHashFeedbackMetadata>(&self.name)
             .unwrap();
 
