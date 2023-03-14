@@ -24,6 +24,6 @@ fn main() {
     }
 
     for fuzzer in fuzzers {
-        println!("{}", fuzzer);
+        println!("{fuzzer}");
     }
 }
