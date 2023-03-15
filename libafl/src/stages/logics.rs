@@ -4,11 +4,10 @@ use core::marker::PhantomData;
 
 use crate::{
     corpus::CorpusId,
-    Error,
-    state::UsesState,
     stages::{Stage, StagesTuple},
+    state::UsesState,
+    Error,
 };
-
 
 /// Perform the stage if closure evaluates to true
 #[derive(Debug)]
@@ -32,7 +31,6 @@ where
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
-
 {
     type State = E::State;
 }
@@ -54,7 +52,8 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         if (self.closure)(fuzzer, executor, state, manager, corpus_idx)? {
-            self.stages.perform_all(fuzzer, executor, state, manager, corpus_idx)?
+            self.stages
+                .perform_all(fuzzer, executor, state, manager, corpus_idx)?;
         }
         Ok(())
     }
