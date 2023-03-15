@@ -24,7 +24,8 @@ use crate::{
     bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
-    observers::cmp::{CmpValues, CmpValuesMetadata},
+    observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
+    stages::TaintMetadata,
     state::{HasMaxSize, HasMetadata, HasRand},
     Error,
 };
@@ -303,7 +304,7 @@ where
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let tokens_len = {
-            let meta = state.metadata().get::<Tokens>();
+            let meta = state.metadata_map().get::<Tokens>();
             if meta.is_none() {
                 return Ok(MutationResult::Skipped);
             }
@@ -317,7 +318,7 @@ where
         let size = input.bytes().len();
         let off = state.rand_mut().below((size + 1) as u64) as usize;
 
-        let meta = state.metadata().get::<Tokens>().unwrap();
+        let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
         let mut len = token.len();
 
@@ -373,7 +374,7 @@ where
         }
 
         let tokens_len = {
-            let meta = state.metadata().get::<Tokens>();
+            let meta = state.metadata_map().get::<Tokens>();
             if meta.is_none() {
                 return Ok(MutationResult::Skipped);
             }
@@ -386,7 +387,7 @@ where
 
         let off = state.rand_mut().below(size as u64) as usize;
 
-        let meta = state.metadata().get::<Tokens>().unwrap();
+        let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
         let mut len = token.len();
         if off + len > size {
@@ -436,7 +437,7 @@ where
         }
 
         let cmps_len = {
-            let meta = state.metadata().get::<CmpValuesMetadata>();
+            let meta = state.metadata_map().get::<CmpValuesMetadata>();
             if meta.is_none() {
                 return Ok(MutationResult::Skipped);
             }
@@ -451,7 +452,7 @@ where
         let len = input.bytes().len();
         let bytes = input.bytes_mut();
 
-        let meta = state.metadata().get::<CmpValuesMetadata>().unwrap();
+        let meta = state.metadata_map().get::<CmpValuesMetadata>().unwrap();
         let cmp_values = &meta.list[idx];
 
         let mut result = MutationResult::Skipped;
@@ -595,6 +596,970 @@ impl I2SRandReplace {
     #[must_use]
     pub fn new() -> Self {
         Self
+    }
+}
+
+const CMP_ATTTRIBUTE_IS_EQUAL: u8 = 1;
+const CMP_ATTRIBUTE_IS_GREATER: u8 = 2;
+const CMP_ATTRIBUTE_IS_LESSER: u8 = 4;
+const CMP_ATTRIBUTE_IS_FP: u8 = 8;
+const CMP_ATTRIBUTE_IS_FP_MOD: u8 = 16;
+const CMP_ATTRIBUTE_IS_INT_MOD: u8 = 32;
+const CMP_ATTRIBUTE_IS_TRANSFORM: u8 = 64;
+
+/// AFL++ redqueen mutation
+#[derive(Debug, Default)]
+pub struct AFLppRedQueen {
+    cmp_start_idx: usize,
+    cmp_h_start_idx: usize,
+    cmp_buf_start_idx: usize,
+    taint_idx: usize,
+    enable_transform: bool,
+    enable_arith: bool,
+}
+
+impl AFLppRedQueen {
+    #[inline]
+    fn swapa(x: u8) -> u8 {
+        (x & 0xf8) + ((x & 7) ^ 0x07)
+    }
+
+    /// Cmplog Pattern Matching
+    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::if_not_else)]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn cmp_extend_encoding(
+        &self,
+        pattern: u64,
+        repl: u64,
+        another_pattern: u64,
+        changed_val: u64,
+        attr: u8,
+        another_buf: &[u8],
+        buf: &mut [u8], // Unlike AFL++ we change the original buf (it's named buf here)
+        buf_idx: usize,
+        taint_len: usize,
+        input_len: usize,
+        hshape: usize,
+    ) -> bool {
+        // TODO: ascii2num (we need check q->is_ascii (in calibration stage(?)))
+
+        // try Transform
+        if self.enable_transform
+            && pattern != another_pattern
+            && repl == changed_val
+            && attr <= CMP_ATTTRIBUTE_IS_EQUAL
+        {
+            // Try to identify transform magic
+            let mut bytes: usize = match hshape {
+                0 => 0, // NEVER happen
+                1 => 1,
+                2 => 2,
+                3 | 4 => 4,
+                _ => 8,
+            };
+            // prevent overflow
+            bytes = core::cmp::min(bytes, input_len - buf_idx);
+
+            let (b_val, o_b_val, mask): (u64, u64, u64) = match bytes {
+                0 => {
+                    (0, 0, 0) // cannot happen
+                }
+                1 => (
+                    u64::from(buf[buf_idx]),
+                    u64::from(another_buf[buf_idx]),
+                    0xff,
+                ),
+                2 | 3 => (
+                    u64::from(u16::from_be_bytes(
+                        another_buf[buf_idx..buf_idx + 2].try_into().unwrap(),
+                    )),
+                    u64::from(u16::from_be_bytes(
+                        another_buf[buf_idx..buf_idx + 2].try_into().unwrap(),
+                    )),
+                    0xffff,
+                ),
+                4 | 5 | 6 | 7 => (
+                    u64::from(u32::from_be_bytes(
+                        buf[buf_idx..buf_idx + 4].try_into().unwrap(),
+                    )),
+                    u64::from(u32::from_be_bytes(
+                        another_buf[buf_idx..buf_idx + 4].try_into().unwrap(),
+                    )),
+                    0xffff_ffff,
+                ),
+                _ => (
+                    u64::from_be_bytes(buf[buf_idx..buf_idx + 8].try_into().unwrap()),
+                    u64::from_be_bytes(another_buf[buf_idx..buf_idx + 8].try_into().unwrap()),
+                    0xffff_ffff_ffff_ffff,
+                ),
+            };
+
+            // Try arith
+            let diff: i64 = (pattern - b_val) as i64;
+            let new_diff: i64 = (another_pattern - o_b_val) as i64;
+
+            if diff == new_diff && diff != 0 {
+                let new_repl: u64 = (repl as i64 - diff) as u64;
+
+                let ret = self.cmp_extend_encoding(
+                    pattern,
+                    new_repl,
+                    another_pattern,
+                    repl,
+                    CMP_ATTRIBUTE_IS_TRANSFORM,
+                    another_buf,
+                    buf,
+                    buf_idx,
+                    taint_len,
+                    input_len,
+                    hshape,
+                );
+                if ret {
+                    return true;
+                }
+            }
+
+            // Try XOR
+
+            // Shadowing
+            let diff: i64 = (pattern ^ b_val) as i64;
+            let new_diff: i64 = (another_pattern ^ o_b_val) as i64;
+
+            if diff == new_diff && diff != 0 {
+                let new_repl: u64 = (repl as i64 ^ diff) as u64;
+                let ret = self.cmp_extend_encoding(
+                    pattern,
+                    new_repl,
+                    another_pattern,
+                    repl,
+                    CMP_ATTRIBUTE_IS_TRANSFORM,
+                    another_buf,
+                    buf,
+                    buf_idx,
+                    taint_len,
+                    input_len,
+                    hshape,
+                );
+
+                if ret {
+                    return true;
+                }
+            }
+
+            // Try Lowercase
+            // Shadowing
+            let diff = (b_val | 0x2020_2020_2020_2020 & mask) == (pattern & mask);
+
+            let new_diff = (b_val | 0x2020_2020_2020_2020 & mask) == (another_pattern & mask);
+
+            if new_diff && diff {
+                let new_repl: u64 = repl & (0x5f5f_5f5f_5f5f_5f5f & mask);
+                let ret = self.cmp_extend_encoding(
+                    pattern,
+                    new_repl,
+                    another_pattern,
+                    repl,
+                    CMP_ATTRIBUTE_IS_TRANSFORM,
+                    another_buf,
+                    buf,
+                    buf_idx,
+                    taint_len,
+                    input_len,
+                    hshape,
+                );
+
+                if ret {
+                    return true;
+                }
+            }
+
+            // Try Uppercase
+            // Shadowing
+            let diff = (b_val | 0x5f5f_5f5f_5f5f_5f5f & mask) == (pattern & mask);
+
+            let o_diff = (b_val | 0x5f5f_5f5f_5f5f_5f5f & mask) == (another_pattern & mask);
+
+            if o_diff && diff {
+                let new_repl: u64 = repl & (0x2020_2020_2020_2020 & mask);
+                let ret = self.cmp_extend_encoding(
+                    pattern,
+                    new_repl,
+                    another_pattern,
+                    repl,
+                    CMP_ATTRIBUTE_IS_TRANSFORM,
+                    another_buf,
+                    buf,
+                    buf_idx,
+                    taint_len,
+                    input_len,
+                    hshape,
+                );
+
+                if ret {
+                    return true;
+                }
+            }
+        }
+
+        let its_len = core::cmp::min(input_len - buf_idx, taint_len);
+
+        // Try pattern matching
+        // println!("Pattern match");
+        match hshape {
+            0 => (), // NEVER HAPPEN, Do nothing
+            1 => {
+                // 1 byte pattern match
+                let buf_8 = buf[buf_idx];
+                let another_buf_8 = another_buf[buf_idx];
+                if buf_8 == pattern as u8 && another_buf_8 == another_pattern as u8 {
+                    buf[buf_idx] = repl as u8;
+                    return true;
+                }
+            }
+            2 | 3 => {
+                if its_len >= 2 {
+                    let buf_16 = u16::from_be_bytes(buf[buf_idx..buf_idx + 2].try_into().unwrap());
+                    let another_buf_16 =
+                        u16::from_be_bytes(another_buf[buf_idx..buf_idx + 2].try_into().unwrap());
+
+                    if buf_16 == pattern as u16 && another_buf_16 == another_pattern as u16 {
+                        buf[buf_idx] = (repl & 0xff) as u8;
+                        buf[buf_idx + 1] = (repl >> 8 & 0xff) as u8;
+                        return true;
+                    }
+                }
+            }
+            4 | 5 | 6 | 7 => {
+                if its_len >= 4 {
+                    let buf_32 = u32::from_be_bytes(buf[buf_idx..buf_idx + 4].try_into().unwrap());
+                    let another_buf_32 =
+                        u32::from_be_bytes(another_buf[buf_idx..buf_idx + 4].try_into().unwrap());
+                    // println!("buf: {buf_32} {another_buf_32} {pattern} {another_pattern}");
+                    if buf_32 == pattern as u32 && another_buf_32 == another_pattern as u32 {
+                        // println!("Matched!");
+                        buf[buf_idx] = (repl & 0xff) as u8;
+                        buf[buf_idx + 1] = (repl >> 8 & 0xff) as u8;
+                        buf[buf_idx + 2] = (repl >> 16 & 0xff) as u8;
+                        buf[buf_idx + 3] = (repl >> 24 & 0xff) as u8;
+
+                        return true;
+                    }
+                }
+            }
+            _ => {
+                if its_len >= 8 {
+                    let buf_64 = u64::from_be_bytes(buf[buf_idx..buf_idx + 8].try_into().unwrap());
+                    let another_buf_64 =
+                        u64::from_be_bytes(another_buf[buf_idx..buf_idx + 8].try_into().unwrap());
+
+                    if buf_64 == pattern && another_buf_64 == another_pattern {
+                        buf[buf_idx] = (repl & 0xff) as u8;
+                        buf[buf_idx + 1] = (repl >> 8 & 0xff) as u8;
+                        buf[buf_idx + 2] = (repl >> 16 & 0xff) as u8;
+                        buf[buf_idx + 3] = (repl >> 24 & 0xff) as u8;
+                        buf[buf_idx + 4] = (repl >> 32 & 0xff) as u8;
+                        buf[buf_idx + 5] = (repl >> 32 & 0xff) as u8;
+                        buf[buf_idx + 6] = (repl >> 40 & 0xff) as u8;
+                        buf[buf_idx + 7] = (repl >> 48 & 0xff) as u8;
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Try arith
+        if self.enable_arith || attr != CMP_ATTRIBUTE_IS_TRANSFORM {
+            if (attr & (CMP_ATTRIBUTE_IS_GREATER | CMP_ATTRIBUTE_IS_LESSER)) == 0 || hshape < 4 {
+                return false;
+            }
+
+            // Transform >= to < and <= to >
+            let attr = if (attr & CMP_ATTTRIBUTE_IS_EQUAL) != 0
+                && (attr & (CMP_ATTRIBUTE_IS_GREATER | CMP_ATTRIBUTE_IS_LESSER)) != 0
+            {
+                if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
+                    attr + 2
+                } else {
+                    attr - 2
+                }
+            } else {
+                attr
+            };
+
+            // FP
+            if (CMP_ATTRIBUTE_IS_FP..CMP_ATTRIBUTE_IS_FP_MOD).contains(&attr) {
+                let repl_new: u64;
+
+                if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
+                    if hshape == 4 && its_len >= 4 {
+                        let mut g = repl as f32;
+                        g += 1.0;
+                        repl_new = u64::from(g as u32);
+                    } else if hshape == 8 && its_len >= 8 {
+                        let mut g = repl as f64;
+                        g += 1.0;
+                        repl_new = g as u64;
+                    } else {
+                        return false;
+                    }
+
+                    let ret = self.cmp_extend_encoding(
+                        pattern,
+                        repl,
+                        another_pattern,
+                        repl_new,
+                        CMP_ATTRIBUTE_IS_FP_MOD,
+                        another_buf,
+                        buf,
+                        buf_idx,
+                        taint_len,
+                        input_len,
+                        hshape,
+                    );
+                    if ret {
+                        return true;
+                    }
+                } else {
+                    if hshape == 4 && its_len >= 4 {
+                        let mut g = repl as f32;
+                        g -= 1.0;
+                        repl_new = u64::from(g as u32);
+                    } else if hshape == 8 && its_len >= 8 {
+                        let mut g = repl as f64;
+                        g -= 1.0;
+                        repl_new = g as u64;
+                    } else {
+                        return false;
+                    }
+
+                    let ret = self.cmp_extend_encoding(
+                        pattern,
+                        repl,
+                        another_pattern,
+                        repl_new,
+                        CMP_ATTRIBUTE_IS_FP_MOD,
+                        another_buf,
+                        buf,
+                        buf_idx,
+                        taint_len,
+                        input_len,
+                        hshape,
+                    );
+                    if ret {
+                        return true;
+                    }
+                }
+            } else if attr < CMP_ATTRIBUTE_IS_FP {
+                if attr & CMP_ATTRIBUTE_IS_GREATER != 0 {
+                    let repl_new = repl + 1;
+
+                    let ret = self.cmp_extend_encoding(
+                        pattern,
+                        repl,
+                        another_pattern,
+                        repl_new,
+                        CMP_ATTRIBUTE_IS_INT_MOD,
+                        another_buf,
+                        buf,
+                        buf_idx,
+                        taint_len,
+                        input_len,
+                        hshape,
+                    );
+
+                    if ret {
+                        return true;
+                    }
+                } else {
+                    let repl_new = repl - 1;
+
+                    let ret = self.cmp_extend_encoding(
+                        pattern,
+                        repl,
+                        another_pattern,
+                        repl_new,
+                        CMP_ATTRIBUTE_IS_INT_MOD,
+                        another_buf,
+                        buf,
+                        buf_idx,
+                        taint_len,
+                        input_len,
+                        hshape,
+                    );
+
+                    if ret {
+                        return true;
+                    }
+                }
+            } else {
+                return false;
+            }
+        }
+
+        false
+    }
+
+    /// rtn part from AFL++
+    #[allow(clippy::too_many_arguments)]
+    pub fn rtn_extend_encoding(
+        &self,
+        pattern: &[u8],
+        repl: &[u8],
+        o_pattern: &[u8],
+        _changed_val: &[u8],
+        o_buf: &[u8],
+        buf: &mut [u8],
+        buf_idx: usize,
+        taint_len: usize,
+        input_len: usize,
+        hshape: usize,
+    ) -> bool {
+        let l0 = pattern.len();
+        let ol0 = repl.len();
+        // let l1 = o_pattern.len();
+        // let ol1 = changed_val.len();
+
+        let lmax = core::cmp::max(l0, ol0);
+        let its_len = core::cmp::min(
+            core::cmp::min(input_len - buf_idx, taint_len),
+            core::cmp::min(lmax, hshape),
+        );
+
+        // TODO: Match before (This: https://github.com/AFLplusplus/AFLplusplus/blob/ea14f3fd40e32234989043a525e3853fcb33c1b6/src/afl-fuzz-redqueen.c#L2047)
+        let mut copy_len = 0;
+        for i in 0..its_len {
+            if pattern[i] != buf[buf_idx + i] && o_pattern[i] != o_buf[buf_idx + i] {
+                break;
+            }
+            copy_len += 1;
+        }
+
+        if copy_len > 0 {
+            buffer_copy(buf, repl, 0, buf_idx, copy_len);
+            true
+        } else {
+            false
+        }
+
+        // TODO: Transform (This: https://github.com/AFLplusplus/AFLplusplus/blob/stable/src/afl-fuzz-redqueen.c#L2089)
+        // It's hard to implement this naively
+        // because AFL++ redqueen does not check any pattern, but it calls its_fuzz() instead.
+        // we can't execute the harness inside a mutator
+
+        // Direct matching
+    }
+}
+
+impl<I, S> Mutator<I, S> for AFLppRedQueen
+where
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    I: HasBytesVec,
+{
+    #[allow(clippy::needless_range_loop)]
+    #[allow(clippy::too_many_lines)]
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        // TODO
+        // add autotokens (https://github.com/AFLplusplus/AFLplusplus/blob/3881ccd0b7520f67fd0b34f010443dc249cbc8f1/src/afl-fuzz-redqueen.c#L1903)
+        // handle 128-bits logs
+
+        let size = input.bytes().len();
+        if size == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+
+        let (cmp_len, cmp_meta, taint_meta) = {
+            let cmp_meta = state.metadata_map().get::<AFLppCmpValuesMetadata>();
+            let taint_meta = state.metadata_map().get::<TaintMetadata>();
+            if cmp_meta.is_none() || taint_meta.is_none() {
+                return Ok(MutationResult::Skipped);
+            }
+
+            let cmp_len = cmp_meta.unwrap().headers().len();
+            if cmp_len == 0 {
+                return Ok(MutationResult::Skipped);
+            }
+            (cmp_len, cmp_meta.unwrap(), taint_meta.unwrap())
+        };
+
+        // These idxes must saved in this mutator itself!
+        let (cmp_start_idx, cmp_h_start_idx, cmp_buf_start_idx, mut taint_idx) = if stage_idx == 0 {
+            (0, 0, 0, 0)
+        } else {
+            (
+                self.cmp_start_idx,
+                self.cmp_h_start_idx,
+                self.cmp_buf_start_idx,
+                self.taint_idx,
+            )
+        };
+
+        let orig_cmpvals = cmp_meta.orig_cmpvals();
+        let new_cmpvals = cmp_meta.new_cmpvals();
+        let headers = cmp_meta.headers();
+        let input_len = input.bytes().len();
+        let new_bytes = taint_meta.input_vec();
+        let orig_bytes = input.bytes_mut();
+        // TODO: Swap this.
+        let taint = taint_meta.ranges();
+        // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
+        for cmp_idx in cmp_start_idx..cmp_len {
+            let (w_idx, header) = headers[cmp_idx];
+
+            if orig_cmpvals.get(&w_idx).is_none() || new_cmpvals.get(&w_idx).is_none() {
+                // These two should have same boolean value
+
+                // so there's nothing interesting at cmp_idx, then just skip!
+                continue;
+            }
+
+            let orig_val = orig_cmpvals.get(&w_idx).unwrap();
+            let new_val = new_cmpvals.get(&w_idx).unwrap();
+
+            let logged = core::cmp::min(orig_val.len(), new_val.len());
+
+            for cmp_h_idx in cmp_h_start_idx..logged {
+                let mut skip_opt = false;
+                for prev_idx in 0..cmp_h_idx {
+                    if new_val[prev_idx] == new_val[cmp_h_idx] {
+                        skip_opt = true;
+                    }
+                }
+                // Opt not in the paper
+                if skip_opt {
+                    continue;
+                }
+
+                for cmp_buf_idx in cmp_buf_start_idx..input_len {
+                    let taint_len = match taint.get(taint_idx) {
+                        Some(t) => {
+                            if cmp_buf_idx < t.start {
+                                input_len - cmp_buf_idx
+                            } else {
+                                // if cmp_buf_idx == t.end go to next range
+                                if cmp_buf_idx == t.end {
+                                    taint_idx += 1;
+                                }
+
+                                // Here cmp_buf_idx >= t.start
+                                t.end - cmp_buf_idx
+                            }
+                        }
+                        None => input_len - cmp_buf_idx,
+                    };
+
+                    let hshape = (header.shape() + 1) as usize;
+                    let mut matched = false;
+                    match (&orig_val[cmp_h_idx], &new_val[cmp_h_idx]) {
+                        (CmpValues::U8(orig), CmpValues::U8(new)) => {
+                            let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
+
+                            let attribute = header.attribute() as u8;
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                // Compare v0 against v1
+                                if self.cmp_extend_encoding(
+                                    orig_v0.into(),
+                                    orig_v1.into(),
+                                    new_v0.into(),
+                                    new_v1.into(),
+                                    attribute,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+
+                                // Swapped
+                                if self.cmp_extend_encoding(
+                                    orig_v0.swap_bytes().into(),
+                                    orig_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
+                                    attribute,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+                            }
+
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                // Compare v1 against v0
+                                if self.cmp_extend_encoding(
+                                    orig_v1.into(),
+                                    orig_v0.into(),
+                                    new_v1.into(),
+                                    new_v0.into(),
+                                    Self::swapa(attribute),
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+
+                                // Swapped
+                                if self.cmp_extend_encoding(
+                                    orig_v1.swap_bytes().into(),
+                                    orig_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
+                                    Self::swapa(attribute),
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+                            }
+                        }
+                        (CmpValues::U16(orig), CmpValues::U16(new)) => {
+                            let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
+                            let attribute: u8 = header.attribute() as u8;
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                // Compare v0 against v1
+                                if self.cmp_extend_encoding(
+                                    orig_v0.into(),
+                                    orig_v1.into(),
+                                    new_v0.into(),
+                                    new_v1.into(),
+                                    attribute,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+
+                                // Swapped
+                                // Compare v0 against v1
+                                if self.cmp_extend_encoding(
+                                    orig_v0.swap_bytes().into(),
+                                    orig_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
+                                    attribute,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+                            }
+
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                // Compare v1 against v0
+                                if self.cmp_extend_encoding(
+                                    orig_v1.into(),
+                                    orig_v0.into(),
+                                    new_v1.into(),
+                                    new_v0.into(),
+                                    Self::swapa(attribute),
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+
+                                // Swapped
+                                if self.cmp_extend_encoding(
+                                    orig_v1.swap_bytes().into(),
+                                    orig_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
+                                    Self::swapa(attribute),
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+                            }
+                        }
+                        (CmpValues::U32(orig), CmpValues::U32(new)) => {
+                            let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
+                            let attribute = header.attribute() as u8;
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                // Compare v0 against v1
+                                if self.cmp_extend_encoding(
+                                    orig_v0.into(),
+                                    orig_v1.into(),
+                                    new_v0.into(),
+                                    new_v1.into(),
+                                    attribute,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+
+                                // swapped
+                                // Compare v0 against v1
+                                if self.cmp_extend_encoding(
+                                    orig_v0.swap_bytes().into(),
+                                    orig_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
+                                    attribute,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+                            }
+
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                // Compare v1 against v0
+                                if self.cmp_extend_encoding(
+                                    orig_v1.into(),
+                                    orig_v0.into(),
+                                    new_v1.into(),
+                                    new_v0.into(),
+                                    Self::swapa(attribute),
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+
+                                // Swapped
+                                // Compare v1 against v0
+                                if self.cmp_extend_encoding(
+                                    orig_v1.swap_bytes().into(),
+                                    orig_v0.swap_bytes().into(),
+                                    new_v1.swap_bytes().into(),
+                                    new_v0.swap_bytes().into(),
+                                    Self::swapa(attribute),
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+                            }
+                        }
+                        (CmpValues::U64(orig), CmpValues::U64(new)) => {
+                            let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
+                            let attribute = header.attribute() as u8;
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                // Compare v0 against v1
+                                if self.cmp_extend_encoding(
+                                    orig_v0,
+                                    orig_v1,
+                                    new_v0,
+                                    new_v1,
+                                    attribute,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+
+                                // Swapped
+                                // Compare v0 against v1
+                                if self.cmp_extend_encoding(
+                                    orig_v0.swap_bytes(),
+                                    orig_v1.swap_bytes(),
+                                    new_v0.swap_bytes(),
+                                    new_v1.swap_bytes(),
+                                    attribute,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+                            }
+
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                // Compare v1 against v0
+                                if self.cmp_extend_encoding(
+                                    orig_v1,
+                                    orig_v0,
+                                    new_v1,
+                                    new_v0,
+                                    Self::swapa(attribute),
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+
+                                // Swapped
+                                // Compare v1 against v0
+                                if self.cmp_extend_encoding(
+                                    orig_v1.swap_bytes(),
+                                    orig_v0.swap_bytes(),
+                                    new_v1.swap_bytes(),
+                                    new_v0.swap_bytes(),
+                                    Self::swapa(attribute),
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+                            }
+                        }
+                        (CmpValues::Bytes(orig), CmpValues::Bytes(new)) => {
+                            let (orig_v0, orig_v1, new_v0, new_v1) =
+                                (&orig.0, &orig.1, &new.0, &new.1);
+                            // let attribute = header.attribute() as u8;
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                // Compare v0 against v1
+                                if self.rtn_extend_encoding(
+                                    orig_v0,
+                                    orig_v1,
+                                    new_v0,
+                                    new_v1,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+                            }
+
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                // Compare v1 against v0
+                                if self.rtn_extend_encoding(
+                                    orig_v1,
+                                    orig_v0,
+                                    new_v1,
+                                    new_v0,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                ) {
+                                    matched = true;
+                                }
+                            }
+                        }
+                        (_, _) => {
+                            // It shouldn't have different shape!
+                        }
+                    }
+
+                    if matched {
+                        // before returning the result
+                        // save indexes
+                        self.cmp_start_idx = cmp_start_idx;
+                        self.cmp_h_start_idx = cmp_h_start_idx;
+                        self.cmp_buf_start_idx = cmp_buf_start_idx + 1; // next
+                        self.taint_idx = taint_idx;
+
+                        return Ok(MutationResult::Mutated);
+                    }
+                    // if no match then go to next round
+                }
+            }
+        }
+
+        Ok(MutationResult::Skipped)
+    }
+}
+
+impl Named for AFLppRedQueen {
+    fn name(&self) -> &str {
+        "AFLppRedQueen"
+    }
+}
+
+impl AFLppRedQueen {
+    /// Create a new `AFLppRedQueen` Mutator
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            cmp_start_idx: 0,
+            cmp_h_start_idx: 0,
+            cmp_buf_start_idx: 0,
+            taint_idx: 0,
+            enable_transform: false,
+            enable_arith: false,
+        }
+    }
+
+    /// Constructor with cmplog options
+    #[must_use]
+    pub fn with_cmplog_options(transform: bool, arith: bool) -> Self {
+        Self {
+            cmp_start_idx: 0,
+            cmp_h_start_idx: 0,
+            cmp_buf_start_idx: 0,
+            taint_idx: 0,
+            enable_transform: transform,
+            enable_arith: arith,
+        }
     }
 }
 

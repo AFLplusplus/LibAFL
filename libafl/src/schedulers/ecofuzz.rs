@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::{powersched::SchedulerMetadata, testcase_score::TestcaseScore, Scheduler},
@@ -102,7 +102,7 @@ where
 
         let (last_mutation_num, last_corpus_count) = {
             let meta = state
-                .metadata()
+                .metadata_map()
                 .get::<EcoMetadata>()
                 .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?;
             (meta.last_mutation_num, meta.last_corpus_count)
@@ -112,7 +112,7 @@ where
             let mut testcase = state.corpus().get(id)?.borrow_mut();
 
             let meta = testcase
-                .metadata_mut()
+                .metadata_map_mut()
                 .get_mut::<EcoTestcaseMetadata>()
                 .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?;
             // Set was_fuzzed for the old current
@@ -122,7 +122,7 @@ where
         };
 
         let meta = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<EcoMetadata>()
             .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?;
 
@@ -151,7 +151,7 @@ where
     fn first_iteration(state: &mut S) -> Result<(), Error> {
         let count = state.corpus().count();
         state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<EcoMetadata>()
             .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?
             .initial_corpus_count
@@ -174,7 +174,7 @@ where
             let was_fuzzed = state.corpus().get(id)?.borrow().scheduled_count() > 0;
             if was_fuzzed {
                 state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<EcoMetadata>()
                     .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?
                     .state = EcoState::Exploration;
@@ -183,7 +183,7 @@ where
         }
 
         state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<EcoMetadata>()
             .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?
             .state = EcoState::Exploitation;
@@ -194,7 +194,7 @@ where
                 .corpus()
                 .get(id)?
                 .borrow()
-                .metadata()
+                .metadata_map()
                 .get::<EcoTestcaseMetadata>()
                 .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
                 .state;
@@ -210,7 +210,7 @@ where
                     .corpus()
                     .get(id)?
                     .borrow_mut()
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<EcoTestcaseMetadata>()
                     .ok_or_else(|| {
                         Error::key_not_found("EcoTestcaseMetadata not found".to_string())
@@ -226,7 +226,7 @@ where
             .corpus()
             .get(selection)?
             .borrow()
-            .metadata()
+            .metadata_map()
             .get::<EcoTestcaseMetadata>()
             .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
             .clone();
@@ -234,7 +234,7 @@ where
         for id in state.corpus().ids() {
             let testcase = state.corpus().get(id)?.borrow();
             let meta = testcase
-                .metadata()
+                .metadata_map()
                 .get::<EcoTestcaseMetadata>()
                 .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?;
 
@@ -274,20 +274,20 @@ where
                 .corpus()
                 .get(parent_idx)?
                 .borrow_mut()
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .metadata_map_mut()
+                .get_mut::<SchedulerTestcaseMetadata>()
                 .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
                 })?
                 .depth(),
             None => 0,
         };
 
-        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
+        // Attach a `SchedulerTestcaseMetadata` to the queue entry.
         depth += 1;
         {
             let mut testcase = state.corpus().get(idx)?.borrow_mut();
-            testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+            testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
                 depth,
                 self.last_hash,
             ));
@@ -302,7 +302,7 @@ where
 
         let executions = *state.executions();
         let meta = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<EcoMetadata>()
             .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?;
 
@@ -328,7 +328,7 @@ where
         let mut hash = observer.hash() as usize;
 
         let psmeta = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<SchedulerMetadata>()
             .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
@@ -341,7 +341,7 @@ where
                 .corpus()
                 .get(id)?
                 .borrow_mut()
-                .metadata_mut()
+                .metadata_map_mut()
                 .get_mut::<EcoTestcaseMetadata>()
                 .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
                 .mutation_num += 1;
@@ -350,10 +350,10 @@ where
                 .corpus()
                 .get(id)?
                 .borrow()
-                .metadata()
-                .get::<SchedulerTestcaseMetaData>()
+                .metadata_map()
+                .get::<SchedulerTestcaseMetadata>()
                 .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
                 })?
                 .n_fuzz_entry();
             if entry == hash {
@@ -361,7 +361,7 @@ where
                     .corpus()
                     .get(id)?
                     .borrow_mut()
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<EcoTestcaseMetadata>()
                     .ok_or_else(|| {
                         Error::key_not_found("EcoTestcaseMetadata not found".to_string())
@@ -389,7 +389,7 @@ where
             .corpus()
             .get(id)?
             .borrow_mut()
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<EcoTestcaseMetadata>()
             .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
             .mutation_num;
@@ -397,7 +397,7 @@ where
         let executions = *state.executions();
 
         let meta = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<EcoMetadata>()
             .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?;
         meta.last_mutation_num = mutation_num;
@@ -453,14 +453,14 @@ where
 
         let (cur_state, rate) = {
             let meta = state
-                .metadata()
+                .metadata_map()
                 .get::<EcoMetadata>()
                 .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?;
             (meta.state, meta.rate)
         };
 
         let meta = entry
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<EcoTestcaseMetadata>()
             .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?;
 

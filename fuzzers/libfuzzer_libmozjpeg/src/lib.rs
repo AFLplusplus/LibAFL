@@ -118,7 +118,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     println!("We're a client, let's fuzz :)");
 
     // Add the JPEG tokens if not existing
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         state.add_metadata(Tokens::from_file("./jpeg.dict")?);
     }
 

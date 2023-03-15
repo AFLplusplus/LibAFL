@@ -171,6 +171,8 @@ where
         let consumed_input = input.clone();
 
         // First, run orig_input once and get the original hash
+
+        // Idea: No need to do this every time
         let orig_hash =
             Self::get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input, name)?;
         let changed_bytes = changed.bytes_mut();
@@ -186,6 +188,7 @@ where
         // Keep it sorted, we want the earliest ones to come first so that it's easier to sort them
         let mut ok_ranges = BinaryHeap::new();
 
+        // println!("Replaced bytes: {:#?}", changed_bytes);
         // Now replace with random values (This is type_replace)
         Self::type_replace(changed_bytes, state);
 
@@ -269,7 +272,7 @@ where
             }
         }
 
-        if let Some(meta) = state.metadata_mut().get_mut::<TaintMetadata>() {
+        if let Some(meta) = state.metadata_map_mut().get_mut::<TaintMetadata>() {
             meta.update(input.bytes().to_vec(), res);
 
             // println!("meta: {:#?}", meta);

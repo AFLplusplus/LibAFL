@@ -71,7 +71,7 @@ where
         _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let last = state
-            .metadata()
+            .metadata_map()
             .get::<SyncFromDiskMetadata>()
             .map(|m| m.last_time);
         let path = self.sync_dir.clone();
@@ -80,11 +80,11 @@ where
         {
             if last.is_none() {
                 state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .insert(SyncFromDiskMetadata::new(max_time));
             } else {
                 state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<SyncFromDiskMetadata>()
                     .unwrap()
                     .last_time = max_time;
@@ -254,7 +254,7 @@ where
     ) -> Result<(), Error> {
         if self.client.can_convert() {
             let last_id = state
-                .metadata()
+                .metadata_map()
                 .get::<SyncFromBrokerMetadata>()
                 .and_then(|m| m.last_id);
 
@@ -283,11 +283,11 @@ where
             let last = state.corpus().last();
             if last_id.is_none() {
                 state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .insert(SyncFromBrokerMetadata::new(last));
             } else {
                 state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<SyncFromBrokerMetadata>()
                     .unwrap()
                     .last_id = last;

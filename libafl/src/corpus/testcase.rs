@@ -45,13 +45,13 @@ where
 {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
-    fn metadata(&self) -> &SerdeAnyMap {
+    fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
 }
@@ -289,7 +289,7 @@ where
 
 /// The Metadata for each testcase used in power schedules.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SchedulerTestcaseMetaData {
+pub struct SchedulerTestcaseMetadata {
     /// Number of bits set in bitmap, updated in calibrate_case
     bitmap_size: u64,
     /// Number of queue cycles behind
@@ -302,8 +302,8 @@ pub struct SchedulerTestcaseMetaData {
     cycle_and_time: (Duration, usize),
 }
 
-impl SchedulerTestcaseMetaData {
-    /// Create new [`struct@SchedulerTestcaseMetaData`]
+impl SchedulerTestcaseMetadata {
+    /// Create new [`struct@SchedulerTestcaseMetadata`]
     #[must_use]
     pub fn new(depth: u64) -> Self {
         Self {
@@ -315,7 +315,7 @@ impl SchedulerTestcaseMetaData {
         }
     }
 
-    /// Create new [`struct@SchedulerTestcaseMetaData`] given `n_fuzz_entry`
+    /// Create new [`struct@SchedulerTestcaseMetadata`] given `n_fuzz_entry`
     #[must_use]
     pub fn with_n_fuzz_entry(depth: u64, n_fuzz_entry: usize) -> Self {
         Self {
@@ -393,7 +393,7 @@ impl SchedulerTestcaseMetaData {
     }
 }
 
-crate::impl_serdeany!(SchedulerTestcaseMetaData);
+crate::impl_serdeany!(SchedulerTestcaseMetadata);
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
@@ -476,7 +476,7 @@ pub mod pybind {
         }
 
         fn metadata(&mut self) -> PyObject {
-            let meta = self.inner.as_mut().metadata_mut();
+            let meta = self.inner.as_mut().metadata_map_mut();
             if !meta.contains::<PythonMetadata>() {
                 Python::with_gil(|py| {
                     let dict: Py<PyDict> = PyDict::new(py).into();

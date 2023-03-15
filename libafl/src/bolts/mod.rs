@@ -154,6 +154,12 @@ pub trait HasRefCnt {
     fn refcnt_mut(&mut self) -> &mut isize;
 }
 
+/// Trait to truncate slices and maps to a new size
+pub trait Truncate {
+    /// Reduce the size of the slice
+    fn truncate(&mut self, len: usize);
+}
+
 /// Current time
 #[cfg(feature = "std")]
 #[must_use]

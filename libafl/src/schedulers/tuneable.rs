@@ -48,13 +48,16 @@ where
 
     fn metadata_mut(state: &mut S) -> &mut TuneableSchedulerMetadata {
         state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<TuneableSchedulerMetadata>()
             .unwrap()
     }
 
     fn metadata(state: &S) -> &TuneableSchedulerMetadata {
-        state.metadata().get::<TuneableSchedulerMetadata>().unwrap()
+        state
+            .metadata_map()
+            .get::<TuneableSchedulerMetadata>()
+            .unwrap()
     }
 
     /// Sets the next corpus id to be used

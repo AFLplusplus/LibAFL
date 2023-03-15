@@ -21,7 +21,11 @@ pub struct Instruction {
  *      - operand string
  *      - instruction length
  */
-pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Result<Vec<Instruction>, String> {
+pub fn pc2basicblock(
+    pc: GuestAddr,
+    emu: &Emulator,
+    mode: Option<capstone::Mode>,
+) -> Result<Vec<Instruction>, String> {
     #[allow(unused_mut)]
     let mut code = {
         #[cfg(emulation_mode = "usermode")]
@@ -43,7 +47,10 @@ pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Result<Vec<Instruction>, 
     let mut iaddr = pc;
     let mut block = Vec::<Instruction>::new();
 
-    let cs = crate::capstone().detail(true).build().unwrap();
+    let mut cs = crate::capstone().detail(true).build().unwrap();
+    if let Some(m) = mode {
+        cs.set_mode(m).unwrap();
+    }
 
     'disasm: while let Ok(insns) = cs.disasm_count(code, iaddr.into(), 1) {
         if insns.is_empty() {
