@@ -300,7 +300,6 @@ where
     }
 }
 
-
 /// `Stage` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
