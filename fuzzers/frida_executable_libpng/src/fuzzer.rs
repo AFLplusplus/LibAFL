@@ -66,7 +66,12 @@ pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -
             buf.as_ptr() as _,
         ];
 
-        main(3, argv.as_ptr());
+        let env: [*const u8; 2] = [
+            null(), // dummy value
+            null(), // dummy value
+        ];
+
+        main(3, argv.as_ptr(), env.as_ptr());
         ExitKind::Ok
     };
 

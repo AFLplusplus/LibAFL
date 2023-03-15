@@ -44,15 +44,15 @@ pub unsafe extern "C" fn __libc_start_main(
 
         let orig_libc_start_main: LibcStartMainFunc = transmute(orig_libc_start_main_addr);
 
-        let mut main_hook = |_argc: i32, _argv: *const *const u8, environment: *const *const u8| -> i32 {
-            //fuzzer::lib(main);
-            return main(_argc, _argv, environment);
+        let mut main_hook = |_argc: i32, _argv: *const *const u8, _environment: *const *const u8| -> i32 {
+            return main(_argc, _argv, _environment);
         };
 
+        let main_hook_addr_temp: *mut c_void = ptr::read(&mut main_hook as *mut _ as *const *mut c_void);
+        let main_hook_addr: *mut c_void = ptr::read(main_hook_addr_temp as *const *mut c_void);
+
         let exit_code = orig_libc_start_main(
-            &mut main_hook as *mut _ as *mut c_void,
-            //&mut main_hook as *mut _ as *mut i32,
-            //main_hook as MainFunc,
+            main_hook_addr,
             argc,
             argv,
             init,
