@@ -87,7 +87,7 @@ where
 
             let payload: Vec<_> = input.bytes().iter().map(|&x| Some(x)).collect();
             let original = input.clone();
-            let meta = entry.metadata().get::<MapNoveltiesMetadata>().ok_or_else(|| {
+            let meta = entry.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
                     Error::key_not_found(format!(
                         "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_idx} (check the arguments of MapFeedback::new(...))"
                     ))
@@ -292,7 +292,7 @@ where
                 assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
 
                 let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
-                entry.metadata_mut().insert(meta);
+                entry.metadata_map_mut().insert(meta);
             }
         }
 

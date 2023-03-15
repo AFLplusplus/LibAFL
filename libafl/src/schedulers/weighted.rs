@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
@@ -209,7 +209,7 @@ where
         }
 
         let wsmeta = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<WeightedScheduleMetadata>()
             .ok_or_else(|| {
                 Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
@@ -249,10 +249,10 @@ where
         })?;
 
         let prev_meta = prev
-            .metadata()
-            .get::<SchedulerTestcaseMetaData>()
+            .metadata_map()
+            .get::<SchedulerTestcaseMetadata>()
             .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
             })?;
 
         // Use these to adjust `SchedulerMetadata`
@@ -261,7 +261,7 @@ where
         let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
 
         let psmeta = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<SchedulerMetadata>()
             .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
@@ -282,10 +282,10 @@ where
         prev: &crate::corpus::Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         let prev_meta = prev
-            .metadata()
-            .get::<SchedulerTestcaseMetaData>()
+            .metadata_map()
+            .get::<SchedulerTestcaseMetadata>()
             .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
             })?;
 
         // Next depth is + 1
@@ -297,7 +297,7 @@ where
         let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
 
         let psmeta = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<SchedulerMetadata>()
             .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
@@ -312,7 +312,7 @@ where
             .corpus()
             .get(idx)?
             .borrow_mut()
-            .add_metadata(SchedulerTestcaseMetaData::new(prev_depth));
+            .add_metadata(SchedulerTestcaseMetadata::new(prev_depth));
         Ok(())
     }
 }
@@ -332,20 +332,20 @@ where
                 .corpus()
                 .get(parent_idx)?
                 .borrow_mut()
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .metadata_map_mut()
+                .get_mut::<SchedulerTestcaseMetadata>()
                 .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
                 })?
                 .depth(),
             None => 0,
         };
 
-        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
+        // Attach a `SchedulerTestcaseMetadata` to the queue entry.
         depth += 1;
         {
             let mut testcase = state.corpus().get(idx)?.borrow_mut();
-            testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+            testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
                 depth,
                 self.last_hash,
             ));
@@ -376,7 +376,7 @@ where
         let mut hash = observer.hash() as usize;
 
         let psmeta = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<SchedulerMetadata>()
             .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
@@ -401,7 +401,7 @@ where
             let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
 
             let wsmeta = state
-                .metadata_mut()
+                .metadata_map_mut()
                 .get_mut::<WeightedScheduleMetadata>()
                 .ok_or_else(|| {
                     Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
@@ -425,7 +425,7 @@ where
             // Update depth
             if current_cycles > corpus_counts {
                 let psmeta = state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<SchedulerMetadata>()
                     .ok_or_else(|| {
                         Error::key_not_found("SchedulerMetadata not found".to_string())
@@ -454,10 +454,10 @@ where
             testcase.set_scheduled_count(scheduled_count + 1);
 
             let tcmeta = testcase
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .metadata_map_mut()
+                .get_mut::<SchedulerTestcaseMetadata>()
                 .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
                 })?;
 
             if tcmeta.handicap() >= 4 {

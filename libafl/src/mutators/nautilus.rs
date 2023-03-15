@@ -165,7 +165,7 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let meta = state
-            .metadata()
+            .metadata_map()
             .get::<NautilusChunksMetadata>()
             .expect("NautilusChunksMetadata not in the state");
         // TODO get rid of tmp

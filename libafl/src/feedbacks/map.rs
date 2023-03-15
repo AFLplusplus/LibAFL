@@ -441,7 +441,7 @@ where
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
         let initial = observer.initial();
         let map_state = state
-            .named_metadata_mut()
+            .named_metadata_map_mut()
             .get_mut::<MapFeedbackMetadata<T>>(&self.name)
             .unwrap();
 
@@ -504,7 +504,7 @@ where
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
 
         let map_state = state
-            .named_metadata_mut()
+            .named_metadata_map_mut()
             .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
             .unwrap();
         let size = observer.usable_count();
@@ -754,7 +754,7 @@ where
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
 
         let map_state = state
-            .named_metadata_mut()
+            .named_metadata_map_mut()
             .get_mut::<MapFeedbackMetadata<T>>(&self.name)
             .unwrap();
         let len = observer.len();

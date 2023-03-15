@@ -230,7 +230,7 @@ where
             ));
 
             let ondisk_meta = OnDiskMetadata {
-                metadata: testcase.metadata(),
+                metadata: testcase.metadata_map(),
                 exec_time: testcase.exec_time(),
                 executions: testcase.executions(),
             };

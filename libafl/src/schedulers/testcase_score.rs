@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 
 use crate::{
     bolts::{HasLen, HasRefCnt},
-    corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, SchedulerTestcaseMetadata, Testcase},
     feedbacks::MapIndexesMetadata,
     schedulers::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
@@ -67,7 +67,7 @@ where
     )]
     fn compute(entry: &mut Testcase<S::Input>, state: &S) -> Result<f64, Error> {
         let psmeta = state
-            .metadata()
+            .metadata_map()
             .get::<SchedulerMetadata>()
             .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
@@ -80,11 +80,11 @@ where
                 for idx in corpus.ids() {
                     let n_fuzz_entry = if cur_index == idx {
                         entry
-                            .metadata()
-                            .get::<SchedulerTestcaseMetaData>()
+                            .metadata_map()
+                            .get::<SchedulerTestcaseMetadata>()
                             .ok_or_else(|| {
                                 Error::key_not_found(
-                                    "SchedulerTestcaseMetaData not found".to_string(),
+                                    "SchedulerTestcaseMetadata not found".to_string(),
                                 )
                             })?
                             .n_fuzz_entry()
@@ -92,11 +92,11 @@ where
                         corpus
                             .get(idx)?
                             .borrow()
-                            .metadata()
-                            .get::<SchedulerTestcaseMetaData>()
+                            .metadata_map()
+                            .get::<SchedulerTestcaseMetadata>()
                             .ok_or_else(|| {
                                 Error::key_not_found(
-                                    "SchedulerTestcaseMetaData not found".to_string(),
+                                    "SchedulerTestcaseMetadata not found".to_string(),
                                 )
                             })?
                             .n_fuzz_entry()
@@ -129,10 +129,10 @@ where
 
         let favored = entry.has_metadata::<IsFavoredMetadata>();
         let tcmeta = entry
-            .metadata()
-            .get::<SchedulerTestcaseMetaData>()
+            .metadata_map()
+            .get::<SchedulerTestcaseMetadata>()
             .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
             })?;
 
         if q_exec_us * 0.1 > avg_exec_us {
@@ -296,15 +296,15 @@ where
     fn compute(entry: &mut Testcase<S::Input>, state: &S) -> Result<f64, Error> {
         let mut weight = 1.0;
         let psmeta = state
-            .metadata()
+            .metadata_map()
             .get::<SchedulerMetadata>()
             .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
         let tcmeta = entry
-            .metadata()
-            .get::<SchedulerTestcaseMetaData>()
+            .metadata_map()
+            .get::<SchedulerTestcaseMetadata>()
             .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
             })?;
 
         // This means that this testcase has never gone through the calibration stage before1,
@@ -344,13 +344,13 @@ where
         weight *= avg_exec_us / q_exec_us;
         weight *= libm::log2(q_bitmap_size).max(1.0) / avg_bitmap_size;
 
-        let tc_ref = match entry.metadata().get::<MapIndexesMetadata>() {
+        let tc_ref = match entry.metadata_map().get::<MapIndexesMetadata>() {
             Some(meta) => meta.refcnt() as f64,
             None => 0.0,
         };
 
         let avg_top_size = state
-            .metadata()
+            .metadata_map()
             .get::<TopRatedsMetadata>()
             .ok_or_else(|| Error::key_not_found("TopRatedsMetadata not found".to_string()))?
             .map()
