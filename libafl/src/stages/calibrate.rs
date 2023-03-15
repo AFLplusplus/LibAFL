@@ -182,7 +182,6 @@ where
                         iter += 2;
                     };
                 }
-
             };
 
             total_time += current_time() - start;
