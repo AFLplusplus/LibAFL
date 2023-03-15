@@ -153,7 +153,7 @@ where
         let mut unstable_entries: Vec<usize> = vec![];
         let map_len: usize = map_first.len();
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
-        // run is found to be unstable, with CAL_STAGE_MAX total runs.
+        // run is found to be unstable or to crash with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
 
@@ -178,10 +178,11 @@ where
                     )?;
 
                     has_errors = true;
-                    if iter < CAL_STAGE_MAX {
-                        iter += 2;
-                    };
                 }
+
+                if iter < CAL_STAGE_MAX {
+                    iter += 2;
+                };
             };
 
             total_time += current_time() - start;
