@@ -58,3 +58,21 @@ where
         Ok(())
     }
 }
+
+impl<CB, E, EM, ST, Z> IfStage<CB, E, EM, ST, Z> 
+where
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    ST: StagesTuple<E, EM, E::State, Z>,
+    Z: UsesState<State = E::State>,
+{
+    /// Constructor
+    pub fn new(closure: CB, stages: ST) -> Self {
+        Self {
+            closure,
+            stages,
+            phantom: PhantomData
+        }
+    }
+}
