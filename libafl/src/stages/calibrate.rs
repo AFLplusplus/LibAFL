@@ -246,14 +246,7 @@ where
         };
 
         // If weighted scheduler or powerscheduler is used, update it
-        let use_powerschedule = state.has_metadata::<SchedulerMetadata>()
-            && state
-                .corpus()
-                .get(corpus_idx)?
-                .borrow()
-                .has_metadata::<SchedulerTestcaseMetadata>();
-
-        if use_powerschedule {
+        if state.has_metadata::<SchedulerMetadata>() {
             let map = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
@@ -280,12 +273,28 @@ where
             testcase.set_scheduled_count(scheduled_count + 1);
             // log::trace!("time: {:#?}", testcase.exec_time());
 
-            let data = testcase
-                .metadata_map_mut()
-                .get_mut::<SchedulerTestcaseMetadata>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
-                })?;
+            // If the testcase doesn't have its own `SchedulerTestcaseMetadata`, create it.
+            let data = if let Ok(metadata) = testcase.metadata_mut::<SchedulerTestcaseMetadata>() {
+                metadata
+            } else {
+                let depth = if let Some(parent_id) = testcase.parent_id() {
+                    if let Some(parent_metadata) = (*state.corpus().get(parent_id)?)
+                        .borrow()
+                        .metadata_map()
+                        .get::<SchedulerTestcaseMetadata>()
+                    {
+                        parent_metadata.depth() + 1
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+                testcase.add_metadata(SchedulerTestcaseMetadata::new(depth));
+                testcase
+                    .metadata_mut::<SchedulerTestcaseMetadata>()
+                    .unwrap()
+            };
 
             data.set_cycle_and_time((total_time, iter));
             data.set_bitmap_size(bitmap_size);
