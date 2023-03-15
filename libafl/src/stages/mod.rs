@@ -30,6 +30,9 @@ pub use generalization::GeneralizationStage;
 pub mod owned;
 pub use owned::StagesOwnedList;
 
+pub mod logics;
+pub use logics::*;
+
 pub mod tuneable;
 pub use tuneable::*;
 
