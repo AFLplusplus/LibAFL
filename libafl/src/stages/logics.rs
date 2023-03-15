@@ -59,7 +59,7 @@ where
     }
 }
 
-impl<CB, E, EM, ST, Z> IfStage<CB, E, EM, ST, Z> 
+impl<CB, E, EM, ST, Z> IfStage<CB, E, EM, ST, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
     E: UsesState,
@@ -72,7 +72,7 @@ where
         Self {
             closure,
             stages,
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
