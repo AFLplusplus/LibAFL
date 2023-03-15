@@ -1,4 +1,4 @@
-use std::{mem::transmute, process::exit, ptr};
+use std::mem::transmute;
 
 use libc::{c_void, dlsym, RTLD_NEXT};
 
