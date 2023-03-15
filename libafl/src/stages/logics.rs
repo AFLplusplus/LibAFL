@@ -55,8 +55,7 @@ where
         if (self.closure)(fuzzer, executor, state, manager, corpus_idx)? {
             self.if_stages
                 .perform_all(fuzzer, executor, state, manager, corpus_idx)?;
-        }
-        else{
+        } else {
             self.else_stages
                 .perform_all(fuzzer, executor, state, manager, corpus_idx)?;
         }
