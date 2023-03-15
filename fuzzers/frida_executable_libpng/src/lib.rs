@@ -1,22 +1,72 @@
-use std::process::exit;
+use std::{process::exit, mem::transmute, ptr};
+
+use libc::{dlsym, RTLD_NEXT, c_void};
 
 mod fuzzer;
 
-#[no_mangle]
-fn __libc_csu_fini() {}
+type LibcStartMainFunc = fn(
+    //extern "C" fn(i32, *const *const u8, *const *const u8) -> i32,
+    *mut c_void,
+    i32,
+    *const *const char,
+    extern "C" fn (i32, *const *const u8, *const *const u8) -> i32,
+    extern "C" fn(),
+    extern "C" fn (),
+    *mut c_void,
+) -> i32;
 
-#[no_mangle]
-fn __libc_csu_init() {}
+type MainFunc = extern "C" fn(
+    i32,
+    *const *const u8,
+    *const *const u8,
+) -> i32;
+
+extern "C" fn _dummy_main(_argc: i32, _argv: *const *const u8, _env: *const *const u8) -> i32 {
+    0
+}
+
+static mut ORIG_MAIN: MainFunc = _dummy_main;
 
 #[no_mangle]
 pub unsafe extern "C" fn __libc_start_main(
-    main: extern "C" fn(isize, *const *const u8) -> isize,
-    _argc: isize,
-    _argv: *const *const char,
-) {
+    main: extern "C" fn(i32, *const *const u8, *const *const u8) -> i32,
+    argc: i32,
+    argv: *const *const char,
+    init: extern "C" fn (i32, *const *const u8, *const *const u8) -> i32,
+    fini: extern "C" fn(),
+    rtld_fini: extern "C" fn (),
+    stack_end: *mut c_void,
+) -> u8 {
     unsafe {
-        fuzzer::lib(main);
-    }
+        ORIG_MAIN = main;
 
-    exit(0);
+        let orig_libc_start_main_addr: *mut c_void = dlsym(RTLD_NEXT, "__libc_start_main\0".as_ptr() as *const i8);
+
+        let orig_libc_start_main: LibcStartMainFunc = transmute(orig_libc_start_main_addr);
+
+        let mut main_hook = |_argc: i32, _argv: *const *const u8, environment: *const *const u8| -> i32 {
+            //fuzzer::lib(main);
+            return main(_argc, _argv, environment);
+        };
+
+        let exit_code = orig_libc_start_main(
+            &mut main_hook as *mut _ as *mut c_void,
+            //&mut main_hook as *mut _ as *mut i32,
+            //main_hook as MainFunc,
+            argc,
+            argv,
+            init,
+            fini,
+            rtld_fini,
+            stack_end
+        );
+        
+        return exit_code as u8;
+
+        /*let exit_code = orig_libc_start_main(
+            &mut main_hook as *mut _ as *mut c_void,
+            argc,
+            argv,
+        );*/
+    }
 }

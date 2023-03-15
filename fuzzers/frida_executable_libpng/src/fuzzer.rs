@@ -50,7 +50,7 @@ use libafl_frida::{
 };
 use libafl_targets::cmplog::CmpLogObserver;
 
-pub unsafe fn lib(main: extern "C" fn(isize, *const *const u8) -> isize) {
+pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -> i32) {
     color_backtrace::install();
 
     let options = parse_args();
