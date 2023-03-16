@@ -1677,8 +1677,8 @@ impl AsanRuntime {
 
         unsafe {
             let mapping = mmap(
-                std::ptr::null_mut(),
-                0x1000,
+                None,
+                NonZeroUsize::try_from(0x1000).unwrap(),
                 ProtFlags::all(),
                 map_flags,
                 -1,
