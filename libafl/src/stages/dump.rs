@@ -57,7 +57,7 @@ where
         _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let (mut corpus_idx, mut solutions_idx) =
-            if let Some(meta) = state.metadata().get::<DumpToDiskMetadata>() {
+            if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
                 (
                     meta.last_corpus.and_then(|x| state.corpus().next(x)),
                     meta.last_solution.and_then(|x| state.solutions().next(x)),

@@ -27,7 +27,7 @@ impl_serdeany!(TuneableMutationalStageMetadata);
 /// Set the number of iterations to be used by this mutational stage
 pub fn set_iters<S: HasMetadata>(state: &mut S, iters: u64) -> Result<(), Error> {
     let metadata = state
-        .metadata_mut()
+        .metadata_map_mut()
         .get_mut::<TuneableMutationalStageMetadata>()
         .ok_or_else(|| Error::illegal_state("TuneableMutationslStage not in use"));
     metadata.map(|metadata| {
@@ -38,7 +38,7 @@ pub fn set_iters<S: HasMetadata>(state: &mut S, iters: u64) -> Result<(), Error>
 /// Get the set iterations
 pub fn get_iters<S: HasMetadata>(state: &S) -> Result<Option<u64>, Error> {
     state
-        .metadata()
+        .metadata_map()
         .get::<TuneableMutationalStageMetadata>()
         .ok_or_else(|| Error::illegal_state("TuneableMutationslStage not in use"))
         .map(|metadata| metadata.iters)
@@ -47,7 +47,7 @@ pub fn get_iters<S: HasMetadata>(state: &S) -> Result<Option<u64>, Error> {
 /// Reset this to a normal, randomized, stage
 pub fn reset<S: HasMetadata>(state: &mut S) -> Result<(), Error> {
     state
-        .metadata_mut()
+        .metadata_map_mut()
         .get_mut::<TuneableMutationalStageMetadata>()
         .ok_or_else(|| Error::illegal_state("TuneableMutationslStage not in use"))
         .map(|metadata| metadata.iters = None)

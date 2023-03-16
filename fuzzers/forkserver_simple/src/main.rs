@@ -180,7 +180,7 @@ pub fn main() {
             .observers_mut()
             .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8, false>>>("shared_mem")
             .unwrap()
-            .downsize_map(dynamic_map_size);
+            .truncate(dynamic_map_size);
     }
 
     let mut executor = TimeoutForkserverExecutor::with_signal(

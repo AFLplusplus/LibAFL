@@ -77,7 +77,7 @@ where
             ));
         }
         let meta = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<ProbabilityMetadata>()
             .unwrap();
         let prob = 1.0 / factor;
@@ -107,7 +107,7 @@ where
             .borrow_mut()
             .set_parent_id_optional(current_idx);
 
-        if state.metadata().get::<ProbabilityMetadata>().is_none() {
+        if state.metadata_map().get::<ProbabilityMetadata>().is_none() {
             state.add_metadata(ProbabilityMetadata::new());
         }
         self.store_probability(state, idx)
@@ -120,7 +120,7 @@ where
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
             let rand_prob: f64 = (state.rand_mut().below(100) as f64) / 100.0;
-            let meta = state.metadata().get::<ProbabilityMetadata>().unwrap();
+            let meta = state.metadata_map().get::<ProbabilityMetadata>().unwrap();
             let threshold = meta.total_probability * rand_prob;
             let mut k: f64 = 0.0;
             let mut ret = *meta.map.keys().last().unwrap();

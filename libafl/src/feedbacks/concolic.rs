@@ -79,7 +79,7 @@ where
             .match_name::<ConcolicObserver>(&self.name)
             .map(ConcolicObserver::create_metadata_from_current_map)
         {
-            testcase.metadata_mut().insert(metadata);
+            testcase.metadata_map_mut().insert(metadata);
         }
         Ok(())
     }

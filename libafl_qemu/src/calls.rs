@@ -301,12 +301,23 @@ where
         S: UsesInput,
         QT: QemuHelperTuple<S>,
     {
-        let emu = hooks.emulator();
-        if let Some(h) = hooks.helpers().match_first_type::<Self>() {
+        if let Some(h) = hooks.helpers_mut().match_first_type_mut::<Self>() {
             if !h.must_instrument(pc) {
                 return None;
             }
 
+            #[cfg(cpu_target = "arm")]
+            h.cs.set_mode(if pc & 1 == 1 {
+                arch::arm::ArchMode::Thumb.into()
+            } else {
+                arch::arm::ArchMode::Arm.into()
+            })
+            .unwrap();
+        }
+
+        let emu = hooks.emulator();
+
+        if let Some(h) = hooks.helpers().match_first_type::<Self>() {
             #[allow(unused_mut)]
             let mut code = {
                 #[cfg(emulation_mode = "usermode")]

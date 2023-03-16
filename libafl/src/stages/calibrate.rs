@@ -199,7 +199,7 @@ where
                     .to_vec();
 
                 let history_map = &mut state
-                    .named_metadata_mut()
+                    .named_metadata_map_mut()
                     .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
                     .unwrap()
                     .history_map;
@@ -230,7 +230,7 @@ where
             // If we see new stable entries executing this new corpus entries, then merge with the existing one
             if state.has_metadata::<UnstableEntriesMetadata>() {
                 let existing = state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<UnstableEntriesMetadata>()
                     .unwrap();
                 for item in unstable_entries {
@@ -261,7 +261,10 @@ where
 
             let bitmap_size = map.count_bytes();
 
-            let psmeta = state.metadata_mut().get_mut::<SchedulerMetadata>().unwrap();
+            let psmeta = state
+                .metadata_map_mut()
+                .get_mut::<SchedulerMetadata>()
+                .unwrap();
             let handicap = psmeta.queue_cycles();
 
             psmeta.set_exec_time(psmeta.exec_time() + total_time);
@@ -278,7 +281,7 @@ where
             // log::trace!("time: {:#?}", testcase.exec_time());
 
             let data = testcase
-                .metadata_mut()
+                .metadata_map_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
                 .ok_or_else(|| {
                     Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
@@ -290,7 +293,7 @@ where
         }
 
         // Send the stability event to the broker
-        if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
+        if let Some(meta) = state.metadata_map().get::<UnstableEntriesMetadata>() {
             let unstable_entries = meta.unstable_entries().len();
             let map_len = meta.map_len();
             mgr.fire(

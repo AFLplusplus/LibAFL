@@ -67,7 +67,7 @@ where
     )]
     fn compute(entry: &mut Testcase<S::Input>, state: &S) -> Result<f64, Error> {
         let psmeta = state
-            .metadata()
+            .metadata_map()
             .get::<SchedulerMetadata>()
             .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
@@ -80,7 +80,7 @@ where
                 for idx in corpus.ids() {
                     let n_fuzz_entry = if cur_index == idx {
                         entry
-                            .metadata()
+                            .metadata_map()
                             .get::<SchedulerTestcaseMetaData>()
                             .ok_or_else(|| {
                                 Error::key_not_found(
@@ -92,7 +92,7 @@ where
                         corpus
                             .get(idx)?
                             .borrow()
-                            .metadata()
+                            .metadata_map()
                             .get::<SchedulerTestcaseMetaData>()
                             .ok_or_else(|| {
                                 Error::key_not_found(
@@ -129,7 +129,7 @@ where
 
         let favored = entry.has_metadata::<IsFavoredMetadata>();
         let tcmeta = entry
-            .metadata()
+            .metadata_map()
             .get::<SchedulerTestcaseMetaData>()
             .ok_or_else(|| {
                 Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
@@ -296,12 +296,12 @@ where
     fn compute(entry: &mut Testcase<S::Input>, state: &S) -> Result<f64, Error> {
         let mut weight = 1.0;
         let psmeta = state
-            .metadata()
+            .metadata_map()
             .get::<SchedulerMetadata>()
             .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
         let tcmeta = entry
-            .metadata()
+            .metadata_map()
             .get::<SchedulerTestcaseMetaData>()
             .ok_or_else(|| {
                 Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
@@ -344,13 +344,13 @@ where
         weight *= avg_exec_us / q_exec_us;
         weight *= libm::log2(q_bitmap_size).max(1.0) / avg_bitmap_size;
 
-        let tc_ref = match entry.metadata().get::<MapIndexesMetadata>() {
+        let tc_ref = match entry.metadata_map().get::<MapIndexesMetadata>() {
             Some(meta) => meta.refcnt() as f64,
             None => 0.0,
         };
 
         let avg_top_size = state
-            .metadata()
+            .metadata_map()
             .get::<TopRatedsMetadata>()
             .ok_or_else(|| Error::key_not_found("TopRatedsMetadata not found".to_string()))?
             .map()
