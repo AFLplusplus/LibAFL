@@ -63,14 +63,13 @@ pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
 /// This problem corresponds to: <https://oeis.org/A059036>
 #[inline]
 pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: usize) -> Range<usize> {
-    let len = state.rand_mut().next() as usize % max_len + 1;
+    let len = 1 + state.rand_mut().below(max_len as u64) as usize;
     // sample from [1..upper + len]
-    let mut offset2 = 1 + state.rand_mut().next() as usize % (upper + len - 1);
+    let mut offset2 = 1 + state.rand_mut().below((upper + len - 1) as u64) as usize;
     let offset1 = offset2.saturating_sub(len);
     if offset2 > upper {
         offset2 = upper;
     }
-    debug_assert!(!(offset1..offset2).is_empty());
 
     offset1..offset2
 }
