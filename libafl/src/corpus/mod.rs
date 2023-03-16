@@ -54,6 +54,13 @@ impl From<u64> for CorpusId {
     }
 }
 
+impl From<CorpusId> for usize {
+    /// Not that the `CorpusId` is not necessarily stable in the corpus (if we remove [`Testcase`]s, for example).
+    fn from(id: CorpusId) -> Self {
+        id.0
+    }
+}
+
 /// Utility macro to call `Corpus::random_id`
 #[macro_export]
 macro_rules! random_corpus_id {

@@ -153,7 +153,7 @@ where
         let mut unstable_entries: Vec<usize> = vec![];
         let map_len: usize = map_first.len();
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
-        // run is found to be unstable, with CAL_STAGE_MAX total runs.
+        // run is found to be unstable or to crash with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
 
@@ -178,11 +178,11 @@ where
                     )?;
 
                     has_errors = true;
-                    if iter < CAL_STAGE_MAX {
-                        iter += 2;
-                    };
                 }
-                continue;
+
+                if iter < CAL_STAGE_MAX {
+                    iter += 2;
+                };
             };
 
             total_time += current_time() - start;
@@ -246,14 +246,7 @@ where
         };
 
         // If weighted scheduler or powerscheduler is used, update it
-        let use_powerschedule = state.has_metadata::<SchedulerMetadata>()
-            && state
-                .corpus()
-                .get(corpus_idx)?
-                .borrow()
-                .has_metadata::<SchedulerTestcaseMetadata>();
-
-        if use_powerschedule {
+        if state.has_metadata::<SchedulerMetadata>() {
             let map = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
@@ -280,7 +273,28 @@ where
             testcase.set_scheduled_count(scheduled_count + 1);
             // log::trace!("time: {:#?}", testcase.exec_time());
 
-            let data = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
+            // If the testcase doesn't have its own `SchedulerTestcaseMetadata`, create it.
+            let data = if let Ok(metadata) = testcase.metadata_mut::<SchedulerTestcaseMetadata>() {
+                metadata
+            } else {
+                let depth = if let Some(parent_id) = testcase.parent_id() {
+                    if let Some(parent_metadata) = (*state.corpus().get(parent_id)?)
+                        .borrow()
+                        .metadata_map()
+                        .get::<SchedulerTestcaseMetadata>()
+                    {
+                        parent_metadata.depth() + 1
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+                testcase.add_metadata(SchedulerTestcaseMetadata::new(depth));
+                testcase
+                    .metadata_mut::<SchedulerTestcaseMetadata>()
+                    .unwrap()
+            };
 
             data.set_cycle_and_time((total_time, iter));
             data.set_bitmap_size(bitmap_size);
