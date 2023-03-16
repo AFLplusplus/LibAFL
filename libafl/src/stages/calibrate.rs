@@ -280,12 +280,7 @@ where
             testcase.set_scheduled_count(scheduled_count + 1);
             // log::trace!("time: {:#?}", testcase.exec_time());
 
-            let data = testcase
-                .metadata_map_mut()
-                .get_mut::<SchedulerTestcaseMetadata>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
-                })?;
+            let data = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
 
             data.set_cycle_and_time((total_time, iter));
             data.set_bitmap_size(bitmap_size);

@@ -228,7 +228,7 @@ pub trait HasTestcase: HasCorpus {
 
     /// To get mutable testcase
     fn testcase_mut(
-        &mut self,
+        &self,
         id: CorpusId,
     ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
         Ok(self.corpus().get(id)?.borrow_mut())
