@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "e5424c34d223c2b638af6e4c9eef039db8b69dd4";
+const QEMU_REVISION: &str = "0dc52ed6f3915f727aaec8648706760f278f0571";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -138,12 +138,7 @@ pub fn build(
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-                .args([
-                    "--disable-blobs",
-                    "--disable-bsd-user",
-                    "--disable-fdt",
-                    "--disable-system",
-                ]);
+                .args(["--disable-bsd-user", "--disable-fdt", "--disable-system"]);
             if cfg!(feature = "debug_assertions") {
                 cmd.arg("--enable-debug");
             }
@@ -165,7 +160,6 @@ pub fn build(
                 .arg("--disable-attr")
                 .arg("--disable-auth-pam")
                 .arg("--disable-dbus-display")
-                .arg("--disable-blobs")
                 .arg("--disable-bochs")
                 .arg("--disable-bpf")
                 .arg("--disable-brlapi")
@@ -255,7 +249,6 @@ pub fn build(
                 .arg("--disable-vhost-vdpa")
                 .arg("--disable-virglrenderer")
                 .arg("--disable-virtfs")
-                .arg("--disable-virtiofsd")
                 .arg("--disable-vmnet")
                 .arg("--disable-vnc")
                 .arg("--disable-vnc-jpeg")
@@ -266,7 +259,9 @@ pub fn build(
                 .arg("--disable-xen")
                 .arg("--disable-xen-pci-passthrough")
                 .arg("--disable-xkbcommon")
-                .arg("--disable-zstd");
+                .arg("--disable-zstd")
+                .arg("--disable-capstone")
+                .arg("--disable-sndio");
             if cfg!(feature = "debug_assertions") {
                 cmd.arg("--enable-debug");
             }
@@ -400,6 +395,10 @@ pub fn build(
     println!("cargo:rustc-link-lib=glib-2.0");
     println!("cargo:rustc-link-lib=stdc++");
     println!("cargo:rustc-link-lib=z");
+    // if keyutils is available, qemu meson script will compile code with keyutils.
+    // therefore, we need to link with keyutils if our system have libkeyutils.
+    let _: Result<pkg_config::Library, pkg_config::Error> =
+        pkg_config::Config::new().probe("libkeyutils");
 
     if !is_usermode {
         println!("cargo:rustc-link-lib=pixman-1");

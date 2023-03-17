@@ -4,7 +4,7 @@ use std::ptr::write_volatile;
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
-    corpus::{InMemoryCorpus, OnDiskCorpus},
+    corpus::{InMemoryCorpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
@@ -74,7 +74,7 @@ pub fn main() {
     )
     .unwrap();
 
-    if state.metadata().get::<NautilusChunksMetadata>().is_none() {
+    if state.metadata_map().get::<NautilusChunksMetadata>().is_none() {
         state.add_metadata(NautilusChunksMetadata::new("/tmp/".into()));
     }
 

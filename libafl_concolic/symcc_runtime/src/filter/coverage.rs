@@ -160,7 +160,7 @@ where
 {
     /// Creates a new `HitmapFilter` using the given map and the [`DefaultHasher`].
     pub fn new(hitcounts_map: M) -> Self {
-        Self::new_with_default_hasher_builder(hitcounts_map)
+        Self::with_default_hasher_builder(hitcounts_map)
     }
 }
 
@@ -170,8 +170,8 @@ where
     H: Hasher + Default,
 {
     /// Creates a new `HitmapFilter` using the given map and [`Hasher`] (as type argument) using the [`BuildHasherDefault`].
-    pub fn new_with_default_hasher_builder(hitcounts_map: M) -> Self {
-        Self::new_with_build_hasher(hitcounts_map, BuildHasherDefault::default())
+    pub fn with_default_hasher_builder(hitcounts_map: M) -> Self {
+        Self::with_build_hasher(hitcounts_map, BuildHasherDefault::default())
     }
 }
 
@@ -181,7 +181,7 @@ where
     BH: BuildHasher,
 {
     /// Creates a new `HitmapFilter` using the given map and [`BuildHasher`] (as type argument).
-    pub fn new_with_build_hasher(hitcounts_map: M, build_hasher: BH) -> Self {
+    pub fn with_build_hasher(hitcounts_map: M, build_hasher: BH) -> Self {
         Self {
             hitcounts_map,
             build_hasher,

@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 
 use crate::{
     bolts::{HasLen, HasRefCnt},
-    corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, SchedulerTestcaseMetadata, Testcase},
     feedbacks::MapIndexesMetadata,
     schedulers::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
@@ -66,10 +66,7 @@ where
         clippy::cast_lossless
     )]
     fn compute(entry: &mut Testcase<S::Input>, state: &S) -> Result<f64, Error> {
-        let psmeta = state
-            .metadata()
-            .get::<SchedulerMetadata>()
-            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+        let psmeta = state.metadata::<SchedulerMetadata>()?;
 
         let fuzz_mu = if let Some(strat) = psmeta.strat() {
             if strat == PowerSchedule::COE {
@@ -77,28 +74,16 @@ where
                 let mut n_paths = 0;
                 let mut v = 0.0;
                 let cur_index = state.corpus().current().unwrap();
-                for idx in 0..corpus.count() {
+                for idx in corpus.ids() {
                     let n_fuzz_entry = if cur_index == idx {
                         entry
-                            .metadata()
-                            .get::<SchedulerTestcaseMetaData>()
-                            .ok_or_else(|| {
-                                Error::key_not_found(
-                                    "SchedulerTestcaseMetaData not found".to_string(),
-                                )
-                            })?
+                            .metadata::<SchedulerTestcaseMetadata>()?
                             .n_fuzz_entry()
                     } else {
                         corpus
                             .get(idx)?
                             .borrow()
-                            .metadata()
-                            .get::<SchedulerTestcaseMetaData>()
-                            .ok_or_else(|| {
-                                Error::key_not_found(
-                                    "SchedulerTestcaseMetaData not found".to_string(),
-                                )
-                            })?
+                            .metadata::<SchedulerTestcaseMetadata>()?
                             .n_fuzz_entry()
                     };
                     v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
@@ -128,12 +113,7 @@ where
         let avg_bitmap_size = psmeta.bitmap_size() / psmeta.bitmap_entries();
 
         let favored = entry.has_metadata::<IsFavoredMetadata>();
-        let tcmeta = entry
-            .metadata()
-            .get::<SchedulerTestcaseMetaData>()
-            .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-            })?;
+        let tcmeta = entry.metadata::<SchedulerTestcaseMetadata>()?;
 
         if q_exec_us * 0.1 > avg_exec_us {
             perf_score = 10.0;
@@ -205,7 +185,7 @@ where
                     }
                 }
                 PowerSchedule::FAST => {
-                    if entry.fuzz_level() != 0 {
+                    if entry.scheduled_count() != 0 {
                         let lg = libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()]));
 
                         match lg {
@@ -244,11 +224,11 @@ where
                     }
                 }
                 PowerSchedule::LIN => {
-                    factor = (entry.fuzz_level() as f64)
+                    factor = (entry.scheduled_count() as f64)
                         / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
                 }
                 PowerSchedule::QUAD => {
-                    factor = ((entry.fuzz_level() * entry.fuzz_level()) as f64)
+                    factor = ((entry.scheduled_count() * entry.scheduled_count()) as f64)
                         / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
                 }
             }
@@ -295,22 +275,14 @@ where
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
     fn compute(entry: &mut Testcase<S::Input>, state: &S) -> Result<f64, Error> {
         let mut weight = 1.0;
-        let psmeta = state
-            .metadata()
-            .get::<SchedulerMetadata>()
-            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+        let psmeta = state.metadata::<SchedulerMetadata>()?;
 
-        let tcmeta = entry
-            .metadata()
-            .get::<SchedulerTestcaseMetaData>()
-            .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-            })?;
+        let tcmeta = entry.metadata::<SchedulerTestcaseMetadata>()?;
 
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
         // This methoud is called in corpus's on_add() method. Fuzz_level is zero at that time.
-        if entry.fuzz_level() == 0 || psmeta.cycles() == 0 {
+        if entry.scheduled_count() == 0 || psmeta.cycles() == 0 {
             return Ok(weight);
         }
 
@@ -333,7 +305,7 @@ where
                 | PowerSchedule::QUAD => {
                     let hits = psmeta.n_fuzz()[tcmeta.n_fuzz_entry()];
                     if hits > 0 {
-                        weight *= libm::log10(f64::from(hits)) + 1.0;
+                        weight /= libm::log10(f64::from(hits)) + 1.0;
                     }
                 }
                 // EXPLORE and EXPLOIT fall into this
@@ -344,17 +316,12 @@ where
         weight *= avg_exec_us / q_exec_us;
         weight *= libm::log2(q_bitmap_size).max(1.0) / avg_bitmap_size;
 
-        let tc_ref = match entry.metadata().get::<MapIndexesMetadata>() {
+        let tc_ref = match entry.metadata_map().get::<MapIndexesMetadata>() {
             Some(meta) => meta.refcnt() as f64,
             None => 0.0,
         };
 
-        let avg_top_size = state
-            .metadata()
-            .get::<TopRatedsMetadata>()
-            .ok_or_else(|| Error::key_not_found("TopRatedsMetadata not found".to_string()))?
-            .map()
-            .len() as f64;
+        let avg_top_size = state.metadata::<TopRatedsMetadata>()?.map().len() as f64;
         weight *= 1.0 + (tc_ref / avg_top_size);
 
         if favored {
@@ -362,7 +329,7 @@ where
         }
 
         // was it fuzzed before?
-        if entry.fuzz_level() == 0 {
+        if entry.scheduled_count() == 0 {
             weight *= 2.0;
         }
 

@@ -139,7 +139,7 @@ impl From<EventType> for libc::c_uint {
 ///# use std::time::Duration;
 ///# use std::thread;
 /// pthread_hook::install(|event, pthread, addr, size| {
-///     println!("thread id=0x{:x} event={:?} addr={:?} size={:x}", pthread, event, addr, size);
+///     log::trace!("thread id=0x{:x} event={:?} addr={:?} size={:x}", pthread, event, addr, size);
 /// });
 ///# thread::spawn(|| {
 ///#     thread::sleep(Duration::from_millis(1));

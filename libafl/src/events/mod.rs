@@ -3,16 +3,17 @@
 pub mod simple;
 pub use simple::*;
 pub mod llmp;
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::c_void;
-use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
+use core::{
+    fmt,
+    hash::{BuildHasher, Hasher},
+    marker::PhantomData,
+    time::Duration,
+};
 
-use ahash::AHasher;
+use ahash::RandomState;
 pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -28,7 +29,6 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    stages::calibrate::UnstableEntriesMetadata,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
@@ -71,7 +71,7 @@ pub unsafe fn shutdown_handler<SP>(
 ) where
     SP: ShMemProvider,
 {
-    println!(
+    log::info!(
         "Fuzzer shutdown by Signal: {} Pid: {}",
         signal,
         std::process::id()
@@ -83,11 +83,11 @@ pub unsafe fn shutdown_handler<SP>(
     } else {
         // The process allocated the staterestorer map must take care of it
         let sr = (ptr as *mut StateRestorer<SP>).as_mut().unwrap();
-        // println!("{:#?}", sr);
+        // log::trace!("{:#?}", sr);
         std::ptr::drop_in_place(sr);
     }
-    println!("Bye!");
-    std::process::exit(0);
+    log::info!("Bye!");
+    libc::_exit(0);
 }
 
 #[cfg(all(unix, feature = "std"))]
@@ -109,11 +109,12 @@ impl Handler for ShutdownSignalData {
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct EventManagerId {
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct EventManagerId(
     /// The id
-    pub id: usize,
-}
+    pub usize,
+);
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
@@ -130,6 +131,17 @@ pub enum LogSeverity {
     Warn,
     /// Error
     Error,
+}
+
+impl From<LogSeverity> for log::Level {
+    fn from(value: LogSeverity) -> Self {
+        match value {
+            LogSeverity::Debug => log::Level::Debug,
+            LogSeverity::Info => log::Level::Info,
+            LogSeverity::Warn => log::Level::Trace,
+            LogSeverity::Error => log::Level::Error,
+        }
+    }
 }
 
 impl fmt::Display for LogSeverity {
@@ -183,7 +195,7 @@ impl EventConfig {
     /// Create a new [`EventConfig`] from a name hash
     #[must_use]
     pub fn from_name(name: &str) -> Self {
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher(); //AHasher::new_with_keys(0, 0);
         hasher.write(name.as_bytes());
         EventConfig::FromName {
             name_hash: hasher.finish(),
@@ -457,20 +469,6 @@ where
                 },
             )?;
 
-            // Send the stability event to the broker
-            if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
-                let unstable_entries = meta.unstable_entries().len();
-                let map_len = meta.map_len();
-                self.fire(
-                    state,
-                    Event::UpdateUserStats {
-                        name: "stability".to_string(),
-                        value: UserStats::Ratio(unstable_entries as u64, map_len as u64),
-                        phantom: PhantomData,
-                    },
-                )?;
-            }
-
             // If performance monitor are requested, fire the `UpdatePerfMonitor` event
             #[cfg(feature = "introspection")]
             {
@@ -504,6 +502,12 @@ pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
     fn on_restart(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Send information that this client is exiting.
+    /// No need to restart us any longer, and no need to print an error, either.
+    fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
     }
 
@@ -628,7 +632,7 @@ impl<S> ProgressReporter for NopEventManager<S> where
 
 impl<S> HasEventManagerId for NopEventManager<S> {
     fn mgr_id(&self) -> EventManagerId {
-        EventManagerId { id: 0 }
+        EventManagerId(0)
     }
 }
 

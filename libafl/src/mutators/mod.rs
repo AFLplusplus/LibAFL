@@ -1,10 +1,13 @@
 //! Mutators mutate input during fuzzing.
 
 pub mod scheduled;
+use core::fmt;
+
 pub use scheduled::*;
 pub mod mutations;
 pub use mutations::*;
 pub mod token_mutations;
+use serde::{Deserialize, Serialize};
 pub use token_mutations::*;
 pub mod encoded_mutations;
 pub use encoded_mutations::*;
@@ -24,12 +27,43 @@ pub use nautilus::*;
 
 use crate::{
     bolts::tuples::{HasConstLen, Named},
-    inputs::UsesInput,
+    corpus::CorpusId,
     Error,
 };
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event
 // We can use it to report which mutations generated the testcase in the broker logs
+
+/// The index of a mutation in the mutations tuple
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[repr(transparent)]
+pub struct MutationId(pub(crate) usize);
+
+impl fmt::Display for MutationId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MutationId({})", self.0)
+    }
+}
+
+impl From<usize> for MutationId {
+    fn from(value: usize) -> Self {
+        MutationId(value)
+    }
+}
+
+impl From<u64> for MutationId {
+    fn from(value: u64) -> Self {
+        MutationId(value as usize)
+    }
+}
+
+impl From<i32> for MutationId {
+    #[allow(clippy::cast_sign_loss)]
+    fn from(value: i32) -> Self {
+        debug_assert!(value >= 0);
+        MutationId(value as usize)
+    }
+}
 
 /// The result of a mutation.
 /// If the mutation got skipped, the target
@@ -44,15 +78,12 @@ pub enum MutationResult {
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<S>
-where
-    S: UsesInput,
-{
+pub trait Mutator<I, S> {
     /// Mutate a given input
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
@@ -61,22 +92,19 @@ where
         &mut self,
         _state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>,
+        _corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
 /// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
-pub trait MutatorsTuple<S>: HasConstLen
-where
-    S: UsesInput,
-{
+pub trait MutatorsTuple<I, S>: HasConstLen {
     /// Runs the `mutate` function on all `Mutators` in this `Tuple`.
     fn mutate_all(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
@@ -85,15 +113,15 @@ where
         &mut self,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error>;
 
     /// Gets the [`Mutator`] at the given index and runs the `mutate` function on it.
     fn get_and_mutate(
         &mut self,
-        index: usize,
+        index: MutationId,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
@@ -103,18 +131,15 @@ where
         index: usize,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error>;
 }
 
-impl<S> MutatorsTuple<S> for ()
-where
-    S: UsesInput,
-{
+impl<I, S> MutatorsTuple<I, S> for () {
     fn mutate_all(
         &mut self,
         _state: &mut S,
-        _input: &mut S::Input,
+        _input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         Ok(MutationResult::Skipped)
@@ -124,16 +149,16 @@ where
         &mut self,
         _state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>,
+        _corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
     fn get_and_mutate(
         &mut self,
-        _index: usize,
+        _index: MutationId,
         _state: &mut S,
-        _input: &mut S::Input,
+        _input: &mut I,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         Ok(MutationResult::Skipped)
@@ -144,22 +169,21 @@ where
         _index: usize,
         _state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>,
+        _corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<Head, Tail, S> MutatorsTuple<S> for (Head, Tail)
+impl<Head, Tail, I, S> MutatorsTuple<I, S> for (Head, Tail)
 where
-    Head: Mutator<S> + Named,
-    Tail: MutatorsTuple<S>,
-    S: UsesInput,
+    Head: Mutator<I, S> + Named,
+    Tail: MutatorsTuple<I, S>,
 {
     fn mutate_all(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let r = self.0.mutate(state, input, stage_idx)?;
@@ -174,7 +198,7 @@ where
         &mut self,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         self.0.post_exec(state, stage_idx, corpus_idx)?;
         self.1.post_exec_all(state, stage_idx, corpus_idx)
@@ -182,15 +206,16 @@ where
 
     fn get_and_mutate(
         &mut self,
-        index: usize,
+        index: MutationId,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if index == 0 {
+        if index.0 == 0 {
             self.0.mutate(state, input, stage_idx)
         } else {
-            self.1.get_and_mutate(index - 1, state, input, stage_idx)
+            self.1
+                .get_and_mutate((index.0 - 1).into(), state, input, stage_idx)
         }
     }
 
@@ -199,7 +224,7 @@ where
         index: usize,
         state: &mut S,
         stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         if index == 0 {
             self.0.post_exec(state, stage_idx, corpus_idx)
@@ -218,6 +243,7 @@ pub mod pybind {
 
     use super::{MutationResult, Mutator};
     use crate::{
+        corpus::CorpusId,
         inputs::{BytesInput, HasBytesVec},
         mutators::scheduled::pybind::PythonStdHavocMutator,
         state::pybind::{PythonStdState, PythonStdStateWrapper},
@@ -236,7 +262,7 @@ pub mod pybind {
         }
     }
 
-    impl Mutator<PythonStdState> for PyObjectMutator {
+    impl Mutator<BytesInput, PythonStdState> for PyObjectMutator {
         fn mutate(
             &mut self,
             state: &mut PythonStdState,
@@ -263,13 +289,17 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             stage_idx: i32,
-            corpus_idx: Option<usize>,
+            corpus_idx: Option<CorpusId>,
         ) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
                     py,
                     "post_exec",
-                    (PythonStdStateWrapper::wrap(state), stage_idx, corpus_idx),
+                    (
+                        PythonStdStateWrapper::wrap(state),
+                        stage_idx,
+                        corpus_idx.map(|x| x.0),
+                    ),
                 )?;
                 Ok(())
             })?;
@@ -331,7 +361,7 @@ pub mod pybind {
         }
     }
 
-    impl Mutator<PythonStdState> for PythonMutator {
+    impl Mutator<BytesInput, PythonStdState> for PythonMutator {
         fn mutate(
             &mut self,
             state: &mut PythonStdState,
@@ -345,7 +375,7 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             stage_idx: i32,
-            corpus_idx: Option<usize>,
+            corpus_idx: Option<CorpusId>,
         ) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, m, {
                 m.post_exec(state, stage_idx, corpus_idx)

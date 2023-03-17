@@ -6,17 +6,14 @@ use alloc::{
 };
 use core::{fmt::Debug, marker::PhantomData};
 
-use hashbrown::HashSet;
-use serde::{Deserialize, Serialize};
-
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::AsSlice,
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec, UsesInput},
+    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
@@ -26,23 +23,6 @@ use crate::{
 };
 
 const MAX_GENERALIZED_LEN: usize = 8192;
-
-/// A state metadata holding the set of indexes related to the generalized corpus entries
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct GeneralizedIndexesMetadata {
-    /// The set of indexes
-    pub indexes: HashSet<usize>,
-}
-
-crate::impl_serdeany!(GeneralizedIndexesMetadata);
-
-impl GeneralizedIndexesMetadata {
-    /// Create the metadata
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
 
 fn increment_by_offset(_list: &[Option<u8>], idx: usize, off: u8) -> usize {
     idx + 1 + off as usize
@@ -69,7 +49,7 @@ pub struct GeneralizationStage<EM, O, OT, Z> {
 impl<EM, O, OT, Z> UsesState for GeneralizationStage<EM, O, OT, Z>
 where
     EM: UsesState,
-    EM::State: UsesInput<Input = GeneralizedInput>,
+    EM::State: UsesInput<Input = BytesInput>,
 {
     type State = EM::State;
 }
@@ -79,7 +59,7 @@ where
     O: MapObserver,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
-    E::State: UsesInput<Input = GeneralizedInput>
+    E::State: UsesInput<Input = BytesInput>
         + HasClientPerfMonitor
         + HasExecutions
         + HasMetadata
@@ -95,37 +75,19 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        if state
-            .metadata()
-            .get::<GeneralizedIndexesMetadata>()
-            .is_none()
-        {
-            state.add_metadata(GeneralizedIndexesMetadata::new());
-        }
-
         let (mut payload, original, novelties) = {
             start_timer!(state);
             state.corpus().get(corpus_idx)?.borrow_mut().load_input()?;
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
             let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
-            let input = entry.input_mut().as_mut().unwrap();
 
-            if input.generalized().is_some() {
-                drop(entry);
-                state
-                    .metadata_mut()
-                    .get_mut::<GeneralizedIndexesMetadata>()
-                    .unwrap()
-                    .indexes
-                    .insert(corpus_idx);
-                return Ok(());
-            }
+            let input = entry.input_mut().as_mut().unwrap();
 
             let payload: Vec<_> = input.bytes().iter().map(|&x| Some(x)).collect();
             let original = input.clone();
-            let meta = entry.metadata().get::<MapNoveltiesMetadata>().ok_or_else(|| {
+            let meta = entry.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
                     Error::key_not_found(format!(
                         "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_idx} (check the arguments of MapFeedback::new(...))"
                     ))
@@ -324,31 +286,14 @@ where
         if payload.len() <= MAX_GENERALIZED_LEN {
             // Save the modified input in the corpus
             {
+                let meta = GeneralizedInputMetadata::generalized_from_options(&payload);
+
+                assert!(meta.generalized().first() == Some(&GeneralizedItem::Gap));
+                assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
+
                 let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
-                entry.load_input()?;
-                entry
-                    .input_mut()
-                    .as_mut()
-                    .unwrap()
-                    .generalized_from_options(&payload);
-                entry.store_input()?;
-
-                debug_assert!(
-                    entry.load_input()?.generalized().unwrap().first()
-                        == Some(&GeneralizedItem::Gap)
-                );
-                debug_assert!(
-                    entry.load_input()?.generalized().unwrap().last()
-                        == Some(&GeneralizedItem::Gap)
-                );
+                entry.metadata_map_mut().insert(meta);
             }
-
-            state
-                .metadata_mut()
-                .get_mut::<GeneralizedIndexesMetadata>()
-                .unwrap()
-                .indexes
-                .insert(corpus_idx);
         }
 
         Ok(())
@@ -360,7 +305,7 @@ where
     EM: UsesState,
     O: MapObserver,
     OT: ObserversTuple<EM::State>,
-    EM::State: UsesInput<Input = GeneralizedInput>
+    EM::State: UsesInput<Input = BytesInput>
         + HasClientPerfMonitor
         + HasExecutions
         + HasMetadata
@@ -391,7 +336,7 @@ where
         state: &mut EM::State,
         manager: &mut EM,
         novelties: &[usize],
-        input: &GeneralizedInput,
+        input: &BytesInput,
     ) -> Result<bool, Error>
     where
         E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
@@ -449,7 +394,7 @@ where
             if end > payload.len() {
                 end = payload.len();
             }
-            let mut candidate = GeneralizedInput::new(vec![]);
+            let mut candidate = BytesInput::new(vec![]);
             candidate
                 .bytes_mut()
                 .extend(payload[..start].iter().flatten());
@@ -502,7 +447,7 @@ where
             while end > start {
                 if payload[end] == Some(closing_char) {
                     endings += 1;
-                    let mut candidate = GeneralizedInput::new(vec![]);
+                    let mut candidate = BytesInput::new(vec![]);
                     candidate
                         .bytes_mut()
                         .extend(payload[..start].iter().flatten());

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{serdeany::SerdeAnyMap, HasLen},
+    corpus::CorpusId,
     inputs::Input,
     state::HasMetadata,
     Error,
@@ -33,9 +34,9 @@ where
     /// Number of executions done at discovery time
     executions: usize,
     /// Number of fuzzing iterations of this particular input updated in perform_mutational
-    fuzz_level: usize,
-    /// If it has been fuzzed
-    fuzzed: bool,
+    scheduled_count: usize,
+    /// Parent [`CorpusId`], if known
+    parent_id: Option<CorpusId>,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -44,13 +45,13 @@ where
 {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
-    fn metadata(&self) -> &SerdeAnyMap {
+    fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
 }
@@ -157,46 +158,44 @@ where
         &mut self.executions
     }
 
-    /// Get the `fuzz_level`
+    /// Get the `scheduled_count`
     #[inline]
-    pub fn fuzz_level(&self) -> usize {
-        self.fuzz_level
+    pub fn scheduled_count(&self) -> usize {
+        self.scheduled_count
     }
 
-    /// Set the `fuzz_level`
+    /// Set the `scheduled_count`
     #[inline]
-    pub fn set_fuzz_level(&mut self, fuzz_level: usize) {
-        self.fuzz_level = fuzz_level;
-    }
-
-    /// Get if it was fuzzed
-    #[inline]
-    pub fn fuzzed(&self) -> bool {
-        self.fuzzed
-    }
-
-    /// Set if it was fuzzed
-    #[inline]
-    pub fn set_fuzzed(&mut self, fuzzed: bool) {
-        self.fuzzed = fuzzed;
+    pub fn set_scheduled_count(&mut self, scheduled_count: usize) {
+        self.scheduled_count = scheduled_count;
     }
 
     /// Create a new Testcase instance given an input
     #[inline]
-    pub fn new(input: I) -> Self {
-        let mut slf = Testcase {
+    pub fn new(mut input: I) -> Self {
+        input.wrapped_as_testcase();
+        Self {
             input: Some(input),
             ..Testcase::default()
-        };
-        slf.input.as_mut().unwrap().wrapped_as_testcase();
-        slf
+        }
+    }
+
+    /// Creates a testcase, attaching the id of the parent
+    /// that this [`Testcase`] was derived from on creation
+    pub fn with_parent_id(mut input: I, parent_id: CorpusId) -> Self {
+        input.wrapped_as_testcase();
+        Self {
+            input: Some(input),
+            parent_id: Some(parent_id),
+            ..Testcase::default()
+        }
     }
 
     /// Create a new Testcase instance given an [`Input`] and a `filename`
     #[inline]
     pub fn with_filename(mut input: I, filename: String) -> Self {
         input.wrapped_as_testcase();
-        Testcase {
+        Self {
             input: Some(input),
             filename: Some(filename),
             ..Testcase::default()
@@ -207,11 +206,27 @@ where
     #[inline]
     pub fn with_executions(mut input: I, executions: usize) -> Self {
         input.wrapped_as_testcase();
-        Testcase {
+        Self {
             input: Some(input),
             executions,
             ..Testcase::default()
         }
+    }
+
+    /// Get the id of the parent, that this testcase was derived from
+    #[must_use]
+    pub fn parent_id(&self) -> Option<CorpusId> {
+        self.parent_id
+    }
+
+    /// Sets the id of the parent, that this testcase was derived from
+    pub fn set_parent_id(&mut self, parent_id: CorpusId) {
+        self.parent_id = Some(parent_id);
+    }
+
+    /// Sets the id of the parent, that this testcase was derived from
+    pub fn set_parent_id_optional(&mut self, parent_id: Option<CorpusId>) {
+        self.parent_id = parent_id;
     }
 }
 
@@ -228,9 +243,9 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
-            fuzz_level: 0,
+            scheduled_count: 0,
             executions: 0,
-            fuzzed: false,
+            parent_id: None,
         }
     }
 }
@@ -274,7 +289,7 @@ where
 
 /// The Metadata for each testcase used in power schedules.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SchedulerTestcaseMetaData {
+pub struct SchedulerTestcaseMetadata {
     /// Number of bits set in bitmap, updated in calibrate_case
     bitmap_size: u64,
     /// Number of queue cycles behind
@@ -283,10 +298,12 @@ pub struct SchedulerTestcaseMetaData {
     depth: u64,
     /// Offset in n_fuzz
     n_fuzz_entry: usize,
+    /// Cycles used to calibrate this (not really needed if it were not for on_replace and on_remove)
+    cycle_and_time: (Duration, usize),
 }
 
-impl SchedulerTestcaseMetaData {
-    /// Create new [`struct@SchedulerTestcaseMetaData`]
+impl SchedulerTestcaseMetadata {
+    /// Create new [`struct@SchedulerTestcaseMetadata`]
     #[must_use]
     pub fn new(depth: u64) -> Self {
         Self {
@@ -294,55 +311,89 @@ impl SchedulerTestcaseMetaData {
             handicap: 0,
             depth,
             n_fuzz_entry: 0,
+            cycle_and_time: (Duration::default(), 0),
+        }
+    }
+
+    /// Create new [`struct@SchedulerTestcaseMetadata`] given `n_fuzz_entry`
+    #[must_use]
+    pub fn with_n_fuzz_entry(depth: u64, n_fuzz_entry: usize) -> Self {
+        Self {
+            bitmap_size: 0,
+            handicap: 0,
+            depth,
+            n_fuzz_entry,
+            cycle_and_time: (Duration::default(), 0),
         }
     }
 
     /// Get the bitmap size
+    #[inline]
     #[must_use]
     pub fn bitmap_size(&self) -> u64 {
         self.bitmap_size
     }
 
     /// Set the bitmap size
+    #[inline]
     pub fn set_bitmap_size(&mut self, val: u64) {
         self.bitmap_size = val;
     }
 
     /// Get the handicap
+    #[inline]
     #[must_use]
     pub fn handicap(&self) -> u64 {
         self.handicap
     }
 
     /// Set the handicap
+    #[inline]
     pub fn set_handicap(&mut self, val: u64) {
         self.handicap = val;
     }
 
     /// Get the depth
+    #[inline]
     #[must_use]
     pub fn depth(&self) -> u64 {
         self.depth
     }
 
     /// Set the depth
+    #[inline]
     pub fn set_depth(&mut self, val: u64) {
         self.depth = val;
     }
 
     /// Get the `n_fuzz_entry`
+    #[inline]
     #[must_use]
     pub fn n_fuzz_entry(&self) -> usize {
         self.n_fuzz_entry
     }
 
     /// Set the `n_fuzz_entry`
+    #[inline]
     pub fn set_n_fuzz_entry(&mut self, val: usize) {
         self.n_fuzz_entry = val;
     }
+
+    /// Get the cycles
+    #[inline]
+    #[must_use]
+    pub fn cycle_and_time(&self) -> (Duration, usize) {
+        self.cycle_and_time
+    }
+
+    #[inline]
+    /// Setter for cycles
+    pub fn set_cycle_and_time(&mut self, cycle_and_time: (Duration, usize)) {
+        self.cycle_and_time = cycle_and_time;
+    }
 }
 
-crate::impl_serdeany!(SchedulerTestcaseMetaData);
+crate::impl_serdeany!(SchedulerTestcaseMetadata);
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
@@ -415,17 +466,17 @@ pub mod pybind {
         }
 
         #[getter]
-        fn fuzz_level(&self) -> usize {
-            self.inner.as_ref().fuzz_level()
+        fn parent_id(&self) -> Option<usize> {
+            self.inner.as_ref().parent_id().map(|x| x.0)
         }
 
         #[getter]
-        fn fuzzed(&self) -> bool {
-            self.inner.as_ref().fuzzed()
+        fn scheduled_count(&self) -> usize {
+            self.inner.as_ref().scheduled_count()
         }
 
         fn metadata(&mut self) -> PyObject {
-            let meta = self.inner.as_mut().metadata_mut();
+            let meta = self.inner.as_mut().metadata_map_mut();
             if !meta.contains::<PythonMetadata>() {
                 Python::with_gil(|py| {
                     let dict: Py<PyDict> = PyDict::new(py).into();

@@ -19,7 +19,7 @@ use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     observers::{MapObserver, ObserversTuple},
-    schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
+    schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, UsesState},
     Error, HasScheduler,
 };
@@ -41,7 +41,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<State = E::State>,
+        CS: Scheduler<State = E::State> + RemovableScheduler, // schedulers that has on_remove/on_replace only!
         EM: UsesState<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>;
 }
@@ -100,7 +100,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<State = E::State>,
+        CS: Scheduler<State = E::State> + RemovableScheduler,
         EM: UsesState<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>,
     {
@@ -111,7 +111,8 @@ where
         let mut seed_exprs = HashMap::new();
         let mut cov_map = HashMap::new();
 
-        for idx in 0..state.corpus().count() {
+        let mut cur_id = state.corpus().first();
+        while let Some(idx) = cur_id {
             let (weight, input) = {
                 let mut testcase = state.corpus().get(idx)?.borrow_mut();
                 let weight = TS::compute(&mut *testcase, state)?
@@ -141,16 +142,20 @@ where
             // Store coverage, mapping coverage map indices to hit counts (if present) and the
             // associated seeds for the map indices with those hit counts.
             for (i, e) in obs.as_iter().copied().enumerate() {
-                cov_map
-                    .entry(i)
-                    .or_insert_with(HashMap::new)
-                    .entry(e)
-                    .or_insert_with(HashSet::new)
-                    .insert(seed_expr.clone());
+                if e != obs.initial() {
+                    cov_map
+                        .entry(i)
+                        .or_insert_with(HashMap::new)
+                        .entry(e)
+                        .or_insert_with(HashSet::new)
+                        .insert(seed_expr.clone());
+                }
             }
 
             // Keep track of that seed's index and weight
             seed_exprs.insert(seed_expr, (idx, weight));
+
+            cur_id = state.corpus().next(idx);
         }
 
         for (_, cov) in cov_map {
@@ -191,7 +196,9 @@ where
                 let removed = state.corpus_mut().remove(idx)?;
                 // scheduler needs to know we've removed the input, or it will continue to try
                 // to use now-missing inputs
-                fuzzer.scheduler_mut().on_remove(state, idx, &removed)?;
+                fuzzer
+                    .scheduler_mut()
+                    .on_remove(state, idx, &Some(removed))?;
             }
             Ok(())
         } else {

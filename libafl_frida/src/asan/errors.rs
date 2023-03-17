@@ -578,7 +578,7 @@ impl AsanErrorsObserver {
 
     /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`
     #[must_use]
-    pub fn new_owned(errors: Option<AsanErrors>) -> Self {
+    pub fn owned(errors: Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Owned(Box::new(errors)),
         }
@@ -643,11 +643,15 @@ where
         }
     }
 
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         _state: &mut S,
+        _observers: &OT,
         testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
         }

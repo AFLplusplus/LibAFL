@@ -12,16 +12,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{current_time, tuples::Named, AsIter},
-    corpus::{Corpus, SchedulerTestcaseMetaData},
-    events::{EventFirer, LogSeverity},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata},
+    events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{
-        map::{IsNovel, MapFeedback, MapFeedbackMetadata, Reducer},
-        HasObserverName,
-    },
+    feedbacks::{map::MapFeedbackMetadata, HasObserverName},
     fuzzer::Evaluator,
     inputs::UsesInput,
-    observers::{MapObserver, ObserversTuple},
+    monitors::UserStats,
+    observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, UsesState},
@@ -103,11 +101,16 @@ where
         executor: &mut E,
         state: &mut E::State,
         mgr: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        // Run this stage only once for each corpus entry
-        if state.corpus().get(corpus_idx)?.borrow_mut().fuzz_level() > 0 {
-            return Ok(());
+        // Run this stage only once for each corpus entry and only if we haven't already inspected it
+        {
+            let corpus = state.corpus().get(corpus_idx)?.borrow();
+            // println!("calibration; corpus.scheduled_count() : {}", corpus.scheduled_count());
+
+            if corpus.scheduled_count() > 0 {
+                return Ok(());
+            }
         }
 
         let mut iter = self.stage_max;
@@ -150,7 +153,7 @@ where
         let mut unstable_entries: Vec<usize> = vec![];
         let map_len: usize = map_first.len();
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
-        // run is found to be unstable, with CAL_STAGE_MAX total runs.
+        // run is found to be unstable or to crash with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
 
@@ -175,11 +178,11 @@ where
                     )?;
 
                     has_errors = true;
-                    if iter < CAL_STAGE_MAX {
-                        iter += 2;
-                    };
                 }
-                continue;
+
+                if iter < CAL_STAGE_MAX {
+                    iter += 2;
+                };
             };
 
             total_time += current_time() - start;
@@ -196,7 +199,7 @@ where
                     .to_vec();
 
                 let history_map = &mut state
-                    .named_metadata_mut()
+                    .named_metadata_map_mut()
                     .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
                     .unwrap()
                     .history_map;
@@ -227,7 +230,7 @@ where
             // If we see new stable entries executing this new corpus entries, then merge with the existing one
             if state.has_metadata::<UnstableEntriesMetadata>() {
                 let existing = state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<UnstableEntriesMetadata>()
                     .unwrap();
                 for item in unstable_entries {
@@ -243,14 +246,7 @@ where
         };
 
         // If weighted scheduler or powerscheduler is used, update it
-        let use_powerschedule = state.has_metadata::<SchedulerMetadata>()
-            && state
-                .corpus()
-                .get(corpus_idx)?
-                .borrow()
-                .has_metadata::<SchedulerTestcaseMetaData>();
-
-        if use_powerschedule {
+        if state.has_metadata::<SchedulerMetadata>() {
             let map = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
@@ -258,7 +254,10 @@ where
 
             let bitmap_size = map.count_bytes();
 
-            let psmeta = state.metadata_mut().get_mut::<SchedulerMetadata>().unwrap();
+            let psmeta = state
+                .metadata_map_mut()
+                .get_mut::<SchedulerMetadata>()
+                .unwrap();
             let handicap = psmeta.queue_cycles();
 
             psmeta.set_exec_time(psmeta.exec_time() + total_time);
@@ -268,21 +267,52 @@ where
             psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
             let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-            let fuzz_level = testcase.fuzz_level();
+            let scheduled_count = testcase.scheduled_count();
 
             testcase.set_exec_time(total_time / (iter as u32));
-            testcase.set_fuzz_level(fuzz_level + 1);
-            // println!("time: {:#?}", testcase.exec_time());
+            testcase.set_scheduled_count(scheduled_count + 1);
+            // log::trace!("time: {:#?}", testcase.exec_time());
 
-            let data = testcase
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?;
+            // If the testcase doesn't have its own `SchedulerTestcaseMetadata`, create it.
+            let data = if let Ok(metadata) = testcase.metadata_mut::<SchedulerTestcaseMetadata>() {
+                metadata
+            } else {
+                let depth = if let Some(parent_id) = testcase.parent_id() {
+                    if let Some(parent_metadata) = (*state.corpus().get(parent_id)?)
+                        .borrow()
+                        .metadata_map()
+                        .get::<SchedulerTestcaseMetadata>()
+                    {
+                        parent_metadata.depth() + 1
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+                testcase.add_metadata(SchedulerTestcaseMetadata::new(depth));
+                testcase
+                    .metadata_mut::<SchedulerTestcaseMetadata>()
+                    .unwrap()
+            };
 
+            data.set_cycle_and_time((total_time, iter));
             data.set_bitmap_size(bitmap_size);
             data.set_handicap(handicap);
+        }
+
+        // Send the stability event to the broker
+        if let Some(meta) = state.metadata_map().get::<UnstableEntriesMetadata>() {
+            let unstable_entries = meta.unstable_entries().len();
+            let map_len = meta.map_len();
+            mgr.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: "stability".to_string(),
+                    value: UserStats::Ratio((map_len - unstable_entries) as u64, map_len as u64),
+                    phantom: PhantomData,
+                },
+            )?;
         }
 
         Ok(())
@@ -297,13 +327,10 @@ where
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
-    pub fn new<N, R>(map_feedback: &MapFeedback<N, O, R, S, O::Entry>) -> Self
+    pub fn new<F>(map_feedback: &F) -> Self
     where
-        O::Entry:
-            PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-        R: Reducer<O::Entry>,
+        F: HasObserverName + Named + UsesObserver<S, Observer = O>,
         for<'it> O: AsIter<'it, Item = O::Entry>,
-        N: IsNovel<O::Entry>,
     {
         Self {
             map_observer_name: map_feedback.observer_name().to_string(),
@@ -316,13 +343,10 @@ where
 
     /// Create a new [`CalibrationStage`], but without checking stability.
     #[must_use]
-    pub fn ignore_stability<N, R>(map_feedback: &MapFeedback<N, O, R, S, O::Entry>) -> Self
+    pub fn ignore_stability<F>(map_feedback: &F) -> Self
     where
-        O::Entry:
-            PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-        R: Reducer<O::Entry>,
+        F: HasObserverName + Named + UsesObserver<S, Observer = O>,
         for<'it> O: AsIter<'it, Item = O::Entry>,
-        N: IsNovel<O::Entry>,
     {
         Self {
             map_observer_name: map_feedback.observer_name().to_string(),

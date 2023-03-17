@@ -40,7 +40,7 @@ impl NyxHelper {
         parallel_mode: bool,
         parent_cpu_id: Option<u32>,
     ) -> Result<Self, Error> {
-        NyxHelper::new_with_initial_timeout(
+        NyxHelper::with_initial_timeout(
             target_dir,
             cpu_id,
             snap_mode,
@@ -52,7 +52,7 @@ impl NyxHelper {
     /// create `NyxProcess` and do basic settings
     /// It will convert instance to parent or child using `parent_cpu_id` when set`parallel_mode`
     /// will fail if initial connection takes more than `initial_timeout` seconds
-    pub fn new_with_initial_timeout(
+    pub fn with_initial_timeout(
         target_dir: &Path,
         cpu_id: u32,
         snap_mode: bool,

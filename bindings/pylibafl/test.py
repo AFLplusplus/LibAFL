@@ -1,5 +1,8 @@
 from pylibafl.libafl import *
 import ctypes
+import platform
+
+MAP_SIZE = 4096
 
 
 class FooObserver(BaseObserver):
@@ -33,11 +36,16 @@ class FooExecutor(BaseExecutor):
         return (self.h)(input)
 
 
-libc = ctypes.cdll.LoadLibrary("libc.so.6")
+if platform.system() == "Darwin":
+    libc = ctypes.cdll.LoadLibrary("libc.dylib")
+else:
+    libc = ctypes.cdll.LoadLibrary("libc.so.6")
 
-area_ptr = libc.calloc(1, 4096)
+# Get a buffer to use for our map observer
+libc.calloc.restype = ctypes.c_void_p
+area_ptr = libc.calloc(1, MAP_SIZE)
 
-observer = StdMapObserverI8("mymap", area_ptr, 4096)
+observer = StdMapObserverI8("mymap", area_ptr, MAP_SIZE)
 
 m = observer.as_map_observer()
 
@@ -69,7 +77,12 @@ mgr = SimpleEventManager(monitor.as_monitor())
 
 
 def harness(buf) -> ExitKind:
+    """
+    The harness fn that the fuzzer will execute in a loop
+    """
     # print(buf)
+
+    # set the observer map byte from python
     m[0] = 1
     if len(buf) > 0 and buf[0] == ord("a"):
         m[1] = 1
@@ -90,5 +103,7 @@ stage = StdMutationalStage(StdHavocMutator().as_mutator())
 stage_tuple_list = StagesTuple([stage.as_stage()])
 
 fuzzer.add_input(state, executor.as_executor(), mgr.as_manager(), b"\0\0")
+
+print("Starting to fuzz from python!")
 
 fuzzer.fuzz_loop(executor.as_executor(), state, mgr.as_manager(), stage_tuple_list)

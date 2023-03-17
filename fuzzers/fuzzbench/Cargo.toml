@@ -1,12 +1,13 @@
 [package]
 name = "fuzzbench"
-version = "0.8.2"
+version = "0.9.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
 
 [features]
 default = ["std"]
 std = []
+no_link_main = ["libafl_targets/libfuzzer_no_link_main"]
 
 [profile.release]
 lto = true
@@ -24,7 +25,7 @@ libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_h
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 clap = { version = "4.0", features = ["default"] }
-nix = "0.25"
+nix = "0.26"
 mimalloc = { version = "*", default-features = false }
 
 [lib]

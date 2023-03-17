@@ -84,6 +84,10 @@ impl ShMemDescription {
 
 /// An id associated with a given shared memory mapping ([`ShMem`]), which can be used to
 /// establish shared-mappings between proccesses.
+/// Id is a file descriptor if you use `MmapShMem` or `AshmemShMem`.
+/// That means you have to use shmem server to access to the shmem segment from other processes in these cases.
+/// On the other hand, id is a unique identifier if you use `CommonUnixShMem` or `Win32ShMem`.
+/// In these two cases, you can use shmat(id) or `OpenFileMappingA`(id) to gain access to the shmem
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct ShMemId {
     id: [u8; 20],
@@ -117,6 +121,13 @@ impl ShMemId {
             slice[i] = *val;
         }
         Self { id: slice }
+    }
+
+    /// Returns `true` if this `ShMemId` has an empty backing slice.
+    /// If this is the case something went wrong, and this `ShMemId` may not be read from.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.id[0] == 0
     }
 
     /// Get the id as a fixed-length slice
@@ -550,6 +561,7 @@ pub mod unix_shmem {
 
         use crate::{
             bolts::{
+                rands::{Rand, RandomSeed, StdRand},
                 shmem::{ShMem, ShMemId, ShMemProvider},
                 AsMutSlice, AsSlice,
             },
@@ -588,6 +600,12 @@ pub mod unix_shmem {
             pub __glibc_reserved5: c_ulong,
         }
 
+        // This is macOS's limit
+        // https://stackoverflow.com/questions/38049068/osx-shm-open-returns-enametoolong
+        #[cfg(target_vendor = "apple")]
+        const MAX_MMAP_FILENAME_LEN: usize = 31;
+
+        #[cfg(not(target_vendor = "apple"))]
         const MAX_MMAP_FILENAME_LEN: usize = 256;
 
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
@@ -610,14 +628,14 @@ pub mod unix_shmem {
 
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
-            pub fn new(map_size: usize, shmem_ctr: usize) -> Result<Self, Error> {
+            pub fn new(map_size: usize, rand_id: u32) -> Result<Self, Error> {
                 unsafe {
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
                     write!(
                         &mut filename_path[..MAX_MMAP_FILENAME_LEN - 1],
                         "/libafl_{}_{}",
                         process::id(),
-                        shmem_ctr
+                        rand_id
                     )?;
 
                     /* create the shared memory segment as if it was a file */
@@ -629,7 +647,7 @@ pub mod unix_shmem {
                     if shm_fd == -1 {
                         perror(b"shm_open\0".as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "Failed to shm_open map with id {shmem_ctr:?}"
+                            "Failed to shm_open map with id {filename_path:?}",
                         )));
                     }
 
@@ -638,7 +656,7 @@ pub mod unix_shmem {
                         perror(b"ftruncate\0".as_ptr() as *const _);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "setup_shm(): ftruncate() failed for map with id {shmem_ctr:?}"
+                            "setup_shm(): ftruncate() failed for map with id {filename_path:?}",
                         )));
                     }
 
@@ -656,7 +674,7 @@ pub mod unix_shmem {
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "mmap() failed for map with id {shmem_ctr:?}"
+                            "mmap() failed for map with id {filename_path:?}",
                         )));
                     }
 
@@ -700,13 +718,19 @@ pub mod unix_shmem {
                     })
                 }
             }
+
+            /// Get `filename_path`
+            #[must_use]
+            pub fn filename_path(&self) -> &Option<[u8; MAX_MMAP_FILENAME_LEN]> {
+                &self.filename_path
+            }
         }
 
         /// A [`ShMemProvider`] which uses `shmget`/`shmat`/`shmctl` to provide shared memory mappings.
         #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct MmapShMemProvider {
-            current_shmem_id: usize,
+            rand: StdRand,
         }
 
         unsafe impl Send for MmapShMemProvider {}
@@ -725,12 +749,12 @@ pub mod unix_shmem {
 
             fn new() -> Result<Self, Error> {
                 Ok(Self {
-                    current_shmem_id: 0,
+                    rand: StdRand::new(),
                 })
             }
             fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
-                self.current_shmem_id += 1;
-                MmapShMem::new(map_size, self.current_shmem_id)
+                let id = self.rand.next() as u32;
+                MmapShMem::new(map_size, id)
             }
 
             fn shmem_from_id_and_size(
@@ -1189,7 +1213,7 @@ pub mod win32_shmem {
         },
     };
 
-    /// The default Sharedmap impl for windows using shmctl & shmget
+    /// The default [`ShMem`] impl for Windows using `shmctl` & `shmget`
     #[derive(Clone)]
     pub struct Win32ShMem {
         id: ShMemId,
@@ -1448,6 +1472,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg_attr(miri, ignore)]
     fn test_shmem_service() {
         let mut provider = StdShMemProvider::new().unwrap();
         let mut map = provider.new_shmem(1024).unwrap();

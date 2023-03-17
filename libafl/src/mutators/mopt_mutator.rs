@@ -7,9 +7,10 @@ use core::{
 
 use serde::{Deserialize, Serialize};
 
+use super::MutationId;
 use crate::{
     bolts::rands::{Rand, StdRand},
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,
@@ -310,7 +311,7 @@ impl MOpt {
     /// This function is used to decide the operator that we want to apply next
     /// see <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L397>
     #[allow(clippy::cast_precision_loss)]
-    pub fn select_algorithm(&mut self) -> Result<usize, Error> {
+    pub fn select_algorithm(&mut self) -> Result<MutationId, Error> {
         let mut res = 0;
         let mut sentry = 0;
 
@@ -341,7 +342,7 @@ impl MOpt {
                 "MOpt: Error in select_algorithm".to_string(),
             ));
         }
-        Ok(res)
+        Ok(res.into())
     }
 }
 
@@ -359,21 +360,21 @@ pub enum MOptMode {
 
 /// This is the main struct of `MOpt`, an `AFL` mutator.
 /// See the original `MOpt` implementation in <https://github.com/puppet-meteor/MOpt-AFL>
-pub struct StdMOptMutator<MT, S>
+pub struct StdMOptMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
+    MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
     max_stack_pow: u64,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<MT, S> Debug for StdMOptMutator<MT, S>
+impl<I, MT, S> Debug for StdMOptMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
+    MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -381,21 +382,21 @@ where
             f,
             "StdMOptMutator with {} mutations for Input type {}",
             self.mutations.len(),
-            core::any::type_name::<S::Input>()
+            core::any::type_name::<I>()
         )
     }
 }
 
-impl<MT, S> Mutator<S> for StdMOptMutator<MT, S>
+impl<I, MT, S> Mutator<I, S> for StdMOptMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
+    MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
     #[inline]
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         self.finds_before = state.corpus().count() + state.solutions().count();
@@ -407,12 +408,12 @@ where
         &mut self,
         state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>,
+        _corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();
 
-        let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+        let mopt = state.metadata_map_mut().get_mut::<MOpt>().unwrap();
         let key_module = self.mode;
         match key_module {
             MOptMode::Corefuzzing => {
@@ -521,9 +522,9 @@ where
     }
 }
 
-impl<MT, S> StdMOptMutator<MT, S>
+impl<I, MT, S> StdMOptMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
+    MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
     /// Create a new [`StdMOptMutator`].
@@ -548,11 +549,11 @@ where
     fn core_mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
-        let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+        let mopt = state.metadata_map_mut().get_mut::<MOpt>().unwrap();
         for i in 0..mopt.operator_num {
             mopt.core_operator_cycles_v3[i] = mopt.core_operator_cycles_v2[i];
         }
@@ -567,10 +568,10 @@ where
             }
 
             state
-                .metadata_mut()
+                .metadata_map_mut()
                 .get_mut::<MOpt>()
                 .unwrap()
-                .core_operator_cycles_v2[idx] += 1;
+                .core_operator_cycles_v2[idx.0] += 1;
         }
         Ok(r)
     }
@@ -578,13 +579,13 @@ where
     fn pilot_mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
         let swarm_now;
         {
-            let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+            let mopt = state.metadata_map_mut().get_mut::<MOpt>().unwrap();
             swarm_now = mopt.swarm_now;
 
             for i in 0..mopt.operator_num {
@@ -603,19 +604,19 @@ where
             }
 
             state
-                .metadata_mut()
+                .metadata_map_mut()
                 .get_mut::<MOpt>()
                 .unwrap()
-                .pilot_operator_cycles_v2[swarm_now][idx] += 1;
+                .pilot_operator_cycles_v2[swarm_now][idx.0] += 1;
         }
 
         Ok(r)
     }
 }
 
-impl<MT, S> ComposedByMutations<MT, S> for StdMOptMutator<MT, S>
+impl<I, MT, S> ComposedByMutations<I, MT, S> for StdMOptMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
+    MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
     /// Get the mutations
@@ -631,21 +632,21 @@ where
     }
 }
 
-impl<MT, S> ScheduledMutator<MT, S> for StdMOptMutator<MT, S>
+impl<I, MT, S> ScheduledMutator<I, MT, S> for StdMOptMutator<I, MT, S>
 where
-    MT: MutatorsTuple<S>,
+    MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut S, _: &S::Input) -> u64 {
+    fn iterations(&self, state: &mut S, _: &I) -> u64 {
         1 << (1 + state.rand_mut().below(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
     #[inline]
-    fn schedule(&self, state: &mut S, _: &S::Input) -> usize {
+    fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<MOpt>()
             .unwrap()
             .select_algorithm()
@@ -655,7 +656,7 @@ where
     fn scheduled_mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut I,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mode = self.mode;

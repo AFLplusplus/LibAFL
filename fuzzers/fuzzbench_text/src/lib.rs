@@ -25,13 +25,13 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsSlice,
     },
-    corpus::{Corpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, GeneralizedInput, HasTargetBytes},
+    inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
         grimoire::{
@@ -47,8 +47,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, dump::DumpToDiskStage, power::StdPowerMutationalStage,
-        GeneralizationStage, StdMutationalStage, TracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
+        StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -148,11 +148,8 @@ pub fn libafl_main() {
         }
     }
     let mut crashes = out_dir.clone();
-    let mut report = out_dir.clone();
     crashes.push("crashes");
-    report.push("report");
     out_dir.push("queue");
-    drop(fs::create_dir(&report));
 
     let in_dir = PathBuf::from(
         res.get_one::<String>("in")
@@ -177,10 +174,8 @@ pub fn libafl_main() {
     );
 
     if check_if_textual(&in_dir, &tokens) {
-        fuzz_text(
-            out_dir, crashes, &report, &in_dir, tokens, &logfile, timeout,
-        )
-        .expect("An error occurred while fuzzing");
+        fuzz_text(out_dir, crashes, &in_dir, tokens, &logfile, timeout)
+            .expect("An error occurred while fuzzing");
     } else {
         fuzz_binary(out_dir, crashes, &in_dir, tokens, &logfile, timeout)
             .expect("An error occurred while fuzzing");
@@ -283,7 +278,7 @@ fn fuzz_binary(
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
-        writeln!(&mut stdout_cpy, "{}", s).unwrap();
+        writeln!(&mut stdout_cpy, "{s}").unwrap();
         #[cfg(windows)]
         println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
@@ -316,7 +311,7 @@ fn fuzz_binary(
 
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -326,7 +321,7 @@ fn fuzz_binary(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::new_with_observer(&time_observer)
+        TimeFeedback::with_observer(&time_observer)
     );
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -337,7 +332,7 @@ fn fuzz_binary(
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
-            OnDiskCorpus::new(corpus_dir).unwrap(),
+            InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
@@ -370,11 +365,13 @@ fn fuzz_binary(
         5,
     )?;
 
-    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
+    let power = StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        PowerSchedule::EXPLORE,
+        &mut state,
+        &edges_observer,
+        Some(PowerSchedule::EXPLORE),
     ));
 
     // A fuzzer with feedbacks and a corpus scheduler
@@ -419,7 +416,7 @@ fn fuzz_binary(
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;
@@ -435,7 +432,7 @@ fn fuzz_binary(
     }
 
     // In case the corpus is empty (on first run), reset
-    if state.corpus().count() < 1 {
+    if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
             .unwrap_or_else(|_| {
@@ -466,7 +463,6 @@ fn fuzz_binary(
 fn fuzz_text(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
-    report_dir: &Path,
     seed_dir: &PathBuf,
     tokenfile: Option<PathBuf>,
     logfile: &PathBuf,
@@ -485,7 +481,7 @@ fn fuzz_text(
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
-        writeln!(&mut stdout_cpy, "{}", s).unwrap();
+        writeln!(&mut stdout_cpy, "{s}").unwrap();
         #[cfg(windows)]
         println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
@@ -519,7 +515,7 @@ fn fuzz_text(
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     // New maximization map feedback linked to the edges observer and the feedback state
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
+    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, true);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -528,7 +524,7 @@ fn fuzz_text(
     let mut feedback = feedback_or!(
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::new_with_observer(&time_observer)
+        TimeFeedback::with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -540,7 +536,7 @@ fn fuzz_text(
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
-            OnDiskCorpus::new(corpus_dir).unwrap(),
+            InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
@@ -573,7 +569,7 @@ fn fuzz_text(
         5,
     )?;
 
-    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
+    let power = StdPowerMutationalStage::new(mutator);
 
     let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
         tuple_list!(
@@ -586,18 +582,20 @@ fn fuzz_text(
         ),
         3,
     );
-    let grimoire = StdMutationalStage::new(grimoire_mutator);
+    let grimoire = StdMutationalStage::transforming(grimoire_mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
-        PowerSchedule::EXPLORE,
+        &mut state,
+        &edges_observer,
+        Some(PowerSchedule::EXPLORE),
     ));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &GeneralizedInput| {
+    let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         libfuzzer_test_one_input(buf);
@@ -633,26 +631,11 @@ fn fuzz_text(
         timeout * 10,
     ));
 
-    let fuzzbench = DumpToDiskStage::new(
-        |input: &GeneralizedInput| input.target_bytes().into(),
-        &report_dir.join("queue"),
-        &report_dir.join("crashes"),
-    )
-    .unwrap();
-
     // The order of the stages matter!
-    let mut stages = tuple_list!(
-        fuzzbench,
-        generalization,
-        calibration,
-        tracing,
-        i2s,
-        power,
-        grimoire
-    );
+    let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);
 
     // Read tokens
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;
@@ -668,7 +651,7 @@ fn fuzz_text(
     }
 
     // In case the corpus is empty (on first run), reset
-    if state.corpus().count() < 1 {
+    if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
             .unwrap_or_else(|_| {

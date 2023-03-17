@@ -12,13 +12,13 @@ description = "TinyInst backend for libafl"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cxx = "1.0"
-libafl = { path = "../libafl", version = "0.8.0", features = [
+libafl = { path = "../libafl", version = "0.9.0", features = [
     "std",
     "libafl_derive",
 ] }
-tinyinst-rs = { git = "https://github.com/elbiazo/tinyinst-rs" }
+tinyinst = { git = "https://github.com/AFLplusplus/tinyinst-rs" }
 # tinyinst-rs = { path = "../../tinyinst-rs" }
+log = "0.4.17"
 
 [build-dependencies]
 cmake = "0.1"

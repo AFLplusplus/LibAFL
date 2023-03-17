@@ -56,7 +56,7 @@ impl QemuEdgeCoverageHelper {
     }
 
     #[must_use]
-    pub fn must_instrument(&self, addr: u64) -> bool {
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
 }
@@ -112,7 +112,7 @@ impl QemuEdgeCoverageChildHelper {
     }
 
     #[must_use]
-    pub fn must_instrument(&self, addr: u64) -> bool {
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
 }
@@ -162,16 +162,16 @@ where
     QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.helpers().match_first_type::<QemuEdgeCoverageHelper>() {
-        if !h.must_instrument(src.into()) && !h.must_instrument(dest.into()) {
+        if !h.must_instrument(src) && !h.must_instrument(dest) {
             return None;
         }
     }
     let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
-    if state.metadata().get::<QemuEdgesMapMetadata>().is_none() {
+    if state.metadata_map().get::<QemuEdgesMapMetadata>().is_none() {
         state.add_metadata(QemuEdgesMapMetadata::new());
     }
     let meta = state
-        .metadata_mut()
+        .metadata_map_mut()
         .get_mut::<QemuEdgesMapMetadata>()
         .unwrap();
 
@@ -224,7 +224,7 @@ where
         .helpers()
         .match_first_type::<QemuEdgeCoverageChildHelper>()
     {
-        if !h.must_instrument(src.into()) && !h.must_instrument(dest.into()) {
+        if !h.must_instrument(src) && !h.must_instrument(dest) {
             return None;
         }
     }

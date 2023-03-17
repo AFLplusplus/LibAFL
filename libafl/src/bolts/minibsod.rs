@@ -345,6 +345,45 @@ pub fn dump_registers<W: Write>(
     write!(writer, "cs : {:#016x}, ", ucontext.sc_cs)?;
     Ok(())
 }
+///
+/// Write the content of all important registers
+#[cfg(all(
+    any(target_os = "solaris", target_os = "illumos"),
+    target_arch = "x86_64"
+))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    use libc::{
+        REG_R10, REG_R11, REG_R12, REG_R13, REG_R14, REG_R15, REG_R8, REG_R9, REG_RAX, REG_RBP,
+        REG_RBX, REG_RCX, REG_RDI, REG_RDX, REG_RFL, REG_RIP, REG_RSI, REG_RSP,
+    };
+
+    let mcontext = &ucontext.uc_mcontext;
+
+    write!(writer, "r8 : {:#016x}, ", mcontext.gregs[REG_R8 as usize])?;
+    write!(writer, "r9 : {:#016x}, ", mcontext.gregs[REG_R9 as usize])?;
+    write!(writer, "r10: {:#016x}, ", mcontext.gregs[REG_R10 as usize])?;
+    writeln!(writer, "r11: {:#016x}, ", mcontext.gregs[REG_R11 as usize])?;
+    write!(writer, "r12: {:#016x}, ", mcontext.gregs[REG_R12 as usize])?;
+    write!(writer, "r13: {:#016x}, ", mcontext.gregs[REG_R13 as usize])?;
+    write!(writer, "r14: {:#016x}, ", mcontext.gregs[REG_R14 as usize])?;
+    writeln!(writer, "r15: {:#016x}, ", mcontext.gregs[REG_R15 as usize])?;
+    write!(writer, "rdi: {:#016x}, ", mcontext.gregs[REG_RDI as usize])?;
+    write!(writer, "rsi: {:#016x}, ", mcontext.gregs[REG_RSI as usize])?;
+    write!(writer, "rbp: {:#016x}, ", mcontext.gregs[REG_RBP as usize])?;
+    writeln!(writer, "rbx: {:#016x}, ", mcontext.gregs[REG_RBX as usize])?;
+    write!(writer, "rdx: {:#016x}, ", mcontext.gregs[REG_RDX as usize])?;
+    write!(writer, "rax: {:#016x}, ", mcontext.gregs[REG_RAX as usize])?;
+    write!(writer, "rcx: {:#016x}, ", mcontext.gregs[REG_RCX as usize])?;
+    writeln!(writer, "rsp: {:#016x}, ", mcontext.gregs[REG_RSP as usize])?;
+    write!(writer, "rip: {:#016x}, ", mcontext.gregs[REG_RIP as usize])?;
+    writeln!(writer, "efl: {:#016x}, ", mcontext.gregs[REG_RFL as usize])?;
+
+    Ok(())
+}
 
 #[allow(clippy::unnecessary_wraps)]
 #[cfg(not(any(
@@ -353,7 +392,8 @@ pub fn dump_registers<W: Write>(
     target_os = "android",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
+    any(target_os = "solaris", target_os = "illumos"),
 )))]
 fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -519,13 +559,34 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
+#[cfg(all(
+    any(target_os = "solaris", target_os = "illumos"),
+    target_arch = "x86_64"
+))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:#016x}, fault address: {:#016x}",
+        signal,
+        ucontext.uc_mcontext.gregs[libc::REG_RIP as usize],
+        ucontext.uc_mcontext.gregs[libc::REG_FS as usize]
+    )?;
+
+    Ok(())
+}
+
 #[cfg(not(any(
     target_vendor = "apple",
     target_os = "linux",
     target_os = "android",
     target_os = "freebsd",
     target_os = "openbsd",
-    target_os = "netbsd"
+    target_os = "netbsd",
+    any(target_os = "solaris", target_os = "illumos"),
 )))]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
@@ -574,6 +635,7 @@ mod tests {
     use crate::bolts::{minibsod::dump_registers, os::unix_signals::ucontext};
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     pub fn test_dump_registers() {
         let ucontext = ucontext().unwrap();
         let mut writer = BufWriter::new(stdout());

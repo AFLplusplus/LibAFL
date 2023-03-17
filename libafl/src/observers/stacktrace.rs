@@ -26,7 +26,7 @@ use crate::{
 /// ([`Debug`] is currently used for dev purposes, symbols hash will be used eventually)
 #[must_use]
 pub fn collect_backtrace() -> u64 {
-    let b = Backtrace::new();
+    let b = Backtrace::new_unresolved();
     if b.frames().is_empty() {
         return 0;
     }
@@ -36,8 +36,8 @@ pub fn collect_backtrace() -> u64 {
     }
     // will use symbols later
     // let trace = format!("{:?}", b);
-    // eprintln!("{}", trace);
-    // println!(
+    // log::trace!("{}", trace);
+    // log::info!(
     //     "backtrace collected with hash={} at pid={}",
     //     hash,
     //     std::process::id()
@@ -52,6 +52,8 @@ pub enum HarnessType {
     InProcess,
     /// Harness type when the target is a child process
     Child,
+    /// Harness type with an external component filling the backtrace hash (e.g. `CrashBacktraceCollector` in `libafl_qemu`)
+    External,
 }
 
 /// An observer looking at the backtrace after the harness crashes
@@ -77,23 +79,34 @@ impl<'a> BacktraceObserver<'a> {
             harness_type,
         }
     }
-}
-
-impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
-    /// Gets the hash value of this observer.
-    #[must_use]
-    fn hash(&self) -> &Option<u64> {
-        self.hash.as_ref()
-    }
 
     /// Updates the hash value of this observer.
     fn update_hash(&mut self, hash: u64) {
         *self.hash.as_mut() = Some(hash);
     }
 
-    /// Clears the current hash value
+    /// Clears the current hash value (sets it to `None`)
     fn clear_hash(&mut self) {
         *self.hash.as_mut() = None;
+    }
+
+    /// Fill the hash value if the harness type is external
+    pub fn fill_external(&mut self, hash: u64, exit_kind: &ExitKind) {
+        if self.harness_type == HarnessType::External {
+            if *exit_kind == ExitKind::Crash {
+                self.update_hash(hash);
+            } else {
+                self.clear_hash();
+            }
+        }
+    }
+}
+
+impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
+    /// Gets the hash value of this observer.
+    #[must_use]
+    fn hash(&self) -> Option<u64> {
+        *self.hash.as_ref()
     }
 }
 
@@ -108,7 +121,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         if self.harness_type == HarnessType::InProcess {
-            if exit_kind == &ExitKind::Crash {
+            if *exit_kind == ExitKind::Crash {
                 self.update_hash(collect_backtrace());
             } else {
                 self.clear_hash();
@@ -124,7 +137,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         if self.harness_type == HarnessType::Child {
-            if exit_kind == &ExitKind::Crash {
+            if *exit_kind == ExitKind::Crash {
                 self.update_hash(collect_backtrace());
             } else {
                 self.clear_hash();
@@ -219,23 +232,18 @@ impl AsanBacktraceObserver {
         });
         self.update_hash(hash);
     }
-}
-
-impl ObserverWithHashField for AsanBacktraceObserver {
-    /// Gets the hash value of this observer.
-    #[must_use]
-    fn hash(&self) -> &Option<u64> {
-        &self.hash
-    }
 
     /// Updates the hash value of this observer.
     fn update_hash(&mut self, hash: u64) {
         self.hash = Some(hash);
     }
+}
 
-    /// Clears the current hash value
-    fn clear_hash(&mut self) {
-        self.hash = None;
+impl ObserverWithHashField for AsanBacktraceObserver {
+    /// Gets the hash value of this observer.
+    #[must_use]
+    fn hash(&self) -> Option<u64> {
+        self.hash
     }
 }
 

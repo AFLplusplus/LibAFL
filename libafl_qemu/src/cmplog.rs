@@ -42,7 +42,7 @@ impl QemuCmpLogHelper {
     }
 
     #[must_use]
-    pub fn must_instrument(&self, addr: u64) -> bool {
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
 }
@@ -83,7 +83,7 @@ impl QemuCmpLogChildHelper {
     }
 
     #[must_use]
-    pub fn must_instrument(&self, addr: u64) -> bool {
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
 }
@@ -127,16 +127,16 @@ where
     QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.match_helper_mut::<QemuCmpLogHelper>() {
-        if !h.must_instrument(pc.into()) {
+        if !h.must_instrument(pc) {
             return None;
         }
     }
     let state = state.expect("The gen_unique_cmp_ids hook works only for in-process fuzzing");
-    if state.metadata().get::<QemuCmpsMapMetadata>().is_none() {
+    if state.metadata_map().get::<QemuCmpsMapMetadata>().is_none() {
         state.add_metadata(QemuCmpsMapMetadata::new());
     }
     let meta = state
-        .metadata_mut()
+        .metadata_map_mut()
         .get_mut::<QemuCmpsMapMetadata>()
         .unwrap();
     let id = meta.current_id as usize;
@@ -159,7 +159,7 @@ where
     QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.match_helper_mut::<QemuCmpLogChildHelper>() {
-        if !h.must_instrument(pc.into()) {
+        if !h.must_instrument(pc) {
             return None;
         }
     }

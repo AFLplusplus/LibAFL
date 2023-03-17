@@ -62,7 +62,7 @@ pub fn fuzz() {
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
-    println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
+    println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
     emu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     unsafe { emu.run() };
@@ -75,8 +75,8 @@ pub fn fuzz() {
     unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
     let ret_addr = u64::from_le_bytes(ret_addr);
 
-    println!("Stack pointer = {:#x}", stack_ptr);
-    println!("Return address = {:#x}", ret_addr);
+    println!("Stack pointer = {stack_ptr:#x}");
+    println!("Return address = {ret_addr:#x}");
 
     emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
@@ -84,7 +84,7 @@ pub fn fuzz() {
     let input_addr = emu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
         .unwrap();
-    println!("Placing input at {:#x}", input_addr);
+    println!("Placing input at {input_addr:#x}");
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
@@ -127,9 +127,9 @@ pub fn fuzz() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::new_tracking(&edges_observer, true, false),
+            MaxMapFeedback::tracking(&edges_observer, true, false),
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::new_with_observer(&time_observer)
+            TimeFeedback::with_observer(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
@@ -176,7 +176,7 @@ pub fn fuzz() {
         // Wrap the executor to keep track of the timeout
         let mut executor = TimeoutExecutor::new(executor, timeout);
 
-        if state.corpus().count() < 1 {
+        if state.must_load_initial_inputs() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
                 .unwrap_or_else(|_| {
@@ -214,6 +214,6 @@ pub fn fuzz() {
     {
         Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
-        Err(err) => panic!("Failed to run launcher: {:?}", err),
+        Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
 }

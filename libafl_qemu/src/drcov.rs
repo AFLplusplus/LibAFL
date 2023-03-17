@@ -1,7 +1,9 @@
 use std::{path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{inputs::UsesInput, state::HasMetadata};
+use libafl::{
+    executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, state::HasMetadata,
+};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
@@ -42,6 +44,7 @@ pub struct QemuDrCovHelper {
 
 impl QemuDrCovHelper {
     #[must_use]
+    #[allow(clippy::let_underscore_untyped)]
     pub fn new(
         filter: QemuInstrumentationFilter,
         module_mapping: RangeMap<usize, (u16, String)>,
@@ -62,7 +65,7 @@ impl QemuDrCovHelper {
     }
 
     #[must_use]
-    pub fn must_instrument(&self, addr: u64) -> bool {
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
 }
@@ -83,7 +86,15 @@ where
 
     fn pre_exec(&mut self, _emulator: &Emulator, _input: &S::Input) {}
 
-    fn post_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
+    fn post_exec<OT>(
+        &mut self,
+        emulator: &Emulator,
+        _input: &S::Input,
+        _observers: &mut OT,
+        _exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+    {
         if self.full_trace {
             if DRCOV_IDS.lock().unwrap().as_ref().unwrap().len() > self.drcov_len {
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
@@ -103,7 +114,16 @@ where
                             continue 'pcs_full;
                         }
                         if *idm == *id {
-                            match pc2basicblock(*pc, emulator) {
+                            #[cfg(cpu_target = "arm")]
+                            let mode = if pc & 1 == 1 {
+                                Some(capstone::arch::arm::ArchMode::Thumb.into())
+                            } else {
+                                Some(capstone::arch::arm::ArchMode::Arm.into())
+                            };
+                            #[cfg(not(cpu_target = "arm"))]
+                            let mode = None;
+
+                            match pc2basicblock(*pc, emulator, mode) {
                                 Ok(block) => {
                                     let mut block_len = 0;
                                     for instr in &block {
@@ -114,7 +134,7 @@ where
                                         *pc as usize + block_len,
                                     ));
                                 }
-                                Err(r) => println!("{r:#?}"),
+                                Err(r) => log::info!("{r:#?}"),
                             }
                         }
                     }
@@ -142,7 +162,17 @@ where
                     if !module_found {
                         continue 'pcs;
                     }
-                    match pc2basicblock(*pc, emulator) {
+
+                    #[cfg(cpu_target = "arm")]
+                    let mode = if pc & 1 == 1 {
+                        Some(capstone::arch::arm::ArchMode::Thumb.into())
+                    } else {
+                        Some(capstone::arch::arm::ArchMode::Arm.into())
+                    };
+                    #[cfg(not(cpu_target = "arm"))]
+                    let mode = None;
+
+                    match pc2basicblock(*pc, emulator, mode) {
                         Ok(block) => {
                             let mut block_len = 0;
                             for instr in &block {
@@ -151,7 +181,7 @@ where
                             drcov_vec
                                 .push(DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len));
                         }
-                        Err(r) => println!("{r:#?}"),
+                        Err(r) => log::info!("{r:#?}"),
                     }
                 }
 
@@ -178,19 +208,22 @@ where
         .helpers()
         .match_first_type::<QemuDrCovHelper>()
         .unwrap();
-    if !drcov_helper.must_instrument(pc.into()) {
+    if !drcov_helper.must_instrument(pc) {
         return None;
     }
 
     let state = state.expect("The gen_unique_block_ids hook works only for in-process fuzzing");
     if state
-        .metadata_mut()
+        .metadata_map_mut()
         .get_mut::<QemuDrCovMetadata>()
         .is_none()
     {
         state.add_metadata(QemuDrCovMetadata::new());
     }
-    let meta = state.metadata_mut().get_mut::<QemuDrCovMetadata>().unwrap();
+    let meta = state
+        .metadata_map_mut()
+        .get_mut::<QemuDrCovMetadata>()
+        .unwrap();
 
     match DRCOV_MAP.lock().unwrap().as_mut().unwrap().entry(pc) {
         Entry::Occupied(e) => {

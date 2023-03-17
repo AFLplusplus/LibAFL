@@ -18,6 +18,8 @@ EXT_FUNC_IMPL(LLVMFuzzerTestOneInput, int, (uint8_t *Data, size_t Size), false) 
 
 EXT_FUNC_IMPL(libafl_main, void, (void), false) {
 }
+
+#ifndef FUZZER_NO_LINK_MAIN
 EXT_FUNC_IMPL(main, int, (int argc, char** argv), false) {
   libafl_main();
   return 0;
@@ -29,6 +31,7 @@ EXT_FUNC_IMPL(main, int, (int argc, char** argv), false) {
 int main(int argc, char** argv) {
    libafl_main();
 }
+#endif
 #endif
 
 #pragma GCC diagnostic pop

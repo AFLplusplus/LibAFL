@@ -1,21 +1,23 @@
-//! The cached ondisk corpus stores testcases to disk keeping a part of them in memory.
+//! The [`CachedOnDiskCorpus`] stores [`Testcase`]s to disk, keeping a subset of them in memory/cache, evicting in a FIFO manner.
 
 use alloc::collections::vec_deque::VecDeque;
 use core::cell::RefCell;
-use std::path::PathBuf;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{
-        ondisk::{OnDiskCorpus, OnDiskMetadataFormat},
-        Corpus, Testcase,
+        inmemory_ondisk::InMemoryOnDiskCorpus, ondisk::OnDiskMetadataFormat, Corpus, CorpusId,
+        Testcase,
     },
     inputs::{Input, UsesInput},
     Error,
 };
 
-/// A corpus that keep in memory a maximun number of testcases. The eviction policy is FIFO.
+/// A corpus that keeps a maximum number of [`Testcase`]s in memory
+/// and load them from disk, when they are being used
+/// The eviction policy is FIFO.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -23,8 +25,8 @@ pub struct CachedOnDiskCorpus<I>
 where
     I: Input,
 {
-    inner: OnDiskCorpus<I>,
-    cached_indexes: RefCell<VecDeque<usize>>,
+    inner: InMemoryOnDiskCorpus<I>,
+    cached_indexes: RefCell<VecDeque<CorpusId>>,
     cache_max_len: usize,
 }
 
@@ -47,33 +49,31 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error> {
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         self.inner.add(testcase)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         // TODO finish
         self.inner.replace(idx, testcase)
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
         let testcase = self.inner.remove(idx)?;
-        if testcase.is_some() {
-            self.cached_indexes.borrow_mut().retain(|e| *e != idx);
-        }
+        self.cached_indexes.borrow_mut().retain(|e| *e != idx);
         Ok(testcase)
     }
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let testcase = { self.inner.get(idx)? };
         if testcase.borrow().input().is_none() {
-            let _ = testcase.borrow_mut().load_input()?;
+            let _: &I = testcase.borrow_mut().load_input()?;
             let mut borrowed_num = 0;
             while self.cached_indexes.borrow().len() >= self.cache_max_len {
                 let removed = self.cached_indexes.borrow_mut().pop_front().unwrap();
@@ -94,14 +94,39 @@ where
 
     /// Current testcase scheduled
     #[inline]
-    fn current(&self) -> &Option<usize> {
+    fn current(&self) -> &Option<CorpusId> {
         self.inner.current()
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
-    fn current_mut(&mut self) -> &mut Option<usize> {
+    fn current_mut(&mut self) -> &mut Option<CorpusId> {
         self.inner.current_mut()
+    }
+
+    #[inline]
+    fn next(&self, idx: CorpusId) -> Option<CorpusId> {
+        self.inner.next(idx)
+    }
+
+    #[inline]
+    fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
+        self.inner.prev(idx)
+    }
+
+    #[inline]
+    fn first(&self) -> Option<CorpusId> {
+        self.inner.first()
+    }
+
+    #[inline]
+    fn last(&self) -> Option<CorpusId> {
+        self.inner.last()
+    }
+
+    #[inline]
+    fn nth(&self, nth: usize) -> CorpusId {
+        self.inner.nth(nth)
     }
 }
 
@@ -110,32 +135,58 @@ where
     I: Input,
 {
     /// Creates the [`CachedOnDiskCorpus`].
-    pub fn new(dir_path: PathBuf, cache_max_len: usize) -> Result<Self, Error> {
-        if cache_max_len == 0 {
-            return Err(Error::illegal_argument(
-                "The max cache len in CachedOnDiskCorpus cannot be 0",
-            ));
-        }
-        Ok(Self {
-            inner: OnDiskCorpus::new(dir_path)?,
-            cached_indexes: RefCell::new(VecDeque::new()),
-            cache_max_len,
-        })
+    ///
+    /// This corpus stores (and reads) all testcases to/from disk
+    ///
+    /// By default, it stores metadata for each [`Testcase`] as prettified json.
+    /// Metadata will be written to a file named `.<testcase>.metadata`
+    /// the metadata may include objective reason, specific information for a fuzz job, and more.
+    ///
+    /// If you don't want metadata, use [`CachedOnDiskCorpus::no_meta`].
+    /// to pick a different metadata format, use [`CachedOnDiskCorpus::with_meta_format`].
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn new<P>(dir_path: P, cache_max_len: usize) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        Self::_new(InMemoryOnDiskCorpus::new(dir_path)?, cache_max_len)
     }
 
-    /// Creates the [`CachedOnDiskCorpus`] specifying the type of `Metadata` to be saved to disk.
-    pub fn new_save_meta(
-        dir_path: PathBuf,
-        meta_format: Option<OnDiskMetadataFormat>,
+    /// Creates an [`CachedOnDiskCorpus`] that does not store [`Testcase`] metadata to disk.
+    pub fn no_meta<P>(dir_path: P, cache_max_len: usize) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        Self::_new(InMemoryOnDiskCorpus::no_meta(dir_path)?, cache_max_len)
+    }
+
+    /// Creates the [`CachedOnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk.
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn with_meta_format<P>(
+        dir_path: P,
         cache_max_len: usize,
-    ) -> Result<Self, Error> {
+        meta_format: OnDiskMetadataFormat,
+    ) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        Self::_new(
+            InMemoryOnDiskCorpus::with_meta_format(dir_path, meta_format)?,
+            cache_max_len,
+        )
+    }
+
+    /// Internal constructor `fn`
+    fn _new(on_disk_corpus: InMemoryOnDiskCorpus<I>, cache_max_len: usize) -> Result<Self, Error> {
         if cache_max_len == 0 {
             return Err(Error::illegal_argument(
                 "The max cache len in CachedOnDiskCorpus cannot be 0",
             ));
         }
         Ok(Self {
-            inner: OnDiskCorpus::new_save_meta(dir_path, meta_format)?,
+            inner: on_disk_corpus,
             cached_indexes: RefCell::new(VecDeque::new()),
             cache_max_len,
         })

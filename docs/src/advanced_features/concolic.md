@@ -1,4 +1,5 @@
 # Concolic Tracing and Hybrid Fuzzing
+
 LibAFL has support for concolic tracing based on the [SymCC](https://github.com/eurecom-s3/symcc) instrumenting compiler.
 
 For those uninitiated, the following text attempts to describe concolic tracing from the ground up using an example.
@@ -96,10 +97,10 @@ These callbacks allow the runtime to construct a trace that is similar to the pr
 
 ### SymCC and its Runtimes
 
-SymCC ships with 2 runtimes: 
+SymCC ships with 2 runtimes:
 
- * a 'simple' runtime that attempts to solve any branch conditions it comes across using [Z3](https://github.com/Z3Prover/z3/wiki) and
- * a [QSym](https://github.com/sslab-gatech/qsym)-based runtime, which does a bit more filtering on the expressions and also solves them using Z3.
+* A 'simple' runtime that attempts to negate and analytically solve any branch conditions it comes across using [Z3](https://github.com/Z3Prover/z3/wiki) and
+* A [QSym](https://github.com/sslab-gatech/qsym)-based runtime, which does a bit more filtering on the expressions and also solves them using Z3.
 
 The integration with LibAFL, however, requires you to **BYORT** (_bring your own runtime_) using the [`symcc_runtime`](https://docs.rs/symcc_runtime/0.1/symcc_runtime) crate.
 This crate allows you to easily build a custom runtime out of the built-in building blocks or create entirely new runtimes with full flexibility.
@@ -134,10 +135,12 @@ Check out the [example hybrid fuzzer's runtime](https://github.com/AFLplusplus/L
 ### Instrumentation
 
 There are two main instrumentation methods to make use of concolic tracing in LibAFL:
-* Using an **compile-time** instrumented target with **SymCC**. 
+
+* Using a **compile-time** instrumented target with **SymCC**.
 This only works when the source is available for the target and the target is reasonably easy to build using the SymCC compiler wrapper.
 * Using **SymQEMU** to dynamically instrument the target at **runtime**.
 This avoids building a separate instrumented target with concolic tracing instrumentation and so does not require source code.
+
 It should be noted, however, that the 'quality' of the generated expressions can be significantly worse and SymQEMU generally produces significantly more and significantly more convoluted expressions than SymCC.
 Therefore, it is recommended to use SymCC over SymQEMU when possible.
 
