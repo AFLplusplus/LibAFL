@@ -22,7 +22,7 @@ use crate::{
         rands::Rand,
         serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     },
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -217,18 +217,6 @@ pub trait HasStartTime {
 
     /// The starting time (mutable)
     fn start_time_mut(&mut self) -> &mut Duration;
-}
-
-/// Trait for the testcase
-pub trait HasTestcase: UsesInput {
-    /// To get the testcase
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error>;
-
-    /// To get mutable testcase
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error>;
 }
 
 /// The state a fuzz run.
