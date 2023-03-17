@@ -10,6 +10,7 @@ LibAFL is written and maintained by
  * [Dominik Maier](https://twitter.com/domenuk) <dominik@aflplus.plus>
  * [s1341](https://twitter.com/srubenst1341) <github@shmarya.net>
  * [Dongjia Zhang](https://github.com/tokatoka) <toka@aflplus.plus>
+ * [Addison Crump](https://github.com/addisoncrump) <me@addisoncrump.info>
 
 ## Why LibAFL?
 
