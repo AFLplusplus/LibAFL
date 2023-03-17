@@ -558,7 +558,7 @@ where
 
     /// Creates a new [`MapObserver`] with an owned map
     #[must_use]
-    pub fn new_owned<S>(name: S, map: Vec<T>) -> Self
+    pub fn owned<S>(name: S, map: Vec<T>) -> Self
     where
         S: Into<String>,
     {
@@ -905,7 +905,7 @@ where
 
     /// Creates a new [`MapObserver`] with an owned map
     #[must_use]
-    pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
+    pub fn owned(name: &'static str, map: Vec<T>) -> Self {
         assert!(map.len() >= N);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
@@ -1828,7 +1828,7 @@ where
 {
     /// Creates a new [`MultiMapObserver`], maybe in differential mode
     #[must_use]
-    fn new_maybe_differential(name: &'static str, maps: Vec<OwnedMutSlice<'a, T>>) -> Self {
+    fn maybe_differential(name: &'static str, maps: Vec<OwnedMutSlice<'a, T>>) -> Self {
         let mut idx = 0;
         let mut builder = vec![];
         for (v, x) in maps.iter().enumerate() {
@@ -1855,7 +1855,7 @@ where
     /// Creates a new [`MultiMapObserver`] in differential mode
     #[must_use]
     pub fn differential(name: &'static str, maps: Vec<OwnedMutSlice<'a, T>>) -> Self {
-        Self::new_maybe_differential(name, maps)
+        Self::maybe_differential(name, maps)
     }
 }
 
@@ -1866,12 +1866,12 @@ where
     /// Creates a new [`MultiMapObserver`]
     #[must_use]
     pub fn new(name: &'static str, maps: Vec<OwnedMutSlice<'a, T>>) -> Self {
-        Self::new_maybe_differential(name, maps)
+        Self::maybe_differential(name, maps)
     }
 
     /// Creates a new [`MultiMapObserver`] with an owned map
     #[must_use]
-    pub fn new_owned(name: &'static str, maps: Vec<Vec<T>>) -> Self {
+    pub fn owned(name: &'static str, maps: Vec<Vec<T>>) -> Self {
         let mut idx = 0;
         let mut v = 0;
         let mut builder = vec![];
@@ -2253,7 +2253,7 @@ pub mod pybind {
 
                 #[must_use]
                 pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
-                    $struct_name_trait::new_std(slf)
+                    $struct_name_trait::std(slf)
                 }
 
                 #[must_use]
@@ -2311,7 +2311,7 @@ pub mod pybind {
 
                 #[must_use]
                 pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
-                    $struct_name_trait::new_owned(slf)
+                    $struct_name_trait::owned(slf)
                 }
 
                 #[must_use]
