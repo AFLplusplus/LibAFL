@@ -103,7 +103,7 @@ where
     /// Create llmp on a port
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn new_on_port(shmem_provider: SP, monitor: MT, port: u16) -> Result<Self, Error> {
+    pub fn on_port(shmem_provider: SP, monitor: MT, port: u16) -> Result<Self, Error> {
         Ok(Self {
             monitor,
             llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
@@ -371,7 +371,7 @@ where
     /// If the port is not yet bound, it will act as broker
     /// Else, it will act as client.
     #[cfg(feature = "std")]
-    pub fn new_on_port(
+    pub fn on_port(
         shmem_provider: SP,
         port: u16,
         configuration: EventConfig,
@@ -937,7 +937,7 @@ where
                     }
                 }
                 ManagerKind::Broker => {
-                    let event_broker = LlmpEventBroker::<S::Input, MT, SP>::new_on_port(
+                    let event_broker = LlmpEventBroker::<S::Input, MT, SP>::on_port(
                         self.shmem_provider.clone(),
                         self.monitor.take().unwrap(),
                         self.broker_port,
@@ -948,7 +948,7 @@ where
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
-                    let mgr = LlmpEventManager::<S, SP>::new_on_port(
+                    let mgr = LlmpEventManager::<S, SP>::on_port(
                         self.shmem_provider.clone(),
                         self.broker_port,
                         self.configuration,
@@ -1166,7 +1166,7 @@ where
 
     /// Create a client from port and the input converters
     #[cfg(feature = "std")]
-    pub fn new_on_port(
+    pub fn on_port(
         shmem_provider: SP,
         port: u16,
         converter: Option<IC>,

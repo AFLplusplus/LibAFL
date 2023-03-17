@@ -578,7 +578,7 @@ impl AsanErrorsObserver {
 
     /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`
     #[must_use]
-    pub fn new_owned(errors: Option<AsanErrors>) -> Self {
+    pub fn owned(errors: Option<AsanErrors>) -> Self {
         Self {
             errors: OwnedPtr::Owned(Box::new(errors)),
         }
