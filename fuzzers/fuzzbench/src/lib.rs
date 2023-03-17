@@ -40,9 +40,10 @@ use libafl::{
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
+    skippable,
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage,
+        calibrate::CalibrationStage, logics::IfElseStage, power::StdPowerMutationalStage,
+        StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,

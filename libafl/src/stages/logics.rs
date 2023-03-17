@@ -9,6 +9,15 @@ use crate::{
     Error,
 };
 
+/// Macro to replace skippable stage
+#[macro_export]
+macro_rules! skippable {
+    ( $cond:expr, $if_stages:expr) => {
+        // recursive call
+        $crate::stages::IfElseStage::new($cond, tuple_list!($if_stage), tuple_list!())
+    };
+}
+
 #[derive(Debug)]
 /// Perform the stage while closure evaluates to true
 pub struct WhileStage<CB, E, EM, ST, Z>
@@ -79,37 +88,40 @@ where
 
 /// Perform the stage if closure evaluates to true
 #[derive(Debug)]
-pub struct IfElseStage<CB, E, EM, ST, Z>
+pub struct IfElseStage<CB, E, EM, ST1, ST2, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
-    ST: StagesTuple<E, EM, E::State, Z>,
+    ST1: StagesTuple<E, EM, E::State, Z>,
+    ST2: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
     closure: CB,
-    if_stages: ST,
-    else_stages: ST,
+    if_stages: ST1,
+    else_stages: ST2,
     phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<CB, E, EM, ST, Z> UsesState for IfElseStage<CB, E, EM, ST, Z>
+impl<CB, E, EM, ST1, ST2, Z> UsesState for IfElseStage<CB, E, EM, ST1, ST2, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
-    ST: StagesTuple<E, EM, E::State, Z>,
+    ST1: StagesTuple<E, EM, E::State, Z>,
+    ST2: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
     type State = E::State;
 }
 
-impl<CB, E, EM, ST, Z> Stage<E, EM, Z> for IfElseStage<CB, E, EM, ST, Z>
+impl<CB, E, EM, ST1, ST2, Z> Stage<E, EM, Z> for IfElseStage<CB, E, EM, ST1, ST2, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
-    ST: StagesTuple<E, EM, E::State, Z>,
+    ST1: StagesTuple<E, EM, E::State, Z>,
+    ST2: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
     fn perform(
@@ -131,16 +143,17 @@ where
     }
 }
 
-impl<CB, E, EM, ST, Z> IfElseStage<CB, E, EM, ST, Z>
+impl<CB, E, EM, ST1, ST2, Z> IfElseStage<CB, E, EM, ST1, ST2, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
-    ST: StagesTuple<E, EM, E::State, Z>,
+    ST1: StagesTuple<E, EM, E::State, Z>,
+    ST2: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
     /// Constructor
-    pub fn new(closure: CB, if_stages: ST, else_stages: ST) -> Self {
+    pub fn new(closure: CB, if_stages: ST1, else_stages: ST2) -> Self {
         Self {
             closure,
             if_stages,
