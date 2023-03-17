@@ -324,6 +324,14 @@ where
     }
 }
 
+impl<I, C, R, SC> HasTestcase for StdState<I, C, R, SC>
+where
+    I: Input,
+    C: Corpus<Input = <Self as UsesInput>::Input>,
+    R: Rand,
+{
+}
+
 impl<I, C, R, SC> HasSolutions for StdState<I, C, R, SC>
 where
     I: Input,
