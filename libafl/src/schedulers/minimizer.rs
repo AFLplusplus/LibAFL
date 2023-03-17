@@ -140,6 +140,8 @@ where
                                         }
                                     })
                                     .or_insert((factor, i));
+                                entry = e_iter.next();
+                                map_entry = map_iter.next();
                             }
                             Ordering::Greater => {
                                 map_entry = map_iter.next();
