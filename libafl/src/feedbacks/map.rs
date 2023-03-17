@@ -666,7 +666,7 @@ where
 
     /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
     #[must_use]
-    pub fn new_tracking(map_observer: &O, track_indexes: bool, track_novelties: bool) -> Self {
+    pub fn tracking(map_observer: &O, track_indexes: bool, track_novelties: bool) -> Self {
         Self {
             indexes: track_indexes,
             novelties: if track_novelties { Some(vec![]) } else { None },

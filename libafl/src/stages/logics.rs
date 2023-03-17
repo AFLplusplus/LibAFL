@@ -77,6 +77,8 @@ where
     }
 }
 
+/// A conditionally enabled stage.
+/// If the closure returns true, the wrapped stage will be executed, else it will be skipped.
 #[derive(Debug)]
 pub struct IfStage<CB, E, EM, ST, Z>
 where
@@ -134,7 +136,8 @@ where
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
-    /// Constructor
+    /// Constructor for this conditionally enabled stage.
+    /// If the closure returns true, the wrapped stage will be executed, else it will be skipped.
     pub fn new(closure: CB, if_stages: ST) -> Self {
         Self {
             closure,

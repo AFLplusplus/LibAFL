@@ -155,7 +155,7 @@ pub fn fuzz() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::new_tracking(&edges_observer, true, true),
+            MaxMapFeedback::tracking(&edges_observer, true, true),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::with_observer(&time_observer)
         );
