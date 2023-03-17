@@ -1,10 +1,10 @@
 [package]
-name = "frida_fuzzer"
+name = "frida_executable_fuzzer"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "frida_fuzzer"
+name = "frida_executable_fuzzer"
 crate_type = ["cdylib"]
 
 [features]
