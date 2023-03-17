@@ -17,7 +17,10 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, HasTestcase,
+        UsesState,
+    },
     Error,
 };
 
@@ -234,7 +237,13 @@ where
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     EM: UsesState<State = S> + EventFirer,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasCorpus + HasRand + HasMetadata,
+    S: UsesInput
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasCorpus
+        + HasRand
+        + HasMetadata
+        + HasTestcase,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<EM, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -262,7 +271,7 @@ where
                 last_id.map_or_else(|| state.corpus().first(), |id| state.corpus().next(id));
 
             while let Some(id) = cur_id {
-                let input = state.corpus().get(id)?.borrow_mut().load_input()?.clone();
+                let input = state.testcase_mut(id)?.load_input()?.clone();
 
                 self.client.fire(
                     state,

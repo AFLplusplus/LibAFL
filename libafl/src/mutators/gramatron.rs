@@ -13,7 +13,7 @@ use crate::{
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
     random_corpus_id,
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand, HasTestcase},
     Error,
 };
 
@@ -99,7 +99,7 @@ pub struct GramatronSpliceMutator;
 
 impl<S> Mutator<S::Input, S> for GramatronSpliceMutator
 where
-    S: HasRand + HasCorpus<Input = GramatronInput> + HasMetadata,
+    S: HasRand + HasCorpus<Input = GramatronInput> + HasMetadata + HasTestcase,
 {
     fn mutate(
         &mut self,
@@ -117,7 +117,7 @@ where
 
         let rand_num = state.rand_mut().next() as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.testcase_mut(idx)?;
         other_testcase.load_input()?; // Preload the input
 
         if !other_testcase.has_metadata::<GramatronIdxMapMetadata>() {
