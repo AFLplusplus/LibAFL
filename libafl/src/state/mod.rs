@@ -220,19 +220,15 @@ pub trait HasStartTime {
 }
 
 /// Trait for the testcase
-pub trait HasTestcase: HasCorpus {
+pub trait HasTestcase: UsesInput {
     /// To get the testcase
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
-        Ok(self.corpus().get(id)?.borrow())
-    }
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error>;
 
     /// To get mutable testcase
     fn testcase_mut(
         &self,
         id: CorpusId,
-    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
-        Ok(self.corpus().get(id)?.borrow_mut())
-    }
+    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error>;
 }
 
 /// The state a fuzz run.
@@ -330,6 +326,18 @@ where
     C: Corpus<Input = <Self as UsesInput>::Input>,
     R: Rand,
 {
+    /// To get the testcase
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.corpus().get(id)?.borrow())
+    }
+
+    /// To get mutable testcase
+    fn testcase_mut(
+        &self,
+        id: CorpusId,
+    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.corpus().get(id)?.borrow_mut())
+    }
 }
 
 impl<I, C, R, SC> HasSolutions for StdState<I, C, R, SC>
