@@ -9,15 +9,6 @@ use crate::{
     Error,
 };
 
-/// Macro to replace skippable stage
-#[macro_export]
-macro_rules! skippable {
-    ( $cond:expr, $if_stages:expr) => {
-        // recursive call
-        $crate::stages::IfElseStage::new($cond, tuple_list!($if_stage), tuple_list!())
-    };
-}
-
 #[derive(Debug)]
 /// Perform the stage while closure evaluates to true
 pub struct WhileStage<CB, E, EM, ST, Z>
