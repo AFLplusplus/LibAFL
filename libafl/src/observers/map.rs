@@ -2253,7 +2253,7 @@ pub mod pybind {
 
                 #[must_use]
                 pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
-                    $struct_name_trait::std(slf)
+                    $struct_name_trait::new_std(slf)
                 }
 
                 #[must_use]
@@ -2311,7 +2311,7 @@ pub mod pybind {
 
                 #[must_use]
                 pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
-                    $struct_name_trait::owned(slf)
+                    $struct_name_trait::new_owned(slf)
                 }
 
                 #[must_use]
