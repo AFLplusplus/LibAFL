@@ -153,9 +153,30 @@ where
                 }
             }
         }
-        if let Some(meta) = state.metadata_map_mut().get_mut::<TopRatedsMetadata>() {
-            meta.map
-                .extend(map.into_iter().map(|(entry, (_, idx))| (entry, idx)));
+        if let Some(mut meta) = state.metadata_map_mut().remove::<TopRatedsMetadata>() {
+            let map_iter = map.iter();
+
+            let reserve = if meta.map.is_empty() {
+                map_iter.size_hint().0
+            } else {
+                (map_iter.size_hint().0 + 1) / 2
+            };
+            meta.map.reserve(reserve);
+
+            for (entry, (_, new_idx)) in map_iter {
+                let mut new = state.corpus().get(*new_idx)?.borrow_mut();
+                let new_meta = new.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
+                    Error::key_not_found(format!(
+                        "{} needed for MinimizerScheduler not found in testcase #{new_idx}",
+                        type_name::<M>()
+                    ))
+                })?;
+                *new_meta.refcnt_mut() += 1;
+                meta.map.insert(*entry, *new_idx);
+            }
+
+            // Put back the metadata
+            state.metadata_map_mut().insert_boxed(meta);
         }
         Ok(())
     }
