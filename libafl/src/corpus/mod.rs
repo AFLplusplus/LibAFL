@@ -189,7 +189,7 @@ pub mod pybind {
             ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
             CorpusId, HasTestcase, Testcase,
         },
-        inputs::{BytesInput, Input, UsesInput},
+        inputs::{BytesInput, UsesInput},
         Error,
     };
 
