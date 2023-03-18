@@ -384,10 +384,7 @@ pub mod pybind {
         }*/
     }
 
-    impl HasTestcase for PythonCorpus
-    where
-        I: Input,
-    {
+    impl HasTestcase for PythonCorpus {
         fn testcase(
             &self,
             id: CorpusId,
