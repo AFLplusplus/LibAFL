@@ -384,7 +384,7 @@ pub mod pybind {
         }*/
     }
 
-    impl<I> HasTestcase for PythonCorpus<I>
+    impl HasTestcase for PythonCorpus
     where
         I: Input,
     {
