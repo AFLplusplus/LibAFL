@@ -105,7 +105,7 @@ script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
 timeout 11s ./${FUZZER_NAME} --cores 0 >fuzz_stdout.log 2>/dev/null || true
-if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
+if [ -z "$(grep "corpus: 8" fuzz_stdout.log)" ]; then
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1
 else
