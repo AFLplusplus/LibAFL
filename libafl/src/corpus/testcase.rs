@@ -2,17 +2,37 @@
 //! It will contain a respective input, and metadata.
 
 use alloc::string::String;
-use core::{default::Default, option::Option, time::Duration};
+use core::{
+    cell::{Ref, RefMut},
+    default::Default,
+    option::Option,
+    time::Duration,
+};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{serdeany::SerdeAnyMap, HasLen},
     corpus::CorpusId,
-    inputs::Input,
+    inputs::{Input, UsesInput},
     state::HasMetadata,
     Error,
 };
+
+/// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
+/// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
+pub trait HasTestcase: UsesInput {
+    /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
+    /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error>;
+
+    /// Shorthand to receive a [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
+    /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
+    fn testcase_mut(
+        &self,
+        id: CorpusId,
+    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error>;
+}
 
 /// An entry in the Testcase Corpus
 #[derive(Serialize, Deserialize, Clone, Debug)]

@@ -63,9 +63,10 @@ where
     }
 
     #[inline]
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         _state: &mut S,
+        _observers: &OT,
         testcase: &mut Testcase<PacketData>,
     ) -> Result<(), Error> {
         testcase

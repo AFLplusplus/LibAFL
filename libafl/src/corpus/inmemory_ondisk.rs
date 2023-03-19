@@ -13,7 +13,10 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::ondisk::{OnDiskMetadata, OnDiskMetadataFormat};
+use super::{
+    ondisk::{OnDiskMetadata, OnDiskMetadataFormat},
+    HasTestcase,
+};
 #[cfg(feature = "gzip")]
 use crate::bolts::compress::GzipCompressor;
 use crate::{
@@ -131,6 +134,25 @@ where
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)
+    }
+}
+
+impl<I> HasTestcase for InMemoryOnDiskCorpus<I>
+where
+    I: Input,
+{
+    fn testcase(
+        &self,
+        id: CorpusId,
+    ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.get(id)?.borrow())
+    }
+
+    fn testcase_mut(
+        &self,
+        id: CorpusId,
+    ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.get(id)?.borrow_mut())
     }
 }
 

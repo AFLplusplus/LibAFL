@@ -1,7 +1,7 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
 pub mod testcase;
-pub use testcase::{SchedulerTestcaseMetadata, Testcase};
+pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
 
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
@@ -187,7 +187,7 @@ pub mod pybind {
             cached::pybind::PythonCachedOnDiskCorpus, inmemory::pybind::PythonInMemoryCorpus,
             inmemory_ondisk::pybind::PythonInMemoryOnDiskCorpus,
             ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
-            CorpusId, Testcase,
+            CorpusId, HasTestcase, Testcase,
         },
         inputs::{BytesInput, UsesInput},
         Error,
@@ -382,6 +382,22 @@ pub mod pybind {
                 .nth(nth)
                 .expect("Failed to get a random CorpusId")
         }*/
+    }
+
+    impl HasTestcase for PythonCorpus {
+        fn testcase(
+            &self,
+            id: CorpusId,
+        ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+            Ok(self.get(id)?.borrow())
+        }
+
+        fn testcase_mut(
+            &self,
+            id: CorpusId,
+        ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+            Ok(self.get(id)?.borrow_mut())
+        }
     }
 
     /// Register the classes to the python module

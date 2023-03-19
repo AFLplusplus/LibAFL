@@ -8,12 +8,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
-    corpus::Corpus,
+    corpus::{Corpus, HasTestcase},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
     random_corpus_id,
-    state::{HasCorpus, HasMetadata, HasRand, HasTestcase},
+    state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
 

@@ -11,16 +11,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{current_time, shmem::ShMemProvider},
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasTestcase},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::Stage,
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, HasTestcase,
-        UsesState,
-    },
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
 };
 

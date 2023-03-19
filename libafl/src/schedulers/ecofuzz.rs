@@ -6,11 +6,11 @@ use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::{powersched::SchedulerMetadata, testcase_score::TestcaseScore, Scheduler},
-    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, HasTestcase, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
 };
 
