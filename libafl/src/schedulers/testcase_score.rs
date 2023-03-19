@@ -66,10 +66,7 @@ where
         clippy::cast_lossless
     )]
     fn compute(entry: &mut Testcase<S::Input>, state: &S) -> Result<f64, Error> {
-        let psmeta = state
-            .metadata_map()
-            .get::<SchedulerMetadata>()
-            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+        let psmeta = state.metadata::<SchedulerMetadata>()?;
 
         let fuzz_mu = if let Some(strat) = psmeta.strat() {
             if strat == PowerSchedule::COE {
@@ -80,25 +77,13 @@ where
                 for idx in corpus.ids() {
                     let n_fuzz_entry = if cur_index == idx {
                         entry
-                            .metadata_map()
-                            .get::<SchedulerTestcaseMetadata>()
-                            .ok_or_else(|| {
-                                Error::key_not_found(
-                                    "SchedulerTestcaseMetadata not found".to_string(),
-                                )
-                            })?
+                            .metadata::<SchedulerTestcaseMetadata>()?
                             .n_fuzz_entry()
                     } else {
                         corpus
                             .get(idx)?
                             .borrow()
-                            .metadata_map()
-                            .get::<SchedulerTestcaseMetadata>()
-                            .ok_or_else(|| {
-                                Error::key_not_found(
-                                    "SchedulerTestcaseMetadata not found".to_string(),
-                                )
-                            })?
+                            .metadata::<SchedulerTestcaseMetadata>()?
                             .n_fuzz_entry()
                     };
                     v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
@@ -128,12 +113,7 @@ where
         let avg_bitmap_size = psmeta.bitmap_size() / psmeta.bitmap_entries();
 
         let favored = entry.has_metadata::<IsFavoredMetadata>();
-        let tcmeta = entry
-            .metadata_map()
-            .get::<SchedulerTestcaseMetadata>()
-            .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
-            })?;
+        let tcmeta = entry.metadata::<SchedulerTestcaseMetadata>()?;
 
         if q_exec_us * 0.1 > avg_exec_us {
             perf_score = 10.0;
@@ -295,17 +275,9 @@ where
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
     fn compute(entry: &mut Testcase<S::Input>, state: &S) -> Result<f64, Error> {
         let mut weight = 1.0;
-        let psmeta = state
-            .metadata_map()
-            .get::<SchedulerMetadata>()
-            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+        let psmeta = state.metadata::<SchedulerMetadata>()?;
 
-        let tcmeta = entry
-            .metadata_map()
-            .get::<SchedulerTestcaseMetadata>()
-            .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetadata not found".to_string())
-            })?;
+        let tcmeta = entry.metadata::<SchedulerTestcaseMetadata>()?;
 
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
@@ -349,12 +321,7 @@ where
             None => 0.0,
         };
 
-        let avg_top_size = state
-            .metadata_map()
-            .get::<TopRatedsMetadata>()
-            .ok_or_else(|| Error::key_not_found("TopRatedsMetadata not found".to_string()))?
-            .map()
-            .len() as f64;
+        let avg_top_size = state.metadata::<TopRatedsMetadata>()?.map().len() as f64;
         weight *= 1.0 + (tc_ref / avg_top_size);
 
         if favored {

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::CachedOnDiskCorpus;
+use super::{CachedOnDiskCorpus, HasTestcase};
 use crate::{
     bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, CorpusId, Testcase},
@@ -137,6 +137,25 @@ where
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)
+    }
+}
+
+impl<I> HasTestcase for OnDiskCorpus<I>
+where
+    I: Input,
+{
+    fn testcase(
+        &self,
+        id: CorpusId,
+    ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.get(id)?.borrow())
+    }
+
+    fn testcase_mut(
+        &self,
+        id: CorpusId,
+    ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.get(id)?.borrow_mut())
     }
 }
 

@@ -181,6 +181,8 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Add no_std toolchain
       run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+    - name: Add wasm target
+      run: rustup target add wasm32-unknown-unknown
     - name: Install cxxbridge
       if: runner.os == 'macOS'
       run: cargo install cxxbridge-cmd
