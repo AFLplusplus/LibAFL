@@ -1,11 +1,11 @@
 # Variables
 [env]
 FUZZER_NAME='libfuzzer_stb_image_sugar'
+PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 LIBAFL_CC = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = '${CARGO_TARGET_DIR}/release/libafl_cc', mapping = {"windows" = '.\\target\\release\\libafl_cc.exe'} }
 LIBAFL_CXX = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = '${CARGO_TARGET_DIR}/release/libafl_cxx', mapping = {"windows" = '.\\target\\release\\libafl_cxx.exe'} }
 FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = '${CARGO_TARGET_DIR}/release/libfuzzer_stb_image_sugar', mapping = {"windows" = '.\\target\\release\\libfuzzer_stb_image_sugar.exe'} }
-PROJECT_DIR = { script = ["pwd"] }
 
 # Compilers
 [tasks.cxx]
