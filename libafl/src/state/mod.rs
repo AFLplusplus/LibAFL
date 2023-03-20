@@ -22,7 +22,7 @@ use crate::{
         rands::Rand,
         serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     },
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -219,22 +219,6 @@ pub trait HasStartTime {
     fn start_time_mut(&mut self) -> &mut Duration;
 }
 
-/// Trait for the testcase
-pub trait HasTestcase: HasCorpus {
-    /// To get the testcase
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
-        Ok(self.corpus().get(id)?.borrow())
-    }
-
-    /// To get mutable testcase
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
-        Ok(self.corpus().get(id)?.borrow_mut())
-    }
-}
-
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "
@@ -321,6 +305,26 @@ where
     #[inline]
     fn corpus_mut(&mut self) -> &mut Self::Corpus {
         &mut self.corpus
+    }
+}
+
+impl<I, C, R, SC> HasTestcase for StdState<I, C, R, SC>
+where
+    I: Input,
+    C: Corpus<Input = <Self as UsesInput>::Input>,
+    R: Rand,
+{
+    /// To get the testcase
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.corpus().get(id)?.borrow())
+    }
+
+    /// To get mutable testcase
+    fn testcase_mut(
+        &self,
+        id: CorpusId,
+    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.corpus().get(id)?.borrow_mut())
     }
 }
 

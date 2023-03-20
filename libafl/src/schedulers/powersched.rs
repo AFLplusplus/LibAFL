@@ -9,11 +9,11 @@ use core::{marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::{RemovableScheduler, Scheduler},
-    state::{HasCorpus, HasMetadata, HasTestcase, UsesState},
+    state::{HasCorpus, HasMetadata, UsesState},
     Error,
 };
 

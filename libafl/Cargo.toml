@@ -27,8 +27,9 @@ cli = ["clap"]  # expose bolts::cli for easy commandline parsing
 qemu_cli = ["cli"] # Commandline flags for qemu-based fuzzers
 frida_cli = ["cli"] # Commandline flags for frida-based fuzzers
 afl_exec_sec = [] # calculate exec/sec like AFL
-errors_backtrace = ["backtrace"] # Create backtraces at Error creation
-cmin = ["z3"] # for corpus minimisation
+errors_backtrace = ["backtrace"]
+cmin = ["z3"] # corpus minimisation
+static_z3 = ["z3/static-link-z3"] # Allows us to build z3 from source, instead of installing it
 corpus_btreemap = [] # Switches from HashMap to BTreeMap for CorpusId
 gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
 regex = ["std", "dep:regex"] # enables the NaiveTokenizer and StacktraceObserver
@@ -98,7 +99,7 @@ log = "0.4.17"
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 
-z3 = { version = "0.11", features = ["static-link-z3"], optional = true } # for concolic mutation
+z3 = { version = "0.11", optional = true } # for concolic mutation and other solving needs
 
 pyo3 = { version = "0.17", optional = true, features = ["serde", "macros"] }
 concat-idents = { version = "1.1.3", optional = true }
