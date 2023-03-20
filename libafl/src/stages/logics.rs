@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-/// Perform the stage while closure evaluates to true
+/// Perform the stage while the closure evaluates to true
 pub struct WhileStage<CB, E, EM, ST, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
