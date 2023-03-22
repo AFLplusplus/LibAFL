@@ -24,7 +24,7 @@ Welcome to `LibAFL`
     clippy::ptr_as_ptr,
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
+    clippy::module_name_repetitions
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,

@@ -317,14 +317,15 @@ impl Default for NopMonitor {
     }
 }
 
-#[cfg(feature = "std")]
 /// Tracking monitor during fuzzing that just prints to `stdout`.
+#[cfg(feature = "std")]
 #[derive(Debug, Clone)]
 pub struct SimplePrintingMonitor {
     start_time: Duration,
     client_stats: Vec<ClientStats>,
 }
 
+#[cfg(feature = "std")]
 impl Default for SimplePrintingMonitor {
     fn default() -> Self {
         Self {
