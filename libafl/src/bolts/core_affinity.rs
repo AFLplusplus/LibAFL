@@ -654,13 +654,10 @@ mod freebsd {
     use alloc::vec::Vec;
     use std::{mem, thread::available_parallelism};
 
-    use libc::{cpuset_setaffinity, cpuset_t, CPU_SET};
+    use libc::{cpuset_setaffinity, cpuset_t, CPU_LEVEL_WHICH, CPU_SET, CPU_WHICH_PID};
 
     use super::CoreId;
     use crate::Error;
-
-    const CPU_LEVEL_WHICH: libc::c_int = 3;
-    const CPU_WHICH_PID: libc::c_int = 2;
 
     #[allow(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
