@@ -25,7 +25,6 @@ Welcome to `LibAFL`
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::unreadable_literal
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -46,7 +45,6 @@ Welcome to `LibAFL`
     unused_import_braces,
     unused_qualifications,
     unused_must_use,
-    missing_docs,
     //unused_results
 ))]
 #![cfg_attr(
