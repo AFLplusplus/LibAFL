@@ -2,10 +2,10 @@
 //! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 //! See also [the paper on token-level fuzzing](https://www.usenix.org/system/files/sec21-salls.pdf)
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 use alloc::string::ToString;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 use core::str::from_utf8;
 use core::{
     cell::RefCell,
