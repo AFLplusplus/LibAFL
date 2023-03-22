@@ -325,6 +325,8 @@ pub struct SimplePrintingMonitor {
     client_stats: Vec<ClientStats>,
 }
 
+use anchor_lang::solana_program::entrypoint::SimplePrintingMonitor;
+
 impl Default for SimplePrintingMonitor {
     fn default() -> Self {
         Self {
