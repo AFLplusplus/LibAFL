@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use libafl::{
     bolts::{
-        core_affinity::Cores,
+        core_affinity::{CoreId, Cores},
         launcher::Launcher,
         rands::{RandomSeed, StdRand},
         shmem::{ShMemProvider, StdShMemProvider},
@@ -32,10 +32,10 @@ fn main() {
     let parent_cpu_id = cores.ids.first().expect("unable to get first core id");
 
     // region: fuzzer start function
-    let mut run_client = |state: Option<_>, mut restarting_mgr, core_id: usize| {
+    let mut run_client = |state: Option<_>, mut restarting_mgr, core_id: CoreId| {
         // nyx shared dir, created by nyx-fuzz/packer/packer/nyx_packer.py
         let share_dir = Path::new("/tmp/nyx_libxml2/");
-        let cpu_id = core_id.try_into().unwrap();
+        let cpu_id = core_id.0.try_into().unwrap();
         let parallel_mode = true;
         // nyx stuff
         let mut helper = NyxHelper::new(
@@ -43,7 +43,7 @@ fn main() {
             cpu_id,
             true,
             parallel_mode,
-            Some(parent_cpu_id.id.try_into().unwrap()),
+            Some(parent_cpu_id.0.try_into().unwrap()),
         )
         .unwrap();
         let observer =
