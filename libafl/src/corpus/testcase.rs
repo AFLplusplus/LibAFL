@@ -8,8 +8,6 @@ use core::{
     option::Option,
     time::Duration,
 };
-#[cfg(feature = "std")]
-use std::fs;
 
 use serde::{Deserialize, Serialize};
 
@@ -146,53 +144,8 @@ where
 
     /// Set the filename
     #[inline]
-    #[cfg(feature = "std")]
-    pub fn set_filename(&mut self, filename: String) -> Result<(), Error> {
-        use std::fs::OpenOptions;
-
-        if self.filename.is_some() {
-            let f = self.filename.clone().unwrap();
-            let old_filename = f.as_str();
-
-            let new_filename = filename.as_str();
-
-            // Do operations below when new filename is specified
-            if old_filename.eq(new_filename) {
-                return Ok(());
-            }
-
-            let new_lock_filename = format!(".{new_filename}.lafl_lock");
-
-            // Try to create lock file for new testcases
-            if OpenOptions::new()
-                .create(true)
-                .write(true)
-                .open(&new_lock_filename)
-                .is_err()
-            {
-                return Err(Error::illegal_state(
-                    "unable to create lock file for new testcase",
-                ));
-            }
-
-            fs::rename(old_filename, new_filename)?;
-
-            let old_metadata_filename = format!(".{old_filename}.metadata");
-            let new_metadata_filename = format!(".{new_filename}.metadata");
-            fs::rename(old_metadata_filename, new_metadata_filename)?;
-
-            fs::remove_file(&new_lock_filename)?;
-        }
-
+    pub fn set_filename(&mut self, filename: String) {
         self.filename = Some(filename);
-        Ok(())
-    }
-
-    #[inline]
-    #[cfg(feature = "no_std")]
-    pub fn set_filename(&mut self, filename: String) -> Result<(), Error> {
-        self.filename = Some(filename);
-        Ok(())
     }
 
     /// Get the execution time of the testcase
