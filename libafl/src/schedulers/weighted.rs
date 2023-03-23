@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata},
+    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
@@ -18,7 +18,7 @@ use crate::{
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         RemovableScheduler, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, HasTestcase, UsesState},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 

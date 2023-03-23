@@ -172,7 +172,11 @@ pub fn libafl_main() {
             .unwrap()
         });
 
-        if state.metadata_map().get::<NautilusChunksMetadata>().is_none() {
+        if state
+            .metadata_map()
+            .get::<NautilusChunksMetadata>()
+            .is_none()
+        {
             state.add_metadata(NautilusChunksMetadata::new("/tmp/".into()));
         }
 
