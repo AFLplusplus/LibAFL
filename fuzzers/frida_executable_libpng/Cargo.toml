@@ -1,0 +1,46 @@
+[package]
+name = "frida_executable_fuzzer"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "frida_executable_fuzzer"
+crate_type = ["cdylib"]
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[build-dependencies]
+cc = { version = "1.0.42", features = ["parallel"] }
+which = "4.1"
+xz2 = "0.1.6"
+flate2 = "1.0.22"
+tar = "0.4.37"
+reqwest = { version = "0.11.4", features = ["blocking"] }
+
+
+
+
+[dependencies]
+libafl = { path = "../../libafl/", features = [ "std", "llmp_compression", "llmp_bind_public", "frida_cli" ] } #,  "llmp_small_maps", "llmp_debug"]}
+capstone = "0.11.0"
+frida-gum = { version = "0.8.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
+libafl_frida = { path = "../../libafl_frida", features = ["cmplog"] }
+libafl_targets = { path = "../../libafl_targets", features = ["sancov_cmplog"] }
+libc = "0.2"
+libloading = "0.7"
+num-traits = "0.2"
+rangemap = "1"
+clap = { version = "4.0", features = ["derive"] }
+serde = "1.0"
+mimalloc = { version = "*", default-features = false }
+
+backtrace = "0.3"
+color-backtrace = "0.5"

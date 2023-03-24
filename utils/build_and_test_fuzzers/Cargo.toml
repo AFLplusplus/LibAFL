@@ -12,4 +12,3 @@ categories = ["development-tools::testing"]
 [dependencies]
 cargo_toml = "0.14"
 walkdir = "2"
-log = "0.4.17"
