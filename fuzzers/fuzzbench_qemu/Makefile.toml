@@ -80,6 +80,7 @@ script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
 timeout 10s ./${FUZZER_NAME} --libafl-in ../libfuzzer_libpng/corpus --libafl-out ./out ./${FUZZER_NAME} || true
+echo $(find out -type f | wc -l)
 if [ $(find out -type f | wc -l) -gt 5 ]; then
     echo "Fuzzer is working"
 else
