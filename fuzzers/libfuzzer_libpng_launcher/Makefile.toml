@@ -82,6 +82,9 @@ windows_alias = "unsupported"
 [tasks.run_unix]
 script_runner = "@shell"
 script='''
+rm -rf corpus/
+mkdir corpus/
+cp seeds/* corpus/
 ./${FUZZER_NAME} --cores 0 --input ./corpus
 '''
 dependencies = [ "fuzzer" ]

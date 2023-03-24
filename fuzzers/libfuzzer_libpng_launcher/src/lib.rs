@@ -20,8 +20,8 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsSlice,
     },
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::EventConfig,
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -74,7 +74,7 @@ struct Opt {
     #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[arg(short, long, help = "Set an initial corpus directory", name = "INPUT")]
+    #[arg(short, long, help = "Set an the corpus directories", name = "INPUT")]
     input: Vec<PathBuf>,
 
     #[arg(
@@ -95,6 +95,24 @@ struct Opt {
         default_value = "10000"
     )]
     timeout: Duration,
+
+    #[arg(
+        short,
+        long,
+        help = "Do not deserialize state on restart",
+        name = "RELOAD_CORPUS",
+        default_value = "false"
+    )]
+    reload_corpus: bool,
+
+    #[arg(
+        short,
+        long,
+        help = "Fuzz loop iterations",
+        name = "LOOP_ITERS",
+        default_value = "1000000"
+    )]
+    loop_iters: u64,
     /*
     /// This fuzzer has hard-coded tokens
     #[arg(
@@ -121,8 +139,9 @@ pub fn libafl_main() {
     let cores = opt.cores;
 
     println!(
-        "Workdir: {:?}",
-        env::current_dir().unwrap().to_string_lossy().to_string()
+        "Workdir: {:?} {}",
+        env::current_dir().unwrap().to_string_lossy().to_string(),
+        opt.reload_corpus
     );
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
@@ -132,7 +151,9 @@ pub fn libafl_main() {
         MultiMonitor::new(|s| println!("{s}")),
     );
 
-    let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id| {
+    let mut run_client = |state: Option<_>,
+                          mut restarting_mgr: LlmpRestartingEventManager<_, _>,
+                          _core_id| {
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
@@ -157,7 +178,7 @@ pub fn libafl_main() {
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
-                InMemoryCorpus::new(),
+                InMemoryOnDiskCorpus::new(&opt.input[0]).unwrap(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(&opt.output).unwrap(),
@@ -229,7 +250,15 @@ pub fn libafl_main() {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
+        fuzzer.fuzz_loop_for(
+            &mut stages,
+            &mut executor,
+            &mut state,
+            &mut restarting_mgr,
+            opt.loop_iters,
+        )?;
+        restarting_mgr.on_restart(&mut state)?;
+
         Ok(())
     };
 
@@ -242,6 +271,7 @@ pub fn libafl_main() {
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"))
+        .serialize_state(!opt.reload_corpus)
         .build()
         .launch()
     {
