@@ -301,7 +301,11 @@ impl CompilerWrapper for ClangWrapper {
 
         if !self.passes.is_empty() {
             if self.use_new_pm {
-                args.push("-fexperimental-new-pass-manager".into());
+                if let Some(ver) = LIBAFL_CC_LLVM_VERSION {
+                    if ver < 16 {
+                        args.push("-fexperimental-new-pass-manager".into());
+                    }
+                }
             } else {
                 args.push("-flegacy-pass-manager".into());
             }
