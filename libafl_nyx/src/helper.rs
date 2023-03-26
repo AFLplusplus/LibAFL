@@ -133,7 +133,7 @@ impl NyxHelper {
     }
 
     /// Set a timeout for Nyx
-    pub fn set_timeout(mut self, time: Duration) {
+    pub fn set_timeout(&mut self, time: Duration) {
         let sec: u8 = time
             .as_secs()
             .try_into()
