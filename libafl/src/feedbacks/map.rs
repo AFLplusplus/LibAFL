@@ -382,6 +382,7 @@ impl<N, O, R, S, T> Feedback<S> for MapFeedback<N, O, R, S, T>
 where
     N: IsNovel<T> + Debug,
     O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
+    for<'it> &'it O: IntoIterator<Item = &'it T>,
     R: Reducer<T> + Debug,
     S: UsesInput + HasClientPerfMonitor + HasNamedMetadata + Debug,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
@@ -628,6 +629,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
+    for<'it> &'it O: IntoIterator<Item = &'it T>,
     for<'it> O: AsIter<'it, Item = T>,
     S: HasNamedMetadata,
 {
@@ -646,6 +648,7 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
+    for<'it> &'it O: IntoIterator<Item = &'it T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     S: UsesInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
@@ -834,6 +837,7 @@ pub struct ReachabilityFeedback<O, S> {
 impl<O, S> ReachabilityFeedback<O, S>
 where
     O: MapObserver<Entry = usize>,
+    for<'it> &'it O: IntoIterator<Item = &'it usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
@@ -861,7 +865,7 @@ impl<O, S> Feedback<S> for ReachabilityFeedback<O, S>
 where
     S: UsesInput + Debug + HasClientPerfMonitor,
     O: MapObserver<Entry = usize>,
-    for<'it> O: AsIter<'it, Item = usize>,
+    for<'it> &'it O: IntoIterator<Item = &'it usize>,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -922,7 +926,7 @@ where
 impl<O, S> Named for ReachabilityFeedback<O, S>
 where
     O: MapObserver<Entry = usize>,
-    for<'it> O: AsIter<'it, Item = usize>,
+    for<'it> &'it O: IntoIterator<Item = &'it usize>,
 {
     #[inline]
     fn name(&self) -> &str {

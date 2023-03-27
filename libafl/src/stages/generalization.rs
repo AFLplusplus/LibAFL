@@ -57,6 +57,7 @@ where
 impl<E, EM, O, Z> Stage<E, EM, Z> for GeneralizationStage<EM, O, E::Observers, Z>
 where
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
     E::State: UsesInput<Input = BytesInput>
@@ -304,6 +305,7 @@ impl<EM, O, OT, Z> GeneralizationStage<EM, O, OT, Z>
 where
     EM: UsesState,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
     OT: ObserversTuple<EM::State>,
     EM::State: UsesInput<Input = BytesInput>
         + HasClientPerfMonitor

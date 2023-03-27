@@ -654,6 +654,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     ) -> Result<ForkserverExecutor<(MO, OT), S, SP>, Error>
     where
         MO: Observer<S> + MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
+        for<'it> &'it MO: IntoIterator<Item = &'it MO::Entry>,
         OT: ObserversTuple<S> + Prepend<MO, PreprendResult = OT>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,

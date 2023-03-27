@@ -75,6 +75,7 @@ where
     E::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasBytesVec,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
     Z: UsesState<State = E::State>,
 {
     #[inline]
@@ -140,6 +141,7 @@ impl<EM, O, E, Z> ColorizationStage<EM, O, E, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
     E: HasObservers + Executor<EM, Z>,
     E::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasBytesVec,

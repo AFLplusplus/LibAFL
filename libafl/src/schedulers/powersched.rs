@@ -182,6 +182,7 @@ impl<O, S> RemovableScheduler for PowerQueueScheduler<O, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
 {
     #[allow(clippy::cast_precision_loss)]
     fn on_replace(
@@ -251,6 +252,7 @@ impl<O, S> Scheduler for PowerQueueScheduler<O, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
@@ -359,6 +361,7 @@ impl<O, S> PowerQueueScheduler<O, S>
 where
     S: HasMetadata,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
 {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]

@@ -340,6 +340,7 @@ impl<M, S> HasObserverName for MapEqualityFeedback<M, S> {
 impl<M, S> Feedback<S> for MapEqualityFeedback<M, S>
 where
     M: MapObserver + Debug,
+    for<'it> &'it M: IntoIterator<Item = &'it M::Entry>,
     S: UsesInput + HasClientPerfMonitor + Debug,
 {
     fn is_interesting<EM, OT>(
@@ -371,6 +372,7 @@ pub struct MapEqualityFactory<M, S> {
 impl<M, S> MapEqualityFactory<M, S>
 where
     M: MapObserver,
+    for<'it> &'it M: IntoIterator<Item = &'it M::Entry>,
 {
     /// Creates a new map equality feedback for the given observer
     pub fn new_from_observer(obs: &M) -> Self {
@@ -390,6 +392,7 @@ impl<M, S> HasObserverName for MapEqualityFactory<M, S> {
 impl<M, OT, S> FeedbackFactory<MapEqualityFeedback<M, S>, S, OT> for MapEqualityFactory<M, S>
 where
     M: MapObserver,
+    for<'it> &'it M: IntoIterator<Item = &'it M::Entry>,
     OT: ObserversTuple<S>,
     S: UsesInput + HasClientPerfMonitor + Debug,
 {

@@ -79,6 +79,7 @@ impl<O, S> EcoScheduler<O, S>
 where
     S: HasCorpus + HasMetadata + HasRand + HasExecutions + HasTestcase,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
 {
     /// Create a new [`EcoScheduler`] without any power schedule
     #[must_use]
@@ -227,6 +228,7 @@ impl<O, S> Scheduler for EcoScheduler<O, S>
 where
     S: HasCorpus + HasMetadata + HasRand + HasExecutions + HasTestcase,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {

@@ -81,11 +81,9 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 }
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
-///
-/// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
 pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug
-// where
-//     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
+where
+    for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>,
 {
     /// Type of each entry in this map
     type Entry: Bounded + PartialEq + Default + Copy + Debug + 'static;
@@ -123,6 +121,7 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
 pub struct MapObserverSimpleIterator<'a, O>
 where
     O: 'a + MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
 {
     index: usize,
     observer: *const O,
@@ -132,6 +131,7 @@ where
 impl<'a, O> Iterator for MapObserverSimpleIterator<'a, O>
 where
     O: 'a + MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
 {
     type Item = &'a O::Entry;
     fn next(&mut self) -> Option<Self::Item> {
@@ -152,6 +152,7 @@ where
 pub struct MapObserverSimpleIteratorMut<'a, O>
 where
     O: 'a + MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
 {
     index: usize,
     observer: *mut O,
@@ -161,6 +162,7 @@ where
 impl<'a, O> Iterator for MapObserverSimpleIteratorMut<'a, O>
 where
     O: 'a + MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
 {
     type Item = &'a O::Entry;
     fn next(&mut self) -> Option<Self::Item> {
@@ -673,7 +675,8 @@ impl<'a, S, T, const N: usize> Observer<S> for ConstMapObserver<'a, T, N>
 where
     S: UsesInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver,
+    Self: MapObserver<Entry = T>,
+    for<'it> &'it Self: IntoIterator<Item = &'it T>,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
@@ -946,7 +949,8 @@ impl<'a, S, T> Observer<S> for VariableMapObserver<'a, T>
 where
     S: UsesInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver,
+    Self: MapObserver<Entry = T>,
+    for<'it> &'it Self: IntoIterator<Item = &'it T>,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
@@ -1219,6 +1223,7 @@ where
 impl<S, M> Observer<S> for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<S> + AsMutSlice<Entry = u8>,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
     S: UsesInput,
 {
     #[inline]
@@ -1268,6 +1273,7 @@ where
 impl<M> HasLen for HitcountsMapObserver<M>
 where
     M: MapObserver,
+    for<'it> &'it M: IntoIterator<Item = &'it M::Entry>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -1278,6 +1284,7 @@ where
 impl<M> MapObserver for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
+    for<'it> &'it M: IntoIterator<Item = &'it M::Entry>,
 {
     type Entry = u8;
 
@@ -1335,7 +1342,8 @@ where
 
 impl<M> AsSlice for HitcountsMapObserver<M>
 where
-    M: MapObserver + AsSlice,
+    M: MapObserver<Entry = u8> + AsSlice,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
 {
     type Entry = <M as AsSlice>::Entry;
     #[inline]
@@ -1346,7 +1354,8 @@ where
 
 impl<M> AsMutSlice for HitcountsMapObserver<M>
 where
-    M: MapObserver + AsMutSlice,
+    M: MapObserver<Entry = u8> + AsMutSlice,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
 {
     type Entry = <M as AsMutSlice>::Entry;
     #[inline]
@@ -1422,6 +1431,7 @@ where
         + MapObserver<Entry = u8>
         + Serialize
         + AsMutSlice<Entry = u8>,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
     OTA: ObserversTuple<S>,
     OTB: ObserversTuple<S>,
     S: UsesInput,
@@ -1458,6 +1468,7 @@ where
 impl<S, M> Observer<S> for HitcountsIterableMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<S>,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
     for<'it> M: AsIterMut<'it, Item = u8>,
     S: UsesInput,
 {
@@ -1494,7 +1505,8 @@ where
 
 impl<M> HasLen for HitcountsIterableMapObserver<M>
 where
-    M: MapObserver,
+    M: MapObserver<Entry = u8>,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -1505,6 +1517,7 @@ where
 impl<M> MapObserver for HitcountsIterableMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
     for<'it> M: AsIterMut<'it, Item = u8>,
 {
     type Entry = u8;
@@ -1563,7 +1576,8 @@ where
 
 impl<M> AsSlice for HitcountsIterableMapObserver<M>
 where
-    M: MapObserver + AsSlice,
+    M: MapObserver<Entry = u8> + AsSlice,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
 {
     type Entry = <M as AsSlice>::Entry;
     #[inline]
@@ -1573,7 +1587,8 @@ where
 }
 impl<M> AsMutSlice for HitcountsIterableMapObserver<M>
 where
-    M: MapObserver + AsMutSlice,
+    M: MapObserver<Entry = u8> + AsMutSlice,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
 {
     type Entry = <M as AsMutSlice>::Entry;
     #[inline]
@@ -1646,6 +1661,7 @@ where
 impl<M, OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for HitcountsIterableMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<S> + DifferentialObserver<OTA, OTB, S>,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
     for<'it> M: AsIterMut<'it, Item = u8>,
     OTA: ObserversTuple<S>,
     OTB: ObserversTuple<S>,
@@ -1688,7 +1704,8 @@ impl<'a, S, T> Observer<S> for MultiMapObserver<'a, T, false>
 where
     S: UsesInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver,
+    Self: MapObserver<Entry = T>,
+    for<'it> &'it Self: IntoIterator<Item = &'it T>,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
@@ -1700,7 +1717,8 @@ impl<'a, S, T> Observer<S> for MultiMapObserver<'a, T, true>
 where
     S: UsesInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver,
+    Self: MapObserver<Entry = T>,
+    for<'it> &'it Self: IntoIterator<Item = &'it T>,
 {
     // in differential mode, we are *not* responsible for resetting the map!
 }
@@ -1952,7 +1970,8 @@ where
 impl<'a, T, OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for MultiMapObserver<'a, T, true>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver,
+    Self: MapObserver<Entry = T>,
+    for<'it> &'it Self: IntoIterator<Item = &'it T>,
     OTA: ObserversTuple<S>,
     OTB: ObserversTuple<S>,
     S: UsesInput,
@@ -1977,7 +1996,8 @@ impl<S, T> Observer<S> for OwnedMapObserver<T>
 where
     S: UsesInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver,
+    Self: MapObserver<Entry = T>,
+    for<'it> &'it Self: IntoIterator<Item = &'it T>,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {

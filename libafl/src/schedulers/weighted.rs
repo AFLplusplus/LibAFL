@@ -100,6 +100,7 @@ impl<F, O, S> WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
     S: HasCorpus + HasMetadata + HasRand,
 {
     /// Create a new [`WeightedScheduler`] without any power schedule
@@ -228,6 +229,7 @@ impl<F, O, S> RemovableScheduler for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     #[allow(clippy::cast_precision_loss)]
@@ -300,6 +302,7 @@ impl<F, O, S> Scheduler for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     /// Add an entry to the corpus and return its index

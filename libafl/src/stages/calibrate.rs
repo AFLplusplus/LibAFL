@@ -84,6 +84,7 @@ where
     E: Executor<EM, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<State = E::State>,
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<E::State>,
     E::State: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
@@ -322,6 +323,7 @@ where
 impl<O, OT, S> CalibrationStage<O, OT, S>
 where
     O: MapObserver,
+    for<'it> &'it O: IntoIterator<Item = &'it O::Entry>,
     OT: ObserversTuple<S>,
     S: HasCorpus + HasMetadata + HasNamedMetadata,
 {
