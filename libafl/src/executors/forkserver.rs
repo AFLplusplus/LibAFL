@@ -24,8 +24,10 @@ use nix::{
     unistd::Pid,
 };
 
-#[cfg(feature = "regex")]
+#[cfg(all(feature = "regex", not(feature = "casr")))]
 use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
+#[cfg(feature = "casr")]
+use crate::observers::{get_asan_runtime_flags_with_log_path, CasrAsanBacktraceObserver};
 use crate::{
     bolts::{
         fs::{get_unique_std_input_file, InputFile},
@@ -1130,7 +1132,7 @@ where
 
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
-            #[cfg(feature = "regex")]
+            #[cfg(all(feature = "regex", not(feature = "casr")))]
             if self.has_asan_observer.is_none() {
                 self.has_asan_observer = Some(
                     self.observers()
@@ -1138,10 +1140,25 @@ where
                         .is_some(),
                 );
             }
-            #[cfg(feature = "regex")]
+            #[cfg(all(feature = "regex", not(feature = "casr")))]
             if self.has_asan_observer.unwrap() {
                 self.observers_mut()
                     .match_name_mut::<AsanBacktraceObserver>("AsanBacktraceObserver")
+                    .unwrap()
+                    .parse_asan_output_from_asan_log_file(pid)?;
+            }
+            #[cfg(feature = "casr")]
+            if self.has_asan_observer.is_none() {
+                self.has_asan_observer = Some(
+                    self.observers()
+                        .match_name::<CasrAsanBacktraceObserver>("CasrAsanBacktraceObserver")
+                        .is_some(),
+                );
+            }
+            #[cfg(feature = "casr")]
+            if self.has_asan_observer.unwrap() {
+                self.observers_mut()
+                    .match_name_mut::<CasrAsanBacktraceObserver>("CasrAsanBacktraceObserver")
                     .unwrap()
                     .parse_asan_output_from_asan_log_file(pid)?;
             }

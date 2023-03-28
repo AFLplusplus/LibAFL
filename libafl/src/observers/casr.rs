@@ -123,7 +123,6 @@ where
     }
 }
 
-#[cfg(feature = "casr")]
 impl Named for CasrAsanBacktraceObserver {
     fn name(&self) -> &str {
         &self.observer_name
