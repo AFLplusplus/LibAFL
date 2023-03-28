@@ -19,11 +19,11 @@ cc = { version = "1.0", features = ["parallel"] }
 which = { version = "4.0.2" }
 
 [dependencies]
-libafl = { path = "../../libafl/", features = ["std", "derive", "llmp_compression", "introspection"] }
+libafl = { path = "../../libafl/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.1", features = ["derive"] }
 mimalloc = { version = "*", default-features = false }
 
 [lib]
