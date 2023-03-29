@@ -82,9 +82,9 @@ windows_alias = "unsupported"
 [tasks.run_unix]
 script_runner = "@shell"
 script='''
-rm -rf corpus/
-mkdir corpus/
-cp seeds/* corpus/
+rm -rf corpus/ || true
+mkdir corpus/ || true
+cp seeds/* corpus/ || true
 ./${FUZZER_NAME} --cores 0 --input ./corpus
 '''
 dependencies = [ "fuzzer" ]
@@ -99,6 +99,9 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
+rm -rf corpus/ || true
+mkdir corpus/ || true
+cp seeds/* corpus/ || true
 timeout 11s ./${FUZZER_NAME} --cores 0 --input ./corpus 2>/dev/null >fuzz_stdout.log || true
 if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
     echo "Fuzzer does not generate any testcases or any crashes"
@@ -120,6 +123,7 @@ windows_alias = "unsupported"
 clear = true
 script_runner="@shell"
 script='''
+rm -rf corpus/ || true
 rm -f ./${FUZZER_NAME}
 make -C libpng-1.6.37 clean
 cargo clean
