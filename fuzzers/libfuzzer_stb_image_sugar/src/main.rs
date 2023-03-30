@@ -20,7 +20,7 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
     fuzz(
-        &[PathBuf::from("./input")],
+        &[PathBuf::from("./corpus")],
         PathBuf::from("./output"),
         &Cores::all().unwrap(),
         1337,
