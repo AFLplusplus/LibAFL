@@ -217,7 +217,8 @@ where
             let filename_str = file_path.to_str().expect("Invalid Path");
             testcase.set_filename(filename_str.into())?;
 
-            fs::remove_file(format!(".{filename}.lafl_lock"))?;
+            let lock_file_path = self.dir_path.join(format!(".{filename}.lafl_lock"));
+            fs::remove_file(lock_file_path)?;
         };
         if self.meta_format.is_some() {
             let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
