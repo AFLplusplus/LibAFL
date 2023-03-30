@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
-    corpus::Corpus,
+    corpus::{Corpus, HasTestcase},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
@@ -99,7 +99,7 @@ pub struct GramatronSpliceMutator;
 
 impl<S> Mutator<S::Input, S> for GramatronSpliceMutator
 where
-    S: HasRand + HasCorpus<Input = GramatronInput> + HasMetadata,
+    S: HasRand + HasCorpus<Input = GramatronInput> + HasMetadata + HasTestcase,
 {
     fn mutate(
         &mut self,
@@ -117,7 +117,7 @@ where
 
         let rand_num = state.rand_mut().next() as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.testcase_mut(idx)?;
         other_testcase.load_input()?; // Preload the input
 
         if !other_testcase.has_metadata::<GramatronIdxMapMetadata>() {
@@ -125,7 +125,7 @@ where
             other_testcase.add_metadata(meta);
         }
         let meta = other_testcase
-            .metadata()
+            .metadata_map()
             .get::<GramatronIdxMapMetadata>()
             .unwrap();
         let other = other_testcase.input().as_ref().unwrap();

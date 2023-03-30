@@ -30,7 +30,7 @@ pub enum NyxProcessType {
     CHILD,
 }
 impl NyxHelper {
-    /// create `NyxProcess` and do basic settings
+    /// Create [`NyxProcess`] and do basic settings
     /// It will convert instance to parent or child using `parent_cpu_id` when set`parallel_mode`
     /// will fail if initial connection takes more than 2 seconds
     pub fn new(
@@ -49,7 +49,7 @@ impl NyxHelper {
             INIT_TIMEOUT,
         )
     }
-    /// create `NyxProcess` and do basic settings
+    /// Create [`NyxProcess`] and do basic settings
     /// It will convert instance to parent or child using `parent_cpu_id` when set`parallel_mode`
     /// will fail if initial connection takes more than `initial_timeout` seconds
     pub fn with_initial_timeout(
@@ -110,7 +110,7 @@ impl NyxHelper {
         match nyx_process.exec() {
             NyxReturnValue::Error => {
                 nyx_process.shutdown();
-                let msg = "Error: Nyx runtime error has occured...";
+                let msg = "Error: Nyx runtime error has occurred...";
                 return Err(Error::illegal_state(msg));
             }
             NyxReturnValue::IoError => {
@@ -119,7 +119,7 @@ impl NyxHelper {
             }
             NyxReturnValue::Abort => {
                 nyx_process.shutdown();
-                let msg = "Error: Nyx abort occured...";
+                let msg = "Error: Nyx abort occurred...";
                 return Err(Error::illegal_state(msg));
             }
             _ => {}
@@ -132,8 +132,8 @@ impl NyxHelper {
         })
     }
 
-    /// set timeout
-    pub fn set_timeout(mut self, time: Duration) {
+    /// Set a timeout for Nyx
+    pub fn set_timeout(&mut self, time: Duration) {
         let sec: u8 = time
             .as_secs()
             .try_into()

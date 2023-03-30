@@ -1671,14 +1671,15 @@ impl AsanRuntime {
         let mut map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE;
 
         // apple aarch64 requires MAP_JIT to allocates WX pages
-        if cfg!(all(target_vendor = "apple", target_arch = "aarch64")) {
+        #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+        {
             map_flags |= MapFlags::MAP_JIT;
         }
 
         unsafe {
             let mapping = mmap(
-                std::ptr::null_mut(),
-                0x1000,
+                None,
+                NonZeroUsize::try_from(0x1000).unwrap(),
                 ProtFlags::all(),
                 map_flags,
                 -1,

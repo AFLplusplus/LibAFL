@@ -27,7 +27,7 @@ where
 {
     fn compute(entry: &mut Testcase<PacketData>, _state: &S) -> Result<f64, Error> {
         Ok(entry
-            .metadata()
+            .metadata_map()
             .get::<PacketLenMetadata>()
             .map_or(1, |m| m.length) as f64)
     }
@@ -63,13 +63,14 @@ where
     }
 
     #[inline]
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         _state: &mut S,
+        _observers: &OT,
         testcase: &mut Testcase<PacketData>,
     ) -> Result<(), Error> {
         testcase
-            .metadata_mut()
+            .metadata_map_mut()
             .insert(PacketLenMetadata { length: self.len });
         Ok(())
     }

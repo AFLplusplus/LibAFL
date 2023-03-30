@@ -311,7 +311,7 @@ fn fuzz_binary(
 
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -416,7 +416,7 @@ fn fuzz_binary(
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;
@@ -515,7 +515,7 @@ fn fuzz_text(
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     // New maximization map feedback linked to the edges observer and the feedback state
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
+    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, true);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -635,7 +635,7 @@ fn fuzz_text(
     let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);
 
     // Read tokens
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;

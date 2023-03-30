@@ -44,7 +44,7 @@ We highly recommend *not* to use e.g. your Linux distribition package as this is
 Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
 
 - LLVM tools  
-The LLVM tools are needed (newer than LLVM 11.0.0 but older than LLVM 15.0.0)
+The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 but older than LLVM 15.0.0)
 
 - Cargo-make  
 We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with
@@ -71,7 +71,7 @@ cargo build --release
 cargo doc
 ```
 
-5. Browse the LibAFL book (WIP!) with (requires [mdbook](https://github.com/rust-lang/mdBook))
+5. Browse the LibAFL book (WIP!) with (requires [mdbook](https://rust-lang.github.io/mdBook/index.html))
 
 ```
 cd docs && mdbook serve

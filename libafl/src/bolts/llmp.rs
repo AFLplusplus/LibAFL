@@ -2201,7 +2201,7 @@ where
 
         while !self.is_shutting_down() {
             if current_milliseconds() > end_time {
-                on_new_msg_or_timeout(None).expect("An error occured in broker timeout. Exiting.");
+                on_new_msg_or_timeout(None).expect("An error occurred in broker timeout. Exiting.");
                 end_time = current_milliseconds() + timeout;
             }
 

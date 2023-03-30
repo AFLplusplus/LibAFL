@@ -35,7 +35,7 @@ pub fn main() -> Result<(), Error> {
     let observer =
         unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
 
-    let factory = MapEqualityFactory::new_from_observer(&observer);
+    let factory = MapEqualityFactory::with_observer(&observer);
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{
         inmemory_ondisk::InMemoryOnDiskCorpus, ondisk::OnDiskMetadataFormat, Corpus, CorpusId,
-        Testcase,
+        HasTestcase, Testcase,
     },
     inputs::{Input, UsesInput},
     Error,
@@ -127,6 +127,22 @@ where
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)
+    }
+}
+
+impl<I> HasTestcase for CachedOnDiskCorpus<I>
+where
+    I: Input,
+{
+    fn testcase(&self, id: CorpusId) -> Result<core::cell::Ref<Testcase<Self::Input>>, Error> {
+        Ok(self.get(id)?.borrow())
+    }
+
+    fn testcase_mut(
+        &self,
+        id: CorpusId,
+    ) -> Result<core::cell::RefMut<Testcase<Self::Input>>, Error> {
+        Ok(self.get(id)?.borrow_mut())
     }
 }
 

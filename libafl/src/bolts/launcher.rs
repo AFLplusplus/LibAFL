@@ -89,6 +89,9 @@ where
     /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
     #[builder(default = true)]
     spawn_broker: bool,
+    /// Tell the manager to serialize or not the state on restart
+    #[builder(default = true)]
+    serialize_state: bool,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(&'a S, &'a SP)>,
 }
@@ -186,6 +189,7 @@ where
                                 cpu_core: Some(*bind_to),
                             })
                             .configuration(self.configuration)
+                            .serialize_state(self.serialize_state)
                             .build()
                             .launch()?;
 
@@ -208,6 +212,7 @@ where
                 .remote_broker_addr(self.remote_broker_addr)
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
+                .serialize_state(self.serialize_state)
                 .build()
                 .launch()?;
 
@@ -255,6 +260,7 @@ where
                         cpu_core: Some(CoreId(core_id)),
                     })
                     .configuration(self.configuration)
+                    .serialize_state(self.serialize_state)
                     .build()
                     .launch()?;
 
@@ -315,6 +321,7 @@ where
                 .remote_broker_addr(self.remote_broker_addr)
                 .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                 .configuration(self.configuration)
+                .serialize_state(self.serialize_state)
                 .build()
                 .launch()?;
 

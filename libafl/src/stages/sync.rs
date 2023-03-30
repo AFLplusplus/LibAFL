@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{current_time, shmem::ShMemProvider},
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasTestcase},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -71,7 +71,7 @@ where
         _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let last = state
-            .metadata()
+            .metadata_map()
             .get::<SyncFromDiskMetadata>()
             .map(|m| m.last_time);
         let path = self.sync_dir.clone();
@@ -80,11 +80,11 @@ where
         {
             if last.is_none() {
                 state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .insert(SyncFromDiskMetadata::new(max_time));
             } else {
                 state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<SyncFromDiskMetadata>()
                     .unwrap()
                     .last_time = max_time;
@@ -234,7 +234,13 @@ where
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     EM: UsesState<State = S> + EventFirer,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasCorpus + HasRand + HasMetadata,
+    S: UsesInput
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasCorpus
+        + HasRand
+        + HasMetadata
+        + HasTestcase,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<EM, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -254,7 +260,7 @@ where
     ) -> Result<(), Error> {
         if self.client.can_convert() {
             let last_id = state
-                .metadata()
+                .metadata_map()
                 .get::<SyncFromBrokerMetadata>()
                 .and_then(|m| m.last_id);
 
@@ -262,7 +268,7 @@ where
                 last_id.map_or_else(|| state.corpus().first(), |id| state.corpus().next(id));
 
             while let Some(id) = cur_id {
-                let input = state.corpus().get(id)?.borrow_mut().load_input()?.clone();
+                let input = state.testcase_mut(id)?.load_input()?.clone();
 
                 self.client.fire(
                     state,
@@ -283,11 +289,11 @@ where
             let last = state.corpus().last();
             if last_id.is_none() {
                 state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .insert(SyncFromBrokerMetadata::new(last));
             } else {
                 state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<SyncFromBrokerMetadata>()
                     .unwrap()
                     .last_id = last;

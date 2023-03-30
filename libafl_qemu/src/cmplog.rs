@@ -132,11 +132,11 @@ where
         }
     }
     let state = state.expect("The gen_unique_cmp_ids hook works only for in-process fuzzing");
-    if state.metadata().get::<QemuCmpsMapMetadata>().is_none() {
+    if state.metadata_map().get::<QemuCmpsMapMetadata>().is_none() {
         state.add_metadata(QemuCmpsMapMetadata::new());
     }
     let meta = state
-        .metadata_mut()
+        .metadata_map_mut()
         .get_mut::<QemuCmpsMapMetadata>()
         .unwrap();
     let id = meta.current_id as usize;

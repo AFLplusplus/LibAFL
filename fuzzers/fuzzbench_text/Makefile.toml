@@ -1,7 +1,7 @@
 [env]
+PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 FUZZER_NAME="fuzzer"
-PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -82,7 +82,7 @@ mkdir in || true
 echo a > in/a
 # Allow sigterm as exit code 
 timeout 11s ./${FUZZER_NAME} -o out -i in >fuzz_stdout.log || true
-if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
+if [ -z "$(grep "objectives: 10" fuzz_stdout.log)" ]; then
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1
 else

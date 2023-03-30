@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
+    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
@@ -208,12 +208,7 @@ where
             alias_probability.insert(*s_arr.get(&n_s).unwrap(), 1.0);
         }
 
-        let wsmeta = state
-            .metadata_mut()
-            .get_mut::<WeightedScheduleMetadata>()
-            .ok_or_else(|| {
-                Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
-            })?;
+        let wsmeta = state.metadata_mut::<WeightedScheduleMetadata>()?;
 
         // Update metadata
         wsmeta.set_alias_probability(alias_probability);
@@ -233,7 +228,7 @@ impl<F, O, S> RemovableScheduler for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
-    S: HasCorpus + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     #[allow(clippy::cast_precision_loss)]
     fn on_remove(
@@ -248,22 +243,14 @@ where
             )
         })?;
 
-        let prev_meta = prev
-            .metadata()
-            .get::<SchedulerTestcaseMetaData>()
-            .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-            })?;
+        let prev_meta = prev.metadata::<SchedulerTestcaseMetadata>()?;
 
         // Use these to adjust `SchedulerMetadata`
         let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
         let prev_bitmap_size = prev_meta.bitmap_size();
         let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
 
-        let psmeta = state
-            .metadata_mut()
-            .get_mut::<SchedulerMetadata>()
-            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
 
         psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
         psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
@@ -281,12 +268,7 @@ where
         idx: CorpusId,
         prev: &crate::corpus::Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        let prev_meta = prev
-            .metadata()
-            .get::<SchedulerTestcaseMetaData>()
-            .ok_or_else(|| {
-                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-            })?;
+        let prev_meta = prev.metadata::<SchedulerTestcaseMetadata>()?;
 
         // Next depth is + 1
         let prev_depth = prev_meta.depth() + 1;
@@ -296,10 +278,7 @@ where
         let prev_bitmap_size = prev_meta.bitmap_size();
         let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
 
-        let psmeta = state
-            .metadata_mut()
-            .get_mut::<SchedulerMetadata>()
-            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
 
         // We won't add new one because it'll get added when it gets executed in calirbation next time.
         psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
@@ -312,7 +291,7 @@ where
             .corpus()
             .get(idx)?
             .borrow_mut()
-            .add_metadata(SchedulerTestcaseMetaData::new(prev_depth));
+            .add_metadata(SchedulerTestcaseMetadata::new(prev_depth));
         Ok(())
     }
 }
@@ -321,7 +300,7 @@ impl<F, O, S> Scheduler for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
-    S: HasCorpus + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
@@ -329,23 +308,17 @@ where
 
         let mut depth = match current_idx {
             Some(parent_idx) => state
-                .corpus()
-                .get(parent_idx)?
-                .borrow_mut()
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?
+                .testcase_mut(parent_idx)?
+                .metadata_mut::<SchedulerTestcaseMetadata>()?
                 .depth(),
             None => 0,
         };
 
-        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
+        // Attach a `SchedulerTestcaseMetadata` to the queue entry.
         depth += 1;
         {
             let mut testcase = state.corpus().get(idx)?.borrow_mut();
-            testcase.add_metadata(SchedulerTestcaseMetaData::with_n_fuzz_entry(
+            testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
                 depth,
                 self.last_hash,
             ));
@@ -375,10 +348,7 @@ where
 
         let mut hash = observer.hash() as usize;
 
-        let psmeta = state
-            .metadata_mut()
-            .get_mut::<SchedulerMetadata>()
-            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
 
         hash %= psmeta.n_fuzz().len();
         // Update the path frequency
@@ -400,12 +370,7 @@ where
             // Choose a random value between 0.000000000 and 1.000000000
             let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
 
-            let wsmeta = state
-                .metadata_mut()
-                .get_mut::<WeightedScheduleMetadata>()
-                .ok_or_else(|| {
-                    Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
-                })?;
+            let wsmeta = state.metadata_mut::<WeightedScheduleMetadata>()?;
 
             let current_cycles = wsmeta.runs_in_current_cycle();
 
@@ -424,12 +389,7 @@ where
 
             // Update depth
             if current_cycles > corpus_counts {
-                let psmeta = state
-                    .metadata_mut()
-                    .get_mut::<SchedulerMetadata>()
-                    .ok_or_else(|| {
-                        Error::key_not_found("SchedulerMetadata not found".to_string())
-                    })?;
+                let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }
 
@@ -447,18 +407,13 @@ where
         let current_idx = *state.corpus().current();
 
         if let Some(idx) = current_idx {
-            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            let mut testcase = state.testcase_mut(idx)?;
             let scheduled_count = testcase.scheduled_count();
 
             // increase scheduled count, this was fuzz_level in afl
             testcase.set_scheduled_count(scheduled_count + 1);
 
-            let tcmeta = testcase
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?;
+            let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
 
             if tcmeta.handicap() >= 4 {
                 tcmeta.set_handicap(tcmeta.handicap() - 4);

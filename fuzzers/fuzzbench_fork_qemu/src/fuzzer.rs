@@ -246,7 +246,7 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = unsafe { CmpLogObserver::with_map_ptr("cmplog", cmplog_map_ptr, true) };
 
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -351,7 +351,7 @@ fn fuzz(
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
-        if state.metadata().get::<Tokens>().is_none() {
+        if state.metadata_map().get::<Tokens>().is_none() {
             state.add_metadata(Tokens::from_file(tokenfile)?);
         }
     }

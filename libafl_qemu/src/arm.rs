@@ -1,3 +1,4 @@
+use capstone::arch::BuildsCapstone;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -50,5 +51,14 @@ impl IntoPy<PyObject> for Regs {
 
 /// Return an ARM ArchCapstoneBuilder
 pub fn capstone() -> capstone::arch::arm::ArchCapstoneBuilder {
-    capstone::Capstone::new().arm()
+    capstone::Capstone::new()
+        .arm()
+        .mode(capstone::arch::arm::ArchMode::Arm)
+}
+
+/// Return an ARM Thumb ArchCapstoneBuilder
+pub fn capstone_thumb() -> capstone::arch::arm::ArchCapstoneBuilder {
+    capstone::Capstone::new()
+        .arm()
+        .mode(capstone::arch::arm::ArchMode::Thumb)
 }

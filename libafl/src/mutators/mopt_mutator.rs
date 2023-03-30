@@ -413,7 +413,7 @@ where
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();
 
-        let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+        let mopt = state.metadata_map_mut().get_mut::<MOpt>().unwrap();
         let key_module = self.mode;
         match key_module {
             MOptMode::Corefuzzing => {
@@ -553,7 +553,7 @@ where
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
-        let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+        let mopt = state.metadata_map_mut().get_mut::<MOpt>().unwrap();
         for i in 0..mopt.operator_num {
             mopt.core_operator_cycles_v3[i] = mopt.core_operator_cycles_v2[i];
         }
@@ -568,7 +568,7 @@ where
             }
 
             state
-                .metadata_mut()
+                .metadata_map_mut()
                 .get_mut::<MOpt>()
                 .unwrap()
                 .core_operator_cycles_v2[idx.0] += 1;
@@ -585,7 +585,7 @@ where
         let mut r = MutationResult::Skipped;
         let swarm_now;
         {
-            let mopt = state.metadata_mut().get_mut::<MOpt>().unwrap();
+            let mopt = state.metadata_map_mut().get_mut::<MOpt>().unwrap();
             swarm_now = mopt.swarm_now;
 
             for i in 0..mopt.operator_num {
@@ -604,7 +604,7 @@ where
             }
 
             state
-                .metadata_mut()
+                .metadata_map_mut()
                 .get_mut::<MOpt>()
                 .unwrap()
                 .pilot_operator_cycles_v2[swarm_now][idx.0] += 1;
@@ -646,7 +646,7 @@ where
     #[inline]
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<MOpt>()
             .unwrap()
             .select_algorithm()

@@ -429,7 +429,7 @@ where
     MT: Monitor, //TODO CE: CustomEvent,
 {
     /// Creates a new [`SimpleEventManager`].
-    fn new_launched(monitor: MT, staterestorer: StateRestorer<SP>) -> Self {
+    fn launched(monitor: MT, staterestorer: StateRestorer<SP>) -> Self {
         Self {
             staterestorer,
             simple_event_mgr: SimpleEventManager::new(monitor),
@@ -535,7 +535,7 @@ where
                 // Mgr to send and receive msgs from/to all other fuzzer instances
                 (
                     None,
-                    SimpleRestartingEventManager::new_launched(monitor, staterestorer),
+                    SimpleRestartingEventManager::launched(monitor, staterestorer),
                 )
             }
             // Restoring from a previous run, deserialize state and corpus.
@@ -551,7 +551,7 @@ where
 
                 (
                     Some(state),
-                    SimpleRestartingEventManager::new_launched(monitor, staterestorer),
+                    SimpleRestartingEventManager::launched(monitor, staterestorer),
                 )
             }
         };
