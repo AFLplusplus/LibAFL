@@ -409,12 +409,14 @@ pub(crate) struct InProcessExecutorHandlerData {
     fuzzer_ptr: *mut c_void,
     executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
+
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
     crash_handler: *const c_void,
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
     timeout_handler: *const c_void,
+
     #[cfg(all(windows, feature = "std"))]
     pub(crate) tp_timer: *mut c_void,
     #[cfg(all(windows, feature = "std"))]
@@ -423,6 +425,8 @@ pub(crate) struct InProcessExecutorHandlerData {
     pub(crate) critical: *mut c_void,
     #[cfg(all(windows, feature = "std"))]
     pub(crate) timeout_input_ptr: *mut c_void,
+
+    pub(crate) timeout_executor_ptr: *mut c_void,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
@@ -457,13 +461,21 @@ impl InProcessExecutorHandlerData {
     }
 
     #[cfg(all(windows, feature = "std"))]
-    fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         self.in_target == 1
     }
 
     #[cfg(unix)]
-    fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
+    }
+
+    fn timeout_executor_mut<'a, E>(&self) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
+        unsafe {
+            (self.timeout_executor_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
+                .as_mut()
+                .unwrap()
+        }
     }
 }
 
@@ -479,6 +491,7 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     executor_ptr: ptr::null(),
     /// The current input for signal handling
     current_input_ptr: ptr::null(),
+
     /// The crash handler fn
     #[cfg(any(unix, feature = "std"))]
     crash_handler: ptr::null(),
@@ -493,6 +506,8 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     critical: null_mut(),
     #[cfg(all(windows, feature = "std"))]
     timeout_input_ptr: null_mut(),
+
+    timeout_executor_ptr: null_mut(),
 };
 
 /// Get the inprocess [`crate::state::State`]
@@ -715,7 +730,12 @@ mod unix_signal_handler {
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
+        if data.timeout_executor_mut::<E>().handle_timeout(data) {
+            return;
+        }
+
         if !data.is_valid() {
+            // TODO reset time and tell timeout exec to redo settimer next iter
             log::warn!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
             return;
         }
