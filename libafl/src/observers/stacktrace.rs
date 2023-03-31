@@ -5,6 +5,7 @@ use alloc::string::{String, ToString};
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
+    vec::Vec,
 };
 use std::{
     fmt::Debug,
@@ -18,7 +19,17 @@ use backtrace::Backtrace;
 #[cfg(feature = "casr")]
 use libcasr::{
     asan::AsanStacktrace,
-    stacktrace::{ParseStacktrace, Stacktrace, StacktraceEntry},
+    constants::{
+        STACK_FRAME_FILEPATH_IGNORE_REGEXES_CPP, STACK_FRAME_FILEPATH_IGNORE_REGEXES_GO,
+        STACK_FRAME_FILEPATH_IGNORE_REGEXES_PYTHON, STACK_FRAME_FILEPATH_IGNORE_REGEXES_RUST,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES_CPP, STACK_FRAME_FUNCTION_IGNORE_REGEXES_GO,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES_PYTHON, STACK_FRAME_FUNCTION_IGNORE_REGEXES_RUST,
+    },
+    init_ignored_frames,
+    stacktrace::{
+        Filter, ParseStacktrace, Stacktrace, StacktraceEntry, STACK_FRAME_FILEPATH_IGNORE_REGEXES,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES,
+    },
 };
 #[cfg(not(feature = "casr"))]
 use regex::Regex;
@@ -66,6 +77,7 @@ pub fn collect_backtrace() -> u64 {
         return 0;
     }
     b.resolve();
+    init_ignored_frames!("rust", "cpp");
     let mut strace = Stacktrace::new();
     for frame in &b.frames()[1..] {
         let mut strace_entry = StacktraceEntry::default();
@@ -85,6 +97,7 @@ pub fn collect_backtrace() -> u64 {
         strace.push(strace_entry);
     }
 
+    strace.filter();
     let mut s = DefaultHasher::new();
     strace.hash(&mut s);
     s.finish()
@@ -284,7 +297,9 @@ impl AsanBacktraceObserver {
     pub fn parse_asan_output(&mut self, output: &str) {
         let mut hash = 0;
         if let Ok(st_vec) = AsanStacktrace::extract_stacktrace(output) {
-            if let Ok(stacktrace) = AsanStacktrace::parse_stacktrace(&st_vec) {
+            if let Ok(mut stacktrace) = AsanStacktrace::parse_stacktrace(&st_vec) {
+                init_ignored_frames!("rust", "cpp", "go");
+                stacktrace.filter();
                 let mut s = DefaultHasher::new();
                 stacktrace.hash(&mut s);
                 hash = s.finish();
