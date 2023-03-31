@@ -24,17 +24,12 @@ use libafl::{
     inputs::{HasTargetBytes, Input},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{get_asan_runtime_flags, StdMapObserver},
+    observers::{AsanBacktraceObserver, get_asan_runtime_flags, StdMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
     Error,
 };
-
-#[cfg(not(feature = "casr"))]
-use libafl::observers::AsanBacktraceObserver;
-#[cfg(feature = "casr")]
-use libafl::observers::CasrAsanBacktraceObserver;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -45,9 +40,6 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = unsafe { StdMapObserver::new("signals", signals.as_mut_slice()) };
     // Create a stacktrace observer
-    #[cfg(feature = "casr")]
-    let bt_observer = CasrAsanBacktraceObserver::new("CasrAsanBacktraceObserver");
-    #[cfg(not(feature = "casr"))]
     let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks

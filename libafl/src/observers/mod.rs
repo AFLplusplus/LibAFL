@@ -16,11 +16,6 @@ pub mod stacktrace;
 #[cfg(feature = "regex")]
 pub use stacktrace::*;
 
-#[cfg(feature = "casr")]
-pub mod casr;
-#[cfg(feature = "casr")]
-pub use casr::*;
-
 pub mod concolic;
 
 pub mod value;

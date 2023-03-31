@@ -1,6 +1,11 @@
 //! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
 use alloc::string::{String, ToString};
+#[cfg(feature = "casr")]
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 use std::{
     fmt::Debug,
     fs::{self, File},
@@ -10,6 +15,9 @@ use std::{
 };
 
 use backtrace::Backtrace;
+#[cfg(feature = "casr")]
+use libcasr::{asan::AsanStacktrace, stacktrace::ParseStacktrace};
+#[cfg(not(feature = "casr"))]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -222,6 +230,7 @@ impl AsanBacktraceObserver {
         Ok(())
     }
 
+    #[cfg(not(feature = "casr"))]
     /// parse ASAN error output emited by the target command and compute the hash
     pub fn parse_asan_output(&mut self, output: &str) {
         let mut hash = 0;
@@ -230,6 +239,20 @@ impl AsanBacktraceObserver {
             let g = m.get(1).unwrap();
             hash ^= u64::from_str_radix(g.as_str(), 16).unwrap();
         });
+        self.update_hash(hash);
+    }
+
+    #[cfg(feature = "casr")]
+    /// parse ASAN error output emited by the target command and compute the hash
+    pub fn parse_asan_output(&mut self, output: &str) {
+        let mut hash = 0;
+        if let Ok(st_vec) = AsanStacktrace::extract_stacktrace(output) {
+            if let Ok(stacktrace) = AsanStacktrace::parse_stacktrace(&st_vec) {
+                let mut s = DefaultHasher::new();
+                stacktrace.hash(&mut s);
+                hash = s.finish();
+            }
+        }
         self.update_hash(hash);
     }
 

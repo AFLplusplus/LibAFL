@@ -33,7 +33,7 @@ static_z3 = ["z3/static-link-z3"] # Allows us to build z3 from source, instead o
 corpus_btreemap = [] # Switches from HashMap to BTreeMap for CorpusId
 gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
 regex = ["std", "dep:regex"] # enables the NaiveTokenizer and StacktraceObserver
-casr = ["libcasr", "std", "regex"] # enables Observers based on libcasr
+casr = ["libcasr", "std", "regex"] # enables deduplication based on libcasr for StacktraceObserver
 
 # features hiding dependencies licensed under GPL
 gpl = []
