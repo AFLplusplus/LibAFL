@@ -6,7 +6,6 @@ edition = "2021"
 [features]
 default = ["std"]
 std = []
-casr = []
 
 [profile.release]
 lto = true

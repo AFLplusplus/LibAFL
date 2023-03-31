@@ -16,7 +16,10 @@ use std::{
 
 use backtrace::Backtrace;
 #[cfg(feature = "casr")]
-use libcasr::{asan::AsanStacktrace, stacktrace::ParseStacktrace};
+use libcasr::{
+    asan::AsanStacktrace,
+    stacktrace::{ParseStacktrace, Stacktrace, StacktraceEntry},
+};
 #[cfg(not(feature = "casr"))]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -30,6 +33,7 @@ use crate::{
     Error,
 };
 
+#[cfg(not(feature = "casr"))]
 /// Collects the backtrace via [`Backtrace`] and [`Debug`]
 /// ([`Debug`] is currently used for dev purposes, symbols hash will be used eventually)
 #[must_use]
@@ -51,6 +55,39 @@ pub fn collect_backtrace() -> u64 {
     //     std::process::id()
     // );
     hash
+}
+
+#[cfg(feature = "casr")]
+/// Collects the backtrace via [`Backtrace`]
+#[must_use]
+pub fn collect_backtrace() -> u64 {
+    let mut b = Backtrace::new_unresolved();
+    if b.frames().is_empty() {
+        return 0;
+    }
+    b.resolve();
+    let mut strace = Stacktrace::new();
+    for frame in &b.frames()[1..] {
+        let mut strace_entry = StacktraceEntry::default();
+        let symbols = frame.symbols();
+        if symbols.len() > 1 {
+            let symbol = &symbols[0];
+            if let Some(name) = symbol.name() {
+                strace_entry.function = name.as_str().unwrap_or("").to_string();
+            }
+            if let Some(file) = symbol.filename() {
+                strace_entry.debug.file = file.to_str().unwrap_or("").to_string();
+            }
+            strace_entry.debug.line = u64::from(symbol.lineno().unwrap_or(0));
+            strace_entry.debug.column = u64::from(symbol.colno().unwrap_or(0));
+        }
+        strace_entry.address = frame.ip() as u64;
+        strace.push(strace_entry);
+    }
+
+    let mut s = DefaultHasher::new();
+    strace.hash(&mut s);
+    s.finish()
 }
 
 /// An enum encoding the types of harnesses

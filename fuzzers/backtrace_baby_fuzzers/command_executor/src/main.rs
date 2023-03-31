@@ -24,7 +24,7 @@ use libafl::{
     inputs::{HasTargetBytes, Input},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{AsanBacktraceObserver, get_asan_runtime_flags, StdMapObserver},
+    observers::{get_asan_runtime_flags, AsanBacktraceObserver, StdMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
