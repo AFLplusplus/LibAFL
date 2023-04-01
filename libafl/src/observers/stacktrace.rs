@@ -1,11 +1,13 @@
 //! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
-use alloc::string::{String, ToString};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(feature = "casr")]
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
-    vec::Vec,
 };
 use std::{
     fmt::Debug,
@@ -77,7 +79,6 @@ pub fn collect_backtrace() -> u64 {
         return 0;
     }
     b.resolve();
-    init_ignored_frames!("rust", "cpp");
     let mut strace = Stacktrace::new();
     for frame in &b.frames()[1..] {
         let mut strace_entry = StacktraceEntry::default();
@@ -124,6 +125,7 @@ pub struct BacktraceObserver<'a> {
 }
 
 impl<'a> BacktraceObserver<'a> {
+    #[cfg(not(feature = "casr"))]
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(
@@ -131,6 +133,22 @@ impl<'a> BacktraceObserver<'a> {
         backtrace_hash: &'a mut Option<u64>,
         harness_type: HarnessType,
     ) -> Self {
+        Self {
+            observer_name: observer_name.to_string(),
+            hash: OwnedRefMut::Ref(backtrace_hash),
+            harness_type,
+        }
+    }
+
+    #[cfg(feature = "casr")]
+    /// Creates a new [`BacktraceObserver`] with the given name.
+    #[must_use]
+    pub fn new(
+        observer_name: &str,
+        backtrace_hash: &'a mut Option<u64>,
+        harness_type: HarnessType,
+    ) -> Self {
+        init_ignored_frames!("rust", "cpp");
         Self {
             observer_name: observer_name.to_string(),
             hash: OwnedRefMut::Ref(backtrace_hash),
@@ -247,9 +265,21 @@ pub struct AsanBacktraceObserver {
 }
 
 impl AsanBacktraceObserver {
+    #[cfg(not(feature = "casr"))]
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: &str) -> Self {
+        Self {
+            observer_name: observer_name.to_string(),
+            hash: None,
+        }
+    }
+
+    #[cfg(feature = "casr")]
+    /// Creates a new [`BacktraceObserver`] with the given name.
+    #[must_use]
+    pub fn new(observer_name: &str) -> Self {
+        init_ignored_frames!("rust", "cpp", "go");
         Self {
             observer_name: observer_name.to_string(),
             hash: None,
@@ -261,9 +291,9 @@ impl AsanBacktraceObserver {
         &mut self,
         stderr: &mut ChildStderr,
     ) -> Result<(), Error> {
-        let mut buf = String::new();
-        stderr.read_to_string(&mut buf)?;
-        self.parse_asan_output(&buf);
+        let mut buf = Vec::new();
+        stderr.read_to_end(&mut buf)?;
+        self.parse_asan_output(&String::from_utf8_lossy(&buf));
         Ok(())
     }
 
@@ -298,7 +328,6 @@ impl AsanBacktraceObserver {
         let mut hash = 0;
         if let Ok(st_vec) = AsanStacktrace::extract_stacktrace(output) {
             if let Ok(mut stacktrace) = AsanStacktrace::parse_stacktrace(&st_vec) {
-                init_ignored_frames!("rust", "cpp", "go");
                 stacktrace.filter();
                 let mut s = DefaultHasher::new();
                 stacktrace.hash(&mut s);

@@ -17,4 +17,5 @@ debug = true
 cc = "*"
 
 [dependencies]
-libafl = { path = "../../../libafl/"}
+libafl = { path = "../../../libafl/" }
+
