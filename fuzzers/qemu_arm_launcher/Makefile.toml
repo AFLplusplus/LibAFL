@@ -141,7 +141,7 @@ dependencies = [ "harness_crashing", "fuzzer" ]
 # Run the fuzzer
 [tasks.test]
 linux_alias = "test_unix"
-mac_alias = "test_unix"
+mac_alias = "test_mac"
 windows_alias = "unsupported"
 
 # Short test

@@ -78,7 +78,7 @@ windows_alias = "unsupported"
 [tasks.test_unix]
 script_runner = "@shell"
 script='''
-echo "This test is skipped"
+echo "This test is skipped. QEMU-based fuzzer doesn't work on Github runners"
 '''
 dependencies = [ "harness", "fuzzer" ]
 

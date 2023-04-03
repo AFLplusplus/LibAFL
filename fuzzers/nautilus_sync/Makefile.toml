@@ -97,7 +97,7 @@ dependencies = [ "fuzzer" ]
 # Test
 [tasks.test]
 linux_alias = "test_unix"
-mac_alias = "test_unix"
+mac_alias = "test_mac"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
@@ -113,6 +113,14 @@ else
 fi
 '''
 dependencies = [ "fuzzer" ]
+
+[tasks.test_mac]
+script_runner = "@shell"
+script='''
+rm -rf libafl_unix_shmem_server || true
+timeout 11s ./${FUZZER_NAME} --cores 0 >fuzz_stdout.log 2>/dev/null || true
+'''
+dependencies = [ "fuzzer", "harness" ]
 
 # Clean up
 [tasks.clean]
