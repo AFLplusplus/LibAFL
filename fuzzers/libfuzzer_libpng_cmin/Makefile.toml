@@ -179,7 +179,7 @@ timeout 11s ./${FUZZER_NAME} >fuzz_stdout.log &
 sleep 0.2
 timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
 '''
-dependencies = [ "fuzzer", "harness" ]
+dependencies = [ "fuzzer" ]
 
 # Clean up
 [tasks.clean]
