@@ -673,28 +673,44 @@ pub struct Emulator {
     _private: (),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum EmuError {
+    #[error("Only one instance of the QEMU Emulator is permitted")]
+    MultipleInstances,
+    #[error("QEMU emulator args cannot be empty")]
+    EmptyArgs,
+    #[error("Too many arguments passed to QEMU emulator ({0} > i32::MAX)")]
+    TooManyArgs(usize),
+}
+
 #[allow(clippy::unused_self)]
 impl Emulator {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
-    pub fn new(args: &[String], env: &[(String, String)]) -> Emulator {
+    pub fn new(args: &[String], env: &[(String, String)]) -> Result<Emulator, EmuError> {
         unsafe {
-            assert!(
-                !EMULATOR_IS_INITIALIZED,
-                "Only an instance of Emulator is permitted"
-            );
+            if EMULATOR_IS_INITIALIZED {
+                return Err(EmuError::MultipleInstances);
+            }
         }
-        assert!(!args.is_empty());
+        if args.is_empty() {
+            return Err(EmuError::EmptyArgs);
+        }
+
+        let argc = args.len();
+        if usize::try_from(i32::MAX).map_or(false, |max| argc > max) {
+            return Err(EmuError::TooManyArgs(argc));
+        }
+        #[allow(clippy::cast_possible_wrap)]
+        let argc = argc as i32;
+
         let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
         let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
-        assert!(argv.len() < i32::MAX as usize);
         let env_strs: Vec<String> = env
             .iter()
             .map(|(k, v)| format!("{}={}\0", &k, &v))
             .collect();
         let mut envp: Vec<*const u8> = env_strs.iter().map(|x| x.as_bytes().as_ptr()).collect();
         envp.push(null());
-        #[allow(clippy::cast_possible_wrap)]
-        let argc = argv.len() as i32;
         unsafe {
             #[cfg(emulation_mode = "usermode")]
             qemu_user_init(
@@ -714,7 +730,7 @@ impl Emulator {
             }
             EMULATOR_IS_INITIALIZED = true;
         }
-        Emulator { _private: () }
+        Ok(Emulator { _private: () })
     }
 
     #[must_use]
@@ -1174,10 +1190,10 @@ pub mod pybind {
     impl Emulator {
         #[allow(clippy::needless_pass_by_value)]
         #[new]
-        fn new(args: Vec<String>, env: Vec<(String, String)>) -> Emulator {
-            Emulator {
-                emu: super::Emulator::new(&args, &env),
-            }
+        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Emulator> {
+            let emu = super::Emulator::new(&args, &env)
+                .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+            Ok(Emulator { emu })
         }
 
         fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {

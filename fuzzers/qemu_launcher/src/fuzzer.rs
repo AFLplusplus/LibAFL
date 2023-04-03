@@ -54,7 +54,7 @@ pub fn fuzz() {
     env::remove_var("LD_LIBRARY_PATH");
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&args, &env);
+    let emu = Emulator::new(&args, &env).unwrap();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer).unwrap();
