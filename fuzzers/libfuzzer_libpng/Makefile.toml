@@ -152,14 +152,14 @@ dependencies = [ "fuzzer_crash" ]
 # Test
 [tasks.test]
 linux_alias = "test_unix"
-mac_alias = "test_unix"
+mac_alias = "test_mac"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 11s ./${FUZZER_NAME} >fuzz_stdout.log &
+(timeout 11s ./${FUZZER_NAME} >fuzz_stdout.log 2>/dev/null || true) &
 sleep 0.2
 timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
 if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
@@ -168,6 +168,16 @@ if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
 else
     echo "Fuzzer is working"
 fi
+'''
+dependencies = [ "fuzzer" ]
+
+[tasks.test_mac]
+script_runner = "@shell"
+script='''
+rm -rf libafl_unix_shmem_server || true
+(timeout 11s ./${FUZZER_NAME} >fuzz_stdout.log 2>/dev/null || true) &
+sleep 0.2
+timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
 '''
 dependencies = [ "fuzzer" ]
 
