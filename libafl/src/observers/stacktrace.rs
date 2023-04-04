@@ -148,7 +148,7 @@ impl<'a> BacktraceObserver<'a> {
         backtrace_hash: &'a mut Option<u64>,
         harness_type: HarnessType,
     ) -> Self {
-        init_ignored_frames!("rust", "cpp");
+        init_ignored_frames!("rust", "cpp", "go");
         Self {
             observer_name: observer_name.to_string(),
             hash: OwnedRefMut::Ref(backtrace_hash),
