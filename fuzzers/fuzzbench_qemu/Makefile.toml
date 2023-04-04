@@ -78,14 +78,7 @@ windows_alias = "unsupported"
 [tasks.test_unix]
 script_runner = "@shell"
 script='''
-rm -rf libafl_unix_shmem_server || true
-timeout 10s cargo run --release -- --libafl-in ../libfuzzer_libpng/corpus --libafl-out ./out ./${FUZZER_NAME} || true
-if [ -z "$(ls -A out/)" ]; then
-    echo "Fuzzer does not generate any testcases or any crashes"
-    exit 1
-else
-    echo "Fuzzer is working"
-fi
+echo "This test is skipped. QEMU-based fuzzer doesn't work on Github runners"
 '''
 dependencies = [ "harness", "fuzzer" ]
 
