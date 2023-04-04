@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// A corpus that keeps a maximum number of [`Testcase`]s in memory
-/// and load them from disk, when they are being used
+/// and load them from disk, when they are being used.
 /// The eviction policy is FIFO.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
