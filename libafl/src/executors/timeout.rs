@@ -25,7 +25,7 @@ use windows::Win32::{
     System::Threading::{
         CreateThreadpoolTimer, EnterCriticalSection, InitializeCriticalSection,
         LeaveCriticalSection, SetThreadpoolTimer, RTL_CRITICAL_SECTION, TP_CALLBACK_ENVIRON_V3,
-        TP_CALLBACK_INSTANCE, TP_TIMER,
+        TP_CALLBACK_INSTANCE, PTP_TIMER,
     },
 };
 
@@ -88,7 +88,7 @@ pub struct TimeoutExecutor<E> {
     #[cfg(windows)]
     milli_sec: i64,
     #[cfg(windows)]
-    tp_timer: *mut TP_TIMER,
+    tp_timer: *mut PTP_TIMER,
     #[cfg(windows)]
     critical: RTL_CRITICAL_SECTION,
 }
@@ -128,7 +128,7 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
 type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
     param0: *mut TP_CALLBACK_INSTANCE,
     param1: *mut c_void,
-    param2: *mut TP_TIMER,
+    param2: *mut PTP_TIMER,
 );
 
 #[cfg(target_os = "linux")]
