@@ -878,7 +878,7 @@ pub mod windows_asan_handler {
     {
         let mut data = &mut GLOBAL_STATE;
         // Have we set a timer_before?
-        if !(data.tp_timer as *mut windows::Win32::System::Threading::PTP_TIMER).is_null() {
+        if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
             /*
                 We want to prevent the timeout handler being run while the main thread is executing the crash handler
                 Timeout handler runs if it has access to the critical section or data.in_target == 0
@@ -1019,7 +1019,7 @@ mod windows_exception_handler {
             let data = unsafe { &mut GLOBAL_STATE };
             // Have we set a timer_before?
             unsafe {
-                if !(data.tp_timer as *mut windows::Win32::System::Threading::PTP_TIMER).is_null() {
+                if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
                     /*
                         We want to prevent the timeout handler being run while the main thread is executing the crash handler
                         Timeout handler runs if it has access to the critical section or data.in_target == 0
@@ -1135,7 +1135,7 @@ mod windows_exception_handler {
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         // Have we set a timer_before?
-        if !(data.tp_timer as *mut windows::Win32::System::Threading::PTP_TIMER).is_null() {
+        if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
             /*
                 We want to prevent the timeout handler being run while the main thread is executing the crash handler
                 Timeout handler runs if it has access to the critical section or data.in_target == 0
