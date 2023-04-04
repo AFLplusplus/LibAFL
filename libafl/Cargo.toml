@@ -32,6 +32,7 @@ cmin = ["z3"] # corpus minimisation
 corpus_btreemap = [] # Switches from HashMap to BTreeMap for CorpusId
 gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
 regex = ["std", "dep:regex"] # enables the NaiveTokenizer and StacktraceObserver
+casr = ["libcasr", "std", "regex"] # enables deduplication based on libcasr for StacktraceObserver
 
 # features hiding dependencies licensed under GPL
 gpl = []
@@ -103,6 +104,7 @@ z3 = { version = "0.11", features = ["static-link-z3"], optional = true } # for 
 pyo3 = { version = "0.17", optional = true, features = ["serde", "macros"] }
 concat-idents = { version = "1.1.3", optional = true }
 
+libcasr = { version = "2.5", optional = true}
 
 # AGPL
 # !!! this create requires nightly

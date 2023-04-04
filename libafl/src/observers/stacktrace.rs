@@ -1,6 +1,14 @@
 //! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
-use alloc::string::{String, ToString};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+#[cfg(feature = "casr")]
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 use std::{
     fmt::Debug,
     fs::{self, File},
@@ -10,6 +18,22 @@ use std::{
 };
 
 use backtrace::Backtrace;
+#[cfg(feature = "casr")]
+use libcasr::{
+    asan::AsanStacktrace,
+    constants::{
+        STACK_FRAME_FILEPATH_IGNORE_REGEXES_CPP, STACK_FRAME_FILEPATH_IGNORE_REGEXES_GO,
+        STACK_FRAME_FILEPATH_IGNORE_REGEXES_PYTHON, STACK_FRAME_FILEPATH_IGNORE_REGEXES_RUST,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES_CPP, STACK_FRAME_FUNCTION_IGNORE_REGEXES_GO,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES_PYTHON, STACK_FRAME_FUNCTION_IGNORE_REGEXES_RUST,
+    },
+    init_ignored_frames,
+    stacktrace::{
+        Filter, ParseStacktrace, Stacktrace, StacktraceEntry, STACK_FRAME_FILEPATH_IGNORE_REGEXES,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES,
+    },
+};
+#[cfg(not(feature = "casr"))]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +46,7 @@ use crate::{
     Error,
 };
 
+#[cfg(not(feature = "casr"))]
 /// Collects the backtrace via [`Backtrace`] and [`Debug`]
 /// ([`Debug`] is currently used for dev purposes, symbols hash will be used eventually)
 #[must_use]
@@ -45,6 +70,40 @@ pub fn collect_backtrace() -> u64 {
     hash
 }
 
+#[cfg(feature = "casr")]
+/// Collects the backtrace via [`Backtrace`]
+#[must_use]
+pub fn collect_backtrace() -> u64 {
+    let mut b = Backtrace::new_unresolved();
+    if b.frames().is_empty() {
+        return 0;
+    }
+    b.resolve();
+    let mut strace = Stacktrace::new();
+    for frame in &b.frames()[1..] {
+        let mut strace_entry = StacktraceEntry::default();
+        let symbols = frame.symbols();
+        if symbols.len() > 1 {
+            let symbol = &symbols[0];
+            if let Some(name) = symbol.name() {
+                strace_entry.function = name.as_str().unwrap_or("").to_string();
+            }
+            if let Some(file) = symbol.filename() {
+                strace_entry.debug.file = file.to_str().unwrap_or("").to_string();
+            }
+            strace_entry.debug.line = u64::from(symbol.lineno().unwrap_or(0));
+            strace_entry.debug.column = u64::from(symbol.colno().unwrap_or(0));
+        }
+        strace_entry.address = frame.ip() as u64;
+        strace.push(strace_entry);
+    }
+
+    strace.filter();
+    let mut s = DefaultHasher::new();
+    strace.hash(&mut s);
+    s.finish()
+}
+
 /// An enum encoding the types of harnesses
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum HarnessType {
@@ -66,6 +125,7 @@ pub struct BacktraceObserver<'a> {
 }
 
 impl<'a> BacktraceObserver<'a> {
+    #[cfg(not(feature = "casr"))]
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(
@@ -73,6 +133,22 @@ impl<'a> BacktraceObserver<'a> {
         backtrace_hash: &'a mut Option<u64>,
         harness_type: HarnessType,
     ) -> Self {
+        Self {
+            observer_name: observer_name.to_string(),
+            hash: OwnedRefMut::Ref(backtrace_hash),
+            harness_type,
+        }
+    }
+
+    #[cfg(feature = "casr")]
+    /// Creates a new [`BacktraceObserver`] with the given name.
+    #[must_use]
+    pub fn new(
+        observer_name: &str,
+        backtrace_hash: &'a mut Option<u64>,
+        harness_type: HarnessType,
+    ) -> Self {
+        init_ignored_frames!("rust", "cpp", "go");
         Self {
             observer_name: observer_name.to_string(),
             hash: OwnedRefMut::Ref(backtrace_hash),
@@ -189,9 +265,21 @@ pub struct AsanBacktraceObserver {
 }
 
 impl AsanBacktraceObserver {
+    #[cfg(not(feature = "casr"))]
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: &str) -> Self {
+        Self {
+            observer_name: observer_name.to_string(),
+            hash: None,
+        }
+    }
+
+    #[cfg(feature = "casr")]
+    /// Creates a new [`BacktraceObserver`] with the given name.
+    #[must_use]
+    pub fn new(observer_name: &str) -> Self {
+        init_ignored_frames!("rust", "cpp", "go");
         Self {
             observer_name: observer_name.to_string(),
             hash: None,
@@ -203,9 +291,9 @@ impl AsanBacktraceObserver {
         &mut self,
         stderr: &mut ChildStderr,
     ) -> Result<(), Error> {
-        let mut buf = String::new();
-        stderr.read_to_string(&mut buf)?;
-        self.parse_asan_output(&buf);
+        let mut buf = Vec::new();
+        stderr.read_to_end(&mut buf)?;
+        self.parse_asan_output(&String::from_utf8_lossy(&buf));
         Ok(())
     }
 
@@ -222,6 +310,7 @@ impl AsanBacktraceObserver {
         Ok(())
     }
 
+    #[cfg(not(feature = "casr"))]
     /// parse ASAN error output emited by the target command and compute the hash
     pub fn parse_asan_output(&mut self, output: &str) {
         let mut hash = 0;
@@ -230,6 +319,21 @@ impl AsanBacktraceObserver {
             let g = m.get(1).unwrap();
             hash ^= u64::from_str_radix(g.as_str(), 16).unwrap();
         });
+        self.update_hash(hash);
+    }
+
+    #[cfg(feature = "casr")]
+    /// parse ASAN error output emited by the target command and compute the hash
+    pub fn parse_asan_output(&mut self, output: &str) {
+        let mut hash = 0;
+        if let Ok(st_vec) = AsanStacktrace::extract_stacktrace(output) {
+            if let Ok(mut stacktrace) = AsanStacktrace::parse_stacktrace(&st_vec) {
+                stacktrace.filter();
+                let mut s = DefaultHasher::new();
+                stacktrace.hash(&mut s);
+                hash = s.finish();
+            }
+        }
         self.update_hash(hash);
     }
 
