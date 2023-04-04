@@ -46,9 +46,7 @@ impl Tokens {
     /// Creates a new tokens metadata (old-skool afl name: `dictornary`)
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            ..Tokens::default()
-        }
+        Tokens::default()
     }
 
     /// Add tokens from a slice of Vecs of bytes

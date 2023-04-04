@@ -90,6 +90,8 @@ pub struct ClientStats {
     pub corpus_size: u64,
     /// The total executions for this client
     pub executions: u64,
+    /// The number of executions of the previous state in case a client decrease the number of execution (e.g when restarting without saving the state)
+    pub prev_state_executions: u64,
     /// The size of the objectives corpus for this client
     pub objective_size: u64,
     /// The last reported executions for this client
@@ -119,13 +121,21 @@ impl ClientStats {
             self.last_window_time = cur_time;
             self.last_window_executions = self.executions;
         }
-        self.executions = executions;
+        if self.executions > self.prev_state_executions + executions {
+            // Something is strange here, sum the executions
+            self.prev_state_executions = self.executions;
+        }
+        self.executions = self.prev_state_executions + executions;
     }
 
     /// We got a new information about executions for this client, insert them.
     #[cfg(not(feature = "afl_exec_sec"))]
     pub fn update_executions(&mut self, executions: u64, _cur_time: Duration) {
-        self.executions = executions;
+        if self.executions > self.prev_state_executions + executions {
+            // Something is strange here, sum the executions
+            self.prev_state_executions = self.executions;
+        }
+        self.executions = self.prev_state_executions + executions;
     }
 
     /// We got a new information about corpus size for this client, insert them.
@@ -317,12 +327,22 @@ impl Default for NopMonitor {
     }
 }
 
-#[cfg(feature = "std")]
 /// Tracking monitor during fuzzing that just prints to `stdout`.
-#[derive(Debug, Clone, Default)]
+#[cfg(feature = "std")]
+#[derive(Debug, Clone)]
 pub struct SimplePrintingMonitor {
     start_time: Duration,
     client_stats: Vec<ClientStats>,
+}
+
+#[cfg(feature = "std")]
+impl Default for SimplePrintingMonitor {
+    fn default() -> Self {
+        Self {
+            start_time: current_time(),
+            client_stats: Vec::new(),
+        }
+    }
 }
 
 #[cfg(feature = "std")]
