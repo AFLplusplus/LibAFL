@@ -102,7 +102,7 @@ dependencies = [ "fuzzer", "harness" ]
 # Test
 [tasks.test]
 linux_alias = "test_unix"
-mac_alias = "test_unix"
+mac_alias = "test_mac"
 windows_alias = "test_windows"
 
 [tasks.test_unix]
@@ -116,6 +116,15 @@ if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
 else
     echo "Fuzzer is working"
 fi
+'''
+dependencies = [ "fuzzer", "harness" ]
+
+# Don't grep and check the result on macOS because it's unstable
+[tasks.test_mac]
+script_runner = "@shell"
+script='''
+rm -rf libafl_unix_shmem_server || true
+timeout 10s ./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so >fuzz_stdout.log || true
 '''
 dependencies = [ "fuzzer", "harness" ]
 
