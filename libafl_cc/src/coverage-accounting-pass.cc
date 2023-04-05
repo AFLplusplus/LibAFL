@@ -1,18 +1,10 @@
 /*
-   american fuzzy lop++ - LLVM-mode instrumentation pass
-   ---------------------------------------------------
+   LibAFL - Coverage accounting LLVM pass
+   --------------------------------------------------
 
-   Written by Laszlo Szekeres <lszekeres@google.com>,
-              Adrian Herrera <adrian.herrera@anu.edu.au>,
-              Michal Zalewski
+   Written by Andrea Fioraldi <andreafioraldi@gmail.com>
 
-   LLVM integration design comes from Laszlo Szekeres. C bits copied-and-pasted
-   from afl-as.c are Michal's fault.
-
-   NGRAM previous location coverage comes from Adrian Herrera.
-
-   Copyright 2015, 2016 Google Inc. All rights reserved.
-   Copyright 2019-2020 AFLplusplus Project. All rights reserved.
+   Copyright 2023 AFLplusplus Project. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -20,11 +12,7 @@
 
      http://www.apache.org/licenses/LICENSE-2.0
 
-   This library is plugged into LLVM when invoking clang through afl-clang-fast.
-   It tells the compiler to add code roughly equivalent to the bits discussed
-   in ../afl-as.h.
-
- */
+*/
 
 #include "common-llvm.h"
 
