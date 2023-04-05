@@ -31,7 +31,7 @@ use crate::{
         fs::{get_unique_std_input_file, InputFile},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-        tuples::Prepend,
+        tuples::{MatchName, Prepend},
         AsMutSlice, AsSlice, Truncate,
     },
     executors::{Executor, ExitKind, HasObservers},
@@ -418,7 +418,7 @@ impl<E> TimeoutForkserverExecutor<E> {
 
 impl<E, EM, Z> Executor<EM, Z> for TimeoutForkserverExecutor<E>
 where
-    E: Executor<EM, Z> + HasForkserver + Debug,
+    E: Executor<EM, Z> + HasForkserver + HasObservers + Debug,
     E::Input: HasTargetBytes,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
@@ -488,6 +488,13 @@ where
             self.executor.forkserver_mut().set_status(status);
             if libc::WIFSIGNALED(self.executor.forkserver().status()) {
                 exit_kind = ExitKind::Crash;
+                #[cfg(feature = "regex")]
+                if let Some(asan_observer) = self
+                    .observers_mut()
+                    .match_name_mut::<AsanBacktraceObserver>("AsanBacktraceObserver")
+                {
+                    asan_observer.parse_asan_output_from_asan_log_file(pid)?;
+                }
             }
         } else {
             self.executor.forkserver_mut().set_last_run_timed_out(1);
