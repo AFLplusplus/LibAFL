@@ -373,7 +373,7 @@ where
     M: MapObserver,
 {
     /// Creates a new map equality feedback for the given observer
-    pub fn new_from_observer(obs: &M) -> Self {
+    pub fn with_observer(obs: &M) -> Self {
         Self {
             obs_name: obs.name().to_string(),
             phantom: PhantomData,
