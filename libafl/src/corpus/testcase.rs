@@ -151,13 +151,14 @@ where
         use std::fs::OpenOptions;
 
         if self.filename.is_some() {
-            let f = self.filename.clone().unwrap();
-            let old_filename = f.as_str();
+            // We are renaming!
 
-            let new_filename = filename.as_str();
+            let old_filename = self.filename.take().unwrap();
+            let new_filename = filename;
 
             // Do operations below when new filename is specified
-            if old_filename.eq(new_filename) {
+            if old_filename == new_filename {
+                self.filename = Some(old_filename);
                 return Ok(());
             }
 
@@ -170,21 +171,24 @@ where
                 .open(&new_lock_filename)
                 .is_err()
             {
+                self.filename = Some(old_filename);
                 return Err(Error::illegal_state(
                     "unable to create lock file for new testcase",
                 ));
             }
 
-            fs::rename(old_filename, new_filename)?;
+            fs::rename(&old_filename, &new_filename)?;
 
             let old_metadata_filename = format!(".{old_filename}.metadata");
             let new_metadata_filename = format!(".{new_filename}.metadata");
             fs::rename(old_metadata_filename, new_metadata_filename)?;
 
             fs::remove_file(&new_lock_filename)?;
+            self.filename = Some(new_filename);
+        } else {
+            self.filename = Some(filename);
         }
 
-        self.filename = Some(filename);
         Ok(())
     }
 

@@ -215,32 +215,30 @@ where
     fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            let file_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);
-            let mut file = file_orig.clone();
+            let filename_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);
+            let mut filename = filename_orig.clone();
 
             let mut ctr = 2;
-            let filename = loop {
-                let lockfile = format!(".{file}.lafl_lock");
+            let (filename, lockfile) = loop {
+                let lockfile = format!(".{filename}.lafl_lock");
+                let lockfile = self.dir_path.join(lockfile);
 
                 if OpenOptions::new()
                     .write(true)
                     .create_new(true)
-                    .open(self.dir_path.join(lockfile))
+                    .open(&lockfile)
                     .is_ok()
                 {
-                    break file;
+                    break (filename, lockfile);
                 }
 
-                file = format!("{file_orig}-{ctr}");
+                filename = format!("{filename_orig}-{ctr}");
                 ctr += 1;
             };
 
-            let file_path = self.dir_path.join(filename.clone());
-            let filename_str = file_path.to_str().expect("Invalid Path");
-            testcase.set_filename(filename_str.into())?;
+            testcase.set_filename(filename)?;
 
-            let lock_file_path = self.dir_path.join(format!(".{filename}.lafl_lock"));
-            fs::remove_file(lock_file_path)?;
+            fs::remove_file(lockfile)?;
         };
         if self.meta_format.is_some() {
             let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
