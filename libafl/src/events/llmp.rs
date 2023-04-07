@@ -663,6 +663,8 @@ where
     llmp_mgr: LlmpEventManager<S, SP>,
     /// The staterestorer to serialize the state for the next runner
     staterestorer: StateRestorer<SP>,
+    /// Decide if the state restorer must save the serialized state
+    save_state: bool,
 }
 
 #[cfg(feature = "std")]
@@ -721,8 +723,10 @@ where
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
-        self.staterestorer
-            .save(&(state, &self.llmp_mgr.describe()?))
+        self.staterestorer.save(&(
+            if self.save_state { Some(state) } else { None },
+            &self.llmp_mgr.describe()?,
+        ))
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
@@ -787,6 +791,20 @@ where
         Self {
             llmp_mgr,
             staterestorer,
+            save_state: true,
+        }
+    }
+
+    /// Create a new runner specifying if it must save the serialized state on restart.
+    pub fn with_save_state(
+        llmp_mgr: LlmpEventManager<S, SP>,
+        staterestorer: StateRestorer<SP>,
+        save_state: bool,
+    ) -> Self {
+        Self {
+            llmp_mgr,
+            staterestorer,
+            save_state,
         }
     }
 
@@ -877,6 +895,9 @@ where
     /// but it will quit after client 2 connected and disconnected.
     #[builder(default = None)]
     exit_cleanly_after: Option<NonZeroUsize>,
+    /// Tell the manager to serialize or not the state on restart
+    #[builder(default = true)]
+    serialize_state: bool,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<S>,
 }
@@ -1027,7 +1048,7 @@ where
                 compiler_fence(Ordering::SeqCst);
 
                 #[allow(clippy::manual_assert)]
-                if !staterestorer.has_content() {
+                if !staterestorer.has_content() && self.serialize_state {
                     #[cfg(unix)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
@@ -1062,29 +1083,38 @@ where
         }
 
         // If we're restarting, deserialize the old state.
-        let (state, mut mgr) = if let Some((state, mgr_description)) = staterestorer.restore()? {
-            (
-                Some(state),
-                LlmpRestartingEventManager::new(
-                    LlmpEventManager::existing_client_from_description(
-                        new_shmem_provider,
-                        &mgr_description,
-                        self.configuration,
-                    )?,
-                    staterestorer,
-                ),
-            )
-        } else {
-            log::info!("First run. Let's set it all up");
-            // Mgr to send and receive msgs from/to all other fuzzer instances
-            let mgr = LlmpEventManager::<S, SP>::existing_client_from_env(
-                new_shmem_provider,
-                _ENV_FUZZER_BROKER_CLIENT_INITIAL,
-                self.configuration,
-            )?;
+        let (state, mut mgr) =
+            if let Some((state_opt, mgr_description)) = staterestorer.restore()? {
+                (
+                    state_opt,
+                    LlmpRestartingEventManager::with_save_state(
+                        LlmpEventManager::existing_client_from_description(
+                            new_shmem_provider,
+                            &mgr_description,
+                            self.configuration,
+                        )?,
+                        staterestorer,
+                        self.serialize_state,
+                    ),
+                )
+            } else {
+                log::info!("First run. Let's set it all up");
+                // Mgr to send and receive msgs from/to all other fuzzer instances
+                let mgr = LlmpEventManager::<S, SP>::existing_client_from_env(
+                    new_shmem_provider,
+                    _ENV_FUZZER_BROKER_CLIENT_INITIAL,
+                    self.configuration,
+                )?;
 
-            (None, LlmpRestartingEventManager::new(mgr, staterestorer))
-        };
+                (
+                    None,
+                    LlmpRestartingEventManager::with_save_state(
+                        mgr,
+                        staterestorer,
+                        self.serialize_state,
+                    ),
+                )
+            };
         // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
         mgr.staterestorer.reset();
 
