@@ -19,6 +19,8 @@ pub mod grimoire;
 pub use grimoire::*;
 pub mod tuneable;
 pub use tuneable::*;
+pub mod utf8;
+pub use utf8::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;

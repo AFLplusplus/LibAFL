@@ -12,6 +12,9 @@ pub use gramatron::*;
 pub mod generalized;
 pub use generalized::*;
 
+pub mod utf8;
+pub use utf8::Utf8Input;
+
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 use alloc::{
