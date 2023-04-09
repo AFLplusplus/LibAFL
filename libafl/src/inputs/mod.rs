@@ -3,6 +3,9 @@
 pub mod bytes;
 pub use bytes::BytesInput;
 
+pub mod convert;
+pub use convert::{ConvertInput, ConvertInputLossy};
+
 pub mod encoded;
 pub use encoded::*;
 

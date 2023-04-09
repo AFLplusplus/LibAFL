@@ -21,6 +21,8 @@ pub mod tuneable;
 pub use tuneable::*;
 pub mod utf8;
 pub use utf8::*;
+pub mod convert;
+pub use convert::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;

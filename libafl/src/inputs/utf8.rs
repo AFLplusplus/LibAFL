@@ -14,7 +14,13 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::{bolts::fs::write_file_atomic, Error};
-use crate::{bolts::HasLen, inputs::Input};
+use crate::{
+    bolts::HasLen,
+    inputs::{
+        convert::{ConvertInput, ConvertInputLossy},
+        BytesInput, HasBytesVec, Input,
+    },
+};
 
 /// A UTF-8 string
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -86,6 +92,22 @@ impl Utf8Input {
     /// Creates a new string input using the given string
     #[must_use]
     pub fn new(string: String) -> Self {
+        Self { string }
+    }
+}
+
+impl ConvertInput<BytesInput> for Utf8Input {
+    type Error = std::string::FromUtf8Error;
+
+    fn convert_from(i: BytesInput) -> Result<Self, Self::Error> {
+        let string = String::from_utf8(i.bytes().to_vec())?;
+        Ok(Self { string })
+    }
+}
+
+impl ConvertInputLossy<BytesInput> for Utf8Input {
+    fn lossy_convert_from(i: BytesInput) -> Self {
+        let string = String::from(String::from_utf8_lossy(i.bytes()));
         Self { string }
     }
 }
