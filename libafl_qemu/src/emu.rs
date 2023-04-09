@@ -3,6 +3,7 @@
 use core::{
     convert::Into,
     ffi::c_void,
+    fmt,
     mem::MaybeUninit,
     ptr::{addr_of, copy_nonoverlapping, null},
 };
@@ -673,14 +674,38 @@ pub struct Emulator {
     _private: (),
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum EmuError {
-    #[error("Only one instance of the QEMU Emulator is permitted")]
     MultipleInstances,
-    #[error("QEMU emulator args cannot be empty")]
     EmptyArgs,
-    #[error("Too many arguments passed to QEMU emulator ({0} > i32::MAX)")]
     TooManyArgs(usize),
+}
+
+impl std::error::Error for EmuError {}
+
+impl fmt::Display for EmuError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            EmuError::MultipleInstances => {
+                write!(f, "Only one instance of the QEMU Emulator is permitted")
+            }
+            EmuError::EmptyArgs => {
+                write!(f, "QEMU emulator args cannot be empty")
+            }
+            EmuError::TooManyArgs(n) => {
+                write!(
+                    f,
+                    "Too many arguments passed to QEMU emulator ({n} > i32::MAX)"
+                )
+            }
+        }
+    }
+}
+
+impl From<EmuError> for libafl::Error {
+    fn from(err: EmuError) -> Self {
+        libafl::Error::unknown(format!("{err}"))
+    }
 }
 
 #[allow(clippy::unused_self)]
@@ -697,7 +722,7 @@ impl Emulator {
         }
 
         let argc = args.len();
-        if usize::try_from(i32::MAX).map_or(false, |max| argc > max) {
+        if i32::try_from(argc).is_err() {
             return Err(EmuError::TooManyArgs(argc));
         }
         #[allow(clippy::cast_possible_wrap)]
