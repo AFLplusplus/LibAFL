@@ -4,6 +4,8 @@ use core::{marker::PhantomData, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     bolts::{current_time, rands::Rand},
     corpus::{Corpus, CorpusId},
