@@ -19,9 +19,9 @@ use crate::{
 };
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct TuneableMutationalStageMetadata {
-    pub iters: Option<u64>,
-    pub fuzz_time: Option<Duration>,
+struct TuneableMutationalStageMetadata {
+    iters: Option<u64>,
+    fuzz_time: Option<Duration>,
 }
 
 impl_serdeany!(TuneableMutationalStageMetadata);
@@ -110,7 +110,7 @@ where
         let fuzz_time = metadata.fuzz_time;
         let iters = metadata.iters;
 
-        let (start_time, iters) = if time.is_some() {
+        let (start_time, iters) = if fuzz_time.is_some() {
             (Some(current_time()), iters)
         } else {
             (None, Some(self.iterations(state, corpus_idx)?))
@@ -130,7 +130,7 @@ where
                 }
             }
             if let Some(iters) = iters {
-                if i >= iters {
+                if i >= iters as usize {
                     break;
                 }
             } else {
@@ -256,10 +256,6 @@ impl TuneableMutationalStage<(), (), (), (), ()> {
     /// Set the time to mutate a single input in this mutational stage
     pub fn seed_fuzz_time<S: HasMetadata>(state: &mut S) -> Result<Option<Duration>, Error> {
         get_seed_fuzz_time(state)
-    }
-
-    pub fn metadata<S: HasMetadata>(state: &S) -> Result<&TuneableMutationalStageMetadata, Error> {
-        state.metadata()
     }
 }
 
