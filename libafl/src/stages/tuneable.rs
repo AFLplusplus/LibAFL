@@ -94,7 +94,7 @@ where
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
-    /// Runs this (mutational) stage for the given [`Testcase`]
+    /// Runs this (mutational) stage for the given `testcase`
     /// Exactly the same functionality as [`MutationalStage::perform_mutational`], but with added timeout support.
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
