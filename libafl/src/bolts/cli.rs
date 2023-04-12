@@ -41,7 +41,7 @@
 //!
 //!     let env: Vec<(String, String)> = env::vars().collect();
 //!
-//!     let emu = Emulator::new(&mut options.qemu_args.to_vec(), &mut env);
+//!     let emu = Emulator::new(&mut options.qemu_args.to_vec(), &mut env).unwrap();
 //!     // do other stuff...
 //! }
 //!
