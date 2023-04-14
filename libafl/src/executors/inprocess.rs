@@ -1106,6 +1106,20 @@ mod windows_exception_handler {
         );
         compiler_fence(Ordering::SeqCst);
 
+        if !data.timeout_executor_ptr.is_null()
+            && data.timeout_executor_mut::<E>().handle_timeout(data)
+        {
+            compiler_fence(Ordering::SeqCst);
+            LeaveCriticalSection(
+                (data.critical as *mut RTL_CRITICAL_SECTION)
+                    .as_mut()
+                    .unwrap(),
+            );
+            compiler_fence(Ordering::SeqCst);
+
+            return;
+        }
+
         if data.in_target == 1 {
             let executor = data.executor_mut::<E>();
             let state = data.state_mut::<E::State>();

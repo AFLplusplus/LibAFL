@@ -98,13 +98,20 @@ pub struct TimeoutExecutor<E> {
 
     exec_tmout: Duration,
 
-    // for batch mode
+    // for batch mode (linux only atm)
+    #[allow(unused)]
     batch_mode: bool,
+    #[allow(unused)]
     executions: u32,
+    #[allow(unused)]
     avg_mul_k: u32,
+    #[allow(unused)]
     last_signal_time: Duration,
+    #[allow(unused)]
     avg_exec_time: Duration,
+    #[allow(unused)]
     start_time: Duration,
+    #[allow(unused)]
     tmout_start_time: Duration,
 }
 
