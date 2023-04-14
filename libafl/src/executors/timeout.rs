@@ -354,6 +354,10 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         self.exec_tmout = exec_tmout;
     }
 
+    pub(crate) fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool {
+        false // TODO
+    }
+
     /// Retrieve the inner `Executor` that is wrapped by this `TimeoutExecutor`.
     pub fn inner(&mut self) -> &mut E {
         &mut self.executor

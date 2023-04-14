@@ -426,6 +426,7 @@ pub(crate) struct InProcessExecutorHandlerData {
     #[cfg(all(windows, feature = "std"))]
     pub(crate) timeout_input_ptr: *mut c_void,
 
+    #[cfg(any(unix, feature = "std"))]
     pub(crate) timeout_executor_ptr: *mut c_void,
 }
 
@@ -470,6 +471,7 @@ impl InProcessExecutorHandlerData {
         !self.current_input_ptr.is_null()
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn timeout_executor_mut<'a, E>(&self) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
         unsafe {
             (self.timeout_executor_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
@@ -730,7 +732,9 @@ mod unix_signal_handler {
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        if data.timeout_executor_mut::<E>().handle_timeout(data) {
+        if !data.timeout_executor_ptr.is_null()
+            && data.timeout_executor_mut::<E>().handle_timeout(data)
+        {
             return;
         }
 
