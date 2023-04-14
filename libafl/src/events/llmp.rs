@@ -89,7 +89,7 @@ where
     SP: ShMemProvider + 'static,
     MT: Monitor,
 {
-    /// Create an even broker from a raw broker.
+    /// Create an event broker from a raw broker.
     pub fn new(llmp: llmp::LlmpBroker<SP>, monitor: MT) -> Result<Self, Error> {
         Ok(Self {
             monitor,
@@ -100,7 +100,8 @@ where
         })
     }
 
-    /// Create llmp on a port
+    /// Create an LLMP broker on a port.
+    ///
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
     pub fn on_port(shmem_provider: SP, monitor: MT, port: u16) -> Result<Self, Error> {
@@ -118,7 +119,7 @@ where
         self.llmp.set_exit_cleanly_after(n_clients);
     }
 
-    /// Connect to an llmp broker on the givien address
+    /// Connect to an LLMP broker on the given address
     #[cfg(feature = "std")]
     pub fn connect_b2b<A>(&mut self, addr: A) -> Result<(), Error>
     where
@@ -308,14 +309,14 @@ where
     S: UsesInput,
     SP: ShMemProvider + 'static,
 {
-    /// The llmp client for inter process communication
+    /// The LLMP client for inter process communication
     llmp: LlmpClient<SP>,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     /// The configuration defines this specific fuzzer.
-    /// A node will not re-use the observer values sent over `LLMP`
+    /// A node will not re-use the observer values sent over LLMP
     /// from nodes with other configurations.
     configuration: EventConfig,
     phantom: PhantomData<S>,
@@ -355,7 +356,7 @@ where
     S: UsesInput + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
 {
-    /// Create a manager from a raw llmp client
+    /// Create a manager from a raw LLMP client
     pub fn new(llmp: LlmpClient<SP>, configuration: EventConfig) -> Result<Self, Error> {
         Ok(Self {
             llmp,
@@ -367,9 +368,10 @@ where
         })
     }
 
-    /// Create llmp on a port
-    /// If the port is not yet bound, it will act as broker
-    /// Else, it will act as client.
+    /// Create an LLMP event manager on a port
+    ///
+    /// If the port is not yet bound, it will act as a broker; otherwise, it
+    /// will act as a client.
     #[cfg(feature = "std")]
     pub fn on_port(
         shmem_provider: SP,
@@ -386,7 +388,8 @@ where
         })
     }
 
-    /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].
+    /// If a client respawns, it may reuse the existing connection, previously
+    /// stored by [`LlmpClient::to_env()`].
     #[cfg(feature = "std")]
     pub fn existing_client_from_env(
         shmem_provider: SP,
@@ -403,7 +406,7 @@ where
         })
     }
 
-    /// Describe the client event mgr's llmp parts in a restorable fashion
+    /// Describe the client event manager's LLMP parts in a restorable fashion
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         self.llmp.describe()
     }
@@ -424,7 +427,8 @@ where
         })
     }
 
-    /// Write the config for a client [`EventManager`] to env vars, a new client can reattach using [`LlmpEventManager::existing_client_from_env()`].
+    /// Write the config for a client [`EventManager`] to env vars, a new
+    /// client can reattach using [`LlmpEventManager::existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.llmp.to_env(env_name).unwrap();
@@ -556,8 +560,8 @@ where
     S: UsesInput,
     SP: ShMemProvider,
 {
-    /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
-    /// Otherwise, the OS may already have removed the shared maps,
+    /// The LLMP client needs to wait until a broker has mapped all pages before shutting down.
+    /// Otherwise, the OS may already have removed the shared maps.
     fn await_restart_safe(&mut self) {
         // wait until we can drop the message safely.
         self.llmp.await_safe_to_unmap_blocking();
@@ -659,7 +663,7 @@ where
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
-    /// The embedded llmp event manager
+    /// The embedded LLMP event manager
     llmp_mgr: LlmpEventManager<S, SP>,
     /// The staterestorer to serialize the state for the next runner
     staterestorer: StateRestorer<SP>,
@@ -827,7 +831,7 @@ pub enum ManagerKind {
     Any,
     /// A client, getting messages from a local broker.
     Client {
-        /// The cpu core id of this client
+        /// The CPU core ID of this client
         cpu_core: Option<CoreId>,
     },
     /// A [`llmp::LlmpBroker`], forwarding the packets of local clients.
@@ -965,7 +969,7 @@ where
                     )?;
 
                     broker_things(event_broker, self.remote_broker_addr)?;
-                    unreachable!("The broker may never return normally, only on Errors or when shutting down.");
+                    unreachable!("The broker may never return normally, only on errors or when shutting down.");
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
