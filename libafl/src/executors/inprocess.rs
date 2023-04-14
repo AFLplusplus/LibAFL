@@ -735,7 +735,6 @@ mod unix_signal_handler {
         }
 
         if !data.is_valid() {
-            // TODO reset time and tell timeout exec to redo settimer next iter
             log::warn!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
             return;
         }

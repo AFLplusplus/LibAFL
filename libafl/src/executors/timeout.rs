@@ -98,6 +98,7 @@ pub struct TimeoutExecutor<E> {
 
     exec_tmout: Duration,
 
+    // for batch mode
     batch_mode: bool,
     executions: u32,
     avg_mul_k: u32,
@@ -145,16 +146,6 @@ type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
     param2: *mut TP_TIMER,
 );
 
-impl<E> TimeoutExecutor<E> {
-    /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
-    /// With this method batch mode is enabled.
-    pub fn batch_mode(executor: E, exec_tmout: Duration) -> Self {
-        let mut me = Self::new(executor, exec_tmout);
-        me.batch_mode = true;
-        me
-    }
-}
-
 #[cfg(target_os = "linux")]
 impl<E> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
@@ -191,6 +182,14 @@ impl<E> TimeoutExecutor<E> {
             start_time: Duration::ZERO,
             tmout_start_time: Duration::ZERO,
         }
+    }
+
+    /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
+    /// With this method batch mode is enabled.
+    pub fn batch_mode(executor: E, exec_tmout: Duration) -> Self {
+        let mut me = Self::new(executor, exec_tmout);
+        me.batch_mode = true;
+        me
     }
 
     /// Set the timeout for this executor
@@ -374,6 +373,11 @@ where
     ) -> Result<ExitKind, Error> {
         unsafe {
             let data = &mut GLOBAL_STATE;
+            write_volatile(
+                &mut data.timeout_executor_ptr,
+                self as *mut _ as *mut c_void,
+            );
+
             write_volatile(&mut data.tp_timer, self.tp_timer as *mut _ as *mut c_void);
             write_volatile(
                 &mut data.critical,
