@@ -990,8 +990,11 @@ mod windows_exception_handler {
         },
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
-            Executor, ExitKind, HasInProcessHandlers, HasObservers,
+            inprocess::{
+                run_observers_and_save_state, HasInProcessHandlers, InProcessExecutorHandlerData,
+                GLOBAL_STATE,
+            },
+            Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
