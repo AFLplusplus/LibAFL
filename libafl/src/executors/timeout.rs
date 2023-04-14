@@ -305,6 +305,10 @@ impl<E> TimeoutExecutor<E> {
         self.itimerval = itimerval;
         self.exec_tmout = exec_tmout;
     }
+
+    pub(crate) fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool {
+        false // TODO
+    }
 }
 
 #[cfg(windows)]
