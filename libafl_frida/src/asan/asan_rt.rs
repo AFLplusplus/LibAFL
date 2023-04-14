@@ -1690,13 +1690,17 @@ impl AsanRuntime {
             // on apple aarch64, WX pages can't be both writable and executable at the same time.
             // pthread_jit_write_protect_np flips them from executable (1) to writable (0)
             #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-            libc::pthread_jit_write_protect_np(0);
+            {
+                libc::pthread_jit_write_protect_np(0);
+            }
 
             blob.as_ptr()
                 .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
 
             #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-            libc::pthread_jit_write_protect_np(1);
+            {
+                libc::pthread_jit_write_protect_np(1);
+            }
             self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
         }
     }
