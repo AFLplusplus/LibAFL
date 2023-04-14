@@ -339,6 +339,7 @@ impl InProcessHandlers {
     }
 
     /// Create new [`InProcessHandlers`].
+    #[cfg(not(all(windows, feature = "std")))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers,
@@ -363,7 +364,20 @@ impl InProcessHandlers {
                     as *const _,
             })
         }
-        #[cfg(all(windows, feature = "std"))]
+        #[cfg(not(any(unix, feature = "std")))]
+        Ok(Self {})
+    }
+
+    /// Create new [`InProcessHandlers`].
+    #[cfg(all(windows, feature = "std"))]
+    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
+    where
+        E: Executor<EM, Z> + HasObservers + HasInProcessHandlers,
+        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        OF: Feedback<E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
+        Z: HasObjective<Objective = OF, State = E::State>,
+    {
         unsafe {
             let data = &mut GLOBAL_STATE;
             #[cfg(feature = "std")]
@@ -378,8 +392,6 @@ impl InProcessHandlers {
                     as *const c_void,
             })
         }
-        #[cfg(not(any(unix, feature = "std")))]
-        Ok(Self {})
     }
 
     /// Replace the handlers with `nop` handlers, deactivating the handlers
