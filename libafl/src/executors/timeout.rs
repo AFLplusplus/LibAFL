@@ -2,7 +2,7 @@
 
 #[cfg(target_os = "linux")]
 use core::ptr::{addr_of, addr_of_mut};
-//#[cfg(all(windows, feature = "std"))]
+#[cfg(any(windows, target_os = "linux"))]
 use core::{ffi::c_void, ptr::write_volatile};
 #[cfg(any(windows, unix))]
 use core::{
@@ -29,14 +29,14 @@ use windows::Win32::{
     },
 };
 
+#[cfg(target_os = "linux")]
+use crate::bolts::current_time;
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::inprocess::HasInProcessHandlers;
+#[cfg(any(windows, target_os = "linux"))]
+use crate::executors::inprocess::GLOBAL_STATE;
 use crate::{
-    bolts::current_time,
-    executors::{
-        inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-        Executor, ExitKind, HasObservers,
-    },
+    executors::{inprocess::InProcessExecutorHandlerData, Executor, ExitKind, HasObservers},
     observers::UsesObservers,
     state::UsesState,
     Error,
