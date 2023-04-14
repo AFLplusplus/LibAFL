@@ -509,6 +509,7 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     #[cfg(all(windows, feature = "std"))]
     timeout_input_ptr: null_mut(),
 
+    #[cfg(any(unix, feature = "std"))]
     timeout_executor_ptr: null_mut(),
 };
 
@@ -990,7 +991,7 @@ mod windows_exception_handler {
         events::{EventFirer, EventRestarter},
         executors::{
             inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
-            Executor, ExitKind, HasObservers,
+            Executor, ExitKind, HasInProcessHandlers, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
