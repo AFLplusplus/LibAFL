@@ -397,11 +397,7 @@ pub mod pybind {
     use pyo3::{prelude::*, types::PyDict};
 
     use super::{HasMetadata, Testcase};
-    use crate::{
-        bolts::ownedref::OwnedMutPtr,
-        inputs::{BytesInput, HasBytesVec},
-        pybind::PythonMetadata,
-    };
+    use crate::{bolts::ownedref::OwnedMutPtr, inputs::BytesInput, pybind::PythonMetadata};
 
     /// `PythonTestcase` with fixed generics
     pub type PythonTestcase = Testcase<BytesInput>;
@@ -438,14 +434,6 @@ pub mod pybind {
             Self {
                 inner: OwnedMutPtr::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
             }
-        }
-
-        fn load_input(&mut self) -> &[u8] {
-            self.inner
-                .as_mut()
-                .load_input()
-                .expect("Failed to load input")
-                .bytes()
         }
 
         #[getter]

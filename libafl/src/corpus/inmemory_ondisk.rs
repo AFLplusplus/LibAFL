@@ -280,7 +280,7 @@ where
 
             fs::remove_file(&new_lock_filename)?;
 
-            *testcase.filename_mut() = Some(new_filename.into());
+            *testcase.filename_mut() = Some(new_filename);
         } else {
             *testcase.filename_mut() = Some(filename);
         }

@@ -383,6 +383,14 @@ pub mod pybind {
             unwrap_me!(self.wrapper, c, { c.last() })
         }
 
+        fn load_input_into(&self, testcase: &mut Testcase<BytesInput>) -> Result<(), Error> {
+            unwrap_me!(self.wrapper, c, { c.load_input_into(testcase) })
+        }
+
+        fn store_input_from(&self, testcase: &Testcase<BytesInput>) -> Result<(), Error> {
+            unwrap_me!(self.wrapper, c, { c.store_input_from(testcase) })
+        }
+
         /*fn ids<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
             CorpusIdIterator {
                 corpus: self,

@@ -1,6 +1,6 @@
 //! The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk to e.g. allow AFL to sync
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{clone::Clone, marker::PhantomData};
 use std::{fs, fs::File, io::Write, path::PathBuf};
 
@@ -76,8 +76,7 @@ where
                 testcase
                     .filename()
                     .as_ref()
-                    .map(|x| x.as_str())
-                    .unwrap_or_else(|| "unnamed")
+                    .map_or_else(|| "unnamed", String::as_str)
             ));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
@@ -95,8 +94,7 @@ where
                 testcase
                     .filename()
                     .as_ref()
-                    .map(|x| x.as_str())
-                    .unwrap_or_else(|| "unnamed")
+                    .map_or_else(|| "unnamed", String::as_str)
             ));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
