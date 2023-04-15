@@ -79,7 +79,9 @@ where
     ) -> Result<(), Error> {
         let (mut payload, original, novelties) = {
             start_timer!(state);
-            state.corpus().get(corpus_idx)?.borrow_mut().load_input()?;
+            let corpus = state.corpus();
+            let mut testcase = corpus.get(corpus_idx)?.borrow_mut();
+            state.corpus().load_input_into(&mut testcase)?;
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
             let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
 

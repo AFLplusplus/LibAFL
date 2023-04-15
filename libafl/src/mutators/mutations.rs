@@ -1100,22 +1100,20 @@ where
             }
         }
 
-        let other_size = state
-            .corpus()
-            .get(idx)?
-            .borrow_mut()
-            .load_input()?
-            .bytes()
-            .len();
+        let other_size = {
+            let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+            state.corpus().load_input_into(&mut other_testcase)?;
+
+            let other = other_testcase.input().as_ref().unwrap();
+            other.bytes().len()
+        };
+
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
 
         let range = rand_range(state, other_size, min(other_size, max_size - size));
         let target = state.rand_mut().below(size as u64) as usize;
-
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-        let other = other_testcase.load_input()?;
 
         input.bytes_mut().resize(size + range.len(), 0);
         buffer_self_copy(
@@ -1124,6 +1122,11 @@ where
             target + range.len(),
             size - target,
         );
+
+        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        state.corpus().load_input_into(&mut other_testcase)?;
+        let other = other_testcase.input().as_ref().unwrap();
+
         buffer_copy(
             input.bytes_mut(),
             other.bytes(),
@@ -1177,13 +1180,14 @@ where
             }
         }
 
-        let other_size = state
-            .corpus()
-            .get(idx)?
-            .borrow_mut()
-            .load_input()?
-            .bytes()
-            .len();
+        let other_size = {
+            let corpus = state.corpus();
+            let mut other_testcase = corpus.get(idx)?.borrow_mut();
+            corpus.load_input_into(&mut other_testcase)?;
+            let other = other_testcase.input().as_ref().unwrap();
+            other.bytes().len()
+        };
+
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -1191,8 +1195,9 @@ where
         let target = state.rand_mut().below(size as u64) as usize;
         let range = rand_range(state, other_size, min(other_size, size - target));
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-        let other = other_testcase.load_input()?;
+        let other_testcase = state.corpus().get(idx)?.borrow_mut();
+
+        let other = other_testcase.input().as_ref().unwrap();
 
         buffer_copy(
             input.bytes_mut(),
@@ -1261,7 +1266,8 @@ where
 
         let (first_diff, last_diff) = {
             let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-            let other = other_testcase.load_input()?;
+            state.corpus().load_input_into(&mut other_testcase)?;
+            let other = other_testcase.input().as_ref().unwrap();
 
             let mut counter: u32 = 0;
             loop {
@@ -1279,8 +1285,9 @@ where
 
         let split_at = state.rand_mut().between(first_diff, last_diff) as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-        let other = other_testcase.load_input()?;
+        let other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let other = other_testcase.input().as_ref().unwrap();
+
         input
             .bytes_mut()
             .splice(split_at.., other.bytes()[split_at..].iter().copied());

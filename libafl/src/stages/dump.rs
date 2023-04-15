@@ -68,10 +68,17 @@ where
 
         while let Some(i) = corpus_idx {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
-            let input = testcase.load_input()?;
-            let bytes = (self.to_bytes)(input);
+            state.corpus().load_input_into(&mut testcase)?;
+            let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap());
 
-            let fname = self.corpus_dir.join(format!("id_{i}"));
+            let fname = self.corpus_dir.join(format!(
+                "id_{i}_{}",
+                testcase
+                    .filename()
+                    .as_ref()
+                    .map(|x| x.as_str())
+                    .unwrap_or_else(|| "unnamed")
+            ));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 
@@ -80,10 +87,17 @@ where
 
         while let Some(i) = solutions_idx {
             let mut testcase = state.solutions().get(i)?.borrow_mut();
-            let input = testcase.load_input()?;
-            let bytes = (self.to_bytes)(input);
+            state.solutions().load_input_into(&mut testcase)?;
+            let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap());
 
-            let fname = self.solutions_dir.join(format!("id_{i}"));
+            let fname = self.solutions_dir.join(format!(
+                "id_{i}_{}",
+                testcase
+                    .filename()
+                    .as_ref()
+                    .map(|x| x.as_str())
+                    .unwrap_or_else(|| "unnamed")
+            ));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 

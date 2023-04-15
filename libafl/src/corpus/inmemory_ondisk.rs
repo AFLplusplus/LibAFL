@@ -11,6 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use alloc::string::String;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -135,6 +136,28 @@ where
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)
     }
+
+    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+        if testcase.input_mut().is_none() {
+            let Some(filename) = testcase.filename().as_ref() else {
+                return Err(Error::illegal_argument("No filename set for testcase"));
+            };
+            let input = I::from_file(self.dir_path.join(filename))?;
+            testcase.set_input(input);
+        }
+        Ok(())
+    }
+
+    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+        // Store the input to disk
+        let Some(filename) = testcase.filename() else {
+            return Err(Error::illegal_argument("No filename set for testcase"));
+        };
+        let Some(input) = testcase.input() else {
+            return Err(Error::illegal_argument("No input available for testcase"));
+        };
+        input.to_file(self.dir_path.join(filename))
+    }
 }
 
 impl<I> HasTestcase for InMemoryOnDiskCorpus<I>
@@ -212,6 +235,59 @@ where
         })
     }
 
+    /// Sets the filename for a [`Testcase`].
+    /// If an error gets returned from the corpus (i.e., file exists), we'll have to retry with a different filename.
+    #[inline]
+    pub fn set_filename_for(
+        &self,
+        testcase: &mut Testcase<I>,
+        filename: String,
+    ) -> Result<(), Error> {
+        if testcase.filename().is_some() {
+            // We are renaming!
+
+            let old_filename = testcase.filename_mut().take().unwrap();
+            let new_filename = filename;
+
+            // Do operations below when new filename is specified
+            if old_filename == new_filename {
+                *testcase.filename_mut() = Some(old_filename);
+                return Ok(());
+            }
+
+            // we need to rename.
+
+            let new_lock_filename = format!(".{new_filename}.lafl_lock");
+
+            // Try to create lock file for new testcases
+            if OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&new_lock_filename)
+                .is_err()
+            {
+                *testcase.filename_mut() = Some(old_filename);
+                return Err(Error::illegal_state(
+                    "unable to create lock file for new testcase",
+                ));
+            }
+
+            fs::rename(&old_filename, &new_filename)?;
+
+            let old_metadata_filename = format!(".{old_filename}.metadata");
+            let new_metadata_filename = format!(".{new_filename}.metadata");
+            fs::rename(old_metadata_filename, new_metadata_filename)?;
+
+            fs::remove_file(&new_lock_filename)?;
+
+            *testcase.filename_mut() = Some(new_filename.into());
+        } else {
+            *testcase.filename_mut() = Some(filename);
+        }
+
+        Ok(())
+    }
+
     fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
@@ -236,7 +312,7 @@ where
                 ctr += 1;
             };
 
-            testcase.set_filename(filename)?;
+            self.set_filename_for(testcase, filename)?;
 
             fs::remove_file(lockfile)?;
         };
@@ -272,9 +348,8 @@ where
             tmpfile.write_all(&serialized)?;
             fs::rename(&tmpfile_name, &filename)?;
         }
-        testcase
-            .store_input()
-            .expect("Could not save testcase to disk");
+        self.store_input_from(testcase)?;
+        *testcase.input_mut() = None;
         Ok(())
     }
 

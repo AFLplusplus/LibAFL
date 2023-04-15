@@ -64,16 +64,18 @@ where
 impl<I, S> MutatedTransform<I, S> for I
 where
     I: Input + Clone,
+    S: HasCorpus<Input = I>,
 {
     type Post = ();
 
     #[inline]
     fn try_transform_from(
         base: &mut Testcase<I>,
-        _state: &S,
+        state: &S,
         _corpus_idx: CorpusId,
     ) -> Result<Self, Error> {
-        Ok(base.load_input()?.clone())
+        state.corpus().load_input_into(base)?;
+        Ok(base.input().as_ref().unwrap().clone())
     }
 
     #[inline]

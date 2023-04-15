@@ -107,10 +107,7 @@ mod tests {
 
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();
-        let t = Testcase::with_filename(
-            BytesInput::new(vec![0_u8; 4]),
-            "target/.test/fancy/path/fancyfile".into(),
-        );
+        let t = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "fancyfile".into());
         q.add(t).unwrap();
 
         let objective_q =
@@ -133,7 +130,7 @@ mod tests {
             .unwrap()
             .clone();
 
-        assert_eq!(filename, "target/.test/fancy/path/fancyfile");
+        assert_eq!(filename, "fancyfile");
 
         fs::remove_dir_all("target/.test/fancy").unwrap();
     }

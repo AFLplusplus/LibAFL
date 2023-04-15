@@ -115,12 +115,7 @@ where
 
         let mut iter = self.stage_max;
 
-        let input = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .load_input()?
-            .clone();
+        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
         // Run once to get the initial calibration map
         executor.observers_mut().pre_exec_all(state, &input)?;
@@ -158,12 +153,7 @@ where
         let mut has_errors = false;
 
         while i < iter {
-            let input = state
-                .corpus()
-                .get(corpus_idx)?
-                .borrow_mut()
-                .load_input()?
-                .clone();
+            let input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
             executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();

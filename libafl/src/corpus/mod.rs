@@ -71,7 +71,7 @@ macro_rules! random_corpus_id {
     }};
 }
 
-/// Corpus with all current testcases
+/// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Returns the number of elements
     fn count(&self) -> usize;
@@ -84,7 +84,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Add an entry to the corpus and return its index
     fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
 
-    /// Replaces the testcase at the given idx, returning the existing.
+    /// Replaces the [`Testcase`] at the given idx, returning the existing.
     fn replace(
         &mut self,
         idx: CorpusId,
@@ -130,9 +130,24 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
             .nth(nth)
             .expect("Failed to get the {nth} CorpusId")
     }
+
+    /// Method to load the input for this [`Testcase`] from persistent storage,
+    /// if necessary, and if was not already loaded (`== Some(input)`).
+    /// After this call, `testcase.input()` must always return `Some(input)`.
+    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error>;
+
+    /// Method to store the input of this `Testcase` to persistent storage, if necessary.
+    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error>;
+
+    /// Loads the `Input` for a given [`CorpusId`] from the [`Corpus`], and returns the clone.
+    fn cloned_input_for_id(&self, idx: CorpusId) -> Result<Self::Input, Error> {
+        let mut testcase = self.get(idx).unwrap().borrow_mut();
+        self.load_input_into(&mut testcase)?;
+        Ok(testcase.input().as_ref().unwrap().clone())
+    }
 }
 
-/// `Iterator` over the ids of a `Corpus`
+/// [`Iterator`] over the ids of a [`Corpus`]
 #[derive(Debug)]
 pub struct CorpusIdIterator<'a, C>
 where
