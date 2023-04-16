@@ -3,6 +3,7 @@
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
+use alloc::string::String;
 use core::{cell::RefCell, time::Duration};
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
@@ -11,7 +12,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use alloc::string::String;
 use serde::{Deserialize, Serialize};
 
 use super::{

@@ -8,8 +8,10 @@ use core::{
     option::Option,
     time::Duration,
 };
+
 use serde::{Deserialize, Serialize};
 
+use super::Corpus;
 use crate::{
     bolts::{serdeany::SerdeAnyMap, HasLen},
     corpus::CorpusId,
@@ -17,8 +19,6 @@ use crate::{
     state::HasMetadata,
     Error,
 };
-
-use super::Corpus;
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
