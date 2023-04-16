@@ -70,7 +70,7 @@ where
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::unused_self)]
     pub fn store_probability(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
-        let factor = F::compute(&mut *state.corpus().get(idx)?.borrow_mut(), state)?;
+        let factor = F::compute(state, &mut *state.corpus().get(idx)?.borrow_mut())?;
         if factor == 0.0 {
             return Err(Error::illegal_state(
                 "Infinity probability calculated for probabilistic sampling scheduler",
@@ -186,7 +186,7 @@ mod tests {
     where
         S: HasMetadata + HasCorpus,
     {
-        fn compute(_: &mut Testcase<S::Input>, _state: &S) -> Result<f64, Error> {
+        fn compute(_state: &S, _: &mut Testcase<S::Input>) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }

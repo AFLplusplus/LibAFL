@@ -248,7 +248,7 @@ impl<I> Testcase<I>
 where
     I: Input + HasLen,
 {
-    /// Get the cached len
+    /// Get the cached `len`. Will `Error::EmptyOptional` if `len` is not yet cached.
     #[inline]
     pub fn cached_len(&mut self) -> Result<usize, Error> {
         match &self.input {
@@ -262,8 +262,28 @@ where
                     Ok(l)
                 } else {
                     Err(Error::empty_optional(
-                        "No cached_len available. Call corpus.load_input_into(testcase) first.",
+                        "No cached_len available. Call corpus.load_input_into(testcase) first, or use `len()`.",
                     ))
+                }
+            }
+        }
+    }
+
+    /// Get the `len` or calculate it, if not yet calculated.
+    #[inline]
+    pub fn len<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<usize, Error> {
+        match &self.input {
+            Some(i) => {
+                let l = i.len();
+                self.cached_len = Some(l);
+                Ok(l)
+            }
+            None => {
+                if let Some(l) = self.cached_len {
+                    Ok(l)
+                } else {
+                    corpus.load_input_into(self)?;
+                    self.len(corpus)
                 }
             }
         }
