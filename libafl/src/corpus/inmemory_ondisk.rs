@@ -242,7 +242,7 @@ where
     /// Sets the filename for a [`Testcase`].
     /// If an error gets returned from the corpus (i.e., file exists), we'll have to retry with a different filename.
     #[inline]
-    pub fn set_filename_for(
+    pub fn rename_testcase(
         &self,
         testcase: &mut Testcase<I>,
         filename: String,
@@ -258,8 +258,6 @@ where
                 *testcase.filename_mut() = Some(old_filename);
                 return Ok(());
             }
-
-            // we need to rename.
 
             let new_lock_filename = format!(".{new_filename}.lafl_lock");
 
@@ -295,17 +293,24 @@ where
             *testcase.metadata_path_mut() = new_metadata_path;
             *testcase.filename_mut() = Some(new_filename);
             *testcase.file_path_mut() = Some(new_file_path);
+            Ok(())
         } else {
-            *testcase.filename_mut() = Some(filename);
+            Err(Error::illegal_argument(
+                "Cannot rename testcase without name!",
+            ))
         }
-
-        Ok(())
     }
 
     fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
-        if testcase.filename().is_none() {
+        let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            let file_name_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);
+            testcase.input().as_ref().unwrap().generate_name(idx.0)
+        });
+        if testcase.file_path().is_some() {
+            // We already have a valid path, no need to do calculate anything
+            *testcase.filename_mut() = Some(file_name_orig);
+        } else {
+            // New testcase, we need to save it.
             let mut file_name = file_name_orig.clone();
 
             let mut ctr = 2;
@@ -326,10 +331,12 @@ where
                 ctr += 1;
             };
 
-            self.set_filename_for(testcase, file_name)?;
+            *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
+            *testcase.filename_mut() = Some(file_name);
 
             fs::remove_file(lockfile_path)?;
-        };
+        }
+
         if self.meta_format.is_some() {
             let metafile_name = format!(".{}.metadata", testcase.filename().as_ref().unwrap());
             let metafile_path = self.dir_path.join(&metafile_name);
@@ -357,6 +364,7 @@ where
             fs::rename(&tmpfile_path, &metafile_path)?;
             *testcase.metadata_path_mut() = Some(metafile_path);
         }
+
         self.store_input_from(testcase)?;
         Ok(())
     }

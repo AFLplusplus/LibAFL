@@ -8,6 +8,7 @@ use core::{
     option::Option,
     time::Duration,
 };
+#[cfg(feature = "std")]
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -48,10 +49,12 @@ where
     /// The filename for this [`Testcase`]
     filename: Option<String>,
     /// Complete path to the [`Input`] on disk, if this [`Testcase`] is backed by a file in the filesystem
+    #[cfg(feature = "std")]
     file_path: Option<PathBuf>,
     /// Map of metadata associated with this [`Testcase`]
     metadata: SerdeAnyMap,
     /// Complete path to the metadata [`SerdeAnyMap`] on disk, if this [`Testcase`] is backed by a file in the filesystem
+    #[cfg(feature = "std")]
     metadata_path: Option<PathBuf>,
     /// Time needed to execute the input
     exec_time: Option<Duration>,
@@ -128,24 +131,28 @@ where
 
     /// Get the filename path, if any
     #[inline]
+    #[cfg(feature = "std")]
     pub fn file_path(&self) -> &Option<PathBuf> {
         &self.file_path
     }
 
     /// Get the filename path, if any (mutable)
     #[inline]
+    #[cfg(feature = "std")]
     pub fn file_path_mut(&mut self) -> &mut Option<PathBuf> {
         &mut self.file_path
     }
 
     /// Get the metadata path, if any
     #[inline]
+    #[cfg(feature = "std")]
     pub fn metadata_path(&self) -> &Option<PathBuf> {
         &self.metadata_path
     }
 
     /// Get the metadata path, if any (mutable)
     #[inline]
+    #[cfg(feature = "std")]
     pub fn metadata_path_mut(&mut self) -> &mut Option<PathBuf> {
         &mut self.metadata_path
     }
