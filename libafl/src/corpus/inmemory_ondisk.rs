@@ -263,7 +263,7 @@ where
             if OpenOptions::new()
                 .create(true)
                 .write(true)
-                .open(&new_lock_filename)
+                .open(self.dir_path.join(&new_lock_filename))
                 .is_err()
             {
                 *testcase.filename_mut() = Some(old_filename);
@@ -272,13 +272,19 @@ where
                 ));
             }
 
-            fs::rename(&old_filename, &new_filename)?;
+            fs::rename(
+                self.dir_path.join(&old_filename),
+                self.dir_path.join(&new_filename),
+            )?;
 
             let old_metadata_filename = format!(".{old_filename}.metadata");
             let new_metadata_filename = format!(".{new_filename}.metadata");
-            fs::rename(old_metadata_filename, new_metadata_filename)?;
+            fs::rename(
+                self.dir_path.join(old_metadata_filename),
+                self.dir_path.join(new_metadata_filename),
+            )?;
 
-            fs::remove_file(&new_lock_filename)?;
+            fs::remove_file(self.dir_path.join(&new_lock_filename))?;
 
             *testcase.filename_mut() = Some(new_filename);
         } else {
@@ -291,42 +297,36 @@ where
     fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            let filename_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);
-            let mut filename = filename_orig.clone();
+            let file_name_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);
+            let mut file_name = file_name_orig.clone();
 
             let mut ctr = 2;
-            let (filename, lockfile) = loop {
-                let lockfile = format!(".{filename}.lafl_lock");
-                let lockfile = self.dir_path.join(lockfile);
+            let (file_name, lockfile_path) = loop {
+                let lockfile_name = format!(".{file_name}.lafl_lock");
+                let lockfile_path = self.dir_path.join(lockfile_name);
 
                 if OpenOptions::new()
                     .write(true)
                     .create_new(true)
-                    .open(&lockfile)
+                    .open(&lockfile_path)
                     .is_ok()
                 {
-                    break (filename, lockfile);
+                    break (file_name, lockfile_path);
                 }
 
-                filename = format!("{filename_orig}-{ctr}");
+                file_name = format!("{file_name_orig}-{ctr}");
                 ctr += 1;
             };
 
-            self.set_filename_for(testcase, filename)?;
+            self.set_filename_for(testcase, file_name)?;
 
-            fs::remove_file(lockfile)?;
+            fs::remove_file(lockfile_path)?;
         };
         if self.meta_format.is_some() {
-            let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
-            filename.set_file_name(format!(
-                ".{}.metadata",
-                filename.file_name().unwrap().to_string_lossy()
-            ));
-            let mut tmpfile_name = PathBuf::from(&filename);
-            tmpfile_name.set_file_name(format!(
-                ".{}.tmp",
-                tmpfile_name.file_name().unwrap().to_string_lossy()
-            ));
+            let metafile_name = format!(".{}.metadata", testcase.filename().as_ref().unwrap());
+            let metafile_path = self.dir_path.join(&metafile_name);
+            let mut tmpfile_path = metafile_path.clone();
+            tmpfile_path.set_file_name(format!(".{metafile_name}.tmp",));
 
             let ondisk_meta = OnDiskMetadata {
                 metadata: testcase.metadata_map(),
@@ -334,7 +334,7 @@ where
                 executions: testcase.executions(),
             };
 
-            let mut tmpfile = File::create(&tmpfile_name)?;
+            let mut tmpfile = File::create(&tmpfile_path)?;
 
             let serialized = match self.meta_format.as_ref().unwrap() {
                 OnDiskMetadataFormat::Postcard => postcard::to_allocvec(&ondisk_meta)?,
@@ -346,7 +346,7 @@ where
                     .unwrap(),
             };
             tmpfile.write_all(&serialized)?;
-            fs::rename(&tmpfile_name, &filename)?;
+            fs::rename(&tmpfile_path, &metafile_path)?;
         }
         self.store_input_from(testcase)?;
         *testcase.input_mut() = None;
@@ -355,15 +355,13 @@ where
 
     fn remove_testcase(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         if let Some(filename) = testcase.filename() {
-            fs::remove_file(filename)?;
-        }
-        if self.meta_format.is_some() {
-            let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
-            filename.set_file_name(format!(
-                ".{}.metadata",
-                filename.file_name().unwrap().to_string_lossy()
-            ));
-            fs::remove_file(filename)?;
+            fs::remove_file(self.dir_path.join(&filename))?;
+            if self.meta_format.is_some() {
+                fs::remove_file(self.dir_path.join(format!(".{filename}.metadata")))?;
+            }
+            // also try to remove the corresponding `.lafl_lock` file if it still exists
+            // (even though it shouldn't exist anymore, at this point in time)
+            let _ = fs::remove_file(self.dir_path.join(format!(".{filename}.lafl_lock")))?;
         }
         Ok(())
     }
