@@ -8,6 +8,7 @@ use core::{
     option::Option,
     time::Duration,
 };
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -42,12 +43,16 @@ pub struct Testcase<I>
 where
     I: Input,
 {
-    /// The input of this testcase
+    /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
     input: Option<I>,
-    /// Filename, if this testcase is backed by a file in the filesystem
+    /// The filename for this [`Testcase`]
     filename: Option<String>,
-    /// Map of metadata associated with this testcase
+    /// Complete path to the [`Input`] on disk, if this [`Testcase`] is backed by a file in the filesystem
+    file_path: Option<PathBuf>,
+    /// Map of metadata associated with this [`Testcase`]
     metadata: SerdeAnyMap,
+    /// Complete path to the metadata [`SerdeAnyMap`] on disk, if this [`Testcase`] is backed by a file in the filesystem
+    metadata_path: Option<PathBuf>,
     /// Time needed to execute the input
     exec_time: Option<Duration>,
     /// Cached len of the input, if any
@@ -119,6 +124,30 @@ where
     #[inline]
     pub fn filename_mut(&mut self) -> &mut Option<String> {
         &mut self.filename
+    }
+
+    /// Get the filename path, if any
+    #[inline]
+    pub fn file_path(&self) -> &Option<PathBuf> {
+        &self.file_path
+    }
+
+    /// Get the filename path, if any (mutable)
+    #[inline]
+    pub fn file_path_mut(&mut self) -> &mut Option<PathBuf> {
+        &mut self.file_path
+    }
+
+    /// Get the metadata path, if any
+    #[inline]
+    pub fn metadata_path(&self) -> &Option<PathBuf> {
+        &self.metadata_path
+    }
+
+    /// Get the metadata path, if any (mutable)
+    #[inline]
+    pub fn metadata_path_mut(&mut self) -> &mut Option<PathBuf> {
+        &mut self.metadata_path
     }
 
     /// Get the execution time of the testcase
@@ -239,6 +268,8 @@ where
             scheduled_count: 0,
             executions: 0,
             parent_id: None,
+            file_path: None,
+            metadata_path: None,
         }
     }
 }

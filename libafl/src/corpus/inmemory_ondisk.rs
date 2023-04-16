@@ -73,7 +73,9 @@ where
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let idx = self.inner.add(testcase)?;
-        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), idx)?;
+        let testcase = &mut self.get(idx).unwrap().borrow_mut();
+        self.save_testcase(testcase, idx)?;
+        *testcase.input_mut() = None;
         Ok(idx)
     }
 
@@ -82,7 +84,9 @@ where
     fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         let entry = self.inner.replace(idx, testcase)?;
         self.remove_testcase(&entry)?;
-        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), idx)?;
+        let testcase = &mut self.get(idx).unwrap().borrow_mut();
+        self.save_testcase(testcase, idx)?;
+        *testcase.input_mut() = None;
         Ok(entry)
     }
 
@@ -139,10 +143,10 @@ where
 
     fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
         if testcase.input_mut().is_none() {
-            let Some(filename) = testcase.filename().as_ref() else {
-                return Err(Error::illegal_argument("No filename set for testcase"));
+            let Some(file_path) = testcase.file_path().as_ref() else {
+                return Err(Error::illegal_argument("No file path set for testcase. Could not load inputs."));
             };
-            let input = I::from_file(self.dir_path.join(filename))?;
+            let input = I::from_file(file_path)?;
             testcase.set_input(input);
         }
         Ok(())
@@ -150,13 +154,13 @@ where
 
     fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
         // Store the input to disk
-        let Some(filename) = testcase.filename() else {
-            return Err(Error::illegal_argument("No filename set for testcase"));
+        let Some(file_path) = testcase.file_path() else {
+            return Err(Error::illegal_argument("No file path set for testcase. Could not store input to disk."));
         };
         let Some(input) = testcase.input() else {
-            return Err(Error::illegal_argument("No input available for testcase"));
+            return Err(Error::illegal_argument("No input available for testcase. Could not store anything."));
         };
-        input.to_file(self.dir_path.join(filename))
+        input.to_file(file_path)
     }
 }
 
@@ -263,7 +267,7 @@ where
             if OpenOptions::new()
                 .create(true)
                 .write(true)
-                .open(self.dir_path.join(&new_lock_filename))
+                .open(self.dir_path.join(new_lock_filename))
                 .is_err()
             {
                 *testcase.filename_mut() = Some(old_filename);
@@ -272,21 +276,25 @@ where
                 ));
             }
 
-            fs::rename(
-                self.dir_path.join(&old_filename),
-                self.dir_path.join(&new_filename),
-            )?;
+            let new_file_path = self.dir_path.join(&new_filename);
 
-            let old_metadata_filename = format!(".{old_filename}.metadata");
-            let new_metadata_filename = format!(".{new_filename}.metadata");
-            fs::rename(
-                self.dir_path.join(old_metadata_filename),
-                self.dir_path.join(new_metadata_filename),
-            )?;
+            fs::rename(testcase.file_path().as_ref().unwrap(), &new_file_path)?;
 
-            fs::remove_file(self.dir_path.join(&new_lock_filename))?;
+            let new_metadata_path = {
+                if let Some(old_metadata_path) = testcase.metadata_path() {
+                    // We have metadata. Let's rename it.
+                    let new_metadata_path = self.dir_path.join(format!(".{new_filename}.metadata"));
+                    fs::rename(old_metadata_path, &new_metadata_path)?;
 
+                    Some(new_metadata_path)
+                } else {
+                    None
+                }
+            };
+
+            *testcase.metadata_path_mut() = new_metadata_path;
             *testcase.filename_mut() = Some(new_filename);
+            *testcase.file_path_mut() = Some(new_file_path);
         } else {
             *testcase.filename_mut() = Some(filename);
         }
@@ -347,9 +355,9 @@ where
             };
             tmpfile.write_all(&serialized)?;
             fs::rename(&tmpfile_path, &metafile_path)?;
+            *testcase.metadata_path_mut() = Some(metafile_path);
         }
         self.store_input_from(testcase)?;
-        *testcase.input_mut() = None;
         Ok(())
     }
 
