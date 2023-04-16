@@ -288,6 +288,12 @@ where
             }
         }
     }
+
+    /// Returns if the underlying input has a `len` of 0
+    #[inline]
+    pub fn is_empty<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<bool, Error> {
+        self.len(corpus) == 0
+    }
 }
 
 /// Create a testcase from an input
