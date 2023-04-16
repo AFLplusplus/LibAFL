@@ -271,7 +271,8 @@ where
 
     /// Get the `len` or calculate it, if not yet calculated.
     #[inline]
-    pub fn len<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<usize, Error> {
+    #[allow(clippy::len_without_is_empty)]
+    pub fn load_len<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<usize, Error> {
         match &self.input {
             Some(i) => {
                 let l = i.len();
@@ -283,16 +284,10 @@ where
                     Ok(l)
                 } else {
                     corpus.load_input_into(self)?;
-                    self.len(corpus)
+                    self.load_len(corpus)
                 }
             }
         }
-    }
-
-    /// Returns if the underlying input has a `len` of 0
-    #[inline]
-    pub fn is_empty<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<bool, Error> {
-        self.len(corpus) == 0
     }
 }
 

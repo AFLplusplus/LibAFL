@@ -39,7 +39,7 @@ where
     fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error> {
         // TODO maybe enforce entry.exec_time().is_some()
         Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as f64
-            * entry.len(state.corpus())? as f64)
+            * entry.load_len(state.corpus())? as f64)
     }
 }
 
