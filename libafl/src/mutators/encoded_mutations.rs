@@ -241,10 +241,12 @@ where
 
         input.codes_mut().resize(size + len, 0);
         self.tmp_buf.resize(len, 0);
-        buffer_copy(&mut self.tmp_buf, input.codes(), from, 0, len);
+        unsafe {
+            buffer_copy(&mut self.tmp_buf, input.codes(), from, 0, len);
 
-        buffer_self_copy(input.codes_mut(), off, off + len, size - off);
-        buffer_copy(input.codes_mut(), &self.tmp_buf, 0, off, len);
+            buffer_self_copy(input.codes_mut(), off, off + len, size - off);
+            buffer_copy(input.codes_mut(), &self.tmp_buf, 0, off, len);
+        };
 
         Ok(MutationResult::Mutated)
     }
@@ -284,7 +286,9 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
         let to = state.rand_mut().below(size as u64) as usize;
         let len = 1 + state.rand_mut().below((size - max(from, to)) as u64) as usize;
 
-        buffer_self_copy(input.codes_mut(), from, to, len);
+        unsafe {
+            buffer_self_copy(input.codes_mut(), from, to, len);
+        }
 
         Ok(MutationResult::Mutated)
     }
@@ -355,8 +359,10 @@ where
         let other = other_testcase.input().as_ref().unwrap();
 
         input.codes_mut().resize(size + len, 0);
-        buffer_self_copy(input.codes_mut(), to, to + len, size - to);
-        buffer_copy(input.codes_mut(), other.codes(), from, to, len);
+        unsafe {
+            buffer_self_copy(input.codes_mut(), to, to + len, size - to);
+            buffer_copy(input.codes_mut(), other.codes(), from, to, len);
+        }
 
         Ok(MutationResult::Mutated)
     }
@@ -422,7 +428,9 @@ where
         // no need to load the input again, it'll already be present at this point.
         let other = other_testcase.input().as_ref().unwrap();
 
-        buffer_copy(input.codes_mut(), other.codes(), from, to, len);
+        unsafe {
+            buffer_copy(input.codes_mut(), other.codes(), from, to, len);
+        }
 
         Ok(MutationResult::Mutated)
     }
