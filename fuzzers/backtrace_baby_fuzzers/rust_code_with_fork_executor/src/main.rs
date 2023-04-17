@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
+use std::{path::PathBuf, ptr::write};
 
 use libafl::{
     bolts::{
@@ -30,12 +30,12 @@ use libafl::{
 pub fn main() {
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
     let mut signals = shmem_provider.new_shmem(16).unwrap();
-    let mut signals_clone = signals.clone();
+    let signals_len = signals.len();
+    let signals_ptr = signals.as_mut_slice().as_mut_ptr();
     let mut bt = shmem_provider.new_shmem_object::<Option<u64>>().unwrap();
 
-    let mut signals_set = |idx: usize| {
-        let a = signals.as_mut_slice();
-        a[idx] = 1;
+    let signals_set = |idx: usize| {
+        unsafe { write(signals_ptr.add(idx), 1) };
     };
 
     // The closure that we want to fuzz
@@ -65,7 +65,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", signals_clone.as_mut_slice()) };
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", signals_ptr, signals_len) };
     // Create a stacktrace observer
     let bt_observer = BacktraceObserver::new(
         "BacktraceObserver",

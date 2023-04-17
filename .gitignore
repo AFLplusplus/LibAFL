@@ -47,6 +47,7 @@ a
 forkserver_test
 __pycache__
 *.lafl_lock
+*.metadata
 
 *atomic_file_testfile*
 **/libxml2
