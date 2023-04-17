@@ -248,9 +248,10 @@ pub trait HasInProcessHandlers {
 #[cfg(windows)]
 impl<H, HB, OT, S> HasInProcessHandlers for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: HasSolutions + HasClientPerfMonitor + HasCorpus,
 {
     /// the timeout handler
     #[inline]
