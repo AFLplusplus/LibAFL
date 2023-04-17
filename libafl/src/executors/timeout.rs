@@ -313,6 +313,7 @@ impl<E> TimeoutExecutor<E> {
         self.exec_tmout = exec_tmout;
     }
 
+    #[allow(clippy::unused_self)]
     pub(crate) fn handle_timeout(&mut self, _data: &mut InProcessExecutorHandlerData) -> bool {
         false // TODO
     }
@@ -355,12 +356,12 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
     }
 
     /// Set the timeout for this executor
-    #[cfg(windows)]
     pub fn set_timeout(&mut self, exec_tmout: Duration) {
         self.milli_sec = exec_tmout.as_millis() as i64;
         self.exec_tmout = exec_tmout;
     }
 
+    #[allow(clippy::unused_self)]
     pub(crate) fn handle_timeout(&mut self, _data: &mut InProcessExecutorHandlerData) -> bool {
         false // TODO
     }
