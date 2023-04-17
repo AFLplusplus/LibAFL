@@ -202,17 +202,21 @@ pub fn libafl_main() {
         };
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        let mut executor = TimeoutExecutor::new(
-            InProcessExecutor::new(
-                &mut harness,
-                tuple_list!(edges_observer, time_observer),
-                &mut fuzzer,
-                &mut state,
-                &mut restarting_mgr,
-            )?,
-            // 10 seconds timeout
-            opt.timeout,
-        );
+        let executor = InProcessExecutor::new(
+            &mut harness,
+            tuple_list!(edges_observer, time_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut restarting_mgr,
+        )?;
+
+        // Wrap the executor with a timeout
+        #[cfg(target_os = "linux")]
+        let mut executor = TimeoutExecutor::batch_mode(executor, opt.timeout);
+
+        // Wrap the executor with a timeout
+        #[cfg(not(target_os = "linux"))]
+        let mut executor = TimeoutExecutor::new(executor, opt.timeout);
 
         // The actual target run starts here.
         // Call LLVMFUzzerInitialize() if present.
