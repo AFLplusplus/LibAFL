@@ -90,14 +90,13 @@ impl<I> Testcase<I>
 where
     I: Input,
 {
-    /// Returns this testcase with a loaded input
-    pub fn test_load_input<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<&I, Error> {
-        // TODO: Why not call load_input on the corpus directly?
+    /// Returns this [`Testcase`] with a loaded `Input`]
+    pub fn load_input<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<&I, Error> {
         corpus.load_input_into(self)?;
         Ok(self.input.as_ref().unwrap())
     }
 
-    /// Get the input, if any
+    /// Get the input, if available any
     #[inline]
     pub fn input(&self) -> &Option<I> {
         &self.input

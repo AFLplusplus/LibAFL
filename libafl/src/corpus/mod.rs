@@ -141,9 +141,8 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
 
     /// Loads the `Input` for a given [`CorpusId`] from the [`Corpus`], and returns the clone.
     fn cloned_input_for_id(&self, idx: CorpusId) -> Result<Self::Input, Error> {
-        let mut testcase = self.get(idx).unwrap().borrow_mut();
-        self.load_input_into(&mut testcase)?;
-        Ok(testcase.input().as_ref().unwrap().clone())
+        let mut testcase = self.get(idx)?.borrow_mut();
+        Ok(testcase.load_input(self)?.clone())
     }
 }
 

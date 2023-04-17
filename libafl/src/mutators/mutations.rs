@@ -1116,10 +1116,7 @@ where
 
         let other_size = {
             let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-            state.corpus().load_input_into(&mut other_testcase)?;
-
-            let other = other_testcase.input().as_ref().unwrap();
-            other.bytes().len()
+            other_testcase.load_input(state.corpus())?.bytes().len()
         };
 
         if other_size < 2 {
@@ -1140,6 +1137,7 @@ where
         }
 
         let other_testcase = state.corpus().get(idx)?.borrow_mut();
+        // No need to load the input again, it'll still be cached.
         let other = other_testcase.input().as_ref().unwrap();
 
         unsafe {
@@ -1198,11 +1196,8 @@ where
         }
 
         let other_size = {
-            let corpus = state.corpus();
-            let mut other_testcase = corpus.get(idx)?.borrow_mut();
-            corpus.load_input_into(&mut other_testcase)?;
-            let other = other_testcase.input().as_ref().unwrap();
-            other.bytes().len()
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            testcase.load_input(state.corpus())?.bytes().len()
         };
 
         if other_size < 2 {
@@ -1213,7 +1208,7 @@ where
         let range = rand_range(state, other_size, min(other_size, size - target));
 
         let other_testcase = state.corpus().get(idx)?.borrow_mut();
-
+        // No need to load the input again, it'll still be cached.
         let other = other_testcase.input().as_ref().unwrap();
 
         unsafe {
@@ -1285,8 +1280,7 @@ where
 
         let (first_diff, last_diff) = {
             let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-            state.corpus().load_input_into(&mut other_testcase)?;
-            let other = other_testcase.input().as_ref().unwrap();
+            let other = other_testcase.load_input(state.corpus())?;
 
             let mut counter: u32 = 0;
             loop {
@@ -1305,6 +1299,7 @@ where
         let split_at = state.rand_mut().between(first_diff, last_diff) as usize;
 
         let other_testcase = state.corpus().get(idx)?.borrow_mut();
+        // Input will already be loaded.
         let other = other_testcase.input().as_ref().unwrap();
 
         input
