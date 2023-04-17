@@ -290,27 +290,11 @@ where
 {
     /// Get the cached `len`. Will `Error::EmptyOptional` if `len` is not yet cached.
     #[inline]
-    pub fn cached_len(&mut self) -> Result<usize, Error> {
-        match &self.input {
-            Some(i) => {
-                let l = i.len();
-                self.cached_len = Some(l);
-                Ok(l)
-            }
-            None => {
-                if let Some(l) = self.cached_len {
-                    Ok(l)
-                } else {
-                    Err(Error::empty_optional(
-                        "No cached_len available. Call corpus.load_input_into(testcase) first, or use `len()`.",
-                    ))
-                }
-            }
-        }
+    pub fn cached_len(&mut self) -> Option<usize> {
+        self.cached_len
     }
 
     /// Get the `len` or calculate it, if not yet calculated.
-    #[inline]
     #[allow(clippy::len_without_is_empty)]
     pub fn load_len<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<usize, Error> {
         match &self.input {
