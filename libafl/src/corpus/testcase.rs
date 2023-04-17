@@ -275,7 +275,9 @@ where
             scheduled_count: 0,
             executions: 0,
             parent_id: None,
+            #[cfg(feature = "std")]
             file_path: None,
+            #[cfg(feature = "std")]
             metadata_path: None,
         }
     }
