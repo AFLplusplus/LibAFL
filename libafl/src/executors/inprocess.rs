@@ -246,7 +246,7 @@ pub trait HasInProcessHandlers {
 }
 
 #[cfg(windows)]
-impl<'a, H, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, OT, S>
+impl<H, HB, OT, S> HasInProcessHandlers for GenericInProcessExecutor<H, HB, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
