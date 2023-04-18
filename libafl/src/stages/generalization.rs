@@ -79,10 +79,13 @@ where
     ) -> Result<(), Error> {
         let (mut payload, original, novelties) = {
             start_timer!(state);
-            state.corpus().get(corpus_idx)?.borrow_mut().load_input()?;
+            {
+                let corpus = state.corpus();
+                let mut testcase = corpus.get(corpus_idx)?.borrow_mut();
+                corpus.load_input_into(&mut testcase)?;
+            }
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
             let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
-
             let input = entry.input_mut().as_mut().unwrap();
 
             let payload: Vec<_> = input.bytes().iter().map(|&x| Some(x)).collect();

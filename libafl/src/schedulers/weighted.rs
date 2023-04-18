@@ -154,7 +154,7 @@ where
 
         for i in state.corpus().ids() {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
-            let weight = F::compute(&mut *testcase, state)?;
+            let weight = F::compute(state, &mut *testcase)?;
             weights.insert(i, weight);
             sum += weight;
         }

@@ -9,10 +9,11 @@ use core::{
     time::Duration,
 };
 #[cfg(feature = "std")]
-use std::fs;
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use super::Corpus;
 use crate::{
     bolts::{serdeany::SerdeAnyMap, HasLen},
     corpus::CorpusId,
@@ -43,12 +44,18 @@ pub struct Testcase<I>
 where
     I: Input,
 {
-    /// The input of this testcase
+    /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
     input: Option<I>,
-    /// Filename, if this testcase is backed by a file in the filesystem
+    /// The filename for this [`Testcase`]
     filename: Option<String>,
-    /// Map of metadata associated with this testcase
+    /// Complete path to the [`Input`] on disk, if this [`Testcase`] is backed by a file in the filesystem
+    #[cfg(feature = "std")]
+    file_path: Option<PathBuf>,
+    /// Map of metadata associated with this [`Testcase`]
     metadata: SerdeAnyMap,
+    /// Complete path to the metadata [`SerdeAnyMap`] on disk, if this [`Testcase`] is backed by a file in the filesystem
+    #[cfg(feature = "std")]
+    metadata_path: Option<PathBuf>,
     /// Time needed to execute the input
     exec_time: Option<Duration>,
     /// Cached len of the input, if any
@@ -83,36 +90,13 @@ impl<I> Testcase<I>
 where
     I: Input,
 {
-    /// Returns this testcase with a loaded input
-    pub fn load_input(&mut self) -> Result<&I, Error> {
-        if self.input.is_none() {
-            self.input = Some(I::from_file(self.filename.as_ref().unwrap())?);
-        }
+    /// Returns this [`Testcase`] with a loaded `Input`]
+    pub fn load_input<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<&I, Error> {
+        corpus.load_input_into(self)?;
         Ok(self.input.as_ref().unwrap())
     }
 
-    /// Store the input to disk if possible
-    pub fn store_input(&mut self) -> Result<bool, Error> {
-        match self.filename() {
-            Some(fname) => {
-                let saved = match self.input() {
-                    None => false,
-                    Some(i) => {
-                        i.to_file(fname)?;
-                        true
-                    }
-                };
-                if saved {
-                    // remove the input from memory
-                    *self.input_mut() = None;
-                }
-                Ok(saved)
-            }
-            None => Ok(false),
-        }
-    }
-
-    /// Get the input, if any
+    /// Get the input, if available any
     #[inline]
     pub fn input(&self) -> &Option<I> {
         &self.input
@@ -144,55 +128,32 @@ where
         &mut self.filename
     }
 
-    /// Set the filename
+    /// Get the filename path, if any
     #[inline]
     #[cfg(feature = "std")]
-    pub fn set_filename(&mut self, filename: String) -> Result<(), Error> {
-        use std::fs::OpenOptions;
-
-        if self.filename.is_some() {
-            let f = self.filename.clone().unwrap();
-            let old_filename = f.as_str();
-
-            let new_filename = filename.as_str();
-
-            // Do operations below when new filename is specified
-            if old_filename.eq(new_filename) {
-                return Ok(());
-            }
-
-            let new_lock_filename = format!(".{new_filename}.lafl_lock");
-
-            // Try to create lock file for new testcases
-            if OpenOptions::new()
-                .create(true)
-                .write(true)
-                .open(&new_lock_filename)
-                .is_err()
-            {
-                return Err(Error::illegal_state(
-                    "unable to create lock file for new testcase",
-                ));
-            }
-
-            fs::rename(old_filename, new_filename)?;
-
-            let old_metadata_filename = format!(".{old_filename}.metadata");
-            let new_metadata_filename = format!(".{new_filename}.metadata");
-            fs::rename(old_metadata_filename, new_metadata_filename)?;
-
-            fs::remove_file(&new_lock_filename)?;
-        }
-
-        self.filename = Some(filename);
-        Ok(())
+    pub fn file_path(&self) -> &Option<PathBuf> {
+        &self.file_path
     }
 
+    /// Get the filename path, if any (mutable)
     #[inline]
-    #[cfg(feature = "no_std")]
-    pub fn set_filename(&mut self, filename: String) -> Result<(), Error> {
-        self.filename = Some(filename);
-        Ok(())
+    #[cfg(feature = "std")]
+    pub fn file_path_mut(&mut self) -> &mut Option<PathBuf> {
+        &mut self.file_path
+    }
+
+    /// Get the metadata path, if any
+    #[inline]
+    #[cfg(feature = "std")]
+    pub fn metadata_path(&self) -> &Option<PathBuf> {
+        &self.metadata_path
+    }
+
+    /// Get the metadata path, if any (mutable)
+    #[inline]
+    #[cfg(feature = "std")]
+    pub fn metadata_path_mut(&mut self) -> &mut Option<PathBuf> {
+        &mut self.metadata_path
     }
 
     /// Get the execution time of the testcase
@@ -313,6 +274,10 @@ where
             scheduled_count: 0,
             executions: 0,
             parent_id: None,
+            #[cfg(feature = "std")]
+            file_path: None,
+            #[cfg(feature = "std")]
+            metadata_path: None,
         }
     }
 }
@@ -322,25 +287,30 @@ impl<I> Testcase<I>
 where
     I: Input + HasLen,
 {
-    /// Get the cached len
+    /// Get the cached `len`. Will `Error::EmptyOptional` if `len` is not yet cached.
     #[inline]
-    pub fn cached_len(&mut self) -> Result<usize, Error> {
-        Ok(match &self.input {
+    pub fn cached_len(&mut self) -> Option<usize> {
+        self.cached_len
+    }
+
+    /// Get the `len` or calculate it, if not yet calculated.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn load_len<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<usize, Error> {
+        match &self.input {
             Some(i) => {
                 let l = i.len();
                 self.cached_len = Some(l);
-                l
+                Ok(l)
             }
             None => {
                 if let Some(l) = self.cached_len {
-                    l
+                    Ok(l)
                 } else {
-                    let l = self.load_input()?.len();
-                    self.cached_len = Some(l);
-                    l
+                    corpus.load_input_into(self)?;
+                    self.load_len(corpus)
                 }
             }
-        })
+        }
     }
 }
 
@@ -471,11 +441,7 @@ pub mod pybind {
     use pyo3::{prelude::*, types::PyDict};
 
     use super::{HasMetadata, Testcase};
-    use crate::{
-        bolts::ownedref::OwnedMutPtr,
-        inputs::{BytesInput, HasBytesVec},
-        pybind::PythonMetadata,
-    };
+    use crate::{bolts::ownedref::OwnedMutPtr, inputs::BytesInput, pybind::PythonMetadata};
 
     /// `PythonTestcase` with fixed generics
     pub type PythonTestcase = Testcase<BytesInput>;
@@ -512,14 +478,6 @@ pub mod pybind {
             Self {
                 inner: OwnedMutPtr::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
             }
-        }
-
-        fn load_input(&mut self) -> &[u8] {
-            self.inner
-                .as_mut()
-                .load_input()
-                .expect("Failed to load input")
-                .bytes()
         }
 
         #[getter]

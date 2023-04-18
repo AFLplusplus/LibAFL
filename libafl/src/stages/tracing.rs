@@ -51,12 +51,8 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         start_timer!(state);
-        let input = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .load_input()?
-            .clone();
+        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         start_timer!(state);
@@ -142,12 +138,7 @@ where
     ) -> Result<(), Error> {
         // First run with the un-mutated input
 
-        let unmutated_input = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .load_input()?
-            .clone();
+        let unmutated_input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
         if let Some(name) = &self.cmplog_observer_name {
             if let Some(ob) = self
@@ -277,12 +268,8 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         start_timer!(state);
-        let input = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .load_input()?
-            .clone();
+        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         start_timer!(state);
