@@ -474,13 +474,8 @@ impl InProcessExecutorHandlerData {
         r
     }
 
-    #[cfg(all(windows, feature = "std"))]
-    pub(crate) fn is_valid(&self) -> bool {
-        self.in_target == 1
-    }
-
-    #[cfg(unix)]
-    pub(crate) fn is_valid(&self) -> bool {
+    #[cfg(any(unix, feature = "std"))]
+    pub fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }
 
