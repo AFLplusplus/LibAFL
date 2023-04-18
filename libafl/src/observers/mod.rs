@@ -498,7 +498,7 @@ where
     #[cfg(feature = "no_std")]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
-        self.start_time = Duration::from_secs(0);
+        self.start_time = current_time();
         Ok(())
     }
 
