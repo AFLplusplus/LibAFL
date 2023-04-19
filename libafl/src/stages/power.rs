@@ -55,7 +55,7 @@ where
     fn iterations(&self, state: &mut E::State, corpus_idx: CorpusId) -> Result<u64, Error> {
         // Update handicap
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let score = F::compute(&mut *testcase, state)? as u64;
+        let score = F::compute(state, &mut *testcase)? as u64;
 
         Ok(score)
     }

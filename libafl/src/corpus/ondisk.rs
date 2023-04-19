@@ -138,6 +138,16 @@ where
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)
     }
+
+    #[inline]
+    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+        self.inner.load_input_into(testcase)
+    }
+
+    #[inline]
+    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+        self.inner.store_input_from(testcase)
+    }
 }
 
 impl<I> HasTestcase for OnDiskCorpus<I>

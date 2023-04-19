@@ -25,7 +25,7 @@ impl<S> TestcaseScore<S> for PacketLenTestcaseScore
 where
     S: HasCorpus<Input = PacketData> + HasMetadata,
 {
-    fn compute(entry: &mut Testcase<PacketData>, _state: &S) -> Result<f64, Error> {
+    fn compute(_state: &S, entry: &mut Testcase<PacketData>) -> Result<f64, Error> {
         Ok(entry
             .metadata_map()
             .get::<PacketLenMetadata>()

@@ -137,14 +137,15 @@ where
         }
 
         start_timer!(state);
-        let mut input = state
-            .corpus()
-            .get(self.current_corpus_idx.unwrap())
-            .unwrap()
-            .borrow_mut()
-            .load_input()
-            .unwrap()
-            .clone();
+
+        let input = state
+            .corpus_mut()
+            .cloned_input_for_id(self.current_corpus_idx.unwrap());
+        let mut input = match input {
+            Err(e) => return Some(Err(e)),
+            Ok(input) => input,
+        };
+
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         start_timer!(state);

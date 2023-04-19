@@ -117,11 +117,10 @@ where
 
         let rand_num = state.rand_mut().next() as usize;
 
-        let mut other_testcase = state.testcase_mut(idx)?;
-        other_testcase.load_input()?; // Preload the input
+        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
 
         if !other_testcase.has_metadata::<GramatronIdxMapMetadata>() {
-            let meta = GramatronIdxMapMetadata::new(other_testcase.input().as_ref().unwrap());
+            let meta = GramatronIdxMapMetadata::new(other_testcase.load_input(state.corpus())?);
             other_testcase.add_metadata(meta);
         }
         let meta = other_testcase
