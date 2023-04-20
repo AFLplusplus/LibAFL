@@ -230,7 +230,7 @@ where
         Self::_new(dir_path.as_ref(), None)
     }
 
-    ///Create an [`InmemoryOnDiskCorpus`] that will not store .lafl_lock files
+    ///Create an [`InmemoryOnDiskCorpus`] that will not store .`lafl_lock` files
     ///
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
     pub fn no_lafl_lock<P>(dir_path: P) -> Result<Self, Error>
