@@ -151,15 +151,15 @@ impl CommandConfigurator for StdCommandConfigurator {
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<EM, OT, S, T, Z> {
+pub struct CommandExecutor<OT, S, T> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
     observers: OT,
-    phantom: PhantomData<(EM, S, Z)>,
+    phantom: PhantomData<S>,
 }
 
-impl CommandExecutor<(), (), (), (), ()> {
+impl CommandExecutor<(), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -178,7 +178,7 @@ impl CommandExecutor<(), (), (), (), ()> {
     }
 }
 
-impl<EM, OT, S, T, Z> Debug for CommandExecutor<EM, OT, S, T, Z>
+impl<OT, S, T> Debug for CommandExecutor<OT, S, T>
 where
     T: Debug,
     OT: Debug,
@@ -191,7 +191,7 @@ where
     }
 }
 
-impl<EM, OT, S, T, Z> CommandExecutor<EM, OT, S, T, Z>
+impl<OT, S, T> CommandExecutor<OT, S, T>
 where
     T: Debug,
     OT: Debug,
@@ -202,7 +202,7 @@ where
     }
 }
 
-impl<EM, OT, S, Z> CommandExecutor<EM, OT, S, StdCommandConfigurator, Z>
+impl<OT, S> CommandExecutor<OT, S, StdCommandConfigurator>
 where
     OT: MatchName + Debug + ObserversTuple<S>,
     S: UsesInput,
@@ -293,7 +293,7 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<EM, OT, S, T, Z>
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
     S: UsesInput,
@@ -357,14 +357,14 @@ where
     }
 }
 
-impl<EM, OT, S, T, Z> UsesState for CommandExecutor<EM, OT, S, T, Z>
+impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
 where
     S: UsesInput,
 {
     type State = S;
 }
 
-impl<EM, OT, S, T, Z> UsesObservers for CommandExecutor<EM, OT, S, T, Z>
+impl<OT, S, T> UsesObservers for CommandExecutor<OT, S, T>
 where
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -372,7 +372,7 @@ where
     type Observers = OT;
 }
 
-impl<EM, OT, S, T, Z> HasObservers for CommandExecutor<EM, OT, S, T, Z>
+impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
 where
     S: UsesInput,
     T: Debug,
@@ -527,10 +527,10 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `CommandExecutor`
-    pub fn build<EM, OT, S, Z>(
+    pub fn build<OT, S>(
         &self,
         observers: OT,
-    ) -> Result<CommandExecutor<EM, OT, S, StdCommandConfigurator, Z>, Error>
+    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
     where
         OT: Debug + MatchName + ObserversTuple<S>,
         S: UsesInput,
@@ -578,7 +578,7 @@ impl CommandExecutorBuilder {
             input_location: self.input_location.clone(),
             command,
         };
-        Ok(configurator.into_executor::<EM, OT, S, Z>(observers))
+        Ok(configurator.into_executor::<OT, S>(observers))
     }
 }
 
@@ -628,7 +628,7 @@ pub trait CommandConfigurator: Sized + Debug {
         I: Input + HasTargetBytes;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<EM, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, OT, S, Self, Z>
+    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
     where
         OT: Debug + MatchName,
     {
