@@ -21,6 +21,7 @@ use super::{current_time, format_duration_hms, Duration, String, TimedStats, Tui
 #[derive(Default)]
 pub struct TuiUI {
     title: String,
+    version: String, 
     enhanced_graphics: bool,
     show_logs: bool,
     clients_idx: usize,
@@ -32,9 +33,10 @@ pub struct TuiUI {
 }
 
 impl TuiUI {
-    pub fn new(title: String, enhanced_graphics: bool) -> Self {
+    pub fn new(title: String, version: String, enhanced_graphics: bool) -> Self {
         Self {
             title,
+            version,
             enhanced_graphics,
             show_logs: true,
             clients_idx: 1,
@@ -106,8 +108,11 @@ impl TuiUI {
             .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
             .split(top_layout[0]);
 
+        let mut status_bar:String = self.title.clone();
+        status_bar=status_bar+" (LibAFL-"+self.version.as_str()+")";
+
         let text = vec![Spans::from(Span::styled(
-            &self.title,
+            &status_bar,
             Style::default()
                 .fg(Color::LightMagenta)
                 .add_modifier(Modifier::BOLD),

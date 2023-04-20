@@ -1,6 +1,6 @@
 //! Monitor based on tui-rs
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, string::ToString};
 use std::{
     collections::VecDeque,
     fmt::Write,
@@ -362,7 +362,10 @@ fn run_tui_thread(
 
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
-        let mut ui = TuiUI::new(title, enhanced_graphics);
+
+        let version= env!("CARGO_PKG_VERSION").to_string();
+
+        let mut ui = TuiUI::new(title, version, enhanced_graphics);
 
         let mut last_tick = Instant::now();
         let mut cnt = 0;
