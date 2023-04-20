@@ -1291,14 +1291,14 @@ where
                     return Ok(());
                 };
 
-                let _res = fuzzer.evaluate_input_with_observers::<E, EM>(
+                let res = fuzzer.evaluate_input_with_observers::<E, EM>(
                     state,
                     executor,
                     manager,
                     converter.convert(input)?,
                     false,
                 )?;
-                if let Some(item) = _res.1 {
+                if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
                 Ok(())
