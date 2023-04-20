@@ -377,7 +377,7 @@ where
             }
             // also try to remove the corresponding `.lafl_lock` file if it still exists
             // (even though it shouldn't exist anymore, at this point in time)
-            let _ = fs::remove_file(self.dir_path.join(format!(".{filename}.lafl_lock")));
+            fs::remove_file(self.dir_path.join(format!(".{filename}.lafl_lock")))?;
         }
         Ok(())
     }
