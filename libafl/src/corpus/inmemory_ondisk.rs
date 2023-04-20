@@ -50,6 +50,7 @@ where
     inner: InMemoryCorpus<I>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
+    lafl_lock: bool,
 }
 
 impl<I> UsesInput for InMemoryOnDiskCorpus<I>
@@ -229,6 +230,19 @@ where
         Self::_new(dir_path.as_ref(), None)
     }
 
+    ///Create an [`InmemoryOnDiskCorpus`] that will not store .lafl_lock files
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn no_lafl_lock<P>(dir_path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let mut corpus = Self::_new(dir_path.as_ref(), Some(OnDiskMetadataFormat::JsonPretty))?;
+        corpus.lafl_lock = false;
+
+        Ok(corpus)
+    }
+
     /// Private fn to crate a new corpus at the given (non-generic) path with the given optional `meta_format`
     fn _new(dir_path: &Path, meta_format: Option<OnDiskMetadataFormat>) -> Result<Self, Error> {
         fs::create_dir_all(dir_path)?;
@@ -236,6 +250,7 @@ where
             inner: InMemoryCorpus::new(),
             dir_path: dir_path.into(),
             meta_format,
+            lafl_lock: true,
         })
     }
 
@@ -259,19 +274,21 @@ where
                 return Ok(());
             }
 
-            let new_lock_filename = format!(".{new_filename}.lafl_lock");
+            if self.lafl_lock {
+                let new_lock_filename = format!(".{new_filename}.lafl_lock");
 
-            // Try to create lock file for new testcases
-            if OpenOptions::new()
-                .create(true)
-                .write(true)
-                .open(self.dir_path.join(new_lock_filename))
-                .is_err()
-            {
-                *testcase.filename_mut() = Some(old_filename);
-                return Err(Error::illegal_state(
-                    "unable to create lock file for new testcase",
-                ));
+                // Try to create lock file for new testcases
+                if OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .open(self.dir_path.join(new_lock_filename))
+                    .is_err()
+                {
+                    *testcase.filename_mut() = Some(old_filename);
+                    return Err(Error::illegal_state(
+                        "unable to create lock file for new testcase",
+                    ));
+                }
             }
 
             let new_file_path = self.dir_path.join(&new_filename);
@@ -312,29 +329,48 @@ where
         } else {
             // New testcase, we need to save it.
             let mut file_name = file_name_orig.clone();
-
             let mut ctr = 2;
-            let (file_name, lockfile_path) = loop {
-                let lockfile_name = format!(".{file_name}.lafl_lock");
-                let lockfile_path = self.dir_path.join(lockfile_name);
+            // When the lock_file=true,Try to create lock file for new testcases
+            if self.lafl_lock {
+                let (new_file_name, lockfile_path) = loop {
+                    let lockfile_name = format!(".{file_name}.lafl_lock");
+                    let lockfile_path = self.dir_path.join(lockfile_name);
 
-                if OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(&lockfile_path)
-                    .is_ok()
-                {
-                    break (file_name, lockfile_path);
-                }
+                    if OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&lockfile_path)
+                        .is_ok()
+                    {
+                        break (file_name, lockfile_path);
+                    }
 
-                file_name = format!("{file_name_orig}-{ctr}");
-                ctr += 1;
-            };
-
-            *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
-            *testcase.filename_mut() = Some(file_name);
-
-            fs::remove_file(lockfile_path)?;
+                    file_name = format!("{file_name_orig}-{ctr}");
+                    ctr += 1;
+                };
+                fs::remove_file(lockfile_path)?;
+                file_name = new_file_name;
+                *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
+                *testcase.filename_mut() = Some(file_name);
+            } else {
+                // When the lock_file=false,Try to create file for new testcases
+                let new_file_name = loop {
+                    let file_path = self.dir_path.join(&file_name);
+                    if OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&file_path)
+                        .is_ok()
+                    {
+                        break file_name;
+                    }
+                    file_name = format!("{file_name_orig}-{ctr}");
+                    ctr += 1;
+                };
+                file_name = new_file_name;
+                *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
+                *testcase.filename_mut() = Some(file_name);
+            }
         }
 
         if self.meta_format.is_some() {
@@ -377,7 +413,9 @@ where
             }
             // also try to remove the corresponding `.lafl_lock` file if it still exists
             // (even though it shouldn't exist anymore, at this point in time)
-            let _ = fs::remove_file(self.dir_path.join(format!(".{filename}.lafl_lock")));
+            if self.lafl_lock {
+                let _ = fs::remove_file(self.dir_path.join(format!(".{filename}.lafl_lock")));
+            }
         }
         Ok(())
     }
