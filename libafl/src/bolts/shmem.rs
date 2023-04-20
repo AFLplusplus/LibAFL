@@ -527,6 +527,9 @@ where
 /// Is needed on top.
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
+    #[cfg(doc)]
+    use crate::bolts::shmem::{ShMem, ShMemProvider};
+
     /// Shared memory provider for Android, allocating and forwarding maps over unix domain sockets.
     #[cfg(target_os = "android")]
     pub type UnixShMemProvider = ashmem::AshmemShMemProvider;
