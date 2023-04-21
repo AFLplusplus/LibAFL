@@ -9,6 +9,7 @@ use crate::{
     bolts::{
         llmp::{LlmpReceiver, LlmpSender, Tag},
         shmem::ShMemProvider,
+        ClientId,
     },
     events::{
         Event, EventConfig, EventFirer, EventManager, EventManagerId, EventProcessor,
@@ -46,17 +47,17 @@ where
 
 impl<EM, SP> EventFirer for CentralizedEventManager<EM, SP>
 where
-    EM: EventFirer,
+    EM: EventFirer + HasEventManagerId,
     SP: ShMemProvider,
 {
     fn fire(
         &mut self,
         state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
+        mut event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         if let Some(sender) = self.sender_to_main.as_mut() {
             // secondary node
-            let is_nt = match event {
+            let is_nt = match &mut event {
                 Event::NewTestcase {
                     input: _,
                     client_config: _,
@@ -65,7 +66,11 @@ where
                     observers_buf: _,
                     time: _,
                     executions: _,
-                } => true,
+                    forward_id,
+                } => {
+                    *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
+                    true
+                }
                 _ => false,
             };
             if is_nt {
@@ -120,7 +125,7 @@ where
 
 impl<E, EM, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, SP>
 where
-    EM: EventProcessor<E, Z> + EventFirer,
+    EM: EventProcessor<E, Z> + EventFirer + HasEventManagerId,
     SP: ShMemProvider,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -141,7 +146,7 @@ where
             for (idx, receiver) in receivers.iter_mut().enumerate() {
                 while let Some((_client_id, tag, _flags, msg)) = receiver.recv_buf_with_flags()? {
                     assert!(
-                        tag != _LLMP_TAG_TO_MAIN,
+                        tag == _LLMP_TAG_TO_MAIN,
                         "Only the TO_MAIN parcel should have arrived in the main node!"
                     );
 
@@ -151,28 +156,44 @@ where
                     match event {
                         Event::NewTestcase {
                             input,
-                            client_config: _,
-                            exit_kind: _,
-                            corpus_size: _,
-                            observers_buf: _,
-                            time: _,
-                            executions: _,
+                            client_config,
+                            exit_kind,
+                            corpus_size,
+                            observers_buf,
+                            time,
+                            executions,
+                            forward_id,
                         } => {
                             log::info!(
-                                "Received new Testcase to convert from secondary node {idx:?}"
+                                "Received new Testcase to evaluate from secondary node {idx:?}"
                             );
 
                             // TODO check the config and use the serialized observers
 
                             let res = fuzzer.evaluate_input_with_observers::<E, Self>(
-                                state, executor, self, input,
-                                true, // Yes, we want to propagate a NewTestcase event brodcasting from the broker!
+                                state,
+                                executor,
+                                self,
+                                input.clone(),
+                                false,
                             )?;
                             if let Some(item) = res.1 {
                                 log::info!("Added received Testcase as item #{item}");
-                            }
 
-                            // TODO UpdateExecStats and a way to update corpus_size for the original client
+                                self.inner.fire(
+                                    state,
+                                    Event::NewTestcase {
+                                        input,
+                                        observers_buf,
+                                        exit_kind,
+                                        corpus_size,
+                                        client_config,
+                                        time,
+                                        executions,
+                                        forward_id,
+                                    },
+                                )?;
+                            }
                         }
                         _ => panic!(
                             "Only the NewTestcase event should have arrived to the main node!"
@@ -221,7 +242,7 @@ where
 
 impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
 where
-    EM: ProgressReporter,
+    EM: ProgressReporter + HasEventManagerId,
     EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
     SP: ShMemProvider,
 {

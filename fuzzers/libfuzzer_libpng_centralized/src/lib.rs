@@ -12,22 +12,23 @@ use std::{env, net::SocketAddr, path::PathBuf};
 use clap::{self, Parser};
 use libafl::{
     bolts::{
-        core_affinity::Cores,
+        core_affinity::{CoreId, Cores},
         current_nanos,
         launcher::Launcher,
+        llmp::{LlmpReceiver, LlmpSender},
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
-        AsSlice,
+        AsSlice, ClientId,
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::EventConfig,
+    events::{CentralizedEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    monitors::{MultiMonitor, OnDiskTOMLMonitor},
+    monitors::MultiMonitor,
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
@@ -112,6 +113,8 @@ struct Opt {
 /// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
 pub fn libafl_main() {
+    env_logger::init();
+
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
@@ -124,17 +127,39 @@ pub fn libafl_main() {
         "Workdir: {:?}",
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
-    
-    LlmpSender::new(StdShMemProvider::new().expect("Failed to init shared memory"), ClientId::from(666), false).unwrap();
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = OnDiskTOMLMonitor::new(
-        "./fuzzer_stats.toml",
-        MultiMonitor::new(|s| println!("{s}")),
-    );
+    let mut senders = vec![];
+    let mut receivers = vec![];
+    let mut main_core_id = None;
+    let mut core_id_map = std::collections::HashMap::<CoreId, usize>::default();
+    for core_id in &cores.ids {
+        if main_core_id.is_none() {
+            main_core_id = Some(core_id.clone());
+            continue;
+        }
+        let sender =
+            LlmpSender::new(shmem_provider.clone(), ClientId(core_id.0 as u32), false).unwrap();
+        let receiver = LlmpReceiver::on_existing_shmem(
+            shmem_provider.clone(),
+            sender.out_shmems[0].shmem.clone(),
+            None,
+        )
+        .unwrap();
 
-    let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id| {
+        core_id_map.insert(core_id.clone(), senders.len());
+        senders.push(Some(sender));
+        receivers.push(receiver);
+    }
+
+    eprintln!("Main is {main_core_id:?}");
+
+    let mut receivers = Some(receivers);
+
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
+
+    let mut run_client = |state: Option<_>, restarting_mgr, core_id: CoreId| {
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
@@ -171,6 +196,15 @@ pub fn libafl_main() {
             )
             .unwrap()
         });
+
+        let mut mgr = if main_core_id.unwrap() == core_id {
+            CentralizedEventManager::new_main(restarting_mgr, receivers.take().unwrap())
+        } else {
+            let idx = *core_id_map.get(&core_id).unwrap();
+            CentralizedEventManager::new_secondary(restarting_mgr, senders[idx].take().unwrap())
+        };
+
+        // let mut mgr = restarting_mgr;
 
         println!("We're a client, let's fuzz :)");
 
@@ -209,7 +243,7 @@ pub fn libafl_main() {
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
             &mut state,
-            &mut restarting_mgr,
+            &mut mgr,
         )?;
 
         // Wrap the executor with a timeout
@@ -230,12 +264,12 @@ pub fn libafl_main() {
         // In case the corpus is empty (on first run), reset
         if state.must_load_initial_inputs() {
             state
-                .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
+                .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &opt.input)
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
+        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
         Ok(())
     };
 
