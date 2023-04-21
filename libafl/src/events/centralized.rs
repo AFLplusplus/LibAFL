@@ -119,7 +119,7 @@ where
 
     #[inline]
     fn await_restart_safe(&mut self) {
-        self.inner.await_restart_safe()
+        self.inner.await_restart_safe();
     }
 }
 
