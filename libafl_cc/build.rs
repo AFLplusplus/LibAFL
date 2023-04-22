@@ -317,6 +317,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         "afl-coverage-pass.cc",
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",
+        "dump-cfg-pass.cc"
     ] {
         build_pass(bindir_path, out_dir, &cxxflags, &ldflags, src_dir, pass);
     }
