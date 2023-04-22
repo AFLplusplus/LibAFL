@@ -87,7 +87,18 @@ class DumpCfgPass : public ModulePass {
 #endif
 
  protected:
+  DenseMap<BasicBlock *, uint32_t> bb_to_cur_loc;
+  DenseMap<StringRef, BasicBlock *> entry_bb;
+  DenseMap<BasicBlock *, std::vector<StringRef>> calls_in_bb;
  private:
+   bool isLLVMIntrinsicFn(StringRef &n) {
+    // Not interested in these LLVM's functions
+    if (n.startswith("llvm.")) {
+      return true;
+    } else {
+      return false;
+    }
+  }
 };
 
 }  // namespace
@@ -116,6 +127,88 @@ char DumpCfgPass::ID = 0;
 PreservedAnalyses DumpCfgPass::run(Module &M, ModuleAnalysisManager &MAM) {
 #else
 bool DumpCfgPass::runOnModule(Module &M) {
+
+  LLVMContext &Ctx = M.getContext();
+  auto moduleName = M.getName();
+
+  for(auto &F: M){
+    unsigned bb_cnt = 0;
+    entry_bb[F.getName()] = &F.getEntryBlock();
+    for(auto &BB: F) {
+      bb_to_cur_loc[&BB] = bb_cnt;
+      bb_cnt++;
+      for(auto &IN: BB) {
+        CallBase *callBase = nullptr;
+        if((callBase = dyn_cast<CallBase>(&IN))) {
+          auto F = callBase -> getCalledFunction();
+          if (F) {
+            StringRef fname = F->getName();
+            if(isLLVMIntrinsicFn(name)) {
+              continue;
+            }
+
+            calls_in_bb[&BB].push_back(name);
+          }
+        }
+      } 
+    }
+  }
+  
+  nlohmann::json cfg;
+
+  if (getenv("CFG_OUTPUT_PATH")) {
+    std::ofstream(getenv("CFG_OUTPUT_PATH") + std::string("/") +
+                  std::string(moduleName) + ".cfg") cfg;
+  };
+
+  // Dump CFG for this module
+  for (auto record = bb_to_cur_loc.begin(); record != bb_to_cur_loc.end();
+       record++) {
+    auto current_bb = record->getFirst();
+    auto loc = record->getSecond();
+    Function *calling_func = current_bb->getParent();
+    std::string func_name = std::string("");
+
+    if (calling_func) {
+      func_name = std::string(calling_func->getName());
+      // outs() << "Function name: " << calling_func->getName() << "\n";
+    }
+
+    std::vector<uint32_t> outgoing;
+    for (auto bb_successor = succ_begin(current_bb);
+         bb_successor != succ_end(current_bb); bb_successor++) {
+      outgoing.push_back(bb_to_cur_loc[*bb_successor]);
+    }
+    cfg["edges"][func_name][loc] = outgoing;
+  }
+
+  for (auto record = calls_in_bb.begin(); record != calls_in_bb.end();
+       record++) {
+    auto current_bb = record->getFirst();
+    auto loc = bb_to_cur_loc[current_bb];
+    Function *calling_func = current_bb->getParent();
+    std::string func_name = std::string("");
+
+    if (calling_func) {
+      func_name = std::string(calling_func->getName());
+      // outs() << "Function name: " << calling_func->getName() << "\n";
+    }
+
+    std::vector<std::string> outgoing_funcs;
+    for (auto &item : record->getSecond()) {
+      outgoing_funcs.push_back(std::string(item));
+    }
+    if (!outgoing_funcs.empty()) {
+      cfg["calls"][func_name][std::to_string(loc)] = outgoing_funcs;
+    }
+  }
+
+  for (auto record = entry_bb.begin(); record != entry_bb.end(); record++) {
+    cfg["entries"][std::string(record->getFirst())] =
+        bb_to_cur_loc[record->getSecond()];
+  }
+
+  cfg << cfg << "\n";
 
 #endif
 
