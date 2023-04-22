@@ -23,6 +23,8 @@ pub fn main() {
 
         #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         cc.add_pass(LLVMPasses::AutoTokens);
+        
+        cc.add_pass(LLVMPasses::DumpCfg);
 
         if let Some(code) = cc
             .cpp(is_cpp)
@@ -33,7 +35,6 @@ pub fn main() {
             .parse_args(&args)
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "fuzzbench")
-            .add_pass(LLVMPasses::DumpCfgPass)
             .run()
             .expect("Failed to run the wrapped compiler")
         {

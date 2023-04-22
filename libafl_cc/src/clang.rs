@@ -38,6 +38,8 @@ pub enum LLVMPasses {
     AutoTokens,
     /// The Coverage Accouting (BB metric) pass
     CoverageAccounting,
+    /// The dump cfg pass
+    DumpCfg,
 }
 
 impl LLVMPasses {

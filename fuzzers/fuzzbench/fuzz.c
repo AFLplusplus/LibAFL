@@ -4,7 +4,7 @@
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   if (Size >= 8 && *(uint32_t *)Data == 0xaabbccdd) { abort(); }
 
-  if (*Data[0] == 0) {
+  if (*(uint32_t *)Data[0] == 0) {
   	printf("AAA\n");
   }
   else{

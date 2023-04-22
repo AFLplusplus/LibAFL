@@ -62,6 +62,7 @@
 
 #include <iostream>
 
+#include <nlohmann/json.hpp>
 
 using namespace llvm;
 
@@ -87,11 +88,12 @@ class DumpCfgPass : public ModulePass {
 #endif
 
  protected:
-  DenseMap<BasicBlock *, uint32_t> bb_to_cur_loc;
-  DenseMap<StringRef, BasicBlock *> entry_bb;
+  DenseMap<BasicBlock *, uint32_t>               bb_to_cur_loc;
+  DenseMap<StringRef, BasicBlock *>              entry_bb;
   DenseMap<BasicBlock *, std::vector<StringRef>> calls_in_bb;
+
  private:
-   bool isLLVMIntrinsicFn(StringRef &n) {
+  bool isLLVMIntrinsicFn(StringRef &n) {
     // Not interested in these LLVM's functions
     if (n.startswith("llvm.")) {
       return true;
@@ -128,45 +130,39 @@ PreservedAnalyses DumpCfgPass::run(Module &M, ModuleAnalysisManager &MAM) {
 #else
 bool DumpCfgPass::runOnModule(Module &M) {
 
+#endif
   LLVMContext &Ctx = M.getContext();
-  auto moduleName = M.getName();
+  auto         moduleName = M.getName();
 
-  for(auto &F: M){
+  for (auto &F : M) {
     unsigned bb_cnt = 0;
     entry_bb[F.getName()] = &F.getEntryBlock();
-    for(auto &BB: F) {
+    for (auto &BB : F) {
       bb_to_cur_loc[&BB] = bb_cnt;
       bb_cnt++;
-      for(auto &IN: BB) {
+      for (auto &IN : BB) {
         CallBase *callBase = nullptr;
-        if((callBase = dyn_cast<CallBase>(&IN))) {
-          auto F = callBase -> getCalledFunction();
+        if ((callBase = dyn_cast<CallBase>(&IN))) {
+          auto F = callBase->getCalledFunction();
           if (F) {
             StringRef fname = F->getName();
-            if(isLLVMIntrinsicFn(name)) {
-              continue;
-            }
+            if (isLLVMIntrinsicFn(fname)) { continue; }
 
-            calls_in_bb[&BB].push_back(name);
+            calls_in_bb[&BB].push_back(fname);
           }
         }
-      } 
+      }
     }
   }
-  
-  nlohmann::json cfg;
 
-  if (getenv("CFG_OUTPUT_PATH")) {
-    std::ofstream(getenv("CFG_OUTPUT_PATH") + std::string("/") +
-                  std::string(moduleName) + ".cfg") cfg;
-  };
+  nlohmann::json cfg;
 
   // Dump CFG for this module
   for (auto record = bb_to_cur_loc.begin(); record != bb_to_cur_loc.end();
        record++) {
-    auto current_bb = record->getFirst();
-    auto loc = record->getSecond();
-    Function *calling_func = current_bb->getParent();
+    auto        current_bb = record->getFirst();
+    auto        loc = record->getSecond();
+    Function   *calling_func = current_bb->getParent();
     std::string func_name = std::string("");
 
     if (calling_func) {
@@ -184,9 +180,9 @@ bool DumpCfgPass::runOnModule(Module &M) {
 
   for (auto record = calls_in_bb.begin(); record != calls_in_bb.end();
        record++) {
-    auto current_bb = record->getFirst();
-    auto loc = bb_to_cur_loc[current_bb];
-    Function *calling_func = current_bb->getParent();
+    auto        current_bb = record->getFirst();
+    auto        loc = bb_to_cur_loc[current_bb];
+    Function   *calling_func = current_bb->getParent();
     std::string func_name = std::string("");
 
     if (calling_func) {
@@ -208,9 +204,11 @@ bool DumpCfgPass::runOnModule(Module &M) {
         bb_to_cur_loc[record->getSecond()];
   }
 
-  cfg << cfg << "\n";
-
-#endif
+  if (getenv("CFG_OUTPUT_PATH")) {
+    std::ofstream cfg_out(getenv("CFG_OUTPUT_PATH") + std::string("/") +
+                          std::string(moduleName) + ".cfg");
+    cfg_out << cfg << "\n";
+  };
 
 #if USE_NEW_PM
   auto PA = PreservedAnalyses::all();
@@ -224,13 +222,12 @@ bool DumpCfgPass::runOnModule(Module &M) {
 
 #else
 static void registerDumpCfgPass(const PassManagerBuilder &,
-                                   legacy::PassManagerBase &PM) {
+                                legacy::PassManagerBase &PM) {
   PM.add(new DumpCfgPass());
 }
 
-static RegisterPass<DumpCfgPass> X("dumpcfg",
-                                      "dumpcfg instrumentation pass", false,
-                                      false);
+static RegisterPass<DumpCfgPass> X("dumpcfg", "dumpcfg instrumentation pass",
+                                   false, false);
 
 static RegisterStandardPasses RegisterDumpCfgPass(
     PassManagerBuilder::EP_OptimizerLast, registerDumpCfgPass);
