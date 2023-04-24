@@ -64,6 +64,13 @@
 
 #include <nlohmann/json.hpp>
 
+#define FATAL(x...)               \
+  do {                            \
+    fprintf(stderr, "FATAL: " x); \
+    exit(1);                      \
+                                  \
+  } while (0)
+
 using namespace llvm;
 
 namespace {
@@ -208,7 +215,9 @@ bool DumpCfgPass::runOnModule(Module &M) {
     std::ofstream cfg_out(getenv("CFG_OUTPUT_PATH") + std::string("/") +
                           std::string(moduleName) + ".cfg");
     cfg_out << cfg << "\n";
-  };
+  } else {
+    FATAL("CFG_OUTPUT_PATH not set!");
+  }
 
 #if USE_NEW_PM
   auto PA = PreservedAnalyses::all();

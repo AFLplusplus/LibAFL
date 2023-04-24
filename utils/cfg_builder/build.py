@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+
 import json
 import os
 import networkx as nx
@@ -11,17 +12,19 @@ for dirpath, _, files in os.walk(input_path):
             cfg[x] = json.load(open(os.path.join(dirpath, x)))
 
 G = nx.DiGraph()
-# First add all the edges
 
 node_ids = 0
 
 for mname, module in cfg.items():
     fnname2SG = dict()
+    # First, add all the intra-procedural edges
+
     for (fname, v) in module['edges'].items():
         sz = len(v)
         for idx in range(node_ids, node_ids + sz):
             G.add_node(idx)
-            G.nodes[idx]['label'] = mname + ' ' + fname + ' ' + str(idx - node_ids)
+            G.nodes[idx]['label'] = mname + ' ' + \
+                fname + ' ' + str(idx - node_ids)
         node_id_list = list(range(node_ids, node_ids + sz))
         node_ids += sz
         SG = G.subgraph(node_id_list)
@@ -29,6 +32,8 @@ for mname, module in cfg.items():
         for src, dsts in enumerate(v):
             for item in dsts:
                 G.add_edge(node_id_list[src], node_id_list[item])
+
+    # Next, build inter-procedural edges
     for (fname, calls) in module['calls'].items():
         for (idx, target_fns) in calls.items():
             # G.nodes isn't sorted
