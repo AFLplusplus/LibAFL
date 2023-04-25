@@ -458,7 +458,7 @@ where
     }
 
     fn should_use_serialized_observers(&self) -> bool {
-        if self.execution_time == Duration::ZERO || self.serialization_time == Duration::ZERO {
+        if self.execution_time == Duration::ZERO {
             false
         } else {
             self.serialization_time + self.deserialization_time < self.execution_time
