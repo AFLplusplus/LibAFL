@@ -394,7 +394,7 @@ where
                     let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
                         None
                     } else {
-                        Some(manager.serialize_observers::<OT>(observers)?)
+                        manager.serialize_observers::<OT>(observers)?
                     };
                     manager.fire(
                         state,
@@ -523,7 +523,7 @@ where
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
         } else {
-            Some(manager.serialize_observers::<OT>(observers)?)
+            manager.serialize_observers::<OT>(observers)?
         };
         manager.fire(
             state,

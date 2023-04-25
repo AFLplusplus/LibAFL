@@ -432,11 +432,11 @@ pub trait EventFirer: UsesState {
     }
 
     /// Serialize all observers for this type and manager
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
-        Ok(postcard::to_allocvec(observers)?)
+        Ok(Some(postcard::to_allocvec(observers)?))
     }
 
     /// Get the configuration

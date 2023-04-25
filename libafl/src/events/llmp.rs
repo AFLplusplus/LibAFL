@@ -37,6 +37,7 @@ use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::
 use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
 use crate::{
     bolts::{
+        current_time,
         llmp::{self, LlmpClient, LlmpClientDescription, Tag},
         shmem::ShMemProvider,
         ClientId,
@@ -49,6 +50,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
+    observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
 };
@@ -325,6 +327,9 @@ where
     /// A node will not re-use the observer values sent over LLMP
     /// from nodes with other configurations.
     configuration: EventConfig,
+    serialization_time: Duration,
+    deserialization_time: Duration,
+    execution_time: Duration,
     phantom: PhantomData<S>,
 }
 
@@ -359,7 +364,7 @@ where
 
 impl<S, SP> LlmpEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: UsesInput,
     SP: ShMemProvider + 'static,
 {
     /// Create a manager from a raw LLMP client
@@ -369,6 +374,9 @@ where
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
+            serialization_time: Duration::ZERO,
+            deserialization_time: Duration::ZERO,
+            execution_time: Duration::ZERO,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -389,6 +397,9 @@ where
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
+            serialization_time: Duration::ZERO,
+            deserialization_time: Duration::ZERO,
+            execution_time: Duration::ZERO,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -407,6 +418,9 @@ where
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
+            serialization_time: Duration::ZERO,
+            deserialization_time: Duration::ZERO,
+            execution_time: Duration::ZERO,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -428,6 +442,9 @@ where
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
+            serialization_time: Duration::ZERO,
+            deserialization_time: Duration::ZERO,
+            execution_time: Duration::ZERO,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -440,6 +457,20 @@ where
         self.llmp.to_env(env_name).unwrap();
     }
 
+    fn should_use_serialized_observers(&self) -> bool {
+        if self.execution_time == Duration::ZERO || self.serialization_time == Duration::ZERO {
+            false
+        } else {
+            self.serialization_time + self.deserialization_time < self.execution_time
+        }
+    }
+}
+
+impl<S, SP> LlmpEventManager<S, SP>
+where
+    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    SP: ShMemProvider + 'static,
+{
     // Handle arriving events in the client
     #[allow(clippy::unused_self)]
     fn handle_in_client<E, Z>(
@@ -468,18 +499,29 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                let _res = if client_config.match_with(&self.configuration)
+                let res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
+                    && self.should_use_serialized_observers()
                 {
+                    let start = current_time();
                     let observers: E::Observers =
                         postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                    fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
+                    let res = fuzzer
+                        .process_execution(state, self, input, &observers, &exit_kind, false)?;
+                    self.deserialization_time = current_time() - start;
+
+                    // Count this as execution even if we are not actually executing nothing for the stats
+                    *state.executions_mut() += 1;
+                    res
                 } else {
-                    fuzzer.evaluate_input_with_observers::<E, Self>(
+                    let start = current_time();
+                    let res = fuzzer.evaluate_input_with_observers::<E, Self>(
                         state, executor, self, input, false,
-                    )?
+                    )?;
+                    self.execution_time = current_time() - start;
+                    res
                 };
-                if let Some(item) = _res.1 {
+                if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
                 Ok(())
@@ -555,6 +597,21 @@ where
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
+    }
+
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
+    where
+        OT: ObserversTuple<Self::State> + Serialize,
+    {
+        if self.should_use_serialized_observers() {
+            let start = current_time();
+            let ser = postcard::to_allocvec(observers)?;
+            self.serialization_time = current_time() - start;
+
+            Ok(Some(ser))
+        } else {
+            Ok(None)
+        }
     }
 
     fn configuration(&self) -> EventConfig {
@@ -709,6 +766,13 @@ where
     ) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         self.llmp_mgr.fire(state, event)
+    }
+
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
+    where
+        OT: ObserversTuple<Self::State> + Serialize,
+    {
+        self.llmp_mgr.serialize_observers(observers)
     }
 
     fn configuration(&self) -> EventConfig {

@@ -91,7 +91,7 @@ where
         self.inner.log(state, severity_level, message)
     }
 
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
