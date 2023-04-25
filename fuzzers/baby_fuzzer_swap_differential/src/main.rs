@@ -6,7 +6,7 @@ use std::{
 };
 
 #[cfg(feature = "tui")]
-use libafl::monitors::tui::TuiMonitor;
+use libafl::monitors::tui::{ui::TuiUI, TuiMonitor};
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
@@ -206,7 +206,9 @@ pub fn main() {
     #[cfg(not(feature = "tui"))]
     let mon = SimpleMonitor::new(|s| println!("{s}"));
     #[cfg(feature = "tui")]
-    let mon = TuiMonitor::new(String::from("Baby Fuzzer"), false);
+    let ui = TuiUI::new(String::from("Baby Fuzzer"), false);
+    #[cfg(feature = "tui")]
+    let mon = TuiMonitor::new(ui);
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
