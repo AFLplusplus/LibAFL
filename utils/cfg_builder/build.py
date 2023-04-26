@@ -67,6 +67,5 @@ for mname, module in cfg.items():
                     G.add_edge(src, dst)
                     GG.add_edge(fname2id[fname], fname2id[target_fn])
 
-if "DOT_OUT" in os.environ:
-    nx.nx_agraph.write_dot(G, "cfg.xdot")
-    nx.nx_agraph.write_dot(GG, "cg.xdot")
+nx.nx_agraph.write_dot(G, "cfg.xdot")
+nx.nx_agraph.write_dot(GG, "cg.xdot")
