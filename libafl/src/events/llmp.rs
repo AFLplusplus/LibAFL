@@ -11,9 +11,9 @@ use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 #[cfg(feature = "std")]
 use std::net::{SocketAddr, ToSocketAddrs};
 
-use serde::Deserialize;
 #[cfg(feature = "std")]
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
@@ -601,7 +601,7 @@ where
         if self.execution_time == Duration::ZERO
             || self.serialization_time == Duration::ZERO
             || self.serialization_time + self.deserialization_time < self.execution_time
-            || (self.serializations_cnt & 0xff) == 0
+            || self.serializations_cnt.trailing_zeros() >= 8
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
