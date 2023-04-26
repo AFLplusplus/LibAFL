@@ -29,7 +29,7 @@ use crate::{
     monitors::{ClientStats, Monitor, UserStats},
 };
 
-mod ui;
+pub mod ui;
 use ui::TuiUI;
 
 const DEFAULT_TIME_WINDOW: u64 = 60 * 10; // 10 min
@@ -326,20 +326,15 @@ impl Monitor for TuiMonitor {
 impl TuiMonitor {
     /// Creates the monitor
     #[must_use]
-    pub fn new(title: String, enhanced_graphics: bool) -> Self {
-        Self::with_time(title, enhanced_graphics, current_time())
+    pub fn new(tui_ui: TuiUI) -> Self {
+        Self::with_time(tui_ui, current_time())
     }
 
     /// Creates the monitor with a given `start_time`.
     #[must_use]
-    pub fn with_time(title: String, enhanced_graphics: bool, start_time: Duration) -> Self {
+    pub fn with_time(tui_ui: TuiUI, start_time: Duration) -> Self {
         let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
-        run_tui_thread(
-            context.clone(),
-            Duration::from_millis(250),
-            title,
-            enhanced_graphics,
-        );
+        run_tui_thread(context.clone(), Duration::from_millis(250), tui_ui);
         Self {
             context,
             start_time,
@@ -348,12 +343,7 @@ impl TuiMonitor {
     }
 }
 
-fn run_tui_thread(
-    context: Arc<RwLock<TuiContext>>,
-    tick_rate: Duration,
-    title: String,
-    enhanced_graphics: bool,
-) {
+fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration, tui_ui: TuiUI) {
     thread::spawn(move || -> io::Result<()> {
         // setup terminal
         let mut stdout = io::stdout();
@@ -362,7 +352,8 @@ fn run_tui_thread(
 
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
-        let mut ui = TuiUI::new(title, enhanced_graphics);
+
+        let mut ui = tui_ui;
 
         let mut last_tick = Instant::now();
         let mut cnt = 0;
