@@ -3,23 +3,41 @@
 import json
 import os
 import networkx as nx
+import sys
+
 cfg = dict()
 
+if 'CFG_OUTPUT_PATH' not in os.environ:
+    sys.exit("CFG_OUTPUT_PATH not set")
+
 input_path = os.environ["CFG_OUTPUT_PATH"]
+
+
 for dirpath, _, files in os.walk(input_path):
     for x in files:
         if x.endswith(".cfg"):
             cfg[x] = json.load(open(os.path.join(dirpath, x)))
 
 G = nx.DiGraph()
+GG = nx.DiGraph()
+# First add all the edges
 
 node_ids = 0
+f_ids = 0
+
+fname2id = dict()
 
 for mname, module in cfg.items():
     fnname2SG = dict()
     # First, add all the intra-procedural edges
 
     for (fname, v) in module['edges'].items():
+
+        if fname not in fname2id:
+            GG.add_node(f_ids, label=fname)
+            fname2id[fname] = f_ids
+            f_ids += 1
+
         sz = len(v)
         for idx in range(node_ids, node_ids + sz):
             G.add_node(idx)
@@ -47,6 +65,8 @@ for mname, module in cfg.items():
 
                     # Now we have 2 index, build the edge
                     G.add_edge(src, dst)
+                    GG.add_edge(fname2id[fname], fname2id[target_fn])
 
 if "DOT_OUT" in os.environ:
     nx.nx_agraph.write_dot(G, "cfg.xdot")
+    nx.nx_agraph.write_dot(GG, "cg.xdot")
