@@ -330,6 +330,7 @@ where
     serialization_time: Duration,
     deserialization_time: Duration,
     execution_time: Duration,
+    serializations_cnt: usize,
     phantom: PhantomData<S>,
 }
 
@@ -377,6 +378,7 @@ where
             serialization_time: Duration::ZERO,
             deserialization_time: Duration::ZERO,
             execution_time: Duration::ZERO,
+            serializations_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -400,6 +402,7 @@ where
             serialization_time: Duration::ZERO,
             deserialization_time: Duration::ZERO,
             execution_time: Duration::ZERO,
+            serializations_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -421,6 +424,7 @@ where
             serialization_time: Duration::ZERO,
             deserialization_time: Duration::ZERO,
             execution_time: Duration::ZERO,
+            serializations_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -445,6 +449,7 @@ where
             serialization_time: Duration::ZERO,
             deserialization_time: Duration::ZERO,
             execution_time: Duration::ZERO,
+            serializations_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -455,14 +460,6 @@ where
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.llmp.to_env(env_name).unwrap();
-    }
-
-    fn should_use_serialized_observers(&self) -> bool {
-        if self.execution_time == Duration::ZERO {
-            false
-        } else {
-            self.serialization_time + self.deserialization_time < self.execution_time
-        }
     }
 }
 
@@ -499,28 +496,26 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                let res = if client_config.match_with(&self.configuration)
-                    && observers_buf.is_some()
-                    && self.should_use_serialized_observers()
-                {
-                    let start = current_time();
-                    let observers: E::Observers =
-                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                    let res = fuzzer
-                        .process_execution(state, self, input, &observers, &exit_kind, false)?;
-                    self.deserialization_time = current_time() - start;
+                let res =
+                    if client_config.match_with(&self.configuration) && observers_buf.is_some() {
+                        let start = current_time();
+                        let observers: E::Observers =
+                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                        let res = fuzzer
+                            .process_execution(state, self, input, &observers, &exit_kind, false)?;
+                        self.deserialization_time = current_time() - start;
 
-                    // Count this as execution even if we are not actually executing nothing for the stats
-                    *state.executions_mut() += 1;
-                    res
-                } else {
-                    let start = current_time();
-                    let res = fuzzer.evaluate_input_with_observers::<E, Self>(
-                        state, executor, self, input, false,
-                    )?;
-                    self.execution_time = current_time() - start;
-                    res
-                };
+                        // Count this as execution even if we are not actually executing nothing for the stats
+                        *state.executions_mut() += 1;
+                        res
+                    } else {
+                        let start = current_time();
+                        let res = fuzzer.evaluate_input_with_observers::<E, Self>(
+                            state, executor, self, input, false,
+                        )?;
+                        self.execution_time = current_time() - start;
+                        res
+                    };
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
@@ -603,13 +598,19 @@ where
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
-        if self.should_use_serialized_observers() {
+        if self.execution_time == Duration::ZERO
+            || self.serialization_time == Duration::ZERO
+            || self.serialization_time + self.deserialization_time < self.execution_time
+            || (self.serializations_cnt & 0xff) == 0
+        {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
             self.serialization_time = current_time() - start;
 
+            self.serializations_cnt += 1;
             Ok(Some(ser))
         } else {
+            self.serializations_cnt += 1;
             Ok(None)
         }
     }
