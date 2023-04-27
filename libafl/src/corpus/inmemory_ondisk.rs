@@ -321,7 +321,7 @@ where
                 if OpenOptions::new()
                     .write(true)
                     .create_new(true)
-                    .open(&lockfile_path)
+                    .open(&file_name)
                     .is_ok()
                 {
                     break (file_name, lockfile_path);
