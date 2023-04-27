@@ -294,7 +294,6 @@ where
             *testcase.filename_mut() = Some(new_filename);
             *testcase.file_path_mut() = Some(new_file_path);
 
-            fs::remove_file(new_lock_filename)?;
             Ok(())
         } else {
             Err(Error::illegal_argument(
@@ -317,17 +316,17 @@ where
             let mut file_name = file_name_orig.clone();
 
             let mut ctr = 2;
-            let (file_name, lockfile_path) = loop {
+            let file_name = loop {
                 let lockfile_name = format!(".{file_name}.lafl_lock");
                 let lockfile_path = self.dir_path.join(lockfile_name);
 
                 if OpenOptions::new()
                     .write(true)
                     .create_new(true)
-                    .open(self.dir_path.join(&file_name))
+                    .open(lockfile_path)
                     .is_ok()
                 {
-                    break (file_name, lockfile_path);
+                    break file_name;
                 }
 
                 file_name = format!("{file_name_orig}-{ctr}");
@@ -337,7 +336,6 @@ where
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
             *testcase.filename_mut() = Some(file_name);
 
-            fs::remove_file(lockfile_path)?;
         }
 
         if self.meta_format.is_some() {
