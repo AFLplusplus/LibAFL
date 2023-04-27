@@ -234,8 +234,14 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     let llvm_bindir = exec_llvm_config(&["--bindir"]);
     let bindir_path = Path::new(&llvm_bindir);
 
-    let clang = bindir_path.join("clang");
-    let clangcpp = bindir_path.join("clang++");
+    let clang_path = env::var_os("CLANG").unwrap();
+    let clang_cpp_path = env::var_os("CLANG_PP").unwrap();
+
+    let clang = Path::new( &clang_path );
+    let clangcpp = Path::new( &clang_cpp_path );
+
+    //let clang = bindir_path.join("clang");
+    //let clangcpp = bindir_path.join("clang++");
 
     if !clang.exists() {
         println!("cargo:warning=Failed to find clang frontend.");
