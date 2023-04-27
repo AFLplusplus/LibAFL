@@ -265,7 +265,7 @@ where
             if OpenOptions::new()
                 .create(true)
                 .write(true)
-                .open(self.dir_path.join(&new_lock_filename))
+                .open(self.dir_path.join(new_lock_filename))
                 .is_err()
             {
                 *testcase.filename_mut() = Some(old_filename);
