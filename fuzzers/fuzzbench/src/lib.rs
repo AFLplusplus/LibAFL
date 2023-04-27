@@ -310,7 +310,7 @@ fn fuzz(
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
         &mut state,
         &edges_observer,
-        Some(PowerSchedule::EXPLORE),
+        Some(PowerSchedule::FAST),
     ));
 
     // A fuzzer with feedbacks and a corpus scheduler
