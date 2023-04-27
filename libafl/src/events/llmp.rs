@@ -496,26 +496,28 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                let res =
-                    if client_config.match_with(&self.configuration) && observers_buf.is_some() {
-                        let start = current_time();
-                        let observers: E::Observers =
-                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                        let res = fuzzer
-                            .process_execution(state, self, input, &observers, &exit_kind, false)?;
-                        self.deserialization_time = current_time() - start;
+                let res = if client_config.match_with(&self.configuration)
+                    && observers_buf.is_some()
+                    && self.execution_time != Duration::ZERO
+                {
+                    let start = current_time();
+                    let observers: E::Observers =
+                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                    let res = fuzzer
+                        .process_execution(state, self, input, &observers, &exit_kind, false)?;
+                    self.deserialization_time = current_time() - start;
 
-                        // Count this as execution even if we are not actually executing nothing for the stats
-                        *state.executions_mut() += 1;
-                        res
-                    } else {
-                        let start = current_time();
-                        let res = fuzzer.evaluate_input_with_observers::<E, Self>(
-                            state, executor, self, input, false,
-                        )?;
-                        self.execution_time = current_time() - start;
-                        res
-                    };
+                    // Count this as execution even if we are not actually executing nothing for the stats
+                    *state.executions_mut() += 1;
+                    res
+                } else {
+                    let start = current_time();
+                    let res = fuzzer.evaluate_input_with_observers::<E, Self>(
+                        state, executor, self, input, false,
+                    )?;
+                    self.execution_time = current_time() - start;
+                    res
+                };
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
