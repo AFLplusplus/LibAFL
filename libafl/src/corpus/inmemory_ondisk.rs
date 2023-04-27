@@ -265,7 +265,7 @@ where
             if OpenOptions::new()
                 .create(true)
                 .write(true)
-                .open(self.dir_path.join(new_lock_filename))
+                .open(self.dir_path.join(&new_lock_filename))
                 .is_err()
             {
                 *testcase.filename_mut() = Some(old_filename);
@@ -293,6 +293,8 @@ where
             *testcase.metadata_path_mut() = new_metadata_path;
             *testcase.filename_mut() = Some(new_filename);
             *testcase.file_path_mut() = Some(new_file_path);
+
+            fs::remove_file(new_lock_filename)?;
             Ok(())
         } else {
             Err(Error::illegal_argument(
@@ -304,6 +306,7 @@ where
     fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
         let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
+
             testcase.input().as_ref().unwrap().generate_name(idx.0)
         });
         if testcase.file_path().is_some() {
@@ -321,7 +324,7 @@ where
                 if OpenOptions::new()
                     .write(true)
                     .create_new(true)
-                    .open(&file_name)
+                    .open(self.dir_path.join(&file_name))
                     .is_ok()
                 {
                     break (file_name, lockfile_path);
