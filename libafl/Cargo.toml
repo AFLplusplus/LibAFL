@@ -46,6 +46,9 @@ llmp_compression = ["gzip"] # llmp compression using GZip
 llmp_debug = [] # Enables debug output for LLMP
 llmp_small_maps = [] # reduces initial map size for llmp
 llmp_broker_timeouts = ["std"] # The broker loop will yield occasionally, even without status messages from client nodes
+# Manager features
+count_process_execution = []
+no_count_newtestcases = []
 
 [build-dependencies]
 rustversion = "1.0"

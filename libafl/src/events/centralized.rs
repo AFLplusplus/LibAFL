@@ -168,15 +168,41 @@ where
                                 "Received new Testcase to evaluate from secondary node {idx:?}"
                             );
 
-                            // TODO check the config and use the serialized observers
+                            let res = if client_config.match_with(&self.configuration())
+                                && observers_buf.is_some()
+                            {
+                                let observers: E::Observers =
+                                    postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                                let res = fuzzer.process_execution(
+                                    state,
+                                    self,
+                                    input.clone(),
+                                    &observers,
+                                    &exit_kind,
+                                    false,
+                                )?;
 
-                            let res = fuzzer.evaluate_input_with_observers::<E, Self>(
-                                state,
-                                executor,
-                                self,
-                                input.clone(),
-                                false,
-                            )?;
+                                // Count this as execution even if we are not actually executing nothing for the stats
+                                #[cfg(feature = "count_process_execution")]
+                                {
+                                    *state.executions_mut() += 1;
+                                }
+                                res
+                            } else {
+                                let res = fuzzer.evaluate_input_with_observers::<E, Self>(
+                                    state,
+                                    executor,
+                                    self,
+                                    input.clone(),
+                                    false,
+                                )?;
+
+                                #[cfg(feature = "no_count_newtestcases")]
+                                {
+                                    *state.executions_mut() -= 1;
+                                }
+                                res
+                            };
                             if let Some(item) = res.1 {
                                 log::info!("Added received Testcase as item #{item}");
 

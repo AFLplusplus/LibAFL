@@ -508,7 +508,10 @@ where
                     self.deserialization_time = current_time() - start;
 
                     // Count this as execution even if we are not actually executing nothing for the stats
-                    *state.executions_mut() += 1;
+                    #[cfg(feature = "count_process_execution")]
+                    {
+                        *state.executions_mut() += 1;
+                    }
                     res
                 } else {
                     let start = current_time();
@@ -516,6 +519,11 @@ where
                         state, executor, self, input, false,
                     )?;
                     self.execution_time = current_time() - start;
+
+                    #[cfg(feature = "no_count_newtestcases")]
+                    {
+                        *state.executions_mut() -= 1;
+                    }
                     res
                 };
                 if let Some(item) = res.1 {
