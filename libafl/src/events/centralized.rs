@@ -131,6 +131,7 @@ where
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
         + ExecutionProcessor<E::Observers, State = Self::State>,
+    Self::State: HasExecutions,
 {
     fn process(
         &mut self,
