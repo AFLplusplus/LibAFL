@@ -2091,7 +2091,7 @@ where
 
     /// For internal use: Forward the current message to the out map.
     unsafe fn forward_msg(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
-        let mut out: *mut LlmpMsg = self.alloc_next((*msg).buf_len_padded as usize)?;
+        let out: *mut LlmpMsg = self.alloc_next((*msg).buf_len_padded as usize)?;
 
         /* Copy over the whole message.
         If we should need zero copy, we could instead post a link to the
