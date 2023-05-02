@@ -908,7 +908,7 @@ pub mod windows_asan_handler {
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        let mut data = &mut GLOBAL_STATE;
+        let data = &mut GLOBAL_STATE;
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
             /*
