@@ -293,6 +293,7 @@ where
             *testcase.metadata_path_mut() = new_metadata_path;
             *testcase.filename_mut() = Some(new_filename);
             *testcase.file_path_mut() = Some(new_file_path);
+
             Ok(())
         } else {
             Err(Error::illegal_argument(
@@ -304,6 +305,7 @@ where
     fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
         let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
+
             testcase.input().as_ref().unwrap().generate_name(idx.0)
         });
         if testcase.file_path().is_some() {
@@ -314,17 +316,17 @@ where
             let mut file_name = file_name_orig.clone();
 
             let mut ctr = 2;
-            let (file_name, lockfile_path) = loop {
+            let file_name = loop {
                 let lockfile_name = format!(".{file_name}.lafl_lock");
                 let lockfile_path = self.dir_path.join(lockfile_name);
 
                 if OpenOptions::new()
                     .write(true)
                     .create_new(true)
-                    .open(&lockfile_path)
+                    .open(lockfile_path)
                     .is_ok()
                 {
-                    break (file_name, lockfile_path);
+                    break file_name;
                 }
 
                 file_name = format!("{file_name_orig}-{ctr}");
@@ -333,8 +335,6 @@ where
 
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
             *testcase.filename_mut() = Some(file_name);
-
-            fs::remove_file(lockfile_path)?;
         }
 
         if self.meta_format.is_some() {

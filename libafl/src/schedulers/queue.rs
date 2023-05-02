@@ -132,6 +132,6 @@ mod tests {
 
         assert_eq!(filename, "fancyfile");
 
-        fs::remove_dir_all("target/.test/fancy").unwrap();
+        fs::remove_dir_all("target/.test/fancy/path").unwrap();
     }
 }
