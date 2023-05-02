@@ -1053,7 +1053,7 @@ where
                 "PROGRAM ABORT : BUG: EOP does not fit in page! page {page:?}, size_current {:?}, size_total {:?}",
                 ptr::addr_of!((*page).size_used), ptr::addr_of!((*page).size_total));
 
-        let mut ret: *mut LlmpMsg = if last_msg.is_null() {
+        let ret: *mut LlmpMsg = if last_msg.is_null() {
             (*page).messages.as_mut_ptr()
         } else {
             llmp_next_msg_ptr_checked(map, last_msg, EOP_MSG_SIZE)?
@@ -1266,7 +1266,7 @@ where
         let mut new_map_shmem =
             self.new_or_unused_shmem((*old_map).sender_id, next_min_shmem_size)?;
 
-        let mut new_map = new_map_shmem.page_mut();
+        let new_map = new_map_shmem.page_mut();
 
         #[cfg(feature = "llmp_debug")]
         log::info!("got new map at: {new_map:?}");
@@ -1286,7 +1286,7 @@ where
         let out = self.alloc_eop()?;
 
         #[allow(clippy::cast_ptr_alignment)]
-        let mut end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+        let end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
         (*end_of_page_msg).map_size = new_map_shmem.shmem.len();
         (*end_of_page_msg).shm_str = *new_map_shmem.shmem.id().as_array();
 
