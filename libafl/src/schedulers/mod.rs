@@ -34,7 +34,7 @@ pub use tuneable::*;
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::ObserversTuple,
     random_corpus_id,
@@ -105,14 +105,14 @@ pub struct RandScheduler<S> {
 
 impl<S> UsesState for RandScheduler<S>
 where
-    S: UsesInput,
+    S: UsesInput + HasTestcase,
 {
     type State = S;
 }
 
 impl<S> Scheduler for RandScheduler<S>
 where
-    S: HasCorpus + HasRand,
+    S: HasCorpus + HasRand + HasTestcase,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         // Set parent id

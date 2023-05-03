@@ -4,7 +4,7 @@ use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasTestcase},
     inputs::UsesInput,
     schedulers::{RemovableScheduler, Scheduler},
     state::{HasCorpus, UsesState},
@@ -24,11 +24,11 @@ where
     type State = S;
 }
 
-impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus {}
+impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus + HasTestcase {}
 
 impl<S> Scheduler for QueueScheduler<S>
 where
-    S: HasCorpus,
+    S: HasCorpus + HasTestcase,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         // Set parent id
