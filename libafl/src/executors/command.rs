@@ -139,11 +139,9 @@ impl CommandConfigurator for StdCommandConfigurator {
                     if err.kind() != std::io::ErrorKind::BrokenPipe {
                         return Err(err.into());
                     }
-                } else {
-                    if let Err(err) = stdin.flush() {
-                        if err.kind() != std::io::ErrorKind::BrokenPipe {
-                            return Err(err.into());
-                        }
+                } else if let Err(err) = stdin.flush() {
+                    if err.kind() != std::io::ErrorKind::BrokenPipe {
+                        return Err(err.into());
                     }
                 }
                 drop(stdin);
