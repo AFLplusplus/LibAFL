@@ -132,25 +132,25 @@ fn build_pass(
     ldflags: &Vec<&str>,
     src_dir: &Path,
     src_file: &str,
+    optional: bool,
 ) {
     let dot_offset = src_file.rfind('.').unwrap();
     let src_stub = &src_file[..dot_offset];
 
     println!("cargo:rerun-if-changed=src/{src_file}");
-    if cfg!(unix) {
-        assert!(Command::new(bindir_path.join("clang++"))
+    let r = if cfg!(unix) {
+        let r = Command::new(bindir_path.join("clang++"))
             .arg("-v")
             .args(cxxflags)
             .arg(src_dir.join(src_file))
             .args(ldflags)
             .arg("-o")
             .arg(out_dir.join(format!("{src_stub}.{}", dll_extension())))
-            .status()
-            .unwrap_or_else(|_| panic!("Failed to compile {src_file}"))
-            .success());
+            .status();
+
+        Some(r)
     } else if cfg!(windows) {
-        println!("{cxxflags:?}");
-        assert!(Command::new(bindir_path.join("clang-cl"))
+        let r = Command::new(bindir_path.join("clang-cl"))
             .arg("-v")
             .args(cxxflags)
             .arg(src_dir.join(src_file))
@@ -162,12 +162,38 @@ fn build_pass(
                     .join(format!("{src_stub}.{}", dll_extension()))
                     .display()
             ))
-            .status()
-            .unwrap_or_else(|_| panic!("Failed to compile {src_file}"))
-            .success());
+            .status();
+        Some(r)
+    } else {
+        None
+    };
+
+    match r {
+        Some(r) => match r {
+            Ok(s) => {
+                if !s.success() {
+                    if optional {
+                        println!("cargo:warning=Skipping src/{src_file}");
+                    } else {
+                        panic!("Failed to compile {src_file}");
+                    }
+                }
+            }
+            Err(_) => {
+                if optional {
+                    println!("cargo:warning=Skipping src/{src_file}");
+                } else {
+                    panic!("Failed to compile {src_file}");
+                }
+            }
+        },
+        None => {
+            println!("cargo:warning=Skipping src/{src_file}");
+        }
     }
 }
 
+#[allow(clippy::single_element_loop)]
 #[allow(clippy::too_many_lines)]
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
@@ -318,7 +344,28 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",
     ] {
-        build_pass(bindir_path, out_dir, &cxxflags, &ldflags, src_dir, pass);
+        build_pass(
+            bindir_path,
+            out_dir,
+            &cxxflags,
+            &ldflags,
+            src_dir,
+            pass,
+            false,
+        );
+    }
+
+    // Optional pass
+    for pass in &["dump-cfg-pass.cc"] {
+        build_pass(
+            bindir_path,
+            out_dir,
+            &cxxflags,
+            &ldflags,
+            src_dir,
+            pass,
+            true,
+        );
     }
 
     cc::Build::new()

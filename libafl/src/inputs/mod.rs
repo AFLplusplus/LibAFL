@@ -73,7 +73,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
         Ok(postcard::from_bytes(&bytes)?)
     }
 
-    /// Generate a name for this input
+    /// Generate a name for this input, the user is responsible for making each name of testcase unique.
     fn generate_name(&self, idx: usize) -> String;
 
     /// An hook executed if the input is stored as `Testcase`

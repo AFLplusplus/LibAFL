@@ -212,6 +212,7 @@ where
                 observers_buf: _,
                 time,
                 executions,
+                forward_id: _,
             } => {
                 monitor
                     .client_stats_mut_for(ClientId(0))

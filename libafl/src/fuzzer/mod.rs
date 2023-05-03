@@ -406,6 +406,7 @@ where
                             client_config: manager.configuration(),
                             time: current_time(),
                             executions: *state.executions(),
+                            forward_id: None,
                         },
                     )?;
                 }
@@ -534,6 +535,7 @@ where
                 client_config: manager.configuration(),
                 time: current_time(),
                 executions: *state.executions(),
+                forward_id: None,
             },
         )?;
         Ok(idx)

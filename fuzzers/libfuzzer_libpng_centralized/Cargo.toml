@@ -1,0 +1,32 @@
+[package]
+name = "libfuzzer_libpng_launcher"
+version = "0.10.0"
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+which = { version = "4.0.2" }
+
+[dependencies]
+libafl = { path = "../../libafl/", features = ["std", "derive", "rand_trait", "fork", "prelude", "gzip", "regex"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer"] }
+# TODO Include it only when building cc
+libafl_cc = { path = "../../libafl_cc/" }
+clap = { version = "4.0", features = ["derive"] }
+mimalloc = { version = "*", default-features = false }
+env_logger = "0.10"
+
+[lib]
+name = "libfuzzer_libpng"
+crate-type = ["staticlib"]
