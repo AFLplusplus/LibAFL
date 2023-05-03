@@ -82,8 +82,7 @@ where
             {
                 let corpus = state.corpus();
                 let mut testcase = corpus.get(corpus_idx)?.borrow_mut();
-
-                if testcase.has_metadata::<GeneralizedInputMetadata>() {
+                if testcase.scheduled_count() > 0 {
                     return Ok(());
                 }
 
