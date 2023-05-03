@@ -135,8 +135,17 @@ impl CommandConfigurator for StdCommandConfigurator {
                 self.command.stdin(Stdio::piped()).spawn()?;
                 let mut handle = self.command.spawn()?;
                 let mut stdin = handle.stdin.take().unwrap();
-                stdin.write_all(input.target_bytes().as_slice())?;
-                stdin.flush()?;
+                if let Err(err) = stdin.write_all(input.target_bytes().as_slice()) {
+                    if err.kind() != std::io::ErrorKind::BrokenPipe {
+                        return Err(err.into());
+                    }
+                } else {
+                    if let Err(err) = stdin.flush() {
+                        if err.kind() != std::io::ErrorKind::BrokenPipe {
+                            return Err(err.into());
+                        }
+                    }
+                }
                 drop(stdin);
                 Ok(handle)
             }
