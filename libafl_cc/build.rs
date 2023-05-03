@@ -2,6 +2,7 @@
 use std::path::PathBuf;
 use std::{env, fs::File, io::Write, path::Path, process::Command, str};
 
+
 #[cfg(target_vendor = "apple")]
 use glob::glob;
 use which::which;
@@ -150,7 +151,7 @@ fn build_pass(
 
         Some(r)
     } else if cfg!(windows) {
-        let r = Command::new(bindir_path.join("clang-cl"))
+        let r = Command::new(bindir_path.join("clang-cl.exe"))
             .arg("-v")
             .args(cxxflags)
             .arg(src_dir.join(src_file))
@@ -234,14 +235,16 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     let llvm_bindir = exec_llvm_config(&["--bindir"]);
     let bindir_path = Path::new(&llvm_bindir);
 
-    let clang_path = env::var_os("CLANG").unwrap();
-    let clang_cpp_path = env::var_os("CLANG_PP").unwrap();
+    let clang;
+    let clangcpp;
 
-    let clang = Path::new( &clang_path );
-    let clangcpp = Path::new( &clang_cpp_path );
-
-    //let clang = bindir_path.join("clang");
-    //let clangcpp = bindir_path.join("clang++");
+    if cfg!(windows) {
+        clang = bindir_path.join("clang.exe");
+        clangcpp = bindir_path.join("clang++.exe");
+    } else {
+        clang = bindir_path.join("clang");
+        clangcpp = bindir_path.join("clang++");
+    }
 
     if !clang.exists() {
         println!("cargo:warning=Failed to find clang frontend.");
