@@ -47,13 +47,96 @@ typedef uint32_t prev_loc_t;
 
 #define MAP_SIZE LIBAFL_ACCOUNTING_MAP_SIZE
 
-#define SECURITY_SENSITIVE_FUNCS(CF)                                   \
-  static CF securitySensitiveFunctions[] = {                           \
-      CF("memcpy"),    CF("strlen"),   CF("ReadImage"), CF("memmove"), \
-      CF("free"),      CF("memset"),   CF("delete"),    CF("memcmp"),  \
-      CF("getString"), CF("vsprintf"), CF("GET_COLOR"), CF("read"),    \
-      CF("load_bmp"),  CF("huffcode"), CF("strcmp"),    CF("new"),     \
-      CF("getName"),   CF("strncat"),  CF("png_load"),                 \
+#define SECURITY_SENSITIVE_FUNCS(CF)                          \
+  static CF securitySensitiveFunctions[] = {                  \
+      /* mem allocations */                                   \
+      CF("malloc"),                                           \
+      CF("calloc"),                                           \
+      CF("realloc"),                                          \
+      CF("reallocarray"),                                     \
+      CF("memalign"),                                         \
+      CF("__libc_memalign"),                                  \
+      CF("aligned_alloc"),                                    \
+      CF("posix_memalign"),                                   \
+      CF("valloc"),                                           \
+      CF("pvalloc"),                                          \
+      CF("mmap"), /* memory frees */                          \
+      CF("free"),                                             \
+      CF("cfree"),                                            \
+      CF("munmap"), /* mem operations */                      \
+      CF("memcmp"),                                           \
+      CF("memcpy"),                                           \
+      CF("mempcpy"),                                          \
+      CF("memmove"),                                          \
+      CF("memset"),                                           \
+      CF("memchr"),                                           \
+      CF("memrchr"),                                          \
+      CF("memmem"),                                           \
+      CF("bzero"),                                            \
+      CF("explicit_bzero"),                                   \
+      CF("bcmp"), /* strings */                               \
+      CF("strlen"),                                           \
+      CF("strnlen"),                                          \
+      CF("strcpy"),                                           \
+      CF("strncpy"),                                          \
+      CF("strerror"),                                         \
+      CF("strcat"),                                           \
+      CF("strncat"),                                          \
+      CF("strcmp"),                                           \
+      CF("strspn"),                                           \
+      CF("strcoll"),                                          \
+      CF("strncmp"),                                          \
+      CF("strxfrm"),                                          \
+      CF("strstr"),                                           \
+      CF("strchr"),                                           \
+      CF("strscpn"),                                          \
+      CF("strpbrk"),                                          \
+      CF("strrchr"),                                          \
+      CF("strtok"),                                           \
+      CF("strcasecmp"),                                       \
+      CF("strncasecmp"),                                      \
+      CF("strcasestr"),                                       \
+      CF("atoi"),                                             \
+      CF("atol"),                                             \
+      CF("atoll"),                                            \
+      CF("wcslen"),                                           \
+      CF("wcscpy"),                                           \
+      CF("wcscmp"),                                           \
+      CF("stpcpy"),                                           \
+      CF("strdup"), /* c++ new */                             \
+      CF("_Znam"),                                            \
+      CF("_ZnamRKSt9nothrow_t"),                              \
+      CF("_ZnamSt11align_val_t"),                             \
+      CF("_ZnamSt11align_val_tRKSt9nothrow_t"),               \
+      CF("_Znwm"),                                            \
+      CF("_ZnwmRKSt9nothrow_t"),                              \
+      CF("_ZnwmSt11align_val_t"),                             \
+      CF("_ZnwmSt11align_val_tRKSt9nothrow_t"), /* c++ del */ \
+      CF("_ZdaPv"),                                           \
+      CF("_ZdaPvm"),                                          \
+      CF("_ZdaPvmSt11align_val_t"),                           \
+      CF("_ZdaPvRKSt9nothrow_t"),                             \
+      CF("_ZdaPvSt11align_val_t"),                            \
+      CF("_ZdaPvSt11align_val_tRKSt9nothrow_t"),              \
+      CF("_ZdlPv"),                                           \
+      CF("_ZdlPvm"),                                          \
+      CF("_ZdlPvmSt11align_val_t"),                           \
+      CF("_ZdlPvRKSt9nothrow_t"),                             \
+      CF("_ZdlPvSt11align_val_t"),                            \
+      CF("_ZdlPvSt11align_val_tRKSt9nothrow_t"), /* others */ \
+      CF("ReadImage"),                                        \
+      CF("free"),                                             \
+      CF("delete"),                                           \
+      CF("getString"),                                        \
+      CF("vsprintf"),                                         \
+      CF("GET_COLOR"),                                        \
+      CF("read"),                                             \
+      CF("load_bmp"),                                         \
+      CF("huffcode"),                                         \
+      CF("new"),                                              \
+      CF("getName"),                                          \
+      CF("write"),                                            \
+      CF("png_load"),                                         \
   };
 
 using namespace llvm;
