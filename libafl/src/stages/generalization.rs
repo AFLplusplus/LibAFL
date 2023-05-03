@@ -82,6 +82,11 @@ where
             {
                 let corpus = state.corpus();
                 let mut testcase = corpus.get(corpus_idx)?.borrow_mut();
+
+                if testcase.has_metadata::<GeneralizedInputMetadata>() {
+                    return Ok(());
+                }
+
                 corpus.load_input_into(&mut testcase)?;
             }
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
