@@ -334,26 +334,6 @@ where
 
         Ok(id)
     }
-
-    /// Set current fuzzed corpus id and `scheduled_count`
-    fn set_current_scheduled(
-        &mut self,
-        state: &mut Self::State,
-        next_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        let current_idx = *state.corpus().current();
-
-        if let Some(idx) = current_idx {
-            let mut testcase = state.testcase_mut(idx)?;
-            let scheduled_count = testcase.scheduled_count();
-
-            // increase scheduled count, this was fuzz_level in afl
-            testcase.set_scheduled_count(scheduled_count + 1);
-        }
-
-        *state.corpus_mut().current_mut() = next_idx;
-        Ok(())
-    }
 }
 
 /// The weight for each corpus entry

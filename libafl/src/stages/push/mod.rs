@@ -23,7 +23,7 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -38,7 +38,7 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand,
+    CS::State: HasClientPerfMonitor + HasRand + HasCorpus,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -59,7 +59,7 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand,
+    CS::State: HasClientPerfMonitor + HasRand + HasCorpus,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -84,7 +84,7 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand,
+    CS::State: HasClientPerfMonitor + HasRand + HasCorpus,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -116,7 +116,7 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand,
+    CS::State: HasClientPerfMonitor + HasRand + HasCorpus,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -184,7 +184,7 @@ where
 pub trait PushStage<CS, EM, OT, Z>: Iterator
 where
     CS: Scheduler,
-    CS::State: HasClientPerfMonitor + HasRand + HasExecutions + HasMetadata,
+    CS::State: HasClientPerfMonitor + HasRand + HasExecutions + HasMetadata + HasCorpus,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasTestcase},
     inputs::UsesInput,
     schedulers::{Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
@@ -89,7 +89,7 @@ where
 
 impl<F, S> UsesState for ProbabilitySamplingScheduler<F, S>
 where
-    S: UsesInput,
+    S: UsesInput + HasTestcase,
 {
     type State = S;
 }
@@ -97,7 +97,7 @@ where
 impl<F, S> Scheduler for ProbabilitySamplingScheduler<F, S>
 where
     F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
@@ -134,16 +134,6 @@ where
             self.set_current_scheduled(state, Some(ret))?;
             Ok(ret)
         }
-    }
-
-    /// Set current fuzzed corpus id and `scheduled_count`
-    fn set_current_scheduled(
-        &mut self,
-        state: &mut Self::State,
-        next_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        *state.corpus_mut().current_mut() = next_idx;
-        Ok(())
     }
 }
 
