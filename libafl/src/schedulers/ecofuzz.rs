@@ -111,8 +111,6 @@ where
             let meta = testcase.metadata_mut::<EcoTestcaseMetadata>()?;
 
             // Set was_fuzzed for the old current
-            meta.last_found = count - last_corpus_count;
-            meta.last_energy = meta.mutation_num - last_mutation_num;
             meta.computed_score
         };
 
@@ -372,7 +370,7 @@ where
     fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error> {
         // subtract # initial inputs to the corpus count
         let mut energy = 0;
-        let mut average_cost = (state.corpus().count() / state.executions()) as u64;
+        let mut average_cost = (state.executions() / state.corpus().count()) as u64;
         if average_cost == 0 {
             average_cost = 1024;
         }
