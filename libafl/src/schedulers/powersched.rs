@@ -336,11 +336,6 @@ where
 
         if let Some(idx) = current_idx {
             let mut testcase = state.testcase_mut(idx)?;
-            let scheduled_count = testcase.scheduled_count();
-
-            // increase scheduled count, this was fuzz_level in afl
-            testcase.set_scheduled_count(scheduled_count + 1);
-
             let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
 
             if tcmeta.handicap() >= 4 {

@@ -43,7 +43,10 @@ use crate::{
 };
 
 /// The scheduler also implemnts `on_remove` and `on_replace` if it implements this stage.
-pub trait RemovableScheduler: Scheduler {
+pub trait RemovableScheduler: Scheduler
+where
+    Self::State: HasCorpus,
+{
     /// Removed the given entry from the corpus at the given index
     fn on_remove(
         &mut self,
@@ -67,7 +70,10 @@ pub trait RemovableScheduler: Scheduler {
 
 /// The scheduler define how the fuzzer requests a testcase from the corpus.
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
-pub trait Scheduler: UsesState {
+pub trait Scheduler: UsesState
+where
+    Self::State: HasCorpus,
+{
     /// Added an entry to the corpus at the given index
     fn on_add(&mut self, _state: &mut Self::State, _idx: CorpusId) -> Result<(), Error>;
     // Add parent_id here if it has no inner
@@ -94,7 +100,10 @@ pub trait Scheduler: UsesState {
         &mut self,
         state: &mut Self::State,
         next_idx: Option<CorpusId>,
-    ) -> Result<(), Error>;
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
+    }
 }
 
 /// Feed the fuzzer simply with a random testcase on request
@@ -135,25 +144,6 @@ where
             self.set_current_scheduled(state, Some(id))?;
             Ok(id)
         }
-    }
-
-    /// Set current fuzzed corpus id and `scheduled_count`. You should call this from `next`
-    fn set_current_scheduled(
-        &mut self,
-        state: &mut Self::State,
-        next_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        let current_idx = *state.corpus().current();
-
-        if let Some(idx) = current_idx {
-            let mut testcase = state.testcase_mut(idx)?;
-            let scheduled_count = testcase.scheduled_count();
-
-            // increase scheduled count, this was fuzz_level in afl
-            testcase.set_scheduled_count(scheduled_count + 1);
-        }
-        *state.corpus_mut().current_mut() = next_idx;
-        Ok(())
     }
 }
 

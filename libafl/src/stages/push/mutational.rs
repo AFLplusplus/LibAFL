@@ -43,7 +43,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand + Clone + Debug,
+    CS::State: HasClientPerfMonitor + HasRand + HasCorpus + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
