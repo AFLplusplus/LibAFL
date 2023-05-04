@@ -100,11 +100,6 @@ where
     fn handle_previous(id: CorpusId, state: &mut S) -> Result<(), Error> {
         let count = state.corpus().count();
 
-        let (last_mutation_num, last_corpus_count) = {
-            let meta = state.metadata::<EcoMetadata>()?;
-            (meta.last_mutation_num, meta.last_corpus_count)
-        };
-
         let computed_score = {
             let mut testcase = state.testcase_mut(id)?;
 
@@ -115,8 +110,9 @@ where
         };
 
         let meta = state.metadata_mut::<EcoMetadata>()?;
+        let cur_exec = state.executions();
 
-        let mut regret = meta.last_find_iteration as f64 / computed_score;
+        let mut regret = (cur_exec - meta.last_executions) as f64 / computed_score;
         if regret == 0.0 {
             regret = 1.1;
         }
@@ -152,7 +148,7 @@ where
         let mut selection = None;
         for id in state.corpus().ids() {
             let was_fuzzed = state.testcase(id)?.scheduled_count() > 0;
-            if was_fuzzed {
+            if !was_fuzzed {
                 selection = Some(id);
                 break;
             }
@@ -160,7 +156,7 @@ where
 
         for id in state.corpus().ids() {
             let was_fuzzed = state.testcase(id)?.scheduled_count() > 0;
-            if was_fuzzed {
+            if !was_fuzzed {
                 state.metadata_mut::<EcoMetadata>()?.state = EcoState::Exploration;
                 return Ok(selection.expect("Error in the algorithm, this cannot be None"));
             }
