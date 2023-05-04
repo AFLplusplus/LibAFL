@@ -27,7 +27,7 @@ pub struct IsFavoredMetadata {}
 crate::impl_serdeany!(IsFavoredMetadata);
 
 /// A state metadata holding a map of favoreds testcases for each map entry
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct TopRatedsMetadata {
     /// map index -> corpus index
     pub map: HashMap<usize, CorpusId>,
@@ -39,21 +39,13 @@ impl TopRatedsMetadata {
     /// Creates a new [`struct@TopRatedsMetadata`]
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            map: HashMap::default(),
-        }
+        Self::default()
     }
 
     /// Getter for map
     #[must_use]
     pub fn map(&self) -> &HashMap<usize, CorpusId> {
         &self.map
-    }
-}
-
-impl Default for TopRatedsMetadata {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -193,54 +185,52 @@ where
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_score(&self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
         // Create a new top rated meta if not existing
-        if state.metadata().get::<TopRatedsMetadata>().is_none() {
-            state.add_metadata(TopRatedsMetadata::new());
-        }
+        let mut top_rateds = state
+            .metadata_mut()
+            .remove::<TopRatedsMetadata>()
+            .unwrap_or_default();
 
-        let mut new_favoreds = vec![];
-        {
-            let mut entry = state.corpus().get(idx)?.borrow_mut();
-            let factor = F::compute(&mut *entry, state)?;
-            let meta = entry.metadata_mut().get_mut::<M>().ok_or_else(|| {
-                Error::key_not_found(format!(
-                    "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
-                ))
-            })?;
-            let top_rateds = state.metadata().get::<TopRatedsMetadata>().unwrap();
-            for elem in meta.as_slice() {
-                if let Some(old_idx) = top_rateds.map.get(elem) {
-                    if *old_idx == idx {
-                        new_favoreds.push(*elem); // always retain current; we'll drop it later otherwise
-                        continue;
-                    }
-                    let mut old = state.corpus().get(*old_idx)?.borrow_mut();
-                    if factor > F::compute(&mut *old, state)? {
-                        continue;
-                    }
-
-                    let must_remove = {
-                        let old_meta = old.metadata_mut().get_mut::<M>().ok_or_else(|| {
-                            Error::key_not_found(format!(
-                                "{} needed for MinimizerScheduler not found in testcase #{old_idx}",
-                                type_name::<M>()
-                            ))
-                        })?;
-                        *old_meta.refcnt_mut() -= 1;
-                        old_meta.refcnt() <= 0
-                    };
-
-                    if must_remove {
-                        drop(old.metadata_mut().remove::<M>());
-                    }
-                }
-
-                new_favoreds.push(*elem);
+        let mut entry = state.corpus().get(idx)?.borrow_mut();
+        let factor = F::compute(&mut *entry, state)?;
+        let meta = entry.metadata_mut().get_mut::<M>().ok_or_else(|| {
+            Error::key_not_found(format!(
+                "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
+            ))
+        })?;
+        let mut elems = HashSet::<usize>::from_iter(meta.as_slice().iter().copied());
+        for (elem, &old_idx) in top_rateds.map() {
+            if old_idx == idx || !elems.contains(elem) {
+                continue;
+            }
+            let mut old = state.corpus().get(old_idx)?.borrow_mut();
+            if factor > F::compute(&mut *old, state)? {
+                elems.remove(elem);
+                continue;
             }
 
-            *meta.refcnt_mut() = new_favoreds.len() as isize;
-        }
+            let must_remove = {
+                let old_meta = old.metadata_mut().get_mut::<M>().ok_or_else(|| {
+                    Error::key_not_found(format!(
+                        "{} needed for MinimizerScheduler not found in testcase #{old_idx}",
+                        type_name::<M>()
+                    ))
+                })?;
+                *old_meta.refcnt_mut() -= 1;
+                old_meta.refcnt() <= 0
+            };
 
-        if new_favoreds.is_empty() {
+            if must_remove {
+                drop(old.metadata_mut().remove::<M>());
+            }
+        }
+        let favored = elems.len() as isize;
+        *meta.refcnt_mut() = favored;
+        top_rateds
+            .map
+            .extend(elems.into_iter().map(|elem| (elem, idx)));
+        drop(entry);
+
+        if favored == 0 {
             drop(
                 state
                     .corpus()
@@ -249,17 +239,9 @@ where
                     .metadata_mut()
                     .remove::<M>(),
             );
-            return Ok(());
         }
 
-        for elem in new_favoreds {
-            state
-                .metadata_mut()
-                .get_mut::<TopRatedsMetadata>()
-                .unwrap()
-                .map
-                .insert(elem, idx);
-        }
+        state.metadata_mut().insert_boxed(top_rateds);
         Ok(())
     }
 

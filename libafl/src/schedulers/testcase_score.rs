@@ -125,7 +125,11 @@ where
             .as_nanos() as f64;
 
         let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
-        let avg_bitmap_size = psmeta.bitmap_size() / psmeta.bitmap_entries();
+        let avg_bitmap_size = if psmeta.bitmap_entries() == 0 {
+            1
+        } else {
+            psmeta.bitmap_size() / psmeta.bitmap_entries()
+        };
 
         let favored = entry.has_metadata::<IsFavoredMetadata>();
         let tcmeta = entry

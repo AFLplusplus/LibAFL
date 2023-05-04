@@ -3,6 +3,7 @@
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
+use alloc::string::String;
 use core::{cell::RefCell, time::Duration};
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
@@ -46,6 +47,7 @@ where
     inner: InMemoryCorpus<I>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
+    prefix: Option<String>,
 }
 
 impl<I> UsesInput for InMemoryOnDiskCorpus<I>
@@ -154,7 +156,11 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), Some(OnDiskMetadataFormat::JsonPretty))
+        Self::_new(
+            dir_path.as_ref(),
+            Some(OnDiskMetadataFormat::JsonPretty),
+            None,
+        )
     }
 
     /// Creates the [`InMemoryOnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk.
@@ -162,12 +168,27 @@ where
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
     pub fn with_meta_format<P>(
         dir_path: P,
-        meta_format: OnDiskMetadataFormat,
+        meta_format: Option<OnDiskMetadataFormat>,
     ) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), Some(meta_format))
+        Self::_new(dir_path.as_ref(), meta_format, None)
+    }
+
+    /// Creates the [`InMemoryOnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk
+    /// and the prefix for the filenames.
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn with_meta_format_and_prefix<P>(
+        dir_path: P,
+        meta_format: Option<OnDiskMetadataFormat>,
+        prefix: Option<String>,
+    ) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        Self::_new(dir_path.as_ref(), meta_format, prefix)
     }
 
     /// Creates an [`InMemoryOnDiskCorpus`] that will not store .metadata files
@@ -177,16 +198,25 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), None)
+        Self::_new(dir_path.as_ref(), None, None)
     }
 
     /// Private fn to crate a new corpus at the given (non-generic) path with the given optional `meta_format`
-    fn _new(dir_path: &Path, meta_format: Option<OnDiskMetadataFormat>) -> Result<Self, Error> {
-        fs::create_dir_all(dir_path)?;
+    fn _new(
+        dir_path: &Path,
+        meta_format: Option<OnDiskMetadataFormat>,
+        prefix: Option<String>,
+    ) -> Result<Self, Error> {
+        match fs::create_dir_all(dir_path) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e.into()),
+        }
         Ok(InMemoryOnDiskCorpus {
             inner: InMemoryCorpus::new(),
             dir_path: dir_path.into(),
             meta_format,
+            prefix,
         })
     }
 

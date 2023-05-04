@@ -11,5 +11,9 @@ pub static mut COUNTERS_MAPS: Vec<&'static mut [u8]> = Vec::new();
 #[allow(clippy::cast_sign_loss)]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
-    unsafe { COUNTERS_MAPS.push(from_raw_parts_mut(start, stop.offset_from(start) as usize)) }
+    unsafe {
+        if !COUNTERS_MAPS.iter().any(|map| map.as_ptr() == start) {
+            COUNTERS_MAPS.push(from_raw_parts_mut(start, stop.offset_from(start) as usize))
+        }
+    }
 }

@@ -15,7 +15,7 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{self, null_mut},
+    ptr::{self, drop_in_place, null_mut},
 };
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
@@ -587,6 +587,10 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     log::info!("Waiting for broker...");
     event_mgr.await_restart_safe();
     log::info!("Bye!");
+
+    unsafe {
+        drop_in_place(state);
+    }
 }
 
 #[cfg(unix)]
@@ -736,8 +740,6 @@ mod unix_signal_handler {
             event_mgr,
             ExitKind::Timeout,
         );
-
-        event_mgr.await_restart_safe();
 
         libc::_exit(55);
     }

@@ -3,7 +3,10 @@
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
 use alloc::{string::String, vec::Vec};
-use core::{fmt::Write, time::Duration};
+use core::{
+    fmt::{Debug, Formatter, Write},
+    time::Duration,
+};
 
 use crate::{
     bolts::{current_time, format_duration_hms, ClientId},
@@ -11,7 +14,7 @@ use crate::{
 };
 
 /// Tracking monitor during fuzzing and display both per-client and cumulative info.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct MultiMonitor<F>
 where
     F: FnMut(String),
@@ -19,6 +22,18 @@ where
     print_fn: F,
     start_time: Duration,
     client_stats: Vec<ClientStats>,
+}
+
+impl<F> Debug for MultiMonitor<F>
+where
+    F: FnMut(String),
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("MultiMonitor")
+            .field("start_time", &self.start_time)
+            .field("client_stats", &self.client_stats)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<F> Monitor for MultiMonitor<F>

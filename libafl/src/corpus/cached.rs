@@ -1,6 +1,6 @@
 //! The [`CachedOnDiskCorpus`] stores [`Testcase`]s to disk, keeping a subset of them in memory/cache, evicting in a FIFO manner.
 
-use alloc::collections::vec_deque::VecDeque;
+use alloc::{collections::vec_deque::VecDeque, string::String};
 use core::cell::RefCell;
 use std::path::Path;
 
@@ -167,13 +167,32 @@ where
     pub fn with_meta_format<P>(
         dir_path: P,
         cache_max_len: usize,
-        meta_format: OnDiskMetadataFormat,
+        meta_format: Option<OnDiskMetadataFormat>,
     ) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
         Self::_new(
             InMemoryOnDiskCorpus::with_meta_format(dir_path, meta_format)?,
+            cache_max_len,
+        )
+    }
+
+    /// Creates the [`CachedOnDiskCorpus`] specifying the metadata format and the prefix to prepend
+    /// to each testcase.
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn with_meta_format_and_prefix<P>(
+        dir_path: P,
+        cache_max_len: usize,
+        meta_format: Option<OnDiskMetadataFormat>,
+        prefix: Option<String>,
+    ) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        Self::_new(
+            InMemoryOnDiskCorpus::with_meta_format_and_prefix(dir_path, meta_format, prefix)?,
             cache_max_len,
         )
     }

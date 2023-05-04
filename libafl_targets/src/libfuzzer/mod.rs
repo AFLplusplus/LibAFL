@@ -4,11 +4,17 @@
 
 use alloc::{string::String, vec::Vec};
 
+mod mutators;
+pub use mutators::*;
+
+mod observers;
+pub use observers::*;
+
 extern "C" {
-    /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
+    // int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
 
-    // libafl_targets_libfuzzer_init calls LLVMFUzzerInitialize()
+    // libafl_targets_libfuzzer_init calls LLVMFuzzerInitialize()
     fn libafl_targets_libfuzzer_init(argc: *const i32, argv: *const *const *const u8) -> i32;
 }
 

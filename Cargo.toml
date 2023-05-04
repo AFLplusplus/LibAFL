@@ -9,6 +9,7 @@ members = [
     "libafl_tinyinst",
     "libafl_sugar",
     "libafl_nyx",
+    "libafl_libfuzzer",
     "libafl_concolic/symcc_runtime",
     "libafl_concolic/symcc_libafl",
     "libafl_concolic/test/dump_constraints",
