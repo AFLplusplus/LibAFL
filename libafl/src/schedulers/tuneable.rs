@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::RemovableScheduler;
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasTestcase},
     impl_serdeany,
     inputs::UsesInput,
     schedulers::Scheduler,
@@ -92,11 +92,11 @@ where
     type State = S;
 }
 
-impl<S> RemovableScheduler for TuneableScheduler<S> where S: HasCorpus + HasMetadata {}
+impl<S> RemovableScheduler for TuneableScheduler<S> where S: HasCorpus + HasMetadata + HasTestcase {}
 
 impl<S> Scheduler for TuneableScheduler<S>
 where
-    S: HasCorpus + HasMetadata,
+    S: HasCorpus + HasMetadata + HasTestcase,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         // Set parent id
@@ -125,15 +125,5 @@ where
         };
         self.set_current_scheduled(state, Some(id))?;
         Ok(id)
-    }
-
-    /// Set current fuzzed corpus id and `scheduled_count`
-    fn set_current_scheduled(
-        &mut self,
-        state: &mut Self::State,
-        next_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        *state.corpus_mut().current_mut() = next_idx;
-        Ok(())
     }
 }

@@ -257,10 +257,8 @@ where
             psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
             let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-            let scheduled_count = testcase.scheduled_count();
 
             testcase.set_exec_time(total_time / (iter as u32));
-            testcase.set_scheduled_count(scheduled_count + 1);
             // log::trace!("time: {:#?}", testcase.exec_time());
 
             // If the testcase doesn't have its own `SchedulerTestcaseMetadata`, create it.
