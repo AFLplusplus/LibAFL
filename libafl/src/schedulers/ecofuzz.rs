@@ -375,10 +375,7 @@ where
             (meta.state, meta.rate, meta.initial_corpus_count)
         };
 
-        let initial = match initial_corpus_count {
-            Some(n) => n,
-            None => 0,
-        };
+        let initial = initial_corpus_count.unwrap_or(0);
 
         let mut average_cost: u64 = if state.corpus().count() == initial {
             *state.executions() as u64 / state.corpus().count() as u64
@@ -401,7 +398,8 @@ where
             }
         }
 
-        if cur_state == EcoState::Exploitation && energy == 0 {
+        if cur_state == EcoState::Exploitation && energy == 0 || cur_state != EcoState::Exploitation
+        {
             if meta.exec_num > average_cost {
                 energy = average_cost / 4;
             } else if meta.exec_num > average_cost / 2 {
