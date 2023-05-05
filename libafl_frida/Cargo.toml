@@ -44,7 +44,7 @@ frida-gum-sys = { version = "0.4.1", features = [
     "event-sink",
     "invocation-listener",
 ] }
-frida-gum = { path = "../../frida-rust/frida-gum", features = [
+frida-gum = { git = "https://github.com/r4ve1/frida-rust", features = [
     "auto-download",
     "event-sink",
     "invocation-listener",

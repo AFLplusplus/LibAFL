@@ -35,7 +35,7 @@ where
 {
     base: InProcessExecutor<'a, H, OT, S>,
     // thread_id for the Stalker
-    thread_id: u64,
+    thread_id: usize,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -157,7 +157,7 @@ where
     pub fn new(
         gum: &'a Gum,
         base: InProcessExecutor<'a, H, OT, S>,
-        thread_id: u64,
+        thread_id: usize,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     ) -> Self {
         let mut stalker = Stalker::new(gum);
