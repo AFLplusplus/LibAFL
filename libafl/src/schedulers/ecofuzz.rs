@@ -110,11 +110,10 @@ where
             tcmeta.last_energy = tcmeta.mutation_num - last_mutation_num;
             tcmeta.found = count - last_corpus_count;
             // Set was_fuzzed for the old current
-            meta.computed_score
+            tcmeta.computed_score
         };
-
+        let cur_exec = *state.executions();
         let meta = state.metadata_mut::<EcoMetadata>()?;
-        let cur_exec = state.executions();
 
         let mut regret = (cur_exec - meta.last_executions) as f64 / computed_score;
         if regret == 0.0 {
@@ -149,11 +148,10 @@ where
 
     /// Create a new alias table when the fuzzer finds a new corpus entry
     fn schedule(state: &mut S) -> Result<CorpusId, Error> {
-        let mut selection = None;
         for id in state.corpus().ids() {
             let was_fuzzed = state.testcase(id)?.scheduled_count() > 0;
             if !was_fuzzed {
-                selection = Some(id);
+                let selection = Some(id);
                 state.metadata_mut::<EcoMetadata>()?.state = EcoState::Exploration;
                 return Ok(selection.expect("Error in the algorithm, this cannot be None"));
             }
@@ -231,7 +229,7 @@ where
             None => 0,
         };
 
-        assert(self.last_hash != 0);
+        assert!(self.last_hash != 0);
 
         // Attach a `SchedulerTestcaseMetadata` to the queue entry.
         depth += 1;
@@ -248,10 +246,7 @@ where
             .testcase_mut(idx)?
             .add_metadata(EcoTestcaseMetadata::default());
 
-        let executions = *state.executions();
-        let meta = state.metadata_mut::<EcoMetadata>()?;
-
-        let exec_num = 0;
+        let mut exec_num = 0;
         for id in state.corpus().ids() {
             let entry = state
                 .testcase(id)?
@@ -263,8 +258,11 @@ where
             }
         }
 
-        meta.exec_num = exec_num;
-        meta.serial = state.corpus().count() + 1;
+        let mut tc = state.testcase_mut(idx)?;
+        let tcmeta = tc.metadata_mut::<EcoTestcaseMetadata>()?;
+
+        tcmeta.exec_num = exec_num;
+        tcmeta.serial = state.corpus().count() as u64 + 1;
         Ok(())
     }
 
@@ -322,10 +320,6 @@ where
         let id = Self::schedule(state)?;
         self.set_current_scheduled(state, Some(id))?;
 
-        let mutation_num = state
-            .testcase_mut(id)?
-            .metadata_mut::<EcoTestcaseMetadata>()?
-            .mutation_num;
         let count = state.corpus().count();
         let executions = *state.executions();
 
@@ -376,20 +370,20 @@ where
         // subtract # initial inputs to the corpus count
         let mut energy = 0;
 
-        let (cur_state, rate) = {
+        let (cur_state, rate, initial_corpus_count) = {
             let meta = state.metadata::<EcoMetadata>()?;
-            (meta.state, meta.rate)
+            (meta.state, meta.rate, meta.initial_corpus_count)
         };
 
-        let initial = match cur_state.initial_corpus_count {
+        let initial = match initial_corpus_count {
             Some(n) => n,
             None => 0,
         };
 
-        let mut average_cost = if state.corpus().count() == initial {
-            state.executions() / state.corpus().count() as u64
+        let mut average_cost: u64 = if state.corpus().count() == initial {
+            *state.executions() as u64 / state.corpus().count() as u64
         } else {
-            state.executions() / (state.corpus().count() - initial) as u64
+            *state.executions() as u64 / (state.corpus().count() - initial) as u64
         };
 
         if average_cost == 0 {
@@ -400,7 +394,7 @@ where
 
         if cur_state == EcoState::Exploitation {
             meta.state = EcoState::Exploitation;
-            if meta.last_found == 0 {
+            if meta.found == 0 {
                 energy = core::cmp::min(2 * meta.last_energy, 16 * average_cost);
             } else {
                 energy = core::cmp::min(meta.last_energy, 16 * average_cost);
