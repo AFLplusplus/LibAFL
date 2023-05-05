@@ -42,8 +42,7 @@ pub struct EcoTestcaseMetadata {
     mutation_num: u64,
     exec_num: u64,
     exec_by_mutation: u64,
-    last_found: usize,
-    line: u64,
+    found: usize,
     last_energy: u64,
     state: EcoState,
     serial: u64,
@@ -60,7 +59,6 @@ pub struct EcoMetadata {
     last_mutation_num: u64,
     last_corpus_count: usize,
     last_executions: usize,
-    last_find_iteration: usize,
     calculate_coe: u64,
     rate: f64,
 }
@@ -100,11 +98,17 @@ where
     fn handle_previous(id: CorpusId, state: &mut S) -> Result<(), Error> {
         let count = state.corpus().count();
 
+        let (last_corpus_count, last_mutation_num) = {
+            let m = state.metadata_mut::<EcoMetadata>()?;
+            (m.last_corpus_count, m.last_mutation_num)
+        };
+
         let computed_score = {
             let mut testcase = state.testcase_mut(id)?;
 
-            let meta = testcase.metadata_mut::<EcoTestcaseMetadata>()?;
-
+            let tcmeta = testcase.metadata_mut::<EcoTestcaseMetadata>()?;
+            tcmeta.last_energy = tcmeta.mutation_num - last_mutation_num;
+            tcmeta.found = count - last_corpus_count;
             // Set was_fuzzed for the old current
             meta.computed_score
         };
@@ -150,13 +154,6 @@ where
             let was_fuzzed = state.testcase(id)?.scheduled_count() > 0;
             if !was_fuzzed {
                 selection = Some(id);
-                break;
-            }
-        }
-
-        for id in state.corpus().ids() {
-            let was_fuzzed = state.testcase(id)?.scheduled_count() > 0;
-            if !was_fuzzed {
                 state.metadata_mut::<EcoMetadata>()?.state = EcoState::Exploration;
                 return Ok(selection.expect("Error in the algorithm, this cannot be None"));
             }
@@ -234,6 +231,8 @@ where
             None => 0,
         };
 
+        assert(self.last_hash != 0);
+
         // Attach a `SchedulerTestcaseMetadata` to the queue entry.
         depth += 1;
         {
@@ -252,9 +251,20 @@ where
         let executions = *state.executions();
         let meta = state.metadata_mut::<EcoMetadata>()?;
 
-        let last_find_iteration = executions - meta.last_executions + 1;
-        meta.last_find_iteration = last_find_iteration;
+        let exec_num = 0;
+        for id in state.corpus().ids() {
+            let entry = state
+                .testcase(id)?
+                .metadata::<SchedulerTestcaseMetadata>()?
+                .n_fuzz_entry();
 
+            if entry == self.last_hash {
+                exec_num += 1;
+            }
+        }
+
+        meta.exec_num = exec_num;
+        meta.serial = state.corpus().count() + 1;
         Ok(())
     }
 
@@ -320,7 +330,6 @@ where
         let executions = *state.executions();
 
         let meta = state.metadata_mut::<EcoMetadata>()?;
-        meta.last_mutation_num = mutation_num;
         meta.last_corpus_count = count;
         // TODO in theory it should be assigned at the beginning of the mutational stage
         // we must not count executions done in other stages
@@ -366,15 +375,26 @@ where
     fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error> {
         // subtract # initial inputs to the corpus count
         let mut energy = 0;
-        let mut average_cost = (state.executions() / state.corpus().count()) as u64;
-        if average_cost == 0 {
-            average_cost = 1024;
-        }
 
         let (cur_state, rate) = {
             let meta = state.metadata::<EcoMetadata>()?;
             (meta.state, meta.rate)
         };
+
+        let initial = match cur_state.initial_corpus_count {
+            Some(n) => n,
+            None => 0,
+        };
+
+        let mut average_cost = if state.corpus().count() == initial {
+            state.executions() / state.corpus().count() as u64
+        } else {
+            state.executions() / (state.corpus().count() - initial) as u64
+        };
+
+        if average_cost == 0 {
+            average_cost = 1024;
+        }
 
         let meta = entry.metadata_mut::<EcoTestcaseMetadata>()?;
 
@@ -387,7 +407,7 @@ where
             }
         }
 
-        if energy == 0 {
+        if cur_state == EcoState::Exploitation && energy == 0 {
             if meta.exec_num > average_cost {
                 energy = average_cost / 4;
             } else if meta.exec_num > average_cost / 2 {
