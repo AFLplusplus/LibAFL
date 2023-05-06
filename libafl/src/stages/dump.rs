@@ -1,6 +1,6 @@
 //! The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk to e.g. allow AFL to sync
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{clone::Clone, marker::PhantomData};
 use std::{fs, fs::File, io::Write, path::PathBuf};
 
@@ -41,7 +41,7 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Z::State as UsesInput>::Input) -> Vec<u8>,
+    CB: FnMut(&<Z::State as UsesInput>::Input, &Z::State) -> Vec<u8>,
     EM: UsesState<State = Z::State>,
     E: UsesState<State = Z::State>,
     Z: UsesState,
@@ -68,10 +68,16 @@ where
 
         while let Some(i) = corpus_idx {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
-            let input = testcase.load_input()?;
-            let bytes = (self.to_bytes)(input);
+            state.corpus().load_input_into(&mut testcase)?;
+            let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap(), state);
 
-            let fname = self.corpus_dir.join(format!("id_{i}"));
+            let fname = self.corpus_dir.join(format!(
+                "id_{i}_{}",
+                testcase
+                    .filename()
+                    .as_ref()
+                    .map_or_else(|| "unnamed", String::as_str)
+            ));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 
@@ -80,10 +86,16 @@ where
 
         while let Some(i) = solutions_idx {
             let mut testcase = state.solutions().get(i)?.borrow_mut();
-            let input = testcase.load_input()?;
-            let bytes = (self.to_bytes)(input);
+            state.solutions().load_input_into(&mut testcase)?;
+            let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap(), state);
 
-            let fname = self.solutions_dir.join(format!("id_{i}"));
+            let fname = self.solutions_dir.join(format!(
+                "id_{i}_{}",
+                testcase
+                    .filename()
+                    .as_ref()
+                    .map_or_else(|| "unnamed", String::as_str)
+            ));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 
@@ -101,7 +113,6 @@ where
 
 impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Z::State as UsesInput>::Input) -> Vec<u8>,
     EM: UsesState<State = Z::State>,
     Z: UsesState,
     Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,

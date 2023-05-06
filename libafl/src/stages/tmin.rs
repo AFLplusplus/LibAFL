@@ -72,12 +72,7 @@ where
         let num = self.iterations(state, base_corpus_idx)?;
 
         start_timer!(state);
-        let mut base = state
-            .corpus()
-            .get(base_corpus_idx)?
-            .borrow_mut()
-            .load_input()?
-            .clone();
+        let mut base = state.corpus().cloned_input_for_id(base_corpus_idx)?;
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         base.hash(&mut hasher);
         let base_hash = hasher.finish();
@@ -197,6 +192,7 @@ where
     CS: Scheduler,
     M: Mutator<CS::Input, CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>,
+    CS::State: HasCorpus,
 {
     type State = CS::State;
 }
@@ -205,7 +201,8 @@ impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler + RemovableScheduler,
-    CS::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    CS::State:
+        HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor + HasCorpus,
     <CS::State as UsesInput>::Input: HasLen + Hash,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
@@ -290,6 +287,7 @@ where
     CS: Scheduler,
     M: Mutator<CS::Input, CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>,
+    CS::State: HasCorpus,
 {
     /// Creates a new minimising mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {

@@ -356,14 +356,14 @@ jobs:
         mem: 2048
         release: 13.1
         prepare: |
-          pkg install -y curl bash sudo llvm14
+          pkg install -y curl bash sudo llvm16
           curl https://sh.rustup.rs -sSf | sh -s -- -y
 
         run: |
           freebsd-version
           . "$HOME/.cargo/env"
           rustup toolchain install nightly
-          export LLVM_CONFIG=/usr/local/bin/llvm-config14
+          export LLVM_CONFIG=/usr/local/bin/llvm-config16
           pwd
           ls -lah
           echo "local/bin"

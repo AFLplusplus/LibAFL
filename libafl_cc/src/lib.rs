@@ -168,7 +168,7 @@ pub trait CompilerWrapper {
         let args = self.command()?;
 
         if !self.is_silent() {
-            dbg!("{args:?}");
+            dbg!(args.clone());
         }
         if args.is_empty() {
             return Err(Error::InvalidArguments(
@@ -180,7 +180,7 @@ pub trait CompilerWrapper {
             Err(e) => return Err(Error::Io(e)),
         };
         if !self.is_silent() {
-            dbg!("{status:?}");
+            dbg!(status);
         }
         Ok(status.code())
     }

@@ -246,11 +246,12 @@ pub trait HasInProcessHandlers {
 }
 
 #[cfg(windows)]
-impl<'a, H, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, OT, S>
+impl<H, HB, OT, S> HasInProcessHandlers for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: HasSolutions + HasClientPerfMonitor + HasCorpus,
 {
     /// the timeout handler
     #[inline]
@@ -339,6 +340,7 @@ impl InProcessHandlers {
     }
 
     /// Create new [`InProcessHandlers`].
+    #[cfg(not(all(windows, feature = "std")))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers,
@@ -363,7 +365,20 @@ impl InProcessHandlers {
                     as *const _,
             })
         }
-        #[cfg(all(windows, feature = "std"))]
+        #[cfg(not(any(unix, feature = "std")))]
+        Ok(Self {})
+    }
+
+    /// Create new [`InProcessHandlers`].
+    #[cfg(all(windows, feature = "std"))]
+    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
+    where
+        E: Executor<EM, Z> + HasObservers + HasInProcessHandlers,
+        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        OF: Feedback<E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
+        Z: HasObjective<Objective = OF, State = E::State>,
+    {
         unsafe {
             let data = &mut GLOBAL_STATE;
             #[cfg(feature = "std")]
@@ -378,8 +393,6 @@ impl InProcessHandlers {
                     as *const c_void,
             })
         }
-        #[cfg(not(any(unix, feature = "std")))]
-        Ok(Self {})
     }
 
     /// Replace the handlers with `nop` handlers, deactivating the handlers
@@ -409,12 +422,14 @@ pub(crate) struct InProcessExecutorHandlerData {
     fuzzer_ptr: *mut c_void,
     executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
+
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
     crash_handler: *const c_void,
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
     timeout_handler: *const c_void,
+
     #[cfg(all(windows, feature = "std"))]
     pub(crate) tp_timer: *mut c_void,
     #[cfg(all(windows, feature = "std"))]
@@ -423,6 +438,9 @@ pub(crate) struct InProcessExecutorHandlerData {
     pub(crate) critical: *mut c_void,
     #[cfg(all(windows, feature = "std"))]
     pub(crate) timeout_input_ptr: *mut c_void,
+
+    #[cfg(any(unix, feature = "std"))]
+    pub(crate) timeout_executor_ptr: *mut c_void,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
@@ -456,14 +474,18 @@ impl InProcessExecutorHandlerData {
         r
     }
 
-    #[cfg(all(windows, feature = "std"))]
-    fn is_valid(&self) -> bool {
-        self.in_target == 1
+    #[cfg(any(unix, feature = "std"))]
+    pub fn is_valid(&self) -> bool {
+        !self.current_input_ptr.is_null()
     }
 
-    #[cfg(unix)]
-    fn is_valid(&self) -> bool {
-        !self.current_input_ptr.is_null()
+    #[cfg(any(unix, feature = "std"))]
+    fn timeout_executor_mut<'a, E>(&self) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
+        unsafe {
+            (self.timeout_executor_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
+                .as_mut()
+                .unwrap()
+        }
     }
 }
 
@@ -479,6 +501,7 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     executor_ptr: ptr::null(),
     /// The current input for signal handling
     current_input_ptr: ptr::null(),
+
     /// The crash handler fn
     #[cfg(any(unix, feature = "std"))]
     crash_handler: ptr::null(),
@@ -493,6 +516,9 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     critical: null_mut(),
     #[cfg(all(windows, feature = "std"))]
     timeout_input_ptr: null_mut(),
+
+    #[cfg(any(unix, feature = "std"))]
+    timeout_executor_ptr: null_mut(),
 };
 
 /// Get the inprocess [`crate::state::State`]
@@ -715,6 +741,12 @@ mod unix_signal_handler {
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
+        if !data.timeout_executor_ptr.is_null()
+            && data.timeout_executor_mut::<E>().handle_timeout(data)
+        {
+            return;
+        }
+
         if !data.is_valid() {
             log::warn!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
             return;
@@ -876,7 +908,7 @@ pub mod windows_asan_handler {
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        let mut data = &mut GLOBAL_STATE;
+        let data = &mut GLOBAL_STATE;
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
             /*
@@ -966,7 +998,10 @@ mod windows_exception_handler {
         },
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess::{
+                run_observers_and_save_state, HasInProcessHandlers, InProcessExecutorHandlerData,
+                GLOBAL_STATE,
+            },
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -1067,7 +1102,7 @@ mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers,
+        E: HasObservers + HasInProcessHandlers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
@@ -1082,6 +1117,20 @@ mod windows_exception_handler {
                 .unwrap(),
         );
         compiler_fence(Ordering::SeqCst);
+
+        if !data.timeout_executor_ptr.is_null()
+            && data.timeout_executor_mut::<E>().handle_timeout(data)
+        {
+            compiler_fence(Ordering::SeqCst);
+            LeaveCriticalSection(
+                (data.critical as *mut RTL_CRITICAL_SECTION)
+                    .as_mut()
+                    .unwrap(),
+            );
+            compiler_fence(Ordering::SeqCst);
+
+            return;
+        }
 
         if data.in_target == 1 {
             let executor = data.executor_mut::<E>();

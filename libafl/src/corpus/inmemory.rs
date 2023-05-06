@@ -380,6 +380,17 @@ where
     fn nth(&self, nth: usize) -> CorpusId {
         self.storage.keys[nth]
     }
+
+    #[inline]
+    fn load_input_into(&self, _: &mut Testcase<Self::Input>) -> Result<(), Error> {
+        // Inputs never get evicted, nothing to load here.
+        Ok(())
+    }
+
+    #[inline]
+    fn store_input_from(&self, _: &Testcase<Self::Input>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<I> HasTestcase for InMemoryCorpus<I>

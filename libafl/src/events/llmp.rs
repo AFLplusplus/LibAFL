@@ -228,11 +228,17 @@ where
                 observers_buf: _,
                 time,
                 executions,
+                forward_id,
             } => {
-                let client = monitor.client_stats_mut_for(client_id);
+                let id = if let Some(id) = *forward_id {
+                    id
+                } else {
+                    client_id
+                };
+                let client = monitor.client_stats_mut_for(id);
                 client.update_corpus_size(*corpus_size as u64);
                 client.update_executions(*executions as u64, *time);
-                monitor.display(event.name().to_string(), client_id);
+                monitor.display(event.name().to_string(), id);
                 Ok(BrokerEventResult::Forward)
             }
             Event::UpdateExecStats {
@@ -458,8 +464,9 @@ where
                 observers_buf,
                 time: _,
                 executions: _,
+                forward_id,
             } => {
-                log::info!("Received new Testcase from {client_id:?} ({client_config:?})");
+                log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
                 let _res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
@@ -1284,21 +1291,22 @@ where
                 observers_buf: _, // Useless as we are converting between types
                 time: _,
                 executions: _,
+                forward_id,
             } => {
-                log::info!("Received new Testcase to convert from {_client_id:?}");
+                log::info!("Received new Testcase to convert from {_client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
 
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
                 };
 
-                let _res = fuzzer.evaluate_input_with_observers::<E, EM>(
+                let res = fuzzer.evaluate_input_with_observers::<E, EM>(
                     state,
                     executor,
                     manager,
                     converter.convert(input)?,
                     false,
                 )?;
-                if let Some(item) = _res.1 {
+                if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
                 Ok(())
@@ -1404,6 +1412,7 @@ where
                 observers_buf,
                 time,
                 executions,
+                forward_id,
             } => Event::NewTestcase {
                 input: self.converter.as_mut().unwrap().convert(input)?,
                 client_config,
@@ -1412,6 +1421,7 @@ where
                 observers_buf,
                 time,
                 executions,
+                forward_id,
             },
             Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
             _ => {
@@ -1456,6 +1466,7 @@ where
                 observers_buf,
                 time,
                 executions,
+                forward_id,
             } => Event::NewTestcase {
                 input: self.converter.as_mut().unwrap().convert(input)?,
                 client_config,
@@ -1464,6 +1475,7 @@ where
                 observers_buf,
                 time,
                 executions,
+                forward_id,
             },
             Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
             _ => {

@@ -155,13 +155,7 @@ where
         corpus_idx: CorpusId,
         name: &str,
     ) -> Result<E::Input, Error> {
-        let mut input = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .load_input()
-            .unwrap()
-            .clone();
+        let mut input = state.corpus().cloned_input_for_id(corpus_idx)?;
         // The backup of the input
         let backup = input.clone();
         // This is the buffer we'll randomly mutate during type_replace

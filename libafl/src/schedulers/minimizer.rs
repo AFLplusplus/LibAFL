@@ -116,7 +116,7 @@ where
         let mut map = HashMap::new();
         for i in state.corpus().ids() {
             let mut old = state.corpus().get(i)?.borrow_mut();
-            let factor = F::compute(&mut *old, state)?;
+            let factor = F::compute(state, &mut *old)?;
             if let Some(old_map) = old.metadata_map_mut().get_mut::<M>() {
                 let mut e_iter = entries.iter();
                 let mut map_iter = old_map.as_slice().iter(); // ASSERTION: guaranteed to be in order?
@@ -256,7 +256,7 @@ where
         let mut new_favoreds = vec![];
         {
             let mut entry = state.corpus().get(idx)?.borrow_mut();
-            let factor = F::compute(&mut *entry, state)?;
+            let factor = F::compute(state, &mut *entry)?;
             let meta = entry.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
                 Error::key_not_found(format!(
                     "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
@@ -270,7 +270,7 @@ where
                         continue;
                     }
                     let mut old = state.corpus().get(*old_idx)?.borrow_mut();
-                    if factor > F::compute(&mut *old, state)? {
+                    if factor > F::compute(state, &mut *old)? {
                         continue;
                     }
 
