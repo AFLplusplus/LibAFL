@@ -479,7 +479,7 @@ impl CommandExecutorBuilder {
     }
 
     /// Adds an argument to the program's commandline.
-    /// 
+    ///
     /// You may want to use [`CommandExecutor::parse_afl_cmdline`] if you're going to pass `@@`
     pub fn arg<O: AsRef<OsStr>>(&mut self, arg: O) -> &mut CommandExecutorBuilder {
         self.args.push(arg.as_ref().to_owned());
@@ -487,7 +487,7 @@ impl CommandExecutorBuilder {
     }
 
     /// Adds a range of arguments to the program's commandline.
-    /// 
+    ///
     /// You may want to use [`CommandExecutor::parse_afl_cmdline`] if you're going to pass `@@`
     pub fn args<IT, O>(&mut self, args: IT) -> &mut CommandExecutorBuilder
     where

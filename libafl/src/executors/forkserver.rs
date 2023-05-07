@@ -898,7 +898,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     }
 
     /// Adds an argument to the harness's commandline
-    /// 
+    ///
     /// You may want to use `parse_afl_cmdline` if you're going to pass `@@`
     #[must_use]
     pub fn arg<O>(mut self, arg: O) -> Self
@@ -910,7 +910,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     }
 
     /// Adds arguments to the harness's commandline
-    /// 
+    ///
     /// You may want to use `parse_afl_cmdline` if you're going to pass `@@`
     #[must_use]
     pub fn args<IT, O>(mut self, args: IT) -> Self
