@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::{powersched::SchedulerMetadata, testcase_score::TestcaseScore, Scheduler},
@@ -47,7 +47,6 @@ pub struct EcoTestcaseMetadata {
     last_energy: u64,
     state: EcoState,
     serial: u64,
-    was_fuzzed: bool,
     computed_score: f64,
 }
 
@@ -78,7 +77,7 @@ pub struct EcoScheduler<O, S> {
 
 impl<O, S> EcoScheduler<O, S>
 where
-    S: HasCorpus + HasMetadata + HasRand + HasExecutions,
+    S: HasCorpus + HasMetadata + HasRand + HasExecutions + HasTestcase,
     O: MapObserver,
 {
     /// Create a new [`EcoScheduler`] without any power schedule
@@ -102,31 +101,22 @@ where
         let count = state.corpus().count();
 
         let (last_mutation_num, last_corpus_count) = {
-            let meta = state
-                .metadata()
-                .get::<EcoMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?;
+            let meta = state.metadata::<EcoMetadata>()?;
             (meta.last_mutation_num, meta.last_corpus_count)
         };
 
         let computed_score = {
-            let mut testcase = state.corpus().get(id)?.borrow_mut();
+            let mut testcase = state.testcase_mut(id)?;
 
-            let meta = testcase
-                .metadata_mut()
-                .get_mut::<EcoTestcaseMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?;
+            let meta = testcase.metadata_mut::<EcoTestcaseMetadata>()?;
+
             // Set was_fuzzed for the old current
-            meta.was_fuzzed = true;
             meta.last_found = count - last_corpus_count;
             meta.last_energy = meta.mutation_num - last_mutation_num;
             meta.computed_score
         };
 
-        let meta = state
-            .metadata_mut()
-            .get_mut::<EcoMetadata>()
-            .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?;
+        let meta = state.metadata_mut::<EcoMetadata>()?;
 
         let mut regret = meta.last_find_iteration as f64 / computed_score;
         if regret == 0.0 {
@@ -153,9 +143,7 @@ where
     fn first_iteration(state: &mut S) -> Result<(), Error> {
         let count = state.corpus().count();
         state
-            .metadata_mut()
-            .get_mut::<EcoMetadata>()
-            .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?
+            .metadata_mut::<EcoMetadata>()?
             .initial_corpus_count
             .get_or_insert(count);
         Ok(())
@@ -165,55 +153,27 @@ where
     fn schedule(state: &mut S) -> Result<CorpusId, Error> {
         let mut selection = None;
         for id in state.corpus().ids() {
-            let was_fuzzed = state
-                .corpus()
-                .get(id)?
-                .borrow()
-                .metadata()
-                .get::<EcoTestcaseMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
-                .was_fuzzed;
-            if !was_fuzzed {
+            let was_fuzzed = state.testcase(id)?.scheduled_count() > 0;
+            if was_fuzzed {
                 selection = Some(id);
                 break;
             }
         }
 
         for id in state.corpus().ids() {
-            let was_fuzzed = state
-                .corpus()
-                .get(id)?
-                .borrow()
-                .metadata()
-                .get::<EcoTestcaseMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
-                .was_fuzzed;
+            let was_fuzzed = state.testcase(id)?.scheduled_count() > 0;
             if was_fuzzed {
-                state
-                    .metadata_mut()
-                    .get_mut::<EcoMetadata>()
-                    .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?
-                    .state = EcoState::Exploration;
+                state.metadata_mut::<EcoMetadata>()?.state = EcoState::Exploration;
                 return Ok(selection.expect("Error in the algorithm, this cannot be None"));
             }
         }
 
-        state
-            .metadata_mut()
-            .get_mut::<EcoMetadata>()
-            .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?
-            .state = EcoState::Exploitation;
+        state.metadata_mut::<EcoMetadata>()?.state = EcoState::Exploitation;
 
         let mut cur = state.corpus().first();
         while let Some(id) = cur {
-            let testcase_state = state
-                .corpus()
-                .get(id)?
-                .borrow()
-                .metadata()
-                .get::<EcoTestcaseMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
-                .state;
+            let testcase_state = state.testcase(id)?.metadata::<EcoTestcaseMetadata>()?.state;
+
             if testcase_state != EcoState::Exploitation {
                 break;
             }
@@ -223,14 +183,8 @@ where
         if cur.is_none() {
             for id in state.corpus().ids() {
                 state
-                    .corpus()
-                    .get(id)?
-                    .borrow_mut()
-                    .metadata_mut()
-                    .get_mut::<EcoTestcaseMetadata>()
-                    .ok_or_else(|| {
-                        Error::key_not_found("EcoTestcaseMetadata not found".to_string())
-                    })?
+                    .testcase_mut(id)?
+                    .metadata_mut::<EcoTestcaseMetadata>()?
                     .state = EcoState::None;
             }
 
@@ -239,20 +193,13 @@ where
 
         let mut selection = cur.unwrap();
         let mut selection_meta = state
-            .corpus()
-            .get(selection)?
-            .borrow()
-            .metadata()
-            .get::<EcoTestcaseMetadata>()
-            .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
+            .testcase(selection)?
+            .metadata::<EcoTestcaseMetadata>()?
             .clone();
 
         for id in state.corpus().ids() {
-            let testcase = state.corpus().get(id)?.borrow();
-            let meta = testcase
-                .metadata()
-                .get::<EcoTestcaseMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?;
+            let testcase = state.testcase(id)?;
+            let meta = testcase.metadata::<EcoTestcaseMetadata>()?;
 
             if meta.exec_by_mutation
                 * selection_meta.mutation_num
@@ -278,7 +225,7 @@ where
 
 impl<O, S> Scheduler for EcoScheduler<O, S>
 where
-    S: HasCorpus + HasMetadata + HasRand + HasExecutions,
+    S: HasCorpus + HasMetadata + HasRand + HasExecutions + HasTestcase,
     O: MapObserver,
 {
     /// Add an entry to the corpus and return its index
@@ -287,59 +234,33 @@ where
 
         let mut depth = match current_idx {
             Some(parent_idx) => state
-                .corpus()
-                .get(parent_idx)?
-                .borrow_mut()
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?
+                .testcase_mut(parent_idx)?
+                .metadata_mut::<SchedulerTestcaseMetadata>()?
                 .depth(),
             None => 0,
         };
 
-        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
+        // Attach a `SchedulerTestcaseMetadata` to the queue entry.
         depth += 1;
-        state.corpus().get(idx)?.borrow_mut().add_metadata(
-            SchedulerTestcaseMetaData::with_n_fuzz_entry(depth, self.last_hash),
-        );
-
+        {
+            let mut testcase = state.testcase_mut(idx)?;
+            testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
+                depth,
+                self.last_hash,
+            ));
+            testcase.set_parent_id_optional(current_idx);
+        }
         // Add the testcase metadata for this scheduler
         state
-            .corpus()
-            .get(idx)?
-            .borrow_mut()
+            .testcase_mut(idx)?
             .add_metadata(EcoTestcaseMetadata::default());
 
         let executions = *state.executions();
-        let meta = state
-            .metadata_mut()
-            .get_mut::<EcoMetadata>()
-            .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?;
+        let meta = state.metadata_mut::<EcoMetadata>()?;
 
         let last_find_iteration = executions - meta.last_executions + 1;
         meta.last_find_iteration = last_find_iteration;
 
-        Ok(())
-    }
-
-    fn on_replace(
-        &mut self,
-        state: &mut S,
-        idx: CorpusId,
-        _testcase: &Testcase<S::Input>,
-    ) -> Result<(), Error> {
-        self.on_add(state, idx)
-    }
-
-    #[allow(clippy::unused_self)]
-    fn on_remove(
-        &mut self,
-        _state: &mut S,
-        _idx: CorpusId,
-        _testcase: &Option<Testcase<S::Input>>,
-    ) -> Result<(), Error> {
         Ok(())
     }
 
@@ -358,10 +279,7 @@ where
 
         let mut hash = observer.hash() as usize;
 
-        let psmeta = state
-            .metadata_mut()
-            .get_mut::<SchedulerMetadata>()
-            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
 
         hash %= psmeta.n_fuzz().len();
         // Update the path frequency
@@ -369,34 +287,18 @@ where
 
         if let Some(id) = *state.corpus().current() {
             state
-                .corpus()
-                .get(id)?
-                .borrow_mut()
-                .metadata_mut()
-                .get_mut::<EcoTestcaseMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
+                .testcase_mut(id)?
+                .metadata_mut::<EcoTestcaseMetadata>()?
                 .mutation_num += 1;
 
             let entry = state
-                .corpus()
-                .get(id)?
-                .borrow()
-                .metadata()
-                .get::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?
+                .testcase(id)?
+                .metadata::<SchedulerTestcaseMetadata>()?
                 .n_fuzz_entry();
             if entry == hash {
                 state
-                    .corpus()
-                    .get(id)?
-                    .borrow_mut()
-                    .metadata_mut()
-                    .get_mut::<EcoTestcaseMetadata>()
-                    .ok_or_else(|| {
-                        Error::key_not_found("EcoTestcaseMetadata not found".to_string())
-                    })?
+                    .testcase_mut(id)?
+                    .metadata_mut::<EcoTestcaseMetadata>()?
                     .exec_by_mutation += 1;
             }
         }
@@ -414,23 +316,16 @@ where
         }
 
         let id = Self::schedule(state)?;
-        *state.corpus_mut().current_mut() = Some(id);
+        self.set_current_scheduled(state, Some(id))?;
 
         let mutation_num = state
-            .corpus()
-            .get(id)?
-            .borrow_mut()
-            .metadata_mut()
-            .get_mut::<EcoTestcaseMetadata>()
-            .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?
+            .testcase_mut(id)?
+            .metadata_mut::<EcoTestcaseMetadata>()?
             .mutation_num;
         let count = state.corpus().count();
         let executions = *state.executions();
 
-        let meta = state
-            .metadata_mut()
-            .get_mut::<EcoMetadata>()
-            .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?;
+        let meta = state.metadata_mut::<EcoMetadata>()?;
         meta.last_mutation_num = mutation_num;
         meta.last_corpus_count = count;
         // TODO in theory it should be assigned at the beginning of the mutational stage
@@ -454,7 +349,7 @@ where
 {
     /// Compute the `weight` used in weighted corpus entry selection algo
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
-    fn compute(entry: &mut Testcase<S::Input>, state: &S) -> Result<f64, Error> {
+    fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error> {
         // subtract # initial inputs to the corpus count
         let mut energy = 0;
         let mut average_cost = (state.corpus().count() / state.executions()) as u64;
@@ -463,17 +358,11 @@ where
         }
 
         let (cur_state, rate) = {
-            let meta = state
-                .metadata()
-                .get::<EcoMetadata>()
-                .ok_or_else(|| Error::key_not_found("EcoMetadata not found".to_string()))?;
+            let meta = state.metadata::<EcoMetadata>()?;
             (meta.state, meta.rate)
         };
 
-        let meta = entry
-            .metadata_mut()
-            .get_mut::<EcoTestcaseMetadata>()
-            .ok_or_else(|| Error::key_not_found("EcoTestcaseMetadata not found".to_string()))?;
+        let meta = entry.metadata_mut::<EcoTestcaseMetadata>()?;
 
         if cur_state == EcoState::Exploitation {
             meta.state = EcoState::Exploitation;

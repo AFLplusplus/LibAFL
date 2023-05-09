@@ -35,7 +35,7 @@ where
 {
     let mut metadata = maybe_state
         .as_mut()
-        .and_then(|state| state.metadata_mut().remove())
+        .and_then(|state| state.metadata_map_mut().remove())
         .unwrap_or_else(|| Box::new(ShouldUseGrimoireMetadata::default()));
     let grimoire = if let Some(grimoire) = options.grimoire() {
         if grimoire && !mutator_status.std_mutational {

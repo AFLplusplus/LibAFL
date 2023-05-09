@@ -483,10 +483,7 @@ mod tests {
             .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
             .unwrap();
 
-        let testcase = corpus
-            .get(corpus.first().unwrap())
-            .expect("Corpus did not contain entries");
-        let mut input = testcase.borrow_mut().load_input().unwrap().clone();
+        let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
 
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);
@@ -524,10 +521,7 @@ mod tests {
             .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
             .unwrap();
 
-        let testcase = corpus
-            .get(corpus.first().unwrap())
-            .expect("Corpus did not contain entries");
-        let mut input = testcase.borrow_mut().load_input().unwrap().clone();
+        let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
         let input_prior = input.clone();
 
         let mut feedback = ConstFeedback::new(false);

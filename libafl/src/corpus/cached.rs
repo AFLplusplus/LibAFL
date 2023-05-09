@@ -9,14 +9,14 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{
         inmemory_ondisk::InMemoryOnDiskCorpus, ondisk::OnDiskMetadataFormat, Corpus, CorpusId,
-        Testcase,
+        HasTestcase, Testcase,
     },
     inputs::{Input, UsesInput},
     Error,
 };
 
 /// A corpus that keeps a maximum number of [`Testcase`]s in memory
-/// and load them from disk, when they are being used
+/// and load them from disk, when they are being used.
 /// The eviction policy is FIFO.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -73,7 +73,7 @@ where
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let testcase = { self.inner.get(idx)? };
         if testcase.borrow().input().is_none() {
-            let _: &I = testcase.borrow_mut().load_input()?;
+            self.load_input_into(&mut testcase.borrow_mut())?;
             let mut borrowed_num = 0;
             while self.cached_indexes.borrow().len() >= self.cache_max_len {
                 let removed = self.cached_indexes.borrow_mut().pop_front().unwrap();
@@ -127,6 +127,32 @@ where
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)
+    }
+
+    #[inline]
+    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+        self.inner.load_input_into(testcase)
+    }
+
+    #[inline]
+    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+        self.inner.store_input_from(testcase)
+    }
+}
+
+impl<I> HasTestcase for CachedOnDiskCorpus<I>
+where
+    I: Input,
+{
+    fn testcase(&self, id: CorpusId) -> Result<core::cell::Ref<Testcase<Self::Input>>, Error> {
+        Ok(self.get(id)?.borrow())
+    }
+
+    fn testcase_mut(
+        &self,
+        id: CorpusId,
+    ) -> Result<core::cell::RefMut<Testcase<Self::Input>>, Error> {
+        Ok(self.get(id)?.borrow_mut())
     }
 }
 

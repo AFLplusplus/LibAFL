@@ -19,7 +19,7 @@ use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     observers::{MapObserver, ObserversTuple},
-    schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
+    schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, UsesState},
     Error, HasScheduler,
 };
@@ -41,7 +41,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<State = E::State>,
+        CS: Scheduler<State = E::State> + RemovableScheduler, // schedulers that has on_remove/on_replace only!
         EM: UsesState<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>;
 }
@@ -100,7 +100,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<State = E::State>,
+        CS: Scheduler<State = E::State> + RemovableScheduler,
         EM: UsesState<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>,
     {
@@ -115,7 +115,7 @@ where
         while let Some(idx) = cur_id {
             let (weight, input) = {
                 let mut testcase = state.corpus().get(idx)?.borrow_mut();
-                let weight = TS::compute(&mut *testcase, state)?
+                let weight = TS::compute(state, &mut *testcase)?
                     .to_u64()
                     .expect("Weight must be computable.");
                 let input = testcase

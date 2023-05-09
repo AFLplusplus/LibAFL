@@ -38,6 +38,8 @@ pub enum LLVMPasses {
     AutoTokens,
     /// The Coverage Accouting (BB metric) pass
     CoverageAccounting,
+    /// The dump cfg pass
+    DumpCfg,
 }
 
 impl LLVMPasses {
@@ -54,6 +56,9 @@ impl LLVMPasses {
             }
             LLVMPasses::CoverageAccounting => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("coverage-accounting-pass.{}", dll_extension())),
+            LLVMPasses::DumpCfg => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("dump-cfg-pass.{}", dll_extension()))
+            }
         }
     }
 }
@@ -301,7 +306,11 @@ impl CompilerWrapper for ClangWrapper {
 
         if !self.passes.is_empty() {
             if self.use_new_pm {
-                args.push("-fexperimental-new-pass-manager".into());
+                if let Some(ver) = LIBAFL_CC_LLVM_VERSION {
+                    if ver < 16 {
+                        args.push("-fexperimental-new-pass-manager".into());
+                    }
+                }
             } else {
                 args.push("-flegacy-pass-manager".into());
             }
@@ -470,6 +479,7 @@ mod tests {
     use crate::{ClangWrapper, CompilerWrapper};
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_clang_version() {
         if let Err(res) = ClangWrapper::new()
             .parse_args(&["my-clang", "-v"])

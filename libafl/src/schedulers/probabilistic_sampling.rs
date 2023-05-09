@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasTestcase},
     inputs::UsesInput,
     schedulers::{Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
@@ -70,14 +70,14 @@ where
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::unused_self)]
     pub fn store_probability(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
-        let factor = F::compute(&mut *state.corpus().get(idx)?.borrow_mut(), state)?;
+        let factor = F::compute(state, &mut *state.corpus().get(idx)?.borrow_mut())?;
         if factor == 0.0 {
             return Err(Error::illegal_state(
                 "Infinity probability calculated for probabilistic sampling scheduler",
             ));
         }
         let meta = state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<ProbabilityMetadata>()
             .unwrap();
         let prob = 1.0 / factor;
@@ -89,7 +89,7 @@ where
 
 impl<F, S> UsesState for ProbabilitySamplingScheduler<F, S>
 where
-    S: UsesInput,
+    S: UsesInput + HasTestcase,
 {
     type State = S;
 }
@@ -97,10 +97,17 @@ where
 impl<F, S> Scheduler for ProbabilitySamplingScheduler<F, S>
 where
     F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
-        if state.metadata().get::<ProbabilityMetadata>().is_none() {
+        let current_idx = *state.corpus().current();
+        state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .set_parent_id_optional(current_idx);
+
+        if state.metadata_map().get::<ProbabilityMetadata>().is_none() {
             state.add_metadata(ProbabilityMetadata::new());
         }
         self.store_probability(state, idx)
@@ -113,7 +120,7 @@ where
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
             let rand_prob: f64 = (state.rand_mut().below(100) as f64) / 100.0;
-            let meta = state.metadata().get::<ProbabilityMetadata>().unwrap();
+            let meta = state.metadata_map().get::<ProbabilityMetadata>().unwrap();
             let threshold = meta.total_probability * rand_prob;
             let mut k: f64 = 0.0;
             let mut ret = *meta.map.keys().last().unwrap();
@@ -124,7 +131,7 @@ where
                     break;
                 }
             }
-            *state.corpus_mut().current_mut() = Some(ret);
+            self.set_current_scheduled(state, Some(ret))?;
             Ok(ret)
         }
     }
@@ -169,7 +176,7 @@ mod tests {
     where
         S: HasMetadata + HasCorpus,
     {
-        fn compute(_: &mut Testcase<S::Input>, _state: &S) -> Result<f64, Error> {
+        fn compute(_state: &S, _: &mut Testcase<S::Input>) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }

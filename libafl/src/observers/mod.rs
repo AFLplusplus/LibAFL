@@ -11,9 +11,9 @@ pub mod stdio;
 #[cfg(feature = "std")]
 pub use stdio::{StdErrObserver, StdOutObserver};
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 pub mod stacktrace;
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 pub use stacktrace::*;
 
 pub mod concolic;
@@ -498,7 +498,7 @@ where
     #[cfg(feature = "no_std")]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
-        self.start_time = Duration::from_secs(0);
+        self.start_time = current_time();
         Ok(())
     }
 

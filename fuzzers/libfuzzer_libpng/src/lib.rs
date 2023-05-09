@@ -90,7 +90,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -112,7 +112,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
-            OnDiskCorpus::new("corpus_out").unwrap(),
+            InMemoryCorpus::new(),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
@@ -128,7 +128,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     println!("We're a client, let's fuzz :)");
 
     // Create a PNG dictionary if not existing
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         state.add_metadata(Tokens::from([
             vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
             "IHDR".as_bytes().to_vec(),

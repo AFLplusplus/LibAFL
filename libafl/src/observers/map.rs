@@ -21,7 +21,7 @@ use crate::{
     bolts::{
         ownedref::{OwnedMutPtr, OwnedMutSlice},
         tuples::Named,
-        AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen,
+        AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Truncate,
     },
     executors::ExitKind,
     inputs::UsesInput,
@@ -116,12 +116,6 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
 
     /// Get the number of set entries with the specified indexes
     fn how_many_set(&self, indexes: &[usize]) -> usize;
-
-    /// Resize the inner map to be smaller (and thus faster to process)
-    /// It returns Some(old size) on success, None on failure
-    fn downsize_map(&mut self, _new_len: usize) -> Option<usize> {
-        None
-    }
 }
 
 /// A Simple iterator calling `MapObserver::get`
@@ -410,9 +404,21 @@ where
         }
         res
     }
+}
 
-    fn downsize_map(&mut self, new_len: usize) -> Option<usize> {
-        self.map.downsize(new_len)
+impl<'a, T, const DIFFERENTIAL: bool> Truncate for StdMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    fn truncate(&mut self, new_len: usize) {
+        self.map.truncate(new_len);
     }
 }
 
@@ -552,7 +558,7 @@ where
 
     /// Creates a new [`MapObserver`] with an owned map
     #[must_use]
-    pub fn new_owned<S>(name: S, map: Vec<T>) -> Self
+    pub fn owned<S>(name: S, map: Vec<T>) -> Self
     where
         S: Into<String>,
     {
@@ -899,7 +905,7 @@ where
 
     /// Creates a new [`MapObserver`] with an owned map
     #[must_use]
-    pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
+    pub fn owned(name: &'static str, map: Vec<T>) -> Self {
         assert!(map.len() >= N);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
@@ -1316,9 +1322,14 @@ where
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         self.base.how_many_set(indexes)
     }
+}
 
-    fn downsize_map(&mut self, new_len: usize) -> Option<usize> {
-        self.base.downsize_map(new_len)
+impl<M> Truncate for HitcountsMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned + Truncate,
+{
+    fn truncate(&mut self, new_len: usize) {
+        self.base.truncate(new_len);
     }
 }
 
@@ -1539,9 +1550,14 @@ where
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         self.base.how_many_set(indexes)
     }
+}
 
-    fn downsize_map(&mut self, new_len: usize) -> Option<usize> {
-        self.base.downsize_map(new_len)
+impl<M> Truncate for HitcountsIterableMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned + Truncate,
+{
+    fn truncate(&mut self, new_len: usize) {
+        self.base.truncate(new_len);
     }
 }
 
@@ -1812,21 +1828,15 @@ where
 {
     /// Creates a new [`MultiMapObserver`], maybe in differential mode
     #[must_use]
-    fn new_maybe_differential(name: &'static str, maps: &'a mut [&'a mut [T]]) -> Self {
+    fn maybe_differential(name: &'static str, maps: Vec<OwnedMutSlice<'a, T>>) -> Self {
         let mut idx = 0;
-        let mut v = 0;
         let mut builder = vec![];
-        let maps: Vec<_> = maps
-            .iter_mut()
-            .map(|x| {
-                let l = x.len();
-                let r = (idx..(idx + l), v);
-                idx += l;
-                builder.push(r);
-                v += 1;
-                OwnedMutSlice::from(x)
-            })
-            .collect();
+        for (v, x) in maps.iter().enumerate() {
+            let l = x.as_slice().len();
+            let r = (idx..(idx + l), v);
+            idx += l;
+            builder.push(r);
+        }
         Self {
             maps,
             intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
@@ -1844,8 +1854,8 @@ where
 {
     /// Creates a new [`MultiMapObserver`] in differential mode
     #[must_use]
-    pub fn differential(name: &'static str, maps: &'a mut [&'a mut [T]]) -> Self {
-        Self::new_maybe_differential(name, maps)
+    pub fn differential(name: &'static str, maps: Vec<OwnedMutSlice<'a, T>>) -> Self {
+        Self::maybe_differential(name, maps)
     }
 }
 
@@ -1855,13 +1865,13 @@ where
 {
     /// Creates a new [`MultiMapObserver`]
     #[must_use]
-    pub fn new(name: &'static str, maps: &'a mut [&'a mut [T]]) -> Self {
-        Self::new_maybe_differential(name, maps)
+    pub fn new(name: &'static str, maps: Vec<OwnedMutSlice<'a, T>>) -> Self {
+        Self::maybe_differential(name, maps)
     }
 
     /// Creates a new [`MultiMapObserver`] with an owned map
     #[must_use]
-    pub fn new_owned(name: &'static str, maps: Vec<Vec<T>>) -> Self {
+    pub fn owned(name: &'static str, maps: Vec<Vec<T>>) -> Self {
         let mut idx = 0;
         let mut v = 0;
         let mut builder = vec![];

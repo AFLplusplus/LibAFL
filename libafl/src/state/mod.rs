@@ -1,6 +1,11 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use core::{
+    cell::{Ref, RefMut},
+    fmt::Debug,
+    marker::PhantomData,
+    time::Duration,
+};
 #[cfg(feature = "std")]
 use std::{
     fs,
@@ -17,7 +22,7 @@ use crate::{
         rands::Rand,
         serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     },
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -58,21 +63,6 @@ pub trait HasCorpus: UsesInput {
     fn corpus(&self) -> &Self::Corpus;
     /// The testcase corpus (mutable)
     fn corpus_mut(&mut self) -> &mut Self::Corpus;
-}
-
-/// Trait for a state that has information about which [`CorpusId`]
-/// is currently being fuzzed.
-/// When a new interesting input was found, this value becomes the `parent_id`.
-pub trait HasFuzzedCorpusId {
-    /// The currently fuzzed [`CorpusId`], if known.
-    /// If a new interesting testcase was found, this should usually become the `parent_id`.
-    fn fuzzed_corpus_id(&self) -> Option<CorpusId>;
-
-    /// Sets the currently fuzzed [`CorpusId`].
-    fn set_fuzzed_corpus_id(&mut self, corpus_id: CorpusId);
-
-    /// Resets the currently fuzzed [`CorpusId`].
-    fn clear_fuzzed_corpus_id(&mut self);
 }
 
 /// Interact with the maximum size
@@ -116,9 +106,9 @@ pub trait HasClientPerfMonitor {
 /// Trait for elements offering metadata
 pub trait HasMetadata {
     /// A map, storing all metadata
-    fn metadata(&self) -> &SerdeAnyMap;
+    fn metadata_map(&self) -> &SerdeAnyMap;
     /// A map, storing all metadata (mutable)
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap;
+    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap;
 
     /// Add a metadata to the metadata map
     #[inline]
@@ -126,7 +116,7 @@ pub trait HasMetadata {
     where
         M: SerdeAny,
     {
-        self.metadata_mut().insert(meta);
+        self.metadata_map_mut().insert(meta);
     }
 
     /// Check for a metadata
@@ -135,16 +125,38 @@ pub trait HasMetadata {
     where
         M: SerdeAny,
     {
-        self.metadata().get::<M>().is_some()
+        self.metadata_map().get::<M>().is_some()
+    }
+
+    /// To get metadata
+    #[inline]
+    fn metadata<M>(&self) -> Result<&M, Error>
+    where
+        M: SerdeAny,
+    {
+        self.metadata_map().get::<M>().ok_or_else(|| {
+            Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        })
+    }
+
+    /// To get mutable metadata
+    #[inline]
+    fn metadata_mut<M>(&mut self) -> Result<&mut M, Error>
+    where
+        M: SerdeAny,
+    {
+        self.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
+            Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        })
     }
 }
 
 /// Trait for elements offering named metadata
 pub trait HasNamedMetadata {
     /// A map, storing all metadata
-    fn named_metadata(&self) -> &NamedSerdeAnyMap;
+    fn named_metadata_map(&self) -> &NamedSerdeAnyMap;
     /// A map, storing all metadata (mutable)
-    fn named_metadata_mut(&mut self) -> &mut NamedSerdeAnyMap;
+    fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap;
 
     /// Add a metadata to the metadata map
     #[inline]
@@ -152,7 +164,7 @@ pub trait HasNamedMetadata {
     where
         M: SerdeAny,
     {
-        self.named_metadata_mut().insert(meta, name);
+        self.named_metadata_map_mut().insert(meta, name);
     }
 
     /// Check for a metadata
@@ -161,7 +173,31 @@ pub trait HasNamedMetadata {
     where
         M: SerdeAny,
     {
-        self.named_metadata().contains::<M>(name)
+        self.named_metadata_map().contains::<M>(name)
+    }
+
+    /// To get named metadata
+    #[inline]
+    fn named_metadata<M>(&self, name: &str) -> Result<&M, Error>
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_map().get::<M>(name).ok_or_else(|| {
+            Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+        })
+    }
+
+    /// To get mutable named metadata
+    #[inline]
+    fn named_metadata_mut<M>(&mut self, name: &str) -> Result<&mut M, Error>
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_map_mut()
+            .get_mut::<M>(name)
+            .ok_or_else(|| {
+                Error::key_not_found(format!("{} not found", core::any::type_name::<M>()))
+            })
     }
 }
 
@@ -207,8 +243,6 @@ pub struct StdState<I, C, R, SC> {
     named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
-    /// The [`CorpusId`] of the testcase we're currently fuzzing.
-    fuzzed_corpus_id: Option<CorpusId>,
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
@@ -274,17 +308,23 @@ where
     }
 }
 
-impl<I, C, R, SC> HasFuzzedCorpusId for StdState<I, C, R, SC> {
-    fn fuzzed_corpus_id(&self) -> Option<CorpusId> {
-        self.fuzzed_corpus_id
+impl<I, C, R, SC> HasTestcase for StdState<I, C, R, SC>
+where
+    I: Input,
+    C: Corpus<Input = <Self as UsesInput>::Input>,
+    R: Rand,
+{
+    /// To get the testcase
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.corpus().get(id)?.borrow())
     }
 
-    fn set_fuzzed_corpus_id(&mut self, fuzzed_corpus_id: CorpusId) {
-        self.fuzzed_corpus_id = Some(fuzzed_corpus_id);
-    }
-
-    fn clear_fuzzed_corpus_id(&mut self) {
-        self.fuzzed_corpus_id = None;
+    /// To get mutable testcase
+    fn testcase_mut(
+        &self,
+        id: CorpusId,
+    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.corpus().get(id)?.borrow_mut())
     }
 }
 
@@ -311,13 +351,13 @@ where
 impl<I, C, R, SC> HasMetadata for StdState<I, C, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
-    fn metadata(&self) -> &SerdeAnyMap {
+    fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
 }
@@ -325,13 +365,13 @@ impl<I, C, R, SC> HasMetadata for StdState<I, C, R, SC> {
 impl<I, C, R, SC> HasNamedMetadata for StdState<I, C, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
-    fn named_metadata(&self) -> &NamedSerdeAnyMap {
+    fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
         &self.named_metadata
     }
 
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
-    fn named_metadata_mut(&mut self) -> &mut NamedSerdeAnyMap {
+    fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
         &mut self.named_metadata
     }
 }
@@ -725,7 +765,6 @@ where
             corpus,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
-            fuzzed_corpus_id: None,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "std")]
@@ -803,11 +842,11 @@ impl<I> HasExecutions for NopState<I> {
 
 #[cfg(test)]
 impl<I> HasMetadata for NopState<I> {
-    fn metadata(&self) -> &SerdeAnyMap {
+    fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
 }
@@ -910,7 +949,7 @@ pub mod pybind {
         }
 
         fn metadata(&mut self) -> PyObject {
-            let meta = self.inner.as_mut().metadata_mut();
+            let meta = self.inner.as_mut().metadata_map_mut();
             if !meta.contains::<PythonMetadata>() {
                 Python::with_gil(|py| {
                     let dict: Py<PyDict> = PyDict::new(py).into();

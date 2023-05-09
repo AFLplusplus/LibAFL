@@ -24,7 +24,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsSlice,
     },
-    corpus::{Corpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
@@ -249,7 +249,7 @@ fn fuzz(
 
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -271,7 +271,7 @@ fn fuzz(
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
-            OnDiskCorpus::new(corpus_dir).unwrap(),
+            InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
@@ -310,7 +310,7 @@ fn fuzz(
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
         &mut state,
         &edges_observer,
-        Some(PowerSchedule::EXPLORE),
+        Some(PowerSchedule::FAST),
     ));
 
     // A fuzzer with feedbacks and a corpus scheduler
@@ -355,7 +355,7 @@ fn fuzz(
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;

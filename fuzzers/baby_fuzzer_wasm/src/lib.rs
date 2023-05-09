@@ -23,15 +23,16 @@ use crate::utils::set_panic_hook;
 
 // defined for internal use by libafl
 #[no_mangle]
+#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 pub extern "C" fn external_current_millis() -> u64 {
     let window: Window = web_sys::window().expect("should be in browser to run this demo");
     let performance: Performance = window
         .performance()
         .expect("should be in browser to run this demo");
-    let now = performance.now() as u64;
-    now
+    performance.now() as u64
 }
 
+#[allow(clippy::missing_panics_doc)]
 #[wasm_bindgen]
 pub fn fuzz() {
     set_panic_hook();
@@ -39,7 +40,7 @@ pub fn fuzz() {
     let mut signals = [0u8; 64];
     let signals_ptr = signals.as_mut_ptr();
     let signals_set = |i: usize| unsafe {
-        *signals_ptr.offset(i as isize) += 1;
+        *signals_ptr.add(i) += 1;
     };
 
     // The closure that we want to fuzz

@@ -359,7 +359,7 @@ where
         }
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-        let other = other_testcase.load_input()?;
+        let other = other_testcase.load_input(state.corpus())?;
         let data2 = Vec::from(other.bytes());
         drop(other_testcase);
 

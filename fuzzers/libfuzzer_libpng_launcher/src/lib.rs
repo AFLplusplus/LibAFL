@@ -143,7 +143,7 @@ pub fn libafl_main() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::new_tracking(&edges_observer, true, false),
+            MaxMapFeedback::tracking(&edges_observer, true, false),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::with_observer(&time_observer)
         );
@@ -173,7 +173,7 @@ pub fn libafl_main() {
         println!("We're a client, let's fuzz :)");
 
         // Create a PNG dictionary if not existing
-        if state.metadata().get::<Tokens>().is_none() {
+        if state.metadata_map().get::<Tokens>().is_none() {
             state.add_metadata(Tokens::from([
                 vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
                 "IHDR".as_bytes().to_vec(),
@@ -202,17 +202,21 @@ pub fn libafl_main() {
         };
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        let mut executor = TimeoutExecutor::new(
-            InProcessExecutor::new(
-                &mut harness,
-                tuple_list!(edges_observer, time_observer),
-                &mut fuzzer,
-                &mut state,
-                &mut restarting_mgr,
-            )?,
-            // 10 seconds timeout
-            opt.timeout,
-        );
+        let executor = InProcessExecutor::new(
+            &mut harness,
+            tuple_list!(edges_observer, time_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut restarting_mgr,
+        )?;
+
+        // Wrap the executor with a timeout
+        #[cfg(target_os = "linux")]
+        let mut executor = TimeoutExecutor::batch_mode(executor, opt.timeout);
+
+        // Wrap the executor with a timeout
+        #[cfg(not(target_os = "linux"))]
+        let mut executor = TimeoutExecutor::new(executor, opt.timeout);
 
         // The actual target run starts here.
         // Call LLVMFUzzerInitialize() if present.

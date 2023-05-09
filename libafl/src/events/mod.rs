@@ -2,6 +2,8 @@
 
 pub mod simple;
 pub use simple::*;
+pub mod centralized;
+pub use centralized::*;
 pub mod llmp;
 use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(all(unix, feature = "std"))]
@@ -24,7 +26,7 @@ use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 #[cfg(all(unix, feature = "std"))]
 use crate::bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 use crate::{
-    bolts::current_time,
+    bolts::{current_time, ClientId},
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
@@ -286,6 +288,8 @@ where
         time: Duration,
         /// The executions of this client
         executions: usize,
+        /// The original sender if, if forwarded
+        forward_id: Option<ClientId>,
     },
     /// New stats event to monitor.
     UpdateExecStats {
@@ -360,6 +364,7 @@ where
                 observers_buf: _,
                 time: _,
                 executions: _,
+                forward_id: _,
             } => "Testcase",
             Event::UpdateExecStats {
                 time: _,
@@ -669,6 +674,7 @@ mod tests {
             client_config: EventConfig::AlwaysUnique,
             time: current_time(),
             executions: 0,
+            forward_id: None,
         };
 
         let serialized = postcard::to_allocvec(&e).unwrap();
@@ -683,6 +689,7 @@ mod tests {
                 client_config: _,
                 time: _,
                 executions: _,
+                forward_id: _,
             } => {
                 let o: tuple_list_type!(StdMapObserver::<u32, false>) =
                     postcard::from_bytes(observers_buf.as_ref().unwrap()).unwrap();

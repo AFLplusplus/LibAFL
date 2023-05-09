@@ -35,7 +35,7 @@ use nix::{
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
-#[cfg(unix)]
+#[cfg(all(unix, not(miri)))]
 use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::os::unix_signals::{ucontext_t, Handler, Signal};
@@ -50,7 +50,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasSolutions, UsesState},
     Error,
 };
 
@@ -167,7 +167,7 @@ where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+    S: HasSolutions + HasClientPerfMonitor + HasCorpus,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -246,11 +246,12 @@ pub trait HasInProcessHandlers {
 }
 
 #[cfg(windows)]
-impl<'a, H, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, OT, S>
+impl<H, HB, OT, S> HasInProcessHandlers for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: HasSolutions + HasClientPerfMonitor + HasCorpus,
 {
     /// the timeout handler
     #[inline]
@@ -339,19 +340,22 @@ impl InProcessHandlers {
     }
 
     /// Create new [`InProcessHandlers`].
+    #[cfg(not(all(windows, feature = "std")))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(unix)]
+        #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut GLOBAL_STATE;
             #[cfg(feature = "std")]
             unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
+            #[cfg(not(miri))]
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
@@ -361,7 +365,20 @@ impl InProcessHandlers {
                     as *const _,
             })
         }
-        #[cfg(all(windows, feature = "std"))]
+        #[cfg(not(any(unix, feature = "std")))]
+        Ok(Self {})
+    }
+
+    /// Create new [`InProcessHandlers`].
+    #[cfg(all(windows, feature = "std"))]
+    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
+    where
+        E: Executor<EM, Z> + HasObservers + HasInProcessHandlers,
+        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        OF: Feedback<E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
+        Z: HasObjective<Objective = OF, State = E::State>,
+    {
         unsafe {
             let data = &mut GLOBAL_STATE;
             #[cfg(feature = "std")]
@@ -376,8 +393,6 @@ impl InProcessHandlers {
                     as *const c_void,
             })
         }
-        #[cfg(not(any(unix, feature = "std")))]
-        Ok(Self {})
     }
 
     /// Replace the handlers with `nop` handlers, deactivating the handlers
@@ -407,12 +422,14 @@ pub(crate) struct InProcessExecutorHandlerData {
     fuzzer_ptr: *mut c_void,
     executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
+
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
     crash_handler: *const c_void,
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
     timeout_handler: *const c_void,
+
     #[cfg(all(windows, feature = "std"))]
     pub(crate) tp_timer: *mut c_void,
     #[cfg(all(windows, feature = "std"))]
@@ -421,6 +438,9 @@ pub(crate) struct InProcessExecutorHandlerData {
     pub(crate) critical: *mut c_void,
     #[cfg(all(windows, feature = "std"))]
     pub(crate) timeout_input_ptr: *mut c_void,
+
+    #[cfg(any(unix, feature = "std"))]
+    pub(crate) timeout_executor_ptr: *mut c_void,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
@@ -454,14 +474,18 @@ impl InProcessExecutorHandlerData {
         r
     }
 
-    #[cfg(all(windows, feature = "std"))]
-    fn is_valid(&self) -> bool {
-        self.in_target == 1
+    #[cfg(any(unix, feature = "std"))]
+    pub fn is_valid(&self) -> bool {
+        !self.current_input_ptr.is_null()
     }
 
-    #[cfg(unix)]
-    fn is_valid(&self) -> bool {
-        !self.current_input_ptr.is_null()
+    #[cfg(any(unix, feature = "std"))]
+    fn timeout_executor_mut<'a, E>(&self) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
+        unsafe {
+            (self.timeout_executor_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
+                .as_mut()
+                .unwrap()
+        }
     }
 }
 
@@ -477,6 +501,7 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     executor_ptr: ptr::null(),
     /// The current input for signal handling
     current_input_ptr: ptr::null(),
+
     /// The crash handler fn
     #[cfg(any(unix, feature = "std"))]
     crash_handler: ptr::null(),
@@ -491,6 +516,9 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     critical: null_mut(),
     #[cfg(all(windows, feature = "std"))]
     timeout_input_ptr: null_mut(),
+
+    #[cfg(any(unix, feature = "std"))]
+    timeout_executor_ptr: null_mut(),
 };
 
 /// Get the inprocess [`crate::state::State`]
@@ -543,7 +571,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     E: HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
-    E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
     let observers = executor.observers_mut();
@@ -559,8 +587,8 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
     if interesting {
         let mut new_testcase = Testcase::new(input.clone());
-        new_testcase.set_parent_id_optional(state.fuzzed_corpus_id());
         new_testcase.add_metadata(exitkind);
+        new_testcase.set_parent_id_optional(*state.corpus().current());
         fuzzer
             .objective_mut()
             .append_metadata(state, observers, &mut new_testcase)
@@ -580,8 +608,6 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     }
 
     // We will start mutators from scratch after restart.
-    state.clear_fuzzed_corpus_id();
-
     event_mgr.on_restart(state).unwrap();
 
     log::info!("Waiting for broker...");
@@ -616,7 +642,7 @@ mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions},
+        state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -675,7 +701,7 @@ mod unix_signal_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
@@ -716,9 +742,15 @@ mod unix_signal_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
+        if !data.timeout_executor_ptr.is_null()
+            && data.timeout_executor_mut::<E>().handle_timeout(data)
+        {
+            return;
+        }
+
         if !data.is_valid() {
             log::warn!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing.");
             return;
@@ -757,7 +789,7 @@ mod unix_signal_handler {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
@@ -865,7 +897,7 @@ pub mod windows_asan_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions},
+        state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     };
 
     /// # Safety
@@ -875,10 +907,10 @@ pub mod windows_asan_handler {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        let mut data = &mut GLOBAL_STATE;
+        let data = &mut GLOBAL_STATE;
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
             /*
@@ -968,13 +1000,16 @@ mod windows_exception_handler {
         },
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess::{
+                run_observers_and_save_state, HasInProcessHandlers, InProcessExecutorHandlerData,
+                GLOBAL_STATE,
+            },
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasFuzzedCorpusId, HasSolutions},
+        state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -1013,7 +1048,7 @@ mod windows_exception_handler {
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
@@ -1069,10 +1104,10 @@ mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers,
+        E: HasObservers + HasInProcessHandlers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let data: &mut InProcessExecutorHandlerData =
@@ -1084,6 +1119,20 @@ mod windows_exception_handler {
                 .unwrap(),
         );
         compiler_fence(Ordering::SeqCst);
+
+        if !data.timeout_executor_ptr.is_null()
+            && data.timeout_executor_mut::<E>().handle_timeout(data)
+        {
+            compiler_fence(Ordering::SeqCst);
+            LeaveCriticalSection(
+                (data.critical as *mut RTL_CRITICAL_SECTION)
+                    .as_mut()
+                    .unwrap(),
+            );
+            compiler_fence(Ordering::SeqCst);
+
+            return;
+        }
 
         if data.in_target == 1 {
             let executor = data.executor_mut::<E>();
@@ -1133,7 +1182,7 @@ mod windows_exception_handler {
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasFuzzedCorpusId,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         // Have we set a timer_before?
@@ -1286,9 +1335,11 @@ impl InChildProcessHandlers {
     where
         E: HasObservers,
     {
+        #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
             // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
+            #[cfg(not(miri))]
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
@@ -1303,9 +1354,11 @@ impl InChildProcessHandlers {
     where
         E: HasObservers,
     {
+        #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
             // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
+            #[cfg(not(miri))]
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
@@ -2077,6 +2130,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg_attr(miri, ignore)]
     #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
         use crate::{

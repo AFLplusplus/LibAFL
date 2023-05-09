@@ -73,7 +73,7 @@ where
                 "FixMe: Nyx InvalidWriteToPayload handler is missing",
             )),
             NyxReturnValue::Error => Err(libafl::Error::illegal_state(
-                "Error: Nyx runtime error has occured...",
+                "Error: Nyx runtime error has occurred...",
             )),
             NyxReturnValue::IoError => {
                 // todo! *stop_soon_p = 0

@@ -1,15 +1,16 @@
-use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
+use std::{path::PathBuf, ptr::write};
 
 use libafl::prelude::*;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
+static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
-    unsafe { SIGNALS[idx] = 1 };
+    unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
 #[allow(clippy::similar_names)]
@@ -32,10 +33,9 @@ pub fn main() -> Result<(), Error> {
     };
 
     // Create an observation channel using the signals map
-    let observer =
-        unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
-    let factory = MapEqualityFactory::new_from_observer(&observer);
+    let factory = MapEqualityFactory::with_observer(&observer);
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);

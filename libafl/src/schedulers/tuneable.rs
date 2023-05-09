@@ -7,8 +7,9 @@ use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
 
+use super::RemovableScheduler;
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasTestcase},
     impl_serdeany,
     inputs::UsesInput,
     schedulers::Scheduler,
@@ -47,13 +48,16 @@ where
 
     fn metadata_mut(state: &mut S) -> &mut TuneableSchedulerMetadata {
         state
-            .metadata_mut()
+            .metadata_map_mut()
             .get_mut::<TuneableSchedulerMetadata>()
             .unwrap()
     }
 
     fn metadata(state: &S) -> &TuneableSchedulerMetadata {
-        state.metadata().get::<TuneableSchedulerMetadata>().unwrap()
+        state
+            .metadata_map()
+            .get::<TuneableSchedulerMetadata>()
+            .unwrap()
     }
 
     /// Sets the next corpus id to be used
@@ -88,10 +92,24 @@ where
     type State = S;
 }
 
+impl<S> RemovableScheduler for TuneableScheduler<S> where S: HasCorpus + HasMetadata + HasTestcase {}
+
 impl<S> Scheduler for TuneableScheduler<S>
 where
-    S: HasCorpus + HasMetadata,
+    S: HasCorpus + HasMetadata + HasTestcase,
 {
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+        // Set parent id
+        let current_idx = *state.corpus().current();
+        state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .set_parent_id_optional(current_idx);
+
+        Ok(())
+    }
+
     /// Gets the next entry in the queue
     fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
@@ -105,7 +123,7 @@ where
         } else {
             state.corpus().first().unwrap()
         };
-        *state.corpus_mut().current_mut() = Some(id);
+        self.set_current_scheduled(state, Some(id))?;
         Ok(id)
     }
 }

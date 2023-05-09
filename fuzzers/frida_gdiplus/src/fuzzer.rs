@@ -121,7 +121,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new_tracking(&edges_observer, true, false),
+                    MaxMapFeedback::tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::with_observer(&time_observer)
                 );
@@ -156,7 +156,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 println!("We're a client, let's fuzz :)");
 
                 // Create a PNG dictionary if not existing
-                if state.metadata().get::<Tokens>().is_none() {
+                if state.metadata_map().get::<Tokens>().is_none() {
                     state.add_metadata(Tokens::from([
                         vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
                         b"IHDR".to_vec(),
@@ -237,7 +237,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new_tracking(&edges_observer, true, false),
+                    MaxMapFeedback::tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::with_observer(&time_observer)
                 );
@@ -271,7 +271,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 println!("We're a client, let's fuzz :)");
 
                 // Create a PNG dictionary if not existing
-                if state.metadata().get::<Tokens>().is_none() {
+                if state.metadata_map().get::<Tokens>().is_none() {
                     state.add_metadata(Tokens::from([
                         vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
                         b"IHDR".to_vec(),
@@ -367,7 +367,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new_tracking(&edges_observer, true, false),
+                    MaxMapFeedback::tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::with_observer(&time_observer)
                 );
@@ -401,7 +401,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 println!("We're a client, let's fuzz :)");
 
                 // Create a PNG dictionary if not existing
-                if state.metadata().get::<Tokens>().is_none() {
+                if state.metadata_map().get::<Tokens>().is_none() {
                     state.add_metadata(Tokens::from([
                         vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
                         b"IHDR".to_vec(),

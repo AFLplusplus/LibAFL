@@ -24,8 +24,7 @@ Welcome to `LibAFL`
     clippy::ptr_as_ptr,
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::unreadable_literal
+    clippy::module_name_repetitions
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -46,7 +45,6 @@ Welcome to `LibAFL`
     unused_import_braces,
     unused_qualifications,
     unused_must_use,
-    missing_docs,
     //unused_results
 ))]
 #![cfg_attr(
@@ -519,6 +517,9 @@ mod tests {
             fuzzer
                 .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
                 .unwrap_or_else(|_| panic!("Error in iter {i}"));
+            if cfg!(miri) {
+                break;
+            }
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();

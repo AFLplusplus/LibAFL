@@ -19,13 +19,12 @@ use serde::{de::DeserializeOwned, Serialize};
 use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
+#[cfg(all(unix, feature = "std", not(miri)))]
+use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use crate::bolts::os::{fork, ForkResult};
 #[cfg(all(unix, feature = "std"))]
-use crate::{
-    bolts::os::unix_signals::setup_signal_handler,
-    events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
-};
+use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
 use crate::{
     bolts::ClientId,
     events::{
@@ -213,6 +212,7 @@ where
                 observers_buf: _,
                 time,
                 executions,
+                forward_id: _,
             } => {
                 monitor
                     .client_stats_mut_for(ClientId(0))
@@ -430,7 +430,7 @@ where
     MT: Monitor, //TODO CE: CustomEvent,
 {
     /// Creates a new [`SimpleEventManager`].
-    fn new_launched(monitor: MT, staterestorer: StateRestorer<SP>) -> Self {
+    fn launched(monitor: MT, staterestorer: StateRestorer<SP>) -> Self {
         Self {
             staterestorer,
             simple_event_mgr: SimpleEventManager::new(monitor),
@@ -472,7 +472,7 @@ where
             }
 
             // We setup signal handlers to clean up shmem segments used by state restorer
-            #[cfg(unix)]
+            #[cfg(all(unix, not(miri)))]
             if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
@@ -536,7 +536,7 @@ where
                 // Mgr to send and receive msgs from/to all other fuzzer instances
                 (
                     None,
-                    SimpleRestartingEventManager::new_launched(monitor, staterestorer),
+                    SimpleRestartingEventManager::launched(monitor, staterestorer),
                 )
             }
             // Restoring from a previous run, deserialize state and corpus.
@@ -552,7 +552,7 @@ where
 
                 (
                     Some(state),
-                    SimpleRestartingEventManager::new_launched(monitor, staterestorer),
+                    SimpleRestartingEventManager::launched(monitor, staterestorer),
                 )
             }
         };

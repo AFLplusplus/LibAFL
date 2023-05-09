@@ -54,7 +54,7 @@ pub fn fuzz() {
     env::remove_var("LD_LIBRARY_PATH");
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&args, &env);
+    let emu = Emulator::new(&args, &env).unwrap();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer).unwrap();
@@ -127,7 +127,7 @@ pub fn fuzz() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::new_tracking(&edges_observer, true, false),
+            MaxMapFeedback::tracking(&edges_observer, true, false),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::with_observer(&time_observer)
         );

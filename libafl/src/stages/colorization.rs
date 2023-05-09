@@ -155,13 +155,7 @@ where
         corpus_idx: CorpusId,
         name: &str,
     ) -> Result<E::Input, Error> {
-        let mut input = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .load_input()
-            .unwrap()
-            .clone();
+        let mut input = state.corpus().cloned_input_for_id(corpus_idx)?;
         // The backup of the input
         let backup = input.clone();
         // This is the buffer we'll randomly mutate during type_replace
@@ -171,6 +165,8 @@ where
         let consumed_input = input.clone();
 
         // First, run orig_input once and get the original hash
+
+        // Idea: No need to do this every time
         let orig_hash =
             Self::get_raw_map_hash_run(fuzzer, executor, state, manager, consumed_input, name)?;
         let changed_bytes = changed.bytes_mut();
@@ -186,6 +182,7 @@ where
         // Keep it sorted, we want the earliest ones to come first so that it's easier to sort them
         let mut ok_ranges = BinaryHeap::new();
 
+        // println!("Replaced bytes: {:#?}", changed_bytes);
         // Now replace with random values (This is type_replace)
         Self::type_replace(changed_bytes, state);
 
@@ -199,13 +196,15 @@ where
                 let range_start = r.start;
                 let range_end = r.end;
                 let copy_len = r.len();
-                buffer_copy(
-                    input.bytes_mut(),
-                    changed.bytes(),
-                    range_start,
-                    range_start,
-                    copy_len,
-                );
+                unsafe {
+                    buffer_copy(
+                        input.bytes_mut(),
+                        changed.bytes(),
+                        range_start,
+                        range_start,
+                        copy_len,
+                    );
+                }
 
                 let consumed_input = input.clone();
                 let changed_hash = Self::get_raw_map_hash_run(
@@ -226,13 +225,15 @@ where
                     // Seems like this range is too big that we can't keep the original hash anymore
 
                     // Revert the changes
-                    buffer_copy(
-                        input.bytes_mut(),
-                        backup.bytes(),
-                        range_start,
-                        range_start,
-                        copy_len,
-                    );
+                    unsafe {
+                        buffer_copy(
+                            input.bytes_mut(),
+                            backup.bytes(),
+                            range_start,
+                            range_start,
+                            copy_len,
+                        );
+                    }
 
                     // Add smaller range
                     if copy_len > 1 {
@@ -269,7 +270,7 @@ where
             }
         }
 
-        if let Some(meta) = state.metadata_mut().get_mut::<TaintMetadata>() {
+        if let Some(meta) = state.metadata_map_mut().get_mut::<TaintMetadata>() {
             meta.update(input.bytes().to_vec(), res);
 
             // println!("meta: {:#?}", meta);

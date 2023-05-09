@@ -23,5 +23,5 @@ fn main() {
         }
     }
 
-    log::info!("{}", fuzzers.join("\n"));
+    println!("{}", fuzzers.join("\n"));
 }

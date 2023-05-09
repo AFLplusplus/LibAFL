@@ -1,6 +1,6 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{fs, io::Read, path::PathBuf};
+use std::{fs, io::Read, path::PathBuf, ptr::write};
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
@@ -24,10 +24,10 @@ use libafl::{
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
-
+static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
-    unsafe { SIGNALS[idx] = 1 };
+    unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
 fn is_sub<T: PartialEq>(mut haystack: &[T], needle: &[T]) -> bool {
@@ -82,10 +82,9 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", &mut SIGNALS) };
-
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
     // Feedback to rate the interestingness of an input
-    let mut feedback = MaxMapFeedback::new_tracking(&observer, false, true);
+    let mut feedback = MaxMapFeedback::tracking(&observer, false, true);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -107,7 +106,7 @@ pub fn main() {
     )
     .unwrap();
 
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         state.add_metadata(Tokens::from([b"FOO".to_vec(), b"BAR".to_vec()]));
     }
 

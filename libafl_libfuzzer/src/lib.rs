@@ -6,3 +6,5 @@
 //! This crate links to a (separately built) internal crate which affords the actual functionality.
 //! The internal crate must be built separately to ensure flags from dependent crates are not leaked
 //! to the runtime (e.g., to prevent coverage being collected on the runtime).
+
+pub use libfuzzer_sys::*;

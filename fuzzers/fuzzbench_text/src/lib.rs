@@ -288,6 +288,12 @@ fn fuzz_binary(
     // This way, we are able to continue fuzzing afterwards.
     let mut shmem_provider = StdShMemProvider::new()?;
 
+    /*
+    // For debugging
+    let mut mgr = SimpleEventManager::new(monitor);
+    let mut state = None;
+    */
+
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
@@ -311,7 +317,7 @@ fn fuzz_binary(
 
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -416,7 +422,7 @@ fn fuzz_binary(
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;
@@ -435,8 +441,8 @@ fn fuzz_binary(
     if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
-            .unwrap_or_else(|_| {
-                println!("Failed to load initial corpus at {:?}", &seed_dir);
+            .unwrap_or_else(|e| {
+                println!("Failed to load initial corpus at {seed_dir:?} - {e:?}");
                 process::exit(0);
             });
         println!("We imported {} inputs from disk.", state.corpus().count());
@@ -491,6 +497,14 @@ fn fuzz_text(
     // This way, we are able to continue fuzzing afterwards.
     let mut shmem_provider = StdShMemProvider::new()?;
 
+    /*
+    // For debugging
+    log::set_max_level(log::LevelFilter::Trace);
+    SimpleStderrLogger::set_logger()?;
+    let mut mgr = SimpleEventManager::new(monitor);
+    let mut state = None;
+    */
+
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
@@ -515,7 +529,7 @@ fn fuzz_text(
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     // New maximization map feedback linked to the edges observer and the feedback state
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
+    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, true);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -635,7 +649,7 @@ fn fuzz_text(
     let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);
 
     // Read tokens
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;
@@ -654,8 +668,8 @@ fn fuzz_text(
     if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
-            .unwrap_or_else(|_| {
-                println!("Failed to load initial corpus at {:?}", &seed_dir);
+            .unwrap_or_else(|e| {
+                println!("Failed to load initial corpus at {seed_dir:?} {e:?}");
                 process::exit(0);
             });
         println!("We imported {} inputs from disk.", state.corpus().count());

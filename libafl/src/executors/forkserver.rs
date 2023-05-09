@@ -24,21 +24,20 @@ use nix::{
     unistd::Pid,
 };
 
+#[cfg(feature = "regex")]
+use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
 use crate::{
     bolts::{
         fs::{get_unique_std_input_file, InputFile},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-        tuples::Prepend,
-        AsMutSlice, AsSlice,
+        tuples::{MatchName, Prepend},
+        AsMutSlice, AsSlice, Truncate,
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
-    observers::{
-        get_asan_runtime_flags_with_log_path, AsanBacktraceObserver, MapObserver, Observer,
-        ObserversTuple, UsesObservers,
-    },
+    observers::{MapObserver, Observer, ObserversTuple, UsesObservers},
     state::UsesState,
     Error,
 };
@@ -232,9 +231,11 @@ impl Forkserver {
             command.env("__AFL_DEFER_FORKSRV", "1");
         }
 
+        #[cfg(feature = "regex")]
+        command.env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path());
+
         match command
             .env("LD_BIND_NOW", "1")
-            .env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path())
             .envs(envs)
             .setlimit(memlimit)
             .setsid()
@@ -417,7 +418,7 @@ impl<E> TimeoutForkserverExecutor<E> {
 
 impl<E, EM, Z> Executor<EM, Z> for TimeoutForkserverExecutor<E>
 where
-    E: Executor<EM, Z> + HasForkserver + Debug,
+    E: Executor<EM, Z> + HasForkserver + HasObservers + Debug,
     E::Input: HasTargetBytes,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
@@ -487,6 +488,13 @@ where
             self.executor.forkserver_mut().set_status(status);
             if libc::WIFSIGNALED(self.executor.forkserver().status()) {
                 exit_kind = ExitKind::Crash;
+                #[cfg(feature = "regex")]
+                if let Some(asan_observer) = self
+                    .observers_mut()
+                    .match_name_mut::<AsanBacktraceObserver>("AsanBacktraceObserver")
+                {
+                    asan_observer.parse_asan_output_from_asan_log_file(pid)?;
+                }
             }
         } else {
             self.executor.forkserver_mut().set_last_run_timed_out(1);
@@ -652,7 +660,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         other_observers: OT,
     ) -> Result<ForkserverExecutor<(MO, OT), S, SP>, Error>
     where
-        MO: Observer<S> + MapObserver, // TODO maybe enforce Entry = u8 for the cov map
+        MO: Observer<S> + MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
         OT: ObserversTuple<S> + Prepend<MO, PreprendResult = OT>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
@@ -670,7 +678,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         );
 
         if let Some(dynamic_map_size) = self.map_size {
-            map_observer.downsize_map(dynamic_map_size);
+            map_observer.truncate(dynamic_map_size);
         }
 
         let observers: (MO, OT) = other_observers.prepend(map_observer);
@@ -1129,6 +1137,7 @@ where
 
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
+            #[cfg(feature = "regex")]
             if self.has_asan_observer.is_none() {
                 self.has_asan_observer = Some(
                     self.observers()
@@ -1136,6 +1145,7 @@ where
                         .is_some(),
                 );
             }
+            #[cfg(feature = "regex")]
             if self.has_asan_observer.unwrap() {
                 self.observers_mut()
                     .match_name_mut::<AsanBacktraceObserver>("AsanBacktraceObserver")
@@ -1280,6 +1290,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg_attr(miri, ignore)]
     fn test_forkserver() {
         const MAP_SIZE: usize = 65536;
         let bin = OsString::from("echo");

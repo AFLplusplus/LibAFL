@@ -167,11 +167,11 @@ where
         }
     }
     let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
-    if state.metadata().get::<QemuEdgesMapMetadata>().is_none() {
+    if state.metadata_map().get::<QemuEdgesMapMetadata>().is_none() {
         state.add_metadata(QemuEdgesMapMetadata::new());
     }
     let meta = state
-        .metadata_mut()
+        .metadata_map_mut()
         .get_mut::<QemuEdgesMapMetadata>()
         .unwrap();
 

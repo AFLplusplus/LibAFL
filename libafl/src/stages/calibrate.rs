@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{current_time, tuples::Named, AsIter},
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverName},
@@ -106,19 +106,16 @@ where
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
             let corpus = state.corpus().get(corpus_idx)?.borrow();
-            if corpus.fuzz_level() > 0 {
+            // println!("calibration; corpus.scheduled_count() : {}", corpus.scheduled_count());
+
+            if corpus.scheduled_count() > 0 {
                 return Ok(());
             }
         }
 
         let mut iter = self.stage_max;
 
-        let input = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .load_input()?
-            .clone();
+        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
         // Run once to get the initial calibration map
         executor.observers_mut().pre_exec_all(state, &input)?;
@@ -151,17 +148,12 @@ where
         let mut unstable_entries: Vec<usize> = vec![];
         let map_len: usize = map_first.len();
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
-        // run is found to be unstable, with CAL_STAGE_MAX total runs.
+        // run is found to be unstable or to crash with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
 
         while i < iter {
-            let input = state
-                .corpus()
-                .get(corpus_idx)?
-                .borrow_mut()
-                .load_input()?
-                .clone();
+            let input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
             executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();
@@ -176,11 +168,11 @@ where
                     )?;
 
                     has_errors = true;
-                    if iter < CAL_STAGE_MAX {
-                        iter += 2;
-                    };
                 }
-                continue;
+
+                if iter < CAL_STAGE_MAX {
+                    iter += 2;
+                };
             };
 
             total_time += current_time() - start;
@@ -197,7 +189,7 @@ where
                     .to_vec();
 
                 let history_map = &mut state
-                    .named_metadata_mut()
+                    .named_metadata_map_mut()
                     .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
                     .unwrap()
                     .history_map;
@@ -228,7 +220,7 @@ where
             // If we see new stable entries executing this new corpus entries, then merge with the existing one
             if state.has_metadata::<UnstableEntriesMetadata>() {
                 let existing = state
-                    .metadata_mut()
+                    .metadata_map_mut()
                     .get_mut::<UnstableEntriesMetadata>()
                     .unwrap();
                 for item in unstable_entries {
@@ -244,14 +236,7 @@ where
         };
 
         // If weighted scheduler or powerscheduler is used, update it
-        let use_powerschedule = state.has_metadata::<SchedulerMetadata>()
-            && state
-                .corpus()
-                .get(corpus_idx)?
-                .borrow()
-                .has_metadata::<SchedulerTestcaseMetaData>();
-
-        if use_powerschedule {
+        if state.has_metadata::<SchedulerMetadata>() {
             let map = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
@@ -259,7 +244,10 @@ where
 
             let bitmap_size = map.count_bytes();
 
-            let psmeta = state.metadata_mut().get_mut::<SchedulerMetadata>().unwrap();
+            let psmeta = state
+                .metadata_map_mut()
+                .get_mut::<SchedulerMetadata>()
+                .unwrap();
             let handicap = psmeta.queue_cycles();
 
             psmeta.set_exec_time(psmeta.exec_time() + total_time);
@@ -269,18 +257,32 @@ where
             psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
             let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-            let fuzz_level = testcase.fuzz_level();
 
             testcase.set_exec_time(total_time / (iter as u32));
-            testcase.set_fuzz_level(fuzz_level + 1);
             // log::trace!("time: {:#?}", testcase.exec_time());
 
-            let data = testcase
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?;
+            // If the testcase doesn't have its own `SchedulerTestcaseMetadata`, create it.
+            let data = if let Ok(metadata) = testcase.metadata_mut::<SchedulerTestcaseMetadata>() {
+                metadata
+            } else {
+                let depth = if let Some(parent_id) = testcase.parent_id() {
+                    if let Some(parent_metadata) = (*state.corpus().get(parent_id)?)
+                        .borrow()
+                        .metadata_map()
+                        .get::<SchedulerTestcaseMetadata>()
+                    {
+                        parent_metadata.depth() + 1
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+                testcase.add_metadata(SchedulerTestcaseMetadata::new(depth));
+                testcase
+                    .metadata_mut::<SchedulerTestcaseMetadata>()
+                    .unwrap()
+            };
 
             data.set_cycle_and_time((total_time, iter));
             data.set_bitmap_size(bitmap_size);
@@ -288,7 +290,7 @@ where
         }
 
         // Send the stability event to the broker
-        if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
+        if let Some(meta) = state.metadata_map().get::<UnstableEntriesMetadata>() {
             let unstable_entries = meta.unstable_entries().len();
             let map_len = meta.map_len();
             mgr.fire(

@@ -5,6 +5,7 @@ use core::cell::RefCell;
 
 use serde::{Deserialize, Serialize};
 
+use super::HasTestcase;
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     inputs::{Input, UsesInput},
@@ -378,6 +379,36 @@ where
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.storage.keys[nth]
+    }
+
+    #[inline]
+    fn load_input_into(&self, _: &mut Testcase<Self::Input>) -> Result<(), Error> {
+        // Inputs never get evicted, nothing to load here.
+        Ok(())
+    }
+
+    #[inline]
+    fn store_input_from(&self, _: &Testcase<Self::Input>) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<I> HasTestcase for InMemoryCorpus<I>
+where
+    I: Input,
+{
+    fn testcase(
+        &self,
+        id: CorpusId,
+    ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.get(id)?.borrow())
+    }
+
+    fn testcase_mut(
+        &self,
+        id: CorpusId,
+    ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+        Ok(self.get(id)?.borrow_mut())
     }
 }
 

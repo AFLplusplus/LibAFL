@@ -171,7 +171,7 @@ fn fuzz(
 
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&args, &env);
+    let emu = Emulator::new(&args, &env).unwrap();
     //let emu = init_with_asan(&mut args, &mut env);
 
     let mut elf_buffer = Vec::new();
@@ -258,7 +258,7 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+    let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -366,7 +366,7 @@ fn fuzz(
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
-        if state.metadata().get::<Tokens>().is_none() {
+        if state.metadata_map().get::<Tokens>().is_none() {
             state.add_metadata(Tokens::from_file(tokenfile)?);
         }
     }

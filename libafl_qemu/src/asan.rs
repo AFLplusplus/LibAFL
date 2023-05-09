@@ -6,7 +6,9 @@ use std::{
     sync::Mutex,
 };
 
-use libafl::{executors::ExitKind, inputs::UsesInput, state::HasMetadata};
+use libafl::{
+    executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, state::HasMetadata,
+};
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
@@ -14,7 +16,7 @@ use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
-    emu::{Emulator, MemAccessInfo, SyscallHookResult},
+    emu::{EmuError, Emulator, MemAccessInfo, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
     GuestAddr,
@@ -452,8 +454,10 @@ impl AsanGiovese {
 
 static mut ASAN_INITED: bool = false;
 
-pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> Emulator {
-    assert!(!args.is_empty());
+pub fn init_with_asan(
+    args: &mut Vec<String>,
+    env: &mut [(String, String)],
+) -> Result<Emulator, EmuError> {
     let current = env::current_exe().unwrap();
     let asan_lib = fs::canonicalize(current)
         .unwrap()
@@ -730,7 +734,15 @@ where
         }
     }
 
-    fn post_exec(&mut self, emulator: &Emulator, _input: &S::Input, exit_kind: &mut ExitKind) {
+    fn post_exec<OT>(
+        &mut self,
+        emulator: &Emulator,
+        _input: &S::Input,
+        _observers: &mut OT,
+        exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S>,
+    {
         if self.reset(emulator) == AsanRollback::HasLeaks {
             *exit_kind = ExitKind::Crash;
         }

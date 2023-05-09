@@ -91,7 +91,7 @@ pub fn merge(
 
     let mut shmem_provider = StdShMemProvider::new()?;
 
-    let edges = unsafe { &mut COUNTERS_MAPS };
+    let edges = unsafe { core::mem::take(&mut COUNTERS_MAPS) };
     let edges_observer = HitcountsIterableMapObserver::new(MultiMapObserver::new("edges", edges));
 
     let mut shmem = shmem_provider.new_shmem(edges_observer.usable_count())?;
@@ -155,8 +155,7 @@ pub fn merge(
     state.load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, options.dirs())?;
 
     let edge_meta = state
-        .named_metadata()
-        .get::<MapFeedbackMetadata<u8>>(&map_feedback_name)
+        .named_metadata::<MapFeedbackMetadata<u8>>(&map_feedback_name)
         .unwrap();
     let edges_max = edge_meta.history_map.len();
     let edges = edges_max - bytecount::count(&edge_meta.history_map, 0);

@@ -29,8 +29,7 @@ where
     ST: StagesTuple<E, EM, S, F>,
 {
     let meta = state
-        .named_metadata()
-        .get::<MapFeedbackMetadata<u8>>(&(MAPFEEDBACK_PREFIX.to_string() + "edges"))
+        .named_metadata::<MapFeedbackMetadata<u8>>(&(MAPFEEDBACK_PREFIX.to_string() + "edges"))
         .unwrap();
     let observed = meta.history_map.iter().filter(|&&e| e != 0).count();
     let total = meta.history_map.len();

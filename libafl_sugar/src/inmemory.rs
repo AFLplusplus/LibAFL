@@ -137,7 +137,7 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let monitor = MultiMonitor::new(|s| log::info!("{s}"));
+        let monitor = MultiMonitor::new(|s| println!("{s}"));
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _>,
@@ -155,7 +155,7 @@ where
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::new_tracking(&edges_observer, true, false),
+                MaxMapFeedback::tracking(&edges_observer, true, false),
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::with_observer(&time_observer)
             );
@@ -181,7 +181,7 @@ where
 
             // Create a dictionary if not existing
             if let Some(tokens_file) = &self.tokens_file {
-                if state.metadata().get::<Tokens>().is_none() {
+                if state.metadata_map().get::<Tokens>().is_none() {
                     state.add_metadata(Tokens::from_file(tokens_file)?);
                 }
             }

@@ -21,7 +21,7 @@ use crate::{
     mark_feature_time,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
-    schedulers::Scheduler,
+    schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, HasSolutions, UsesState},
@@ -36,7 +36,7 @@ pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
 where
     Self::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor,
     <Self::State as UsesInput>::Input: HasLen + Hash,
-    CS: Scheduler<State = Self::State>,
+    CS: Scheduler<State = Self::State> + RemovableScheduler,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
     EM: EventFirer<State = Self::State>,
     F1: Feedback<Self::State>,
@@ -72,12 +72,7 @@ where
         let num = self.iterations(state, base_corpus_idx)?;
 
         start_timer!(state);
-        let mut base = state
-            .corpus()
-            .get(base_corpus_idx)?
-            .borrow_mut()
-            .load_input()?
-            .clone();
+        let mut base = state.corpus().cloned_input_for_id(base_corpus_idx)?;
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         base.hash(&mut hasher);
         let base_hash = hasher.finish();
@@ -197,6 +192,7 @@ where
     CS: Scheduler,
     M: Mutator<CS::Input, CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>,
+    CS::State: HasCorpus,
 {
     type State = CS::State;
 }
@@ -204,8 +200,9 @@ where
 impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
-    CS: Scheduler,
-    CS::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    CS: Scheduler + RemovableScheduler,
+    CS::State:
+        HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor + HasCorpus,
     <CS::State as UsesInput>::Input: HasLen + Hash,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
@@ -252,7 +249,7 @@ where
 impl<CS, E, EM, F1, F2, FF, M, OT, Z> TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
-    CS: Scheduler,
+    CS: Scheduler + RemovableScheduler,
     E: HasObservers<Observers = OT, State = CS::State> + Executor<EM, Z>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,
@@ -290,6 +287,7 @@ where
     CS: Scheduler,
     M: Mutator<CS::Input, CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>,
+    CS::State: HasCorpus,
 {
     /// Creates a new minimising mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
@@ -373,7 +371,7 @@ where
     M: MapObserver,
 {
     /// Creates a new map equality feedback for the given observer
-    pub fn new_from_observer(obs: &M) -> Self {
+    pub fn with_observer(obs: &M) -> Self {
         Self {
             obs_name: obs.name().to_string(),
             phantom: PhantomData,

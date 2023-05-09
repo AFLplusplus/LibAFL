@@ -1,7 +1,7 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
 pub mod testcase;
-pub use testcase::{SchedulerTestcaseMetaData, Testcase};
+pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
 
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
@@ -54,6 +54,13 @@ impl From<u64> for CorpusId {
     }
 }
 
+impl From<CorpusId> for usize {
+    /// Not that the `CorpusId` is not necessarily stable in the corpus (if we remove [`Testcase`]s, for example).
+    fn from(id: CorpusId) -> Self {
+        id.0
+    }
+}
+
 /// Utility macro to call `Corpus::random_id`
 #[macro_export]
 macro_rules! random_corpus_id {
@@ -64,7 +71,7 @@ macro_rules! random_corpus_id {
     }};
 }
 
-/// Corpus with all current testcases
+/// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Returns the number of elements
     fn count(&self) -> usize;
@@ -77,7 +84,7 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Add an entry to the corpus and return its index
     fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
 
-    /// Replaces the testcase at the given idx, returning the existing.
+    /// Replaces the [`Testcase`] at the given idx, returning the existing.
     fn replace(
         &mut self,
         idx: CorpusId,
@@ -123,9 +130,23 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
             .nth(nth)
             .expect("Failed to get the {nth} CorpusId")
     }
+
+    /// Method to load the input for this [`Testcase`] from persistent storage,
+    /// if necessary, and if was not already loaded (`== Some(input)`).
+    /// After this call, `testcase.input()` must always return `Some(input)`.
+    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error>;
+
+    /// Method to store the input of this `Testcase` to persistent storage, if necessary.
+    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error>;
+
+    /// Loads the `Input` for a given [`CorpusId`] from the [`Corpus`], and returns the clone.
+    fn cloned_input_for_id(&self, idx: CorpusId) -> Result<Self::Input, Error> {
+        let mut testcase = self.get(idx)?.borrow_mut();
+        Ok(testcase.load_input(self)?.clone())
+    }
 }
 
-/// `Iterator` over the ids of a `Corpus`
+/// [`Iterator`] over the ids of a [`Corpus`]
 #[derive(Debug)]
 pub struct CorpusIdIterator<'a, C>
 where
@@ -180,7 +201,7 @@ pub mod pybind {
             cached::pybind::PythonCachedOnDiskCorpus, inmemory::pybind::PythonInMemoryCorpus,
             inmemory_ondisk::pybind::PythonInMemoryOnDiskCorpus,
             ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
-            CorpusId, Testcase,
+            CorpusId, HasTestcase, Testcase,
         },
         inputs::{BytesInput, UsesInput},
         Error,
@@ -361,6 +382,14 @@ pub mod pybind {
             unwrap_me!(self.wrapper, c, { c.last() })
         }
 
+        fn load_input_into(&self, testcase: &mut Testcase<BytesInput>) -> Result<(), Error> {
+            unwrap_me!(self.wrapper, c, { c.load_input_into(testcase) })
+        }
+
+        fn store_input_from(&self, testcase: &Testcase<BytesInput>) -> Result<(), Error> {
+            unwrap_me!(self.wrapper, c, { c.store_input_from(testcase) })
+        }
+
         /*fn ids<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
             CorpusIdIterator {
                 corpus: self,
@@ -375,6 +404,22 @@ pub mod pybind {
                 .nth(nth)
                 .expect("Failed to get a random CorpusId")
         }*/
+    }
+
+    impl HasTestcase for PythonCorpus {
+        fn testcase(
+            &self,
+            id: CorpusId,
+        ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+            Ok(self.get(id)?.borrow())
+        }
+
+        fn testcase_mut(
+            &self,
+            id: CorpusId,
+        ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+            Ok(self.get(id)?.borrow_mut())
+        }
     }
 
     /// Register the classes to the python module

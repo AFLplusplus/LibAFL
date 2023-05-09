@@ -67,7 +67,7 @@ pub fn main() {
     let mgr = SimpleEventManager::new(monitor);
 
     // A queue policy to get testcasess from the corpus
-    let scheduler = QueueScheduler::new();
+    let mut scheduler = QueueScheduler::new();
 
     // Create the executor for an in-process function with just one observer
     //let mut executor = InProcessExecutor::new(&mut harness, &mut fuzzer, &mut state, &mut mgr)

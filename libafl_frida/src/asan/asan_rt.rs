@@ -1671,14 +1671,15 @@ impl AsanRuntime {
         let mut map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE;
 
         // apple aarch64 requires MAP_JIT to allocates WX pages
-        if cfg!(all(target_vendor = "apple", target_arch = "aarch64")) {
+        #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+        {
             map_flags |= MapFlags::MAP_JIT;
         }
 
         unsafe {
             let mapping = mmap(
-                std::ptr::null_mut(),
-                0x1000,
+                None,
+                NonZeroUsize::try_from(0x1000).unwrap(),
                 ProtFlags::all(),
                 map_flags,
                 -1,
@@ -1689,13 +1690,17 @@ impl AsanRuntime {
             // on apple aarch64, WX pages can't be both writable and executable at the same time.
             // pthread_jit_write_protect_np flips them from executable (1) to writable (0)
             #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-            libc::pthread_jit_write_protect_np(0);
+            {
+                libc::pthread_jit_write_protect_np(0);
+            }
 
             blob.as_ptr()
                 .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
 
             #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-            libc::pthread_jit_write_protect_np(1);
+            {
+                libc::pthread_jit_write_protect_np(1);
+            }
             self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
         }
     }

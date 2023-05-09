@@ -1,32 +1,43 @@
-use std::{path::PathBuf, process::Command};
+use std::{fs, path::PathBuf, process::Command};
 
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/src");
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/Cargo.toml");
 
-    let mut lib_path = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    lib_path.push("libafl_libfuzzer_runtime");
+    let custom_lib_dir =
+        PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("libafl_libfuzzer");
+    std::fs::create_dir_all(&custom_lib_dir)
+        .expect("Couldn't create the output directory for the fuzzer runtime build");
+
+    let mut lib_src = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
+    lib_src.push("libafl_libfuzzer_runtime");
 
     let mut command = Command::new(std::env::var_os("CARGO").unwrap());
     command
-        .env_clear()
-        .env("PATH", std::env::var_os("PATH").unwrap())
-        .current_dir(&lib_path);
+        .env_remove("RUSTFLAGS")
+        .env_remove("CARGO_ENCODED_RUSTFLAGS");
 
-    lib_path.push("target");
-    lib_path.push(std::env::var_os("TARGET").unwrap());
-    lib_path.push("release");
-
-    if rustversion::cfg!(nightly) {
-        command.arg("-Zbuild-std");
+    for (var, _) in std::env::vars() {
+        if var.starts_with("CARGO_PKG_") || var.starts_with("CARGO_FEATURE_") {
+            command.env_remove(var);
+        }
     }
 
     command
-        .arg("build")
+        .env("PATH", std::env::var_os("PATH").unwrap())
+        .current_dir(&lib_src);
+
+    command.arg("build");
+
+    if cfg!(feature = "merge") {
+        command.arg("--features").arg("merge");
+    }
+
+    command
         .arg("--release")
+        .arg("--no-default-features")
         .arg("--target-dir")
-        .arg(PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("runtime-target"))
+        .arg(&custom_lib_dir)
         .arg("--target")
         .arg(std::env::var_os("TARGET").unwrap());
 
@@ -34,9 +45,38 @@ fn main() {
         panic!("Couldn't build runtime crate! Did you remember to use nightly?");
     }
 
+    let mut lib_path = custom_lib_dir.join(std::env::var_os("TARGET").unwrap());
+    lib_path.push("release");
+    lib_path.push("libafl_libfuzzer_runtime.a");
+
+    // // TODO this is definitely not compat with macOS/Windows...
+    // let mut command = Command::new("ld");
+    // command
+    //     .arg("-Ur")
+    //     .arg("--whole-archive")
+    //     .arg(lib_path)
+    //     .args(["-o", custom_lib_dir.join("libFuzzer.o").to_str().expect("Invalid path characters present in your current directory prevent us from linking to the runtime")]);
+    //
+    // if command.status().map(|s| !s.success()).unwrap_or(true) {
+    //     panic!("Couldn't link runtime crate!");
+    // }
+    //
+    // let mut command = Command::new("ar");
+    // command
+    //     .arg("cr")
+    //     .arg(custom_lib_dir.join("libFuzzer.a"))
+    //     .arg(custom_lib_dir.join("libFuzzer.o"));
+    //
+    // if command.status().map(|s| !s.success()).unwrap_or(true) {
+    //     panic!("Couldn't create runtime archive!");
+    // }
+
+    fs::copy(lib_path, custom_lib_dir.join("libFuzzer.a")).unwrap();
+
     println!(
-        "cargo:link-lib-search=native={}",
-        lib_path.to_str().unwrap()
+        "cargo:rustc-link-search=native={}",
+        custom_lib_dir.to_str().unwrap()
     );
-    println!("cargo:link-lib=static=afl_libfuzzer_runtime");
+    println!("cargo:rustc-link-lib=static=Fuzzer");
+    println!("cargo:rustc-link-lib=stdc++")
 }

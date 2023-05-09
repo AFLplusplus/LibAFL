@@ -20,7 +20,10 @@ use libafl::{
     events::{EventConfig, ProgressReporter, SimpleEventManager, SimpleRestartingEventManager},
     executors::ExitKind,
     inputs::UsesInput,
-    monitors::{tui::TuiMonitor, MultiMonitor, SimpleMonitor},
+    monitors::{
+        tui::{ui::TuiUI, TuiMonitor},
+        MultiMonitor, SimpleMonitor,
+    },
     stages::StagesTuple,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasSolutions, UsesState},
     Error, Fuzzer,
@@ -49,8 +52,7 @@ where
             .get(solution)
             .expect("Last solution was not available")
             .borrow()
-            .metadata()
-            .get::<LibfuzzerCrashCauseMetadata>()
+            .metadata::<LibfuzzerCrashCauseMetadata>()
             .expect("Crash cause not attached to solution")
             .kind();
         let mut halt = false;
@@ -132,7 +134,7 @@ pub fn fuzz(
                     .unwrap()
                     .port();
 
-                let monitor = TuiMonitor::new(options.fuzzer_name().to_string(), true);
+                let monitor = TuiMonitor::new(TuiUI::new(options.fuzzer_name().to_string(), true));
 
                 match Launcher::builder()
                     .shmem_provider(shmem_provider)
