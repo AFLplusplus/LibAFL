@@ -445,6 +445,7 @@ pub mod pybind {
     use crate::qemu;
 
     #[pyclass(unsendable)]
+    #[derive(Debug)]
     struct QemuBytesCoverageSugar {
         input_dirs: Vec<PathBuf>,
         output_dir: PathBuf,
