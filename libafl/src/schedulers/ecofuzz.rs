@@ -61,6 +61,7 @@ pub struct EcoMetadata {
     last_executions: usize,
     calculate_coe: u64,
     rate: f64,
+    regret: f64,
 }
 
 crate::impl_serdeany!(EcoMetadata);
@@ -98,27 +99,21 @@ where
     fn handle_previous(id: CorpusId, state: &mut S) -> Result<(), Error> {
         let count = state.corpus().count();
 
-        let (last_corpus_count, last_mutation_num) = {
+        let (last_corpus_count, last_mutation_num, regret) = {
             let m = state.metadata_mut::<EcoMetadata>()?;
-            (m.last_corpus_count, m.last_mutation_num)
+            (m.last_corpus_count, m.last_mutation_num, m.regret)
         };
 
-        let computed_score = {
+        {
             let mut testcase = state.testcase_mut(id)?;
 
             let tcmeta = testcase.metadata_mut::<EcoTestcaseMetadata>()?;
+            debug_assert!(tcmeta.mutation_num >= last_mutation_num);
             tcmeta.last_energy = tcmeta.mutation_num - last_mutation_num;
             tcmeta.found = count - last_corpus_count;
             // Set was_fuzzed for the old current
-            tcmeta.computed_score
         };
-        let cur_exec = *state.executions();
         let meta = state.metadata_mut::<EcoMetadata>()?;
-
-        let mut regret = (cur_exec - meta.last_executions) as f64 / computed_score;
-        if regret == 0.0 {
-            regret = 1.1;
-        }
 
         meta.rate =
             ((meta.rate * meta.calculate_coe as f64) + regret) / (meta.calculate_coe as f64 + 1.0);
@@ -148,6 +143,8 @@ where
 
     /// Create a new alias table when the fuzzer finds a new corpus entry
     fn schedule(state: &mut S) -> Result<CorpusId, Error> {
+        // println!("{:#?}", state.metadata::<EcoMetadata>());
+
         for id in state.corpus().ids() {
             let was_fuzzed = state.testcase(id)?.scheduled_count() > 0;
             if !was_fuzzed {
@@ -201,6 +198,7 @@ where
             }
         }
 
+        // println!("selection_meta {:#?}", selection_meta);
         Ok(selection)
     }
 }
@@ -218,6 +216,7 @@ where
     O: MapObserver,
 {
     /// Add an entry to the corpus and return its index
+    #[allow(clippy::cast_precision_loss)]
     fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
 
@@ -229,7 +228,28 @@ where
             None => 0,
         };
 
-        assert!(self.last_hash != 0);
+        // assert!(self.last_hash != 0);
+
+        let cur_exec = *state.executions();
+        let last_exec = state.metadata::<EcoMetadata>()?.last_executions;
+        let last_energy = if let Some(parent_idx) = current_idx {
+            let e = state
+                .testcase(parent_idx)?
+                .metadata::<EcoTestcaseMetadata>()?
+                .last_energy;
+            if e == 0 {
+                (cur_exec - last_exec) as u64
+            } else {
+                e
+            }
+        } else {
+            (cur_exec - last_exec) as u64
+        };
+        let mut regret = (cur_exec - last_exec) as f64 / last_energy as f64;
+        if regret == 0.0 {
+            regret = 1.1;
+        }
+        state.metadata_mut::<EcoMetadata>()?.regret = regret;
 
         // Attach a `SchedulerTestcaseMetadata` to the queue entry.
         depth += 1;
@@ -302,6 +322,8 @@ where
                     .testcase_mut(id)?
                     .metadata_mut::<EcoTestcaseMetadata>()?
                     .exec_by_mutation += 1;
+
+                // println!("{entry} {hash}");
             }
         }
 
@@ -322,12 +344,19 @@ where
 
         let count = state.corpus().count();
         let executions = *state.executions();
+        let last_mutation_num = state
+            .testcase(id)?
+            .metadata::<EcoTestcaseMetadata>()?
+            .mutation_num;
 
         let meta = state.metadata_mut::<EcoMetadata>()?;
         meta.last_corpus_count = count;
+        meta.last_mutation_num = last_mutation_num;
         // TODO in theory it should be assigned at the beginning of the mutational stage
         // we must not count executions done in other stages
         meta.last_executions = executions;
+
+        // println!("scheduling {id}");
 
         Ok(id)
     }
@@ -352,6 +381,7 @@ where
 
         let (cur_state, rate, initial_corpus_count) = {
             let meta = state.metadata::<EcoMetadata>()?;
+            // println!("{:#?}", meta);
             (meta.state, meta.rate, meta.initial_corpus_count)
         };
 
@@ -368,7 +398,7 @@ where
         }
 
         let meta = entry.metadata_mut::<EcoTestcaseMetadata>()?;
-
+        // println!("{} {} {:#?}", meta.last_energy, average_cost, cur_state);
         if cur_state == EcoState::Exploitation {
             meta.state = EcoState::Exploitation;
             if meta.found == 0 {
@@ -388,9 +418,14 @@ where
                 energy = average_cost;
             }
         }
-
-        let score = energy as f64 * rate;
+        let mut score = energy as f64 * rate;
         meta.computed_score = score;
+
+        // println!("{score}");
+
+        if score < 1.0 {
+            score = 1.0;
+        }
 
         Ok(score)
     }
