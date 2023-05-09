@@ -365,6 +365,7 @@ pub mod pybind {
     /// In-Memory fuzzing made easy.
     /// Use this sugar for scaling `libfuzzer`-style fuzzers.
     #[pyclass(unsendable)]
+    #[derive(Debug)]
     struct InMemoryBytesCoverageSugar {
         input_dirs: Vec<PathBuf>,
         output_dir: PathBuf,
