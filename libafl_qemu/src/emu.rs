@@ -85,7 +85,7 @@ impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
 }
 
 #[cfg(feature = "python")]
-use pyo3::{prelude::*, PyIterProtocol};
+use pyo3::prelude::*;
 
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
@@ -444,8 +444,8 @@ impl Iterator for GuestMaps {
 }
 
 #[cfg(all(emulation_mode = "usermode", feature = "python"))]
-#[pyproto]
-impl PyIterProtocol for GuestMaps {
+#[pymethods]
+impl GuestMaps {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
@@ -1184,7 +1184,7 @@ pub mod pybind {
                     if any.is_none() {
                         SyscallHookResult::new(None)
                     } else {
-                        let a: Result<&PyInt, _> = any.cast_as();
+                        let a: Result<&PyInt, _> = any.downcast();
                         if let Ok(i) = a {
                             SyscallHookResult::new(Some(
                                 i.extract().expect("Invalid syscall hook return value"),
