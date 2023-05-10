@@ -69,7 +69,7 @@ where
         Self {
             gen,
             state,
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         }
     }
 }
