@@ -281,9 +281,8 @@ where
         bytes.extend_from_slice(target.as_slice());
         bytes.resize(state.max_size(), 0);
 
-        let result = Rc::new(RefCell::new(Err(Error::illegal_state(
-            "Never updated mutator proxy's result.",
-        ))));
+        // we assume that the fuzzer did not use this mutator, but instead utilised their own
+        let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
         let proxy = MutatorProxy::new(state, &self.mutator, &result, stage_idx);
         let old = MUTATOR.with(|mutator| {
             let mut mutator = mutator.borrow_mut();
@@ -367,9 +366,8 @@ where
         let mut out = vec![0u8; state.max_size()];
         let data1 = input.bytes();
 
-        let result = Rc::new(RefCell::new(Err(Error::illegal_state(
-            "Never updated mutator proxy's result.",
-        ))));
+        // we assume that the fuzzer did not use this mutator, but instead utilised their own
+        let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
         let proxy = MutatorProxy::new(state, &self.mutator, &result, stage_idx);
         let old = MUTATOR.with(|mutator| {
             let mut mutator = mutator.borrow_mut();
