@@ -11,6 +11,7 @@ rustversion = "1.0"
 
 [features]
 arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
+introspection = []
 merge = []
 
 [dependencies]
