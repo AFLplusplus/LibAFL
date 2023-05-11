@@ -165,6 +165,7 @@ pub fn build(
                 .arg("--disable-brlapi")
                 .arg("--disable-bsd-user")
                 .arg("--disable-bzip2")
+                .arg("--disable-capstone")
                 .arg("--disable-cap-ng")
                 .arg("--disable-canokey")
                 .arg("--disable-cloop")
@@ -231,6 +232,7 @@ pub fn build(
                 .arg("--disable-slirp-smbd")
                 .arg("--disable-smartcard")
                 .arg("--disable-snappy")
+                .arg("--disable-sndio")
                 .arg("--disable-sparse")
                 .arg("--disable-spice")
                 .arg("--disable-spice-protocol")
@@ -259,9 +261,7 @@ pub fn build(
                 .arg("--disable-xen")
                 .arg("--disable-xen-pci-passthrough")
                 .arg("--disable-xkbcommon")
-                .arg("--disable-zstd")
-                .arg("--disable-capstone")
-                .arg("--disable-sndio");
+                .arg("--disable-zstd");
             if cfg!(feature = "debug_assertions") {
                 cmd.arg("--enable-debug");
             }
