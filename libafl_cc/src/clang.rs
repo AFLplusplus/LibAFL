@@ -144,7 +144,10 @@ impl CompilerWrapper for ClangWrapper {
         let mut suppress_linking = 0;
         let mut i = 1;
         while i < args.len() {
-            if args[i].as_ref().ends_with(".s") {
+            if std::path::Path::new(args[i].as_ref())
+                .extension()
+                .map_or(false, |ext| ext.eq_ignore_ascii_case("s"))
+            {
                 self.is_asm = true;
             }
 
