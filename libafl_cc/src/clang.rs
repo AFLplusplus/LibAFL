@@ -74,6 +74,7 @@ pub struct ClangWrapper {
 
     name: String,
     is_cpp: bool,
+    is_asm: bool,
     linking: bool,
     shared: bool,
     x_set: bool,
@@ -143,6 +144,10 @@ impl CompilerWrapper for ClangWrapper {
         let mut suppress_linking = 0;
         let mut i = 1;
         while i < args.len() {
+            if args[i].as_ref().ends_with(".s") {
+                self.is_asm = true;
+            }
+
             match args[i].as_ref() {
                 "--libafl-no-link" => {
                     suppress_linking += 1;
@@ -336,7 +341,7 @@ impl CompilerWrapper for ClangWrapper {
                 args.push(pass.path().into_os_string().into_string().unwrap());
             }
         }
-        if !self.passes.is_empty() {
+        if !self.is_asm && !self.passes.is_empty() {
             for passes_arg in &self.passes_args {
                 args.push("-mllvm".into());
                 args.push(passes_arg.into());
@@ -401,6 +406,7 @@ impl ClangWrapper {
             wrapped_cxx: CLANGXX_PATH.into(),
             name: String::new(),
             is_cpp: false,
+            is_asm: false,
             linking: false,
             shared: false,
             x_set: false,
