@@ -15,4 +15,4 @@ introspection = []
 merge = []
 
 [dependencies]
-libfuzzer-sys = { path = "../../libfuzzer", default-features = false }
+libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
