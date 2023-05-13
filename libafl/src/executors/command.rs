@@ -8,13 +8,12 @@ use core::{
 use std::os::unix::ffi::OsStrExt;
 #[cfg(feature = "std")]
 use std::process::Child;
-#[cfg(all(feature = "std", unix))]
-use std::time::Duration;
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::Duration,
 };
 
 use super::HasObservers;
