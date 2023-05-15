@@ -40,17 +40,24 @@ main(){
 	install_libpng
 
 	build_libpng
-	echo "start to run the new fuzzer"
+	#start to run the new fuzzer
 	new_executions=$(build_run_fuzzer)
 
 	git_checkout
 
 	build_libpng
-	echo "start to run the last fuzzer"
+	#start to run the last fuzzer
 	last_executions=$(build_run_fuzzer)	
 
-	echo "the execution count of the new fuzzer is $new_executions"
-	echo "the execution count of the last fuzzer is $last_executions"
+	prefix=""
+	if [ "$(uname)" == "Darwin" ]; then
+		prefix="macos"
+	else
+		prefix="linux"
+	fi
+
+	echo "${prefix}_new_executions=$new_executions" >> "$GITHUB_ENV"
+	echo "${prefix}_last_executions=$last_executions" >> "$GITHUB_ENV"
 }
 
 main
