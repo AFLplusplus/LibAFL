@@ -336,6 +336,7 @@ extern "C" {
     // void libafl_add_block_hook(uint64_t (*gen)(target_ulong pc), void (*exec)(uint64_t id));
     fn libafl_add_block_hook(
         gen: Option<extern "C" fn(GuestAddr, u64) -> u64>,
+        post_gen: Option<extern "C" fn(GuestAddr, GuestUsize, u64)>,
         exec: Option<extern "C" fn(u64, u64)>,
         data: u64,
     );
@@ -1037,10 +1038,11 @@ impl Emulator {
     pub fn add_block_hooks(
         &self,
         gen: Option<extern "C" fn(GuestAddr, u64) -> u64>,
+        post_gen: Option<extern "C" fn(GuestAddr, GuestUsize, u64)>,
         exec: Option<extern "C" fn(u64, u64)>,
         data: u64,
     ) {
-        unsafe { libafl_add_block_hook(gen, exec, data) }
+        unsafe { libafl_add_block_hook(gen, post_gen, exec, data) }
     }
 
     pub fn add_read_hooks(

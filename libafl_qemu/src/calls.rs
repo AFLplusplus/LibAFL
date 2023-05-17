@@ -414,7 +414,7 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.blocks(Some(Self::gen_blocks_calls::<QT, S>), None);
+        hooks.blocks(Some(Self::gen_blocks_calls::<QT, S>), None, None);
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, input: &S::Input) {

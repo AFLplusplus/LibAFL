@@ -15,7 +15,7 @@ pub use crate::emu::SyscallHookResult;
 use crate::{
     emu::{Emulator, FatPtr, MemAccessInfo, SKIP_EXEC_HOOK},
     helper::QemuHelperTuple,
-    GuestAddr,
+    GuestAddr, GuestUsize,
 };
 
 // all kinds of hooks
@@ -136,7 +136,7 @@ where
     }
 }
 
-static mut BLOCK_HOOKS: Vec<(Hook, Hook)> = vec![];
+static mut BLOCK_HOOKS: Vec<(Hook, Hook, Hook)> = vec![];
 
 extern "C" fn gen_block_hook_wrapper<QT, S>(pc: GuestAddr, index: u64) -> u64
 where
@@ -145,7 +145,7 @@ where
 {
     unsafe {
         let hooks = get_qemu_hooks::<QT, S>();
-        let (gen, _) = &mut BLOCK_HOOKS[index as usize];
+        let (gen, _, _) = &mut BLOCK_HOOKS[index as usize];
         match gen {
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr) -> Option<u64> =
@@ -163,6 +163,34 @@ where
     }
 }
 
+extern "C" fn gen_post_block_hook_wrapper<QT, S>(
+    pc: GuestAddr,
+    block_length: GuestUsize,
+    index: u64,
+) where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    unsafe {
+        let hooks = get_qemu_hooks::<QT, S>();
+        let (_, post_gen, _) = &mut BLOCK_HOOKS[index as usize];
+        match post_gen {
+            Hook::Function(ptr) => {
+                let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr, GuestUsize) =
+                    transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc, block_length);
+            }
+            Hook::Closure(ptr) => {
+                let func: &mut Box<
+                    dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr, GuestUsize),
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc, block_length);
+            }
+            _ => (),
+        }
+    }
+}
+
 extern "C" fn exec_block_hook_wrapper<QT, S>(id: u64, index: u64)
 where
     S: UsesInput,
@@ -170,7 +198,7 @@ where
 {
     unsafe {
         let hooks = get_qemu_hooks::<QT, S>();
-        let (_, exec) = &mut BLOCK_HOOKS[index as usize];
+        let (_, _, exec) = &mut BLOCK_HOOKS[index as usize];
         match exec {
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
@@ -859,6 +887,9 @@ where
     pub fn blocks(
         &self,
         generation_hook: Option<fn(&mut Self, Option<&mut S>, pc: GuestAddr) -> Option<u64>>,
+        post_generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, block_length: GuestUsize),
+        >,
         execution_hook: Option<fn(&mut Self, Option<&mut S>, id: u64)>,
     ) {
         unsafe {
@@ -869,6 +900,11 @@ where
                 } else {
                     Some(gen_block_hook_wrapper::<QT, S>)
                 },
+                if post_generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_post_block_hook_wrapper::<QT, S>)
+                },
                 if execution_hook.is_none() {
                     None
                 } else {
@@ -878,6 +914,9 @@ where
             );
             BLOCK_HOOKS.push((
                 generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                post_generation_hook.map_or(Hook::Empty, |hook| {
                     Hook::Function(hook as *const libc::c_void)
                 }),
                 execution_hook.map_or(Hook::Empty, |hook| {
@@ -892,6 +931,9 @@ where
         generation_hook: Option<
             Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr) -> Option<u64>>,
         >,
+        post_generation_hook: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, GuestUsize)>,
+        >,
         execution_hook: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>>,
     ) {
         let index = BLOCK_HOOKS.len();
@@ -900,6 +942,11 @@ where
                 None
             } else {
                 Some(gen_block_hook_wrapper::<QT, S>)
+            },
+            if post_generation_hook.is_none() {
+                None
+            } else {
+                Some(gen_post_block_hook_wrapper::<QT, S>)
             },
             if execution_hook.is_none() {
                 None
@@ -910,6 +957,7 @@ where
         );
         BLOCK_HOOKS.push((
             generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            post_generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
             execution_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
         ));
     }
@@ -917,6 +965,9 @@ where
     pub fn blocks_raw(
         &self,
         generation_hook: Option<fn(&mut Self, Option<&mut S>, pc: GuestAddr) -> Option<u64>>,
+        post_generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, block_length: GuestUsize),
+        >,
         execution_hook: Option<extern "C" fn(id: u64, data: u64)>,
     ) {
         unsafe {
@@ -927,11 +978,19 @@ where
                 } else {
                     Some(gen_block_hook_wrapper::<QT, S>)
                 },
+                if post_generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_post_block_hook_wrapper::<QT, S>)
+                },
                 execution_hook,
                 index as u64,
             );
             BLOCK_HOOKS.push((
                 generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                post_generation_hook.map_or(Hook::Empty, |hook| {
                     Hook::Function(hook as *const libc::c_void)
                 }),
                 Hook::Empty,

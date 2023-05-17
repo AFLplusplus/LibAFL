@@ -80,6 +80,7 @@ where
     {
         hooks.blocks(
             Some(gen_unique_block_ids::<QT, S>),
+            None,
             Some(exec_trace_block::<QT, S>),
         );
     }
