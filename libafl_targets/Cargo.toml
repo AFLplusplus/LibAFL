@@ -9,13 +9,7 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing"]
 edition = "2021"
-categories = [
-    "development-tools::testing",
-    "emulators",
-    "embedded",
-    "os",
-    "no-std",
-]
+categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 
 [features]
@@ -31,21 +25,17 @@ sancov_value_profile = []
 sancov_8bit = []
 sancov_cmplog = []
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
-clippy = []                                   # Ignore compiler warnings during clippy
+clippy = [] # Ignore compiler warnings during clippy
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.10.0", default-features = false, features = [
-] }
+libafl = { path = "../libafl", version = "0.10.0", default-features = false, features = [] }
 log = "0.4.17"
-serde = { version = "1.0", default-features = false, features = [
-    "alloc",
-    "derive",
-] } # serialization lib
 
 rangemap = "1.0"
+serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 num-traits = "0.2.15"
 intervaltree = "0.2.7"
 ahash = "0.8.3"
