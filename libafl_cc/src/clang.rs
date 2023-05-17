@@ -382,8 +382,8 @@ impl CompilerWrapper for ClangWrapper {
     }
 
     fn filter(&self, args: &mut Vec<String>) {
-        let blacklist = ["-Werror=unused-command-line-argument"];
-        for item in blacklist {
+        let blocklist = ["-Werror=unused-command-line-argument", "-Werror"];
+        for item in blocklist {
             args.retain(|x| x.clone() != item);
         }
     }
