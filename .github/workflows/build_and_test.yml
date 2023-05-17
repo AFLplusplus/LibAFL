@@ -230,8 +230,6 @@ jobs:
       matrix:
           os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    outputs:
-      output_new_executions: ${steps.}
     steps:
     - uses: actions-rs/toolchain@v1
       with:
@@ -249,28 +247,9 @@ jobs:
     - name: Build and run libfuzzer_libpng (Linux)
       if: runner.os == 'Linux'
       run: ./scripts/executions-check.sh 
-    - name: Build and run libfuzzer_libpng (macOS)  
+    - name: Build and run libfuzzer_libpng (macOS) 
       if: runner.os == 'macOS'
-      run: /usr/local/bin/bash -c './scripts/executions-check.sh' 
-    - name: Post the execution count in a new PR (linux)
-      if: runner.os == 'Linux'
-      uses: wow-actions/auto-comment@v1
-      with:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        pullRequestOpened: |
-          On the Linux platform:
-            the execution count of the new fuzzer is ${{env.linux_new_executions}}
-            the execution count of the last fuzzer is ${{env.linux_last_executions}}
-    - name: Post the execution count in a new PR (macOS)
-      if: runner.os == 'macOS'
-      uses: wow-actions/auto-comment@v1
-      with:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        pullRequestOpened: |
-          On the MacOS platform:
-            the execution count of the new fuzzer is ${{env.macos_new_executions}}
-            the execution count of the last fuzzer is ${{env.macos_last_executions}}
-
+      run: /usr/local/bin/bash -c './scripts/executions-check.sh'
 
   nostd-build:
     runs-on: ubuntu-latest
