@@ -381,6 +381,13 @@ impl CompilerWrapper for ClangWrapper {
         self.linking
     }
 
+    fn filter(&self, args: &mut Vec<String>) {
+        let blacklist = ["-Werror=unused-command-line-argument"];
+        for item in blacklist {
+            args.retain(|x| x.clone() != item);
+        }
+    }
+
     fn silence(&mut self, value: bool) -> &'_ mut Self {
         self.is_silent = value;
         self
