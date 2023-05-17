@@ -89,6 +89,7 @@ pub struct ClangWrapper {
     link_args: Vec<String>,
     passes: Vec<LLVMPasses>,
     passes_args: Vec<String>,
+    passes_linking_args: Vec<String>,
 }
 
 #[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
@@ -302,6 +303,8 @@ impl CompilerWrapper for ClangWrapper {
 
     fn command(&mut self) -> Result<Vec<String>, Error> {
         let mut args = vec![];
+        let mut use_pass = false;
+
         if self.is_cpp {
             args.push(self.wrapped_cxx.clone());
         } else {
@@ -324,6 +327,7 @@ impl CompilerWrapper for ClangWrapper {
             }
         }
         for pass in &self.passes {
+            use_pass = true;
             if self.use_new_pm {
                 // https://github.com/llvm/llvm-project/issues/56137
                 // Need this -Xclang -load -Xclang -<pass>.so thing even with the new PM
@@ -357,6 +361,10 @@ impl CompilerWrapper for ClangWrapper {
             }
 
             args.extend_from_slice(self.link_args.as_slice());
+
+            if use_pass {
+                args.extend_from_slice(self.passes_linking_args.as_slice());
+            }
 
             if cfg!(unix) {
                 args.push("-pthread".into());
@@ -423,6 +431,7 @@ impl ClangWrapper {
             link_args: vec![],
             passes: vec![],
             passes_args: vec![],
+            passes_linking_args: vec![],
             is_silent: false,
         }
     }
@@ -463,6 +472,15 @@ impl ClangWrapper {
         S: AsRef<str>,
     {
         self.passes_args.push(arg.as_ref().to_string());
+        self
+    }
+
+    /// Add arguments for LLVM passes during linking. For example, ngram needs -lm
+    pub fn add_passes_linking_arg<S>(&mut self, arg: S) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        self.passes_linking_args.push(arg.as_ref().to_string());
         self
     }
 
