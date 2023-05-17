@@ -19,7 +19,7 @@ use crate::{
     feedbacks::{Feedback, FeedbackFactory, HasObserverName},
     inputs::UsesInput,
     mark_feature_time,
-    mutators::Mutator,
+    mutators::{MutationResult, Mutator},
     observers::{MapObserver, ObserversTuple},
     schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
@@ -97,8 +97,12 @@ where
             state.set_max_size(before_len);
 
             start_timer!(state);
-            self.mutator_mut().mutate(state, &mut input, i as i32)?;
+            let mutated = self.mutator_mut().mutate(state, &mut input, i as i32)?;
             mark_feature_time!(state, PerfFeature::Mutate);
+
+            if mutated == MutationResult::Skipped {
+                continue;
+            }
 
             let corpus_idx = if input.len() < before_len {
                 // run the input

@@ -4,6 +4,7 @@ use std::{
     io::Write,
     path::PathBuf,
     process::{Child, Command, Stdio},
+    time::Duration,
 };
 
 use libafl::{
@@ -102,6 +103,10 @@ pub fn main() {
             let mut stdin = child.stdin.as_ref().unwrap();
             stdin.write_all(input.target_bytes().as_slice())?;
             Ok(child)
+        }
+
+        fn exec_timeout(&self) -> Duration {
+            Duration::from_secs(5)
         }
     }
 
