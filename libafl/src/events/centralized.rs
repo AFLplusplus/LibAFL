@@ -1,24 +1,27 @@
 //! A wrapper manager to implement a main-secondary architecture with point-to-point channels
 
 use alloc::{boxed::Box, string::String, vec::Vec};
+use core::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
 use crate::{
     bolts::{
+        current_time,
         llmp::{LlmpReceiver, LlmpSender, Tag},
         shmem::ShMemProvider,
         ClientId,
     },
     events::{
-        Event, EventConfig, EventFirer, EventManager, EventManagerId, EventProcessor,
-        EventRestarter, HasEventManagerId, LogSeverity,
+        llmp::EventStatsCollector, Event, EventConfig, EventFirer, EventManager, EventManagerId,
+        EventProcessor, EventRestarter, HasEventManagerId, LogSeverity,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::UsesInput,
     observers::ObserversTuple,
+    schedulers::powersched::SchedulerMetadata,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
 };
@@ -125,13 +128,13 @@ where
 
 impl<E, EM, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, SP>
 where
-    EM: EventProcessor<E, Z> + EventFirer + HasEventManagerId,
+    EM: EventStatsCollector + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
     SP: ShMemProvider,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
         + ExecutionProcessor<E::Observers, State = Self::State>,
-    Self::State: HasExecutions,
+    Self::State: HasExecutions + HasMetadata,
 {
     fn process(
         &mut self,
@@ -169,11 +172,26 @@ where
                                 "Received new Testcase to evaluate from secondary node {idx:?}"
                             );
 
+                            #[cfg(feature = "adaptive_serialization")]
+                            let must_go = || self.inner.execution_time() != Duration::ZERO;
+
+                            #[cfg(not(feature = "adaptive_serialization"))]
+                            let must_go = || true;
+
                             let res = if client_config.match_with(&self.configuration())
                                 && observers_buf.is_some()
+                                && must_go()
                             {
+                                #[cfg(feature = "adaptive_serialization")]
+                                let start = current_time();
                                 let observers: E::Observers =
                                     postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+
+                                #[cfg(feature = "adaptive_serialization")]
+                                {
+                                    *self.inner.deserialization_time_mut() = current_time() - start;
+                                }
+
                                 let res = fuzzer.process_execution(
                                     state,
                                     self,
@@ -197,6 +215,15 @@ where
                                     input.clone(),
                                     false,
                                 )?;
+
+                                #[cfg(feature = "adaptive_serialization")]
+                                if state.has_metadata::<SchedulerMetadata>() {
+                                    let psmeta =
+                                        state.metadata_map().get::<SchedulerMetadata>().unwrap();
+                                    *self.inner.execution_time_mut() =
+                                        psmeta.exec_time() / psmeta.cycles() as u32;
+                                    //eprintln!("yyyyyyyyyyyyy {:?}", self.inner.execution_time());
+                                }
 
                                 #[cfg(feature = "no_count_newtestcases")]
                                 {
@@ -241,7 +268,7 @@ where
 
 impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
 where
-    EM: EventManager<E, Z>,
+    EM: EventStatsCollector + EventManager<E, Z>,
     EM::State: HasClientPerfMonitor + HasExecutions + HasMetadata,
     SP: ShMemProvider,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,

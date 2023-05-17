@@ -51,6 +51,7 @@ use crate::{
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
     observers::ObserversTuple,
+    schedulers::powersched::SchedulerMetadata,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
 };
@@ -310,6 +311,28 @@ where
     }
 }
 
+/// Collected stats to decide if observers must be serialized or not
+#[cfg(feature = "adaptive_serialization")]
+pub trait EventStatsCollector {
+    /// Expose the collected observers serialization time
+    fn serialization_time(&self) -> Duration;
+    /// Expose the collected observers deserialization time
+    fn deserialization_time(&self) -> Duration;
+    /// Expose the collected execution time
+    fn execution_time(&self) -> Duration;
+
+    /// Expose the collected observers serialization time (mut)
+    fn serialization_time_mut(&mut self) -> &mut Duration;
+    /// Expose the collected observers deserialization time (mut)
+    fn deserialization_time_mut(&mut self) -> &mut Duration;
+    /// Expose the collected execution time (mut)
+    fn execution_time_mut(&mut self) -> &mut Duration;
+}
+
+/// Collected stats to decide if observers must be serialized or not
+#[cfg(not(feature = "adaptive_serialization"))]
+pub trait EventStatsCollector {}
+
 /// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
 /// using low-level message passing, [`crate::bolts::llmp`].
 pub struct LlmpEventManager<S, SP>
@@ -327,11 +350,42 @@ where
     /// A node will not re-use the observer values sent over LLMP
     /// from nodes with other configurations.
     configuration: EventConfig,
+    #[cfg(feature = "adaptive_serialization")]
     serialization_time: Duration,
+    #[cfg(feature = "adaptive_serialization")]
     deserialization_time: Duration,
+    #[cfg(feature = "adaptive_serialization")]
     execution_time: Duration,
+    #[cfg(feature = "adaptive_serialization")]
     serializations_cnt: usize,
     phantom: PhantomData<S>,
+}
+
+#[cfg(feature = "adaptive_serialization")]
+impl<S, SP> EventStatsCollector for LlmpEventManager<S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+{
+    fn serialization_time(&self) -> Duration {
+        self.serialization_time
+    }
+    fn deserialization_time(&self) -> Duration {
+        self.deserialization_time
+    }
+    fn execution_time(&self) -> Duration {
+        self.execution_time
+    }
+
+    fn serialization_time_mut(&mut self) -> &mut Duration {
+        &mut self.serialization_time
+    }
+    fn deserialization_time_mut(&mut self) -> &mut Duration {
+        &mut self.deserialization_time
+    }
+    fn execution_time_mut(&mut self) -> &mut Duration {
+        &mut self.execution_time
+    }
 }
 
 impl<S, SP> core::fmt::Debug for LlmpEventManager<S, SP>
@@ -375,9 +429,13 @@ where
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
+            #[cfg(feature = "adaptive_serialization")]
             serialization_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             deserialization_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             execution_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -399,9 +457,13 @@ where
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
+            #[cfg(feature = "adaptive_serialization")]
             serialization_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             deserialization_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             execution_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -421,9 +483,13 @@ where
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
+            #[cfg(feature = "adaptive_serialization")]
             serialization_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             deserialization_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             execution_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -446,9 +512,13 @@ where
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
+            #[cfg(feature = "adaptive_serialization")]
             serialization_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             deserialization_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             execution_time: Duration::ZERO,
+            #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -465,7 +535,7 @@ where
 
 impl<S, SP> LlmpEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider + 'static,
 {
     // Handle arriving events in the client
@@ -496,16 +566,27 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
+                #[cfg(feature = "adaptive_serialization")]
+                let must_go = || self.execution_time != Duration::ZERO;
+
+                #[cfg(not(feature = "adaptive_serialization"))]
+                let must_go = || true;
+
                 let res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
-                    && self.execution_time != Duration::ZERO
+                    && must_go()
                 {
+                    #[cfg(feature = "adaptive_serialization")]
                     let start = current_time();
                     let observers: E::Observers =
                         postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                    #[cfg(feature = "adaptive_serialization")]
+                    {
+                        self.deserialization_time = current_time() - start;
+                    }
+
                     let res = fuzzer
                         .process_execution(state, self, input, &observers, &exit_kind, false)?;
-                    self.deserialization_time = current_time() - start;
 
                     // Count this as execution even if we are not actually executing nothing for the stats
                     #[cfg(feature = "count_process_execution")]
@@ -514,11 +595,17 @@ where
                     }
                     res
                 } else {
-                    let start = current_time();
                     let res = fuzzer.evaluate_input_with_observers::<E, Self>(
                         state, executor, self, input, false,
                     )?;
-                    self.execution_time = current_time() - start;
+
+                    #[cfg(feature = "adaptive_serialization")]
+                    if state.has_metadata::<SchedulerMetadata>() {
+                        let psmeta = state.metadata_map().get::<SchedulerMetadata>().unwrap();
+                        self.execution_time = psmeta.exec_time() / psmeta.cycles() as u32;
+                    }
+
+                    // self.execution_time = current_time() - start;
 
                     #[cfg(feature = "no_count_newtestcases")]
                     {
@@ -608,13 +695,16 @@ where
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
+        //eprintln!("{:?} {:?} {:?}", self.execution_time, self.serialization_time, self.deserialization_time);
+        #[cfg(feature = "adaptive_serialization")]
         if self.execution_time == Duration::ZERO
             || self.serialization_time == Duration::ZERO
-            || self.serialization_time + self.deserialization_time < self.execution_time
+            || (self.serialization_time + self.deserialization_time) * 2 < self.execution_time
             || self.serializations_cnt.trailing_zeros() >= 8
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
+            //eprintln!("aaaaaaaaaa {:?} {:?}", ser.len(), (self.serialization_time + self.deserialization_time) * 4 < self.execution_time);
             self.serialization_time = current_time() - start;
 
             self.serializations_cnt += 1;
@@ -623,6 +713,9 @@ where
             self.serializations_cnt += 1;
             Ok(None)
         }
+
+        #[cfg(not(feature = "adaptive_serialization"))]
+        Ok(Some(postcard::to_allocvec(observers)?))
     }
 
     fn configuration(&self) -> EventConfig {
@@ -645,7 +738,7 @@ where
 
 impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<S, SP>
 where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -746,6 +839,41 @@ where
     save_state: bool,
 }
 
+#[cfg(feature = "adaptive_serialization")]
+impl<S, SP> EventStatsCollector for LlmpRestartingEventManager<S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+{
+    fn serialization_time(&self) -> Duration {
+        self.llmp_mgr.serialization_time
+    }
+    fn deserialization_time(&self) -> Duration {
+        self.llmp_mgr.deserialization_time
+    }
+    fn execution_time(&self) -> Duration {
+        self.llmp_mgr.execution_time
+    }
+
+    fn serialization_time_mut(&mut self) -> &mut Duration {
+        &mut self.llmp_mgr.serialization_time
+    }
+    fn deserialization_time_mut(&mut self) -> &mut Duration {
+        &mut self.llmp_mgr.deserialization_time
+    }
+    fn execution_time_mut(&mut self) -> &mut Duration {
+        &mut self.llmp_mgr.execution_time
+    }
+}
+
+#[cfg(not(feature = "adaptive_serialization"))]
+impl<S, SP> EventStatsCollector for LlmpRestartingEventManager<S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+{
+}
+
 #[cfg(feature = "std")]
 impl<S, SP> UsesState for LlmpRestartingEventManager<S, SP>
 where
@@ -828,7 +956,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
