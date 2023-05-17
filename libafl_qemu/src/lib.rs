@@ -74,8 +74,6 @@ pub mod asan;
 #[cfg(emulation_mode = "usermode")]
 pub use asan::{init_with_asan, QemuAsanHelper};
 
-pub mod blocks;
-
 pub mod calls;
 pub mod drcov;
 
