@@ -256,6 +256,156 @@ where
     }
 }
 
+/// The default mutational stage
+#[derive(Clone, Debug)]
+pub struct ContinuousMutationalStage<CB, E, EM, I, M, Z> {
+    mutator: M,
+    closure: CB,
+    #[allow(clippy::type_complexity)]
+    phantom: PhantomData<(E, EM, I, Z)>,
+}
+
+impl<CB, E, EM, I, M, Z> UsesState for ContinuousMutationalStage<CB, E, EM, I, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    type State = Z::State;
+}
+
+impl<CB, E, EM, I, M, Z> MutationalStage<E, EM, I, M, Z>
+    for ContinuousMutationalStage<CB, E, EM, I, M, Z>
+where
+    CB: FnMut(
+        &mut Z,
+        &mut E,
+        &mut E::State,
+        &mut EM,
+        CorpusId,
+        MutationResult,
+    ) -> Result<bool, Error>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    I: MutatedTransform<Self::Input, Self::State> + Clone,
+{
+    /// The mutator, added to this stage
+    #[inline]
+    fn mutator(&self) -> &M {
+        &self.mutator
+    }
+
+    /// The list of mutators, added to this stage (as mutable ref)
+    #[inline]
+    fn mutator_mut(&mut self) -> &mut M {
+        &mut self.mutator
+    }
+
+    /// Gets the number of iterations as a random number
+    fn iterations(&self, _state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
+        Ok(u64::MAX)
+    }
+}
+
+impl<CB, E, EM, I, M, Z> Stage<E, EM, Z> for ContinuousMutationalStage<CB, E, EM, I, M, Z>
+where
+    CB: FnMut(
+        &mut Z,
+        &mut E,
+        &mut E::State,
+        &mut EM,
+        CorpusId,
+        MutationResult,
+    ) -> Result<bool, Error>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    I: MutatedTransform<Self::Input, Self::State> + Clone,
+{
+    #[inline]
+    #[allow(clippy::let_and_return)]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Z::State,
+        manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<(), Error> {
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else { return Ok(()); };
+        drop(testcase);
+
+        let mut i = 0;
+        loop {
+            let mut input = input.clone();
+
+            let mutated = self.mutator_mut().mutate(state, &mut input, i)?;
+
+            if (self.closure)(fuzzer, executor, state, manager, corpus_idx, mutated)? {
+                break;
+            }
+
+            // Time is measured directly the `evaluate_input` function
+            let (untransformed, post) = input.try_transform_into(state)?;
+            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+
+            self.mutator_mut().post_exec(state, i, corpus_idx)?;
+            post.post_exec(state, i, corpus_idx)?;
+            i += 1;
+        }
+
+        Ok(())
+    }
+}
+
+impl<CB, E, EM, M, Z> ContinuousMutationalStage<CB, E, EM, Z::Input, M, Z>
+where
+    CB: FnMut(
+        &mut Z,
+        &mut E,
+        &mut E::State,
+        &mut EM,
+        CorpusId,
+        MutationResult,
+    ) -> Result<bool, Error>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<Z::Input, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    /// Creates a new default mutational stage
+    pub fn new(mutator: M, closure: CB) -> Self {
+        Self::transforming(mutator, closure)
+    }
+}
+
+impl<CB, E, EM, I, M, Z> ContinuousMutationalStage<CB, E, EM, I, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    /// Creates a new transforming mutational stage
+    pub fn transforming(mutator: M, closure: CB) -> Self {
+        Self {
+            mutator,
+            closure,
+            phantom: PhantomData,
+        }
+    }
+}
+
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 /// `StdMutationalStage` Python bindings
