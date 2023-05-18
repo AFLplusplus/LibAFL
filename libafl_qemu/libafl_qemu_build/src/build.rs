@@ -138,7 +138,12 @@ pub fn build(
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-                .args(["--disable-bsd-user", "--disable-fdt", "--disable-system"]);
+                .args([
+                    "--disable-bsd-user",
+                    "--disable-fdt",
+                    "--disable-system",
+                    "--disable-capstone",
+                ]);
             if cfg!(feature = "debug_assertions") {
                 cmd.arg("--enable-debug");
             }
