@@ -13,8 +13,6 @@ use core::{
 
 use ahash::RandomState;
 use intervaltree::IntervalTree;
-use num_traits::Bounded;
-use serde::{Deserialize, Serialize};
 use libafl::{
     bolts::{
         ownedref::{OwnedMutPtr, OwnedMutSlice},
@@ -24,9 +22,11 @@ use libafl::{
     executors::ExitKind,
     inputs::UsesInput,
     observers::{DifferentialObserver, Observer, ObserversTuple},
-    Error,
     prelude::*,
+    Error,
 };
+use num_traits::Bounded;
+use serde::{Deserialize, Serialize};
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
 /// They are initialized by calling [`__sanitizer_cov_8bit_counters_init`](
@@ -45,16 +45,14 @@ pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut 
     }
 }
 
-pub unsafe fn counters_maps_observer(name: &'static str) -> CountersMultiMapObserver<false>
-{
+pub unsafe fn counters_maps_observer(name: &'static str) -> CountersMultiMapObserver<false> {
     CountersMultiMapObserver::new(name)
 }
 
 /// The Multi Map Observer merge different maps into one observer
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct CountersMultiMapObserver<const DIFFERENTIAL: bool>
-{
+pub struct CountersMultiMapObserver<const DIFFERENTIAL: bool> {
     intervals: IntervalTree<usize, usize>,
     len: usize,
     initial: u8,
@@ -81,24 +79,21 @@ where
     // in differential mode, we are *not* responsible for resetting the map!
 }
 
-impl<const DIFFERENTIAL: bool> Named for CountersMultiMapObserver<DIFFERENTIAL>
-{
+impl<const DIFFERENTIAL: bool> Named for CountersMultiMapObserver<DIFFERENTIAL> {
     #[inline]
     fn name(&self) -> &str {
         self.name.as_str()
     }
 }
 
-impl<const DIFFERENTIAL: bool> HasLen for CountersMultiMapObserver<DIFFERENTIAL>
-{
+impl<const DIFFERENTIAL: bool> HasLen for CountersMultiMapObserver<DIFFERENTIAL> {
     #[inline]
     fn len(&self) -> usize {
         self.len
     }
 }
 
-impl<const DIFFERENTIAL: bool> MapObserver for CountersMultiMapObserver<DIFFERENTIAL>
-{
+impl<const DIFFERENTIAL: bool> MapObserver for CountersMultiMapObserver<DIFFERENTIAL> {
     type Entry = u8;
 
     #[inline]
@@ -185,8 +180,7 @@ impl<const DIFFERENTIAL: bool> MapObserver for CountersMultiMapObserver<DIFFEREN
     }
 }
 
-impl<const DIFFERENTIAL: bool> CountersMultiMapObserver<DIFFERENTIAL>
-{
+impl<const DIFFERENTIAL: bool> CountersMultiMapObserver<DIFFERENTIAL> {
     /// Creates a new [`CountersMultiMapObserver`], maybe in differential mode
     #[must_use]
     fn maybe_differential(name: &'static str) -> Self {
@@ -208,8 +202,7 @@ impl<const DIFFERENTIAL: bool> CountersMultiMapObserver<DIFFERENTIAL>
     }
 }
 
-impl CountersMultiMapObserver<true>
-{
+impl CountersMultiMapObserver<true> {
     /// Creates a new [`CountersMultiMapObserver`] in differential mode
     #[must_use]
     pub fn differential(name: &'static str) -> Self {
@@ -217,8 +210,7 @@ impl CountersMultiMapObserver<true>
     }
 }
 
-impl CountersMultiMapObserver<false>
-{
+impl CountersMultiMapObserver<false> {
     /// Creates a new [`CountersMultiMapObserver`]
     #[must_use]
     pub fn new(name: &'static str) -> Self {
@@ -248,9 +240,7 @@ impl CountersMultiMapObserver<false>
     }
 }
 
-impl<'it, const DIFFERENTIAL: bool> AsIter<'it>
-    for CountersMultiMapObserver<DIFFERENTIAL>
-{
+impl<'it, const DIFFERENTIAL: bool> AsIter<'it> for CountersMultiMapObserver<DIFFERENTIAL> {
     type Item = u8;
     type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'static, u8>>>;
 
@@ -259,9 +249,7 @@ impl<'it, const DIFFERENTIAL: bool> AsIter<'it>
     }
 }
 
-impl<'it, const DIFFERENTIAL: bool> AsIterMut<'it>
-    for CountersMultiMapObserver<DIFFERENTIAL>
-{
+impl<'it, const DIFFERENTIAL: bool> AsIterMut<'it> for CountersMultiMapObserver<DIFFERENTIAL> {
     type Item = u8;
     type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
@@ -270,9 +258,7 @@ impl<'it, const DIFFERENTIAL: bool> AsIterMut<'it>
     }
 }
 
-impl<'it, const DIFFERENTIAL: bool> IntoIterator
-    for &'it CountersMultiMapObserver<DIFFERENTIAL>
-{
+impl<'it, const DIFFERENTIAL: bool> IntoIterator for &'it CountersMultiMapObserver<DIFFERENTIAL> {
     type Item = <Iter<'it, u8> as Iterator>::Item;
     type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'static, u8>>>;
 
