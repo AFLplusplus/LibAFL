@@ -36,7 +36,6 @@ log = "0.4.17"
 
 rangemap = "1.0"
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
-num-traits = "0.2.15"
 intervaltree = "0.2.7"
 ahash = "0.8.3"
 # serde-big-array = "0.3.2"

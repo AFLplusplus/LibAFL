@@ -7,7 +7,6 @@ use core::{
     fmt::Debug,
     hash::{BuildHasher, Hasher},
     iter::Flatten,
-    marker::PhantomData,
     slice::{from_raw_parts, Iter, IterMut},
 };
 
@@ -15,17 +14,12 @@ use ahash::RandomState;
 use intervaltree::IntervalTree;
 use libafl::{
     bolts::{
-        ownedref::{OwnedMutPtr, OwnedMutSlice},
-        tuples::Named,
-        AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Truncate,
+        ownedref::OwnedMutSlice, tuples::Named, AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen,
     },
-    executors::ExitKind,
     inputs::UsesInput,
-    observers::{DifferentialObserver, Observer, ObserversTuple},
-    prelude::*,
+    observers::{DifferentialObserver, MapObserver, Observer, ObserversTuple},
     Error,
 };
-use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
@@ -45,11 +39,36 @@ pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut 
     }
 }
 
+#[must_use]
+/// Create a new [`CountersMultiMapObserver`] of the [`COUNTERS_MAP`].
+///
+/// This is a special [`MultiMapObserver`] for the [`COUNTERS_MAP`] and may be used when
+/// 8-bit counters are used for `SanitizerCoverage`. You can utilize this observer in a
+/// [`HitcountsIterableMapObserver`] like so:
+///
+/// ```rust,ignore
+/// use libafl::{
+///     observers::HitcountsIterableMapObserver,
+///     feedbacks::MaxMapFeedback,
+/// };
+/// use libafl_targets::sancov_8bit::counters_maps_observer;
+///
+/// let counters_maps_observer = unsafe { counters_maps_observer("counters-maps") };
+/// let counters_maps_hitcounts_observer = HitcountsIterableMapObserver::new(counters_maps_observer);
+/// let counters_maps_feedback = MaxMapFeedback::new(&counters_maps_hitcounts_observer);
+/// ```
+///
+/// # Safety
+///
+/// This function instantiates an observer of a `static mut` map whose contents are mutated by
+/// `SanitizerCoverage` instrumentation. This is unsafe, and data in the map may be mutated from
+/// under us at any time. It should never be assumed constant.
 pub unsafe fn counters_maps_observer(name: &'static str) -> CountersMultiMapObserver<false> {
     CountersMultiMapObserver::new(name)
 }
 
-/// The Multi Map Observer merge different maps into one observer
+/// The [`CountersMultiMapObserver`] observes all the counters that may be set by
+/// `SanitizerCoverage` in [`COUNTERS_MAPS`]
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct CountersMultiMapObserver<const DIFFERENTIAL: bool> {
