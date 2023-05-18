@@ -383,13 +383,13 @@ fn fuzz(
 
         let cb = |_fuzzer: &mut _,
                   _executor: &mut _,
-                  state: &mut _,
+                  state: &mut StdState<_, InMemoryOnDiskCorpus<_>, _, _>,
                   _event_manager: &mut _,
                   corpus_id: CorpusId|
          -> Result<bool, libafl::Error> {
             let corpus = state.corpus().get(corpus_id)?.borrow();
-            let res = corpus.scheduled_count() > 0;
-
+            let res = corpus.scheduled_count() == 0;
+            
             Ok(res)
         };
 

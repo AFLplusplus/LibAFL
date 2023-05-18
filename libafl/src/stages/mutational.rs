@@ -15,7 +15,7 @@ use crate::{
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
-    Error,
+    Error, ExecuteInputResult, prelude::CrossoverInsertMutator,
 };
 
 // TODO multi mutators stage
@@ -343,11 +343,14 @@ where
         let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else { return Ok(()); };
         drop(testcase);
 
+        println!("Starting CMPLOG stage for corpus {corpus_idx}");
         let mut i = 0;
+        let mut found = 0;
         loop {
             let mut input = input.clone();
 
             let mutated = self.mutator_mut().mutate(state, &mut input, i)?;
+            println!("{:#?}", mutated);
 
             if (self.closure)(fuzzer, executor, state, manager, corpus_idx, mutated)? {
                 break;
@@ -355,12 +358,17 @@ where
 
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            let (res, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+
+            if res == ExecuteInputResult::Corpus {
+                found += 1;
+            }
 
             self.mutator_mut().post_exec(state, i, corpus_idx)?;
             post.post_exec(state, i, corpus_idx)?;
             i += 1;
         }
+        println!("Exiting CMPLOG stage found: {found}");
 
         Ok(())
     }
