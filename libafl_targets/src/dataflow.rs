@@ -75,7 +75,7 @@ static mut GUARD_LABELS: Vec<u8> = Vec::new();
 
 pub(crate) static mut LAST_GUARD: u32 = 0;
 
-pub static mut CMPLOG_ENABLED: bool = false;
+pub static mut DFCMP_ENABLED: bool = false;
 
 static mut INPUT: Vec<u8> = Vec::new();
 static mut LABEL_START: usize = 0;
@@ -243,7 +243,7 @@ pub unsafe fn __dfsw___sanitizer_cov_trace_switch(
         GUARD_LABELS
             .get_mut(LAST_GUARD as usize)
             .map(|label| *label |= l1);
-        if CMPLOG_ENABLED {
+        if DFCMP_ENABLED {
             // From: https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-data-flow
             // Called before a switch statement.
             // Val is the switch operand.
@@ -270,7 +270,7 @@ macro_rules! hook {
                 GUARD_LABELS
                     .get_mut(LAST_GUARD as usize)
                     .map(|label| *label |= l1 | l2);
-                if CMPLOG_ENABLED {
+                if DFCMP_ENABLED {
                     cmplog_insert(
                         LAST_GUARD,
                         core::mem::size_of::<$arg_type>() as u8,
@@ -296,7 +296,7 @@ macro_rules! hook_const {
                 GUARD_LABELS
                     .get_mut(LAST_GUARD as usize)
                     .map(|label| *label |= l2);
-                if CMPLOG_ENABLED && valid_label(core::mem::size_of::<$arg_type>() as u8, l2) {
+                if DFCMP_ENABLED && valid_label(core::mem::size_of::<$arg_type>() as u8, l2) {
                     cmplog_const_insert(
                         LAST_GUARD,
                         core::mem::size_of::<$arg_type>() as u8,
@@ -463,7 +463,7 @@ where
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         unsafe {
-            CMPLOG_ENABLED = true;
+            DFCMP_ENABLED = true;
             dfsan_flush();
         }
         Ok(())
@@ -476,7 +476,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         unsafe {
-            CMPLOG_ENABLED = false;
+            DFCMP_ENABLED = false;
         }
         Ok(())
     }
@@ -785,7 +785,7 @@ where
         if !state.has_metadata::<Tokens>() {
             state.add_metadata(Tokens::default());
         }
-        if let Some(tokens) = state.metadata_mut().get_mut::<Tokens>() {
+        if let Ok(tokens) = state.metadata_mut::<Tokens>() {
             tokens.add_tokens(mined_tokens);
         }
 
@@ -802,7 +802,7 @@ where
 
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         // convert for optimisations later with direct indexing
-        testcase.metadata_mut().insert(meta);
+        testcase.add_metadata(meta);
 
         unsafe {
             CMPLOG.clear();
@@ -846,7 +846,7 @@ where
             .get(state.corpus().current().unwrap())
             .unwrap()
             .borrow();
-        let Some(meta) = tc.metadata().get::<DataflowCmplogReplacementsMetadata>() else { return Ok(MutationResult::Skipped); };
+        let Ok(meta) = tc.metadata::<DataflowCmplogReplacementsMetadata>() else { return Ok(MutationResult::Skipped); };
         if !meta.replacements.is_empty() && choice & 1 == 0 {
             let index = index % meta.replacements.len();
             let (pos, value) = &meta.replacements[index];
