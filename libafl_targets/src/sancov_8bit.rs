@@ -40,6 +40,7 @@ pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut 
 }
 
 #[must_use]
+#[no_mangle]
 /// Create a new [`CountersMultiMapObserver`] of the [`COUNTERS_MAP`].
 ///
 /// This is a special [`MultiMapObserver`] for the [`COUNTERS_MAP`] and may be used when
