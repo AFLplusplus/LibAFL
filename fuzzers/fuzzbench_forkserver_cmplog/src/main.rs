@@ -393,10 +393,10 @@ fn fuzz(
             Ok(res)
         };
 
-        let cmplog = IfStage::new(cb, tuple_list!(tracing, rq));
+        let cmplog = IfStage::new(cb, tuple_list!(colorization, tracing, rq));
 
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, colorization, cmplog, power);
+        let mut stages = tuple_list!(calibration, cmplog, power);
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
     } else {
