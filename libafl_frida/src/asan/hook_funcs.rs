@@ -165,7 +165,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[cfg(all(not(target_vendor = "apple")))]
+    #[cfg(not(target_vendor = "apple"))]
     pub fn hook_malloc_usable_size(&mut self, ptr: *mut c_void) -> usize {
         self.allocator_mut().get_usable_size(ptr)
     }
@@ -583,7 +583,7 @@ impl AsanRuntime {
         unsafe { memmem(haystack, haystacklen, needle, needlelen) }
     }
 
-    #[cfg(all(not(target_os = "android")))]
+    #[cfg(not(target_os = "android"))]
     #[inline]
     pub fn hook_bzero(&mut self, s: *mut c_void, n: usize) {
         extern "C" {
@@ -619,7 +619,7 @@ impl AsanRuntime {
         unsafe { explicit_bzero(s, n) }
     }
 
-    #[cfg(all(not(target_os = "android")))]
+    #[cfg(not(target_os = "android"))]
     #[inline]
     pub fn hook_bcmp(&mut self, s1: *const c_void, s2: *const c_void, n: usize) -> i32 {
         extern "C" {
