@@ -624,6 +624,53 @@ pub fn generate_minibsod<W: Write>(
         };
     }
 
+    #[cfg(target_os = "freebsd")]
+    {
+        let mut s: usize = 0;
+        let arr = &[libc::CTL_KERN, libc::KERN_PROC, libc::KERN_PROC_VMMAP, -1];
+        let mib = arr.as_ptr();
+        let miblen = arr.len() as u32;
+        if unsafe {
+            libc::sysctl(
+                mib,
+                miblen,
+                std::ptr::null_mut(),
+                &mut s,
+                std::ptr::null_mut(),
+                0,
+            )
+        } == 0
+        {
+            s = s * 4 / 3;
+            let mut buf: std::boxed::Box<[u8]> = vec![0; s].into_boxed_slice();
+            let bufptr = buf.as_mut_ptr() as *mut libc::c_void;
+            if unsafe { libc::sysctl(mib, miblen, bufptr, &mut s, std::ptr::null_mut(), 0) } == 0 {
+                let mut start = bufptr as usize;
+                let end = start + s;
+
+                unsafe {
+                    while start < end {
+                        let entry = start as *mut u8 as *mut libc::kinfo_vmentry;
+                        let sz = (*entry).kve_structsize;
+                        if sz == 0 {
+                            break;
+                        }
+
+                        let i = format!(
+                            "{}-{} {:?}\n",
+                            (*entry).kve_start,
+                            (*entry).kve_end,
+                            (*entry).kve_path
+                        );
+                        writer.write(&i.into_bytes())?;
+
+                        start = start + sz as usize;
+                    }
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
