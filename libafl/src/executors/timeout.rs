@@ -490,7 +490,7 @@ where
         if self.batch_mode {
             unsafe {
                 let elapsed = current_time() - self.tmout_start_time;
-                // elapsed may be > than tmout in case of reveived but ingored signal
+                // elapsed may be > than tmout in case of received but ingored signal
                 if elapsed > self.exec_tmout
                     || self.exec_tmout - elapsed < self.avg_exec_time * self.avg_mul_k
                 {
