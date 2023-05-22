@@ -40,7 +40,9 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#if LLVM_VERSION_MAJOR < 11
+  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#endif
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Pass.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -142,7 +144,6 @@ class CmpLogRoutines : public ModulePass {
   const char *getPassName() const override {
   #else
   StringRef getPassName() const override {
-
   #endif
     return "cmplog routines";
   }
@@ -465,6 +466,7 @@ bool CmpLogRoutines::runOnModule(Module &M) {
 
 #if USE_NEW_PM
 #else
+  #if LLVM_VERSION_MAJOR < 11 /* use old pass manager */
 static void registerCmpLogRoutinesPass(const PassManagerBuilder &,
                                        legacy::PassManagerBase &PM) {
   auto p = new CmpLogRoutines();
@@ -477,10 +479,9 @@ static RegisterStandardPasses RegisterCmpLogRoutinesPass(
 static RegisterStandardPasses RegisterCmpLogRoutinesPass0(
     PassManagerBuilder::EP_EnabledOnOptLevel0, registerCmpLogRoutinesPass);
 
-  #if LLVM_VERSION_MAJOR >= 11
 static RegisterStandardPasses RegisterCmpLogRoutinesPassLTO(
     PassManagerBuilder::EP_FullLinkTimeOptimizationLast,
     registerCmpLogRoutinesPass);
-  #endif
 
+  #endif
 #endif
