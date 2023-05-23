@@ -32,7 +32,7 @@ use crate::coverage_rt::CoverageRuntime;
 #[cfg(unix)]
 use crate::{asan::asan_rt::AsanRuntime, drcov_rt::DrCovRuntime};
 
-#[cfg(any(target_vendor = "apple"))]
+#[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;

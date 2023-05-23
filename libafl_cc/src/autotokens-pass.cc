@@ -45,7 +45,9 @@
   #include "llvm/IR/LegacyPassManager.h"
 #endif
 
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#if LLVM_VERSION_MAJOR < 11
+  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#endif
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DebugInfo.h"
@@ -53,7 +55,6 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -224,7 +225,6 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
 PreservedAnalyses AutoTokensPass::run(Module &M, ModuleAnalysisManager &MAM) {
 #else
 bool AutoTokensPass::runOnModule(Module &M) {
-
 #endif
 
   DenseMap<Value *, std::string *> valueMap;
@@ -683,6 +683,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
 #if USE_NEW_PM
 
 #else
+  #if LLVM_VERSION_MAJOR < 11
 static void registerAutoTokensPass(const PassManagerBuilder &,
                                    legacy::PassManagerBase &PM) {
   PM.add(new AutoTokensPass());
@@ -697,4 +698,5 @@ static RegisterStandardPasses RegisterAutoTokensPass(
 
 static RegisterStandardPasses RegisterAutoTokensPass0(
     PassManagerBuilder::EP_EnabledOnOptLevel0, registerAutoTokensPass);
+  #endif
 #endif

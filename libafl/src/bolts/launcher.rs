@@ -10,7 +10,6 @@
 //! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
-#[cfg(all(feature = "std"))]
 use alloc::string::ToString;
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
