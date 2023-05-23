@@ -64,13 +64,13 @@ where
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr) =
                     transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc);
+                func(hooks, inprocess_get_state::<S>(), pc);
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
                     dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr),
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc);
+                func(hooks, inprocess_get_state::<S>(), pc);
             }
             _ => (),
         }
@@ -95,7 +95,7 @@ where
                     GuestAddr,
                     GuestAddr,
                 ) -> Option<u64> = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
@@ -106,7 +106,7 @@ where
                         GuestAddr,
                     ) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
@@ -124,12 +124,12 @@ where
         match exec {
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), id);
+                func(hooks, inprocess_get_state::<S>(), id);
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64)> =
                     transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), id);
+                func(hooks, inprocess_get_state::<S>(), id);
             }
             _ => (),
         }
@@ -150,13 +150,13 @@ where
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr) -> Option<u64> =
                     transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
                     dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
@@ -178,13 +178,13 @@ extern "C" fn gen_post_block_hook_wrapper<QT, S>(
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr, GuestUsize) =
                     transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, block_length);
+                func(hooks, inprocess_get_state::<S>(), pc, block_length);
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
                     dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr, GuestUsize),
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, block_length);
+                func(hooks, inprocess_get_state::<S>(), pc, block_length);
             }
             _ => (),
         }
@@ -202,12 +202,12 @@ where
         match exec {
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), id);
+                func(hooks, inprocess_get_state::<S>(), id);
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64)> =
                     transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), id);
+                func(hooks, inprocess_get_state::<S>(), id);
             }
             _ => (),
         }
@@ -233,7 +233,7 @@ where
                     GuestAddr,
                     MemAccessInfo,
                 ) -> Option<u64> = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
@@ -244,7 +244,7 @@ where
                         MemAccessInfo,
                     ) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
@@ -267,7 +267,7 @@ where
                     GuestAddr,
                     MemAccessInfo,
                 ) -> Option<u64> = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
@@ -278,7 +278,7 @@ where
                         MemAccessInfo,
                     ) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
@@ -299,13 +299,13 @@ macro_rules! define_rw_exec_hook {
                     Hook::Function(ptr) => {
                         let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64, GuestAddr) =
                             transmute(*ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, addr);
+                        func(hooks, inprocess_get_state::<S>(), id, addr);
                     }
                     Hook::Closure(ptr) => {
                         let func: &mut Box<
                             dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64, GuestAddr),
                         > = transmute(ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, addr);
+                        func(hooks, inprocess_get_state::<S>(), id, addr);
                     }
                     _ => (),
                 }
@@ -333,7 +333,7 @@ macro_rules! define_rw_exec_hook_n {
                             GuestAddr,
                             usize,
                         ) = transmute(*ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, addr, size);
+                        func(hooks, inprocess_get_state::<S>(), id, addr, size);
                     }
                     Hook::Closure(ptr) => {
                         let func: &mut Box<
@@ -345,7 +345,7 @@ macro_rules! define_rw_exec_hook_n {
                                 usize,
                             ),
                         > = transmute(ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, addr, size);
+                        func(hooks, inprocess_get_state::<S>(), id, addr, size);
                     }
                     _ => (),
                 }
@@ -384,7 +384,7 @@ where
                     GuestAddr,
                     usize,
                 ) -> Option<u64> = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
@@ -395,7 +395,7 @@ where
                         usize,
                     ) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
@@ -421,7 +421,7 @@ macro_rules! define_cmp_exec_hook {
                             $itype,
                             $itype,
                         ) = transmute(*ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, v0, v1);
+                        func(hooks, inprocess_get_state::<S>(), id, v0, v1);
                     }
                     Hook::Closure(ptr) => {
                         let func: &mut Box<
@@ -433,7 +433,7 @@ macro_rules! define_cmp_exec_hook {
                                 $itype,
                             ),
                         > = transmute(ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, v0, v1);
+                        func(hooks, inprocess_get_state::<S>(), id, v0, v1);
                     }
                     _ => (),
                 }
@@ -461,12 +461,12 @@ where
             match hook {
                 Hook::Function(ptr) => {
                     let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u32) = transmute(*ptr);
-                    (func)(hooks, inprocess_get_state::<S>(), tid);
+                    func(hooks, inprocess_get_state::<S>(), tid);
                 }
                 Hook::Closure(ptr) => {
                     let mut func: Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u32)> =
                         transmute(*ptr);
-                    (func)(hooks, inprocess_get_state::<S>(), tid);
+                    func(hooks, inprocess_get_state::<S>(), tid);
 
                     // Forget the closure so that drop is not called on captured variables.
                     core::mem::forget(func);
@@ -474,7 +474,7 @@ where
                 Hook::Once(ptr) => {
                     let func: Box<dyn FnOnce(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u32)> =
                         transmute(*ptr);
-                    (func)(hooks, inprocess_get_state::<S>(), tid);
+                    func(hooks, inprocess_get_state::<S>(), tid);
                     *hook = Hook::Empty;
                 }
                 Hook::Empty => (),
@@ -521,7 +521,7 @@ where
                         u64,
                         u64,
                     ) -> SyscallHookResult = transmute(*ptr);
-                    let r = (func)(
+                    let r = func(
                         hooks,
                         inprocess_get_state::<S>(),
                         sys_num,
@@ -556,7 +556,7 @@ where
                             u64,
                         ) -> SyscallHookResult,
                     > = transmute(*ptr);
-                    let r = (func)(
+                    let r = func(
                         hooks,
                         inprocess_get_state::<S>(),
                         sys_num,
@@ -625,7 +625,7 @@ where
                         u64,
                         u64,
                     ) -> u64 = transmute(*ptr);
-                    res = (func)(
+                    res = func(
                         hooks,
                         inprocess_get_state::<S>(),
                         res,
@@ -658,7 +658,7 @@ where
                             u64,
                         ) -> u64,
                     > = transmute(*ptr);
-                    res = (func)(
+                    res = func(
                         hooks,
                         inprocess_get_state::<S>(),
                         res,
@@ -831,8 +831,8 @@ where
     ) {
         let index = EDGE_HOOKS.len();
         self.emulator.add_edge_hooks(
-            generation_hook.map(|_|gen_edge_hook_wrapper::<QT, S>),
-            execution_hook.map(|_|exec_edge_hook_wrapper::<QT, S>),
+            generation_hook.map(|_| gen_edge_hook_wrapper::<QT, S>),
+            execution_hook.map(|_| exec_edge_hook_wrapper::<QT, S>),
             index as u64,
         );
         EDGE_HOOKS.push((
@@ -906,9 +906,9 @@ where
     ) {
         let index = BLOCK_HOOKS.len();
         self.emulator.add_block_hooks(
-            generation_hook.map(|_|gen_block_hook_wrapper::<QT, S>),
-            post_generation_hook.map(|_|gen_post_block_hook_wrapper::<QT, S>),
-            execution_hook.map(|_|exec_block_hook_wrapper::<QT, S>),
+            generation_hook.map(|_| gen_block_hook_wrapper::<QT, S>),
+            post_generation_hook.map(|_| gen_post_block_hook_wrapper::<QT, S>),
+            execution_hook.map(|_| exec_block_hook_wrapper::<QT, S>),
             index as u64,
         );
         BLOCK_HOOKS.push((
@@ -1010,12 +1010,12 @@ where
     ) {
         let index = READ_HOOKS.len();
         self.emulator.add_read_hooks(
-            generation_hook.map(|_|gen_read_hook_wrapper::<QT, S>),
-            execution_hook1.map(|_|exec_read1_hook_wrapper::<QT, S>),
-            execution_hook2.map(|_|exec_read2_hook_wrapper::<QT, S>),
-            execution_hook4.map(|_|exec_read4_hook_wrapper::<QT, S>),
-            execution_hook8.map(|_|exec_read8_hook_wrapper::<QT, S>),
-            execution_hook_n.map(|_|exec_read_n_hook_wrapper::<QT, S>),
+            generation_hook.map(|_| gen_read_hook_wrapper::<QT, S>),
+            execution_hook1.map(|_| exec_read1_hook_wrapper::<QT, S>),
+            execution_hook2.map(|_| exec_read2_hook_wrapper::<QT, S>),
+            execution_hook4.map(|_| exec_read4_hook_wrapper::<QT, S>),
+            execution_hook8.map(|_| exec_read8_hook_wrapper::<QT, S>),
+            execution_hook_n.map(|_| exec_read_n_hook_wrapper::<QT, S>),
             index as u64,
         );
         READ_HOOKS.push((
@@ -1127,12 +1127,12 @@ where
     ) {
         let index = WRITE_HOOKS.len();
         self.emulator.add_write_hooks(
-            generation_hook.map(|_|gen_write_hook_wrapper::<QT, S>),
-            execution_hook1.map(|_|exec_write1_hook_wrapper::<QT, S>),
-            execution_hook2.map(|_|exec_write2_hook_wrapper::<QT, S>),
-            execution_hook4.map(|_|exec_write4_hook_wrapper::<QT, S>),
-            execution_hook8.map(|_|exec_write8_hook_wrapper::<QT, S>),
-            execution_hook_n.map(|_|exec_write_n_hook_wrapper::<QT, S>),
+            generation_hook.map(|_| gen_write_hook_wrapper::<QT, S>),
+            execution_hook1.map(|_| exec_write1_hook_wrapper::<QT, S>),
+            execution_hook2.map(|_| exec_write2_hook_wrapper::<QT, S>),
+            execution_hook4.map(|_| exec_write4_hook_wrapper::<QT, S>),
+            execution_hook8.map(|_| exec_write8_hook_wrapper::<QT, S>),
+            execution_hook_n.map(|_| exec_write_n_hook_wrapper::<QT, S>),
             index as u64,
         );
         WRITE_HOOKS.push((
@@ -1232,11 +1232,11 @@ where
     ) {
         let index = CMP_HOOKS.len();
         self.emulator.add_cmp_hooks(
-            generation_hook.map(|_|gen_cmp_hook_wrapper::<QT, S>),
-            execution_hook1.map(|_|exec_cmp1_hook_wrapper::<QT, S>),
-            execution_hook2.map(|_|exec_cmp2_hook_wrapper::<QT, S>),
-            execution_hook4.map(|_|exec_cmp4_hook_wrapper::<QT, S>),
-            execution_hook8.map(|_|exec_cmp8_hook_wrapper::<QT, S>),
+            generation_hook.map(|_| gen_cmp_hook_wrapper::<QT, S>),
+            execution_hook1.map(|_| exec_cmp1_hook_wrapper::<QT, S>),
+            execution_hook2.map(|_| exec_cmp2_hook_wrapper::<QT, S>),
+            execution_hook4.map(|_| exec_cmp4_hook_wrapper::<QT, S>),
+            execution_hook8.map(|_| exec_cmp8_hook_wrapper::<QT, S>),
             index as u64,
         );
         CMP_HOOKS.push((
