@@ -11,7 +11,7 @@ use crate::{
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
-    mutators::{MutationResult, Mutator, MultipleMutator},
+    mutators::{MultipleMutator, MutationResult, Mutator},
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
@@ -286,6 +286,7 @@ where
 {
     #[inline]
     #[allow(clippy::let_and_return)]
+    #[allow(clippy::cast_possible_wrap)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -298,19 +299,16 @@ where
         let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else { return Ok(()); };
         drop(testcase);
 
-        let mut i = 0;
-
         let mut generated = vec![];
-        let _ = self.mutator.mutate(state, &input, &mut generated, i)?;
+        let _ = self.mutator.mutate(state, &input, &mut generated, 0)?;
 
-        for new_inputs in generated {
+        for (i, new_input) in generated.into_iter().enumerate() {
             // Time is measured directly the `evaluate_input` function
-            let (untransformed, post) = new_inputs.try_transform_into(state)?;
+            let (untransformed, post) = new_input.try_transform_into(state)?;
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
 
-            self.mutator.post_exec(state, i, corpus_idx)?;
-            post.post_exec(state, i, corpus_idx)?;
-            i += 1;
+            self.mutator.post_exec(state, i as i32, corpus_idx)?;
+            post.post_exec(state, i as i32, corpus_idx)?;
         }
 
         Ok(())

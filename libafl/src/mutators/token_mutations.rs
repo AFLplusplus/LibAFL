@@ -4,9 +4,10 @@ use alloc::vec::Vec;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use core::slice::from_raw_parts;
 use core::{
+    fmt::Debug,
     mem::size_of,
     ops::{Add, AddAssign},
-    slice::Iter, fmt::Debug,
+    slice::Iter,
 };
 #[cfg(feature = "std")]
 use std::{
@@ -825,7 +826,7 @@ impl AFLppRedQueen {
                 let buf_8 = buf[buf_idx];
                 let another_buf_8 = another_buf[buf_idx];
                 if buf_8 == pattern as u8 && another_buf_8 == another_pattern as u8 {
-                    let mut cloned = buf.to_vec().clone();
+                    let mut cloned = buf.to_vec();
                     cloned[buf_idx] = repl as u8;
                     vec.push(cloned);
                     return true;
@@ -838,7 +839,7 @@ impl AFLppRedQueen {
                         u16::from_be_bytes(another_buf[buf_idx..buf_idx + 2].try_into().unwrap());
 
                     if buf_16 == pattern as u16 && another_buf_16 == another_pattern as u16 {
-                        let mut cloned = buf.to_vec().clone();
+                        let mut cloned = buf.to_vec();
                         cloned[buf_idx + 1] = (repl & 0xff) as u8;
                         cloned[buf_idx] = (repl >> 8 & 0xff) as u8;
                         vec.push(cloned);
@@ -853,7 +854,7 @@ impl AFLppRedQueen {
                         u32::from_be_bytes(another_buf[buf_idx..buf_idx + 4].try_into().unwrap());
                     // println!("buf: {buf_32} {another_buf_32} {pattern} {another_pattern}");
                     if buf_32 == pattern as u32 && another_buf_32 == another_pattern as u32 {
-                        let mut cloned = buf.to_vec().clone();
+                        let mut cloned = buf.to_vec();
                         cloned[buf_idx + 3] = (repl & 0xff) as u8;
                         cloned[buf_idx + 2] = (repl >> 8 & 0xff) as u8;
                         cloned[buf_idx + 1] = (repl >> 16 & 0xff) as u8;
@@ -871,7 +872,7 @@ impl AFLppRedQueen {
                         u64::from_be_bytes(another_buf[buf_idx..buf_idx + 8].try_into().unwrap());
 
                     if buf_64 == pattern && another_buf_64 == another_pattern {
-                        let mut cloned = buf.to_vec().clone();
+                        let mut cloned = buf.to_vec();
 
                         cloned[buf_idx + 7] = (repl & 0xff) as u8;
                         cloned[buf_idx + 6] = (repl >> 8 & 0xff) as u8;
@@ -1064,7 +1065,7 @@ impl AFLppRedQueen {
         if copy_len > 0 {
             unsafe {
                 for l in 1..=copy_len {
-                    let mut cloned = buf.to_vec().clone();
+                    let mut cloned = buf.to_vec();
                     buffer_copy(&mut cloned, repl, 0, buf_idx, l);
                     vec.push(cloned);
                 }
