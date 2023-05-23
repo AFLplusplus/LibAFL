@@ -344,7 +344,6 @@ where
         drop(testcase);
 
         let mut i = 0;
-        let mut found = 0;
         loop {
             let mut input = input.clone();
 
@@ -356,11 +355,7 @@ where
 
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = input.try_transform_into(state)?;
-            let (res, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-
-            if res == ExecuteInputResult::Corpus {
-                found += 1;
-            }
+            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
 
             self.mutator_mut().post_exec(state, i, corpus_idx)?;
             post.post_exec(state, i, corpus_idx)?;

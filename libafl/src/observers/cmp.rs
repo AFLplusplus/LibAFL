@@ -417,13 +417,14 @@ where
 
         let count = self.usable_count();
         for i in 0..count {
-            if self.original {
-                // Update header
-                meta.headers.push((i, self.cmp_map().headers[i]));
-            }
-
             let execs = self.cmp_map().usable_executions_for(i);
             if execs > 0 {
+
+                if self.original {
+                    // Update header
+                    meta.headers.push((i, self.cmp_map().headers[i]));
+                }
+
                 // Recongize loops and discard if needed
                 if execs > 4 {
                     let mut increasing_v0 = 0;
@@ -615,7 +616,7 @@ pub const AFL_CMP_MAP_W: usize = 65536;
 /// The AFL++ `CMP_MAP_H`
 pub const AFL_CMP_MAP_H: usize = 32;
 /// The AFL++ `CMP_MAP_RTN_H`
-pub const AFL_CMP_MAP_RTN_H: usize = AFL_CMP_MAP_H / 4;
+pub const AFL_CMP_MAP_RTN_H: usize = AFL_CMP_MAP_H / 2;
 
 /// The AFL++ `CMP_TYPE_INS`
 pub const AFL_CMP_TYPE_INS: u32 = 1;
@@ -806,12 +807,14 @@ impl CmpMap for AFLppCmpMap {
             }
         } else {
             unsafe {
+                let v0_len  = self.vals.fn_operands[idx][execution].v0_len & (0x80 - 1);
+                let v1_len = self.vals.fn_operands[idx][execution].v1_len & (0x80 - 1);
                 Some(CmpValues::Bytes((
                     self.vals.fn_operands[idx][execution].v0
-                        [..(self.vals.fn_operands[idx][execution].v0_len as usize)]
+                        [..(v0_len as usize)]
                         .to_vec(),
                     self.vals.fn_operands[idx][execution].v1
-                        [..(self.vals.fn_operands[idx][execution].v1_len as usize)]
+                        [..(v1_len as usize)]
                         .to_vec(),
                 )))
             }

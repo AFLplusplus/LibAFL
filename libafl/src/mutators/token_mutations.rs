@@ -869,7 +869,7 @@ impl AFLppRedQueen {
                         buf[buf_idx + 3] = (repl >> 32 & 0xff) as u8;
                         buf[buf_idx + 2] = (repl >> 32 & 0xff) as u8;
                         buf[buf_idx + 1] = (repl >> 40 & 0xff) as u8;
-                        buf[buf_idx ] = (repl >> 48 & 0xff) as u8;
+                        buf[buf_idx] = (repl >> 48 & 0xff) as u8;
                         return true;
                     }
                 }
@@ -1476,40 +1476,36 @@ where
                             let (orig_v0, orig_v1, new_v0, new_v1) =
                                 (&orig.0, &orig.1, &new.0, &new.1);
                             // let attribute = header.attribute() as u8;
-                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
-                                // Compare v0 against v1
-                                if self.rtn_extend_encoding(
-                                    orig_v0,
-                                    orig_v1,
-                                    new_v0,
-                                    new_v1,
-                                    new_bytes,
-                                    orig_bytes,
-                                    cmp_buf_idx,
-                                    taint_len,
-                                    input_len,
-                                    hshape,
-                                ) {
-                                    matched = true;
-                                }
+                            // Compare v0 against v1
+                            if self.rtn_extend_encoding(
+                                orig_v0,
+                                orig_v1,
+                                new_v0,
+                                new_v1,
+                                new_bytes,
+                                orig_bytes,
+                                cmp_buf_idx,
+                                taint_len,
+                                input_len,
+                                hshape,
+                            ) {
+                                matched = true;
                             }
 
-                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
-                                // Compare v1 against v0
-                                if self.rtn_extend_encoding(
-                                    orig_v1,
-                                    orig_v0,
-                                    new_v1,
-                                    new_v0,
-                                    new_bytes,
-                                    orig_bytes,
-                                    cmp_buf_idx,
-                                    taint_len,
-                                    input_len,
-                                    hshape,
-                                ) {
-                                    matched = true;
-                                }
+                            // Compare v1 against v0
+                            if self.rtn_extend_encoding(
+                                orig_v1,
+                                orig_v0,
+                                new_v1,
+                                new_v0,
+                                new_bytes,
+                                orig_bytes,
+                                cmp_buf_idx,
+                                taint_len,
+                                input_len,
+                                hshape,
+                            ) {
+                                matched = true;
                             }
                         }
                         (_, _) => {
