@@ -179,7 +179,10 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
-#[cfg(all(target_os = "freebsd", target_arch = "x86_64"))]
+#[cfg(all(
+    any(target_os = "freebsd", target_os = "dragonfly"),
+    target_arch = "x86_64"
+))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -391,6 +394,7 @@ pub fn dump_registers<W: Write>(
     target_os = "linux",
     target_os = "android",
     target_os = "freebsd",
+    target_os = "dragonfly",
     target_os = "netbsd",
     target_os = "openbsd",
     any(target_os = "solaris", target_os = "illumos"),
@@ -512,7 +516,7 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
-#[cfg(target_os = "freebsd")]
+#[cfg(all(target_os = "freebsd", target_arch = "x86_64"))]
 #[allow(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
@@ -523,6 +527,22 @@ fn write_crash<W: Write>(
         writer,
         "Received signal {} at{:016x}, fault address: 0x{:016x}",
         signal, ucontext.uc_mcontext.mc_rip, ucontext.uc_mcontext.mc_fs
+    )?;
+
+    Ok(())
+}
+
+#[cfg(all(target_os = "dragonfly", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at{:016x}, fault address: 0x{:016x}",
+        signal, ucontext.uc_mcontext.mc_rip, ucontext.uc_mcontext.mc_cs
     )?;
 
     Ok(())
@@ -584,6 +604,7 @@ fn write_crash<W: Write>(
     target_os = "linux",
     target_os = "android",
     target_os = "freebsd",
+    target_os = "dragonfly",
     target_os = "openbsd",
     target_os = "netbsd",
     any(target_os = "solaris", target_os = "illumos"),
