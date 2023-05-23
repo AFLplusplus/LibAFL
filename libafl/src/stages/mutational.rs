@@ -11,11 +11,11 @@ use crate::{
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
-    mutators::{MutationResult, Mutator},
+    mutators::{MultipleMutator, MutationResult, Mutator},
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
-    Error, ExecuteInputResult, prelude::CrossoverInsertMutator,
+    Error,
 };
 
 // TODO multi mutators stage
@@ -258,73 +258,28 @@ where
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct ContinuousMutationalStage<CB, E, EM, I, M, Z> {
+pub struct MultipleMutationalStage<E, EM, I, M, Z> {
     mutator: M,
-    closure: CB,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
 
-impl<CB, E, EM, I, M, Z> UsesState for ContinuousMutationalStage<CB, E, EM, I, M, Z>
+impl<E, EM, I, M, Z> UsesState for MultipleMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: Mutator<I, Z::State>,
+    M: MultipleMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
     type State = Z::State;
 }
 
-impl<CB, E, EM, I, M, Z> MutationalStage<E, EM, I, M, Z>
-    for ContinuousMutationalStage<CB, E, EM, I, M, Z>
+impl<E, EM, I, M, Z> Stage<E, EM, Z> for MultipleMutationalStage<E, EM, I, M, Z>
 where
-    CB: FnMut(
-        &mut Z,
-        &mut E,
-        &mut E::State,
-        &mut EM,
-        CorpusId,
-        MutationResult,
-    ) -> Result<bool, Error>,
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: Mutator<I, Z::State>,
-    Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
-    I: MutatedTransform<Self::Input, Self::State> + Clone,
-{
-    /// The mutator, added to this stage
-    #[inline]
-    fn mutator(&self) -> &M {
-        &self.mutator
-    }
-
-    /// The list of mutators, added to this stage (as mutable ref)
-    #[inline]
-    fn mutator_mut(&mut self) -> &mut M {
-        &mut self.mutator
-    }
-
-    /// Gets the number of iterations as a random number
-    fn iterations(&self, _state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
-        Ok(u64::MAX)
-    }
-}
-
-impl<CB, E, EM, I, M, Z> Stage<E, EM, Z> for ContinuousMutationalStage<CB, E, EM, I, M, Z>
-where
-    CB: FnMut(
-        &mut Z,
-        &mut E,
-        &mut E::State,
-        &mut EM,
-        CorpusId,
-        MutationResult,
-    ) -> Result<bool, Error>,
-    E: UsesState<State = Z::State>,
-    EM: UsesState<State = Z::State>,
-    M: Mutator<I, Z::State>,
+    M: MultipleMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
@@ -344,20 +299,16 @@ where
         drop(testcase);
 
         let mut i = 0;
-        loop {
-            let mut input = input.clone();
 
-            let mutated = self.mutator_mut().mutate(state, &mut input, i)?;
+        let mut generated = vec![];
+        let _ = self.mutator.mutate(state, &input, &mut generated, i)?;
 
-            if (self.closure)(fuzzer, executor, state, manager, corpus_idx, mutated)? {
-                break;
-            }
-
+        for new_inputs in generated {
             // Time is measured directly the `evaluate_input` function
-            let (untransformed, post) = input.try_transform_into(state)?;
+            let (untransformed, post) = new_inputs.try_transform_into(state)?;
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
 
-            self.mutator_mut().post_exec(state, i, corpus_idx)?;
+            self.mutator.post_exec(state, i, corpus_idx)?;
             post.post_exec(state, i, corpus_idx)?;
             i += 1;
         }
@@ -366,41 +317,32 @@ where
     }
 }
 
-impl<CB, E, EM, M, Z> ContinuousMutationalStage<CB, E, EM, Z::Input, M, Z>
+impl<E, EM, M, Z> MultipleMutationalStage<E, EM, Z::Input, M, Z>
 where
-    CB: FnMut(
-        &mut Z,
-        &mut E,
-        &mut E::State,
-        &mut EM,
-        CorpusId,
-        MutationResult,
-    ) -> Result<bool, Error>,
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: Mutator<Z::Input, Z::State>,
+    M: MultipleMutator<Z::Input, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
     /// Creates a new default mutational stage
-    pub fn new(mutator: M, closure: CB) -> Self {
-        Self::transforming(mutator, closure)
+    pub fn new(mutator: M) -> Self {
+        Self::transforming(mutator)
     }
 }
 
-impl<CB, E, EM, I, M, Z> ContinuousMutationalStage<CB, E, EM, I, M, Z>
+impl<E, EM, I, M, Z> MultipleMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: Mutator<I, Z::State>,
+    M: MultipleMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
     /// Creates a new transforming mutational stage
-    pub fn transforming(mutator: M, closure: CB) -> Self {
+    pub fn transforming(mutator: M) -> Self {
         Self {
             mutator,
-            closure,
             phantom: PhantomData,
         }
     }

@@ -419,7 +419,6 @@ where
         for i in 0..count {
             let execs = self.cmp_map().usable_executions_for(i);
             if execs > 0 {
-
                 if self.original {
                     // Update header
                     meta.headers.push((i, self.cmp_map().headers[i]));
@@ -807,15 +806,11 @@ impl CmpMap for AFLppCmpMap {
             }
         } else {
             unsafe {
-                let v0_len  = self.vals.fn_operands[idx][execution].v0_len & (0x80 - 1);
+                let v0_len = self.vals.fn_operands[idx][execution].v0_len & (0x80 - 1);
                 let v1_len = self.vals.fn_operands[idx][execution].v1_len & (0x80 - 1);
                 Some(CmpValues::Bytes((
-                    self.vals.fn_operands[idx][execution].v0
-                        [..(v0_len as usize)]
-                        .to_vec(),
-                    self.vals.fn_operands[idx][execution].v1
-                        [..(v1_len as usize)]
-                        .to_vec(),
+                    self.vals.fn_operands[idx][execution].v0[..(v0_len as usize)].to_vec(),
+                    self.vals.fn_operands[idx][execution].v1[..(v1_len as usize)].to_vec(),
                 )))
             }
         }

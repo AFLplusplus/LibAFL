@@ -35,7 +35,7 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, mutational::ContinuousMutationalStage,
+        calibrate::CalibrationStage, mutational::MultipleMutationalStage,
         power::StdPowerMutationalStage, tracing::AFLppCmplogTracingStage, ColorizationStage,
         IfStage,
     },
@@ -367,19 +367,9 @@ fn fuzz(
 
         let tracing = AFLppCmplogTracingStage::with_cmplog_observer_name(cmplog_executor, "cmplog");
 
-        let brk = |_fuzzer: &mut _,
-                   _executor: &mut _,
-                   _state: &mut _,
-                   _event_manager: &mut _,
-                   _corpus_id: CorpusId,
-                   mutation_result: MutationResult|
-         -> Result<bool, libafl::Error> {
-            Ok(mutation_result == MutationResult::Skipped)
-        };
-
         // Setup a randomic Input2State stage
         let rq =
-            ContinuousMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true), brk);
+            MultipleMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));
 
         let cb = |_fuzzer: &mut _,
                   _executor: &mut _,
