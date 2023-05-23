@@ -1,5 +1,6 @@
 //! [`LLVM` `8-bi-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
+
 use libafl::bolts::ownedref::OwnedMutSlice;
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
@@ -24,7 +25,6 @@ pub use self::observers::{counters_maps_observer, CountersMultiMapObserver};
 
 #[cfg(feature = "observers")]
 mod observers {
-    use super::COUNTERS_MAPS;
     use alloc::{
         string::{String, ToString},
         vec::Vec,
@@ -47,6 +47,8 @@ mod observers {
         Error,
     };
     use serde::{Deserialize, Serialize};
+
+    use super::COUNTERS_MAPS;
 
     #[must_use]
     #[export_name = "counters_maps_observer"]
