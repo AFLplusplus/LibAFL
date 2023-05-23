@@ -4,10 +4,9 @@ use alloc::vec::Vec;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use core::slice::from_raw_parts;
 use core::{
-    fmt::Debug,
     mem::size_of,
     ops::{Add, AddAssign},
-    slice::Iter,
+    slice::Iter, fmt::Debug,
 };
 #[cfg(feature = "std")]
 use std::{

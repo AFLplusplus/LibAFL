@@ -11,7 +11,7 @@ use crate::{
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
-    mutators::{MultipleMutator, MutationResult, Mutator},
+    mutators::{MutationResult, Mutator, MultipleMutator},
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
