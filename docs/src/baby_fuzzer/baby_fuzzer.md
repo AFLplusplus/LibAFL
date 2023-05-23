@@ -37,6 +37,7 @@ edition = "2018"
 ```
 
 In order to use LibAFl we must add it as dependency adding `libafl = { path = "path/to/libafl/" }` under `[dependencies]`.
+That path actually needs to point to the `libafl` directory within the cloned repo, not the root of the repo itself.
 You can use the LibAFL version from [crates.io](https://crates.io/crates/libafl) if you want, in this case, you have to use `libafl = "*"` to get the latest version (or set it to the current version).
 
 As we are going to fuzz Rust code, we want that a panic does not simply cause the program to exit, but raise an `abort` that can then be caught by the fuzzer.
@@ -102,6 +103,21 @@ fn main(){
     harness(&input);
 }
 ```
+
+To test the crash manually, you can add a feature in your `Cargo.toml` that enables the call that triggers the panic:
+
+```toml
+[features]
+panic = []
+```
+
+And then run the program with that feature activated:
+
+```console
+$ cargo run -F panic
+```
+
+And you should see the program crash as expected.
 
 ## Generating and running some tests
 
