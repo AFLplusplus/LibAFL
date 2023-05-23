@@ -807,16 +807,8 @@ where
         unsafe {
             let index = EDGE_HOOKS.len();
             self.emulator.add_edge_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_edge_hook_wrapper::<QT, S>)
-                },
-                if execution_hook.is_none() {
-                    None
-                } else {
-                    Some(exec_edge_hook_wrapper::<QT, S>)
-                },
+                generation_hook.map(|_| gen_edge_hook_wrapper::<QT, S>),
+                execution_hook.map(|_| exec_edge_hook_wrapper::<QT, S>),
                 index as u64,
             );
             EDGE_HOOKS.push((
@@ -839,16 +831,8 @@ where
     ) {
         let index = EDGE_HOOKS.len();
         self.emulator.add_edge_hooks(
-            if generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_edge_hook_wrapper::<QT, S>)
-            },
-            if execution_hook.is_none() {
-                None
-            } else {
-                Some(exec_edge_hook_wrapper::<QT, S>)
-            },
+            generation_hook.map(|_|gen_edge_hook_wrapper::<QT, S>),
+            execution_hook.map(|_|exec_edge_hook_wrapper::<QT, S>),
             index as u64,
         );
         EDGE_HOOKS.push((
@@ -867,11 +851,7 @@ where
         unsafe {
             let index = EDGE_HOOKS.len();
             self.emulator.add_edge_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_edge_hook_wrapper::<QT, S>)
-                },
+                generation_hook.map(|_| gen_edge_hook_wrapper::<QT, S>),
                 execution_hook,
                 index as u64,
             );
@@ -895,21 +875,9 @@ where
         unsafe {
             let index = BLOCK_HOOKS.len();
             self.emulator.add_block_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_block_hook_wrapper::<QT, S>)
-                },
-                if post_generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_post_block_hook_wrapper::<QT, S>)
-                },
-                if execution_hook.is_none() {
-                    None
-                } else {
-                    Some(exec_block_hook_wrapper::<QT, S>)
-                },
+                generation_hook.map(|_| gen_block_hook_wrapper::<QT, S>),
+                post_generation_hook.map(|_| gen_post_block_hook_wrapper::<QT, S>),
+                execution_hook.map(|_| exec_block_hook_wrapper::<QT, S>),
                 index as u64,
             );
             BLOCK_HOOKS.push((
@@ -938,21 +906,9 @@ where
     ) {
         let index = BLOCK_HOOKS.len();
         self.emulator.add_block_hooks(
-            if generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_block_hook_wrapper::<QT, S>)
-            },
-            if post_generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_post_block_hook_wrapper::<QT, S>)
-            },
-            if execution_hook.is_none() {
-                None
-            } else {
-                Some(exec_block_hook_wrapper::<QT, S>)
-            },
+            generation_hook.map(|_|gen_block_hook_wrapper::<QT, S>),
+            post_generation_hook.map(|_|gen_post_block_hook_wrapper::<QT, S>),
+            execution_hook.map(|_|exec_block_hook_wrapper::<QT, S>),
             index as u64,
         );
         BLOCK_HOOKS.push((
@@ -973,16 +929,8 @@ where
         unsafe {
             let index = BLOCK_HOOKS.len();
             self.emulator.add_block_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_block_hook_wrapper::<QT, S>)
-                },
-                if post_generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_post_block_hook_wrapper::<QT, S>)
-                },
+                generation_hook.map(|_| gen_block_hook_wrapper::<QT, S>),
+                post_generation_hook.map(|_| gen_post_block_hook_wrapper::<QT, S>),
                 execution_hook,
                 index as u64,
             );
@@ -1014,36 +962,12 @@ where
         unsafe {
             let index = READ_HOOKS.len();
             self.emulator.add_read_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_read_hook_wrapper::<QT, S>)
-                },
-                if execution_hook1.is_none() {
-                    None
-                } else {
-                    Some(exec_read1_hook_wrapper::<QT, S>)
-                },
-                if execution_hook2.is_none() {
-                    None
-                } else {
-                    Some(exec_read2_hook_wrapper::<QT, S>)
-                },
-                if execution_hook4.is_none() {
-                    None
-                } else {
-                    Some(exec_read4_hook_wrapper::<QT, S>)
-                },
-                if execution_hook8.is_none() {
-                    None
-                } else {
-                    Some(exec_read8_hook_wrapper::<QT, S>)
-                },
-                if execution_hook_n.is_none() {
-                    None
-                } else {
-                    Some(exec_read_n_hook_wrapper::<QT, S>)
-                },
+                generation_hook.map(|_| gen_read_hook_wrapper::<QT, S>),
+                execution_hook1.map(|_| exec_read1_hook_wrapper::<QT, S>),
+                execution_hook2.map(|_| exec_read2_hook_wrapper::<QT, S>),
+                execution_hook4.map(|_| exec_read4_hook_wrapper::<QT, S>),
+                execution_hook8.map(|_| exec_read8_hook_wrapper::<QT, S>),
+                execution_hook_n.map(|_| exec_read_n_hook_wrapper::<QT, S>),
                 index as u64,
             );
             READ_HOOKS.push((
@@ -1086,36 +1010,12 @@ where
     ) {
         let index = READ_HOOKS.len();
         self.emulator.add_read_hooks(
-            if generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_read_hook_wrapper::<QT, S>)
-            },
-            if execution_hook1.is_none() {
-                None
-            } else {
-                Some(exec_read1_hook_wrapper::<QT, S>)
-            },
-            if execution_hook2.is_none() {
-                None
-            } else {
-                Some(exec_read2_hook_wrapper::<QT, S>)
-            },
-            if execution_hook4.is_none() {
-                None
-            } else {
-                Some(exec_read4_hook_wrapper::<QT, S>)
-            },
-            if execution_hook8.is_none() {
-                None
-            } else {
-                Some(exec_read8_hook_wrapper::<QT, S>)
-            },
-            if execution_hook_n.is_none() {
-                None
-            } else {
-                Some(exec_read_n_hook_wrapper::<QT, S>)
-            },
+            generation_hook.map(|_|gen_read_hook_wrapper::<QT, S>),
+            execution_hook1.map(|_|exec_read1_hook_wrapper::<QT, S>),
+            execution_hook2.map(|_|exec_read2_hook_wrapper::<QT, S>),
+            execution_hook4.map(|_|exec_read4_hook_wrapper::<QT, S>),
+            execution_hook8.map(|_|exec_read8_hook_wrapper::<QT, S>),
+            execution_hook_n.map(|_|exec_read_n_hook_wrapper::<QT, S>),
             index as u64,
         );
         READ_HOOKS.push((
@@ -1142,11 +1042,7 @@ where
         unsafe {
             let index = READ_HOOKS.len();
             self.emulator.add_read_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_read_hook_wrapper::<QT, S>)
-                },
+                generation_hook.map(|_| gen_read_hook_wrapper::<QT, S>),
                 execution_hook1,
                 execution_hook2,
                 execution_hook4,
@@ -1183,36 +1079,12 @@ where
         unsafe {
             let index = WRITE_HOOKS.len();
             self.emulator.add_write_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_write_hook_wrapper::<QT, S>)
-                },
-                if execution_hook1.is_none() {
-                    None
-                } else {
-                    Some(exec_write1_hook_wrapper::<QT, S>)
-                },
-                if execution_hook2.is_none() {
-                    None
-                } else {
-                    Some(exec_write2_hook_wrapper::<QT, S>)
-                },
-                if execution_hook4.is_none() {
-                    None
-                } else {
-                    Some(exec_write4_hook_wrapper::<QT, S>)
-                },
-                if execution_hook8.is_none() {
-                    None
-                } else {
-                    Some(exec_write8_hook_wrapper::<QT, S>)
-                },
-                if execution_hook_n.is_none() {
-                    None
-                } else {
-                    Some(exec_write_n_hook_wrapper::<QT, S>)
-                },
+                generation_hook.map(|_| gen_write_hook_wrapper::<QT, S>),
+                execution_hook1.map(|_| exec_write1_hook_wrapper::<QT, S>),
+                execution_hook2.map(|_| exec_write2_hook_wrapper::<QT, S>),
+                execution_hook4.map(|_| exec_write4_hook_wrapper::<QT, S>),
+                execution_hook8.map(|_| exec_write8_hook_wrapper::<QT, S>),
+                execution_hook_n.map(|_| exec_write_n_hook_wrapper::<QT, S>),
                 index as u64,
             );
             WRITE_HOOKS.push((
@@ -1255,36 +1127,12 @@ where
     ) {
         let index = WRITE_HOOKS.len();
         self.emulator.add_write_hooks(
-            if generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_write_hook_wrapper::<QT, S>)
-            },
-            if execution_hook1.is_none() {
-                None
-            } else {
-                Some(exec_write1_hook_wrapper::<QT, S>)
-            },
-            if execution_hook2.is_none() {
-                None
-            } else {
-                Some(exec_write2_hook_wrapper::<QT, S>)
-            },
-            if execution_hook4.is_none() {
-                None
-            } else {
-                Some(exec_write4_hook_wrapper::<QT, S>)
-            },
-            if execution_hook8.is_none() {
-                None
-            } else {
-                Some(exec_write8_hook_wrapper::<QT, S>)
-            },
-            if execution_hook_n.is_none() {
-                None
-            } else {
-                Some(exec_write_n_hook_wrapper::<QT, S>)
-            },
+            generation_hook.map(|_|gen_write_hook_wrapper::<QT, S>),
+            execution_hook1.map(|_|exec_write1_hook_wrapper::<QT, S>),
+            execution_hook2.map(|_|exec_write2_hook_wrapper::<QT, S>),
+            execution_hook4.map(|_|exec_write4_hook_wrapper::<QT, S>),
+            execution_hook8.map(|_|exec_write8_hook_wrapper::<QT, S>),
+            execution_hook_n.map(|_|exec_write_n_hook_wrapper::<QT, S>),
             index as u64,
         );
         WRITE_HOOKS.push((
@@ -1311,11 +1159,7 @@ where
         unsafe {
             let index = WRITE_HOOKS.len();
             self.emulator.add_write_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_write_hook_wrapper::<QT, S>)
-                },
+                generation_hook.map(|_| gen_write_hook_wrapper::<QT, S>),
                 execution_hook1,
                 execution_hook2,
                 execution_hook4,
@@ -1349,31 +1193,11 @@ where
         unsafe {
             let index = CMP_HOOKS.len();
             self.emulator.add_cmp_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_cmp_hook_wrapper::<QT, S>)
-                },
-                if execution_hook1.is_none() {
-                    None
-                } else {
-                    Some(exec_cmp1_hook_wrapper::<QT, S>)
-                },
-                if execution_hook2.is_none() {
-                    None
-                } else {
-                    Some(exec_cmp2_hook_wrapper::<QT, S>)
-                },
-                if execution_hook4.is_none() {
-                    None
-                } else {
-                    Some(exec_cmp4_hook_wrapper::<QT, S>)
-                },
-                if execution_hook8.is_none() {
-                    None
-                } else {
-                    Some(exec_cmp8_hook_wrapper::<QT, S>)
-                },
+                generation_hook.map(|_| gen_cmp_hook_wrapper::<QT, S>),
+                execution_hook1.map(|_| exec_cmp1_hook_wrapper::<QT, S>),
+                execution_hook2.map(|_| exec_cmp2_hook_wrapper::<QT, S>),
+                execution_hook4.map(|_| exec_cmp4_hook_wrapper::<QT, S>),
+                execution_hook8.map(|_| exec_cmp8_hook_wrapper::<QT, S>),
                 index as u64,
             );
             CMP_HOOKS.push((
@@ -1408,31 +1232,11 @@ where
     ) {
         let index = CMP_HOOKS.len();
         self.emulator.add_cmp_hooks(
-            if generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_cmp_hook_wrapper::<QT, S>)
-            },
-            if execution_hook1.is_none() {
-                None
-            } else {
-                Some(exec_cmp1_hook_wrapper::<QT, S>)
-            },
-            if execution_hook2.is_none() {
-                None
-            } else {
-                Some(exec_cmp2_hook_wrapper::<QT, S>)
-            },
-            if execution_hook4.is_none() {
-                None
-            } else {
-                Some(exec_cmp4_hook_wrapper::<QT, S>)
-            },
-            if execution_hook8.is_none() {
-                None
-            } else {
-                Some(exec_cmp8_hook_wrapper::<QT, S>)
-            },
+            generation_hook.map(|_|gen_cmp_hook_wrapper::<QT, S>),
+            execution_hook1.map(|_|exec_cmp1_hook_wrapper::<QT, S>),
+            execution_hook2.map(|_|exec_cmp2_hook_wrapper::<QT, S>),
+            execution_hook4.map(|_|exec_cmp4_hook_wrapper::<QT, S>),
+            execution_hook8.map(|_|exec_cmp8_hook_wrapper::<QT, S>),
             index as u64,
         );
         CMP_HOOKS.push((
@@ -1457,11 +1261,7 @@ where
         unsafe {
             let index = CMP_HOOKS.len();
             self.emulator.add_cmp_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_cmp_hook_wrapper::<QT, S>)
-                },
+                generation_hook.map(|_| gen_cmp_hook_wrapper::<QT, S>),
                 execution_hook1,
                 execution_hook2,
                 execution_hook4,
