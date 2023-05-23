@@ -10,7 +10,7 @@ use crate::{
     bolts::{current_time, rands::Rand},
     corpus::{Corpus, CorpusId},
     impl_serdeany, mark_feature_time,
-    mutators::Mutator,
+    mutators::{MutationResult, Mutator},
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
         MutationalStage, Stage,
@@ -142,8 +142,12 @@ where
             let mut input = input.clone();
 
             start_timer!(state);
-            self.mutator_mut().mutate(state, &mut input, i as i32)?;
+            let mutated = self.mutator_mut().mutate(state, &mut input, i as i32)?;
             mark_feature_time!(state, PerfFeature::Mutate);
+
+            if mutated == MutationResult::Skipped {
+                continue;
+            }
 
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = input.try_transform_into(state)?;

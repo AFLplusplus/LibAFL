@@ -157,6 +157,9 @@ pub trait CompilerWrapper {
     /// Get if in linking mode
     fn is_linking(&self) -> bool;
 
+    /// Filter out argumets
+    fn filter(&self, _args: &mut Vec<String>) {}
+
     /// Silences `libafl_cc` output
     fn silence(&mut self, value: bool) -> &'_ mut Self;
 
@@ -165,7 +168,8 @@ pub trait CompilerWrapper {
 
     /// Run the compiler
     fn run(&mut self) -> Result<Option<i32>, Error> {
-        let args = self.command()?;
+        let mut args = self.command()?;
+        self.filter(&mut args);
 
         if !self.is_silent() {
             dbg!(args.clone());

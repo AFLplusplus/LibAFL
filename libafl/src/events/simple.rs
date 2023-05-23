@@ -122,8 +122,7 @@ where
         _executor: &mut E,
     ) -> Result<usize, Error> {
         let count = self.events.len();
-        while !self.events.is_empty() {
-            let event = self.events.pop().unwrap();
+        while let Some(event) = self.events.pop() {
             self.handle_in_client(state, event)?;
         }
         Ok(count)
