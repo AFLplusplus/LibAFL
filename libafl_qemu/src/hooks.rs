@@ -807,8 +807,12 @@ where
         unsafe {
             let index = EDGE_HOOKS.len();
             self.emulator.add_edge_hooks(
-                generation_hook.map(|_| gen_edge_hook_wrapper::<QT, S>),
-                execution_hook.map(|_| exec_edge_hook_wrapper::<QT, S>),
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_edge_hook_wrapper::<QT, S> as _),
+                execution_hook
+                    .as_ref()
+                    .map(|_| exec_edge_hook_wrapper::<QT, S> as _),
                 index as u64,
             );
             EDGE_HOOKS.push((
@@ -831,8 +835,12 @@ where
     ) {
         let index = EDGE_HOOKS.len();
         self.emulator.add_edge_hooks(
-            generation_hook.map(|_| gen_edge_hook_wrapper::<QT, S>),
-            execution_hook.map(|_| exec_edge_hook_wrapper::<QT, S>),
+            generation_hook
+                .as_ref()
+                .map(|_| gen_edge_hook_wrapper::<QT, S> as _),
+            execution_hook
+                .as_ref()
+                .map(|_| exec_edge_hook_wrapper::<QT, S> as _),
             index as u64,
         );
         EDGE_HOOKS.push((
@@ -851,7 +859,9 @@ where
         unsafe {
             let index = EDGE_HOOKS.len();
             self.emulator.add_edge_hooks(
-                generation_hook.map(|_| gen_edge_hook_wrapper::<QT, S>),
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_edge_hook_wrapper::<QT, S> as _),
                 execution_hook,
                 index as u64,
             );
@@ -875,9 +885,15 @@ where
         unsafe {
             let index = BLOCK_HOOKS.len();
             self.emulator.add_block_hooks(
-                generation_hook.map(|_| gen_block_hook_wrapper::<QT, S>),
-                post_generation_hook.map(|_| gen_post_block_hook_wrapper::<QT, S>),
-                execution_hook.map(|_| exec_block_hook_wrapper::<QT, S>),
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_block_hook_wrapper::<QT, S> as _),
+                post_generation_hook
+                    .as_ref()
+                    .map(|_| gen_post_block_hook_wrapper::<QT, S> as _),
+                execution_hook
+                    .as_ref()
+                    .map(|_| exec_block_hook_wrapper::<QT, S> as _),
                 index as u64,
             );
             BLOCK_HOOKS.push((
@@ -906,9 +922,15 @@ where
     ) {
         let index = BLOCK_HOOKS.len();
         self.emulator.add_block_hooks(
-            generation_hook.map(|_| gen_block_hook_wrapper::<QT, S>),
-            post_generation_hook.map(|_| gen_post_block_hook_wrapper::<QT, S>),
-            execution_hook.map(|_| exec_block_hook_wrapper::<QT, S>),
+            generation_hook
+                .as_ref()
+                .map(|_| gen_block_hook_wrapper::<QT, S> as _),
+            post_generation_hook
+                .as_ref()
+                .map(|_| gen_post_block_hook_wrapper::<QT, S> as _),
+            execution_hook
+                .as_ref()
+                .map(|_| exec_block_hook_wrapper::<QT, S> as _),
             index as u64,
         );
         BLOCK_HOOKS.push((
@@ -929,8 +951,12 @@ where
         unsafe {
             let index = BLOCK_HOOKS.len();
             self.emulator.add_block_hooks(
-                generation_hook.map(|_| gen_block_hook_wrapper::<QT, S>),
-                post_generation_hook.map(|_| gen_post_block_hook_wrapper::<QT, S>),
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_block_hook_wrapper::<QT, S> as _),
+                post_generation_hook
+                    .as_ref()
+                    .map(|_| gen_post_block_hook_wrapper::<QT, S> as _),
                 execution_hook,
                 index as u64,
             );
@@ -962,12 +988,24 @@ where
         unsafe {
             let index = READ_HOOKS.len();
             self.emulator.add_read_hooks(
-                generation_hook.map(|_| gen_read_hook_wrapper::<QT, S>),
-                execution_hook1.map(|_| exec_read1_hook_wrapper::<QT, S>),
-                execution_hook2.map(|_| exec_read2_hook_wrapper::<QT, S>),
-                execution_hook4.map(|_| exec_read4_hook_wrapper::<QT, S>),
-                execution_hook8.map(|_| exec_read8_hook_wrapper::<QT, S>),
-                execution_hook_n.map(|_| exec_read_n_hook_wrapper::<QT, S>),
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_read_hook_wrapper::<QT, S> as _),
+                execution_hook1
+                    .as_ref()
+                    .map(|_| exec_read1_hook_wrapper::<QT, S> as _),
+                execution_hook2
+                    .as_ref()
+                    .map(|_| exec_read2_hook_wrapper::<QT, S> as _),
+                execution_hook4
+                    .as_ref()
+                    .map(|_| exec_read4_hook_wrapper::<QT, S> as _),
+                execution_hook8
+                    .as_ref()
+                    .map(|_| exec_read8_hook_wrapper::<QT, S> as _),
+                execution_hook_n
+                    .as_ref()
+                    .map(|_| exec_read_n_hook_wrapper::<QT, S> as _),
                 index as u64,
             );
             READ_HOOKS.push((
@@ -1010,12 +1048,24 @@ where
     ) {
         let index = READ_HOOKS.len();
         self.emulator.add_read_hooks(
-            generation_hook.map(|_| gen_read_hook_wrapper::<QT, S>),
-            execution_hook1.map(|_| exec_read1_hook_wrapper::<QT, S>),
-            execution_hook2.map(|_| exec_read2_hook_wrapper::<QT, S>),
-            execution_hook4.map(|_| exec_read4_hook_wrapper::<QT, S>),
-            execution_hook8.map(|_| exec_read8_hook_wrapper::<QT, S>),
-            execution_hook_n.map(|_| exec_read_n_hook_wrapper::<QT, S>),
+            generation_hook
+                .as_ref()
+                .map(|_| gen_read_hook_wrapper::<QT, S> as _),
+            execution_hook1
+                .as_ref()
+                .map(|_| exec_read1_hook_wrapper::<QT, S> as _),
+            execution_hook2
+                .as_ref()
+                .map(|_| exec_read2_hook_wrapper::<QT, S> as _),
+            execution_hook4
+                .as_ref()
+                .map(|_| exec_read4_hook_wrapper::<QT, S> as _),
+            execution_hook8
+                .as_ref()
+                .map(|_| exec_read8_hook_wrapper::<QT, S> as _),
+            execution_hook_n
+                .as_ref()
+                .map(|_| exec_read_n_hook_wrapper::<QT, S> as _),
             index as u64,
         );
         READ_HOOKS.push((
@@ -1042,7 +1092,9 @@ where
         unsafe {
             let index = READ_HOOKS.len();
             self.emulator.add_read_hooks(
-                generation_hook.map(|_| gen_read_hook_wrapper::<QT, S>),
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_read_hook_wrapper::<QT, S> as _),
                 execution_hook1,
                 execution_hook2,
                 execution_hook4,
@@ -1079,12 +1131,24 @@ where
         unsafe {
             let index = WRITE_HOOKS.len();
             self.emulator.add_write_hooks(
-                generation_hook.map(|_| gen_write_hook_wrapper::<QT, S>),
-                execution_hook1.map(|_| exec_write1_hook_wrapper::<QT, S>),
-                execution_hook2.map(|_| exec_write2_hook_wrapper::<QT, S>),
-                execution_hook4.map(|_| exec_write4_hook_wrapper::<QT, S>),
-                execution_hook8.map(|_| exec_write8_hook_wrapper::<QT, S>),
-                execution_hook_n.map(|_| exec_write_n_hook_wrapper::<QT, S>),
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_write_hook_wrapper::<QT, S> as _),
+                execution_hook1
+                    .as_ref()
+                    .map(|_| exec_write1_hook_wrapper::<QT, S> as _),
+                execution_hook2
+                    .as_ref()
+                    .map(|_| exec_write2_hook_wrapper::<QT, S> as _),
+                execution_hook4
+                    .as_ref()
+                    .map(|_| exec_write4_hook_wrapper::<QT, S> as _),
+                execution_hook8
+                    .as_ref()
+                    .map(|_| exec_write8_hook_wrapper::<QT, S> as _),
+                execution_hook_n
+                    .as_ref()
+                    .map(|_| exec_write_n_hook_wrapper::<QT, S> as _),
                 index as u64,
             );
             WRITE_HOOKS.push((
@@ -1127,12 +1191,24 @@ where
     ) {
         let index = WRITE_HOOKS.len();
         self.emulator.add_write_hooks(
-            generation_hook.map(|_| gen_write_hook_wrapper::<QT, S>),
-            execution_hook1.map(|_| exec_write1_hook_wrapper::<QT, S>),
-            execution_hook2.map(|_| exec_write2_hook_wrapper::<QT, S>),
-            execution_hook4.map(|_| exec_write4_hook_wrapper::<QT, S>),
-            execution_hook8.map(|_| exec_write8_hook_wrapper::<QT, S>),
-            execution_hook_n.map(|_| exec_write_n_hook_wrapper::<QT, S>),
+            generation_hook
+                .as_ref()
+                .map(|_| gen_write_hook_wrapper::<QT, S> as _),
+            execution_hook1
+                .as_ref()
+                .map(|_| exec_write1_hook_wrapper::<QT, S> as _),
+            execution_hook2
+                .as_ref()
+                .map(|_| exec_write2_hook_wrapper::<QT, S> as _),
+            execution_hook4
+                .as_ref()
+                .map(|_| exec_write4_hook_wrapper::<QT, S> as _),
+            execution_hook8
+                .as_ref()
+                .map(|_| exec_write8_hook_wrapper::<QT, S> as _),
+            execution_hook_n
+                .as_ref()
+                .map(|_| exec_write_n_hook_wrapper::<QT, S> as _),
             index as u64,
         );
         WRITE_HOOKS.push((
@@ -1159,7 +1235,9 @@ where
         unsafe {
             let index = WRITE_HOOKS.len();
             self.emulator.add_write_hooks(
-                generation_hook.map(|_| gen_write_hook_wrapper::<QT, S>),
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_write_hook_wrapper::<QT, S> as _),
                 execution_hook1,
                 execution_hook2,
                 execution_hook4,
@@ -1193,11 +1271,21 @@ where
         unsafe {
             let index = CMP_HOOKS.len();
             self.emulator.add_cmp_hooks(
-                generation_hook.map(|_| gen_cmp_hook_wrapper::<QT, S>),
-                execution_hook1.map(|_| exec_cmp1_hook_wrapper::<QT, S>),
-                execution_hook2.map(|_| exec_cmp2_hook_wrapper::<QT, S>),
-                execution_hook4.map(|_| exec_cmp4_hook_wrapper::<QT, S>),
-                execution_hook8.map(|_| exec_cmp8_hook_wrapper::<QT, S>),
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_cmp_hook_wrapper::<QT, S> as _),
+                execution_hook1
+                    .as_ref()
+                    .map(|_| exec_cmp1_hook_wrapper::<QT, S> as _),
+                execution_hook2
+                    .as_ref()
+                    .map(|_| exec_cmp2_hook_wrapper::<QT, S> as _),
+                execution_hook4
+                    .as_ref()
+                    .map(|_| exec_cmp4_hook_wrapper::<QT, S> as _),
+                execution_hook8
+                    .as_ref()
+                    .map(|_| exec_cmp8_hook_wrapper::<QT, S> as _),
                 index as u64,
             );
             CMP_HOOKS.push((
@@ -1232,11 +1320,21 @@ where
     ) {
         let index = CMP_HOOKS.len();
         self.emulator.add_cmp_hooks(
-            generation_hook.map(|_| gen_cmp_hook_wrapper::<QT, S>),
-            execution_hook1.map(|_| exec_cmp1_hook_wrapper::<QT, S>),
-            execution_hook2.map(|_| exec_cmp2_hook_wrapper::<QT, S>),
-            execution_hook4.map(|_| exec_cmp4_hook_wrapper::<QT, S>),
-            execution_hook8.map(|_| exec_cmp8_hook_wrapper::<QT, S>),
+            generation_hook
+                .as_ref()
+                .map(|_| gen_cmp_hook_wrapper::<QT, S> as _),
+            execution_hook1
+                .as_ref()
+                .map(|_| exec_cmp1_hook_wrapper::<QT, S> as _),
+            execution_hook2
+                .as_ref()
+                .map(|_| exec_cmp2_hook_wrapper::<QT, S> as _),
+            execution_hook4
+                .as_ref()
+                .map(|_| exec_cmp4_hook_wrapper::<QT, S> as _),
+            execution_hook8
+                .as_ref()
+                .map(|_| exec_cmp8_hook_wrapper::<QT, S> as _),
             index as u64,
         );
         CMP_HOOKS.push((
@@ -1261,7 +1359,9 @@ where
         unsafe {
             let index = CMP_HOOKS.len();
             self.emulator.add_cmp_hooks(
-                generation_hook.map(|_| gen_cmp_hook_wrapper::<QT, S>),
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_cmp_hook_wrapper::<QT, S> as _),
                 execution_hook1,
                 execution_hook2,
                 execution_hook4,
