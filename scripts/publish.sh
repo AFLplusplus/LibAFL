@@ -35,6 +35,14 @@ cd .. || exit 1
 sleep 20
 
 cd libafl_qemu
+
+cd libafl_qemu_build
+cargo publish "$@"
+cd ..
+cd libafl_qemu_sys
+cargo publish "$@"
+cd ..
+
 cargo publish "$@"
 cd .. || exit 1
 
