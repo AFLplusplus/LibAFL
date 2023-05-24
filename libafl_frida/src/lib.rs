@@ -77,7 +77,7 @@ pub mod windows_hooks;
 pub mod coverage_rt;
 
 /// Hooking thread lifecycle events. Seems like this is apple-only for now.
-#[cfg(any(target_vendor = "apple"))]
+#[cfg(target_vendor = "apple")]
 pub mod pthread_hook;
 
 #[cfg(feature = "cmplog")]

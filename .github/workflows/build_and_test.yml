@@ -225,6 +225,32 @@ jobs:
       if: runner.os == 'macOS' # use bash v4
       run: /usr/local/bin/bash -c 'RUN_ON_CI=1 ./scripts/test_all_fuzzers.sh'
 
+  executions-check:
+    strategy:
+      matrix:
+          os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: lyricwulf/abc@v1
+      with: 
+        linux: llvm llvm-dev clang 
+        macos: llvm bash coreutils
+    - uses: actions/checkout@v3
+      with:
+        submodules: true # recursively checkout submodules
+        fetch-depth: 0
+    - uses: Swatinem/rust-cache@v2
+    - name: Build and run libfuzzer_libpng (Linux)
+      if: runner.os == 'Linux'
+      run: ./scripts/executions-check.sh 
+    - name: Build and run libfuzzer_libpng (macOS) 
+      if: runner.os == 'macOS'
+      run: /usr/local/bin/bash -c './scripts/executions-check.sh'
+
   nostd-build:
     runs-on: ubuntu-latest
     steps:
