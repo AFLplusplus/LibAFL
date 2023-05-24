@@ -17,7 +17,7 @@ You can find a complete version of this tutorial as an example fuzzer in [`fuzze
 
 We use cargo to create a new Rust project with LibAFL as a dependency.
 
-```sh
+```console
 $ cargo new baby_fuzzer
 $ cd baby_fuzzer
 ```
@@ -25,18 +25,11 @@ $ cd baby_fuzzer
 The generated `Cargo.toml` looks like the following:
 
 ```toml
-[package]
-name = "baby_fuzzer"
-version = "0.1.0"
-authors = ["Your Name <you@example.com>"]
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
+{{#include ../../listings/baby_fuzzer/listing-01/Cargo.toml}}
 ```
 
 In order to use LibAFl we must add it as dependency adding `libafl = { path = "path/to/libafl/" }` under `[dependencies]`.
+That path actually needs to point to the `libafl` directory within the cloned repo, not the root of the repo itself.
 You can use the LibAFL version from [crates.io](https://crates.io/crates/libafl) if you want, in this case, you have to use `libafl = "*"` to get the latest version (or set it to the current version).
 
 As we are going to fuzz Rust code, we want that a panic does not simply cause the program to exit, but raise an `abort` that can then be caught by the fuzzer.
@@ -47,27 +40,9 @@ Alongside this setting, we add some optimization flags for the compilation, when
 The final `Cargo.toml` should look similar to the following:
 
 ```toml
-[package]
-name = "baby_fuzzer"
-version = "0.1.0"
-authors = ["Your Name <you@example.com>"]
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-libafl = { path = "path/to/libafl/" }
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-lto = true
-codegen-units = 1
-opt-level = 3
-debug = true
+{{#include ../../listings/baby_fuzzer/listing-02/Cargo.toml}}
 ```
+
 
 ## The function under test
 
@@ -76,32 +51,22 @@ To start, we create the closure that we want to fuzz. It takes a buffer as input
 `ExitKind` is used to inform the fuzzer about the harness' exit status.
 
 ```rust
-extern crate libafl;
-use libafl::{
-    bolts::AsSlice,
-    inputs::{BytesInput, HasTargetBytes},
-    executors::ExitKind,
-};
-
-fn main(){
-    let mut harness = |input: &BytesInput| {
-        let target = input.target_bytes();
-        let buf = target.as_slice();
-        if buf.len() > 0 && buf[0] == 'a' as u8 {
-            if buf.len() > 1 && buf[1] == 'b' as u8 {
-                if buf.len() > 2 && buf[2] == 'c' as u8 {
-                    panic!("=)");
-                }
-            }
-        }
-        ExitKind::Ok
-    };
-    // To test the panic:
-    let input = BytesInput::new(Vec::from("abc"));
-    #[cfg(feature = "panic")]
-    harness(&input);
-}
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-03/src/main.rs}}
 ```
+
+To test the crash manually, you can add a feature in `Cargo.toml` that enables the call that triggers the panic:
+
+```toml
+{{#include ../../listings/baby_fuzzer/listing-03/Cargo.toml:22:23}}
+```
+
+And then run the program with that feature activated:
+
+```console
+$ cargo run -F panic
+```
+
+And you should see the program crash as expected.
 
 ## Generating and running some tests
 
@@ -109,19 +74,9 @@ One of the main components that a LibAFL-based fuzzer uses is the State, a conta
 It includes all state, such as the Corpus of inputs, the current RNG state, and potential Metadata for the testcases and run.
 In our `main` we create a basic State instance like the following:
 
-```rust,ignore
-// create a State from scratch
-let mut state = StdState::new(
-    // RNG
-    StdRand::with_seed(current_nanos()),
-    // Corpus that will be evolved, we keep it in memory for performance
-    InMemoryCorpus::new(),
-    // Corpus in which we store solutions (crashes in this example),
-    // on disk so the user can get them after stopping the fuzzer
-    OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-    &mut (),
-    &mut ()
-).unwrap();
+
+```rust
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-04/src/main.rs:state}}
 ```
 
 - The first parameter is a random number generator, that is part of the fuzzer state, in this case, we use the default one `StdRand`, but you can choose a different one. We seed it with the current nanoseconds.
@@ -134,38 +89,21 @@ let mut state = StdState::new(
 
 Another required component is the **EventManager**. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a `Monitor` instance.
 
-```rust,ignore
-// The Monitor trait defines how the fuzzer stats are displayed to the user
-let mon = SimpleMonitor::new(|s| println!("{s}"));
-
-// The event manager handle the various events generated during the fuzzing loop
-// such as the notification of the addition of a new item to the corpus
-let mut mgr = SimpleEventManager::new(mon);
+```rust
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-04/src/main.rs:event_manager}}
 ```
 
 In addition, we have the **Fuzzer**, an entity that contains some actions that alter the State. One of these actions is the scheduling of the testcases to the fuzzer using a **Scheduler**.
 We create it as `QueueScheduler`, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
 
-```rust,ignore
-// A queue policy to get testcasess from the corpus
-let scheduler = QueueScheduler::new();
-
-// A fuzzer with feedbacks and a corpus scheduler
-let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+```rust
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-04/src/main.rs:scheduler_fuzzer}}
 ```
 
 Last but not least, we need an **Executor** that is the entity responsible to run our program under test. In this example, we want to run the harness function in-process (without forking off a child, for example), and so we use the `InProcessExecutor`.
 
-```rust,ignore
-// Create the executor for an in-process function
-let mut executor = InProcessExecutor::new(
-    &mut harness,
-    (),
-    &mut fuzzer,
-    &mut state,
-    &mut mgr,
-)
-.expect("Failed to create the Executor");
+```rust
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-04/src/main.rs:executor}}
 ```
 
 It takes a reference to the harness, the state, and the event manager. We will discuss the second parameter later.
@@ -175,41 +113,19 @@ Now we have the 4 major entities ready for running our tests, but we still canno
 
 For this purpose, we use a **Generator**, `RandPrintablesGenerator` that generates a string of printable bytes.
 
-```rust,ignore
-use libafl::generators::RandPrintablesGenerator;
-
-// Generator of printable bytearrays of max size 32
-let mut generator = RandPrintablesGenerator::new(32);
-
-// Generate 8 initial inputs
-state
-    .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
-    .expect("Failed to generate the initial corpus".into());
+```rust
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-04/src/main.rs:generator}}
 ```
 
 Now you can prepend the necessary `use` directives to your main.rs and compile the fuzzer.
 
 ```rust
-extern crate libafl;
-
-use std::path::PathBuf;
-use libafl::{
-    bolts::{AsSlice, current_nanos, rands::StdRand},
-    corpus::{InMemoryCorpus, OnDiskCorpus},
-    events::SimpleEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
-    fuzzer::StdFuzzer,
-    generators::RandPrintablesGenerator,
-    inputs::{BytesInput, HasTargetBytes},
-    monitors::SimpleMonitor,
-    schedulers::QueueScheduler,
-    state::StdState,
-};
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-04/src/main.rs:use}}
 ```
 
 When running, you should see something similar to:
 
-```sh
+```console
 $ cargo run
     Finished dev [unoptimized + debuginfo] target(s) in 0.04s
      Running `target/debug/baby_fuzzer`
@@ -228,57 +144,19 @@ We represent such map as a `static mut` variable.
 As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions by `signals_set` in our harness:
 
 ```rust
-extern crate libafl;
-use libafl::{
-    bolts::AsSlice,
-    inputs::{BytesInput, HasTargetBytes},
-    executors::ExitKind,
-};
-
-// Coverage map with explicit assignments due to the lack of instrumentation
-static mut SIGNALS: [u8; 16] = [0; 16];
-
-fn signals_set(idx: usize) {
-    unsafe { SIGNALS[idx] = 1 };
-}
-
-// The closure that we want to fuzz
-let mut harness = |input: &BytesInput| {
-    let target = input.target_bytes();
-    let buf = target.as_slice();
-    signals_set(0); // set SIGNALS[0]
-    if buf.len() > 0 && buf[0] == 'a' as u8 {
-        signals_set(1); // set SIGNALS[1]
-        if buf.len() > 1 && buf[1] == 'b' as u8 {
-            signals_set(2); // set SIGNALS[2]
-            if buf.len() > 2 && buf[2] == 'c' as u8 {
-                panic!("=)");
-            }
-        }
-    }
-    ExitKind::Ok
-};
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-05/src/main.rs:signals}}
 ```
 
 The observer can be created directly from the `SIGNALS` map, in the following way:
 
-```rust,ignore
-// Create an observation channel using the signals map
-let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
+```rust
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-05/src/main.rs:observer}}
 ```
 
 The observers are usually kept in the corresponding executor as they keep track of information that is valid for just one run. We have then to modify our InProcessExecutor creation to include the observer as follows:
 
-```rust,ignore
-// Create the executor for an in-process function with just one observer
-let mut executor = InProcessExecutor::new(
-    &mut harness,
-    tuple_list!(observer),
-    &mut fuzzer,
-    &mut state,
-    &mut mgr,
-)
-.expect("Failed to create the Executor".into());
+```rust
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-05/src/main.rs:executor_with_observer}}
 ```
 
 Now that the fuzzer can observe which condition is satisfied, we need a way to rate an input as interesting (i.e. worth of addition to the corpus) based on this observation. Here comes the notion of Feedback.
@@ -291,45 +169,19 @@ We use `MaxMapFeedback`, a feedback that implements a novelty search over the ma
 
 We need to update our State creation including the feedback state and the Fuzzer including the feedback and the objective:
 
-```rust,ignore
-extern crate libafl;
-use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
-    corpus::{InMemoryCorpus, OnDiskCorpus},
-    feedbacks::{MaxMapFeedback, CrashFeedback},
-    fuzzer::StdFuzzer,
-    state::StdState,
-    observers::StdMapObserver,
-};
+```rust
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-05/src/main.rs:state_with_feedback_and_objective}}
+```
 
-// Feedback to rate the interestingness of an input
-let mut feedback = MaxMapFeedback::new(&observer);
+Once again, you need to add the necessary `use` directives for this to work properly:
 
-// A feedback to choose if an input is a solution or not
-let mut objective = CrashFeedback::new();
-
-// create a State from scratch
-let mut state = StdState::new(
-    // RNG
-    StdRand::with_seed(current_nanos()),
-    // Corpus that will be evolved, we keep it in memory for performance
-    InMemoryCorpus::new(),
-    // Corpus in which we store solutions (crashes in this example),
-    // on disk so the user can get them after stopping the fuzzer
-    OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-    &mut feedback,
-    &mut objective
-).unwrap();
-
-// ...
-
-// A fuzzer with feedbacks and a corpus scheduler
-let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+```rust
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-05/src/main.rs:use}}
 ```
 
 ## The actual fuzzing
 
-Now, after including the correct `use`, we can run the program, but the outcome is not so different from the previous one as the random generator does not take into account what we save as interesting in the corpus. To do that, we need to plug a Mutator.
+Now, we can run the program, but the outcome is not so different from the previous one as the random generator does not take into account what we save as interesting in the corpus. To do that, we need to plug a Mutator.
 
 **Stages** perform actions on individual inputs, taken from the corpus.
 For instance, the `MutationalStage` executes the harness several times in a row, every time with mutated inputs.
@@ -337,28 +189,20 @@ For instance, the `MutationalStage` executes the harness several times in a row,
 As the last step, we create a MutationalStage that uses a mutator inspired by the havoc mutator of AFL.
 
 ```rust,ignore
-use libafl::{
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    stages::mutational::StdMutationalStage,
-    fuzzer::Fuzzer,
-};
-
-// ...
-
-// Setup a mutational stage with a basic bytes mutator
-let mutator = StdScheduledMutator::new(havoc_mutations());
-let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
-fuzzer
-    .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
-    .expect("Error in the fuzzing loop");
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-06/src/main.rs:mutational_stage}}
 ```
 
 `fuzz_loop` will request a testcase for each iteration to the fuzzer using the scheduler and then it will invoke the stage.
 
+Again, we need to add the new `use` directives:
+
+```rust,ignore
+{{#rustdoc_include ../../listings/baby_fuzzer/listing-06/src/main.rs:use}}
+```
+
 After adding this code, we have a proper fuzzer, that can run and find the input that panics the function in less than a second.
 
-```text
+```console
 $ cargo run
    Compiling baby_fuzzer v0.1.0 (/home/andrea/Desktop/baby_fuzzer)
     Finished dev [unoptimized + debuginfo] target(s) in 1.56s
