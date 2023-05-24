@@ -202,7 +202,7 @@ Again, we need to add the new `use` directives:
 
 After adding this code, we have a proper fuzzer, that can run and find the input that panics the function in less than a second.
 
-```text
+```console
 $ cargo run
    Compiling baby_fuzzer v0.1.0 (/home/andrea/Desktop/baby_fuzzer)
     Finished dev [unoptimized + debuginfo] target(s) in 1.56s
