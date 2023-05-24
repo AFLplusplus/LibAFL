@@ -51,7 +51,7 @@ fn main() {
 
     /* ANCHOR: observer */
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", unsafe { &mut SIGNALS }) };
+    let observer = unsafe { StdMapObserver::new("signals", &mut SIGNALS) };
     /* ANCHOR_END: observer */
 
     /* ANCHOR: state_with_feedback_and_objective */
