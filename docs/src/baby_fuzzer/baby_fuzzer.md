@@ -143,7 +143,7 @@ Now we want to turn our simple fuzzer into a feedback-based one and increase the
 We represent such map as a `static mut` variable.
 As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions by `signals_set` in our harness:
 
-```rust,compile_fail
+```rust
 {{#rustdoc_include ../../listings/baby_fuzzer/listing-05/src/main.rs:signals}}
 ```
 
@@ -188,7 +188,7 @@ For instance, the `MutationalStage` executes the harness several times in a row,
 
 As the last step, we create a MutationalStage that uses a mutator inspired by the havoc mutator of AFL.
 
-```rust
+```rust,ignore
 {{#rustdoc_include ../../listings/baby_fuzzer/listing-06/src/main.rs:mutational_stage}}
 ```
 
@@ -196,7 +196,7 @@ As the last step, we create a MutationalStage that uses a mutator inspired by th
 
 Again, we need to add the new `use` directives:
 
-```rust
+```rust,ignore
 {{#rustdoc_include ../../listings/baby_fuzzer/listing-06/src/main.rs:use}}
 ```
 
