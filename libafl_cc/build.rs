@@ -132,10 +132,17 @@ fn build_pass(
     ldflags: &Vec<&str>,
     src_dir: &Path,
     src_file: &str,
+    additional_srcfiles: Option<&Vec<&str>>,
     optional: bool,
 ) {
     let dot_offset = src_file.rfind('.').unwrap();
     let src_stub = &src_file[..dot_offset];
+
+    let additionals = if let Some(x) = additional_srcfiles {
+        x.iter().map(|f| src_dir.join(f)).collect::<Vec<PathBuf>>()
+    } else {
+        Vec::new()
+    };
 
     println!("cargo:rerun-if-changed=src/{src_file}");
     let r = if cfg!(unix) {
@@ -143,6 +150,7 @@ fn build_pass(
             .arg("-v")
             .args(cxxflags)
             .arg(src_dir.join(src_file))
+            .args(additionals)
             .args(ldflags)
             .arg("-o")
             .arg(out_dir.join(format!("{src_stub}.{}", dll_extension())))
@@ -154,6 +162,7 @@ fn build_pass(
             .arg("-v")
             .args(cxxflags)
             .arg(src_dir.join(src_file))
+            .args(additionals)
             .arg("/link")
             .args(ldflags)
             .arg(format!(
@@ -359,6 +368,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
             &ldflags,
             src_dir,
             pass,
+            None,
             false,
         );
     }
@@ -372,6 +382,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
             &ldflags,
             src_dir,
             pass,
+            None,
             true,
         );
     }
