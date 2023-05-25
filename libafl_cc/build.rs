@@ -125,6 +125,7 @@ fn find_llvm_version() -> Option<i32> {
     None
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_pass(
     bindir_path: &Path,
     out_dir: &Path,
