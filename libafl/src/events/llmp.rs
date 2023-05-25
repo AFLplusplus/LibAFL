@@ -318,15 +318,11 @@ pub trait EventStatsCollector {
     fn serialization_time(&self) -> Duration;
     /// Expose the collected observers deserialization time
     fn deserialization_time(&self) -> Duration;
-    /// Expose the collected execution time
-    fn execution_time(&self) -> Duration;
 
     /// Expose the collected observers serialization time (mut)
     fn serialization_time_mut(&mut self) -> &mut Duration;
     /// Expose the collected observers deserialization time (mut)
     fn deserialization_time_mut(&mut self) -> &mut Duration;
-    /// Expose the collected execution time (mut)
-    fn execution_time_mut(&mut self) -> &mut Duration;
 }
 
 /// Collected stats to decide if observers must be serialized or not
@@ -355,8 +351,6 @@ where
     #[cfg(feature = "adaptive_serialization")]
     deserialization_time: Duration,
     #[cfg(feature = "adaptive_serialization")]
-    execution_time: Duration,
-    #[cfg(feature = "adaptive_serialization")]
     serializations_cnt: usize,
     phantom: PhantomData<S>,
 }
@@ -373,18 +367,12 @@ where
     fn deserialization_time(&self) -> Duration {
         self.deserialization_time
     }
-    fn execution_time(&self) -> Duration {
-        self.execution_time
-    }
 
     fn serialization_time_mut(&mut self) -> &mut Duration {
         &mut self.serialization_time
     }
     fn deserialization_time_mut(&mut self) -> &mut Duration {
         &mut self.deserialization_time
-    }
-    fn execution_time_mut(&mut self) -> &mut Duration {
-        &mut self.execution_time
     }
 }
 
@@ -434,8 +422,6 @@ where
             #[cfg(feature = "adaptive_serialization")]
             deserialization_time: Duration::ZERO,
             #[cfg(feature = "adaptive_serialization")]
-            execution_time: Duration::ZERO,
-            #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -462,8 +448,6 @@ where
             #[cfg(feature = "adaptive_serialization")]
             deserialization_time: Duration::ZERO,
             #[cfg(feature = "adaptive_serialization")]
-            execution_time: Duration::ZERO,
-            #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
@@ -487,8 +471,6 @@ where
             serialization_time: Duration::ZERO,
             #[cfg(feature = "adaptive_serialization")]
             deserialization_time: Duration::ZERO,
-            #[cfg(feature = "adaptive_serialization")]
-            execution_time: Duration::ZERO,
             #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
             phantom: PhantomData,
@@ -516,8 +498,6 @@ where
             serialization_time: Duration::ZERO,
             #[cfg(feature = "adaptive_serialization")]
             deserialization_time: Duration::ZERO,
-            #[cfg(feature = "adaptive_serialization")]
-            execution_time: Duration::ZERO,
             #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
             phantom: PhantomData,
@@ -566,15 +546,8 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                #[cfg(feature = "adaptive_serialization")]
-                let must_go = || self.execution_time != Duration::ZERO;
-
-                #[cfg(not(feature = "adaptive_serialization"))]
-                let must_go = || true;
-
                 let res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()
-                    && must_go()
                 {
                     #[cfg(feature = "adaptive_serialization")]
                     let start = current_time();
@@ -598,14 +571,6 @@ where
                     let res = fuzzer.evaluate_input_with_observers::<E, Self>(
                         state, executor, self, input, false,
                     )?;
-
-                    #[cfg(feature = "adaptive_serialization")]
-                    if state.has_metadata::<SchedulerMetadata>() {
-                        let psmeta = state.metadata_map().get::<SchedulerMetadata>().unwrap();
-                        self.execution_time = psmeta.exec_time() / psmeta.cycles() as u32;
-                    }
-
-                    // self.execution_time = current_time() - start;
 
                     #[cfg(feature = "no_count_newtestcases")]
                     {
@@ -695,11 +660,13 @@ where
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
-        //eprintln!("{:?} {:?} {:?}", self.execution_time, self.serialization_time, self.deserialization_time);
         #[cfg(feature = "adaptive_serialization")]
-        if self.execution_time == Duration::ZERO
-            || self.serialization_time == Duration::ZERO
-            || (self.serialization_time + self.deserialization_time) * 2 < self.execution_time
+        let exec_time = observers.match_name::<crate::observers::TimeObserver>("time").map(|o| o.last_runtime().unwrap_or(Duration::ZERO)).unwrap();
+    
+        //eprintln!("{:?} {:?}     {:?} {:?}", self.execution_time, runtime, self.serialization_time, self.deserialization_time);
+        #[cfg(feature = "adaptive_serialization")]
+        if self.serialization_time == Duration::ZERO
+            || (self.serialization_time + self.deserialization_time) * 2 < exec_time // self.execution_time
             || self.serializations_cnt.trailing_zeros() >= 8
         {
             let start = current_time();
@@ -851,18 +818,12 @@ where
     fn deserialization_time(&self) -> Duration {
         self.llmp_mgr.deserialization_time
     }
-    fn execution_time(&self) -> Duration {
-        self.llmp_mgr.execution_time
-    }
 
     fn serialization_time_mut(&mut self) -> &mut Duration {
         &mut self.llmp_mgr.serialization_time
     }
     fn deserialization_time_mut(&mut self) -> &mut Duration {
         &mut self.llmp_mgr.deserialization_time
-    }
-    fn execution_time_mut(&mut self) -> &mut Duration {
-        &mut self.llmp_mgr.execution_time
     }
 }
 

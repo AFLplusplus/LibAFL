@@ -172,15 +172,8 @@ where
                                 "Received new Testcase to evaluate from secondary node {idx:?}"
                             );
 
-                            #[cfg(feature = "adaptive_serialization")]
-                            let must_go = || self.inner.execution_time() != Duration::ZERO;
-
-                            #[cfg(not(feature = "adaptive_serialization"))]
-                            let must_go = || true;
-
                             let res = if client_config.match_with(&self.configuration())
                                 && observers_buf.is_some()
-                                && must_go()
                             {
                                 #[cfg(feature = "adaptive_serialization")]
                                 let start = current_time();
@@ -215,15 +208,6 @@ where
                                     input.clone(),
                                     false,
                                 )?;
-
-                                #[cfg(feature = "adaptive_serialization")]
-                                if state.has_metadata::<SchedulerMetadata>() {
-                                    let psmeta =
-                                        state.metadata_map().get::<SchedulerMetadata>().unwrap();
-                                    *self.inner.execution_time_mut() =
-                                        psmeta.exec_time() / psmeta.cycles() as u32;
-                                    //eprintln!("yyyyyyyyyyyyy {:?}", self.inner.execution_time());
-                                }
 
                                 #[cfg(feature = "no_count_newtestcases")]
                                 {
