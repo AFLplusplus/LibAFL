@@ -247,7 +247,7 @@ impl CompilerWrapper for ClangWrapper {
             new_args.push("dynamic_lookup".into());
         }
 
-        self.base_args = new_args;
+        self.base_args.extend(new_args);
         Ok(self)
     }
 
