@@ -1,4 +1,3 @@
-#[cfg(target_vendor = "apple")]
 use std::path::PathBuf;
 use std::{env, fs::File, io::Write, path::Path, process::Command, str};
 
