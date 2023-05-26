@@ -663,7 +663,7 @@ where
         #[cfg(feature = "adaptive_serialization")]
         let exec_time = observers.match_name::<crate::observers::TimeObserver>("time").map(|o| o.last_runtime().unwrap_or(Duration::ZERO)).unwrap();
     
-        //eprintln!("{:?} {:?}     {:?} {:?}", self.execution_time, runtime, self.serialization_time, self.deserialization_time);
+        //eprintln!("{:?}    {:?} {:?}", exec_time, self.serialization_time, self.deserialization_time);
         #[cfg(feature = "adaptive_serialization")]
         if self.serialization_time == Duration::ZERO
             || (self.serialization_time + self.deserialization_time) * 2 < exec_time // self.execution_time
@@ -671,7 +671,7 @@ where
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
-            //eprintln!("aaaaaaaaaa {:?} {:?}", ser.len(), (self.serialization_time + self.deserialization_time) * 4 < self.execution_time);
+            //eprintln!("aaaaaaaaaa {:?} {:?}", ser.len(), (self.serialization_time + self.deserialization_time) * 4 < exec_time);
             self.serialization_time = current_time() - start;
 
             self.serializations_cnt += 1;
