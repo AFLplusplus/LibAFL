@@ -463,42 +463,56 @@ where
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
         if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
-            // Default no introspection implmentation
-            #[cfg(not(feature = "introspection"))]
-            self.fire(
-                state,
-                Event::UpdateExecStats {
-                    executions,
-                    time: cur,
-                    phantom: PhantomData,
-                },
-            )?;
-
-            // If performance monitor are requested, fire the `UpdatePerfMonitor` event
-            #[cfg(feature = "introspection")]
-            {
-                state
-                    .introspection_monitor_mut()
-                    .set_current_time(crate::bolts::cpu::read_time_counter());
-
-                // Send the current monitor over to the manager. This `.clone` shouldn't be
-                // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s
-                self.fire(
-                    state,
-                    Event::UpdatePerfMonitor {
-                        executions,
-                        time: cur,
-                        introspection_monitor: Box::new(state.introspection_monitor().clone()),
-                        phantom: PhantomData,
-                    },
-                )?;
-            }
+            self.report_progress(state)?;
 
             Ok(cur)
         } else {
             if cur.as_millis() % 1000 == 0 {}
             Ok(last_report_time)
         }
+    }
+    
+    /// Send off an info/monitor/heartbeat message to the broker.
+    /// Will return an [`crate::Error`], if the stats could not be sent.
+    fn report_progress(
+        &mut self,
+        state: &mut Self::State,
+    ) -> Result<(), Error> {
+        let executions = *state.executions();
+        let cur = current_time();
+
+        // Default no introspection implmentation
+        #[cfg(not(feature = "introspection"))]
+        self.fire(
+            state,
+            Event::UpdateExecStats {
+                executions,
+                time: cur,
+                phantom: PhantomData,
+            },
+        )?;
+
+        // If performance monitor are requested, fire the `UpdatePerfMonitor` event
+        #[cfg(feature = "introspection")]
+        {
+            state
+                .introspection_monitor_mut()
+                .set_current_time(crate::bolts::cpu::read_time_counter());
+
+            // Send the current monitor over to the manager. This `.clone` shouldn't be
+            // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s
+            self.fire(
+                state,
+                Event::UpdatePerfMonitor {
+                    executions,
+                    time: cur,
+                    introspection_monitor: Box::new(state.introspection_monitor().clone()),
+                    phantom: PhantomData,
+                },
+            )?;
+        }
+        
+        Ok(())
     }
 }
 

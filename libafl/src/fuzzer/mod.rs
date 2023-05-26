@@ -225,6 +225,8 @@ where
             last = manager.maybe_report_progress(state, last, monitor_timeout)?;
         }
 
+        manager.report_progress(state)?;
+
         // If we would assume the fuzzer loop will always exit after this, we could do this here:
         // manager.on_restart(state)?;
         // But as the state may grow to a few megabytes,

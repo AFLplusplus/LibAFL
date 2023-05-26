@@ -222,7 +222,7 @@ impl<E> TimeoutExecutor<E> {
         if !self.batch_mode {
             return false;
         }
-        // eprintln!("handle_timeout {:?} {}", self.avg_exec_time, self.avg_mul_k);
+        //eprintln!("handle_timeout {:?} {}", self.avg_exec_time, self.avg_mul_k);
         let cur_time = current_time();
         if !data.is_valid() {
             // outside the target
