@@ -101,14 +101,17 @@ where
     {
         self.inner.serialize_observers(observers)
     }
-    
+
     #[cfg(feature = "adaptive_serialization")]
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
-        let exec_time = observers.match_name::<crate::observers::TimeObserver>("time").map(|o| o.last_runtime().unwrap_or(Duration::ZERO)).unwrap();
-    
+        let exec_time = observers
+            .match_name::<crate::observers::TimeObserver>("time")
+            .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
+            .unwrap();
+
         //eprintln!("{:?}    {:?} {:?}", exec_time, self.serialization_time, self.deserialization_time);
         if self.inner.serialization_time() == Duration::ZERO
             || (self.inner.serialization_time() + self.inner.deserialization_time()) * 4 < exec_time // self.execution_time

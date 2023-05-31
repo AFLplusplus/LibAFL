@@ -459,7 +459,6 @@ where
         last_report_time: Duration,
         monitor_timeout: Duration,
     ) -> Result<Duration, Error> {
-        let executions = *state.executions();
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
         if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
@@ -471,13 +470,10 @@ where
             Ok(last_report_time)
         }
     }
-    
+
     /// Send off an info/monitor/heartbeat message to the broker.
     /// Will return an [`crate::Error`], if the stats could not be sent.
-    fn report_progress(
-        &mut self,
-        state: &mut Self::State,
-    ) -> Result<(), Error> {
+    fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         let executions = *state.executions();
         let cur = current_time();
 
@@ -511,7 +507,7 @@ where
                 },
             )?;
         }
-        
+
         Ok(())
     }
 }

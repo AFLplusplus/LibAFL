@@ -556,38 +556,37 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                let res = if client_config.match_with(&self.configuration)
-                    && observers_buf.is_some()
-                {
-                    #[cfg(feature = "adaptive_serialization")]
-                    let start = current_time();
-                    let observers: E::Observers =
-                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                    #[cfg(feature = "adaptive_serialization")]
-                    {
-                        self.deserialization_time = current_time() - start;
-                    }
+                let res =
+                    if client_config.match_with(&self.configuration) && observers_buf.is_some() {
+                        #[cfg(feature = "adaptive_serialization")]
+                        let start = current_time();
+                        let observers: E::Observers =
+                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                        #[cfg(feature = "adaptive_serialization")]
+                        {
+                            self.deserialization_time = current_time() - start;
+                        }
 
-                    let res = fuzzer
-                        .process_execution(state, self, input, &observers, &exit_kind, false)?;
+                        let res = fuzzer
+                            .process_execution(state, self, input, &observers, &exit_kind, false)?;
 
-                    // Count this as execution even if we are not actually executing nothing for the stats
-                    #[cfg(feature = "count_process_execution")]
-                    {
-                        *state.executions_mut() += 1;
-                    }
-                    res
-                } else {
-                    let res = fuzzer.evaluate_input_with_observers::<E, Self>(
-                        state, executor, self, input, false,
-                    )?;
+                        // Count this as execution even if we are not actually executing nothing for the stats
+                        #[cfg(feature = "count_process_execution")]
+                        {
+                            *state.executions_mut() += 1;
+                        }
+                        res
+                    } else {
+                        let res = fuzzer.evaluate_input_with_observers::<E, Self>(
+                            state, executor, self, input, false,
+                        )?;
 
-                    #[cfg(feature = "no_count_newtestcases")]
-                    {
-                        *state.executions_mut() -= 1;
-                    }
-                    res
-                };
+                        #[cfg(feature = "no_count_newtestcases")]
+                        {
+                            *state.executions_mut() -= 1;
+                        }
+                        res
+                    };
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
@@ -671,8 +670,11 @@ where
         OT: ObserversTuple<Self::State> + Serialize,
     {
         #[cfg(feature = "adaptive_serialization")]
-        let exec_time = observers.match_name::<crate::observers::TimeObserver>("time").map(|o| o.last_runtime().unwrap_or(Duration::ZERO)).unwrap();
-    
+        let exec_time = observers
+            .match_name::<crate::observers::TimeObserver>("time")
+            .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
+            .unwrap();
+
         //eprintln!("{:?}    {:?} {:?}", exec_time, self.serialization_time, self.deserialization_time);
         #[cfg(feature = "adaptive_serialization")]
         if self.serialization_time == Duration::ZERO
