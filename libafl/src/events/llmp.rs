@@ -318,11 +318,15 @@ pub trait EventStatsCollector {
     fn serialization_time(&self) -> Duration;
     /// Expose the collected observers deserialization time
     fn deserialization_time(&self) -> Duration;
+    /// How many times observers were serialized
+    fn serializations_cnt(&self) -> usize;
 
     /// Expose the collected observers serialization time (mut)
     fn serialization_time_mut(&mut self) -> &mut Duration;
     /// Expose the collected observers deserialization time (mut)
     fn deserialization_time_mut(&mut self) -> &mut Duration;
+    /// How many times observers were serialized (mut)
+    fn serializations_cnt_mut(&mut self) -> &mut usize;
 }
 
 /// Collected stats to decide if observers must be serialized or not
@@ -367,12 +371,18 @@ where
     fn deserialization_time(&self) -> Duration {
         self.deserialization_time
     }
+    fn serializations_cnt(&self) -> usize {
+        self.serializations_cnt
+    }
 
     fn serialization_time_mut(&mut self) -> &mut Duration {
         &mut self.serialization_time
     }
     fn deserialization_time_mut(&mut self) -> &mut Duration {
         &mut self.deserialization_time
+    }
+    fn serializations_cnt_mut(&mut self) -> &mut usize {
+        &mut self.serializations_cnt
     }
 }
 
