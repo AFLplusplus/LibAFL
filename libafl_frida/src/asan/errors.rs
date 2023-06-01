@@ -536,7 +536,7 @@ impl AsanErrors {
             if let Some(rt) = rt {
                 rt.unhook_functions();
             }
-            loop {}
+            // loop {}
             panic!("ASAN: Crashing target!");
         }
     }
