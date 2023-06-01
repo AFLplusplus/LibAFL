@@ -6,9 +6,9 @@
 //! going to make it compilable only for Windows, don't forget to modify the
 //! `scripts/test_all_fuzzers.sh` to opt-out this fuzzer from that test.
 
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
+// use mimalloc::MiMalloc;
+// #[global_allocator]
+// static GLOBAL: MiMalloc = MiMalloc;
 
 use std::path::PathBuf;
 
@@ -41,9 +41,7 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-#[cfg(unix)]
 use libafl_frida::asan::asan_rt::AsanRuntime;
-#[cfg(unix)]
 use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
 use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
@@ -97,15 +95,10 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
-                #[cfg(unix)]
                 let asan = AsanRuntime::new(options.clone());
 
-                #[cfg(unix)]
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
-                #[cfg(windows)]
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -127,16 +120,12 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 );
 
                 // Feedbacks to recognize an input as solution
-                #[cfg(unix)]
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
                     // true enables the AsanErrorFeedback
                     feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
                 );
-                #[cfg(windows)]
-                let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
-
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
                     StdState::new(
@@ -175,14 +164,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-                #[cfg(unix)]
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
                     AsanErrorsObserver::new(&ASAN_ERRORS)
                 );
-                #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -211,7 +197,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
-                Ok(())
+                Ok::<(), Error>(())
             })(state, mgr, core_id)
         } else if options.cmplog && options.cmplog_cores.contains(core_id) {
             (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, _core_id| {
@@ -468,7 +454,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         .run_client(&mut run_client)
         .cores(&options.cores)
         .broker_port(options.broker_port)
-        .stdout_file(Some(&options.stdout))
+        // .stdout_file(Some(&options.stdout))
         .remote_broker_addr(options.remote_broker_addr)
         .build()
         .launch()

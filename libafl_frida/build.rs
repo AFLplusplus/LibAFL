@@ -7,6 +7,7 @@ fn main() {
     }
 
     // Force linking against libc++
-    #[cfg(unix)]
-    println!("cargo:rustc-link-lib=dylib=c++");
+    if target_os != "windows" {
+        println!("cargo:rustc-link-lib=dylib=c++");
+    }
 }

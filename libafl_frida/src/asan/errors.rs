@@ -23,7 +23,9 @@ use termcolor::{Color, ColorSpec, WriteColor};
 
 #[cfg(target_arch = "x86_64")]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
-use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT};
+use crate::{
+    alloc::AllocationMetadata, asan::asan_rt::AsanRuntime, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -134,7 +136,7 @@ impl AsanErrors {
 
     /// Report an error
     #[allow(clippy::too_many_lines)]
-    pub(crate) fn report_error(&mut self, error: AsanError) {
+    pub(crate) fn report_error(&mut self, error: AsanError, rt: Option<&mut AsanRuntime>) {
         self.errors.push(error.clone());
 
         let mut out_stream = default_output_stream();
@@ -530,6 +532,9 @@ impl AsanErrors {
 
         #[allow(clippy::manual_assert)]
         if !self.options.continue_on_error {
+            if let Some(rt) = rt {
+                rt.unhook_functions();
+            }
             panic!("ASAN: Crashing target!");
         }
     }

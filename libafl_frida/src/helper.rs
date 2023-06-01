@@ -5,14 +5,12 @@ use capstone::{
     arch::{self, BuildsCapstone},
     Capstone,
 };
-#[cfg(all(target_arch = "x86_64", unix))]
+#[cfg(target_arch = "x86_64")]
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone,
 };
-#[cfg(unix)]
 use frida_gum::instruction_writer::InstructionWriter;
-#[cfg(unix)]
 use frida_gum::CpuContext;
 use frida_gum::{stalker::Transformer, Gum, Module, ModuleDetails, ModuleMap, PageProtection};
 use libafl::{
@@ -20,7 +18,6 @@ use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
 };
-#[cfg(unix)]
 use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
@@ -29,7 +26,6 @@ use rangemap::RangeMap;
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
 use crate::coverage_rt::CoverageRuntime;
-#[cfg(unix)]
 use crate::{asan::asan_rt::AsanRuntime, drcov_rt::DrCovRuntime};
 
 #[cfg(target_vendor = "apple")]
@@ -115,7 +111,6 @@ where
 
 /// An helper that feeds `FridaInProcessExecutor` with edge-coverage instrumentation
 pub struct FridaInstrumentationHelper<'a, RT> {
-    #[cfg(unix)]
     capstone: Capstone,
     ranges: RangeMap<usize, (u16, String)>,
     module_map: ModuleMap,
@@ -153,7 +148,7 @@ fn pc(context: &CpuContext) -> usize {
     context.pc() as usize
 }
 
-#[cfg(all(target_arch = "x86_64", unix))]
+#[cfg(target_arch = "x86_64")]
 fn pc(context: &CpuContext) -> usize {
     context.rip() as usize
 }
@@ -210,7 +205,7 @@ where
                 .detail(true)
                 .build()
                 .expect("Failed to create Capstone object"),
-            #[cfg(all(target_arch = "x86_64", unix))]
+            #[cfg(target_arch = "x86_64")]
             capstone: Capstone::new()
                 .x86()
                 .mode(arch::x86::ArchMode::Mode64)
@@ -259,16 +254,19 @@ where
             let mut first = true;
             for instruction in basic_block {
                 let instr = instruction.instr();
-                #[cfg(unix)]
                 let instr_size = instr.bytes().len();
                 let address = instr.address();
-                //log::trace!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-
-                //log::trace!(
-                //"address: {:x} contains: {:?}",
-                //address,
-                //self.ranges().contains_key(&(address as usize))
-                //);
+                // log::trace!(
+                //     "block @ {:x} transformed to {:x}",
+                //     address,
+                //     output.writer().pc()
+                // );
+                //
+                // log::trace!(
+                //     "address: {:x} contains: {:?}",
+                //     address,
+                //     helper.ranges().contains_key(&(address as usize))
+                // );
 
                 //log::info!("Ranges: {:#?}", self.ranges());
                 if helper.ranges().contains_key(&(address as usize)) {
@@ -283,7 +281,6 @@ where
                             rt.emit_coverage_mapping(address, &output);
                         }
 
-                        #[cfg(unix)]
                         if let Some(rt) = helper.runtime_mut::<DrCovRuntime>() {
                             instruction.put_callout(|context| {
                                 let real_address = rt.real_address_for_stalked(pc(&context));
@@ -297,7 +294,6 @@ where
                         }
                     }
 
-                    #[cfg(unix)]
                     let res = if let Some(_rt) = helper.runtime::<AsanRuntime>() {
                         AsanRuntime::asan_is_interesting_instruction(
                             &helper.capstone,
@@ -308,7 +304,7 @@ where
                         None
                     };
 
-                    #[cfg(all(target_arch = "x86_64", unix))]
+                    #[cfg(target_arch = "x86_64")]
                     if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
                         if let Some(rt) = helper.runtime_mut::<AsanRuntime>() {
                             rt.emit_shadow_check(
@@ -347,16 +343,12 @@ where
                         }
                     }
 
-                    #[cfg(unix)]
                     if let Some(rt) = helper.runtime_mut::<AsanRuntime>() {
                         rt.add_stalked_address(
                             output.writer().pc() as usize - instr_size,
                             address as usize,
                         );
-                    }
-
-                    #[cfg(unix)]
-                    if let Some(rt) = helper.runtime_mut::<DrCovRuntime>() {
+                    } else if let Some(rt) = helper.runtime_mut::<DrCovRuntime>() {
                         rt.add_stalked_address(
                             output.writer().pc() as usize - instr_size,
                             address as usize,

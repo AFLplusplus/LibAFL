@@ -18,7 +18,6 @@ use libafl::{
     Error,
 };
 
-#[cfg(unix)]
 use crate::asan::errors::ASAN_ERRORS;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
@@ -92,7 +91,6 @@ where
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }
-        #[cfg(unix)]
         unsafe {
             if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
                 log::error!("Crashing target as it had ASAN errors");

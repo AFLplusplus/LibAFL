@@ -64,10 +64,8 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
 )]
 
 /// The frida-asan allocator
-#[cfg(unix)]
 pub mod alloc;
 
-#[cfg(unix)]
 pub mod asan;
 
 #[cfg(windows)]
@@ -93,7 +91,6 @@ pub mod drcov_rt;
 pub mod executor;
 
 /// Utilities
-#[cfg(unix)]
 pub mod utils;
 
 // for parsing asan and cmplog cores
