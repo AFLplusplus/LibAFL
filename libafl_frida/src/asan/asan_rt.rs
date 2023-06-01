@@ -622,12 +622,14 @@ impl AsanRuntime {
         }
 
         // Hook the memory allocator functions
+        #[cfg(windows)]
         hook_func!(
             Some("kernel32"),
             HeapAlloc,
             (handle: *mut c_void, flags: u32, size: usize),
             *mut c_void
         );
+        #[cfg(windows)]
         hook_func!(
             Some("kernel32"),
             HeapReAlloc,
@@ -639,6 +641,7 @@ impl AsanRuntime {
             ),
             *mut c_void
         );
+        #[cfg(windows)]
         hook_func!(
             Some("kernel32"),
             HeapFree,
