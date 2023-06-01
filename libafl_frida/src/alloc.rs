@@ -1,4 +1,5 @@
 #[cfg(any(
+    windows,
     target_os = "linux",
     target_vendor = "apple",
     all(target_arch = "aarch64", target_os = "android")
@@ -10,6 +11,7 @@ use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
 use libafl::bolts::cli::FuzzerOptions;
 #[cfg(any(
+    windows,
     target_os = "linux",
     target_vendor = "apple",
     all(target_arch = "aarch64", target_os = "android")
