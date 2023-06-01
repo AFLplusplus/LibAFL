@@ -3,7 +3,6 @@
     target_vendor = "apple",
     all(target_arch = "aarch64", target_os = "android")
 ))]
-use std::io;
 use std::{collections::BTreeMap, ffi::c_void};
 
 use backtrace::Backtrace;
@@ -15,7 +14,6 @@ use libafl::bolts::cli::FuzzerOptions;
     target_vendor = "apple",
     all(target_arch = "aarch64", target_os = "android")
 ))]
-use libc::{sysconf, _SC_PAGESIZE};
 use mmap_rs::{MemoryAreas, MmapMut, MmapOptions, UnsafeMmapFlags};
 
 use rangemap::RangeSet;
@@ -54,11 +52,6 @@ pub struct Allocator {
     /// The current mapping address
     current_mapping_addr: usize,
 }
-
-#[cfg(all(unix, target_vendor = "apple"))]
-const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(all(unix, not(target_vendor = "apple")))]
-const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 macro_rules! map_to_shadow {
     ($self:expr, $address:expr) => {

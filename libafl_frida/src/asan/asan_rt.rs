@@ -65,6 +65,8 @@ extern "C" {
     fn tls_ptr() -> *const c_void;
 }
 
+#[cfg(unix)]
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 #[cfg(all(unix, target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(all(unix, not(target_vendor = "apple")))]
@@ -1752,7 +1754,6 @@ impl AsanRuntime {
             ; ret
         );
 
-        use nix::sys::mman::{mmap, MapFlags, ProtFlags};
         let blob = ops.finalize().unwrap();
         let mut map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE;
 
