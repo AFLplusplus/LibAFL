@@ -17,7 +17,6 @@ use libafl::bolts::cli::FuzzerOptions;
     all(target_arch = "aarch64", target_os = "android")
 ))]
 use mmap_rs::{MemoryAreas, MmapMut, MmapOptions, UnsafeMmapFlags};
-
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 

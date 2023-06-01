@@ -18,10 +18,12 @@ use libafl::{
     Error,
 };
 
-use crate::asan::errors::ASAN_ERRORS;
-use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
 use crate::windows_hooks::initialize;
+use crate::{
+    asan::errors::ASAN_ERRORS,
+    helper::{FridaInstrumentationHelper, FridaRuntimeTuple},
+};
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
 pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>

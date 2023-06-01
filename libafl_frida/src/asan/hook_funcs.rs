@@ -20,6 +20,7 @@ impl AsanRuntime {
     }
     #[inline]
     #[allow(non_snake_case)]
+    #[cfg(windows)]
     pub fn hook_HeapAlloc(&mut self, _handle: *mut c_void, flags: u32, size: usize) -> *mut c_void {
         let ret = unsafe { self.allocator_mut().alloc(size, 8) };
         if flags & 8 == 8 {
@@ -37,6 +38,7 @@ impl AsanRuntime {
     }
     #[inline]
     #[allow(non_snake_case)]
+    #[cfg(windows)]
     pub fn hook_HeapReAlloc(
         &mut self,
         _handle: *mut c_void,
@@ -63,9 +65,35 @@ impl AsanRuntime {
     }
     #[inline]
     #[allow(non_snake_case)]
+    #[cfg(windows)]
     pub fn hook_HeapFree(&mut self, _handle: *mut c_void, _flags: u32, ptr: *mut c_void) -> bool {
         unsafe { self.allocator_mut().release(ptr) };
         true
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_NtGdiCreateCompatibleDC(&mut self, hdc: *mut c_void) -> *mut c_void {
+        let (export, original) = self
+            .hooked_functions
+            .get(&"NtGdiCreateCompatibleDC".to_string())
+            .unwrap();
+        let NtGdiCreateCompatibleDC: extern "C" fn(hdc: *mut c_void) -> *mut c_void =
+            unsafe { std::mem::transmute(original.0) };
+
+        let ret = NtGdiCreateCompatibleDC(hdc);
+
+        let range = frida_gum::RangeDetails::with_address(ret as u64)
+            .unwrap()
+            .memory_range();
+        self.allocator_mut().map_shadow_for_region(
+            range.base_address().0 as usize,
+            range.size(),
+            true,
+        );
+
+        ret
     }
 
     #[allow(non_snake_case)]

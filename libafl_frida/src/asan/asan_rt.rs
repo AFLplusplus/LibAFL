@@ -141,7 +141,7 @@ pub struct AsanRuntime {
     suppressed_addresses: Vec<usize>,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
     shadow_check_func_mapping: Option<mmap_rs::MmapMut>,
-    hooked_functions: Vec<NativePointer>,
+    pub(crate) hooked_functions: HashMap<String, (NativePointer, NativePointer)>,
 
     #[cfg(target_arch = "aarch64")]
     eh_frame: [u32; ASAN_EH_FRAME_DWORD_COUNT],
@@ -319,7 +319,7 @@ impl AsanRuntime {
             suppressed_addresses: Vec::new(),
             shadow_check_func: None,
             shadow_check_func_mapping: None,
-            hooked_functions: Vec::new(),
+            hooked_functions: HashMap::new(),
 
             #[cfg(target_arch = "aarch64")]
             eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],
@@ -484,8 +484,9 @@ impl AsanRuntime {
         if let Some((start, end)) = range {
             #[cfg(unix)]
             {
-                use nix::sys::mman::{mmap, MapFlags, ProtFlags};
                 use std::num::NonZeroUsize;
+
+                use nix::sys::mman::{mmap, MapFlags, ProtFlags};
                 let max_start = end - Self::max_stack_size();
 
                 let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
@@ -550,8 +551,8 @@ impl AsanRuntime {
     pub(crate) fn unhook_functions(&mut self) {
         let gum = unsafe { Gum::obtain() };
         let mut interceptor = Interceptor::obtain(&gum);
-        for func in &self.hooked_functions {
-            interceptor.revert(*func);
+        for (name, (address, original)) in self.hooked_functions.iter() {
+            interceptor.revert(*address);
         }
         self.hooked_functions.clear();
     }
@@ -583,12 +584,42 @@ impl AsanRuntime {
                     }
                     let export =
                         frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
-                    interceptor.replace(
+                    let original = interceptor.replace(
                         export,
                         NativePointer([<replacement_ $name>] as *mut c_void),
                         NativePointer(self as *mut _ as *mut c_void)
                     ).expect("Failed to hook function");
-                    self.hooked_functions.push(export);
+                    self.hooked_functions.insert(stringify!($name).to_string(), (export, original));
+                }
+            }
+        }
+        macro_rules! hook_weak_func {
+            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+                paste::paste! {
+
+                    #[allow(non_snake_case)]
+                    #[no_mangle]
+                    unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let mut invocation = Interceptor::current_invocation();
+                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+                        let real_address = this.real_address_for_stalked(invocation.return_addr());
+                        if !this.suppressed_addresses.contains(&real_address) && this.module_map.as_ref().unwrap().find(real_address as u64).is_some() {
+                            this.[<hook_ $name>]($($param),*)
+                        } else {
+                            let (_, original) = this.hooked_functions.get(stringify!($name)).unwrap();
+                            let $name: extern "C" fn ($($param: $param_type),*) -> $return_type = unsafe {std::mem::transmute(original.0)};
+                            $name($($param),*)
+                        }
+                    }
+                    let export =
+                        frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
+                    let original = interceptor.replace(
+                        export,
+                        NativePointer([<replacement_ $name>] as *mut c_void),
+                        NativePointer(self as *mut _ as *mut c_void)
+                    ).expect("Failed to hook function");
+                    self.hooked_functions.insert(stringify!($name).to_string(), (export, original));
+
                 }
             }
         }
@@ -611,12 +642,12 @@ impl AsanRuntime {
                     }
                     let export =
                         frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function");
-                    interceptor.replace(
+                    let original = interceptor.replace(
                         export,
                         NativePointer([<replacement_ $name>] as *mut c_void),
                         NativePointer(self as *mut _ as *mut c_void)
-                    ).ok();
-                    self.hooked_functions.push(export);
+                    ).expect("Failed to hook function");
+                    self.hooked_functions.insert(stringify!($name).to_string(), (export, original));
                 }
             }
         }
@@ -648,6 +679,14 @@ impl AsanRuntime {
             (handle: *mut c_void, flags: u32, ptr: *mut c_void),
             bool
         );
+        #[cfg(windows)]
+        hook_weak_func!(
+            Some("win32u"),
+            NtGdiCreateCompatibleDC,
+            (handle: *mut c_void),
+            *mut c_void
+        );
+
         hook_func!(None, malloc, (size: usize), *mut c_void);
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
         hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);

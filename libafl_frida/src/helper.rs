@@ -10,9 +10,10 @@ use capstone::{
     arch::{self, BuildsCapstone},
     Capstone,
 };
-use frida_gum::instruction_writer::InstructionWriter;
-use frida_gum::CpuContext;
-use frida_gum::{stalker::Transformer, Gum, Module, ModuleDetails, ModuleMap, PageProtection};
+use frida_gum::{
+    instruction_writer::InstructionWriter, stalker::Transformer, CpuContext, Gum, Module,
+    ModuleDetails, ModuleMap, PageProtection,
+};
 use libafl::{
     bolts::{cli::FuzzerOptions, tuples::MatchFirstType},
     inputs::{HasTargetBytes, Input},
@@ -25,8 +26,7 @@ use rangemap::RangeMap;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
-use crate::coverage_rt::CoverageRuntime;
-use crate::{asan::asan_rt::AsanRuntime, drcov_rt::DrCovRuntime};
+use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
 #[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
