@@ -122,8 +122,8 @@ fn main() {
         .file(src_dir.join("cmplog.c"))
         .compile("cmplog");
 
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-    {
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
+    if target_os == "linux" || target_os == "freebsd" {
         println!("cargo:rerun-if-changed=src/forkserver.c");
 
         cc::Build::new()
@@ -131,8 +131,7 @@ fn main() {
             .compile("forkserver");
     }
 
-    #[cfg(windows)]
-    {
+    if target_os == "windows" {
         println!("cargo:rerun-if-changed=src/windows_asan.c");
 
         cc::Build::new()
