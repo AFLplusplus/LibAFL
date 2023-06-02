@@ -1,11 +1,11 @@
 [env]
-CROSS_CC = "arm-linux-gnueabi-gcc"
-CROSS_CXX = "arm-linux-gnueabi-g++"
+CROSS_CC = "x86_64-linux-gnu-gcc"
+CROSS_CXX = "x86_64-linux-gnu-g++"
 CROSS_CFLAGS = ""
-TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/arm"
-LIBPNG_ARCH = "arm"
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/x86_64"
+LIBPNG_ARCH = "x86_64"
 LIBPNG_OPTIMIZATIONS = "yes"
-FEATURE = "arm"
+FEATURE = "x86_64"
 #LIBAFL_DEBUG_OUTPUT = "1"
 #CUSTOM_QEMU_DIR= "~/qemu-libafl-bridge"
 
@@ -119,7 +119,7 @@ dependencies = ["arch_target_dir", "zlib_unix_wget" ]
 condition = { files_not_exist = [ "${TARGET_DIR}/build-zlib/libz.a" ] }
 script_runner="@shell"
 script='''
-mkdir ${TARGET_DIR}/build-zlib/
+mkdir -p ${TARGET_DIR}/build-zlib/
 
 cd ${TARGET_DIR}/build-zlib/ && \
     CC=$CROSS_CC \
@@ -155,7 +155,7 @@ condition = { files_not_exist = [ "${TARGET_DIR}/build-png/.libs/libpng16.a" ] }
 script_runner="@shell"
 script='''
 
-mkdir ${TARGET_DIR}/build-png/
+mkdir -p ${TARGET_DIR}/build-png/
 
 cd ${TARGET_DIR}/build-png/ && \
     CC=$CROSS_CC \
@@ -234,13 +234,7 @@ mac_alias = "test_unix"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
-script_runner = "@shell"
-script='''
-rm -rf libafl_unix_shmem_server || true
-timeout 11s ${TARGET_DIR}/qemu_coverage "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}" 2>/dev/null >fuzz_stdout.log || true
-echo "This test is skipped"
-'''
-dependencies = [ "harness", "fuzzer" ]
+dependencies = [ "all" ]
 
 [tasks.clean]
 linux_alias = "clean_unix"
