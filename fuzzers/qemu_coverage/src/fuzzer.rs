@@ -89,6 +89,9 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Cpu cores to use", default_value = "all", value_parser = Cores::from_cmdline)]
     cores: Cores,
 
+    #[clap(short, long, help = "Enable output from the fuzzer clients")]
+    verbose: bool,
+
     #[arg(last = true, help = "Arguments passed to the target")]
     args: Vec<String>,
 }
@@ -368,7 +371,11 @@ pub fn fuzz() {
         .monitor(MultiMonitor::new(|s| println!("{s}")))
         .run_client(&mut run_client)
         .cores(&options.cores)
-        .stdout_file(Some("/dev/null"))
+        .stdout_file(if options.verbose {
+            None
+        } else {
+            Some("/dev/null")
+        })
         .build()
         .launch()
     {
