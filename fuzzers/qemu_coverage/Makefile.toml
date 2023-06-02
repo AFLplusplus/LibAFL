@@ -119,7 +119,9 @@ dependencies = ["arch_target_dir", "zlib_unix_wget" ]
 condition = { files_not_exist = [ "${TARGET_DIR}/build-zlib/libz.a" ] }
 script_runner="@shell"
 script='''
-mkdir -p ${TARGET_DIR}/build-zlib/
+rm -rf ${TARGET_DIR}/build-zlib/
+
+mkdir ${TARGET_DIR}/build-zlib/
 
 cd ${TARGET_DIR}/build-zlib/ && \
     CC=$CROSS_CC \
@@ -154,8 +156,9 @@ dependencies = [ "arch_target_dir", "zlib", "libpng_unix_wget" ]
 condition = { files_not_exist = [ "${TARGET_DIR}/build-png/.libs/libpng16.a" ] }
 script_runner="@shell"
 script='''
+rm -rf ${TARGET_DIR}/build-png/
 
-mkdir -p ${TARGET_DIR}/build-png/
+mkdir ${TARGET_DIR}/build-png/
 
 cd ${TARGET_DIR}/build-png/ && \
     CC=$CROSS_CC \
