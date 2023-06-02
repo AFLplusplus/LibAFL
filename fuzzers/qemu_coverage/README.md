@@ -29,7 +29,7 @@ sudo apt install \
 
 ## Run
 
-Defaults to `arm` architecture
+Defaults to `x86_64` architecture
 ```bash
 cargo make run
 ```
