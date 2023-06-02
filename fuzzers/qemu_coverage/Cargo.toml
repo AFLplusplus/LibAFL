@@ -21,7 +21,6 @@ i386 = ["libafl_qemu/i386"]
 aarch64 = ["libafl_qemu/aarch64", "64bit"]
 mips = ["libafl_qemu/mips"]
 ppc = ["libafl_qemu/ppc", "be"]
-clippy = ["x86_64"] # special feature for clippy, don't use in normal projects§
 
 [build-dependencies]
 vergen = { version = "8.2.1", features = ["build", "cargo", "git", "gitcl", "rustc", "si"] }

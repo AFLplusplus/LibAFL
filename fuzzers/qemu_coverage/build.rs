@@ -38,7 +38,10 @@ fn main() {
     } else if cfg!(feature = "ppc") {
         "ppc".to_string()
     } else {
-        panic!("No architecture selected");
+        println!("cargo:warning=No architecture specified defaulting to x86_64...");
+        println!("cargo:rustc-cfg=feature=\"x86_64\"");
+        println!("cargo:rustc-cfg=feature=\"64bit\"");
+        "x86_64".to_string()
     };
 
     println!("cargo:rustc-env=CPU_TARGET={cpu_target}");
