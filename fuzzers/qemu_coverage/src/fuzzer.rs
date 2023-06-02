@@ -16,7 +16,7 @@ use libafl::{
         tuples::tuple_list,
         AsSlice,
     },
-    corpus::{Corpus, NullCorpus},
+    corpus::{Corpus, NopCorpus},
     events::{EventConfig, EventRestarter},
     executors::{ExitKind, TimeoutExecutor},
     fuzzer::StdFuzzer,
@@ -296,8 +296,8 @@ pub fn fuzz() {
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 StdRand::with_seed(current_nanos()),
-                NullCorpus::new(),
-                NullCorpus::new(),
+                NopCorpus::new(),
+                NopCorpus::new(),
                 &mut feedback,
                 &mut objective,
             )

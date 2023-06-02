@@ -25,10 +25,10 @@ pub use cached::CachedOnDiskCorpus;
 pub mod minimizer;
 use core::{cell::RefCell, fmt};
 
-pub mod null;
+pub mod nop;
 #[cfg(feature = "cmin")]
 pub use minimizer::*;
-pub use null::NullCorpus;
+pub use nop::NopCorpus;
 use serde::{Deserialize, Serialize};
 
 use crate::{inputs::UsesInput, Error};

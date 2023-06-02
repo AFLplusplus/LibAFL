@@ -12,19 +12,19 @@ use crate::{
 /// A corpus which does not store any [`Testcase`]s.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct NullCorpus<I> {
+pub struct NopCorpus<I> {
     empty: Option<CorpusId>,
     phantom: PhantomData<I>,
 }
 
-impl<I> UsesInput for NullCorpus<I>
+impl<I> UsesInput for NopCorpus<I>
 where
     I: Input,
 {
     type Input = I;
 }
 
-impl<I> Corpus for NullCorpus<I>
+impl<I> Corpus for NopCorpus<I>
 where
     I: Input,
 {
@@ -124,11 +124,11 @@ where
     }
 }
 
-impl<I> NullCorpus<I>
+impl<I> NopCorpus<I>
 where
     I: Input,
 {
-    /// Creates a new [`NullCorpus`].
+    /// Creates a new [`NopCorpus`].
     #[must_use]
     pub fn new() -> Self {
         Self {
