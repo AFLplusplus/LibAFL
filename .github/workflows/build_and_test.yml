@@ -193,7 +193,7 @@ jobs:
     - uses: lyricwulf/abc@v1
       with: 
         # todo: remove afl++-clang when nyx support samcov_pcguard
-        linux: llvm llvm-dev clang nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi gcc-aarch64-linux-gnu g++-aarch64-linux-gnu gcc-mipsel-linux-gnu g++-mipsel-linux-gnu gcc-powerpc-linux-gnu g++-powerpc-linux-gnu libc6-dev-i386-cross libc6-dev libc6-dev-i386 libgtk-3-dev afl++-clang pax-utils libz3-dev
+        linux: llvm llvm-dev clang nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi gcc-aarch64-linux-gnu g++-aarch64-linux-gnu gcc-mipsel-linux-gnu g++-mipsel-linux-gnu gcc-powerpc-linux-gnu g++-powerpc-linux-gnu libc6-dev-i386-cross libc6-dev libc6-dev-i386 lib32gcc-11-dev lib32stdc++-11-dev libgtk-3-dev afl++-clang pax-utils libz3-dev
         # update bash for macos to support `declare -A` command`
         macos: llvm libpng nasm coreutils z3 bash wget
     - name: pip install
@@ -218,8 +218,12 @@ jobs:
         submodules: true # recursively checkout submodules
         fetch-depth: 0 # to diff with origin/main
     - uses: Swatinem/rust-cache@v2
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
+    #- name: Setup tmate session
+    #  uses: mxschmitt/action-tmate@v3
+    - name: Symlink Headers
+      if: runner.os == 'Linux'
+      # We can't install gcc-multilib which would usually do this for us due to collisions with other packages
+      run: sudo ln -s /usr/include/asm-generic /usr/include/asm
     - name: Build and run example fuzzers (Linux)
       if: runner.os == 'Linux'
       run: RUN_ON_CI=1 ./scripts/test_all_fuzzers.sh
