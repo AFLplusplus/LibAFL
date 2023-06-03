@@ -29,7 +29,7 @@ use crate::{
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
-    state::{HasMaxSize, HasMetadata, HasRand},
+    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
     Error,
 };
 
@@ -621,6 +621,7 @@ const CMP_ATTRIBUTE_IS_TRANSFORM: u8 = 64;
 pub struct AFLppRedQueen {
     enable_transform: bool,
     enable_arith: bool,
+    text_type: TextType,
 }
 
 impl AFLppRedQueen {
@@ -1087,7 +1088,7 @@ impl AFLppRedQueen {
 
 impl<I, S> MultipleMutator<I, S> for AFLppRedQueen
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus,
     I: HasBytesVec + From<Vec<u8>>,
 {
     #[allow(clippy::needless_range_loop)]
@@ -1097,10 +1098,9 @@ where
         state: &mut S,
         input: &I,
         ret: &mut Vec<I>,
-        _stage_idx: i32,
+        stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO
-        // add autotokens (https://github.com/AFLplusplus/AFLplusplus/blob/3881ccd0b7520f67fd0b34f010443dc249cbc8f1/src/afl-fuzz-redqueen.c#L1903)
         // handle 128-bits logs
 
         let size = input.bytes().len();
@@ -1130,10 +1130,17 @@ where
         let input_len = input.bytes().len();
         let new_bytes = taint_meta.input_vec();
         let orig_bytes = input.bytes();
-        // TODO: Swap this.
+
         let taint = taint_meta.ranges();
         let mut vec = vec![];
+        let mut gathered_tokens = Tokens::new();
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
+
+        // Compute when mutating it for the 1st time.
+        if stage_idx == 0 {
+            self.text_type = check_if_text(orig_bytes, orig_bytes.len());
+        }
+
         for cmp_idx in 0..cmp_len {
             let (w_idx, header) = headers[cmp_idx];
 
@@ -1180,14 +1187,16 @@ where
                     };
 
                     let hshape = (header.shape() + 1) as usize;
+
                     match (&orig_val[cmp_h_idx], &new_val[cmp_h_idx]) {
                         (CmpValues::U8(orig), CmpValues::U8(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
-
                             let attribute = header.attribute() as u8;
+
+                            let mut cmp_found = false;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.into(),
                                     orig_v1.into(),
                                     new_v0.into(),
@@ -1203,7 +1212,7 @@ where
                                 );
 
                                 // Swapped
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
@@ -1221,7 +1230,7 @@ where
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.into(),
                                     orig_v0.into(),
                                     new_v1.into(),
@@ -1237,7 +1246,7 @@ where
                                 );
 
                                 // Swapped
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
@@ -1251,14 +1260,28 @@ where
                                     hshape,
                                     &mut vec,
                                 );
+                            }
+
+                            if !cmp_found && self.text_type.is_ascii_or_utf8() {
+                                if orig_v0 == new_v0 {
+                                    let v = orig_v0.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+
+                                if orig_v1 == new_v1 {
+                                    let v = orig_v1.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
                             }
                         }
                         (CmpValues::U16(orig), CmpValues::U16(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
                             let attribute: u8 = header.attribute() as u8;
+
+                            let mut cmp_found = false;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.into(),
                                     orig_v1.into(),
                                     new_v0.into(),
@@ -1275,7 +1298,7 @@ where
 
                                 // Swapped
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
@@ -1293,7 +1316,7 @@ where
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.into(),
                                     orig_v0.into(),
                                     new_v1.into(),
@@ -1309,7 +1332,7 @@ where
                                 );
 
                                 // Swapped
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
@@ -1324,13 +1347,27 @@ where
                                     &mut vec,
                                 );
                             }
+
+                            if !cmp_found && self.text_type.is_ascii_or_utf8() {
+                                if orig_v0 == new_v0 {
+                                    let v = orig_v0.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+
+                                if orig_v1 == new_v1 {
+                                    let v = orig_v1.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+                            }
                         }
                         (CmpValues::U32(orig), CmpValues::U32(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
                             let attribute = header.attribute() as u8;
+
+                            let mut cmp_found = false;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.into(),
                                     orig_v1.into(),
                                     new_v0.into(),
@@ -1347,7 +1384,7 @@ where
 
                                 // swapped
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
@@ -1365,7 +1402,7 @@ where
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.into(),
                                     orig_v0.into(),
                                     new_v1.into(),
@@ -1382,7 +1419,7 @@ where
 
                                 // Swapped
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
@@ -1397,13 +1434,27 @@ where
                                     &mut vec,
                                 );
                             }
+
+                            if !cmp_found && self.text_type.is_ascii_or_utf8() {
+                                if orig_v0 == new_v0 {
+                                    let v = orig_v0.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+
+                                if orig_v1 == new_v1 {
+                                    let v = orig_v1.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+                            }
                         }
                         (CmpValues::U64(orig), CmpValues::U64(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
                             let attribute = header.attribute() as u8;
+
+                            let mut cmp_found = false;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0,
                                     orig_v1,
                                     new_v0,
@@ -1420,7 +1471,7 @@ where
 
                                 // Swapped
                                 // Compare v0 against v1
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.swap_bytes(),
                                     orig_v1.swap_bytes(),
                                     new_v0.swap_bytes(),
@@ -1438,7 +1489,7 @@ where
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1,
                                     orig_v0,
                                     new_v1,
@@ -1455,7 +1506,7 @@ where
 
                                 // Swapped
                                 // Compare v1 against v0
-                                self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.swap_bytes(),
                                     orig_v0.swap_bytes(),
                                     new_v1.swap_bytes(),
@@ -1470,13 +1521,26 @@ where
                                     &mut vec,
                                 );
                             }
+
+                            if !cmp_found && self.text_type.is_ascii_or_utf8() {
+                                if orig_v0 == new_v0 {
+                                    let v = orig_v0.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+
+                                if orig_v1 == new_v1 {
+                                    let v = orig_v1.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+                            }
                         }
                         (CmpValues::Bytes(orig), CmpValues::Bytes(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) =
                                 (&orig.0, &orig.1, &new.0, &new.1);
                             // let attribute = header.attribute() as u8;
+                            let mut rtn_found = false;
                             // Compare v0 against v1
-                            self.rtn_extend_encoding(
+                            rtn_found |= self.rtn_extend_encoding(
                                 orig_v0,
                                 orig_v1,
                                 new_v0,
@@ -1491,7 +1555,7 @@ where
                             );
 
                             // Compare v1 against v0
-                            self.rtn_extend_encoding(
+                            rtn_found |= self.rtn_extend_encoding(
                                 orig_v1,
                                 orig_v0,
                                 new_v1,
@@ -1504,9 +1568,58 @@ where
                                 hshape,
                                 &mut vec,
                             );
+
+                            if !rtn_found {
+                                let is_ascii_or_utf8 = self.text_type.is_ascii_or_utf8();
+
+                                let mut v0_len = hshape;
+                                let mut v1_len = hshape;
+
+                                if is_ascii_or_utf8
+                                    && check_if_text(orig_v0, hshape).size() == hshape
+                                {
+                                    // this is not utf8.
+                                    let v = strlen(orig_v0);
+                                    if v > 0 {
+                                        v0_len = v;
+                                    }
+                                }
+
+                                if is_ascii_or_utf8
+                                    && check_if_text(orig_v1, hshape).size() == hshape
+                                {
+                                    // this is not utf8.
+                                    let v = strlen(orig_v1);
+                                    if v > 0 {
+                                        v1_len = v;
+                                    }
+                                }
+
+                                if !rtn_found && is_ascii_or_utf8 {
+                                    if orig_v0 == new_v0
+                                        && check_if_text(orig_v0, v0_len).size() == v0_len
+                                    {
+                                        Self::try_add_autotokens(
+                                            &mut gathered_tokens,
+                                            orig_v0,
+                                            hshape,
+                                        );
+                                    }
+
+                                    if orig_v1 == new_v1
+                                        && check_if_text(orig_v1, v1_len).size() == v1_len
+                                    {
+                                        Self::try_add_autotokens(
+                                            &mut gathered_tokens,
+                                            orig_v1,
+                                            hshape,
+                                        );
+                                    }
+                                }
+                            }
                         }
                         (_, _) => {
-                            // It shouldn't have different shape!
+                            // not gonna happen
                         }
                     }
 
@@ -1524,6 +1637,15 @@ where
                     */
                     // if no match then go to next round
                 }
+            }
+        }
+
+        match state.metadata_mut::<Tokens>() {
+            Ok(existing) => {
+                existing.add_tokens(&gathered_tokens);
+            }
+            Err(_) => {
+                state.add_metadata(gathered_tokens);
             }
         }
 
@@ -1554,6 +1676,7 @@ impl AFLppRedQueen {
         Self {
             enable_transform: false,
             enable_arith: false,
+            text_type: TextType::None,
         }
     }
 
@@ -1563,8 +1686,161 @@ impl AFLppRedQueen {
         Self {
             enable_transform: transform,
             enable_arith: arith,
+            text_type: TextType::None,
         }
     }
+
+    #[allow(clippy::needless_range_loop)]
+    fn try_add_autotokens(tokens: &mut Tokens, b: &[u8], shape: usize) {
+        let mut cons_ff = 0;
+        let mut cons_0 = 0;
+
+        for idx in 0..shape {
+            if b[idx] == 0 {
+                cons_0 += 1;
+            } else if b[idx] == 0xff {
+                cons_ff += 1;
+            } else {
+                cons_0 = 0;
+                cons_ff = 0;
+            }
+
+            if cons_0 > 1 || cons_ff > 1 {
+                return;
+            }
+        }
+
+        let mut v = b.to_vec();
+        tokens.add_token(&v);
+        v.reverse();
+        tokens.add_token(&v);
+    }
+}
+#[derive(Debug, Copy, Clone)]
+enum TextType {
+    None,
+    Ascii(usize),
+    UTF8(usize),
+}
+
+impl Default for TextType {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+impl TextType {
+    fn is_ascii_or_utf8(self) -> bool {
+        match self {
+            Self::None => false,
+            Self::Ascii(_) | Self::UTF8(_) => true,
+        }
+    }
+
+    fn size(self) -> usize {
+        match self {
+            Self::None => 0,
+            Self::Ascii(sz) | Self::UTF8(sz) => sz,
+        }
+    }
+}
+
+#[inline]
+fn isascii(c: u8) -> bool {
+    c <= 0x7F
+}
+
+#[inline]
+fn isprint(c: u8) -> bool {
+    (0x20..=0x7e).contains(&c)
+}
+
+#[inline]
+fn strlen(buf: &[u8]) -> usize {
+    let mut count = 0;
+    while count < buf.len() {
+        if buf[count] == 0x0 {
+            break;
+        }
+        count += 1;
+    }
+    count
+}
+
+fn check_if_text(buf: &[u8], max_len: usize) -> TextType {
+    debug_assert!(buf.len() <= max_len);
+    let len = max_len;
+    let mut offset: usize = 0;
+    let mut ascii = 0;
+    let mut utf8 = 0;
+    let mut comp = len;
+
+    while offset < max_len {
+        if buf[offset] == 0x09
+            || buf[offset] == 0x0A
+            || buf[offset] == 0x0D
+            || (0x20 <= buf[offset] && buf[offset] <= 0x7E)
+        {
+            offset += 1;
+            utf8 += 1;
+            ascii += 1;
+            continue;
+        }
+
+        if isascii(buf[offset]) || isprint(buf[offset]) {
+            ascii += 1;
+        }
+
+        // non-overlong 2-byte
+        if len - offset > 1
+            && ((0xC2 <= buf[offset] && buf[offset] <= 0xDF)
+                && (0x80 <= buf[offset + 1] && buf[offset + 1] <= 0xBF))
+        {
+            offset += 2;
+            utf8 += 1;
+            comp -= 1;
+            continue;
+        }
+
+        // excluding overlongs
+
+        if (len - offset > 2)
+            && ((buf[offset] == 0xE0 && (0xA0 <= buf[offset + 1] && buf[offset + 1] <= 0xBF) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF)) ||  // straight 3-byte
+            (((0xE1 <= buf[offset] && buf[offset] <= 0xEC) || buf[offset] == 0xEE || buf[offset] == 0xEF) && (0x80 <= buf[offset + 1] && buf[offset + 1] <= 0xBF) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF)) ||  // excluding surrogates
+            (buf[offset] == 0xED && (0x80 <= buf[offset + 1] && buf[offset + 1] <= 0x9F) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF)))
+        {
+            offset += 3;
+            utf8 += 1;
+            comp -= 2;
+            continue;
+        }
+
+        // planes 1-3
+        if (len - offset > 3)
+            && ((buf[offset] == 0xF0 && (0x90 <= buf[offset + 1] && buf[offset + 1] <= 0xBF) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF) && (0x80 <= buf[offset + 3] && buf[offset + 3] <= 0xBF)) ||  // planes 4-15
+            ((0xF1 <= buf[offset] && buf[offset] <= 0xF3) && (0x80 <= buf[offset + 1] && buf[offset + 1] <= 0xBF) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF) && (0x80 <= buf[offset + 3] && buf[offset + 3] <= 0xBF)) ||  // plane 16
+            (buf[offset] == 0xF4 && (0x80 <= buf[offset + 1] && buf[offset + 1] <= 0x8F) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF) && (0x80 <= buf[offset + 3] && buf[offset + 3] <= 0xBF)))
+        {
+            offset += 4;
+            utf8 += 1;
+            comp -= 3;
+            continue;
+        }
+
+        offset += 1;
+    }
+
+    let percent_utf8 = (utf8 * 100) / comp;
+    let percent_ascii = (ascii * 100) / len;
+
+    if percent_utf8 >= percent_ascii && percent_utf8 >= 99 {
+        // utf
+        return TextType::UTF8(utf8);
+    }
+    if percent_ascii >= 99 {
+        return TextType::Ascii(ascii);
+    };
+    TextType::None
 }
 
 #[cfg(test)]
