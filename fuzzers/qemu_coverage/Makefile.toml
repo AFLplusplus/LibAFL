@@ -218,7 +218,7 @@ dependencies = [ "libpng" ]
 
 [tasks.run]
 linux_alias = "run_unix"
-mac_alias = "run_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.run_unix]
@@ -233,7 +233,7 @@ dependencies = [ "harness", "fuzzer" ]
 
 [tasks.test]
 linux_alias = "test_unix"
-mac_alias = "test_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
