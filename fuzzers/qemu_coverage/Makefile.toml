@@ -238,6 +238,12 @@ windows_alias = "unsupported"
 
 [tasks.test_unix]
 dependencies = [ "all" ]
+# Tidy up after we've run our tests so we don't hog all the disk space
+command = "cargo"
+args = [
+    "make",
+    "clean",
+]
 
 [tasks.clean]
 linux_alias = "clean_unix"

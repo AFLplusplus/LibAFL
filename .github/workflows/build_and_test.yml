@@ -218,8 +218,6 @@ jobs:
         submodules: true # recursively checkout submodules
         fetch-depth: 0 # to diff with origin/main
     - uses: Swatinem/rust-cache@v2
-    #- name: Setup tmate session
-    #  uses: mxschmitt/action-tmate@v3
     - name: Symlink Headers
       if: runner.os == 'Linux'
       # We can't install gcc-multilib which would usually do this for us due to collisions with other packages
