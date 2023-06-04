@@ -422,7 +422,7 @@ impl Allocator {
             let remainder = size % 8;
             if remainder > 0 {
                 // log::trace!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
-                ((start + size / 8) as *mut u8).write((0xff << (8 - remainder)) & 0xff);
+                ((start + size / 8) as *mut u8).write(0xff << (8 - remainder));
             }
         }
     }
@@ -458,7 +458,7 @@ impl Allocator {
         }
 
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
-        if !self.pre_allocated_shadow.is_some() {
+        if self.pre_allocated_shadow.is_none() {
             let shadow_end =
                 self.round_up_to_page((end - start) / 8) + self.page_size + shadow_start;
             for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
@@ -476,7 +476,7 @@ impl Allocator {
             let adjusted_start = shadow_start - mapping.as_ptr() as usize;
             mapping
                 .commit(adjusted_start..(adjusted_start + (end - start)))
-                .expect("Failed to commit shadow memory")
+                .expect("Failed to commit shadow memory");
         }
 
         // log::trace!(

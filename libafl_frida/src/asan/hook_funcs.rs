@@ -66,16 +66,24 @@ impl AsanRuntime {
     #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
-    pub fn hook_HeapFree(&mut self, _handle: *mut c_void, _flags: u32, ptr: *mut c_void) -> bool {
-        unsafe { self.allocator_mut().release(ptr) };
-        true
+    pub fn hook_HeapFree(&mut self, handle: *mut c_void, flags: u32, ptr: *mut c_void) -> bool {
+        let allocator = self.allocator_mut();
+        if allocator.is_managed(ptr) {
+            unsafe { self.allocator_mut().release(ptr) };
+            true
+        } else {
+            extern "C" {
+                fn HeapFree(handle: *mut c_void, flags: u32, ptr: *mut c_void) -> bool;
+            }
+            unsafe { HeapFree(handle, flags, ptr) }
+        }
     }
 
     #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_NtGdiCreateCompatibleDC(&mut self, hdc: *mut c_void) -> *mut c_void {
-        let (export, original) = self
+        let (_export, original) = self
             .hooked_functions
             .get(&"NtGdiCreateCompatibleDC".to_string())
             .unwrap();
@@ -186,10 +194,10 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
-        let ret = unsafe { self.allocator_mut().alloc(size * nmemb, 8) };
         extern "C" {
             fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
+        let ret = unsafe { self.allocator_mut().alloc(size * nmemb, 8) };
         unsafe {
             memset(ret, 0, size * nmemb);
         }

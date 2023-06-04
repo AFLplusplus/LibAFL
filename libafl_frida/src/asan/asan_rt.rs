@@ -66,7 +66,7 @@ extern "C" {
 }
 
 #[cfg(unix)]
-use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+use nix::sys::mman::MapFlags;
 #[cfg(all(unix, target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(all(unix, not(target_vendor = "apple")))]
@@ -462,7 +462,9 @@ impl AsanRuntime {
         }
 
         let mut range = None;
+        #[cfg(windows)]
         let mut prev_start = 0;
+        #[cfg(windows)]
         let mut prev_prev_start = 0;
         for area in mmap_rs::MemoryAreas::open(None).unwrap() {
             let area_ref = area.as_ref().unwrap();
@@ -478,8 +480,12 @@ impl AsanRuntime {
                 }
                 break;
             }
-            prev_prev_start = prev_start;
-            prev_start = area_ref.start();
+
+            #[cfg(windows)]
+            {
+                prev_prev_start = prev_start;
+                prev_start = area_ref.start();
+            }
         }
         if let Some((start, end)) = range {
             #[cfg(unix)]
@@ -547,11 +553,11 @@ impl AsanRuntime {
         Interceptor::current_invocation().cpu_context().rip() as usize
     }
 
-    /// Unhook the functions hooked by hook_functions
+    /// Unhook the functions hooked by `hook_functions`
     pub(crate) fn unhook_functions(&mut self) {
         let gum = unsafe { Gum::obtain() };
         let mut interceptor = Interceptor::obtain(&gum);
-        for (name, (address, original)) in self.hooked_functions.iter() {
+        for (_name, (address, _original)) in self.hooked_functions.iter() {
             interceptor.revert(*address);
         }
         self.hooked_functions.clear();
@@ -593,6 +599,7 @@ impl AsanRuntime {
                 }
             }
         }
+        #[cfg(windows)]
         macro_rules! hook_weak_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
@@ -2581,6 +2588,7 @@ impl AsanRuntime {
             writer.put_label(after_report_impl);
         }
 
+        // writer.put_bytes(&[0xcc]);
         /* Save registers that we'll use later in shadow_check_blob
                                         | addr  | rip   |
                                         | Rcx   | Rax   |
