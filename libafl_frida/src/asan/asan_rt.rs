@@ -2588,7 +2588,6 @@ impl AsanRuntime {
             writer.put_label(after_report_impl);
         }
 
-        // writer.put_bytes(&[0xcc]);
         /* Save registers that we'll use later in shadow_check_blob
                                         | addr  | rip   |
                                         | Rcx   | Rax   |
@@ -2648,7 +2647,7 @@ impl AsanRuntime {
                 }
                 X86Register::Rdi => {
                     // In this case rdi is already clobbered, so we want it from the stack (we pushed rdi onto stack before!)
-                    writer.put_mov_reg_reg_offset_ptr(X86Register::Rsi, X86Register::Rsp, -0x28);
+                    writer.put_mov_reg_reg_offset_ptr(X86Register::Rsi, X86Register::Rsp, -0x18);
                 }
                 X86Register::Rsp => {
                     // In this case rsp is also clobbered
