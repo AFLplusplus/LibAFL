@@ -293,10 +293,10 @@ where
 
                         std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
                         let mut child = startable_self()?;
-                        let child = (if !debug_output {
-                            child.stdout(stdio)
-                        } else {
+                        let child = (if debug_output {
                             &mut child
+                        } else {
+                            child.stdout(stdio)
                         })
                         .spawn()?;
                         handles.push(child);
