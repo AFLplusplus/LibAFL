@@ -498,6 +498,49 @@ impl Allocator {
         map_to_shadow!(self, start)
     }
 
+    /// Checks whether the given address up till size is valid unpoisoned shadow memory.
+    #[inline]
+    #[must_use]
+    pub fn check_shadow(&self, address: *const c_void, size: usize) -> bool {
+        if size == 0 {
+            return true;
+        }
+        let address = address as usize;
+        let mut shadow_size = size / 8;
+
+        let mut shadow_addr = map_to_shadow!(self, address);
+
+        if address & 0x7 > 0 {
+            if unsafe { (shadow_addr as *mut u8).read() } & (address & 7) as u8
+                != (address & 7) as u8
+            {
+                return false;
+            }
+            shadow_addr += 1;
+            shadow_size -= 1;
+        }
+
+        let buf = unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
+
+        let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
+
+        if prefix.iter().all(|&x| x == 0xff)
+            && suffix.iter().all(|&x| x == 0xff)
+            && aligned
+                .iter()
+                .all(|&x| x == 0xffffffffffffffffffffffffffffffffu128)
+        {
+            let shadow_remainder = (size % 8) as u8;
+            if shadow_remainder > 0 {
+                (unsafe { ((shadow_addr + shadow_size) as *mut u8).read() } & shadow_remainder)
+                    == shadow_remainder
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+    }
     /// Checks if the currennt address is one of ours
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {

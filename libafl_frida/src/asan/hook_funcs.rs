@@ -92,6 +92,8 @@ impl AsanRuntime {
 
         let ret = NtGdiCreateCompatibleDC(hdc);
 
+        log::trace!("hook_weak_func called! ret: {:?}", ret);
+
         let range = frida_gum::RangeDetails::with_address(ret as u64)
             .unwrap()
             .memory_range();
@@ -430,7 +432,7 @@ impl AsanRuntime {
         extern "C" {
             fn write(fd: i32, buf: *const c_void, count: usize) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(buf, count) {
+        if !self.allocator().check_shadow(buf, count) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "write".to_string(),
@@ -450,7 +452,7 @@ impl AsanRuntime {
         extern "C" {
             fn read(fd: i32, buf: *mut c_void, count: usize) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(buf, count) {
+        if !self.allocator().check_shadow(buf, count) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "read".to_string(),
@@ -470,7 +472,7 @@ impl AsanRuntime {
         extern "C" {
             fn fgets(s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(s, size as usize) {
+        if !self.allocator().check_shadow(s, size as usize) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "fgets".to_string(),
@@ -490,7 +492,7 @@ impl AsanRuntime {
         extern "C" {
             fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
         }
-        if !(self.shadow_check_func().unwrap())(s1, n) {
+        if !self.allocator().check_shadow(s1, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "memcmp".to_string(),
@@ -502,7 +504,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(s2, n) {
+        if !self.allocator().check_shadow(s2, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "memcmp".to_string(),
@@ -522,7 +524,7 @@ impl AsanRuntime {
         extern "C" {
             fn memcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(dest, n) {
+        if !self.allocator().check_shadow(dest, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "memcpy".to_string(),
@@ -534,7 +536,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(src, n) {
+        if !self.allocator().check_shadow(src, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "memcpy".to_string(),
@@ -555,7 +557,7 @@ impl AsanRuntime {
         extern "C" {
             fn mempcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(dest, n) {
+        if !self.allocator().check_shadow(dest, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "mempcpy".to_string(),
@@ -567,7 +569,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(src, n) {
+        if !self.allocator().check_shadow(src, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "mempcpy".to_string(),
@@ -587,7 +589,7 @@ impl AsanRuntime {
         extern "C" {
             fn memmove(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(dest, n) {
+        if !self.allocator().check_shadow(dest, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "memmove".to_string(),
@@ -599,7 +601,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(src, n) {
+        if !self.allocator().check_shadow(src, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "memmove".to_string(),
@@ -619,7 +621,7 @@ impl AsanRuntime {
         extern "C" {
             fn memset(dest: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(dest, n) {
+        if !self.allocator().check_shadow(dest, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "memset".to_string(),
@@ -639,7 +641,7 @@ impl AsanRuntime {
         extern "C" {
             fn memchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "memchr".to_string(),
@@ -660,7 +662,7 @@ impl AsanRuntime {
         extern "C" {
             fn memrchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "memrchr".to_string(),
@@ -691,7 +693,7 @@ impl AsanRuntime {
                 needlelen: usize,
             ) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(haystack, haystacklen) {
+        if !self.allocator().check_shadow(haystack, haystacklen) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "memmem".to_string(),
@@ -703,7 +705,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(needle, needlelen) {
+        if !self.allocator().check_shadow(needle, needlelen) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "memmem".to_string(),
@@ -724,7 +726,7 @@ impl AsanRuntime {
         extern "C" {
             fn bzero(s: *mut c_void, n: usize);
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "bzero".to_string(),
@@ -745,7 +747,7 @@ impl AsanRuntime {
         extern "C" {
             fn explicit_bzero(s: *mut c_void, n: usize);
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "explicit_bzero".to_string(),
@@ -766,7 +768,7 @@ impl AsanRuntime {
         extern "C" {
             fn bcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
         }
-        if !(self.shadow_check_func().unwrap())(s1, n) {
+        if !self.allocator().check_shadow(s1, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "bcmp".to_string(),
@@ -778,7 +780,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(s2, n) {
+        if !self.allocator().check_shadow(s2, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "bcmp".to_string(),
@@ -799,7 +801,7 @@ impl AsanRuntime {
             fn strchr(s: *mut c_char, c: i32) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        if !self.allocator().check_shadow(s as *const c_void, unsafe { strlen(s) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strchr".to_string(),
@@ -820,7 +822,7 @@ impl AsanRuntime {
             fn strrchr(s: *mut c_char, c: i32) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        if !self.allocator().check_shadow(s as *const c_void, unsafe { strlen(s) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strrchr".to_string(),
@@ -841,7 +843,7 @@ impl AsanRuntime {
             fn strcasecmp(s1: *const c_char, s2: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
+        if !self.allocator().check_shadow(s1 as *const c_void, unsafe { strlen(s1) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strcasecmp".to_string(),
@@ -853,7 +855,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
+        if !self.allocator().check_shadow(s2 as *const c_void, unsafe { strlen(s2) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strcasecmp".to_string(),
@@ -873,7 +875,7 @@ impl AsanRuntime {
         extern "C" {
             fn strncasecmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, n) {
+        if !self.allocator().check_shadow(s1 as *const c_void, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strncasecmp".to_string(),
@@ -885,7 +887,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, n) {
+        if !self.allocator().check_shadow(s2 as *const c_void, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strncasecmp".to_string(),
@@ -906,7 +908,7 @@ impl AsanRuntime {
             fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
+        if !self.allocator().check_shadow(s1 as *const c_void, unsafe { strlen(s1) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strcat".to_string(),
@@ -918,7 +920,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
+        if !self.allocator().check_shadow(s2 as *const c_void, unsafe { strlen(s2) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strcat".to_string(),
@@ -939,7 +941,7 @@ impl AsanRuntime {
             fn strcmp(s1: *const c_char, s2: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
+        if !self.allocator().check_shadow(s1 as *const c_void, unsafe { strlen(s1) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strcmp".to_string(),
@@ -951,7 +953,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
+        if !self.allocator().check_shadow(s2 as *const c_void, unsafe { strlen(s2) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strcmp".to_string(),
@@ -972,7 +974,7 @@ impl AsanRuntime {
             fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
             fn strnlen(s: *const c_char, n: usize) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe { strnlen(s1, n) }) {
+        if !self.allocator().check_shadow(s1 as *const c_void, unsafe { strnlen(s1, n) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strncmp".to_string(),
@@ -984,7 +986,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe { strnlen(s2, n) }) {
+        if !self.allocator().check_shadow(s2 as *const c_void, unsafe { strnlen(s2, n) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strncmp".to_string(),
@@ -1005,7 +1007,7 @@ impl AsanRuntime {
             fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
+        if !self.allocator().check_shadow(dest as *const c_void, unsafe { strlen(src) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "strcpy".to_string(),
@@ -1017,7 +1019,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(src as *const c_void, unsafe { strlen(src) }) {
+        if !self.allocator().check_shadow(src as *const c_void, unsafe { strlen(src) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strcpy".to_string(),
@@ -1037,7 +1039,7 @@ impl AsanRuntime {
         extern "C" {
             fn strncpy(dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char;
         }
-        if !(self.shadow_check_func().unwrap())(dest as *const c_void, n) {
+        if !self.allocator().check_shadow(dest as *const c_void, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "strncpy".to_string(),
@@ -1049,7 +1051,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(src as *const c_void, n) {
+        if !self.allocator().check_shadow(src as *const c_void, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strncpy".to_string(),
@@ -1070,7 +1072,7 @@ impl AsanRuntime {
             fn stpcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
+        if !self.allocator().check_shadow(dest as *const c_void, unsafe { strlen(src) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "stpcpy".to_string(),
@@ -1082,7 +1084,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(src as *const c_void, unsafe { strlen(src) }) {
+        if !self.allocator().check_shadow(src as *const c_void, unsafe { strlen(src) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "stpcpy".to_string(),
@@ -1104,7 +1106,7 @@ impl AsanRuntime {
             fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
         }
         let size = unsafe { strlen(s) };
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, size) {
+        if !self.allocator().check_shadow(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strdup".to_string(),
@@ -1130,7 +1132,7 @@ impl AsanRuntime {
             fn strlen(s: *const c_char) -> usize;
         }
         let size = unsafe { strlen(s) };
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, size) {
+        if !self.allocator().check_shadow(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strlen".to_string(),
@@ -1151,7 +1153,7 @@ impl AsanRuntime {
             fn strnlen(s: *const c_char, n: usize) -> usize;
         }
         let size = unsafe { strnlen(s, n) };
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, size) {
+        if !self.allocator().check_shadow(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "strnlen".to_string(),
@@ -1172,7 +1174,7 @@ impl AsanRuntime {
             fn strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(haystack as *const c_void, unsafe {
+        if !self.allocator().check_shadow(haystack as *const c_void, unsafe {
             strlen(haystack)
         }) {
             AsanErrors::get_mut().report_error(
@@ -1186,7 +1188,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(needle as *const c_void, unsafe { strlen(needle) })
+        if !self.allocator().check_shadow(needle as *const c_void, unsafe { strlen(needle) })
         {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
@@ -1212,7 +1214,7 @@ impl AsanRuntime {
             fn strcasestr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(haystack as *const c_void, unsafe {
+        if !self.allocator().check_shadow(haystack as *const c_void, unsafe {
             strlen(haystack)
         }) {
             AsanErrors::get_mut().report_error(
@@ -1226,7 +1228,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(needle as *const c_void, unsafe { strlen(needle) })
+        if !self.allocator().check_shadow(needle as *const c_void, unsafe { strlen(needle) })
         {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
@@ -1248,7 +1250,7 @@ impl AsanRuntime {
             fn atoi(s: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        if !self.allocator().check_shadow(s as *const c_void, unsafe { strlen(s) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "atoi".to_string(),
@@ -1270,7 +1272,7 @@ impl AsanRuntime {
             fn atol(s: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        if !self.allocator().check_shadow(s as *const c_void, unsafe { strlen(s) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "atol".to_string(),
@@ -1292,7 +1294,7 @@ impl AsanRuntime {
             fn atoll(s: *const c_char) -> i64;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        if !self.allocator().check_shadow(s as *const c_void, unsafe { strlen(s) }) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "atoll".to_string(),
@@ -1314,7 +1316,7 @@ impl AsanRuntime {
             fn wcslen(s: *const wchar_t) -> usize;
         }
         let size = unsafe { wcslen(s) };
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, (size + 1) * 2) {
+        if !self.allocator().check_shadow(s as *const c_void, (size + 1) * 2) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgRead((
                     "wcslen".to_string(),
@@ -1336,7 +1338,7 @@ impl AsanRuntime {
             fn wcscpy(dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t;
             fn wcslen(s: *const wchar_t) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(dest as *const c_void, unsafe {
+        if !self.allocator().check_shadow(dest as *const c_void, unsafe {
             (wcslen(src) + 1) * 2
         }) {
             AsanErrors::get_mut().report_error(
@@ -1350,7 +1352,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(src as *const c_void, unsafe {
+        if !self.allocator().check_shadow(src as *const c_void, unsafe {
             (wcslen(src) + 1) * 2
         }) {
             AsanErrors::get_mut().report_error(
@@ -1374,7 +1376,7 @@ impl AsanRuntime {
             fn wcscmp(s1: *const wchar_t, s2: *const wchar_t) -> i32;
             fn wcslen(s: *const wchar_t) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe {
+        if !self.allocator().check_shadow(s1 as *const c_void, unsafe {
             (wcslen(s1) + 1) * 2
         }) {
             AsanErrors::get_mut().report_error(
@@ -1388,7 +1390,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe {
+        if !self.allocator().check_shadow(s2 as *const c_void, unsafe {
             (wcslen(s2) + 1) * 2
         }) {
             AsanErrors::get_mut().report_error(
@@ -1411,7 +1413,7 @@ impl AsanRuntime {
         extern "C" {
             fn memset_pattern4(s: *mut c_void, p4: *const c_void, n: usize);
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "memset_pattern4".to_string(),
@@ -1423,7 +1425,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(p4, n / 4) {
+        if !self.allocator().check_shadow(p4, n / 4) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "memset_pattern4".to_string(),
@@ -1444,7 +1446,7 @@ impl AsanRuntime {
         extern "C" {
             fn memset_pattern8(s: *mut c_void, p8: *const c_void, n: usize);
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "memset_pattern8".to_string(),
@@ -1456,7 +1458,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(p8, n / 8) {
+        if !self.allocator().check_shadow(p8, n / 8) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "memset_pattern8".to_string(),
@@ -1477,7 +1479,7 @@ impl AsanRuntime {
         extern "C" {
             fn memset_pattern16(s: *mut c_void, p16: *const c_void, n: usize);
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "memset_pattern16".to_string(),
@@ -1489,7 +1491,7 @@ impl AsanRuntime {
                 Some(self),
             );
         }
-        if !(self.shadow_check_func().unwrap())(p16, n / 16) {
+        if !self.allocator().check_shadow(p16, n / 16) {
             AsanErrors::get_mut().report_error(
                 AsanError::BadFuncArgWrite((
                     "memset_pattern16".to_string(),
