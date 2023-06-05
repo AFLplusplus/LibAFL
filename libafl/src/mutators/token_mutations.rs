@@ -1572,11 +1572,10 @@ where
                             if !rtn_found {
                                 let is_ascii_or_utf8 = self.text_type.is_ascii_or_utf8();
 
-                                let mut v0_len = hshape;
-                                let mut v1_len = hshape;
-
-                                if is_ascii_or_utf8
-                                    && check_if_text(orig_v0, hshape).size() == hshape
+                                let mut v0_len = orig_v0.len();
+                                let mut v1_len = orig_v1.len();
+                                if is_ascii_or_utf8 && v0_len > 0
+                                    && check_if_text(orig_v0, v0_len).size() == hshape
                                 {
                                     // this is not utf8.
                                     let v = strlen(orig_v0);
@@ -1585,8 +1584,8 @@ where
                                     }
                                 }
 
-                                if is_ascii_or_utf8
-                                    && check_if_text(orig_v1, hshape).size() == hshape
+                                if is_ascii_or_utf8 && v1_len > 0
+                                    && check_if_text(orig_v1, v1_len).size() == hshape
                                 {
                                     // this is not utf8.
                                     let v = strlen(orig_v1);
@@ -1595,24 +1594,24 @@ where
                                     }
                                 }
 
-                                if !rtn_found && is_ascii_or_utf8 {
-                                    if orig_v0 == new_v0
+                                if is_ascii_or_utf8 {
+                                    if orig_v0 == new_v0 && v0_len > 0
                                         && check_if_text(orig_v0, v0_len).size() == v0_len
                                     {
                                         Self::try_add_autotokens(
                                             &mut gathered_tokens,
                                             orig_v0,
-                                            hshape,
+                                            v0_len,
                                         );
                                     }
 
-                                    if orig_v1 == new_v1
+                                    if orig_v1 == new_v1 && v1_len > 0
                                         && check_if_text(orig_v1, v1_len).size() == v1_len
                                     {
                                         Self::try_add_autotokens(
                                             &mut gathered_tokens,
                                             orig_v1,
-                                            hshape,
+                                            v1_len,
                                         );
                                     }
                                 }
@@ -1709,7 +1708,6 @@ impl AFLppRedQueen {
                 return;
             }
         }
-
         let mut v = b.to_vec();
         tokens.add_token(&v);
         v.reverse();
@@ -1768,7 +1766,7 @@ fn strlen(buf: &[u8]) -> usize {
 }
 
 fn check_if_text(buf: &[u8], max_len: usize) -> TextType {
-    debug_assert!(buf.len() <= max_len);
+    // assert!(buf.len() >= max_len);
     let len = max_len;
     let mut offset: usize = 0;
     let mut ascii = 0;
@@ -1829,7 +1827,6 @@ fn check_if_text(buf: &[u8], max_len: usize) -> TextType {
 
         offset += 1;
     }
-
     let percent_utf8 = (utf8 * 100) / comp;
     let percent_ascii = (ascii * 100) / len;
 
