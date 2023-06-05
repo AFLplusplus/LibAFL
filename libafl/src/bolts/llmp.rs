@@ -556,7 +556,6 @@ unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow
 
 /// Get the next pointer and make sure it's in the current page, and has enough space.
 #[inline]
-#[allow(clippy::ptr_cast_constness)]
 unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     map: &mut LlmpSharedMap<SHM>,
     last_msg: *const LlmpMsg,
@@ -583,7 +582,6 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
 /// The messages are padded, so accesses will be aligned properly.
 #[inline]
 #[allow(clippy::cast_ptr_alignment)]
-#[allow(clippy::ptr_cast_constness)]
 unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
     /* DBG("_llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
     (last_msg as *mut u8)
@@ -658,7 +656,6 @@ impl LlmpMsg {
 
     /// Returns `true`, if the pointer is, indeed, in the page of this shared map.
     #[inline]
-    #[allow(clippy::ptr_cast_constness)]
     pub fn in_shmem<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
         let map_size = map.shmem.as_slice().len();
         let buf_ptr = self.buf.as_ptr();
@@ -2093,7 +2090,6 @@ where
     }
 
     /// For internal use: Forward the current message to the out map.
-    #[allow(clippy::ptr_cast_constness)]
     unsafe fn forward_msg(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
         let out: *mut LlmpMsg = self.alloc_next((*msg).buf_len_padded as usize)?;
 

@@ -541,7 +541,6 @@ pub fn inprocess_get_fuzzer<'a, F>() -> Option<&'a mut F> {
 
 /// Gets the inprocess [`Executor`]
 #[must_use]
-#[allow(clippy::ptr_cast_constness)]
 pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
     unsafe { (GLOBAL_STATE.executor_ptr as *mut E).as_mut() }
 }

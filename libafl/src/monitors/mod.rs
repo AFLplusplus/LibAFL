@@ -418,7 +418,7 @@ where
         f.debug_struct("SimpleMonitor")
             .field("start_time", &self.start_time)
             .field("client_stats", &self.client_stats)
-            .finish_non_exhaustive()
+            .finish()
     }
 }
 
