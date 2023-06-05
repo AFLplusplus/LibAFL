@@ -61,7 +61,8 @@ where
     //CE: CustomEvent<I>,
 {
     monitor: MT,
-    addr: String,
+    /// The tokio listener
+    listener: Option<TcpListener>,
     /// Amount of all clients ever, after which (when all are disconnected) this broker should quit.
     exit_cleanly_after: Option<NonZeroUsize>,
     phantom: PhantomData<I>,
@@ -73,13 +74,19 @@ where
     MT: Monitor,
 {
     /// Create a TCP broker, listening on the given address.
-    pub fn new(addr: String, monitor: MT) -> Result<Self, Error> {
-        Ok(Self {
-            addr,
+    #[tokio::main(flavor = "current_thread")]
+    pub async fn new<A: tokio::net::ToSocketAddrs>(addr: A, monitor: MT) -> Result<Self, Error> {
+        Ok(Self::with_listener(TcpListener::bind(addr).await?, monitor))
+    }
+
+    /// Create a TCP broker, with a listener that needs to already be bound to an address.
+    pub fn with_listener(listener: TcpListener, monitor: MT) -> Self {
+        Self {
+            listener: Some(listener),
             monitor,
             phantom: PhantomData,
             exit_cleanly_after: None,
-        })
+        }
     }
 
     /// Exit the broker process cleanly after at least `n` clients attached and all of them disconnected again
@@ -90,18 +97,20 @@ where
     /// Run in the broker until all clients exit
     #[tokio::main(flavor = "current_thread")]
     pub async fn broker_loop(&mut self) -> Result<(), Error> {
-        let listener = TcpListener::bind(&self.addr).await.expect("fun");
-
         let (tx_bc, rx) = broadcast::channel(128);
         let (tx, mut rx_mpsc) = mpsc::channel(128);
 
         let exit_cleanly_after = self.exit_cleanly_after;
 
+        let listener = self
+            .listener
+            .take()
+            .ok_or_else(|| Error::illegal_state("Listener has already been used / was none"))?;
+
         let tokio_broker = spawn(async move {
             let mut recv_handles = vec![];
 
             loop {
-
                 if let Some(max_clients) = exit_cleanly_after {
                     if max_clients.get() <= recv_handles.len() {
                         // we waited fro all the clients we wanted to see attached. Now wait for them to close their tcp connections.
@@ -181,7 +190,7 @@ where
             // wait for all clients to exit/error out
             for recv_handle in recv_handles {
                 drop(recv_handle.await);
-            };
+            }
         });
 
         loop {
@@ -815,7 +824,7 @@ pub enum ManagerKind {
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std<MT, S>(
+pub fn setup_restarting_mgr_tcp<MT, S>(
     monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
@@ -887,7 +896,8 @@ where
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager
-    pub fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<S, SP>), Error> {
+    #[tokio::main(flavor = "current_thread")]
+    pub async fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<S, SP>), Error> {
         // We start ourself as child process to actually fuzz
         let (staterestorer, _new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
@@ -903,7 +913,32 @@ where
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (_mgr, core_id) = match self.kind {
                 ManagerKind::Any => {
-                    panic!("ManagerKind::Any currently not supported for tcp manager");
+                    let connection = TcpListener::bind(("127.0.0.1", self.broker_port)).await;
+                    match connection {
+                        Ok(listener) => {
+                            let event_broker = TcpEventBroker::<S::Input, MT>::with_listener(
+                                listener,
+                                self.monitor.take().unwrap(),
+                            );
+
+                            // Yep, broker. Just loop here.
+                            log::info!(
+                                "Doing broker things. Run this tool again to start fuzzing in a client."
+                            );
+
+                            broker_things(event_broker, self.remote_broker_addr)?;
+
+                            return Err(Error::shutting_down());
+                        }
+                        Err(_) => {
+                            // port was likely already bound
+                            let mgr = TcpEventManager::<S>::new(
+                                &("127.0.0.1", self.broker_port),
+                                self.configuration,
+                            )?;
+                            (mgr, None)
+                        }
+                    }
                 }
                 ManagerKind::Broker => {
                     let event_broker = TcpEventBroker::<S::Input, MT>::new(
