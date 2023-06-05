@@ -28,7 +28,9 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{AFLppCmpMap, HitcountsMapObserver, ForkserverCmpObserver, StdMapObserver, TimeObserver},
+    observers::{
+        AFLppCmpMap, ForkserverCmpObserver, HitcountsMapObserver, StdMapObserver, TimeObserver,
+    },
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
