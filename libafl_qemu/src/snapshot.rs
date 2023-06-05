@@ -88,7 +88,7 @@ impl core::fmt::Debug for QemuSnapshotHelper {
             .field("mmap_start", &self.mmap_start)
             .field("mmap_limit", &self.mmap_limit)
             .field("empty", &self.empty)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
