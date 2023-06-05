@@ -418,7 +418,7 @@ where
         f.debug_struct("SimpleMonitor")
             .field("start_time", &self.start_time)
             .field("client_stats", &self.client_stats)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -995,7 +995,7 @@ pub mod pybind {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("PythonSimpleMonitor")
                 .field("print_fn", &self.print_fn)
-                .finish()
+                .finish_non_exhaustive()
         }
     }
 
