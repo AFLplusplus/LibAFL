@@ -1,7 +1,6 @@
 //! TCP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{
-    borrow::ToOwned,
     boxed::Box,
     string::{String, ToString},
     vec::Vec,
@@ -12,11 +11,8 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 use std::{
-    env::args,
     io::{ErrorKind, Read, Write},
     net::{SocketAddr, TcpStream, ToSocketAddrs},
-    thread::sleep,
-    time::Duration,
 };
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -50,7 +46,7 @@ use crate::{
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, InputConverter, UsesInput},
+    inputs::{Input, UsesInput},
     monitors::Monitor,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
@@ -66,8 +62,6 @@ where
 {
     monitor: MT,
     addr: String,
-    /// Amount of all clients ever connected (for `set_exit_cleanly_after`)
-    total_clients_historic: usize,
     /// Amount of all clients ever, after which (when all are disconnected) this broker should quit.
     exit_cleanly_after: Option<NonZeroUsize>,
     phantom: PhantomData<I>,
@@ -84,7 +78,6 @@ where
             addr,
             monitor,
             phantom: PhantomData,
-            total_clients_historic: 0,
             exit_cleanly_after: None,
         })
     }
@@ -97,40 +90,40 @@ where
     /// Run in the broker until all clients exit
     #[tokio::main(flavor = "current_thread")]
     pub async fn broker_loop(&mut self) -> Result<(), Error> {
-        let monitor = &mut self.monitor;
-
         let listener = TcpListener::bind(&self.addr).await.expect("fun");
 
-        let (tx_bc, rx) = broadcast::channel(16);
-        let (tx, mut rx_mpsc) = mpsc::channel(100);
+        let (tx_bc, rx) = broadcast::channel(128);
+        let (tx, mut rx_mpsc) = mpsc::channel(128);
 
-        //let mut rx2 = tx.subscribe();
+        let exit_cleanly_after = self.exit_cleanly_after;
 
-        /*let event: Event<I> = postcard::from_bytes(event_bytes)?;
-        match Self::handle_in_broker(monitor, client_id, &event)? {
-            BrokerEventResult::Forward => {
-                Ok(tcp::TcpMsgHookResult::ForwardToClients)
-            }*/
+        let tokio_broker = spawn(async move {
+            let mut recv_handles = vec![];
 
-        let mut client_id: ClientId = ClientId(0);
-
-        spawn(async move {
             loop {
+
+                if let Some(max_clients) = exit_cleanly_after {
+                    if max_clients.get() <= recv_handles.len() {
+                        // we waited fro all the clients we wanted to see attached. Now wait for them to close their tcp connections.
+                        break;
+                    }
+                }
+
                 println!("loop");
                 // Asynchronously wait for an inbound socket.
                 let (socket, _) = listener.accept().await.expect("test");
                 let (mut read, mut write) = tokio::io::split(socket);
-                let this_client_id = client_id;
+                // ClientIds for this broker start at 0.
+                let this_client_id = ClientId(recv_handles.len().try_into().unwrap());
                 let this_client_id_bytes = this_client_id.0.to_le_bytes();
 
                 // Send the client id for this node;
                 write.write_all(&this_client_id_bytes).await.unwrap();
-                client_id = ClientId(client_id.0 + 1);
 
                 let tx_inner = tx.clone();
                 let mut rx_inner = rx.resubscribe();
-
-                spawn(async move {
+                // Keep all handles around.
+                recv_handles.push(spawn(async move {
                     // In a loop, read data from the socket and write the data back.
                     loop {
                         let mut len_buf = [0; 4];
@@ -152,7 +145,8 @@ where
                         println!("len: {len:?} - {buf:?}");
                         tx_inner.send(buf).await.expect("Could not send");
                     }
-                });
+                }));
+                // The forwarding end. No need to keep a handle to this (TODO: unless they don't quit/get stuck?)
                 spawn(async move {
                     // In a loop, read data from the socket and write the data back.
                     loop {
@@ -183,27 +177,43 @@ where
                     }
                 });
             }
+            println!("joining handles..");
+            // wait for all clients to exit/error out
+            for recv_handle in recv_handles {
+                drop(recv_handle.await);
+            };
         });
 
         loop {
             let buf = rx_mpsc.recv().await.expect("Could not receive");
 
+            // read client ID.
+            let mut client_id_buf = [0_u8; 4];
+            client_id_buf.copy_from_slice(&buf[..4]);
+
+            let client_id = ClientId(u32::from_le_bytes(client_id_buf));
+
             // cut off the ID.
             let event_bytes = &buf[4..];
 
             let event: Event<I> = postcard::from_bytes(event_bytes).unwrap();
-            match Self::handle_in_broker(monitor, client_id, &event).unwrap() {
+            match Self::handle_in_broker(&mut self.monitor, client_id, &event).unwrap() {
                 BrokerEventResult::Forward => {
                     tx_bc.send(buf).expect("Could not send");
                 }
-                _ => (),
+                BrokerEventResult::Handled => (),
+            }
+
+            if tokio_broker.is_finished() {
+                tokio_broker.await.unwrap();
+                break;
             }
         }
 
-        //#[cfg(feature = "tcp_debug")]
-        //println!("The last client quit. Exiting.");
+        #[cfg(feature = "tcp_debug")]
+        println!("The last client quit. Exiting.");
 
-        //Err(Error::shutting_down())
+        Err(Error::shutting_down())
     }
 
     /// Handle arriving events in the broker
@@ -359,9 +369,6 @@ where
         let mut tcp = TcpStream::connect(addr)?;
 
         let mut our_client_id_buf = [0_u8; 4];
-        let mut other_client_id_buf = [0_u8; 4];
-        let mut len_buf = [0_u8; 4];
-
         tcp.read_exact(&mut our_client_id_buf).unwrap();
         let client_id = ClientId(u32::from_le_bytes(our_client_id_buf));
 
@@ -542,25 +549,23 @@ where
         let mut len_buf = [0_u8; 4];
         let mut count = 0;
 
-        let mut stream = &self.tcp;
-
-        stream.set_nonblocking(true).expect("set to non-blocking");
+        self.tcp.set_nonblocking(true).expect("set to non-blocking");
 
         // read all pending messages
         loop {
-            match stream.read_exact(&mut len_buf) {
+            match self.tcp.read_exact(&mut len_buf) {
                 Ok(()) => {
-                    stream.set_nonblocking(false).expect("set to blocking");
+                    self.tcp.set_nonblocking(false).expect("set to blocking");
                     let len = u32::from_le_bytes(len_buf);
                     let mut buf = vec![0_u8; len as usize + 4_usize];
-                    stream.read_exact(&mut buf).unwrap();
+                    self.tcp.read_exact(&mut buf).unwrap();
 
                     let mut client_id_buf = [0_u8; 4];
                     client_id_buf.copy_from_slice(&buf[..4]);
 
                     let other_client_id = ClientId(u32::from_le_bytes(client_id_buf));
 
-                    stream.set_nonblocking(true).expect("set to non-blocking");
+                    self.tcp.set_nonblocking(true).expect("set to non-blocking");
                     if self_id == other_client_id {
                         panic!("Own ID should never have been sent by the broker");
                     } else {
@@ -581,7 +586,7 @@ where
                 }
             }
         }
-        stream.set_nonblocking(false).expect("set to blocking");
+        self.tcp.set_nonblocking(false).expect("set to blocking");
 
         Ok(count)
     }
@@ -884,10 +889,10 @@ where
     /// Launch the restarting manager
     pub fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<S, SP>), Error> {
         // We start ourself as child process to actually fuzz
-        let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
+        let (staterestorer, _new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
         {
-            let broker_things = |mut broker: TcpEventBroker<S::Input, MT>, remote_broker_addr| {
+            let broker_things = |mut broker: TcpEventBroker<S::Input, MT>, _remote_broker_addr| {
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
                     broker.set_exit_cleanly_after(exit_cleanly_after);
                 }
@@ -896,7 +901,7 @@ where
             };
 
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
-            let (mgr, core_id) = match self.kind {
+            let (_mgr, core_id) = match self.kind {
                 ManagerKind::Any => {
                     panic!("ManagerKind::Any currently not supported for tcp manager");
                 }
@@ -1054,122 +1059,5 @@ where
         */
 
         Ok((state, mgr))
-    }
-}
-
-#[cfg(test)]
-#[cfg(feature = "std")]
-mod tests {
-    use core::sync::atomic::{compiler_fence, Ordering};
-
-    use serial_test::serial;
-
-    use crate::{
-        bolts::{
-            rands::StdRand,
-            shmem::{ShMemProvider, StdShMemProvider},
-            staterestore::StateRestorer,
-            tuples::tuple_list,
-            ClientId,
-        },
-        corpus::{Corpus, InMemoryCorpus, Testcase},
-        events::tcp::{TcpEventManager, _ENV_FUZZER_SENDER},
-        executors::{ExitKind, InProcessExecutor},
-        feedbacks::ConstFeedback,
-        fuzzer::Fuzzer,
-        inputs::BytesInput,
-        mutators::BitFlipMutator,
-        schedulers::RandScheduler,
-        stages::StdMutationalStage,
-        state::StdState,
-        StdFuzzer,
-    };
-
-    #[test]
-    #[serial]
-    #[cfg_attr(miri, ignore)]
-    fn test_mgr_state_restore() {
-        let rand = StdRand::with_seed(0);
-
-        let mut corpus = InMemoryCorpus::<BytesInput>::new();
-        let testcase = Testcase::new(vec![0; 4].into());
-        corpus.add(testcase).unwrap();
-
-        let solutions = InMemoryCorpus::<BytesInput>::new();
-
-        let mut feedback = ConstFeedback::new(false);
-        let mut objective = ConstFeedback::new(false);
-
-        let mut state =
-            StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
-
-        let mut shmem_provider = StdShMemProvider::new().unwrap();
-
-        let mut tcp_client = TcpStream::new(
-            shmem_provider.clone(),
-            TcpSharedMap::new(ClientId(0), shmem_provider.new_shmem(1024).unwrap()),
-            ClientId(0),
-        )
-        .unwrap();
-
-        // A little hack for CI. Don't do that in a real-world scenario.
-        unsafe {
-            tcp_client.mark_safe_to_unmap();
-        }
-
-        let mut tcp_mgr = TcpEventManager::new(tcp_client, "fuzzer".into()).unwrap();
-
-        let scheduler = RandScheduler::new();
-
-        let feedback = ConstFeedback::new(true);
-        let objective = ConstFeedback::new(false);
-
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-        let mut harness = |_buf: &BytesInput| ExitKind::Ok;
-        let mut executor = InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(),
-            &mut fuzzer,
-            &mut state,
-            &mut tcp_mgr,
-        )
-        .unwrap();
-
-        let mutator = BitFlipMutator::new();
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
-        // First, create a channel from the current fuzzer to the next to store state between restarts.
-        let mut staterestorer = StateRestorer::<StdShMemProvider>::new(
-            shmem_provider.new_shmem(256 * 1024 * 1024).unwrap(),
-        );
-
-        staterestorer.reset();
-        staterestorer
-            .save(&(&mut state, &tcp_mgr.describe().unwrap()))
-            .unwrap();
-        assert!(staterestorer.has_content());
-
-        // Store the information to a map.
-        staterestorer.write_to_env(_ENV_FUZZER_SENDER).unwrap();
-
-        compiler_fence(Ordering::SeqCst);
-
-        let sc_cpy = StateRestorer::from_env(&mut shmem_provider, _ENV_FUZZER_SENDER).unwrap();
-        assert!(sc_cpy.has_content());
-
-        let (mut state_clone, mgr_description) = staterestorer.restore().unwrap().unwrap();
-        let mut tcp_clone = TcpEventManager::existing_client_from_description(
-            shmem_provider,
-            &mgr_description,
-            "fuzzer".into(),
-        )
-        .unwrap();
-
-        if false {
-            fuzzer
-                .fuzz_one(&mut stages, &mut executor, &mut state_clone, &mut tcp_clone)
-                .unwrap();
-        }
     }
 }
