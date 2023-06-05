@@ -111,7 +111,7 @@ impl core::fmt::Debug for AsanGiovese {
         f.debug_struct("AsanGiovese")
             .field("alloc_tree", &self.alloc_tree)
             .field("dirty_shadow", &self.dirty_shadow)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

@@ -8,6 +8,7 @@
 )]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::transmute_ptr_to_ptr)]
+#![allow(clippy::ptr_cast_constness)]
 #![allow(clippy::too_many_arguments)]
 // Till they fix this buggy lint in clippy
 #![allow(clippy::borrow_as_ptr)]
