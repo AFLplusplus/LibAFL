@@ -551,7 +551,7 @@ where
             .field("forkserver", &self.forkserver)
             .field("observers", &self.observers)
             .field("map", &self.map)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

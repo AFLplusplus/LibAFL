@@ -18,7 +18,8 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::unreadable_literal
+    clippy::unreadable_literal,
+    clippy::ptr_cast_constness
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
