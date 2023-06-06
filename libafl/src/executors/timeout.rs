@@ -133,7 +133,7 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
                 &(&self.itimerspec.it_value.tv_sec * 1000
                     + &self.itimerspec.it_value.tv_nsec / 1000 / 1000),
             )
-            .finish()
+            .finish_non_exhaustive()
     }
 
     #[cfg(all(unix, not(target_os = "linux")))]
@@ -141,7 +141,7 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
         f.debug_struct("TimeoutExecutor")
             .field("executor", &self.executor)
             .field("itimerval", &self.itimerval)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
