@@ -1,0 +1,7 @@
+libpng-*
+libpng_harness
+libpng_harness_crashing
+zlib-*
+crashes
+target
+drcov.log

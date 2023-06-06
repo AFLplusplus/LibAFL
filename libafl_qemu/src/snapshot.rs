@@ -14,7 +14,12 @@ use crate::SYS_fstatat64;
 use crate::SYS_mmap;
 #[cfg(any(cpu_target = "arm", cpu_target = "mips"))]
 use crate::SYS_mmap2;
-#[cfg(not(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "i386")))]
+#[cfg(not(any(
+    cpu_target = "arm",
+    cpu_target = "mips",
+    cpu_target = "i386",
+    cpu_target = "ppc"
+)))]
 use crate::SYS_newfstatat;
 use crate::{
     emu::{Emulator, MmapPerms, SyscallHookResult},
@@ -638,7 +643,12 @@ where
             let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
             h.access(a0 as GuestAddr, a3 as usize);
         }
-        #[cfg(not(any(cpu_target = "arm", cpu_target = "i386", cpu_target = "mips")))]
+        #[cfg(not(any(
+            cpu_target = "arm",
+            cpu_target = "i386",
+            cpu_target = "mips",
+            cpu_target = "ppc"
+        )))]
         SYS_newfstatat => {
             if a2 != 0 {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();

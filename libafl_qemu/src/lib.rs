@@ -50,6 +50,11 @@ pub mod mips;
 #[cfg(cpu_target = "mips")]
 pub use mips::*;
 
+#[cfg(cpu_target = "ppc")]
+pub mod ppc;
+#[cfg(cpu_target = "ppc")]
+pub use ppc::*;
+
 pub mod elf;
 
 pub mod helper;
