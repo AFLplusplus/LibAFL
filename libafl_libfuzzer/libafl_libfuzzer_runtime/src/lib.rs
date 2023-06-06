@@ -341,7 +341,7 @@ macro_rules! fuzz_with {
                 if !$options.dirs().is_empty() {
                     // Load from disk
                     state
-                        .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, $options.dirs())
+                        .load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, $options.dirs())
                         .unwrap_or_else(|_| {
                             panic!("Failed to load initial corpus at {:?}", $options.dirs())
                         });
