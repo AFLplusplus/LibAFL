@@ -17,7 +17,9 @@ use crate::{
         AsIter,
     },
     corpus::Corpus,
+    events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
+    monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, UsesState},
@@ -42,7 +44,7 @@ where
     where
         E: Executor<EM, Z> + HasObservers,
         CS: Scheduler<State = E::State> + RemovableScheduler, // schedulers that has on_remove/on_replace only!
-        EM: UsesState<State = E::State>,
+        EM: EventFirer<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>;
 }
 
@@ -101,7 +103,7 @@ where
     where
         E: Executor<EM, Z> + HasObservers,
         CS: Scheduler<State = E::State> + RemovableScheduler,
-        EM: UsesState<State = E::State>,
+        EM: EventFirer<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>,
     {
         let cfg = Config::default();
@@ -112,6 +114,15 @@ where
         let mut cov_map = HashMap::new();
 
         let mut cur_id = state.corpus().first();
+
+        manager.log(
+            state,
+            LogSeverity::Info,
+            "Executing each input...".to_string(),
+        )?;
+
+        let total = state.corpus().count() as u64;
+        let mut curr = 0;
         while let Some(idx) = cur_id {
             let (weight, input) = {
                 let mut testcase = state.corpus().get(idx)?.borrow_mut();
@@ -132,6 +143,17 @@ where
             executor
                 .observers_mut()
                 .post_exec_all(state, &input, &kind)?;
+
+            curr += 1;
+
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: "minimisation exec pass".to_string(),
+                    value: UserStats::Ratio(curr, total),
+                    phantom: Default::default(),
+                },
+            )?;
 
             let seed_expr = Bool::fresh_const(&ctx, "seed");
             let obs: &O = executor
@@ -158,6 +180,12 @@ where
             cur_id = state.corpus().next(idx);
         }
 
+        manager.log(
+            state,
+            LogSeverity::Info,
+            "Preparing Z3 assertions...".to_string(),
+        )?;
+
         for (_, cov) in cov_map {
             for (_, seeds) in cov {
                 // At least one seed for each hit count of each coverage map index
@@ -179,6 +207,7 @@ where
             opt.assert_soft(&!seed, *weight, None);
         }
 
+        manager.log(state, LogSeverity::Info, "Performing MaxSAT...".to_string())?;
         // Perform the optimization!
         opt.check(&[]);
 

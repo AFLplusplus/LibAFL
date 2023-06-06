@@ -8,3 +8,12 @@
 //! to the runtime (e.g., to prevent coverage being collected on the runtime).
 
 pub use libfuzzer_sys::*;
+use std::ffi::{c_char, c_int};
+
+extern "C" {
+    pub fn LLVMFuzzerRunDriver(
+        argc: *mut c_int,
+        argv: *mut *mut *const c_char,
+        harness_fn: Option<extern "C" fn(*const u8, usize) -> c_int>,
+    ) -> c_int;
+}
