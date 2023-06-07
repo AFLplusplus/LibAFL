@@ -1,11 +1,25 @@
 //! [`LLVM` `8-bi-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
 
-use libafl::bolts::ownedref::OwnedMutSlice;
+use libafl::bolts::{ownedref::OwnedMutSlice, AsSlice};
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
 /// They are initialized by calling [`__sanitizer_cov_8bit_counters_init`](
 pub static mut COUNTERS_MAPS: Vec<OwnedMutSlice<'static, u8>> = Vec::new();
+
+/// Create more copies of the counters maps -- you are responsible for ensuring there is no
+/// multi-mutability!
+pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
+    COUNTERS_MAPS
+        .iter()
+        .map(|counters| {
+            OwnedMutSlice::from_raw_parts_mut(
+                counters.as_slice().as_ptr() as *mut u8,
+                counters.as_slice().len(),
+            )
+        })
+        .collect()
+}
 
 /// Initialize the sancov `8-bit-counters` - usually called by `llvm`.
 #[no_mangle]

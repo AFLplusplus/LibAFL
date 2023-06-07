@@ -417,19 +417,19 @@ macro_rules! fuzz_with {
         use libafl::observers::{
             HitcountsIterableMapObserver, HitcountsMapObserver, MultiMapObserver, StdMapObserver,
         };
-        use libafl_targets::COUNTERS_MAPS;
+        use libafl_targets::{COUNTERS_MAPS, extra_counters};
 
         // Create an observation channel using the coverage map
         if unsafe { COUNTERS_MAPS.len() } == 1 {
             fuzz_with!($options, $harness, $operation, $and_then, || {
-                let edges = unsafe { core::mem::take(&mut COUNTERS_MAPS) };
+                let edges = unsafe { extra_counters() };
                 let edges_observer =
                     HitcountsMapObserver::new(StdMapObserver::from_mut_slice("edges", edges.into_iter().next().unwrap()));
                 edges_observer
             })
         } else if unsafe { COUNTERS_MAPS.len() } > 1 {
             fuzz_with!($options, $harness, $operation, $and_then, || {
-                let edges = unsafe { core::mem::take(&mut COUNTERS_MAPS) };
+                let edges = unsafe { extra_counters() };
                 let edges_observer =
                     HitcountsIterableMapObserver::new(MultiMapObserver::new("edges", edges));
                 edges_observer
