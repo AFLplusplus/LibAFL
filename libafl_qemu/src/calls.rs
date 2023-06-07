@@ -274,6 +274,13 @@ where
             ret_addr
         };
 
+        #[cfg(cpu_target = "ppc")]
+        let ret_addr = {
+            let emu = hooks.emulator();
+            let ret_addr: GuestAddr = emu.read_reg(Regs::Lr).unwrap();
+            ret_addr
+        };
+
         // log::info!("RET @ 0x{:#x}", ret_addr);
 
         let mut collectors = if let Some(h) = hooks.helpers_mut().match_first_type_mut::<Self>() {
@@ -414,7 +421,7 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.blocks(Some(Self::gen_blocks_calls::<QT, S>), None);
+        hooks.blocks(Some(Self::gen_blocks_calls::<QT, S>), None, None);
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, input: &S::Input) {

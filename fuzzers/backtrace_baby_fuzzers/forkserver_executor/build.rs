@@ -12,6 +12,7 @@ fn main() {
         exit(0);
     }
 
+    env::remove_var("DEBUG");
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
 
     let afl = format!("{}/AFLplusplus", &cwd);
