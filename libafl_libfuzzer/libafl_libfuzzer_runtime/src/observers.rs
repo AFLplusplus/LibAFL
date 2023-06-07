@@ -8,7 +8,9 @@ use std::{
 use ahash::{AHasher, RandomState};
 use libafl::{
     bolts::{tuples::Named, AsIter, HasLen},
-    observers::MapObserver,
+    inputs::UsesInput,
+    observers::{MapObserver, Observer},
+    state::UsesState,
     Error,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -112,6 +114,23 @@ where
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         self.inner.how_many_set(indexes)
     }
+}
+
+impl<M, T> UsesState for SizeEdgeMapObserver<M, T>
+where
+    M: UsesState,
+{
+    type State = M::State;
+}
+
+impl<M, S, T> Observer<S> for SizeEdgeMapObserver<M, T>
+where
+    M: Observer<S> + Debug,
+    S: UsesInput,
+    T: Debug,
+{
+    // normally, you would reset the map here
+    // in our case, we know that the map has already been reset by the other map observer
 }
 
 pub struct SizeEdgeMapIter<'it, I, T> {
