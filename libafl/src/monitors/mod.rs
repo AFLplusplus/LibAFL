@@ -375,7 +375,8 @@ impl Monitor for SimplePrintingMonitor {
         let mut userstats = self.client_stats()[sender_id.0 as usize]
             .user_monitor
             .iter()
-            .map(|(key, value)| format!("{}: {}", key, value)).collect::<Vec<_>>();
+            .map(|(key, value)| format!("{key}: {value}"))
+            .collect::<Vec<_>>();
         userstats.sort();
         println!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}, {}",

@@ -1,7 +1,13 @@
 [package]
 name = "libafl_libfuzzer"
-version = "0.1.0"
+version.workspace = true
+description = "libFuzzer shim which uses LibAFL with common defaults"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
+categories = ["development-tools::testing", "fuzzing"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

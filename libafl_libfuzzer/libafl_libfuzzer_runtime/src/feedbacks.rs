@@ -8,7 +8,7 @@ use libafl::{
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, MinMapFeedback},
     impl_serdeany,
     inputs::{BytesInput, Input, UsesInput},
     observers::ObserversTuple,
@@ -18,7 +18,7 @@ use libafl::{
 use libafl_targets::OOMFeedback;
 use serde::{Deserialize, Serialize};
 
-use crate::options::ArtifactPrefix;
+use crate::{observers::SizeEdgeMapObserver, options::ArtifactPrefix};
 
 #[derive(Debug)]
 pub struct LibfuzzerKeepFeedback {
@@ -178,3 +178,5 @@ where
         Ok(())
     }
 }
+
+pub type ShrinkMapFeedback<O, S, T> = MinMapFeedback<SizeEdgeMapObserver<O, T>, S, usize>;

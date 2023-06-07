@@ -264,6 +264,7 @@ pub type HavocMutationsType = tuple_list_type!(
     CrossoverReplaceMutator,
 );
 
+/// Get the mutations that compose the Havoc mutator (only applied to single inputs)
 #[must_use]
 pub fn havoc_mutations_no_crossover() -> HavocMutationsNoCrossoverType {
     tuple_list!(
@@ -295,6 +296,7 @@ pub fn havoc_mutations_no_crossover() -> HavocMutationsNoCrossoverType {
     )
 }
 
+/// Get the mutations that compose the Havoc mutator's crossover strategy
 #[must_use]
 pub fn havoc_crossover() -> HavocCrossoverType {
     tuple_list!(

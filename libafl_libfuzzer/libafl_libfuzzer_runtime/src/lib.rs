@@ -13,6 +13,7 @@ mod fuzz;
 #[cfg(feature = "merge")]
 mod merge;
 mod misc;
+mod observers;
 mod options;
 mod report;
 
@@ -102,8 +103,9 @@ macro_rules! fuzz_with {
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
 
         use crate::{BACKTRACE, CustomMutationStatus};
-        use crate::feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback};
+        use crate::feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback, ShrinkMapFeedback};
         use crate::misc::should_use_grimoire;
+        use crate::observers::SizeEdgeMapObserver;
 
         let edge_maker = &$edge_maker;
 
@@ -113,6 +115,7 @@ macro_rules! fuzz_with {
             let grimoire = grimoire_metadata.should();
 
             let edges_observer = edge_maker();
+            let size_edges_observer = SizeEdgeMapObserver::new(edge_maker());
 
             let keep_observer = LibfuzzerKeepFeedback::new();
             let keep = keep_observer.keep();
@@ -135,6 +138,7 @@ macro_rules! fuzz_with {
 
             // New maximization map feedback linked to the edges observer
             let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, true);
+            let shrinking_map_feedback = ShrinkMapFeedback::tracking(&size_edges_observer, false, false);
 
             // let map_eq_factory = MapEqualityFactory::new_from_observer(&edges_observer);
 
@@ -154,6 +158,7 @@ macro_rules! fuzz_with {
                 keep_observer,
                 feedback_or!(
                     map_feedback,
+                    feedback_and_fast!(ConstFeedback::new($options.shrink()), shrinking_map_feedback),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::with_observer(&time_observer)
                 )

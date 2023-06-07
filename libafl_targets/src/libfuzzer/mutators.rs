@@ -39,25 +39,34 @@ extern "C" {
     ) -> usize;
 }
 
+/// Detect the presence of a user-defined custom mutator
+#[must_use]
 pub fn has_custom_mutator() -> bool {
     unsafe { libafl_targets_has_libfuzzer_custom_mutator() }
 }
 
+/// Detect the presence of a user-defined custom crossover
+#[must_use]
 pub fn has_custom_crossover() -> bool {
     unsafe { libafl_targets_has_libfuzzer_custom_crossover() }
 }
 
+/// Erased mutator for dynamic mutator access by the custom mutator/crossover
 trait ErasedLLVMFuzzerMutator {
+    /// Perform mutation on the desired buffer
     fn mutate(&self, data: *mut u8, size: usize, max_size: usize) -> usize;
 }
 
 thread_local! {
+    /// The globally accessible mutator reference, if available
     static MUTATOR: RefCell<Option<Box<dyn ErasedLLVMFuzzerMutator>>> = RefCell::new(None);
 }
 
+/// Mutator which is available for user-defined mutator/crossover
+/// See: [Structure-Aware Fuzzing with libFuzzer](https://github.com/google/fuzzing/blob/master/docs/structure-aware-fuzzing.md)
 #[allow(non_snake_case)]
 #[no_mangle]
-pub fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
+pub extern "C" fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     MUTATOR.with(|mutator| {
         if let Ok(mut mutator) = mutator.try_borrow_mut() {
             if let Some(mutator) = mutator.deref_mut() {
@@ -68,15 +77,22 @@ pub fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     })
 }
 
+/// A proxy which wraps a targeted mutator. This is used to provide dynamic access to a global
+/// mutator without knowing the concrete type, which is necessary for custom mutators.
 struct MutatorProxy<'a, M, MT, S> {
+    /// Pointer to the state of the fuzzer
     state: Rc<RefCell<*mut S>>, // refcell to prevent double-mutability over the pointer
+    /// A weak reference to the mutator to provide to the custom mutator
     mutator: Weak<RefCell<M>>,
+    /// The result of mutation, to be propagated to the mutational stage
     result: Rc<RefCell<Result<MutationResult, Error>>>,
+    /// Stage index, which is used by libafl mutator implementations
     stage_idx: i32,
     phantom: PhantomData<(&'a mut (), MT)>,
 }
 
 impl<'a, M, MT, S> MutatorProxy<'a, M, MT, S> {
+    /// Crate a new mutator proxy for the given state and mutator
     fn new(
         state: &'a mut S,
         mutator: &Rc<RefCell<M>>,
@@ -92,6 +108,8 @@ impl<'a, M, MT, S> MutatorProxy<'a, M, MT, S> {
         }
     }
 
+    /// Create a weak version of the proxy, which will become unusable when the custom mutator
+    /// is no longer permitted to be executed.
     fn weak(
         &self,
     ) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool, M, MT, S> {
@@ -115,11 +133,18 @@ impl<'a, M, MT, S> MutatorProxy<'a, M, MT, S> {
     }
 }
 
+/// A weak proxy to the mutators. In order to preserve Rust memory model semantics, we must ensure
+/// that once a libafl mutator exits scope (e.g., once the mutational stage is over) that the
+/// mutator is no longer accessible by the custom mutator.
 #[derive(Clone)]
 struct WeakMutatorProxy<F, M, MT, S> {
+    /// Function which will perform the access to the state.
     accessor: F,
+    /// A weak reference to the mutator
     mutator: Weak<RefCell<M>>,
+    /// The stage index to provide to the mutator, when executed.
     stage_idx: i32,
+    /// The result of mutation, to be propagated to the mutational stage
     result: Rc<RefCell<Result<MutationResult, Error>>>,
     phantom: PhantomData<(MT, S)>,
 }
@@ -174,8 +199,10 @@ where
     }
 }
 
-// we must implement crossover compatibility here because (according to libfuzzer)
-// LLVMFuzzerCustomCrossover may use LLVMFuzzerMutate (wacky)
+/// A mutator which invokes a libFuzzer-like custom mutator or crossover. The `CROSSOVER` constant
+/// controls whether this mutator invokes `LLVMFuzzerCustomMutate` and `LLVMFuzzerCustomCrossover`.
+/// You should avoid using crossover-like mutators with custom mutators as this may lead to the
+/// injection of some input portions to another in ways which violate structure.
 #[derive(Debug)]
 pub struct LLVMCustomMutator<MT, SM, const CROSSOVER: bool> {
     mutator: Rc<RefCell<SM>>,
@@ -183,9 +210,9 @@ pub struct LLVMCustomMutator<MT, SM, const CROSSOVER: bool> {
 }
 
 impl<MT, SM> LLVMCustomMutator<MT, SM, false> {
-    pub fn mutate(mutator: SM) -> Result<Self, Error> {
-        if unsafe { libafl_targets_has_libfuzzer_custom_mutator() } {
-            Ok(unsafe { Self::mutate_unchecked(mutator) })
+    pub unsafe fn mutate(mutator: SM) -> Result<Self, Error> {
+        if libafl_targets_has_libfuzzer_custom_mutator() {
+            Ok(Self::mutate_unchecked(mutator))
         } else {
             Err(Error::illegal_state(
                 "Cowardly refusing to create a LLVMFuzzerMutator if a custom mutator is not defined.",
@@ -202,9 +229,9 @@ impl<MT, SM> LLVMCustomMutator<MT, SM, false> {
 }
 
 impl<MT, SM> LLVMCustomMutator<MT, SM, true> {
-    pub fn crossover(mutator: SM) -> Result<Self, Error> {
-        if unsafe { libafl_targets_has_libfuzzer_custom_crossover() } {
-            Ok(unsafe { Self::crossover_unchecked(mutator) })
+    pub unsafe fn crossover(mutator: SM) -> Result<Self, Error> {
+        if libafl_targets_has_libfuzzer_custom_crossover() {
+            Ok(Self::crossover_unchecked(mutator))
         } else {
             Err(Error::illegal_state(
                 "Cowardly refusing to create a LLVMFuzzerMutator if a custom crossover is not defined.",
