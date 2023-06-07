@@ -19,6 +19,7 @@ rustversion = "1.0"
 arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
 introspection = []
 merge = []
+whole-archive = []
 
 [dependencies]
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }

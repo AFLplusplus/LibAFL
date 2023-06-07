@@ -56,28 +56,30 @@ fn main() {
     lib_path.push("libafl_libfuzzer_runtime.a");
 
     // // TODO this is definitely not compat with macOS/Windows...
-    let mut command = Command::new("ld");
-    command
-        .arg("-Ur")
-        .arg("--whole-archive")
-        .arg(lib_path)
-        .args(["-o", custom_lib_dir.join("libFuzzer.o").to_str().expect("Invalid path characters present in your current directory prevent us from linking to the runtime")]);
+    if cfg!(feature = "whole-archive") {
+        let mut command = Command::new("ld");
+        command
+            .arg("-Ur")
+            .arg("--whole-archive")
+            .arg(lib_path)
+            .args(["-o", custom_lib_dir.join("libFuzzer.o").to_str().expect("Invalid path characters present in your current directory prevent us from linking to the runtime")]);
 
-    if command.status().map(|s| !s.success()).unwrap_or(true) {
-        panic!("Couldn't link runtime crate!");
+        if command.status().map(|s| !s.success()).unwrap_or(true) {
+            panic!("Couldn't link runtime crate!");
+        }
+
+        let mut command = Command::new("ar");
+        command
+            .arg("cr")
+            .arg(custom_lib_dir.join("libFuzzer.a"))
+            .arg(custom_lib_dir.join("libFuzzer.o"));
+
+        if command.status().map(|s| !s.success()).unwrap_or(true) {
+            panic!("Couldn't create runtime archive!");
+        }
+    } else {
+        std::fs::copy(lib_path, custom_lib_dir.join("libFuzzer.a")).unwrap();
     }
-
-    let mut command = Command::new("ar");
-    command
-        .arg("cr")
-        .arg(custom_lib_dir.join("libFuzzer.a"))
-        .arg(custom_lib_dir.join("libFuzzer.o"));
-
-    if command.status().map(|s| !s.success()).unwrap_or(true) {
-        panic!("Couldn't create runtime archive!");
-    }
-
-    // std::fs::copy(lib_path, custom_lib_dir.join("libFuzzer.a")).unwrap();
 
     println!(
         "cargo:rustc-link-search=native={}",
