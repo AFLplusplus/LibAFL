@@ -333,7 +333,7 @@ macro_rules! fuzz_with {
             let mut executor = TimeoutExecutor::new(
                 InProcessExecutor::new(
                     &mut harness,
-                    tuple_list!(edges_observer, time_observer, backtrace_observer, oom_observer),
+                    tuple_list!(edges_observer, size_edges_observer, time_observer, backtrace_observer, oom_observer),
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
