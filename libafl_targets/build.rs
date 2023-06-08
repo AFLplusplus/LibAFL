@@ -86,6 +86,8 @@ fn main() {
 
         #[cfg(feature = "libfuzzer_no_link_main")]
         libfuzzer.define("FUZZER_NO_LINK_MAIN", "1");
+        #[cfg(feature = "libfuzzer_define_run_driver")]
+        libfuzzer.define("FUZZER_DEFINE_RUN_DRIVER", "1");
 
         libfuzzer.compile("libfuzzer");
     }
