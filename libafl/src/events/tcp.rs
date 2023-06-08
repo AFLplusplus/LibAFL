@@ -12,13 +12,12 @@ use core::{
 };
 use std::{
     io::{ErrorKind, Read, Write},
-    net::{SocketAddr, TcpStream, ToSocketAddrs},
+    net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
 };
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpListener,
     sync::{broadcast, mpsc},
     task::spawn,
 };
@@ -52,6 +51,14 @@ use crate::{
     Error,
 };
 
+/// Tries to create (synchronously) a [`TcpListener`] that is `nonblocking` (for later use in tokio).
+/// Will error if the port is already in use (or other errors occur)
+fn create_nonblocking_listener<A: ToSocketAddrs>(addr: A) -> Result<TcpListener, Error> {
+    let listener = std::net::TcpListener::bind(addr)?;
+    listener.set_nonblocking(true)?;
+    Ok(listener)
+}
+
 /// An TCP-backed event manager for simple multi-processed fuzzing
 #[derive(Debug)]
 pub struct TcpEventBroker<I, MT>
@@ -61,7 +68,7 @@ where
     //CE: CustomEvent<I>,
 {
     monitor: MT,
-    /// The tokio listener
+    /// A `nonblocking` [`TcpListener`] that we will `take` and convert to a Tokio listener in [`Self::broker_loop()`].
     listener: Option<TcpListener>,
     /// Amount of all clients ever, after which (when all are disconnected) this broker should quit.
     exit_cleanly_after: Option<NonZeroUsize>,
@@ -74,9 +81,11 @@ where
     MT: Monitor,
 {
     /// Create a TCP broker, listening on the given address.
-    #[tokio::main(flavor = "current_thread")]
-    pub async fn new<A: tokio::net::ToSocketAddrs>(addr: A, monitor: MT) -> Result<Self, Error> {
-        Ok(Self::with_listener(TcpListener::bind(addr).await?, monitor))
+    pub fn new<A: ToSocketAddrs>(addr: A, monitor: MT) -> Result<Self, Error> {
+        Ok(Self::with_listener(
+            create_nonblocking_listener(addr)?,
+            monitor,
+        ))
     }
 
     /// Create a TCP broker, with a listener that needs to already be bound to an address.
@@ -106,6 +115,7 @@ where
             .listener
             .take()
             .ok_or_else(|| Error::illegal_state("Listener has already been used / was none"))?;
+        let listener = tokio::net::TcpListener::from_std(listener)?;
 
         let tokio_broker = spawn(async move {
             let mut recv_handles = vec![];
@@ -118,7 +128,7 @@ where
                     }
                 }
 
-                println!("loop");
+                //println!("loop");
                 // Asynchronously wait for an inbound socket.
                 let (socket, _) = listener.accept().await.expect("test");
                 let (mut read, mut write) = tokio::io::split(socket);
@@ -143,6 +153,7 @@ where
                         // we forward the sender id as well, so we add 4 bytes to the message length
                         len += 4;
 
+                        #[cfg(feature = "tcp_debug")]
                         println!("len +4 = {len:?}");
 
                         let mut buf = vec![0; len as usize];
@@ -151,6 +162,7 @@ where
                             .await
                             .expect("failed to read data from socket");
 
+                        #[cfg(feature = "tcp_debug")]
                         println!("len: {len:?} - {buf:?}");
                         tx_inner.send(buf).await.expect("Could not send");
                     }
@@ -161,6 +173,7 @@ where
                     loop {
                         let buf: Vec<u8> = rx_inner.recv().await.expect("Could not receive");
 
+                        #[cfg(feature = "tcp_debug")]
                         println!("{buf:?}");
 
                         if buf.len() <= 4 {
@@ -169,6 +182,7 @@ where
                         }
 
                         if buf[..4] == this_client_id_bytes {
+                            #[cfg(feature = "tcp_debug")]
                             eprintln!(
                             "Not forwarding message from this very client ({this_client_id:?})."
                         );
@@ -519,6 +533,9 @@ where
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
+        let size = u32::try_from(serialized.len()).unwrap();
+        self.tcp.write_all(&size.to_le_bytes())?;
+        self.tcp.write_all(&self.client_id.0.to_le_bytes())?;
         self.tcp.write_all(&serialized)?;
         Ok(())
     }
@@ -896,8 +913,7 @@ where
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager
-    #[tokio::main(flavor = "current_thread")]
-    pub async fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<S, SP>), Error> {
+    pub fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<S, SP>), Error> {
         // We start ourself as child process to actually fuzz
         let (staterestorer, _new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
@@ -913,7 +929,7 @@ where
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (_mgr, core_id) = match self.kind {
                 ManagerKind::Any => {
-                    let connection = TcpListener::bind(("127.0.0.1", self.broker_port)).await;
+                    let connection = create_nonblocking_listener(&("127.0.0.1", self.broker_port));
                     match connection {
                         Ok(listener) => {
                             let event_broker = TcpEventBroker::<S::Input, MT>::with_listener(
@@ -930,13 +946,16 @@ where
 
                             return Err(Error::shutting_down());
                         }
-                        Err(_) => {
+                        Err(Error::File(_, _)) => {
                             // port was likely already bound
                             let mgr = TcpEventManager::<S>::new(
                                 &("127.0.0.1", self.broker_port),
                                 self.configuration,
                             )?;
                             (mgr, None)
+                        }
+                        Err(e) => {
+                            return Err(e);
                         }
                     }
                 }
