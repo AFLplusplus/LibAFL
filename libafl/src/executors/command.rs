@@ -132,8 +132,7 @@ impl CommandConfigurator for StdCommandConfigurator {
                 Ok(cmd.spawn()?)
             }
             InputLocation::StdIn => {
-                self.command.stdin(Stdio::piped()).spawn()?;
-                let mut handle = self.command.spawn()?;
+                let mut handle = self.command.stdin(Stdio::piped()).spawn()?;
                 let mut stdin = handle.stdin.take().unwrap();
                 if let Err(err) = stdin.write_all(input.target_bytes().as_slice()) {
                     if err.kind() != std::io::ErrorKind::BrokenPipe {

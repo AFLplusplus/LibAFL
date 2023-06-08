@@ -71,7 +71,7 @@ where
         f.debug_struct("PrometheusMonitor")
             .field("start_time", &self.start_time)
             .field("client_stats", &self.client_stats)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

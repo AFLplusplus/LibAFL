@@ -18,6 +18,7 @@ i386 = [] # build qemu for i386
 arm = [] # build qemu for arm
 aarch64 = [] # build qemu for aarch64
 mips = [] # build qemu for mips (el, use with the 'be' feature of mips be)
+ppc = [] # build qemu for powerpc
 
 be = []
 
