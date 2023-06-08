@@ -104,12 +104,12 @@ where
             if options.close_fd_mask() != 0 {
                 let file_null = File::open("/dev/null")?;
                 unsafe {
-                    // if options.close_fd_mask() & 1 != 0 {
-                    //     libc::dup2(file_null.as_raw_fd().into(), 1);
-                    // }
-                    // if options.close_fd_mask() & 2 != 0 {
-                    //     libc::dup2(file_null.as_raw_fd().into(), 2);
-                    // }
+                    if options.close_fd_mask() & 1 != 0 {
+                        libc::dup2(file_null.as_raw_fd().into(), 1);
+                    }
+                    if options.close_fd_mask() & 2 != 0 {
+                        libc::dup2(file_null.as_raw_fd().into(), 2);
+                    }
                 }
             }
         }
