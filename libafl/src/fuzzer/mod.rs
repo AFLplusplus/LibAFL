@@ -497,6 +497,27 @@ where
         let observers = executor.observers();
         // Always consider this to be "interesting"
 
+        // However, we still want to trigger the side effects of objectives and feedbacks.
+        #[cfg(not(feature = "introspection"))]
+        let _is_solution = self
+            .objective_mut()
+            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+
+        #[cfg(feature = "introspection")]
+        let _is_solution = self
+            .objective_mut()
+            .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
+
+        #[cfg(not(feature = "introspection"))]
+        let _is_corpus = self
+            .feedback_mut()
+            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+
+        #[cfg(feature = "introspection")]
+        let _is_corpus = self
+            .feedback_mut()
+            .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
+
         // Not a solution
         self.objective_mut().discard_metadata(state, &input)?;
 
