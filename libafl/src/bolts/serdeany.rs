@@ -246,8 +246,7 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     T: $trait_name,
                 {
-                    self.map
-                        .insert(unpack_type_id(TypeId::of::<T>()), Box::new(t));
+                    self.insert_boxed(Box::new(t));
                 }
 
                 /// Insert a boxed element into the map.
@@ -256,7 +255,20 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     T: $trait_name,
                 {
-                    self.map.insert(unpack_type_id(TypeId::of::<T>()), t);
+                    let id = unpack_type_id(TypeId::of::<T>());
+                    assert!(
+                        unsafe {
+                            REGISTRY
+                                .deserializers
+                                .as_ref()
+                                .expect("Empty types registry")
+                                .get(&id)
+                                .is_some()
+                        },
+                        "type {} was inserted without registration!",
+                        core::any::type_name::<T>()
+                    );
+                    self.map.insert(id, t);
                 }
 
                 /// Returns the count of elements in this map.
@@ -512,6 +524,18 @@ macro_rules! create_serde_registry_for_trait {
                     T: $trait_name,
                 {
                     let id = unpack_type_id(TypeId::of::<T>());
+                    assert!(
+                        unsafe {
+                            REGISTRY
+                                .deserializers
+                                .as_ref()
+                                .expect("Empty types registry")
+                                .get(&id)
+                                .is_some()
+                        },
+                        "type {} was inserted without registration!",
+                        core::any::type_name::<T>()
+                    );
                     if !self.map.contains_key(&id) {
                         self.map.insert(id, HashMap::default());
                     }
