@@ -1102,7 +1102,7 @@ where
     ) -> Result<MutationResult, Error> {
         // TODO
         // handle 128-bits logs
-
+        let mut rtn_finds = 0;
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -1540,6 +1540,7 @@ where
                             // let attribute = header.attribute() as u8;
                             let mut rtn_found = false;
                             // Compare v0 against v1
+                            let be = vec.len();
                             rtn_found |= self.rtn_extend_encoding(
                                 orig_v0,
                                 orig_v1,
@@ -1569,13 +1570,15 @@ where
                                 &mut vec,
                             );
 
-                            if !rtn_found {
-                                let is_ascii_or_utf8 = self.text_type.is_ascii_or_utf8();
-
+                            let af = vec.len();
+                            rtn_finds += (af - be);
+                            let is_ascii_or_utf8 = self.text_type.is_ascii_or_utf8();
+                            if !rtn_found || is_ascii_or_utf8 {
                                 let mut v0_len = orig_v0.len();
                                 let mut v1_len = orig_v1.len();
-                                if is_ascii_or_utf8 && v0_len > 0
-                                    && check_if_text(orig_v0, v0_len).size() == hshape
+                                if v0_len > 0
+                                    && (is_ascii_or_utf8
+                                        || check_if_text(orig_v0, v0_len).size() == hshape)
                                 {
                                     // this is not utf8.
                                     let v = strlen(orig_v0);
@@ -1584,8 +1587,9 @@ where
                                     }
                                 }
 
-                                if is_ascii_or_utf8 && v1_len > 0
-                                    && check_if_text(orig_v1, v1_len).size() == hshape
+                                if v1_len > 0
+                                    && (is_ascii_or_utf8
+                                        || check_if_text(orig_v1, v1_len).size() == hshape)
                                 {
                                     // this is not utf8.
                                     let v = strlen(orig_v1);
@@ -1595,8 +1599,10 @@ where
                                 }
 
                                 if is_ascii_or_utf8 {
-                                    if orig_v0 == new_v0 && v0_len > 0
-                                        && check_if_text(orig_v0, v0_len).size() == v0_len
+                                    if v0_len > 0
+                                        && (orig_v0 == new_v0
+                                            || !rtn_found
+                                            || check_if_text(orig_v0, v0_len).size() == v0_len)
                                     {
                                         Self::try_add_autotokens(
                                             &mut gathered_tokens,
@@ -1605,8 +1611,10 @@ where
                                         );
                                     }
 
-                                    if orig_v1 == new_v1 && v1_len > 0
-                                        && check_if_text(orig_v1, v1_len).size() == v1_len
+                                    if v1_len > 0
+                                        && (orig_v1 == new_v1
+                                            || !rtn_found
+                                            || check_if_text(orig_v1, v1_len).size() == v1_len)
                                     {
                                         Self::try_add_autotokens(
                                             &mut gathered_tokens,
@@ -1642,12 +1650,14 @@ where
         match state.metadata_mut::<Tokens>() {
             Ok(existing) => {
                 existing.add_tokens(&gathered_tokens);
+                println!("we have {} tokens", existing.len())
             }
             Err(_) => {
                 state.add_metadata(gathered_tokens);
             }
         }
 
+        println!("rtn_finds {rtn_finds}");
         let mut mutated = false;
         for item in vec {
             ret.push(I::from(item));
