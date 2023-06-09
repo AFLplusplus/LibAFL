@@ -929,7 +929,7 @@ where
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (_mgr, core_id) = match self.kind {
                 ManagerKind::Any => {
-                    let connection = create_nonblocking_listener(&("127.0.0.1", self.broker_port));
+                    let connection = create_nonblocking_listener(("127.0.0.1", self.broker_port));
                     match connection {
                         Ok(listener) => {
                             let event_broker = TcpEventBroker::<S::Input, MT>::with_listener(

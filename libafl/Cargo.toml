@@ -33,8 +33,7 @@ corpus_btreemap = [] # Switches from HashMap to BTreeMap for CorpusId
 gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
 regex = ["std", "dep:regex"] # enables the NaiveTokenizer and StacktraceObserver
 casr = ["libcasr", "std", "regex"] # enables deduplication based on libcasr for StacktraceObserver
-
-tcp_manager = ["tokio"] # A simple EventManager proxying everything via TCP
+tcp_manager = ["tokio", "std"] # A simple EventManager proxying everything via TCP
 
 # features hiding dependencies licensed under GPL
 gpl = []
