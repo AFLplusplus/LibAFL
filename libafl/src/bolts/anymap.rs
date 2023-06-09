@@ -45,17 +45,18 @@ macro_rules! impl_asany {
 /// # Note
 /// Probably not safe for future compilers, fine for now.
 #[must_use]
-pub fn pack_type_id(id: u128) -> TypeId {
+pub const fn pack_type_id(id: u128) -> TypeId {
     match size_of::<TypeId>() {
         8 => {
             let id_64 = id as u64;
             unsafe { *(addr_of!(id_64) as *const TypeId) }
         }
         16 => unsafe { *(addr_of!(id) as *const TypeId) },
-        size => {
-            // this will complain at compiletime.
+        _ => {
+            // TypeId size of this size is not yet supported"
+            // The assert will complain at compiletime.
             assert_eq_size!(TypeId, u64);
-            panic!("TypeId size of {size} bits is not supported");
+            unreachable!();
         }
     }
 }
@@ -66,15 +67,16 @@ pub fn pack_type_id(id: u128) -> TypeId {
 /// # Note
 /// Probably not safe for future compilers, fine for now.
 #[must_use]
-pub fn unpack_type_id(id: TypeId) -> u128 {
+pub const fn unpack_type_id(id: TypeId) -> u128 {
     #[allow(clippy::cast_ptr_alignment)] // we never actually cast to u128 if the type is u64.
     match size_of::<TypeId>() {
-        8 => unsafe { u128::from(*(addr_of!(id) as *const u64)) },
+        8 => unsafe { *(addr_of!(id) as *const u64) as u128 },
         16 => unsafe { *(addr_of!(id) as *const u128) },
-        size => {
-            // this will complain at compiletime.
+        _ => {
+            // TypeId size of this size is not yet supported"
+            // The assert will complain at compiletime.
             assert_eq_size!(TypeId, u64);
-            panic!("TypeId size of {size} bits is not supported");
+            unreachable!();
         }
     }
 }
