@@ -79,8 +79,6 @@ extern crate std;
 #[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
-#[macro_use]
-extern crate static_assertions;
 #[cfg(feature = "ctor")]
 #[doc(hidden)]
 pub use ctor::ctor;
