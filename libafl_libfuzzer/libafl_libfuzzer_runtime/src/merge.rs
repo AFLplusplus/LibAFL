@@ -94,10 +94,17 @@ pub fn merge(
             prefix.dir(),
             None,
             prefix.filename_prefix().clone(),
+            false,
         )
         .unwrap()
     } else {
-        OnDiskCorpus::no_meta(std::env::current_dir().unwrap()).unwrap()
+        OnDiskCorpus::with_meta_format_and_prefix(
+            &std::env::current_dir().unwrap(),
+            None,
+            None,
+            false,
+        )
+        .unwrap()
     };
 
     let mut shmem_provider = StdShMemProvider::new()?;
