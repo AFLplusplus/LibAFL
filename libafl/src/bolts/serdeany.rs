@@ -100,7 +100,7 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     V: serde::de::SeqAccess<'de>,
                 {
-                    let id: u64 = visitor.next_element()?.unwrap();
+                    let id: u128 = visitor.next_element()?.unwrap();
                     let cb = unsafe {
                         *REGISTRY
                             .deserializers
@@ -117,7 +117,7 @@ macro_rules! create_serde_registry_for_trait {
 
             #[allow(unused_qualifications)]
             struct Registry {
-                deserializers: Option<HashMap<u64, DeserializeCallback<dyn $trait_name>>>,
+                deserializers: Option<HashMap<u128, DeserializeCallback<dyn $trait_name>>>,
                 finalized: bool,
             }
 
@@ -174,7 +174,7 @@ macro_rules! create_serde_registry_for_trait {
             /// in the registry
             #[derive(Debug, Serialize, Deserialize)]
             pub struct SerdeAnyMap {
-                map: HashMap<u64, Box<dyn $trait_name>>,
+                map: HashMap<u128, Box<dyn $trait_name>>,
             }
 
             // Cloning by serializing and deserializing. It ain't fast, but it's honest work.
@@ -313,7 +313,7 @@ macro_rules! create_serde_registry_for_trait {
             #[allow(unused_qualifications)]
             #[derive(Debug, Serialize, Deserialize)]
             pub struct NamedSerdeAnyMap {
-                map: HashMap<u64, HashMap<u64, Box<dyn $trait_name>>>,
+                map: HashMap<u128, HashMap<u64, Box<dyn $trait_name>>>,
             }
 
             // Cloning by serializing and deserializing. It ain't fast, but it's honest work.
@@ -479,8 +479,8 @@ macro_rules! create_serde_registry_for_trait {
                 pub fn all_typeids(
                     &self,
                 ) -> core::iter::Map<
-                    Keys<'_, u64, HashMap<u64, Box<dyn $trait_name>>>,
-                    fn(&u64) -> TypeId,
+                    Keys<'_, u128, HashMap<u64, Box<dyn $trait_name>>>,
+                    fn(&u128) -> TypeId,
                 > {
                     self.map.keys().map(|x| pack_type_id(*x))
                 }
