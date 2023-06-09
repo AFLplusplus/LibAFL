@@ -16,6 +16,7 @@ mod misc;
 mod observers;
 mod options;
 mod report;
+mod tmin;
 
 mod harness_wrap {
     #![allow(non_snake_case)]
@@ -459,6 +460,12 @@ extern "C" {
     fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
 }
 
+#[no_mangle]
+pub extern "C" fn __asan_default_options() -> *const c_char {
+    static ASAN_DEFAULT_OPTIONS: &[u8] = b"halt_on_error=1:abort_on_error=1\0";
+    return ASAN_DEFAULT_OPTIONS.as_ptr() as *const c_char;
+}
+
 #[allow(non_snake_case)]
 #[no_mangle]
 pub extern "C" fn LLVMFuzzerRunDriver(
@@ -486,7 +493,10 @@ pub extern "C" fn LLVMFuzzerRunDriver(
             .map(|cstr| cstr.to_str().unwrap()),
     )
     .unwrap();
-    if !options.dirs().is_empty() && options.dirs().iter().all(|maybe_dir| maybe_dir.is_file()) {
+    if *options.mode() != LibfuzzerMode::Tmin
+        && !options.dirs().is_empty()
+        && options.dirs().iter().all(|maybe_dir| maybe_dir.is_file())
+    {
         // we've been requested to just run some inputs. Do so.
         for input in options.dirs() {
             let input = BytesInput::from_file(input).expect(&format!(
@@ -501,7 +511,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         LibfuzzerMode::Fuzz => fuzz::fuzz(options, harness),
         #[cfg(feature = "merge")]
         LibfuzzerMode::Merge => merge::merge(options, harness),
-        LibfuzzerMode::Tmin => unimplemented!(),
+        LibfuzzerMode::Tmin => tmin::minimize_crash(options, harness),
         LibfuzzerMode::Report => report::report(options, harness),
     };
     match res {

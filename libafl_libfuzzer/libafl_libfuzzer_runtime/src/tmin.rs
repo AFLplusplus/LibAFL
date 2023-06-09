@@ -1,0 +1,181 @@
+use std::{
+    ffi::c_int,
+    fs::{read, write},
+};
+
+use libafl::{
+    bolts::{
+        rands::{RandomSeed, RomuDuoJrRand, StdRand},
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
+        AsSlice, HasLen,
+    },
+    corpus::{Corpus, HasTestcase, InMemoryCorpus, Testcase},
+    events::{EventFirer, LogSeverity, SimpleEventManager},
+    executors::{inprocess::TimeoutInProcessForkExecutor, ExitKind},
+    feedbacks::{CrashFeedback, CrashFeedbackFactory, TimeoutFeedbackFactory},
+    inputs::{BytesInput, HasBytesVec, HasTargetBytes},
+    mutators::{havoc_mutations_no_crossover, Mutator, StdScheduledMutator},
+    schedulers::QueueScheduler,
+    stages::StdTMinMutationalStage,
+    state::{HasCorpus, StdState},
+    Error, Fuzzer, StdFuzzer,
+};
+use libafl_targets::LLVMCustomMutator;
+
+use crate::{options::LibfuzzerOptions, CustomMutationStatus};
+
+type TMinState =
+    StdState<BytesInput, InMemoryCorpus<BytesInput>, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;
+
+fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
+    options: LibfuzzerOptions,
+    harness: &extern "C" fn(*const u8, usize) -> c_int,
+    mutator: M,
+    mut state: TMinState,
+) -> Result<(), Error> {
+    let mut mgr = SimpleEventManager::printing();
+
+    assert_eq!(
+        options.dirs().len(),
+        1,
+        "Must provide exactly one input to minimise"
+    );
+    assert!(options.dirs()[0].exists(), "Input specified does not exist");
+    assert!(options.dirs()[0].is_file(), "Input specified is not a file");
+
+    let input = BytesInput::new(read(&options.dirs()[0])?);
+
+    let mut harness = |input: &BytesInput| {
+        let target = input.target_bytes();
+        let buf = target.as_slice();
+
+        let result = unsafe {
+            crate::libafl_libfuzzer_test_one_input(Some(*harness), buf.as_ptr(), buf.len())
+        };
+        match result {
+            -2 => ExitKind::Crash,
+            _ => ExitKind::Ok,
+        }
+    };
+
+    let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), CrashFeedback::new(), ());
+
+    let shmem_provider = StdShMemProvider::new()?;
+    let mut executor = TimeoutInProcessForkExecutor::new(
+        &mut harness,
+        (),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+        options.timeout(),
+        shmem_provider,
+    )?;
+
+    let exit_kind = fuzzer.execute_input(&mut state, &mut executor, &mut mgr, &input)?;
+
+    let size = input.len();
+    let id = state.corpus_mut().add(Testcase::new(input))?;
+
+    match exit_kind {
+        ExitKind::Crash => {
+            let factory = CrashFeedbackFactory::default();
+            let tmin = StdTMinMutationalStage::new(
+                mutator,
+                factory,
+                (options.runs() == 0)
+                    .then_some(128)
+                    .unwrap_or(options.runs()),
+            );
+            let mut stages = tuple_list!(tmin);
+            fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        }
+        ExitKind::Timeout => {
+            let factory = TimeoutFeedbackFactory::default();
+            let tmin = StdTMinMutationalStage::new(
+                mutator,
+                factory,
+                (options.runs() == 0)
+                    .then_some(128)
+                    .unwrap_or(options.runs()),
+            );
+            let mut stages = tuple_list!(tmin);
+            fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        }
+        kind => unimplemented!("Unsupported exit kind for test minification: {:?}", kind),
+    }
+
+    let mut testcase = state.testcase_mut(id)?;
+    let input = testcase.load_input(state.corpus())?.bytes().to_vec();
+    drop(testcase);
+    if input.len() >= size {
+        mgr.log(
+            &mut state,
+            LogSeverity::Warn,
+            format!(
+                "Unable to reduce {}",
+                options.dirs()[0].as_path().as_os_str().to_str().unwrap()
+            ),
+        )?;
+    } else {
+        if let Some(artifact_prefix) = options.artifact_prefix() {
+            let mut dest = artifact_prefix.dir().clone();
+            dest.push(
+                artifact_prefix
+                    .filename_prefix()
+                    .as_ref()
+                    .map(|s| {
+                        format!(
+                            "{}minimized-from-{}",
+                            s,
+                            options.dirs()[0].file_name().unwrap().to_str().unwrap()
+                        )
+                    })
+                    .unwrap_or_else(|| {
+                        options.dirs()[0]
+                            .file_name()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_string()
+                    }),
+            );
+            let message = format!(
+                "Wrote minimised input to {}",
+                dest.file_name().unwrap().to_str().unwrap()
+            );
+            write(dest, input)?;
+            mgr.log(&mut state, LogSeverity::Info, message)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn minimize_crash(
+    options: LibfuzzerOptions,
+    harness: &extern "C" fn(*const u8, usize) -> c_int,
+) -> Result<(), Error> {
+    let mutator_status = CustomMutationStatus::new();
+
+    let state = StdState::new(
+        StdRand::new(),
+        InMemoryCorpus::<BytesInput>::new(),
+        InMemoryCorpus::new(),
+        &mut (),
+        &mut (),
+    )?;
+
+    // TODO configure with mutation stacking options from libfuzzer
+    if mutator_status.custom_mutation {
+        let custom_mutator = unsafe {
+            LLVMCustomMutator::mutate_unchecked(StdScheduledMutator::new(
+                havoc_mutations_no_crossover(),
+            ))
+        };
+        minimize_crash_with_mutator(options, harness, custom_mutator, state)
+    } else {
+        let std_mutator = StdScheduledMutator::new(havoc_mutations_no_crossover());
+        minimize_crash_with_mutator(options, harness, std_mutator, state)
+    }
+}

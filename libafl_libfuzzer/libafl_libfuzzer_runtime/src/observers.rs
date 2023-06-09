@@ -1,11 +1,6 @@
-use std::{
-    fmt::{Debug, Formatter},
-    hash::{BuildHasher, Hasher},
-    iter::Map,
-    marker::PhantomData,
-};
+use std::{fmt::Debug, hash::Hasher, marker::PhantomData};
 
-use ahash::{AHasher, RandomState};
+use ahash::AHasher;
 use libafl::{
     bolts::{tuples::Named, AsIter, HasLen},
     inputs::UsesInput,
@@ -13,7 +8,7 @@ use libafl::{
     state::UsesState,
     Error,
 };
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 static INITIAL: usize = usize::MAX;
 
@@ -70,7 +65,7 @@ where
         }
     }
 
-    fn get_mut(&mut self, idx: usize) -> &mut Self::Entry {
+    fn get_mut(&mut self, _idx: usize) -> &mut Self::Entry {
         unimplemented!("Impossible to implement for a proxy map.")
     }
 

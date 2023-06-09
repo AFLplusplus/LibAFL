@@ -3,6 +3,7 @@ use std::{path::PathBuf, process::Command};
 fn main() {
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/src");
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/Cargo.toml");
+    println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/build.rs");
 
     let custom_lib_dir =
         PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("libafl_libfuzzer");

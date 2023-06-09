@@ -506,9 +506,25 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
+        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
 
-        // Not a solution
-        self.objective_mut().discard_metadata(state, &input)?;
+        // Maybe a solution
+        if self
+            .objective_mut()
+            .is_interesting(state, manager, &input, observers, &exit_kind)?
+        {
+            self.objective_mut()
+                .append_metadata(state, observers, &mut testcase)?;
+            let idx = state.solutions_mut().add(testcase)?;
+
+            manager.fire(
+                state,
+                Event::Objective {
+                    objective_size: state.solutions().count(),
+                },
+            )?;
+            return Ok(idx);
+        }
 
         // several is_interesting implementations collect some data about the run, later used in
         // append_metadata; we *must* invoke is_interesting here to collect it
@@ -517,7 +533,6 @@ where
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
 
         // Add the input to the main corpus
-        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
         self.feedback_mut()
             .append_metadata(state, observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
