@@ -51,6 +51,7 @@ where
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
     prefix: Option<String>,
+    locking: bool,
 }
 
 impl<I> UsesInput for InMemoryOnDiskCorpus<I>
@@ -208,6 +209,7 @@ where
             dir_path.as_ref(),
             Some(OnDiskMetadataFormat::JsonPretty),
             None,
+            true,
         )
     }
 
@@ -221,7 +223,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), meta_format, None)
+        Self::_new(dir_path.as_ref(), meta_format, None, true)
     }
 
     /// Creates the [`InMemoryOnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk
@@ -232,11 +234,12 @@ where
         dir_path: P,
         meta_format: Option<OnDiskMetadataFormat>,
         prefix: Option<String>,
+        locking: bool,
     ) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), meta_format, prefix)
+        Self::_new(dir_path.as_ref(), meta_format, prefix, locking)
     }
 
     /// Creates an [`InMemoryOnDiskCorpus`] that will not store .metadata files
@@ -246,7 +249,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), None, None)
+        Self::_new(dir_path.as_ref(), None, None, true)
     }
 
     /// Private fn to crate a new corpus at the given (non-generic) path with the given optional `meta_format`
@@ -254,6 +257,7 @@ where
         dir_path: &Path,
         meta_format: Option<OnDiskMetadataFormat>,
         prefix: Option<String>,
+        locking: bool,
     ) -> Result<Self, Error> {
         match fs::create_dir_all(dir_path) {
             Ok(_) => {}
@@ -265,6 +269,7 @@ where
             dir_path: dir_path.into(),
             meta_format,
             prefix,
+            locking,
         })
     }
 
@@ -288,19 +293,21 @@ where
                 return Ok(());
             }
 
-            let new_lock_filename = format!(".{new_filename}.lafl_lock");
+            if self.locking {
+                let new_lock_filename = format!(".{new_filename}.lafl_lock");
 
-            // Try to create lock file for new testcases
-            if OpenOptions::new()
-                .create(true)
-                .write(true)
-                .open(self.dir_path.join(new_lock_filename))
-                .is_err()
-            {
-                *testcase.filename_mut() = Some(old_filename);
-                return Err(Error::illegal_state(
-                    "unable to create lock file for new testcase",
-                ));
+                // Try to create lock file for new testcases
+                if OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .open(self.dir_path.join(new_lock_filename))
+                    .is_err()
+                {
+                    *testcase.filename_mut() = Some(old_filename);
+                    return Err(Error::illegal_state(
+                        "unable to create lock file for new testcase",
+                    ));
+                }
             }
 
             let new_file_path = self.dir_path.join(&new_filename);
@@ -345,21 +352,25 @@ where
             let mut file_name = file_name_orig.clone();
 
             let mut ctr = 2;
-            let file_name = loop {
-                let lockfile_name = format!(".{file_name}.lafl_lock");
-                let lockfile_path = self.dir_path.join(lockfile_name);
+            let file_name = if self.locking {
+                loop {
+                    let lockfile_name = format!(".{file_name}.lafl_lock");
+                    let lockfile_path = self.dir_path.join(lockfile_name);
 
-                if OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(lockfile_path)
-                    .is_ok()
-                {
-                    break file_name;
+                    if OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(lockfile_path)
+                        .is_ok()
+                    {
+                        break file_name;
+                    }
+
+                    file_name = format!("{file_name_orig}-{ctr}");
+                    ctr += 1;
                 }
-
-                file_name = format!("{file_name_orig}-{ctr}");
-                ctr += 1;
+            } else {
+                file_name
             };
 
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));

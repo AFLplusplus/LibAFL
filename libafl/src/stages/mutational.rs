@@ -136,7 +136,8 @@ where
 
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            let (_, corpus_idx) =
+                fuzzer.evaluate_input(state, executor, manager, untransformed, None)?;
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;

@@ -213,12 +213,18 @@ where
         cache_max_len: usize,
         meta_format: Option<OnDiskMetadataFormat>,
         prefix: Option<String>,
+        locking: bool,
     ) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
         Self::_new(
-            InMemoryOnDiskCorpus::with_meta_format_and_prefix(dir_path, meta_format, prefix)?,
+            InMemoryOnDiskCorpus::with_meta_format_and_prefix(
+                dir_path,
+                meta_format,
+                prefix,
+                locking,
+            )?,
             cache_max_len,
         )
     }

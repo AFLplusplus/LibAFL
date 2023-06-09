@@ -172,7 +172,9 @@ where
     ) -> Result<(), Error> {
         // todo: is_interesting, etc.
 
-        fuzzer.process_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
+        fuzzer.process_execution(
+            state, event_mgr, last_input, observers, &exit_kind, true, None,
+        )?;
 
         start_timer!(state);
         self.mutator

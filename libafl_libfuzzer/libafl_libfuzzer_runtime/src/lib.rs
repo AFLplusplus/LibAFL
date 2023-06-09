@@ -194,10 +194,11 @@ macro_rules! fuzz_with {
             };
 
             let crash_corpus = if let Some(prefix) = $options.artifact_prefix() {
-                OnDiskCorpus::with_meta_format_and_prefix(prefix.dir(), None, prefix.filename_prefix().clone())
+                OnDiskCorpus::with_meta_format_and_prefix(prefix.dir(), None, prefix.filename_prefix().clone(), false)
                     .unwrap()
             } else {
-                OnDiskCorpus::no_meta(std::env::current_dir().unwrap()).unwrap()
+                OnDiskCorpus::with_meta_format_and_prefix(&std::env::current_dir().unwrap(), None, None, false)
+                    .unwrap()
             };
 
             // If not restarting, create a State from scratch
@@ -206,7 +207,7 @@ macro_rules! fuzz_with {
                     // RNG
                     StdRand::with_seed(current_nanos()),
                     // Corpus that will be evolved, we keep it in memory for performance
-                    CachedOnDiskCorpus::new(corpus_dir.clone(), 4096).unwrap(),
+                    CachedOnDiskCorpus::with_meta_format_and_prefix(corpus_dir.clone(), 4096, None, None, false).unwrap(),
                     // Corpus in which we store solutions (crashes in this example),
                     // on disk so the user can get them after stopping the fuzzer
                     crash_corpus,

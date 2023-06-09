@@ -2,6 +2,7 @@
 
 use alloc::string::ToString;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use std::path::PathBuf;
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -86,6 +87,7 @@ pub trait ExecutionProcessor<OT>: UsesState {
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
+        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>;
@@ -103,6 +105,7 @@ pub trait EvaluatorObservers<OT>: UsesState + Sized {
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
+        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
@@ -123,8 +126,9 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
+        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        self.evaluate_input_events(state, executor, manager, input, true)
+        self.evaluate_input_events(state, executor, manager, input, true, file_path)
     }
 
     /// Runs the input and triggers observers and feedback,
@@ -137,6 +141,7 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
+        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 
     /// Runs the input and triggers observers and feedback.
@@ -149,6 +154,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
+        file_path: Option<PathBuf>,
     ) -> Result<CorpusId, Error>;
 }
 
@@ -341,6 +347,7 @@ where
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
+        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>,
@@ -387,6 +394,7 @@ where
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+                *testcase.file_path_mut() = file_path.clone();
                 self.feedback_mut()
                     .append_metadata(state, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
@@ -399,6 +407,13 @@ where
                     } else {
                         Some(manager.serialize_observers::<OT>(observers)?)
                     };
+                    let file_path = state
+                        .corpus()
+                        .get(idx)
+                        .unwrap()
+                        .borrow()
+                        .file_path()
+                        .clone();
                     manager.fire(
                         state,
                         Event::NewTestcase {
@@ -409,6 +424,7 @@ where
                             client_config: manager.configuration(),
                             time: current_time(),
                             executions: *state.executions(),
+                            file_path,
                             forward_id: None,
                         },
                     )?;
@@ -421,6 +437,7 @@ where
 
                 // The input is a solution, add it to the respective corpus
                 let mut testcase = Testcase::with_executions(input, *state.executions());
+                *testcase.file_path_mut() = file_path;
                 testcase.set_parent_id_optional(*state.corpus().current());
                 self.objective_mut()
                     .append_metadata(state, observers, &mut testcase)?;
@@ -458,6 +475,7 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
+        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
@@ -468,7 +486,15 @@ where
 
         self.scheduler.on_evaluation(state, &input, observers)?;
 
-        self.process_execution(state, manager, input, observers, &exit_kind, send_events)
+        self.process_execution(
+            state,
+            manager,
+            input,
+            observers,
+            &exit_kind,
+            send_events,
+            file_path,
+        )
     }
 }
 
@@ -491,8 +517,9 @@ where
         manager: &mut EM,
         input: <CS::State as UsesInput>::Input,
         send_events: bool,
+        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        self.evaluate_input_with_observers(state, executor, manager, input, send_events)
+        self.evaluate_input_with_observers(state, executor, manager, input, send_events, file_path)
     }
 
     /// Adds an input, even if it's not considered `interesting` by any of the executors
@@ -502,11 +529,13 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <CS::State as UsesInput>::Input,
+        file_path: Option<PathBuf>,
     ) -> Result<CorpusId, Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+        *testcase.file_path_mut() = file_path;
 
         // Maybe a solution
         if self
@@ -543,6 +572,13 @@ where
         } else {
             Some(manager.serialize_observers::<OT>(observers)?)
         };
+        let file_path = state
+            .corpus()
+            .get(idx)
+            .unwrap()
+            .borrow()
+            .file_path()
+            .clone();
         manager.fire(
             state,
             Event::NewTestcase {
@@ -553,6 +589,7 @@ where
                 client_config: manager.configuration(),
                 time: current_time(),
                 executions: *state.executions(),
+                file_path,
                 forward_id: None,
             },
         )?;
@@ -844,6 +881,7 @@ pub mod pybind {
                     py_executor,
                     py_mgr,
                     BytesInput::new(input),
+                    None,
                 )
                 .expect("Failed to add input")
                 .0

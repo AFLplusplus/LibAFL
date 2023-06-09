@@ -191,6 +191,7 @@ where
             dir_path.as_ref(),
             Some(OnDiskMetadataFormat::JsonPretty),
             None,
+            true,
         )
     }
 
@@ -205,6 +206,7 @@ where
             dir_path.as_ref(),
             Some(OnDiskMetadataFormat::JsonPretty),
             prefix,
+            true,
         )
     }
 
@@ -218,7 +220,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::with_meta_format_and_prefix(dir_path.as_ref(), Some(meta_format), None)
+        Self::with_meta_format_and_prefix(dir_path.as_ref(), Some(meta_format), None, true)
     }
 
     /// Creates an [`OnDiskCorpus`] that will not store .metadata files
@@ -228,7 +230,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::with_meta_format_and_prefix(dir_path.as_ref(), None, None)
+        Self::with_meta_format_and_prefix(dir_path.as_ref(), None, None, true)
     }
 
     /// Creates a new corpus at the given (non-generic) path with the given optional `meta_format`
@@ -239,6 +241,7 @@ where
         dir_path: &Path,
         meta_format: Option<OnDiskMetadataFormat>,
         prefix: Option<String>,
+        locking: bool,
     ) -> Result<Self, Error> {
         Ok(OnDiskCorpus {
             dir_path: dir_path.into(),
@@ -247,6 +250,7 @@ where
                 1,
                 meta_format,
                 prefix,
+                locking,
             )?,
         })
     }

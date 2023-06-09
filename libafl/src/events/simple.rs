@@ -211,6 +211,7 @@ where
                 observers_buf: _,
                 time,
                 executions,
+                file_path: _,
                 forward_id: _,
             } => {
                 monitor

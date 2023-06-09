@@ -146,7 +146,7 @@ where
                     }
                     max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
                     let input = (self.load_callback)(fuzzer, state, &path)?;
-                    fuzzer.evaluate_input(state, executor, manager, input)?;
+                    fuzzer.evaluate_input(state, executor, manager, input, Some(path))?;
                 }
             } else if attr.is_dir() {
                 let dir_max_time =
@@ -280,6 +280,7 @@ where
                         client_config: EventConfig::AlwaysUnique,
                         time: current_time(),
                         executions: 0,
+                        file_path: None,
                         forward_id: None,
                     },
                 )?;

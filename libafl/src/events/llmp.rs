@@ -228,6 +228,7 @@ where
                 observers_buf: _,
                 time,
                 executions,
+                file_path: _,
                 forward_id,
             } => {
                 let id = if let Some(id) = *forward_id {
@@ -464,21 +465,23 @@ where
                 observers_buf,
                 time: _,
                 executions: _,
+                file_path,
                 forward_id,
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                let _res = if client_config.match_with(&self.configuration)
-                    && observers_buf.is_some()
-                {
-                    let observers: E::Observers =
-                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                    fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
-                } else {
-                    fuzzer.evaluate_input_with_observers::<E, Self>(
-                        state, executor, self, input, false,
-                    )?
-                };
+                let _res =
+                    if client_config.match_with(&self.configuration) && observers_buf.is_some() {
+                        let observers: E::Observers =
+                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                        fuzzer.process_execution(
+                            state, self, input, &observers, &exit_kind, false, file_path,
+                        )?
+                    } else {
+                        fuzzer.evaluate_input_with_observers::<E, Self>(
+                            state, executor, self, input, false, file_path,
+                        )?
+                    };
                 if let Some(item) = _res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
@@ -1291,6 +1294,7 @@ where
                 observers_buf: _, // Useless as we are converting between types
                 time: _,
                 executions: _,
+                file_path,
                 forward_id,
             } => {
                 log::info!("Received new Testcase to convert from {_client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
@@ -1305,6 +1309,7 @@ where
                     manager,
                     converter.convert(input)?,
                     false,
+                    file_path,
                 )?;
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
@@ -1412,6 +1417,7 @@ where
                 observers_buf,
                 time,
                 executions,
+                file_path,
                 forward_id,
             } => Event::NewTestcase {
                 input: self.converter.as_mut().unwrap().convert(input)?,
@@ -1421,6 +1427,7 @@ where
                 observers_buf,
                 time,
                 executions,
+                file_path,
                 forward_id,
             },
             Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },

@@ -66,6 +66,7 @@ where
                     observers_buf: _,
                     time: _,
                     executions: _,
+                    file_path: _,
                     forward_id,
                 } => {
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
@@ -162,6 +163,7 @@ where
                             observers_buf,
                             time,
                             executions,
+                            file_path,
                             forward_id,
                         } => {
                             log::info!(
@@ -176,6 +178,7 @@ where
                                 self,
                                 input.clone(),
                                 false,
+                                file_path.clone(),
                             )?;
                             if let Some(item) = res.1 {
                                 log::info!("Added received Testcase as item #{item}");
@@ -190,6 +193,7 @@ where
                                         client_config,
                                         time,
                                         executions,
+                                        file_path,
                                         forward_id,
                                     },
                                 )?;
