@@ -67,7 +67,6 @@ serde = { version = "1.0", default-features = false, features = ["alloc", "deriv
 erased-serde = { version = "0.3.21", default-features = false, features = ["alloc"] } # erased serde
 postcard = { version = "1.0", features = ["alloc"] } # no_std compatible serde serialization fromat
 bincode = {version = "1.3", optional = true }
-static_assertions = "1.1.0"
 c2rust-bitfields = { version = "0.17", features = ["no_std"] }
 num_enum = { version = "0.5.7", default-features = false }
 typed-builder = "0.14" # Implement the builder pattern at compiletime
