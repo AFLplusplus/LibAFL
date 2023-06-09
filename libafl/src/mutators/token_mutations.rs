@@ -645,7 +645,7 @@ impl AFLppRedQueen {
         changed_val: u64,
         attr: u8,
         another_buf: &[u8],
-        buf: &[u8], // Unlike AFL++ we change the original buf (it's named buf here)
+        buf: &[u8],
         buf_idx: usize,
         taint_len: usize,
         input_len: usize,
@@ -1057,7 +1057,7 @@ impl AFLppRedQueen {
             let b1 = i < pattern.len() && pattern[i] != buf[buf_idx + i];
             let b2 = i < o_pattern.len() && o_pattern[i] != o_buf[buf_idx + i];
 
-            if b1 && b2 {
+            if b1 || b2 {
                 break;
             }
             copy_len += 1;
@@ -1102,7 +1102,6 @@ where
     ) -> Result<MutationResult, Error> {
         // TODO
         // handle 128-bits logs
-        let mut rtn_finds = 0;
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -1140,7 +1139,7 @@ where
         if stage_idx == 0 {
             self.text_type = check_if_text(orig_bytes, orig_bytes.len());
         }
-
+        println!("approximate size: {cmp_len} x {input_len}");
         for cmp_idx in 0..cmp_len {
             let (w_idx, header) = headers[cmp_idx];
 
@@ -1262,6 +1261,8 @@ where
                                 );
                             }
 
+                            /*
+                            U8 or U16 is not worth
                             if !cmp_found && self.text_type.is_ascii_or_utf8() {
                                 if orig_v0 == new_v0 {
                                     let v = orig_v0.to_ne_bytes().to_vec();
@@ -1273,6 +1274,7 @@ where
                                     Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
                             }
+                            */
                         }
                         (CmpValues::U16(orig), CmpValues::U16(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
@@ -1348,6 +1350,8 @@ where
                                 );
                             }
 
+                            /*
+                            U8 or U16 is not worth
                             if !cmp_found && self.text_type.is_ascii_or_utf8() {
                                 if orig_v0 == new_v0 {
                                     let v = orig_v0.to_ne_bytes().to_vec();
@@ -1359,6 +1363,7 @@ where
                                     Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
                             }
+                            */
                         }
                         (CmpValues::U32(orig), CmpValues::U32(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
@@ -1435,13 +1440,19 @@ where
                                 );
                             }
 
-                            if !cmp_found && self.text_type.is_ascii_or_utf8() {
-                                if orig_v0 == new_v0 {
+                            if !cmp_found {
+                                if orig_v0 == new_v0
+                                    && check_if_text(&orig_v0.to_ne_bytes().to_vec(), hshape).size()
+                                        == hshape
+                                {
                                     let v = orig_v0.to_ne_bytes().to_vec();
                                     Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
 
-                                if orig_v1 == new_v1 {
+                                if orig_v1 == new_v1
+                                    && check_if_text(&orig_v1.to_ne_bytes().to_vec(), hshape).size()
+                                        == hshape
+                                {
                                     let v = orig_v1.to_ne_bytes().to_vec();
                                     Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
@@ -1522,13 +1533,19 @@ where
                                 );
                             }
 
-                            if !cmp_found && self.text_type.is_ascii_or_utf8() {
-                                if orig_v0 == new_v0 {
+                            if !cmp_found {
+                                if orig_v0 == new_v0
+                                    && check_if_text(&orig_v0.to_ne_bytes().to_vec(), hshape).size()
+                                        == hshape
+                                {
                                     let v = orig_v0.to_ne_bytes().to_vec();
                                     Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
 
-                                if orig_v1 == new_v1 {
+                                if orig_v1 == new_v1
+                                    && check_if_text(&orig_v1.to_ne_bytes().to_vec(), hshape).size()
+                                        == hshape
+                                {
                                     let v = orig_v1.to_ne_bytes().to_vec();
                                     Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
@@ -1540,7 +1557,6 @@ where
                             // let attribute = header.attribute() as u8;
                             let mut rtn_found = false;
                             // Compare v0 against v1
-                            let be = vec.len();
                             rtn_found |= self.rtn_extend_encoding(
                                 orig_v0,
                                 orig_v1,
@@ -1570,59 +1586,45 @@ where
                                 &mut vec,
                             );
 
-                            let af = vec.len();
-                            rtn_finds += (af - be);
                             let is_ascii_or_utf8 = self.text_type.is_ascii_or_utf8();
-                            if !rtn_found || is_ascii_or_utf8 {
-                                let mut v0_len = orig_v0.len();
-                                let mut v1_len = orig_v1.len();
-                                if v0_len > 0
-                                    && (is_ascii_or_utf8
-                                        || check_if_text(orig_v0, v0_len).size() == hshape)
-                                {
-                                    // this is not utf8.
-                                    let v = strlen(orig_v0);
-                                    if v > 0 {
-                                        v0_len = v;
-                                    }
+                            let mut v0_len = orig_v0.len();
+                            let mut v1_len = orig_v1.len();
+                            if v0_len > 0
+                                && (is_ascii_or_utf8
+                                    || check_if_text(orig_v0, v0_len).size() == hshape)
+                            {
+                                // this is not utf8.
+                                let v = strlen(orig_v0);
+                                if v > 0 {
+                                    v0_len = v;
                                 }
+                            }
 
-                                if v1_len > 0
-                                    && (is_ascii_or_utf8
-                                        || check_if_text(orig_v1, v1_len).size() == hshape)
-                                {
-                                    // this is not utf8.
-                                    let v = strlen(orig_v1);
-                                    if v > 0 {
-                                        v1_len = v;
-                                    }
+                            if v1_len > 0
+                                && (is_ascii_or_utf8
+                                    || check_if_text(orig_v1, v1_len).size() == hshape)
+                            {
+                                // this is not utf8.
+                                let v = strlen(orig_v1);
+                                if v > 0 {
+                                    v1_len = v;
                                 }
+                            }
 
-                                if is_ascii_or_utf8 {
-                                    if v0_len > 0
-                                        && (orig_v0 == new_v0
-                                            || !rtn_found
-                                            || check_if_text(orig_v0, v0_len).size() == v0_len)
-                                    {
-                                        Self::try_add_autotokens(
-                                            &mut gathered_tokens,
-                                            orig_v0,
-                                            v0_len,
-                                        );
-                                    }
+                            if v0_len > 0
+                                && orig_v0 == new_v0
+                                && (!rtn_found
+                                || check_if_text(orig_v0, v0_len).size() == v0_len)
+                            {
+                                Self::try_add_autotokens(&mut gathered_tokens, orig_v0, v0_len);
+                            }
 
-                                    if v1_len > 0
-                                        && (orig_v1 == new_v1
-                                            || !rtn_found
-                                            || check_if_text(orig_v1, v1_len).size() == v1_len)
-                                    {
-                                        Self::try_add_autotokens(
-                                            &mut gathered_tokens,
-                                            orig_v1,
-                                            v1_len,
-                                        );
-                                    }
-                                }
+                            if v1_len > 0
+                                && orig_v1 == new_v1
+                                && (!rtn_found
+                                || check_if_text(orig_v1, v1_len).size() == v1_len)
+                            {
+                                Self::try_add_autotokens(&mut gathered_tokens, orig_v1, v1_len);
                             }
                         }
                         (_, _) => {
@@ -1657,7 +1659,6 @@ where
             }
         }
 
-        println!("rtn_finds {rtn_finds}");
         let mut mutated = false;
         for item in vec {
             ret.push(I::from(item));
