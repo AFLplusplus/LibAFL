@@ -460,12 +460,6 @@ extern "C" {
     fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
 }
 
-#[no_mangle]
-pub extern "C" fn __asan_default_options() -> *const c_char {
-    static ASAN_DEFAULT_OPTIONS: &[u8] = b"halt_on_error=1:abort_on_error=1\0";
-    return ASAN_DEFAULT_OPTIONS.as_ptr() as *const c_char;
-}
-
 #[allow(non_snake_case)]
 #[no_mangle]
 pub extern "C" fn LLVMFuzzerRunDriver(

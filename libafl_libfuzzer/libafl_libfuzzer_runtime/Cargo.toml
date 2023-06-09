@@ -23,7 +23,7 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 libafl = { path = "../../libafl", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "fork", "errors_backtrace", "regex"] }
-libafl_targets = { path = "../../libafl_targets", features = ["sancov_8bit", "sancov_cmplog", "libfuzzer", "libfuzzer_oom", "libfuzzer_define_run_driver"] }
+libafl_targets = { path = "../../libafl_targets", features = ["sancov_8bit", "sancov_cmplog", "libfuzzer", "libfuzzer_oom", "libfuzzer_define_run_driver", "sanitizers_flags"] }
 
 ahash = { version = "0.8.3", default-features = false }
 libc = "0.2.139"
