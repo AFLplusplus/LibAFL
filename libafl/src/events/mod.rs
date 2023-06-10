@@ -1,10 +1,13 @@
-//! Eventmanager manages all events that go to other instances of the fuzzer.
+//! An [`EventManager`] manages all events that go to other instances of the fuzzer.
+//! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
 pub mod simple;
 pub use simple::*;
 pub mod centralized;
 pub use centralized::*;
 pub mod llmp;
+#[cfg(feature = "tcp_manager")]
+pub mod tcp;
 use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::c_void;
@@ -111,7 +114,7 @@ impl Handler for ShutdownSignalData {
 }
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
-/// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
+/// by `1` in multiprocessed [`EventManager`]s, such as [`self::llmp::LlmpEventManager`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct EventManagerId(
