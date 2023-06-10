@@ -385,13 +385,13 @@ macro_rules! fuzz_with {
             // let tmin = IfStage::new(|_| mutator_status.std_mutational.into(), tmin);
 
             // Setup a tracing stage in which we log comparisons
-            let tracing = TracingStage::new(InProcessExecutor::new(
+            let tracing = IfStage::new(|_, _, _, _, _| Ok(!$options.skip_tracing()), (TracingStage::new(InProcessExecutor::new(
                 &mut tracing_harness,
                 tuple_list!(cmplog_observer),
                 &mut fuzzer,
                 &mut state,
                 &mut mgr,
-            )?);
+            )?), ()));
 
             // The order of the stages matter!
             let mut stages = tuple_list!(

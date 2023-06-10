@@ -107,6 +107,7 @@ pub struct LibfuzzerOptions {
     malloc_limit: usize,
     dedup: bool,
     shrink: bool,
+    skip_tracing: bool,
     tui: bool,
     runs: usize,
     close_fd_mask: u8,
@@ -195,6 +196,10 @@ impl LibfuzzerOptions {
         self.shrink
     }
 
+    pub fn skip_tracing(&self) -> bool {
+        self.skip_tracing
+    }
+
     pub fn tui(&self) -> bool {
         self.tui
     }
@@ -229,6 +234,7 @@ struct LibfuzzerOptionsBuilder<'a> {
     ignore_remaining: bool,
     dedup: bool,
     shrink: bool,
+    skip_tracing: bool,
     tui: bool,
     runs: usize,
     close_fd_mask: u8,
@@ -311,6 +317,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         }
                         "dedup" => self.dedup = parse_or_bail!(name, value, u64) > 0,
                         "shrink" => self.shrink = parse_or_bail!(name, value, u64) > 0,
+                        "skip_tracing" => self.skip_tracing = parse_or_bail!(name, value, u64) > 0,
                         "tui" => self.tui = parse_or_bail!(name, value, u64) > 0,
                         "runs" => self.runs = parse_or_bail!(name, value, usize),
                         "close_fd_mask" => self.close_fd_mask = parse_or_bail!(name, value, u8),
@@ -352,6 +359,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             },
             dedup: self.dedup,
             shrink: self.shrink,
+            skip_tracing: self.skip_tracing,
             tui: self.tui,
             runs: self.runs,
             close_fd_mask: self.close_fd_mask,
