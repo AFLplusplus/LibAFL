@@ -341,41 +341,43 @@ where
     fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
         let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-
             testcase.input().as_ref().unwrap().generate_name(idx.0)
         });
-        if testcase.file_path().is_some() {
-            // We already have a valid path, no need to do calculate anything
-            *testcase.filename_mut() = Some(file_name_orig);
-        } else {
-            // New testcase, we need to save it.
-            let mut file_name = file_name_orig.clone();
 
-            let mut ctr = 2;
-            let file_name = if self.locking {
-                loop {
-                    let lockfile_name = format!(".{file_name}.lafl_lock");
-                    let lockfile_path = self.dir_path.join(lockfile_name);
+        // New testcase, we need to save it.
+        let mut file_name = file_name_orig.clone();
 
-                    if OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .open(lockfile_path)
-                        .is_ok()
-                    {
-                        break file_name;
-                    }
+        let mut ctr = 2;
+        let file_name = if self.locking {
+            loop {
+                let lockfile_name = format!(".{file_name}.lafl_lock");
+                let lockfile_path = self.dir_path.join(lockfile_name);
 
-                    file_name = format!("{file_name_orig}-{ctr}");
-                    ctr += 1;
+                if OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(lockfile_path)
+                    .is_ok()
+                {
+                    break file_name;
                 }
-            } else {
-                file_name
-            };
 
+                file_name = format!("{file_name_orig}-{ctr}");
+                ctr += 1;
+            }
+        } else {
+            file_name
+        };
+
+        if testcase
+            .file_path()
+            .as_ref()
+            .map(|path| !path.starts_with(&self.dir_path))
+            .unwrap_or(true)
+        {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
-            *testcase.filename_mut() = Some(file_name);
         }
+        *testcase.filename_mut() = Some(file_name);
 
         if self.meta_format.is_some() {
             let metafile_name = format!(".{}.metadata", testcase.filename().as_ref().unwrap());

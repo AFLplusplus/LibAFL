@@ -94,7 +94,7 @@ pub fn merge(
             prefix.dir(),
             None,
             prefix.filename_prefix().clone(),
-            false,
+            true,
         )
         .unwrap()
     } else {
@@ -102,7 +102,7 @@ pub fn merge(
             &std::env::current_dir().unwrap(),
             None,
             None,
-            false,
+            true,
         )
         .unwrap()
     };

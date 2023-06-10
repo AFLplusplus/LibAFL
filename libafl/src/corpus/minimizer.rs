@@ -13,6 +13,7 @@ use z3::{ast::Bool, Config, Context, Optimize};
 
 use crate::{
     bolts::{
+        current_time,
         tuples::{MatchName, Named},
         AsIter,
     },
@@ -22,7 +23,7 @@ use crate::{
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, UsesState},
     Error, HasScheduler,
 };
 
@@ -89,7 +90,7 @@ impl<E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<E, O, T, TS>
 where
     E: UsesState,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
-    E::State: HasMetadata + HasCorpus,
+    E::State: HasMetadata + HasCorpus + HasExecutions,
     T: Copy + Hash + Eq,
     TS: TestcaseScore<E::State>,
 {
@@ -144,6 +145,9 @@ where
                 .observers_mut()
                 .post_exec_all(state, &input, &kind)?;
 
+            *state.executions_mut() += 1;
+            let executions = *state.executions();
+
             curr += 1;
 
             manager.fire(
@@ -152,6 +156,15 @@ where
                     name: "minimisation exec pass".to_string(),
                     value: UserStats::Ratio(curr, total),
                     phantom: Default::default(),
+                },
+            )?;
+
+            manager.fire(
+                state,
+                Event::UpdateExecStats {
+                    time: current_time(),
+                    phantom: Default::default(),
+                    executions,
                 },
             )?;
 

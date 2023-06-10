@@ -394,7 +394,8 @@ where
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-                *testcase.file_path_mut() = file_path.clone();
+                *testcase.filename_mut() = file_path
+                    .and_then(|path| path.file_name().unwrap().to_str().map(|s| s.to_string()));
                 self.feedback_mut()
                     .append_metadata(state, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
@@ -437,7 +438,8 @@ where
 
                 // The input is a solution, add it to the respective corpus
                 let mut testcase = Testcase::with_executions(input, *state.executions());
-                *testcase.file_path_mut() = file_path;
+                *testcase.filename_mut() = file_path
+                    .and_then(|path| path.file_name().unwrap().to_str().map(|s| s.to_string()));
                 testcase.set_parent_id_optional(*state.corpus().current());
                 self.objective_mut()
                     .append_metadata(state, observers, &mut testcase)?;
@@ -535,7 +537,8 @@ where
         let observers = executor.observers();
         // Always consider this to be "interesting"
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-        *testcase.file_path_mut() = file_path;
+        *testcase.filename_mut() =
+            file_path.and_then(|path| path.file_name().unwrap().to_str().map(|s| s.to_string()));
 
         // Maybe a solution
         if self
