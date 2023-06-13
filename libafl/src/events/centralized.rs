@@ -48,6 +48,41 @@ where
     type State = EM::State;
 }
 
+#[cfg(feature = "adaptive_serialization")]
+impl<EM, SP> EventStatsCollector for CentralizedEventManager<EM, SP>
+where
+    EM: EventStatsCollector + UsesState,
+    SP: ShMemProvider,
+{
+    fn serialization_time(&self) -> Duration {
+        self.inner.serialization_time()
+    }
+    fn deserialization_time(&self) -> Duration {
+        self.inner.deserialization_time()
+    }
+    fn serializations_cnt(&self) -> usize {
+        self.inner.serializations_cnt()
+    }
+
+    fn serialization_time_mut(&mut self) -> &mut Duration {
+        self.inner.serialization_time_mut()
+    }
+    fn deserialization_time_mut(&mut self) -> &mut Duration {
+        self.inner.deserialization_time_mut()
+    }
+    fn serializations_cnt_mut(&mut self) -> &mut usize {
+        self.inner.serializations_cnt_mut()
+    }
+}
+
+#[cfg(not(feature = "adaptive_serialization"))]
+impl<S, SP> EventStatsCollector for LlmpRestartingEventManager<S, SP>
+where
+    SP: ShMemProvider + 'static,
+    S: UsesInput,
+{
+}
+
 impl<EM, SP> EventFirer for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventFirer + HasEventManagerId,
@@ -112,15 +147,16 @@ where
             .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
             .unwrap();
 
-        //eprintln!("{:?}    {:?} {:?}", exec_time, self.serialization_time, self.deserialization_time);
+        eprintln!("{:?}    {:?} {:?}", exec_time, self.serialization_time(), self.deserialization_time());
         if self.inner.serialization_time() == Duration::ZERO
             || (self.inner.serialization_time() + self.inner.deserialization_time()) * 4 < exec_time // self.execution_time
             || self.inner.serializations_cnt().trailing_zeros() >= 8
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
-            //eprintln!("aaaaaaaaaa {:?} {:?}", ser.len(), (self.serialization_time + self.deserialization_time) * 4 < exec_time);
             *self.inner.serialization_time_mut() = current_time() - start;
+            
+            eprintln!("aaaaaaaaaa {:?} {:?}", ser.len(), (self.serialization_time() + self.deserialization_time()) * 4 < exec_time);
 
             *self.inner.serializations_cnt_mut() += 1;
             Ok(Some(ser))
