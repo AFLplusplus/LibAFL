@@ -50,7 +50,7 @@ where
 
 impl<EM, SP> EventFirer for CentralizedEventManager<EM, SP>
 where
-    EM: EventFirer + HasEventManagerId,
+    EM: EventStatsCollector + EventFirer + HasEventManagerId,
     SP: ShMemProvider,
 {
     fn fire(
@@ -309,7 +309,7 @@ where
 
 impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
 where
-    EM: ProgressReporter + HasEventManagerId,
+    EM: EventStatsCollector + ProgressReporter + HasEventManagerId,
     EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
     SP: ShMemProvider,
 {

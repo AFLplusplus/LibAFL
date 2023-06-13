@@ -825,17 +825,23 @@ where
     S: UsesInput,
 {
     fn serialization_time(&self) -> Duration {
-        self.llmp_mgr.serialization_time
+        self.llmp_mgr.serialization_time()
     }
     fn deserialization_time(&self) -> Duration {
-        self.llmp_mgr.deserialization_time
+        self.llmp_mgr.deserialization_time()
+    }
+    fn serializations_cnt(&self) -> usize {
+        self.llmp_mgr.serializations_cnt()
     }
 
     fn serialization_time_mut(&mut self) -> &mut Duration {
-        &mut self.llmp_mgr.serialization_time
+        self.llmp_mgr.serialization_time_mut()
     }
     fn deserialization_time_mut(&mut self) -> &mut Duration {
-        &mut self.llmp_mgr.deserialization_time
+        self.llmp_mgr.deserialization_time_mut()
+    }
+    fn serializations_cnt_mut(&mut self) -> &mut usize {
+        self.llmp_mgr.serializations_cnt_mut()
     }
 }
 
