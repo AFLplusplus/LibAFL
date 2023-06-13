@@ -121,7 +121,12 @@ fn find_macos_sdk_libs() -> String {
 }
 
 fn find_llvm_version() -> Option<i32> {
-    let output = exec_llvm_config(&["--version"]);
+    let llvm_env_version = env::var("LLVM_VERSION");
+    let output = if let Ok(version) = llvm_env_version {
+        version
+    } else {
+        exec_llvm_config(&["--version"])
+    };
     if let Some(major) = output.split('.').collect::<Vec<&str>>().first() {
         if let Ok(res) = major.parse::<i32>() {
             return Some(res);
@@ -219,13 +224,27 @@ fn main() {
     let mut clang_constants_file = File::create(dest_path).expect("Could not create file");
 
     println!("cargo:rerun-if-env-changed=LLVM_CONFIG");
+    println!("cargo:rerun-if-env-changed=LLVM_BINDIR");
+    println!("cargo:rerun-if-env-changed=LLVM_CXXFLAGS");
+    println!("cargo:rerun-if-env-changed=LLVM_LDFLAGS");
+    println!("cargo:rerun-if-env-changed=LLVM_VERSION");
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
     println!("cargo:rerun-if-changed=src/common-llvm.h");
     println!("cargo:rerun-if-changed=build.rs");
 
+    let llvm_bindir = env::var("LLVM_BINDIR");
+    let llvm_cxxflags = env::var("LLVM_CXXFLAGS");
+    let llvm_ldflags = env::var("LLVM_LDFLAGS");
+    let llvm_version = env::var("LLVM_VERSION");
+
     // test if llvm-config is available and we can compile the passes
-    if find_llvm_config().is_err() {
+    if find_llvm_config().is_err()
+        && !(llvm_bindir.is_ok()
+            && llvm_cxxflags.is_ok()
+            && llvm_ldflags.is_ok()
+            && llvm_version.is_ok())
+    {
         println!(
             "cargo:warning=Failed to find llvm-config, we will not build LLVM passes. If you need them, set the LLVM_CONFIG environment variable to a recent llvm-config."
         );
@@ -246,7 +265,11 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         return;
     }
 
-    let llvm_bindir = exec_llvm_config(&["--bindir"]);
+    let llvm_bindir = if let Ok(bindir) = llvm_bindir {
+        bindir
+    } else {
+        exec_llvm_config(&["--bindir"])
+    };
     let bindir_path = Path::new(&llvm_bindir);
 
     let clang;
@@ -270,7 +293,11 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         return;
     }
 
-    let cxxflags = exec_llvm_config(&["--cxxflags"]);
+    let cxxflags = if let Ok(flags) = llvm_cxxflags {
+        flags
+    } else {
+        exec_llvm_config(&["--cxxflags"])
+    };
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
     let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
@@ -322,7 +349,11 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     }
     llvm_config_ld.push("--ldflags");
 
-    let ldflags = exec_llvm_config(&llvm_config_ld);
+    let ldflags = if let Ok(flags) = llvm_ldflags {
+        flags
+    } else {
+        exec_llvm_config(&llvm_config_ld)
+    };
     let mut ldflags: Vec<&str> = ldflags.split_whitespace().collect();
 
     if cfg!(unix) {

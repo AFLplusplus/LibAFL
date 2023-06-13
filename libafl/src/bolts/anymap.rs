@@ -3,6 +3,7 @@
 use alloc::boxed::Box;
 use core::{
     any::{Any, TypeId},
+    mem::size_of,
     ptr::addr_of,
 };
 
@@ -43,10 +44,21 @@ macro_rules! impl_asany {
 ///
 /// # Note
 /// Probably not safe for future compilers, fine for now.
+/// The size changed in later rust versions, see <https://github.com/rust-lang/compiler-team/issues/608>
+#[inline]
 #[must_use]
-pub fn pack_type_id(id: u64) -> TypeId {
-    assert_eq_size!(TypeId, u64);
-    unsafe { *(addr_of!(id) as *const TypeId) }
+pub const fn pack_type_id(id: u128) -> TypeId {
+    match size_of::<TypeId>() {
+        8 => {
+            let id_64 = id as u64;
+            unsafe { *(addr_of!(id_64) as *const TypeId) }
+        }
+        16 => unsafe { *(addr_of!(id) as *const TypeId) },
+        _ => {
+            // TypeId size of this size is not yet supported"
+            panic!("Unsupported size for TypeId");
+        }
+    }
 }
 
 /// Unpack a `type_id` to an `u64`
@@ -54,10 +66,19 @@ pub fn pack_type_id(id: u64) -> TypeId {
 ///
 /// # Note
 /// Probably not safe for future compilers, fine for now.
+/// The size changed in later rust versions, see <https://github.com/rust-lang/compiler-team/issues/608>
+#[inline]
 #[must_use]
-pub fn unpack_type_id(id: TypeId) -> u64 {
-    assert_eq_size!(TypeId, u64);
-    unsafe { *(addr_of!(id) as *const u64) }
+pub const fn unpack_type_id(id: TypeId) -> u128 {
+    #[allow(clippy::cast_ptr_alignment)] // we never actually cast to u128 if the type is u64.
+    match size_of::<TypeId>() {
+        8 => unsafe { *(addr_of!(id) as *const u64) as u128 },
+        16 => unsafe { *(addr_of!(id) as *const u128) },
+        _ => {
+            // TypeId size of this size is not yet supported"
+            panic!("Unsupported size for TypeId");
+        }
+    }
 }
 
 /// Create `AnyMap` and `NamedAnyMap` for a given trait
@@ -430,5 +451,24 @@ macro_rules! create_anymap_for_trait {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use core::any::TypeId;
+
+    use super::{pack_type_id, unpack_type_id};
+
+    #[test]
+    fn test_type_id() {
+        let type_id_u64 = unpack_type_id(TypeId::of::<u64>());
+        let type_id_u128 = unpack_type_id(TypeId::of::<u128>());
+
+        assert_eq!(pack_type_id(type_id_u64), TypeId::of::<u64>());
+        assert_eq!(pack_type_id(type_id_u128), TypeId::of::<u128>());
+
+        assert_ne!(pack_type_id(type_id_u64), TypeId::of::<u128>());
+        assert_ne!(pack_type_id(type_id_u128), TypeId::of::<u64>());
     }
 }

@@ -506,6 +506,10 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
+                if staterestorer.wants_to_exit() {
+                    return Err(Error::shutting_down());
+                }
+
                 #[allow(clippy::manual_assert)]
                 if !staterestorer.has_content() {
                     #[cfg(unix)]
