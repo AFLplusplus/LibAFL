@@ -404,8 +404,11 @@ where
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_main(inner: EM, receivers_from_secondary: Vec<LlmpReceiver<SP>>) -> Self {
         Self {
-            total_exectime: Duration::ZERO,
-            execs: 0,m2: 0,
+            mean: Duration::ZERO,
+            trim_mean: Duration::ZERO,
+            n: 0,
+            trim_n: 0,
+            m2: 0,
             inner,
             sender_to_main: None,
             receivers_from_secondary: Some(receivers_from_secondary),
@@ -415,8 +418,10 @@ where
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_secondary(inner: EM, sender_to_main: LlmpSender<SP>) -> Self {
         Self {
-            total_exectime: Duration::ZERO,
-            execs: 0,
+            mean: Duration::ZERO,
+            trim_mean: Duration::ZERO,
+            n: 0,
+            trim_n: 0,
             m2: 0,
             inner,
             sender_to_main: Some(sender_to_main),
