@@ -146,16 +146,27 @@ where
             .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
             .unwrap();
 
+        static mut DIOCAN: usize = 0;
+
+        let force = if self.inner.serializations_cnt() > 256 {
+            (unsafe { DIOCAN }) as f64 / self.inner.serializations_cnt() as f64 >= 0.8
+        } else {
+            (self.inner.serialization_time() + self.inner.deserialization_time()) * 4 < exec_time
+        };
+
         // eprintln!("serialize_observers: {:?}    {:?} {:?}", exec_time, self.serialization_time(), self.deserialization_time());
         if self.inner.serialization_time() == Duration::ZERO
-            || (self.inner.serialization_time() + self.inner.deserialization_time()) * 4 < exec_time // self.execution_time
+            // || (self.inner.serialization_time() + self.inner.deserialization_time()) * 4 < exec_time // self.execution_time
             || self.inner.serializations_cnt().trailing_zeros() >= 8
+            || force
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
             *self.inner.serialization_time_mut() = current_time() - start;
 
             // eprintln!("serialized!   {:?} {:?}", ser.len(), (self.serialization_time() + self.deserialization_time()) * 4 < exec_time);
+
+            unsafe { DIOCAN += 1 };
 
             *self.inner.serializations_cnt_mut() += 1;
             Ok(Some(ser))
