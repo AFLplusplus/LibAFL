@@ -4,6 +4,7 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use core::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use num_integer::Roots;
 
 use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
 use crate::{
@@ -21,7 +22,6 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::UsesInput,
     observers::ObserversTuple,
-    schedulers::powersched::SchedulerMetadata,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
 };
@@ -35,8 +35,10 @@ where
     EM: UsesState,
     SP: ShMemProvider,
 {
-    total_exectime: Duration,
-    execs: u32,
+    mean: Duration,
+    trim_mean: Duration,
+    n: u32,
+    trim_n: u32,
     m2: u128,
 
     inner: EM,
@@ -151,30 +153,31 @@ where
             .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
             .unwrap();
 
-        //self.total_exectime += exec_time;
-        
-        use num::integer::Roots;
-
-        let consider = if self.execs > 16 {
-
-            let variance = self.m2 / (self.execs as u128 -1);
+        let consider = if self.n > 16 {
+            let variance = self.m2 / (self.n as u128 -1);
             let stdd = Duration::from_nanos(variance.sqrt().try_into().unwrap());
-            exec_time <= self.total_exectime + stdd && exec_time >= self.total_exectime - stdd
-
+            if stdd > self.mean {
+                true
+            } else {
+                exec_time <= self.mean + stdd && exec_time >= self.mean - stdd
+            }
         } else { true };
 
-        if consider {
-            self.execs += 1;
-        let delta = if exec_time >= self.total_exectime { exec_time - self.total_exectime } else { self.total_exectime - exec_time };
+        self.n += 1;
+            
+        let delta = if exec_time >= self.mean { exec_time - self.mean } else { self.mean - exec_time };
+        self.mean += delta / self.n;
         
-
-        self.total_exectime += delta / self.execs;
-        
-        let delta_new = if exec_time >= self.total_exectime { exec_time - self.total_exectime } else { self.total_exectime - exec_time };
+        let delta_new = if exec_time >= self.mean { exec_time - self.mean } else { self.mean - exec_time };
         self.m2 += delta.as_nanos() * delta_new.as_nanos();
+
+        if consider {
+            self.trim_n += 1;
+            let delta = if exec_time >= self.trim_mean { exec_time - self.trim_mean } else { self.trim_mean - exec_time };
+            self.trim_mean += delta / self.trim_n;
         }
 
-        let exec_time = self.total_exectime;
+        let exec_time = self.trim_mean;
 
         //let exec_time = self.total_exectime / self.execs;
 
