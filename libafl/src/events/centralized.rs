@@ -35,6 +35,10 @@ where
     EM: UsesState,
     SP: ShMemProvider,
 {
+    total_exectime: Duration,
+    execs: u32,
+    m2: u128,
+
     inner: EM,
     sender_to_main: Option<LlmpSender<SP>>,
     receivers_from_secondary: Option<Vec<LlmpReceiver<SP>>>,
@@ -147,16 +151,44 @@ where
             .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
             .unwrap();
 
-        eprintln!("{:?}    {:?} {:?}", exec_time, self.serialization_time(), self.deserialization_time());
+        //self.total_exectime += exec_time;
+        
+        use num::integer::Roots;
+
+        let consider = if self.execs > 16 {
+
+            let variance = self.m2 / (self.execs as u128 -1);
+            let stdd = Duration::from_nanos(variance.sqrt().try_into().unwrap());
+            exec_time <= self.total_exectime + stdd && exec_time >= self.total_exectime - stdd
+
+        } else { true };
+
+        if consider {
+            self.execs += 1;
+        let delta = if exec_time >= self.total_exectime { exec_time - self.total_exectime } else { self.total_exectime - exec_time };
+        
+
+        self.total_exectime += delta / self.execs;
+        
+        let delta_new = if exec_time >= self.total_exectime { exec_time - self.total_exectime } else { self.total_exectime - exec_time };
+        self.m2 += delta.as_nanos() * delta_new.as_nanos();
+        }
+
+        let exec_time = self.total_exectime;
+
+        //let exec_time = self.total_exectime / self.execs;
+
+        //eprintln!("{:?}    {:?} {:?}", exec_time, self.serialization_time(), self.deserialization_time());
         if self.inner.serialization_time() == Duration::ZERO
             || (self.inner.serialization_time() + self.inner.deserialization_time()) * 4 < exec_time // self.execution_time
             || self.inner.serializations_cnt().trailing_zeros() >= 8
+        // if self.inner.serializations_cnt().trailing_zeros() >= 8
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
             *self.inner.serialization_time_mut() = current_time() - start;
             
-            eprintln!("aaaaaaaaaa {:?} {:?}", ser.len(), (self.serialization_time() + self.deserialization_time()) * 4 < exec_time);
+            //eprintln!("asaaaaaaaaa {:?} {:?}", ser.len(), (self.serialization_time() + self.deserialization_time()) * 4 < exec_time);
 
             *self.inner.serializations_cnt_mut() += 1;
             Ok(Some(ser))
@@ -369,6 +401,8 @@ where
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_main(inner: EM, receivers_from_secondary: Vec<LlmpReceiver<SP>>) -> Self {
         Self {
+            total_exectime: Duration::ZERO,
+            execs: 0,m2: 0,
             inner,
             sender_to_main: None,
             receivers_from_secondary: Some(receivers_from_secondary),
@@ -378,6 +412,9 @@ where
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_secondary(inner: EM, sender_to_main: LlmpSender<SP>) -> Self {
         Self {
+            total_exectime: Duration::ZERO,
+            execs: 0,
+            m2: 0,
             inner,
             sender_to_main: Some(sender_to_main),
             receivers_from_secondary: None,
