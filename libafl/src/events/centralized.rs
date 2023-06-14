@@ -4,7 +4,6 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use core::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use num_integer::Roots;
 
 use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
 use crate::{
@@ -155,7 +154,7 @@ where
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
             *self.inner.serialization_time_mut() = current_time() - start;
-            
+
             // eprintln!("serialized!   {:?} {:?}", ser.len(), (self.serialization_time() + self.deserialization_time()) * 4 < exec_time);
 
             *self.inner.serializations_cnt_mut() += 1;

@@ -51,7 +51,6 @@ use crate::{
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
     observers::ObserversTuple,
-    schedulers::powersched::SchedulerMetadata,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
 };
