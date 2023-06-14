@@ -349,8 +349,8 @@ macro_rules! fuzz_with {
                     // Load from disk
                     state
                         .load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, $options.dirs())
-                        .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", $options.dirs())
+                        .unwrap_or_else(|e| {
+                            panic!("Failed to load initial corpus at {:?}: {}", $options.dirs(), e)
                         });
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
