@@ -35,12 +35,6 @@ where
     EM: UsesState,
     SP: ShMemProvider,
 {
-    mean: Duration,
-    trim_mean: Duration,
-    n: u32,
-    trim_n: u32,
-    m2: u128,
-
     inner: EM,
     sender_to_main: Option<LlmpSender<SP>>,
     receivers_from_secondary: Option<Vec<LlmpReceiver<SP>>>,
@@ -153,45 +147,16 @@ where
             .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
             .unwrap();
 
-        let consider = if self.n > 16 {
-            let variance = self.m2 / (self.n as u128 -1);
-            let stdd = Duration::from_nanos(variance.sqrt().try_into().unwrap());
-            if stdd > self.mean {
-                true
-            } else {
-                exec_time <= self.mean + stdd && exec_time >= self.mean - stdd
-            }
-        } else { true };
-
-        self.n += 1;
-            
-        let delta = if exec_time >= self.mean { exec_time - self.mean } else { self.mean - exec_time };
-        self.mean += delta / self.n;
-        
-        let delta_new = if exec_time >= self.mean { exec_time - self.mean } else { self.mean - exec_time };
-        self.m2 += delta.as_nanos() * delta_new.as_nanos();
-
-        if consider {
-            self.trim_n += 1;
-            let delta = if exec_time >= self.trim_mean { exec_time - self.trim_mean } else { self.trim_mean - exec_time };
-            self.trim_mean += delta / self.trim_n;
-        }
-
-        let exec_time = self.trim_mean;
-
-        //let exec_time = self.total_exectime / self.execs;
-
-        //eprintln!("{:?}    {:?} {:?}", exec_time, self.serialization_time(), self.deserialization_time());
+        // eprintln!("serialize_observers: {:?}    {:?} {:?}", exec_time, self.serialization_time(), self.deserialization_time());
         if self.inner.serialization_time() == Duration::ZERO
             || (self.inner.serialization_time() + self.inner.deserialization_time()) * 4 < exec_time // self.execution_time
             || self.inner.serializations_cnt().trailing_zeros() >= 8
-        // if self.inner.serializations_cnt().trailing_zeros() >= 8
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
             *self.inner.serialization_time_mut() = current_time() - start;
             
-            //eprintln!("asaaaaaaaaa {:?} {:?}", ser.len(), (self.serialization_time() + self.deserialization_time()) * 4 < exec_time);
+            // eprintln!("serialized!   {:?} {:?}", ser.len(), (self.serialization_time() + self.deserialization_time()) * 4 < exec_time);
 
             *self.inner.serializations_cnt_mut() += 1;
             Ok(Some(ser))
@@ -404,11 +369,6 @@ where
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_main(inner: EM, receivers_from_secondary: Vec<LlmpReceiver<SP>>) -> Self {
         Self {
-            mean: Duration::ZERO,
-            trim_mean: Duration::ZERO,
-            n: 0,
-            trim_n: 0,
-            m2: 0,
             inner,
             sender_to_main: None,
             receivers_from_secondary: Some(receivers_from_secondary),
@@ -418,11 +378,6 @@ where
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_secondary(inner: EM, sender_to_main: LlmpSender<SP>) -> Self {
         Self {
-            mean: Duration::ZERO,
-            trim_mean: Duration::ZERO,
-            n: 0,
-            trim_n: 0,
-            m2: 0,
             inner,
             sender_to_main: Some(sender_to_main),
             receivers_from_secondary: None,
