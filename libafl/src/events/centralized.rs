@@ -75,10 +75,10 @@ where
 }
 
 #[cfg(not(feature = "adaptive_serialization"))]
-impl<S, SP> EventStatsCollector for LlmpRestartingEventManager<S, SP>
+impl<EM, SP> EventStatsCollector for CentralizedEventManager<EM, SP>
 where
-    SP: ShMemProvider + 'static,
-    S: UsesInput,
+    EM: EventStatsCollector + UsesState,
+    SP: ShMemProvider,
 {
 }
 
