@@ -1,8 +1,13 @@
 use std::path::PathBuf;
 
+#[cfg(target_vendor = "apple")]
+use libafl::bolts::shmem::UnixShMemProvider;
+#[cfg(windows)]
+use libafl::bolts::shmem::Win32ShMemProvider;
 use libafl::{
     bolts::{
         rands::{RandomSeed, StdRand},
+        shmem::ShMemProvider,
         tuples::tuple_list,
     },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
@@ -17,17 +22,30 @@ use libafl::{
     state::StdState,
     Fuzzer, StdFuzzer,
 };
-use libafl_tinyinst::executor::TinyInstExecutor;
+use libafl_tinyinst::executor::TinyInstExecutorBuilder;
 static mut COVERAGE: Vec<u64> = vec![];
 
+#[cfg(not(any(target_vendor = "apple", windows)))]
+fn main() {}
+
+#[cfg(any(target_vendor = "apple", windows))]
 fn main() {
     // Tinyinst things
     let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
 
-    let args = vec![".\\test\\test.exe".to_string(), "@@".to_string()];
+    // use shmem to pass testcases
+    let args = vec!["test.exe".to_string(), "-m".to_string(), "@@".to_string()];
 
-    let observer = ListObserver::new("cov", unsafe { &mut COVERAGE });
-    let mut feedback = ListFeedback::new_with_observer(&observer);
+    // use file to pass testcases
+    // let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
+
+    let observer = unsafe { ListObserver::new("cov", &mut COVERAGE) };
+    let mut feedback = ListFeedback::with_observer(&observer);
+    #[cfg(windows)]
+    let mut shmem_provider = Win32ShMemProvider::new().unwrap();
+
+    #[cfg(target_vendor = "apple")]
+    let mut shmem_provider = UnixShMemProvider::new().unwrap();
 
     let input = BytesInput::new(b"bad".to_vec());
     let rand = StdRand::new();
@@ -46,13 +64,15 @@ fn main() {
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = unsafe {
-        TinyInstExecutor::new(
-            &mut COVERAGE,
-            tinyinst_args,
-            args,
-            5000,
-            tuple_list!(observer),
-        )
+        TinyInstExecutorBuilder::new()
+            .tinyinst_args(tinyinst_args)
+            .program_args(args)
+            .use_shmem()
+            .persistent("test.exe".to_string(), "fuzz".to_string(), 1, 10000)
+            .timeout(std::time::Duration::new(5, 0))
+            .shmem_provider(&mut shmem_provider)
+            .build(&mut COVERAGE, tuple_list!(observer))
+            .unwrap()
     };
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));

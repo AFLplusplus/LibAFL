@@ -13,10 +13,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::Feedback,
     inputs::UsesInput,
-    observers::{
-        concolic::{ConcolicMetadata, ConcolicObserver},
-        ObserversTuple,
-    },
+    observers::{concolic::ConcolicObserver, ObserversTuple},
     state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
@@ -28,7 +25,6 @@ use crate::{
 #[derive(Debug)]
 pub struct ConcolicFeedback<S> {
     name: String,
-    metadata: Option<ConcolicMetadata>,
     phantom: PhantomData<S>,
 }
 
@@ -39,7 +35,6 @@ impl<S> ConcolicFeedback<S> {
     pub fn from_observer(observer: &ConcolicObserver) -> Self {
         Self {
             name: observer.name().to_owned(),
-            metadata: None,
             phantom: PhantomData,
         }
     }
@@ -61,26 +56,30 @@ where
         _state: &mut S,
         _manager: &mut EM,
         _input: &<S as UsesInput>::Input,
-        observers: &OT,
+        _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        self.metadata = observers
-            .match_name::<ConcolicObserver>(&self.name)
-            .map(ConcolicObserver::create_metadata_from_current_map);
         Ok(false)
     }
 
-    fn append_metadata(
+    fn append_metadata<OT>(
         &mut self,
         _state: &mut S,
-        _testcase: &mut Testcase<<S as UsesInput>::Input>,
-    ) -> Result<(), Error> {
-        if let Some(metadata) = self.metadata.take() {
-            _testcase.metadata_mut().insert(metadata);
+        observers: &OT,
+        testcase: &mut Testcase<S::Input>,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<S>,
+    {
+        if let Some(metadata) = observers
+            .match_name::<ConcolicObserver>(&self.name)
+            .map(ConcolicObserver::create_metadata_from_current_map)
+        {
+            testcase.metadata_map_mut().insert(metadata);
         }
         Ok(())
     }

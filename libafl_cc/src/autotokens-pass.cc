@@ -1,10 +1,10 @@
 /*
-   american fuzzy lop++ - LLVM LTO instrumentation pass
-   ----------------------------------------------------
+   LibAFL - Autotokens LLVM pass
+   --------------------------------------------------
 
-   Written by Marc Heuse <mh@mh-sec.de>
+   Written by Dongjia Zhang <toka@aflplus.plus>
 
-   Copyright 2019-2020 AFLplusplus Project. All rights reserved.
+   Copyright 2022-2023 AFLplusplus Project. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -12,9 +12,7 @@
 
      http://www.apache.org/licenses/LICENSE-2.0
 
-   This library is plugged into LLVM when invoking clang through afl-clang-lto.
-
- */
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,7 +45,9 @@
   #include "llvm/IR/LegacyPassManager.h"
 #endif
 
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#if LLVM_VERSION_MAJOR < 11
+  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#endif
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DebugInfo.h"
@@ -55,7 +55,6 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -226,7 +225,6 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
 PreservedAnalyses AutoTokensPass::run(Module &M, ModuleAnalysisManager &MAM) {
 #else
 bool AutoTokensPass::runOnModule(Module &M) {
-
 #endif
 
   DenseMap<Value *, std::string *> valueMap;
@@ -661,7 +659,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
       ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
       // The actual dict
       GlobalVariable *dict = new GlobalVariable(
-          M, arrayTy, true, GlobalVariable::ExternalLinkage,
+          M, arrayTy, true, GlobalVariable::WeakAnyLinkage,
           ConstantDataArray::get(Ctx,
                                  *(new ArrayRef<char>(ptrhld.get(), offset))),
           "libafl_dictionary_" + M.getName());
@@ -685,6 +683,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
 #if USE_NEW_PM
 
 #else
+  #if LLVM_VERSION_MAJOR < 11
 static void registerAutoTokensPass(const PassManagerBuilder &,
                                    legacy::PassManagerBase &PM) {
   PM.add(new AutoTokensPass());
@@ -699,4 +698,5 @@ static RegisterStandardPasses RegisterAutoTokensPass(
 
 static RegisterStandardPasses RegisterAutoTokensPass0(
     PassManagerBuilder::EP_EnabledOnOptLevel0, registerAutoTokensPass);
+  #endif
 #endif

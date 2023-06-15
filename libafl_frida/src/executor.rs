@@ -8,7 +8,7 @@ use frida_gum::{
 #[cfg(windows)]
 use libafl::{
     executors::inprocess::{HasInProcessHandlers, InProcessHandlers},
-    state::{HasClientPerfMonitor, HasSolutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
 };
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
@@ -39,7 +39,6 @@ where
     /// User provided callback for instrumentation
     helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     followed: bool,
-    gum: &'b Gum,
     _phantom: PhantomData<&'b u8>,
 }
 
@@ -85,8 +84,8 @@ where
                 self.stalker.activate(NativePointer(core::ptr::null_mut()));
             } else {
                 self.followed = true;
-                let transformer = self.helper.transformer(self.gum);
-                self.stalker.follow_me::<NoneEventSink>(&transformer, None);
+                let transformer = self.helper.transformer();
+                self.stalker.follow_me::<NoneEventSink>(transformer, None);
             }
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);
@@ -96,7 +95,7 @@ where
         #[cfg(unix)]
         unsafe {
             if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
-                println!("Crashing target as it had ASAN errors");
+                log::error!("Crashing target as it had ASAN errors");
                 libc::raise(libc::SIGABRT);
             }
         }
@@ -172,12 +171,15 @@ where
                 break;
             }
         }
-        for range in ranges.gaps(&(0..usize::MAX)) {
-            println!("excluding range: {:x}-{:x}", range.start, range.end);
-            stalker.exclude(&MemoryRange::new(
-                NativePointer(range.start as *mut c_void),
-                range.end - range.start,
-            ));
+
+        if !helper.options().disable_excludes {
+            for range in ranges.gaps(&(0..usize::MAX)) {
+                log::info!("excluding range: {:x}-{:x}", range.start, range.end);
+                stalker.exclude(&MemoryRange::new(
+                    NativePointer(range.start as *mut c_void),
+                    range.end - range.start,
+                ));
+            }
         }
 
         #[cfg(windows)]
@@ -187,7 +189,6 @@ where
             base,
             stalker,
             helper,
-            gum,
             followed: false,
             _phantom: PhantomData,
         }
@@ -199,7 +200,7 @@ impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHandlers
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: UsesInput + HasClientPerfMonitor + HasSolutions,
+    S: UsesInput + HasClientPerfMonitor + HasSolutions + HasCorpus,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,

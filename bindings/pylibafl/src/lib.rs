@@ -26,7 +26,7 @@ class BaseFeedback:
         pass
     def is_interesting(self, state, mgr, input, observers, exit_kind) -> bool:
         return False
-    def append_metadata(self, state, testcase):
+    def append_metadata(self, state, observers, testcase):
         pass
     def discard_metadata(self, state, input):
         pass
@@ -84,6 +84,8 @@ def feedback_or_fast(a, b):
 #[pymodule]
 #[pyo3(name = "pylibafl")]
 pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+    pyo3_log::init();
+
     let modules = py.import("sys")?.getattr("modules")?;
 
     let sugar_module = PyModule::new(py, "sugar")?;

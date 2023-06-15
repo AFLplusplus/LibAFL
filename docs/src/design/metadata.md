@@ -19,7 +19,7 @@ pub struct MyMetadata {
 
 The struct must be static, so it cannot hold references to borrowed objects.
 
-As an alternative to `derive(SerdeAny)` that is a proc-macro in `libafl_derive` the user can use `libafl::impl_serdeany!(MyMetadata);`.
+As an alternative to `derive(SerdeAny)` which is a proc-macro in `libafl_derive` the user can use `libafl::impl_serdeany!(MyMetadata);`.
 
 ## Usage
 

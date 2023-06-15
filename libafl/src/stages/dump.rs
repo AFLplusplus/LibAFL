@@ -1,13 +1,13 @@
 //! The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk to e.g. allow AFL to sync
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{clone::Clone, marker::PhantomData};
 use std::{fs, fs::File, io::Write, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     stages::Stage,
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions, UsesState},
@@ -17,8 +17,8 @@ use crate::{
 /// Metadata used to store information about disk dump indexes for names
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct DumpToDiskMetadata {
-    last_corpus: usize,
-    last_solution: usize,
+    last_corpus: Option<CorpusId>,
+    last_solution: Option<CorpusId>,
 }
 
 crate::impl_serdeany!(DumpToDiskMetadata);
@@ -41,7 +41,7 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Z::State as UsesInput>::Input) -> Vec<u8>,
+    CB: FnMut(&<Z::State as UsesInput>::Input, &Z::State) -> Vec<u8>,
     EM: UsesState<State = Z::State>,
     E: UsesState<State = Z::State>,
     Z: UsesState,
@@ -54,39 +54,57 @@ where
         _executor: &mut E,
         state: &mut Z::State,
         _manager: &mut EM,
-        _corpus_idx: usize,
+        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let meta = state
-            .metadata()
-            .get::<DumpToDiskMetadata>()
-            .map_or_else(DumpToDiskMetadata::default, Clone::clone);
+        let (mut corpus_idx, mut solutions_idx) =
+            if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
+                (
+                    meta.last_corpus.and_then(|x| state.corpus().next(x)),
+                    meta.last_solution.and_then(|x| state.solutions().next(x)),
+                )
+            } else {
+                (state.corpus().first(), state.solutions().first())
+            };
 
-        let corpus_count = state.corpus().count();
-        let solutions_count = state.solutions().count();
-
-        for i in meta.last_corpus..corpus_count {
+        while let Some(i) = corpus_idx {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
-            let input = testcase.load_input()?;
-            let bytes = (self.to_bytes)(input);
+            state.corpus().load_input_into(&mut testcase)?;
+            let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap(), state);
 
-            let fname = self.corpus_dir.join(format!("id_{i}"));
+            let fname = self.corpus_dir.join(format!(
+                "id_{i}_{}",
+                testcase
+                    .filename()
+                    .as_ref()
+                    .map_or_else(|| "unnamed", String::as_str)
+            ));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
+
+            corpus_idx = state.corpus().next(i);
         }
 
-        for i in meta.last_solution..solutions_count {
+        while let Some(i) = solutions_idx {
             let mut testcase = state.solutions().get(i)?.borrow_mut();
-            let input = testcase.load_input()?;
-            let bytes = (self.to_bytes)(input);
+            state.solutions().load_input_into(&mut testcase)?;
+            let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap(), state);
 
-            let fname = self.solutions_dir.join(format!("id_{i}"));
+            let fname = self.solutions_dir.join(format!(
+                "id_{i}_{}",
+                testcase
+                    .filename()
+                    .as_ref()
+                    .map_or_else(|| "unnamed", String::as_str)
+            ));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
+
+            solutions_idx = state.solutions().next(i);
         }
 
         state.add_metadata(DumpToDiskMetadata {
-            last_corpus: corpus_count,
-            last_solution: solutions_count,
+            last_corpus: state.corpus().last(),
+            last_solution: state.solutions().last(),
         });
 
         Ok(())
@@ -95,7 +113,6 @@ where
 
 impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Z::State as UsesInput>::Input) -> Vec<u8>,
     EM: UsesState<State = Z::State>,
     Z: UsesState,
     Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,

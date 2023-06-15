@@ -1,6 +1,9 @@
 //! In-memory fuzzer with `QEMU`-based binary-only instrumentation
 //!
-use core::fmt::{self, Debug, Formatter};
+use core::{
+    fmt::{self, Debug, Formatter},
+    ptr::addr_of_mut,
+};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
@@ -33,10 +36,8 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
 };
 pub use libafl_qemu::emu::Emulator;
-use libafl_qemu::{
-    cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks,
-};
-use libafl_targets::CmpLogObserver;
+use libafl_qemu::{edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
+use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -126,7 +127,7 @@ where
 
         let mut out_dir = self.output_dir.clone();
         if fs::create_dir(&out_dir).is_err() {
-            println!("Out dir at {:?} already exists.", &out_dir);
+            log::info!("Out dir at {:?} already exists.", &out_dir);
             assert!(
                 out_dir.is_dir(),
                 "Out dir at {:?} is not a valid directory!",
@@ -141,31 +142,33 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let monitor = MultiMonitor::new(|s| println!("{s}"));
+        let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _>,
                               _core_id| {
             // Create an observation channel using the coverage map
-            let edges = unsafe { &mut edges::EDGES_MAP };
-            let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
-            let edges_observer =
-                HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
+            let edges_observer = unsafe {
+                HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                    "edges",
+                    edges_map_mut_slice(),
+                    addr_of_mut!(edges::MAX_EDGES_NUM),
+                ))
+            };
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
 
             // Keep tracks of CMPs
-            let cmplog = unsafe { &mut cmplog::CMPLOG_MAP };
-            let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+            let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::new_tracking(&edges_observer, true, false),
+                MaxMapFeedback::tracking(&edges_observer, true, false),
                 // Time feedback, this one does not need a feedback state
-                TimeFeedback::new_with_observer(&time_observer)
+                TimeFeedback::with_observer(&time_observer)
             );
 
             // A feedback to choose if an input is a solution or not
@@ -189,7 +192,7 @@ where
 
             // Create a dictionary if not existing
             if let Some(tokens_file) = &self.tokens_file {
-                if state.metadata().get::<Tokens>().is_none() {
+                if state.metadata_map().get::<Tokens>().is_none() {
                     state.add_metadata(Tokens::from_file(tokens_file)?);
                 }
             }
@@ -229,7 +232,7 @@ where
                 let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
                 // In case the corpus is empty (on first run), reset
-                if state.corpus().count() < 1 {
+                if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
                         let mut generator = RandBytesGenerator::new(32);
@@ -244,12 +247,12 @@ where
                                 8,
                             )
                             .expect("Failed to generate the initial corpus");
-                        println!(
+                        log::info!(
                             "We imported {} inputs from the generator.",
                             state.corpus().count()
                         );
                     } else {
-                        println!("Loading from {:?}", &self.input_dirs);
+                        log::info!("Loading from {:?}", &self.input_dirs);
                         // Load from disk
                         state
                             .load_initial_inputs(
@@ -261,7 +264,7 @@ where
                             .unwrap_or_else(|_| {
                                 panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
                             });
-                        println!("We imported {} inputs from disk.", state.corpus().count());
+                        log::info!("We imported {} inputs from disk.", state.corpus().count());
                     }
                 }
 
@@ -332,7 +335,7 @@ where
                 let mut executor = TimeoutExecutor::new(executor, timeout);
 
                 // In case the corpus is empty (on first run), reset
-                if state.corpus().count() < 1 {
+                if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
                         let mut generator = RandBytesGenerator::new(32);
@@ -347,12 +350,12 @@ where
                                 8,
                             )
                             .expect("Failed to generate the initial corpus");
-                        println!(
+                        log::info!(
                             "We imported {} inputs from the generator.",
                             state.corpus().count()
                         );
                     } else {
-                        println!("Loading from {:?}", &self.input_dirs);
+                        log::info!("Loading from {:?}", &self.input_dirs);
                         // Load from disk
                         state
                             .load_initial_inputs(
@@ -364,7 +367,7 @@ where
                             .unwrap_or_else(|_| {
                                 panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
                             });
-                        println!("We imported {} inputs from disk.", state.corpus().count());
+                        log::info!("We imported {} inputs from disk.", state.corpus().count());
                     }
                 }
 
@@ -442,6 +445,7 @@ pub mod pybind {
     use crate::qemu;
 
     #[pyclass(unsendable)]
+    #[derive(Debug)]
     struct QemuBytesCoverageSugar {
         input_dirs: Vec<PathBuf>,
         output_dir: PathBuf,

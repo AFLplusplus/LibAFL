@@ -7,7 +7,7 @@ use core::{cell::UnsafeCell, fmt::Debug};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{ownedref::OwnedPtrMut, tuples::MatchName},
+    bolts::{ownedref::OwnedMutPtr, tuples::MatchName},
     executors::{Executor, ExitKind, HasObservers},
     inputs::UsesInput,
     observers::{DifferentialObserversTuple, ObserversTuple, UsesObservers},
@@ -37,8 +37,8 @@ impl<A, B, OTA, OTB, DOT> DiffExecutor<A, B, OTA, OTB, DOT> {
             primary,
             secondary,
             observers: UnsafeCell::new(ProxyObserversTuple {
-                primary: OwnedPtrMut::Ptr(core::ptr::null_mut()),
-                secondary: OwnedPtrMut::Ptr(core::ptr::null_mut()),
+                primary: OwnedMutPtr::Ptr(core::ptr::null_mut()),
+                secondary: OwnedMutPtr::Ptr(core::ptr::null_mut()),
                 differential: observers,
             }),
         }
@@ -116,8 +116,8 @@ where
     bound = "A: serde::Serialize + serde::de::DeserializeOwned, B: serde::Serialize + serde::de::DeserializeOwned, DOT: serde::Serialize + serde::de::DeserializeOwned"
 )]
 pub struct ProxyObserversTuple<A, B, DOT> {
-    primary: OwnedPtrMut<A>,
-    secondary: OwnedPtrMut<B>,
+    primary: OwnedMutPtr<A>,
+    secondary: OwnedMutPtr<B>,
     differential: DOT,
 }
 
@@ -207,8 +207,8 @@ where
 
 impl<A, B, DOT> ProxyObserversTuple<A, B, DOT> {
     fn set(&mut self, primary: &A, secondary: &B) {
-        self.primary = OwnedPtrMut::Ptr(primary as *const A as *mut A);
-        self.secondary = OwnedPtrMut::Ptr(secondary as *const B as *mut B);
+        self.primary = OwnedMutPtr::Ptr(primary as *const A as *mut A);
+        self.secondary = OwnedMutPtr::Ptr(secondary as *const B as *mut B);
     }
 }
 

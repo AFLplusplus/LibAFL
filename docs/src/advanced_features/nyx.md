@@ -2,12 +2,12 @@
 
 NYX supports both source-based and binary-only fuzzing.
 
-Currently, `libafl_nyx` only supports [afl++](https://github.com/AFLplusplus/AFLplusplus)'s instruction. To install it, you can use `sudo apt install aflplusplus`. Or compile from the source:
+Currently, `libafl_nyx` only supports [afl++](https://github.com/AFLplusplus/AFLplusplus)'s instruction type. To install it, you can use `sudo apt install aflplusplus`. Or compile from the source:
 
 ```bash
 git clone https://github.com/AFLplusplus/AFLplusplus
 cd AFLplusplus
-make all # this will not compile afl's additional extension
+make all # this will not compile afl's additional extensions
 ```
 
 Then you should compile the target with the afl++ compiler wrapper:
@@ -20,9 +20,9 @@ export CXX=afl-clang-fast++
 make
 ```
 
-For binary-only fuzzing, Nyx uses intel-PT(Intel® Processor Trace). You can find the supported CPU at <https://www.intel.com/content/www/us/en/support/articles/000056730/processors.html>.
+For binary-only fuzzing, Nyx uses intel-PT(Intel® Processor Trace). You can find the list of supported CPUs at <https://www.intel.com/content/www/us/en/support/articles/000056730/processors.html>.
 
-## Preparing Nyx working directory
+## Preparing the Nyx working directory
 
 This step is used to pack the target into Nyx's kernel. Don't worry, we have a template shell script in our [example](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/nyx_libxml2_parallel/setup_libxml2.sh):
 
@@ -49,7 +49,7 @@ python3 ./packer/packer/nyx_config_gen.py /tmp/nyx_libxml2/ Kernel || exit
 
 ## Standalone fuzzing
 
-In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/nyx_libxml2_standalone/src/main.rs). First you need to run `./setup_libxml2.sh`, It will prepare your target and create your nyx work directory in `/tmp/libxml2`. After that, you can start write your code.
+In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/nyx_libxml2_standalone/src/main.rs) you first need to run `./setup_libxml2.sh`. It will prepare your target and create your nyx work directory in `/tmp/libxml2`. After that, you can start to write your code.
 
 First, to create `Nyxhelper`:
 
@@ -57,22 +57,21 @@ First, to create `Nyxhelper`:
 let share_dir = Path::new("/tmp/nyx_libxml2/");
 let cpu_id = 0; // use first cpu
 let parallel_mode = false; // close parallel_mode
-let mut helper = NyxHelper::new(share_dir, cpu_id, true, parallel_mode, None).unwrap(); // we don't the set the last parameter in standalone mode, we just use None, here
+let mut helper = NyxHelper::new(share_dir, cpu_id, true, parallel_mode, None).unwrap(); // we don't need to set the last parameter in standalone mode, we just use None, here
 ```
 
 Then, fetch `trace_bits`, create an observer and the `NyxExecutor`:
 
 ```rust,ignore
-let trace_bits = unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
-let observer = StdMapObserver::new("trace", trace_bits);
+let observer = unsafe { StdMapObserver::from_mut_ptr("trace", helper.trace_bits, helper.map_size) };
 let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
 ```
 
-Finally, use them as normal and pass them into `fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)` to start fuzzing.
+Finally, use them normally and pass them into `fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)` to start fuzzing.
 
 ## Parallel fuzzing
 
-In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/nyx_libxml2_parallel/src/main.rs). First you need to run `./setup_libxml2.sh` as described before.
+In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/nyx_libxml2_parallel/src/main.rs) you first need to run `./setup_libxml2.sh` as described before.
 
 Parallel fuzzing relies on [`Launcher`](../message_passing/spawn_instances.md), so spawn logic should be written in the scoop of anonymous function `run_client`:
 
@@ -91,7 +90,7 @@ let mut helper = NyxHelper::new(
     cpu_id,    // current cpu id
     true,      // open snap_mode
     parallel_mode, // open parallel mode
-    Some(parent_cpu_id.id as u32), // the cpu-id of master instance, there is only one master instance, other instances will be treated as slaved
+    Some(parent_cpu_id.id as u32), // the cpu-id of main instance, there is only one main instance, other instances will be treated as secondaries
 )
 .unwrap();
 ```
@@ -99,13 +98,11 @@ let mut helper = NyxHelper::new(
 Then you can fetch the trace_bits and create an observer and `NyxExecutor`
 
 ```rust,ignore
-let trace_bits =
-    unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
-let observer = StdMapObserver::new("trace", trace_bits);
+let observer = unsafe { StdMapObserver::from_mut_ptr("trace", helper.trace_bits, helper.map_size) }
 let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
 ```
 
-Finally, open a `Launcher` as normal to start fuzzing:
+Finally, open a `Launcher` as usual to start fuzzing:
 
 ```rust,ignore
 match Launcher::builder()
@@ -121,6 +118,6 @@ match Launcher::builder()
 {
     Ok(()) => (),
     Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
-    Err(err) => panic!("Failed to run launcher: {:?}", err),
+    Err(err) => panic!("Failed to run launcher: {err:?}"),
 }
 ```

@@ -1,6 +1,6 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of kernels
 //!
-use core::time::Duration;
+use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
@@ -22,15 +22,17 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{TimeObserver, VariableMapObserver},
+    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
     Error,
 };
 use libafl_qemu::{
-    edges, edges::QemuEdgeCoverageHelper, elf::EasyElf, emu::Emulator, GuestPhysAddr, QemuExecutor,
-    QemuHooks, Regs,
+    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
+    elf::EasyElf,
+    emu::Emulator,
+    GuestPhysAddr, QemuExecutor, QemuHooks, Regs,
 };
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
@@ -59,12 +61,12 @@ pub fn fuzz() {
             0,
         )
         .expect("Symbol or env FUZZ_INPUT not found") as GuestPhysAddr;
-    println!("FUZZ_INPUT @ {:#x}", input_addr);
+    println!("FUZZ_INPUT @ {input_addr:#x}");
 
     let main_addr = elf
         .resolve_symbol("main", 0)
         .expect("Symbol main not found");
-    println!("main address = {:#x}", main_addr);
+    println!("main address = {main_addr:#x}");
 
     let breakpoint = elf
         .resolve_symbol(
@@ -72,13 +74,13 @@ pub fn fuzz() {
             0,
         )
         .expect("Symbol or env BREAKPOINT not found");
-    println!("Breakpoint address = {:#x}", breakpoint);
+    println!("Breakpoint address = {breakpoint:#x}");
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
-        let emu = Emulator::new(&args, &env);
+        let emu = Emulator::new(&args, &env).unwrap();
 
         emu.set_breakpoint(main_addr);
         unsafe {
@@ -138,9 +140,13 @@ pub fn fuzz() {
         };
 
         // Create an observation channel using the coverage map
-        let edges = unsafe { &mut edges::EDGES_MAP };
-        let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
-        let edges_observer = VariableMapObserver::new("edges", edges, edges_counter);
+        let edges_observer = unsafe {
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                "edges",
+                edges_map_mut_slice(),
+                addr_of_mut!(MAX_EDGES_NUM),
+            ))
+        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -149,9 +155,9 @@ pub fn fuzz() {
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::new_tracking(&edges_observer, true, true),
+            MaxMapFeedback::tracking(&edges_observer, true, true),
             // Time feedback, this one does not need a feedback state
-            TimeFeedback::new_with_observer(&time_observer)
+            TimeFeedback::with_observer(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
@@ -198,7 +204,7 @@ pub fn fuzz() {
         // Wrap the executor to keep track of the timeout
         let mut executor = TimeoutExecutor::new(executor, timeout);
 
-        if state.corpus().count() < 1 {
+        if state.must_load_initial_inputs() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
                 .unwrap_or_else(|_| {
@@ -222,9 +228,9 @@ pub fn fuzz() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     // The stats reporter for the broker
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    // let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    // let monitor = SimpleMonitor::new(|s| println!("{s}"));
     // let mut mgr = SimpleEventManager::new(monitor);
     // run_client(None, mgr, 0);
 
@@ -242,6 +248,6 @@ pub fn fuzz() {
     {
         Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
-        Err(err) => panic!("Failed to run launcher: {:?}", err),
+        Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
 }

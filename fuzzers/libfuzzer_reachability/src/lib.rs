@@ -22,7 +22,7 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error,
 };
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
 const TARGET_SIZE: usize = 4;
 
@@ -52,7 +52,7 @@ pub fn libafl_main() {
 /// The actual fuzzer
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    let monitor = SimpleMonitor::new(|s| println!("{s}"));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
@@ -63,17 +63,16 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
                     return Ok(());
                 }
                 _ => {
-                    panic!("Failed to setup the restarter: {}", err);
+                    panic!("Failed to setup the restarter: {err}");
                 }
             },
         };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
     let reachability_observer =
-        unsafe { StdMapObserver::new_from_ptr("png.c", __libafl_target_list, TARGET_SIZE) };
+        unsafe { StdMapObserver::from_mut_ptr("png.c", __libafl_target_list, TARGET_SIZE) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&edges_observer);
@@ -133,11 +132,11 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
     if libfuzzer_initialize(&args) == -1 {
-        println!("Warning: LLVMFuzzerInitialize failed with -1")
+        println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
     // In case the corpus is empty (on first run), reset
-    if state.corpus().count() < 1 {
+    if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
             .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", corpus_dirs));

@@ -1,8 +1,8 @@
 # Variables
 [env]
+PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 FUZZER_NAME='libfuzzer_stb_image_concolic'
-PROJECT_DIR = { script = ["pwd"] }
 
 # Compilers
 [tasks.runtime]

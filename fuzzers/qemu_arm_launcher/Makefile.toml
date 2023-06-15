@@ -18,20 +18,20 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.zlib_unix_wget]
-condition = { files_not_exist = [ "./zlib-1.2.12" ] }
+condition = { files_not_exist = [ "./zlib-1.2.13" ] }
 script_runner="@shell"
 # NOTE: There's no specific reason we're using an old version of zlib,
 # but newer versions get moved to fossils/ after a while.
 script='''
-wget https://zlib.net/fossils/zlib-1.2.12.tar.gz
-tar -xvf zlib-1.2.12.tar.gz
+wget https://zlib.net/fossils/zlib-1.2.13.tar.gz
+tar -xvf zlib-1.2.13.tar.gz
 '''
 
 [tasks.zlib_unix]
-condition = { files_not_exist = [ "./zlib-1.2.12/zlib/lib/libz.a" ] }
+condition = { files_not_exist = [ "./zlib-1.2.13/zlib/lib/libz.a" ] }
 script_runner="@shell"
 script='''
-cd zlib-1.2.12 && CC=$CROSS_CC ./configure --prefix=./zlib
+cd zlib-1.2.13 && CC=$CROSS_CC ./configure --prefix=./zlib
 make install
 '''
 dependencies = [ "zlib_unix_wget" ]
@@ -54,7 +54,7 @@ tar -xvf libpng-1.6.37.tar.xz
 condition = { files_not_exist = [ "./libpng-1.6.37/.libs/libpng16.a" ] }
 script_runner="@shell"
 script='''
-cd libpng-1.6.37 && CC=$CROSS_CC CFLAGS=-I../zlib-1.2.12/zlib/lib LDFLAGS=-L../zlib-1.2.12/zlib/lib ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes --host=arm
+cd libpng-1.6.37 && CC=$CROSS_CC CFLAGS=-I../zlib-1.2.13/zlib/lib LDFLAGS=-L../zlib-1.2.13/zlib/lib ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes --host=arm
 make
 '''
 dependencies = [ "zlib", "libpng_unix_wget" ]
@@ -82,10 +82,10 @@ script='''
 arm-linux-gnueabi-g++ \
     ./harness.cc \
     ./libpng-1.6.37/.libs/libpng16.a \
-	./zlib-1.2.12/zlib/lib/libz.a \
+	./zlib-1.2.13/zlib/lib/libz.a \
     -I./libpng-1.6.37/ \
-	-I../zlib-1.2.12/zlib/lib \
-	-L../zlib-1.2.12/zlib/lib \
+	-I../zlib-1.2.13/zlib/lib \
+	-L../zlib-1.2.13/zlib/lib \
     -o ${FUZZER_NAME} \
     -lm \
 	-static
@@ -116,10 +116,10 @@ script='''
 arm-linux-gnueabi-g++ \
     ./harness.cc \
     ./libpng-1.6.37/.libs/libpng16.a \
-	./zlib-1.2.12/zlib/lib/libz.a \
+	./zlib-1.2.13/zlib/lib/libz.a \
     -I./libpng-1.6.37/ \
-	-I../zlib-1.2.12/zlib/lib \
-	-L../zlib-1.2.12/zlib/lib \
+	-I../zlib-1.2.13/zlib/lib \
+	-L../zlib-1.2.13/zlib/lib \
     -o ${FUZZER_NAME_CRASHING} \
     -lm \
 	-DHAS_DUMMY_CRASH \
@@ -149,7 +149,8 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 11s cargo run --release ./${FUZZER_NAME} 2>/dev/null &
+timeout 11s ./target/release/qemu_arm_launcher ./${FUZZER_NAME} 2>/dev/null >fuzz_stdout.log || true
+echo "This test is skipped"
 '''
 dependencies = [ "harness", "fuzzer" ]
 

@@ -6,7 +6,7 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt::Write, time::Duration};
 
 use crate::{
-    bolts::{current_time, format_duration_hms},
+    bolts::{current_time, format_duration_hms, ClientId},
     monitors::{ClientStats, Monitor},
 };
 
@@ -40,8 +40,8 @@ where
         self.start_time
     }
 
-    fn display(&mut self, event_msg: String, sender_id: u32) {
-        let sender = format!("#{sender_id}");
+    fn display(&mut self, event_msg: String, sender_id: ClientId) {
+        let sender = format!("#{}", sender_id.0);
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
         } else {
@@ -56,13 +56,13 @@ where
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec_pretty()
         );
         (self.print_fn)(global_fmt);
 
         let client = self.client_stats_mut_for(sender_id);
         let cur_time = current_time();
-        let exec_sec = client.execs_per_sec(cur_time);
+        let exec_sec = client.execs_per_sec_pretty(cur_time);
 
         let pad = " ".repeat(head.len());
         let mut fmt = format!(

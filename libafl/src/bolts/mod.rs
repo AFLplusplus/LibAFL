@@ -30,9 +30,24 @@ pub mod staterestore;
 pub mod tuples;
 
 use alloc::{string::String, vec::Vec};
-use core::{iter::Iterator, time};
+use core::{iter::Iterator, ops::AddAssign, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "std")]
+use crate::Error;
+
+/// The client ID == the sender id.
+#[repr(transparent)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
+pub struct ClientId(pub u32);
+
+#[cfg(feature = "std")]
+use log::{Metadata, Record};
 
 /// Can be converted to a slice
 pub trait AsSlice {
@@ -139,6 +154,12 @@ pub trait HasRefCnt {
     fn refcnt_mut(&mut self) -> &mut isize;
 }
 
+/// Trait to truncate slices and maps to a new size
+pub trait Truncate {
+    /// Reduce the size of the slice
+    fn truncate(&mut self, len: usize);
+}
+
 /// Current time
 #[cfg(feature = "std")]
 #[must_use]
@@ -204,6 +225,128 @@ pub fn format_duration_hms(duration: &time::Duration) -> String {
     format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
 }
 
+/// Calculates the cumulative sum for a slice, in-place.
+/// The values are useful for example for cumulative probabilities.
+///
+/// So, to give an example:
+/// ```rust
+/// use libafl::bolts::calculate_cumulative_sum_in_place;
+///
+/// let mut value = [2, 4, 1, 3];
+/// calculate_cumulative_sum_in_place(&mut value);
+/// assert_eq!(&[2, 6, 7, 10], &value);
+/// ```
+pub fn calculate_cumulative_sum_in_place<T>(mut_slice: &mut [T])
+where
+    T: Default + AddAssign<T> + Copy,
+{
+    let mut acc = T::default();
+
+    for val in mut_slice {
+        acc += *val;
+        *val = acc;
+    }
+}
+
+/// Stderr logger
+#[cfg(feature = "std")]
+pub static LIBAFL_STDERR_LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
+
+/// Stdout logger
+#[cfg(feature = "std")]
+pub static LIBAFL_STDOUT_LOGGER: SimpleStdoutLogger = SimpleStdoutLogger::new();
+
+/// A simple logger struct that logs to stderr when used with [`log::set_logger`].
+#[derive(Debug)]
+#[cfg(feature = "std")]
+pub struct SimpleStdoutLogger {}
+
+#[cfg(feature = "std")]
+impl Default for SimpleStdoutLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "std")]
+impl SimpleStdoutLogger {
+    /// Create a new [`log::Log`] logger that will wrte log to stdout
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {}
+    }
+
+    /// register stdout logger
+    pub fn set_logger() -> Result<(), Error> {
+        log::set_logger(&LIBAFL_STDOUT_LOGGER)
+            .map_err(|_| Error::unknown("Failed to register logger"))
+    }
+}
+
+#[cfg(feature = "std")]
+impl log::Log for SimpleStdoutLogger {
+    #[inline]
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        println!(
+            "[{:?}] {}: {}",
+            current_time(),
+            record.level(),
+            record.args()
+        );
+    }
+
+    fn flush(&self) {}
+}
+
+/// A simple logger struct that logs to stderr when used with [`log::set_logger`].
+#[derive(Debug)]
+#[cfg(feature = "std")]
+pub struct SimpleStderrLogger {}
+
+#[cfg(feature = "std")]
+impl Default for SimpleStderrLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "std")]
+impl SimpleStderrLogger {
+    /// Create a new [`log::Log`] logger that will wrte log to stdout
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {}
+    }
+
+    /// register stderr logger
+    pub fn set_logger() -> Result<(), Error> {
+        log::set_logger(&LIBAFL_STDERR_LOGGER)
+            .map_err(|_| Error::unknown("Failed to register logger"))
+    }
+}
+
+#[cfg(feature = "std")]
+impl log::Log for SimpleStderrLogger {
+    #[inline]
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        eprintln!(
+            "[{:?}] {}: {}",
+            current_time(),
+            record.level(),
+            record.args()
+        );
+    }
+
+    fn flush(&self) {}
+}
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod bolts_prelude {

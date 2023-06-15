@@ -23,7 +23,7 @@
 //!         fuzz(parsed);
 //!     }
 //!
-//!     println!("{:?}", parsed);
+//!     log::info!("{:?}", parsed);
 //! }
 //! ```
 //!
@@ -41,7 +41,7 @@
 //!
 //!     let env: Vec<(String, String)> = env::vars().collect();
 //!
-//!     let emu = Emulator::new(&mut options.qemu_args.to_vec(), &mut env);
+//!     let emu = Emulator::new(&mut options.qemu_args.to_vec(), &mut env).unwrap();
 //!     // do other stuff...
 //! }
 //!
@@ -59,7 +59,7 @@
 //!         fuzz_with_qemu(parsed);
 //!     }
 //!
-//!     println!("{:?}", parsed);
+//!     log::info!("{:?}", parsed);
 //! }
 //!```
 
@@ -113,47 +113,47 @@ fn parse_instrumentation_location(
 )]
 #[allow(clippy::struct_excessive_bools)]
 pub struct FuzzerOptions {
-    /// timeout for each target execution (milliseconds)
+    /// Timeout for each target execution (milliseconds)
     #[arg(short, long, default_value = "1000", value_parser = parse_timeout, help_heading = "Fuzz Options")]
     pub timeout: Duration,
 
-    /// whether or not to print debug info
+    /// Whether or not to print debug info
     #[arg(short, long)]
     pub verbose: bool,
 
-    /// file to which all client output should be written
+    /// File to which all client output should be written
     #[arg(short, long, default_value = "/dev/null")]
     pub stdout: String,
 
-    /// the name of the configuration to use
+    /// The name of the configuration to use
     #[arg(long, default_value = "default configuration")]
     pub configuration: String,
 
-    /// enable Address Sanitizer (ASAN)
+    /// Enable Address Sanitizer (`ASan`)
     #[arg(short = 'A', long, help_heading = "Fuzz Options")]
     pub asan: bool,
 
-    /// Enable ASAN on each of the provided cores. Use 'all' to select all available
+    /// Enable `ASan` on each of the provided cores. Use 'all' to select all available
     /// cores. 'none' to run a client without binding to any core.
     /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
     #[cfg(feature = "frida_cli")]
-    #[arg(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "ASAN Options")]
+    #[arg(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "Cores that should use ASan")]
     pub asan_cores: Cores,
 
-    /// number of fuzz iterations to perform
+    /// Number of fuzz iterations to perform
     #[arg(short = 'I', long, help_heading = "Fuzz Options", default_value = "0")]
     pub iterations: usize,
 
-    /// path to the harness
+    /// Path to the harness
     #[arg(short = 'H', long, help_heading = "Fuzz Options")]
     pub harness: Option<PathBuf>,
 
-    /// trailing arguments (after "--"); can be passed directly to the harness
+    /// Trailing arguments (after "`--`"); can be passed directly to the harness
     #[cfg(not(feature = "qemu_cli"))]
     #[arg(last = true, value_name = "HARNESS_ARGS")]
     pub harness_args: Vec<String>,
 
-    /// harness function to call
+    /// Harness function to call
     #[cfg(feature = "frida_cli")]
     #[arg(
         short = 'F',
@@ -163,12 +163,12 @@ pub struct FuzzerOptions {
     )]
     pub harness_function: String,
 
-    /// additional libraries to instrument
+    /// Additional libraries to instrument
     #[cfg(feature = "frida_cli")]
     #[arg(short, long, help_heading = "Frida Options")]
     pub libs_to_instrument: Vec<String>,
 
-    /// enable CmpLog instrumentation
+    /// Enable `CmpLog` instrumentation
     #[cfg_attr(
         feature = "frida_cli",
         arg(short = 'C', long, help_heading = "Frida Options")
@@ -179,78 +179,85 @@ pub struct FuzzerOptions {
     )]
     pub cmplog: bool,
 
-    /// Enable CmpLog on each of the provided cores. Use 'all' to select all available
+    /// Enable `CmpLog` on each of the provided cores. Use 'all' to select all available
     /// cores. 'none' to run a client without binding to any core.
     /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
     #[cfg(feature = "frida_cli")]
     #[arg(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "Frida Options")]
     pub cmplog_cores: Cores,
 
-    /// enable ASAN leak detection
+    /// Enable `ASan` leak detection
     #[cfg(feature = "frida_cli")]
-    #[arg(short, long, help_heading = "ASAN Options")]
+    #[arg(short, long, help_heading = "ASan Options")]
     pub detect_leaks: bool,
 
-    /// instruct ASAN to continue after a memory error is detected
+    /// Instruct `ASan` to continue after a memory error is detected
     #[cfg(feature = "frida_cli")]
-    #[arg(long, help_heading = "ASAN Options")]
+    #[arg(long, help_heading = "ASan Options")]
     pub continue_on_error: bool,
 
-    /// instruct ASAN to gather (and report) allocation-/free-site backtraces
+    /// Instruct `ASan` to gather (and report) allocation-/free-site backtraces
     #[cfg(feature = "frida_cli")]
-    #[arg(long, help_heading = "ASAN Options")]
+    #[arg(long, help_heading = "ASan Options")]
     pub allocation_backtraces: bool,
 
-    /// the maximum size that the ASAN allocator should allocate
+    /// The maximum size that the `ASan` allocator should allocate
     #[cfg(feature = "frida_cli")]
     #[arg(
         short,
         long,
         default_value = "1073741824",  // 1_usize << 30
-        help_heading = "ASAN Options"
+        help_heading = "ASan Options"
     )]
     pub max_allocation: usize,
 
-    /// the maximum total allocation size that the ASAN allocator should allocate
+    /// The maximum total allocation size that the `ASan` allocator should allocate
     #[cfg(feature = "frida_cli")]
     #[arg(
         short = 'M',
         long,
         default_value = "4294967296",  // 1_usize << 32
-        help_heading = "ASAN Options"
+        help_heading = "ASan Options"
     )]
     pub max_total_allocation: usize,
 
-    /// instruct ASAN to panic if the max ASAN allocation size is exceeded
+    /// Instruct `ASan` to panic if the max `ASan` allocation size is exceeded
     #[cfg(feature = "frida_cli")]
-    #[arg(long, help_heading = "ASAN Options")]
+    #[arg(long, help_heading = "ASan Options")]
     pub max_allocation_panics: bool,
 
-    /// disable coverage
+    /// Disable coverage
     #[cfg(feature = "frida_cli")]
     #[arg(long, help_heading = "Frida Options")]
     pub disable_coverage: bool,
 
-    /// enable DrCov (aarch64 only)
+    /// Enable `DrCov` (aarch64 only)
     #[cfg(feature = "frida_cli")]
     #[arg(long, help_heading = "Frida Options")]
     pub drcov: bool,
 
-    /// locations which will not be instrumented for ASAN or coverage purposes (ex: mod_name@0x12345)
+    /// Disable `stalker.exclude()` if `true`
+    /// It's better to disable this on Windows or your harness uses c++ exception handling
+    /// See <https://github.com/AFLplusplus/LibAFL/issues/830>
+    #[cfg(feature = "frida_cli")]
+    #[arg(long, help_heading = "Frida Options")]
+    pub disable_excludes: bool,
+
+    /// Locations which will not be instrumented for `ASan` or coverage purposes (ex: `mod_name@0x12345`)
     #[cfg(feature = "frida_cli")]
     #[arg(short = 'D', long, help_heading = "Frida Options", value_parser = parse_instrumentation_location)]
     pub dont_instrument: Vec<(String, usize)>,
 
-    /// trailing arguments (after "--"); can be passed directly to QEMU
+    /// Trailing arguments (after "`--`"); can be passed directly to QEMU
     #[cfg(feature = "qemu_cli")]
     #[arg(last = true)]
     pub qemu_args: Vec<String>,
 
-    /// paths to fuzzer token files (aka 'dictionaries')
+    /// Paths to fuzzer token files (aka 'dictionaries')
     #[arg(short = 'x', long, help_heading = "Fuzz Options")]
     pub tokens: Vec<PathBuf>,
 
-    /// input corpus directories
+    /// Input corpus directories
     #[arg(
         short,
         long,
@@ -259,7 +266,7 @@ pub struct FuzzerOptions {
     )]
     pub input: Vec<PathBuf>,
 
-    /// output solutions directory
+    /// Output solutions directory
     #[arg(
         short,
         long,
@@ -274,15 +281,15 @@ pub struct FuzzerOptions {
     #[arg(short = 'c', long, default_value = "0", value_parser = Cores::from_cmdline)]
     pub cores: Cores,
 
-    /// port on which the broker should listen
+    /// Port on which the broker should listen
     #[arg(short = 'p', long, default_value = "1337", value_name = "PORT")]
     pub broker_port: u16,
 
-    /// ip:port where a remote broker is already listening
+    /// `ip:port` where a remote broker is already listening
     #[arg(short = 'a', long, value_name = "REMOTE")]
     pub remote_broker_addr: Option<SocketAddr>,
 
-    /// path to file that should be sent to the harness for crash reproduction
+    /// Path to file that should be sent to the harness for crash reproduction
     #[arg(short, long, help_heading = "Replay Options")]
     pub replay: Option<PathBuf>,
 
@@ -298,7 +305,7 @@ pub struct FuzzerOptions {
 }
 
 impl FuzzerOptions {
-    /// given an `App`, add it to `FuzzerOptions` as a subcommand and return the resulting `App`
+    /// Given an `App`, add it to `FuzzerOptions` as a subcommand and return the resulting `App`
     ///
     /// # Examples
     ///
@@ -335,7 +342,7 @@ impl FuzzerOptions {
     ///         custom_func(sub_matches.get_one::<String>("bar").unwrap())
     ///     }
     ///
-    ///     println!("{:?}", matches);
+    ///     log::info!("{:?}", matches);
     /// }
     /// ```
     #[must_use]
@@ -347,7 +354,7 @@ impl FuzzerOptions {
 
 /// Parse from `std::env::args_os()`, exit on error
 ///
-/// for more information, see the [cli](super::cli) documentation
+/// For more information, see the [cli](super::cli) documentation
 #[must_use]
 pub fn parse_args() -> FuzzerOptions {
     FuzzerOptions::parse()

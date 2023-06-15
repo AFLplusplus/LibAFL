@@ -24,10 +24,11 @@ use libafl::{
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
+static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 /*
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
-    unsafe { SIGNALS[idx] = 1 };
+    unsafe { str::ptr::write(SIGNALS_PTR.add(idx), 1) };
 }
 */
 
@@ -46,7 +47,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = feedback_or!(
@@ -74,12 +75,16 @@ pub fn main() {
     )
     .unwrap();
 
-    if state.metadata().get::<NautilusChunksMetadata>().is_none() {
+    if state
+        .metadata_map()
+        .get::<NautilusChunksMetadata>()
+        .is_none()
+    {
         state.add_metadata(NautilusChunksMetadata::new("/tmp/".into()));
     }
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    let monitor = SimpleMonitor::new(|s| println!("{s}"));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus

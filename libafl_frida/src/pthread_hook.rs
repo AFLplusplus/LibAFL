@@ -139,7 +139,7 @@ impl From<EventType> for libc::c_uint {
 ///# use std::time::Duration;
 ///# use std::thread;
 /// pthread_hook::install(|event, pthread, addr, size| {
-///     println!("thread id=0x{:x} event={:?} addr={:?} size={:x}", pthread, event, addr, size);
+///     log::trace!("thread id=0x{:x} event={:?} addr={:?} size={:x}", pthread, event, addr, size);
 /// });
 ///# thread::spawn(|| {
 ///#     thread::sleep(Duration::from_millis(1));
@@ -165,7 +165,7 @@ where
     };
 
     // Allow because we're sure this isn't from a different code generation unit.
-    #[allow(clippy::fn_address_comparisons)]
+    #[allow(clippy::fn_address_comparisons, clippy::fn_null_check)]
     if !(prev as *const libc::c_void).is_null() && prev != pthread_introspection_hook {
         PREVIOUS_HOOK.set(prev);
     }

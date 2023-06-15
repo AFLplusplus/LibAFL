@@ -17,10 +17,15 @@ const WRAPPER_HEADER: &str = r#"
 #define QEMU_BUILD_BUG_ON(x) 
 #define QEMU_BUILD_BUG_ON_ZERO(x) 
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
+#endif
+
 #include "qemu/osdep.h"
 #include "qapi/error.h"
 
 #include "exec/target_page.h"
+#include "exec/cpu-defs.h"
 #include "hw/qdev-core.h"
 #include "hw/qdev-properties.h"
 #include "qemu/error-report.h"
@@ -40,6 +45,7 @@ const WRAPPER_HEADER: &str = r#"
 #else
 
 #include "migration/vmstate.h"
+#include "migration/savevm.h"
 #include "hw/core/sysemu-cpu-ops.h"
 #include "exec/address-spaces.h"
 #include "sysemu/tcg.h"

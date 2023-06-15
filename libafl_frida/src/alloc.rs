@@ -4,7 +4,7 @@
     all(target_arch = "aarch64", target_os = "android")
 ))]
 use std::io;
-use std::{collections::BTreeMap, ffi::c_void};
+use std::{collections::BTreeMap, ffi::c_void, num::NonZeroUsize};
 
 use backtrace::Backtrace;
 use frida_gum::{PageProtection, RangeDetails};
@@ -132,7 +132,7 @@ impl Allocator {
                 let start = details.memory_range().base_address().0 as usize;
                 let end = start + details.memory_range().size();
                 occupied_ranges.push((start, end));
-                // println!("{:x} {:x}", start, end);
+                // log::trace!("{:x} {:x}", start, end);
                 let base: usize = 2;
                 // On x64, if end > 2**48, then that's in vsyscall or something.
                 #[cfg(target_arch = "x86_64")]
@@ -168,16 +168,16 @@ impl Allocator {
                 // check if the proposed shadow bit overlaps with occupied ranges.
                 for (start, end) in &occupied_ranges {
                     if (shadow_start <= *end) && (*start <= shadow_end) {
-                        // println!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
-                        println!("shadow_bit {try_shadow_bit:x} is not suitable");
+                        // log::trace!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
+                        log::warn!("shadow_bit {try_shadow_bit:x} is not suitable");
                         break;
                     }
                 }
 
                 if unsafe {
                     mmap(
-                        addr as *mut c_void,
-                        page_size,
+                        NonZeroUsize::new(addr),
+                        NonZeroUsize::new_unchecked(page_size),
                         ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                         MapFlags::MAP_PRIVATE
                             | ANONYMOUS_FLAG
@@ -195,15 +195,15 @@ impl Allocator {
             }
         }
 
-        println!("shadow_bit {shadow_bit:x} is suitable");
+        log::warn!("shadow_bit {shadow_bit:x} is suitable");
         assert!(shadow_bit != 0);
         // attempt to pre-map the entire shadow-memory space
 
         let addr: usize = 1 << shadow_bit;
         let pre_allocated_shadow = unsafe {
             mmap(
-                addr as *mut c_void,
-                addr + addr,
+                NonZeroUsize::new(addr),
+                NonZeroUsize::new_unchecked(addr + addr),
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 ANONYMOUS_FLAG
                     | MapFlags::MAP_FIXED
@@ -266,7 +266,7 @@ impl Allocator {
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
         let mut is_malloc_zero = false;
         let size = if size == 0 {
-            // println!("zero-sized allocation!");
+            // log::warn!("zero-sized allocation!");
             is_malloc_zero = true;
             16
         } else {
@@ -288,7 +288,7 @@ impl Allocator {
         self.total_allocation_size += rounded_up_size;
 
         let metadata = if let Some(mut metadata) = self.find_smallest_fit(rounded_up_size) {
-            //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
+            //log::trace!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
             metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
             if self.options.allocation_backtraces {
@@ -296,10 +296,10 @@ impl Allocator {
             }
             metadata
         } else {
-            // println!("{:x}, {:x}", self.current_mapping_addr, rounded_up_size);
+            // log::trace!("{:x}, {:x}", self.current_mapping_addr, rounded_up_size);
             let mapping = match mmap(
-                self.current_mapping_addr as *mut c_void,
-                rounded_up_size,
+                NonZeroUsize::new(self.current_mapping_addr),
+                NonZeroUsize::new_unchecked(rounded_up_size),
                 ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                 ANONYMOUS_FLAG
                     | MapFlags::MAP_PRIVATE
@@ -310,7 +310,7 @@ impl Allocator {
             ) {
                 Ok(mapping) => mapping as usize,
                 Err(err) => {
-                    println!("An error occurred while mapping memory: {err:?}");
+                    log::error!("An error occurred while mapping memory: {err:?}");
                     return std::ptr::null_mut();
                 }
             };
@@ -341,14 +341,14 @@ impl Allocator {
 
         self.allocations
             .insert(metadata.address + self.page_size, metadata);
-        //println!("serving address: {:?}, size: {:x}", address, size);
+        //log::trace!("serving address: {:?}, size: {:x}", address, size);
         address
     }
 
     /// Releases the allocation at the given address.
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
-        //println!("freeing address: {:?}", ptr);
+        //log::trace!("freeing address: {:?}", ptr);
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
             if !ptr.is_null() {
                  AsanErrors::get_mut()
@@ -447,14 +447,14 @@ impl Allocator {
     }
 
     fn unpoison(start: usize, size: usize) {
-        // println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
+        // log::trace!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
-            // println!("memset: {:?}", start as *mut c_void);
+            // log::trace!("memset: {:?}", start as *mut c_void);
             memset(start as *mut c_void, 0xff, size / 8);
 
             let remainder = size % 8;
             if remainder > 0 {
-                // println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
+                // log::trace!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
                 memset(
                     (start + size / 8) as *mut c_void,
                     (0xff << (8 - remainder)) & 0xff,
@@ -466,14 +466,14 @@ impl Allocator {
 
     /// Poisonn an area in memory
     pub fn poison(start: usize, size: usize) {
-        // println!("poisoning {:x} for {:x}", start, size / 8 + 1);
+        // log::trace!("poisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
-            // println!("memset: {:?}", start as *mut c_void);
+            // log::trace!("memset: {:?}", start as *mut c_void);
             memset(start as *mut c_void, 0x00, size / 8);
 
             let remainder = size % 8;
             if remainder > 0 {
-                // println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
+                // log::trace!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
                 memset((start + size / 8) as *mut c_void, 0x00, 1);
             }
         }
@@ -486,7 +486,7 @@ impl Allocator {
         end: usize,
         unpoison: bool,
     ) -> (usize, usize) {
-        //println!("start: {:x}, end {:x}, size {:x}", start, end, end - start);
+        //log::trace!("start: {:x}, end {:x}, size {:x}", start, end, end - start);
 
         let shadow_mapping_start = map_to_shadow!(self, start);
 
@@ -496,15 +496,15 @@ impl Allocator {
                 self.round_up_to_page((end - start) / 8) + self.page_size + shadow_start;
             for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
                 /*
-                println!(
+                log::trace!(
                     "range: {:x}-{:x}, pagesize: {}",
                     range.start, range.end, self.page_size
                 );
                 */
                 unsafe {
                     mmap(
-                        range.start as *mut c_void,
-                        range.end - range.start,
+                        NonZeroUsize::new(range.start),
+                        NonZeroUsize::new(range.end - range.start).unwrap(),
                         ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                         ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE,
                         -1,
@@ -517,7 +517,7 @@ impl Allocator {
             self.shadow_pages.insert(shadow_start..shadow_end);
         }
 
-        //println!("shadow_mapping_start: {:x}, shadow_size: {:x}", shadow_mapping_start, (end - start) / 8);
+        //log::trace!("shadow_mapping_start: {:x}, shadow_size: {:x}", shadow_mapping_start, (end - start) / 8);
         if unpoison {
             Self::unpoison(shadow_mapping_start, end - start);
         }

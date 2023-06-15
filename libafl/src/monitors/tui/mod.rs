@@ -25,11 +25,11 @@ use tui::{backend::CrosstermBackend, Terminal};
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
 use crate::{
-    bolts::{current_time, format_duration_hms},
+    bolts::{current_time, format_duration_hms, ClientId},
     monitors::{ClientStats, Monitor, UserStats},
 };
 
-mod ui;
+pub mod ui;
 use ui::TuiUI;
 
 const DEFAULT_TIME_WINDOW: u64 = 60 * 10; // 10 min
@@ -169,13 +169,14 @@ pub struct ClientTuiContext {
     pub corpus: u64,
     pub objectives: u64,
     pub executions: u64,
-    pub exec_sec: u64,
+    /// Float value formatted as String
+    pub exec_sec: String,
 
     pub user_stats: HashMap<String, UserStats>,
 }
 
 impl ClientTuiContext {
-    pub fn grab_data(&mut self, client: &ClientStats, exec_sec: u64) {
+    pub fn grab_data(&mut self, client: &ClientStats, exec_sec: String) {
         self.corpus = client.corpus_size;
         self.objectives = client.objective_size;
         self.executions = client.executions;
@@ -256,11 +257,13 @@ impl Monitor for TuiMonitor {
         self.start_time
     }
 
-    fn display(&mut self, event_msg: String, sender_id: u32) {
+    #[allow(clippy::cast_sign_loss)]
+    fn display(&mut self, event_msg: String, sender_id: ClientId) {
         let cur_time = current_time();
 
         {
-            let execsec = self.execs_per_sec();
+            // TODO implement floating-point support for TimedStat
+            let execsec = self.execs_per_sec() as u64;
             let totalexec = self.total_execs();
             let run_time = cur_time - self.start_time;
 
@@ -274,9 +277,9 @@ impl Monitor for TuiMonitor {
         }
 
         let client = self.client_stats_mut_for(sender_id);
-        let exec_sec = client.execs_per_sec(cur_time);
+        let exec_sec = client.execs_per_sec_pretty(cur_time);
 
-        let sender = format!("#{sender_id}");
+        let sender = format!("#{}", sender_id.0);
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
         } else {
@@ -292,10 +295,10 @@ impl Monitor for TuiMonitor {
         }
 
         {
-            let client = &self.client_stats()[sender_id as usize];
+            let client = &self.client_stats()[sender_id.0 as usize];
             let mut ctx = self.context.write().unwrap();
             ctx.clients
-                .entry(sender_id as usize)
+                .entry(sender_id.0 as usize)
                 .or_default()
                 .grab_data(client, exec_sec);
             while ctx.client_logs.len() >= DEFAULT_LOGS_NUMBER {
@@ -323,20 +326,15 @@ impl Monitor for TuiMonitor {
 impl TuiMonitor {
     /// Creates the monitor
     #[must_use]
-    pub fn new(title: String, enhanced_graphics: bool) -> Self {
-        Self::with_time(title, enhanced_graphics, current_time())
+    pub fn new(tui_ui: TuiUI) -> Self {
+        Self::with_time(tui_ui, current_time())
     }
 
     /// Creates the monitor with a given `start_time`.
     #[must_use]
-    pub fn with_time(title: String, enhanced_graphics: bool, start_time: Duration) -> Self {
+    pub fn with_time(tui_ui: TuiUI, start_time: Duration) -> Self {
         let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
-        run_tui_thread(
-            context.clone(),
-            Duration::from_millis(250),
-            title,
-            enhanced_graphics,
-        );
+        run_tui_thread(context.clone(), Duration::from_millis(250), tui_ui);
         Self {
             context,
             start_time,
@@ -345,12 +343,7 @@ impl TuiMonitor {
     }
 }
 
-fn run_tui_thread(
-    context: Arc<RwLock<TuiContext>>,
-    tick_rate: Duration,
-    title: String,
-    enhanced_graphics: bool,
-) {
+fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration, tui_ui: TuiUI) {
     thread::spawn(move || -> io::Result<()> {
         // setup terminal
         let mut stdout = io::stdout();
@@ -359,7 +352,8 @@ fn run_tui_thread(
 
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
-        let mut ui = TuiUI::new(title, enhanced_graphics);
+
+        let mut ui = tui_ui;
 
         let mut last_tick = Instant::now();
         let mut cnt = 0;

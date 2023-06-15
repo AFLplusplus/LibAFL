@@ -1,15 +1,16 @@
-use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
+use std::{path::PathBuf, ptr::write};
 
 use libafl::prelude::*;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
+static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
-    unsafe { SIGNALS[idx] = 1 };
+    unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
 #[allow(clippy::similar_names)]
@@ -32,10 +33,9 @@ pub fn main() -> Result<(), Error> {
     };
 
     // Create an observation channel using the signals map
-    let observer =
-        unsafe { StdMapObserver::new_from_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
-    let factory = MapEqualityFactory::new_from_observer(&observer);
+    let factory = MapEqualityFactory::with_observer(&observer);
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -44,7 +44,7 @@ pub fn main() -> Result<(), Error> {
     let mut objective = CrashFeedback::new();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
 
     let mut mgr = SimpleEventManager::new(mon);
 
@@ -56,7 +56,7 @@ pub fn main() -> Result<(), Error> {
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
-        OnDiskCorpus::new(&corpus_dir).unwrap(),
+        InMemoryOnDiskCorpus::new(&corpus_dir).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(&solution_dir).unwrap(),
@@ -108,7 +108,7 @@ pub fn main() -> Result<(), Error> {
 
     let mut state = StdState::new(
         StdRand::with_seed(current_nanos()),
-        OnDiskCorpus::new(&minimized_dir).unwrap(),
+        InMemoryOnDiskCorpus::new(&minimized_dir).unwrap(),
         InMemoryCorpus::new(),
         &mut (),
         &mut (),
@@ -116,7 +116,7 @@ pub fn main() -> Result<(), Error> {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
 
     let mut mgr = SimpleEventManager::new(mon);
 
@@ -136,7 +136,13 @@ pub fn main() -> Result<(), Error> {
     let mut executor = InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut mgr)?;
 
     state.load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &[solution_dir])?;
-    stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr, 0)?;
+    stages.perform_all(
+        &mut fuzzer,
+        &mut executor,
+        &mut state,
+        &mut mgr,
+        CorpusId::from(0_usize),
+    )?;
 
     Ok(())
 }

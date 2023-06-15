@@ -110,7 +110,7 @@ fn prepare_transitions(
         let (terminal, ss, is_regex) = tokenize(rule);
         let dest = *state_count;
 
-        // println!("Rule \"{}\", {} over {}", &rule, i, rules.len());
+        // log::trace!("Rule \"{}\", {} over {}", &rule, i, rules.len());
 
         // Creating a state stack for the new state
         let mut state_stack = state_stacks
@@ -218,7 +218,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
             }
         }
 
-        // println!("culled_pda size: {} pda size: {}", culled_pda.len(), pda.len());
+        // log::trace!("culled_pda size: {} pda size: {}", culled_pda.len(), pda.len());
 
         let culled_finals: HashSet<usize> = finals.difference(&blocklist).copied().collect();
         assert!(culled_finals.len() == 1);

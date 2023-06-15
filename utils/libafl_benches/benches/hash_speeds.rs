@@ -1,6 +1,6 @@
 //! Compare the speed of rust hash implementations
 
-use std::hash::Hasher;
+use std::hash::{BuildHasher, Hasher};
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use libafl::bolts::rands::{Rand, StdRand};
@@ -22,7 +22,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });*/
     c.bench_function("ahash", |b| {
         b.iter(|| {
-            let mut hasher = ahash::AHasher::new_with_keys(123, 456);
+            let mut hasher = ahash::RandomState::with_seeds(123, 456, 789, 123).build_hasher();
             hasher.write(black_box(&bench_vec));
             hasher.finish();
         });

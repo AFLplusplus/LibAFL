@@ -6,12 +6,12 @@ use std::{
 };
 
 #[cfg(feature = "tui")]
-use libafl::monitors::tui::TuiMonitor;
+use libafl::monitors::tui::{ui::TuiUI, TuiMonitor};
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, InMemoryOnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, DiffExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
@@ -24,18 +24,21 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasSolutions, StdState},
 };
-use libafl_targets::{DifferentialAFLMapSwapObserver, MAX_EDGES_NUM};
+use libafl_targets::{edges_max_num, DifferentialAFLMapSwapObserver};
+#[cfg(not(miri))]
 use mimalloc::MiMalloc;
 
 #[global_allocator]
+#[cfg(not(miri))]
 static GLOBAL: MiMalloc = MiMalloc;
 
 // bindings to the functions defined in the target
 mod bindings {
+    #![allow(non_snake_case)]
     #![allow(non_camel_case_types)]
     #![allow(non_upper_case_globals)]
     #![allow(unused)]
-
+    #![allow(clippy::unreadable_literal)]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
@@ -43,25 +46,25 @@ use bindings::{inspect_first, inspect_second};
 
 #[cfg(feature = "multimap")]
 mod multimap {
-    pub use libafl::observers::{HitcountsIterableMapObserver, MultiMapObserver};
-
-    pub static mut FIRST_EDGES: &'static mut [u8] = &mut [];
-    pub static mut SECOND_EDGES: &'static mut [u8] = &mut [];
-    pub static mut COMBINED_EDGES: [&'static mut [u8]; 2] = [&mut [], &mut []];
+    pub use libafl::{
+        bolts::ownedref::OwnedMutSlice,
+        observers::{HitcountsIterableMapObserver, MultiMapObserver},
+    };
 }
 #[cfg(feature = "multimap")]
-use multimap::*;
+use multimap::{HitcountsIterableMapObserver, MultiMapObserver, OwnedMutSlice};
 
 #[cfg(not(feature = "multimap"))]
 mod slicemap {
     pub use libafl::observers::HitcountsMapObserver;
 
-    pub static mut EDGES: &'static mut [u8] = &mut [];
+    pub static mut EDGES: &mut [u8] = &mut [];
 }
 #[cfg(not(feature = "multimap"))]
-use slicemap::*;
+use slicemap::{HitcountsMapObserver, EDGES};
 
 #[allow(clippy::similar_names)]
+#[allow(clippy::too_many_lines)]
 pub fn main() {
     // The closure that we want to fuzz
     let mut first_harness = |input: &BytesInput| {
@@ -83,19 +86,35 @@ pub fn main() {
         }
     };
 
+    let num_edges: usize = edges_max_num();
+
     #[cfg(feature = "multimap")]
-    let (first_map_observer, second_map_observer, map_swapper, map_observer) = {
+    let (
+        first_map_observer,
+        second_map_observer,
+        map_swapper,
+        map_observer,
+        layout,
+        first_edges,
+        second_edges,
+    ) = {
         // initialize the maps
-        unsafe {
-            let layout = Layout::from_size_align(MAX_EDGES_NUM, 64).unwrap();
-            FIRST_EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), MAX_EDGES_NUM);
-            SECOND_EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), MAX_EDGES_NUM);
-            COMBINED_EDGES = [&mut FIRST_EDGES, &mut SECOND_EDGES];
-        }
+        let layout = Layout::from_size_align(num_edges, 64).unwrap();
+        let first_edges = unsafe { (alloc_zeroed(layout), num_edges) };
+        let second_edges = unsafe { (alloc_zeroed(layout), num_edges) };
+
+        let combined_edges = unsafe {
+            vec![
+                OwnedMutSlice::from_raw_parts_mut(first_edges.0, first_edges.1),
+                OwnedMutSlice::from_raw_parts_mut(second_edges.0, second_edges.1),
+            ]
+        };
 
         // create the base maps used to observe the different executors from two independent maps
-        let mut first_map_observer = StdMapObserver::new("first-edges", unsafe { FIRST_EDGES });
-        let mut second_map_observer = StdMapObserver::new("second-edges", unsafe { SECOND_EDGES });
+        let mut first_map_observer =
+            unsafe { StdMapObserver::from_mut_ptr("first-edges", first_edges.0, first_edges.1) };
+        let mut second_map_observer =
+            unsafe { StdMapObserver::from_mut_ptr("second-edges", second_edges.0, second_edges.1) };
 
         // create a map swapper so that we can replace the coverage map pointer (requires feature pointer_maps!)
         let map_swapper =
@@ -106,28 +125,35 @@ pub fn main() {
         // differential mode
         let map_observer = HitcountsIterableMapObserver::new(MultiMapObserver::differential(
             "combined-edges",
-            unsafe { &mut COMBINED_EDGES },
+            combined_edges,
         ));
+
         (
             first_map_observer,
             second_map_observer,
             map_swapper,
             map_observer,
+            layout,
+            first_edges,
+            second_edges,
         )
     };
     #[cfg(not(feature = "multimap"))]
     let (first_map_observer, second_map_observer, map_swapper, map_observer) = {
         // initialize the map
         unsafe {
-            let layout = Layout::from_size_align(MAX_EDGES_NUM * 2, 64).unwrap();
-            EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), MAX_EDGES_NUM * 2);
+            let layout = Layout::from_size_align(num_edges * 2, 64).unwrap();
+            EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), num_edges * 2);
         }
+
+        let edges_ptr = unsafe { EDGES.as_mut_ptr() };
 
         // create the base maps used to observe the different executors by splitting a slice
         let mut first_map_observer =
-            StdMapObserver::new("first-edges", unsafe { &mut EDGES[..MAX_EDGES_NUM] });
-        let mut second_map_observer =
-            StdMapObserver::new("second-edges", unsafe { &mut EDGES[MAX_EDGES_NUM..] });
+            unsafe { StdMapObserver::from_mut_ptr("first-edges", edges_ptr, num_edges) };
+        let mut second_map_observer = unsafe {
+            StdMapObserver::from_mut_ptr("second-edges", edges_ptr.add(num_edges), num_edges)
+        };
 
         // create a map swapper so that we can replace the coverage map pointer (requires feature pointer_maps!)
         let map_swapper =
@@ -136,10 +162,14 @@ pub fn main() {
         // create a combined map observer, e.g. for calibration
         // we use StdMapObserver::differential to indicate that we want to use the observer in
         // differential mode
-        let map_observer =
-            HitcountsMapObserver::new(StdMapObserver::differential("combined-edges", unsafe {
-                EDGES
-            }));
+        let map_observer = unsafe {
+            HitcountsMapObserver::new(StdMapObserver::differential_from_mut_ptr(
+                "combined-edges",
+                edges_ptr,
+                num_edges * 2,
+            ))
+        };
+
         (
             first_map_observer,
             second_map_observer,
@@ -163,7 +193,7 @@ pub fn main() {
         InMemoryCorpus::new(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
-        OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
+        InMemoryOnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
         // The feedbacks can report the data that should persist in the State.
         &mut feedback,
@@ -174,9 +204,11 @@ pub fn main() {
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
     #[cfg(not(feature = "tui"))]
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
     #[cfg(feature = "tui")]
-    let mon = TuiMonitor::new(String::from("Baby Fuzzer"), false);
+    let ui = TuiUI::new(String::from("Baby Fuzzer"), false);
+    #[cfg(feature = "tui")]
+    let mon = TuiMonitor::new(ui);
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
@@ -242,5 +274,11 @@ pub fn main() {
                 &mut mgr,
             )
             .expect("Error in the fuzzing loop");
+    }
+
+    #[cfg(feature = "multimap")]
+    unsafe {
+        std::alloc::dealloc(first_edges.0, layout);
+        std::alloc::dealloc(second_edges.0, layout);
     }
 }

@@ -1,7 +1,12 @@
 //! Stores and restores state when a client needs to relaunch.
 //! Uses a [`ShMem`] up to a threshold, then write to disk.
 use alloc::string::{String, ToString};
-use core::{hash::Hasher, marker::PhantomData, mem::size_of, ptr, slice};
+use core::{
+    hash::{BuildHasher, Hasher},
+    marker::PhantomData,
+    mem::size_of,
+    ptr, slice,
+};
 use std::{
     env::temp_dir,
     fs::{self, File},
@@ -10,7 +15,7 @@ use std::{
     ptr::read_volatile,
 };
 
-use ahash::AHasher;
+use ahash::RandomState;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -20,6 +25,9 @@ use crate::{
     },
     Error,
 };
+
+/// If the saved page content equals exactly this buf, the restarted child wants to exit cleanly.
+const EXITING_MAGIC: &[u8; 16] = b"LIBAFL_EXIT_NOW\0";
 
 /// The struct stored on the shared map, containing either the data, or the filename to read contents from.
 #[repr(C)]
@@ -114,7 +122,7 @@ where
 
         if size_of::<StateShMemContent>() + serialized.len() > self.shmem.len() {
             // generate a filename
-            let mut hasher = AHasher::new_with_keys(0, 0);
+            let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
             // Using the last few k as randomness for a filename, hoping it's unique.
             hasher.write(&serialized[serialized.len().saturating_sub(4096)..]);
 
@@ -136,7 +144,7 @@ where
                 )));
             }
 
-            /*println!(
+            /*log::info!(
                 "Storing {} bytes to tmpfile {} (larger than map of {} bytes)",
                 serialized.len(),
                 &filename,
@@ -182,6 +190,35 @@ where
         content_mut.buf_len = 0;
     }
 
+    /// When called from a child, informs the restarter/parent process
+    /// that it should no longer respawn the child.
+    pub fn send_exiting(&mut self) {
+        self.reset();
+
+        let len = EXITING_MAGIC.len();
+
+        assert!(size_of::<StateShMemContent>() + len <= self.shmem.len());
+
+        let shmem_content = self.content_mut();
+        unsafe {
+            ptr::copy_nonoverlapping(
+                EXITING_MAGIC as *const u8,
+                shmem_content.buf.as_mut_ptr(),
+                len,
+            );
+        }
+        shmem_content.buf_len = EXITING_MAGIC.len();
+    }
+
+    /// Returns true, if [`Self::send_exiting`] was called on this [`StateRestorer`] last.
+    /// This should be checked in the parent before deciding to restore the client.
+    pub fn wants_to_exit(&self) -> bool {
+        let len = EXITING_MAGIC.len();
+        assert!(size_of::<StateShMemContent>() + len <= self.shmem.len());
+        let bytes = unsafe { slice::from_raw_parts(self.content().buf.as_ptr(), len) };
+        bytes == EXITING_MAGIC
+    }
+
     fn content_mut(&mut self) -> &mut StateShMemContent {
         let ptr = self.shmem.as_slice().as_ptr();
         #[allow(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
@@ -202,7 +239,7 @@ where
         self.content().buf_len > 0
     }
 
-    /// Restores the contents saved in this [`StateRestorer`], if any are availiable.
+    /// Restores the contents saved in this [`StateRestorer`], if any are available.
     /// Can only be read once.
     pub fn restore<S>(&self) -> Result<Option<S>, Error>
     where
@@ -218,6 +255,13 @@ where
                 state_shmem_content.buf_len_checked(self.mapsize())?,
             )
         };
+
+        if bytes == EXITING_MAGIC {
+            return Err(Error::illegal_state(
+                "Trying to restore a state after send_exiting was called.",
+            ));
+        }
+
         let mut state = bytes;
         let mut file_content;
         if state_shmem_content.buf_len == 0 {
@@ -257,6 +301,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg_attr(miri, ignore)]
     fn test_state_restore() {
         const TESTMAP_SIZE: usize = 1024;
 
@@ -270,7 +315,7 @@ mod tests {
 
         assert!(state_restorer.has_content());
         let restored = state_restorer.restore::<String>().unwrap().unwrap();
-        println!("Restored {restored}");
+        log::info!("Restored {restored}");
         assert_eq!(restored, "hello world");
         assert!(!state_restorer.content().is_disk);
 

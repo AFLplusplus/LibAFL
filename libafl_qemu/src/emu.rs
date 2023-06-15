@@ -3,6 +3,7 @@
 use core::{
     convert::Into,
     ffi::c_void,
+    fmt,
     mem::MaybeUninit,
     ptr::{addr_of, copy_nonoverlapping, null},
 };
@@ -84,7 +85,7 @@ impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
 }
 
 #[cfg(feature = "python")]
-use pyo3::{prelude::*, PyIterProtocol};
+use pyo3::prelude::*;
 
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
@@ -335,6 +336,7 @@ extern "C" {
     // void libafl_add_block_hook(uint64_t (*gen)(target_ulong pc), void (*exec)(uint64_t id));
     fn libafl_add_block_hook(
         gen: Option<extern "C" fn(GuestAddr, u64) -> u64>,
+        post_gen: Option<extern "C" fn(GuestAddr, GuestUsize, u64)>,
         exec: Option<extern "C" fn(u64, u64)>,
         data: u64,
     );
@@ -443,8 +445,8 @@ impl Iterator for GuestMaps {
 }
 
 #[cfg(all(emulation_mode = "usermode", feature = "python"))]
-#[pyproto]
-impl PyIterProtocol for GuestMaps {
+#[pymethods]
+impl GuestMaps {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
@@ -463,7 +465,7 @@ impl Drop for GuestMaps {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FatPtr(pub *const c_void, pub *const c_void);
 
 static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
@@ -673,28 +675,68 @@ pub struct Emulator {
     _private: (),
 }
 
+#[derive(Debug)]
+pub enum EmuError {
+    MultipleInstances,
+    EmptyArgs,
+    TooManyArgs(usize),
+}
+
+impl std::error::Error for EmuError {}
+
+impl fmt::Display for EmuError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            EmuError::MultipleInstances => {
+                write!(f, "Only one instance of the QEMU Emulator is permitted")
+            }
+            EmuError::EmptyArgs => {
+                write!(f, "QEMU emulator args cannot be empty")
+            }
+            EmuError::TooManyArgs(n) => {
+                write!(
+                    f,
+                    "Too many arguments passed to QEMU emulator ({n} > i32::MAX)"
+                )
+            }
+        }
+    }
+}
+
+impl From<EmuError> for libafl::Error {
+    fn from(err: EmuError) -> Self {
+        libafl::Error::unknown(format!("{err}"))
+    }
+}
+
 #[allow(clippy::unused_self)]
 impl Emulator {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
-    pub fn new(args: &[String], env: &[(String, String)]) -> Emulator {
+    pub fn new(args: &[String], env: &[(String, String)]) -> Result<Emulator, EmuError> {
         unsafe {
-            assert!(
-                !EMULATOR_IS_INITIALIZED,
-                "Only an instance of Emulator is permitted"
-            );
+            if EMULATOR_IS_INITIALIZED {
+                return Err(EmuError::MultipleInstances);
+            }
         }
-        assert!(!args.is_empty());
+        if args.is_empty() {
+            return Err(EmuError::EmptyArgs);
+        }
+
+        let argc = args.len();
+        if i32::try_from(argc).is_err() {
+            return Err(EmuError::TooManyArgs(argc));
+        }
+        #[allow(clippy::cast_possible_wrap)]
+        let argc = argc as i32;
+
         let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
         let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
-        assert!(argv.len() < i32::MAX as usize);
         let env_strs: Vec<String> = env
             .iter()
             .map(|(k, v)| format!("{}={}\0", &k, &v))
             .collect();
         let mut envp: Vec<*const u8> = env_strs.iter().map(|x| x.as_bytes().as_ptr()).collect();
         envp.push(null());
-        #[allow(clippy::cast_possible_wrap)]
-        let argc = argv.len() as i32;
         unsafe {
             #[cfg(emulation_mode = "usermode")]
             qemu_user_init(
@@ -714,7 +756,7 @@ impl Emulator {
             }
             EMULATOR_IS_INITIALIZED = true;
         }
-        Emulator { _private: () }
+        Ok(Emulator { _private: () })
     }
 
     #[must_use]
@@ -996,10 +1038,11 @@ impl Emulator {
     pub fn add_block_hooks(
         &self,
         gen: Option<extern "C" fn(GuestAddr, u64) -> u64>,
+        post_gen: Option<extern "C" fn(GuestAddr, GuestUsize, u64)>,
         exec: Option<extern "C" fn(u64, u64)>,
         data: u64,
     ) {
-        unsafe { libafl_add_block_hook(gen, exec, data) }
+        unsafe { libafl_add_block_hook(gen, post_gen, exec, data) }
     }
 
     pub fn add_read_hooks(
@@ -1143,7 +1186,7 @@ pub mod pybind {
                     if any.is_none() {
                         SyscallHookResult::new(None)
                     } else {
-                        let a: Result<&PyInt, _> = any.cast_as();
+                        let a: Result<&PyInt, _> = any.downcast();
                         if let Ok(i) = a {
                             SyscallHookResult::new(Some(
                                 i.extract().expect("Invalid syscall hook return value"),
@@ -1174,10 +1217,10 @@ pub mod pybind {
     impl Emulator {
         #[allow(clippy::needless_pass_by_value)]
         #[new]
-        fn new(args: Vec<String>, env: Vec<(String, String)>) -> Emulator {
-            Emulator {
-                emu: super::Emulator::new(&args, &env),
-            }
+        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Emulator> {
+            let emu = super::Emulator::new(&args, &env)
+                .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+            Ok(Emulator { emu })
         }
 
         fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {

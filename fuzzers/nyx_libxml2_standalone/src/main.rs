@@ -9,7 +9,7 @@ use libafl::{
     events::SimpleEventManager,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::BytesInput,
-    monitors::tui::TuiMonitor,
+    monitors::tui::{ui::TuiUI, TuiMonitor},
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::RandScheduler,
@@ -26,8 +26,8 @@ fn main() {
 
     // nyx stuff
     let mut helper = NyxHelper::new(share_dir, cpu_id, true, parallel_mode, None).unwrap();
-    let trace_bits = unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
-    let observer = StdMapObserver::new("trace", trace_bits);
+    let observer =
+        unsafe { StdMapObserver::from_mut_ptr("trace", helper.trace_bits, helper.map_size) };
 
     let input = BytesInput::new(b"22".to_vec());
     let rand = StdRand::new();
@@ -46,7 +46,8 @@ fn main() {
 
     // switch monitor if you want
     // let monitor = SimpleMonitor::new(|x|-> () {println!("{}",x)});
-    let monitor = TuiMonitor::new("test_fuzz".to_string(), true);
+    let ui = TuiUI::new(String::from("test_fuzz"), true);
+    let monitor = TuiMonitor::new(ui);
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
