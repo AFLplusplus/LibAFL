@@ -40,6 +40,8 @@ pub enum Regs {
     Sp = 29,
     Fp = 30,
     Ra = 31,
+
+    Pc = 37,
 }
 
 /// alias registers

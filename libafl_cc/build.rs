@@ -1,6 +1,11 @@
-#[cfg(target_vendor = "apple")]
-use std::path::PathBuf;
-use std::{env, fs::File, io::Write, path::Path, process::Command, str};
+use std::{
+    env,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+    process::Command,
+    str,
+};
 
 #[cfg(target_vendor = "apple")]
 use glob::glob;
@@ -116,7 +121,12 @@ fn find_macos_sdk_libs() -> String {
 }
 
 fn find_llvm_version() -> Option<i32> {
-    let output = exec_llvm_config(&["--version"]);
+    let llvm_env_version = env::var("LLVM_VERSION");
+    let output = if let Ok(version) = llvm_env_version {
+        version
+    } else {
+        exec_llvm_config(&["--version"])
+    };
     if let Some(major) = output.split('.').collect::<Vec<&str>>().first() {
         if let Ok(res) = major.parse::<i32>() {
             return Some(res);
@@ -125,6 +135,7 @@ fn find_llvm_version() -> Option<i32> {
     None
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_pass(
     bindir_path: &Path,
     out_dir: &Path,
@@ -132,10 +143,17 @@ fn build_pass(
     ldflags: &Vec<&str>,
     src_dir: &Path,
     src_file: &str,
+    additional_srcfiles: Option<&Vec<&str>>,
     optional: bool,
 ) {
     let dot_offset = src_file.rfind('.').unwrap();
     let src_stub = &src_file[..dot_offset];
+
+    let additionals = if let Some(x) = additional_srcfiles {
+        x.iter().map(|f| src_dir.join(f)).collect::<Vec<PathBuf>>()
+    } else {
+        Vec::new()
+    };
 
     println!("cargo:rerun-if-changed=src/{src_file}");
     let r = if cfg!(unix) {
@@ -143,6 +161,7 @@ fn build_pass(
             .arg("-v")
             .args(cxxflags)
             .arg(src_dir.join(src_file))
+            .args(additionals)
             .args(ldflags)
             .arg("-o")
             .arg(out_dir.join(format!("{src_stub}.{}", dll_extension())))
@@ -154,6 +173,7 @@ fn build_pass(
             .arg("-v")
             .args(cxxflags)
             .arg(src_dir.join(src_file))
+            .args(additionals)
             .arg("/link")
             .args(ldflags)
             .arg(format!(
@@ -204,13 +224,27 @@ fn main() {
     let mut clang_constants_file = File::create(dest_path).expect("Could not create file");
 
     println!("cargo:rerun-if-env-changed=LLVM_CONFIG");
+    println!("cargo:rerun-if-env-changed=LLVM_BINDIR");
+    println!("cargo:rerun-if-env-changed=LLVM_CXXFLAGS");
+    println!("cargo:rerun-if-env-changed=LLVM_LDFLAGS");
+    println!("cargo:rerun-if-env-changed=LLVM_VERSION");
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
     println!("cargo:rerun-if-changed=src/common-llvm.h");
     println!("cargo:rerun-if-changed=build.rs");
 
+    let llvm_bindir = env::var("LLVM_BINDIR");
+    let llvm_cxxflags = env::var("LLVM_CXXFLAGS");
+    let llvm_ldflags = env::var("LLVM_LDFLAGS");
+    let llvm_version = env::var("LLVM_VERSION");
+
     // test if llvm-config is available and we can compile the passes
-    if find_llvm_config().is_err() {
+    if find_llvm_config().is_err()
+        && !(llvm_bindir.is_ok()
+            && llvm_cxxflags.is_ok()
+            && llvm_ldflags.is_ok()
+            && llvm_version.is_ok())
+    {
         println!(
             "cargo:warning=Failed to find llvm-config, we will not build LLVM passes. If you need them, set the LLVM_CONFIG environment variable to a recent llvm-config."
         );
@@ -231,7 +265,11 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         return;
     }
 
-    let llvm_bindir = exec_llvm_config(&["--bindir"]);
+    let llvm_bindir = if let Ok(bindir) = llvm_bindir {
+        bindir
+    } else {
+        exec_llvm_config(&["--bindir"])
+    };
     let bindir_path = Path::new(&llvm_bindir);
 
     let clang;
@@ -255,7 +293,11 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         return;
     }
 
-    let cxxflags = exec_llvm_config(&["--cxxflags"]);
+    let cxxflags = if let Ok(flags) = llvm_cxxflags {
+        flags
+    } else {
+        exec_llvm_config(&["--cxxflags"])
+    };
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
     let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
@@ -307,7 +349,11 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     }
     llvm_config_ld.push("--ldflags");
 
-    let ldflags = exec_llvm_config(&llvm_config_ld);
+    let ldflags = if let Ok(flags) = llvm_ldflags {
+        flags
+    } else {
+        exec_llvm_config(&llvm_config_ld)
+    };
     let mut ldflags: Vec<&str> = ldflags.split_whitespace().collect();
 
     if cfg!(unix) {
@@ -359,6 +405,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
             &ldflags,
             src_dir,
             pass,
+            None,
             false,
         );
     }
@@ -372,6 +419,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
             &ldflags,
             src_dir,
             pass,
+            None,
             true,
         );
     }

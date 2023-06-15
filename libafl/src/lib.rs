@@ -11,6 +11,7 @@ Welcome to `LibAFL`
 // For `std::simd`
 #![cfg_attr(unstable_feature, feature(portable_simd))]
 #![warn(clippy::cargo)]
+#![allow(ambiguous_glob_reexports)]
 #![deny(clippy::cargo_common_metadata)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
@@ -24,7 +25,8 @@ Welcome to `LibAFL`
     clippy::ptr_as_ptr,
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions
+    clippy::module_name_repetitions,
+    clippy::ptr_cast_constness
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -77,8 +79,6 @@ extern crate std;
 #[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
-#[macro_use]
-extern crate static_assertions;
 #[cfg(feature = "ctor")]
 #[doc(hidden)]
 pub use ctor::ctor;

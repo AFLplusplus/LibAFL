@@ -22,6 +22,7 @@ i386 = ["libafl_qemu_sys/i386"] # build qemu for i386
 arm = ["libafl_qemu_sys/arm"] # build qemu for arm
 aarch64 = ["libafl_qemu_sys/aarch64"] # build qemu for aarch64
 mips = ["libafl_qemu_sys/mips"] # build qemu for mips (el, use with the 'be' feature of mips be)
+ppc = ["libafl_qemu_sys/ppc"] # build qemu for powerpc
 
 be = ["libafl_qemu_sys/be"]
 
