@@ -242,7 +242,7 @@ jobs:
     - uses: lyricwulf/abc@v1
       with: 
         linux: llvm llvm-dev clang 
-        macos: python@3.12 llvm bash coreutils
+        macos: python@3.10 llvm bash coreutils
     - uses: actions/checkout@v3
       with:
         submodules: true # recursively checkout submodules
