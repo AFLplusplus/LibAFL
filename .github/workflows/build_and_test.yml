@@ -239,6 +239,9 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Fix python (macOS)
+      if: runner.os == 'macOS'
+      run: rm -f /usr/local/bin/{2to3,idle3,pydoc3,python3,python3-config,python3.11,python3.11-config}
     - uses: lyricwulf/abc@v1
       with: 
         linux: llvm llvm-dev clang 
