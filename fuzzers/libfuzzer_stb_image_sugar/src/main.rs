@@ -20,7 +20,7 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
     fuzz(
-        &[PathBuf::from("./input")],
+        &[PathBuf::from("./corpus")],
         PathBuf::from("./output"),
         &Cores::all().unwrap(),
         1337,
@@ -32,7 +32,7 @@ fn fuzz(input_dirs: &[PathBuf], output_dir: PathBuf, cores: &Cores, broker_port:
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
     if libfuzzer_initialize(&args) == -1 {
-        println!("Warning: LLVMFuzzerInitialize failed with -1")
+        println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
     InMemoryBytesCoverageSugar::builder()

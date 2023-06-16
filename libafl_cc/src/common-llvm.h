@@ -10,13 +10,18 @@ typedef long double max_align_t;
 #endif
 
 #if LLVM_VERSION_MAJOR >= 7 /* use new pass manager */
-//#define USE_NEW_PM 1
+// #define USE_NEW_PM 1
 #endif
 
 /* #if LLVM_VERSION_STRING >= "4.0.1" */
 #if LLVM_VERSION_MAJOR > 4 || \
     (LLVM_VERSION_MAJOR == 4 && LLVM_VERSION_PATCH >= 1)
   #define HAVE_VECTOR_INTRINSICS 1
+#endif
+
+#if LLVM_VERSION_MAJOR >= 16
+  #include <optional>
+constexpr std::nullopt_t None = std::nullopt;
 #endif
 
 #ifdef USE_NEW_PM

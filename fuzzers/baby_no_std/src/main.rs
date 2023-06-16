@@ -1,8 +1,6 @@
 #![no_std]
 // Embedded targets: build with no_main
 #![cfg_attr(not(any(windows)), no_main)]
-// Embedded needs alloc error handlers which only work on nightly right now...
-#![cfg_attr(not(any(windows)), feature(default_alloc_error_handler))]
 
 #[cfg(any(windows, unix))]
 extern crate alloc;
@@ -10,6 +8,7 @@ extern crate alloc;
 use alloc::ffi::CString;
 #[cfg(not(any(windows)))]
 use core::panic::PanicInfo;
+use core::ptr::write;
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
@@ -48,10 +47,11 @@ fn panic(_info: &PanicInfo) -> ! {
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
+static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
-    unsafe { SIGNALS[idx] = 1 };
+    unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
 /// Provide custom time in `no_std` environment
@@ -87,7 +87,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);

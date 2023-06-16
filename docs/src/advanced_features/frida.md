@@ -17,7 +17,7 @@ If you are on Windows, you'll need to install llvm tools.
 LibAFL uses Frida's [__Stalker__](https://frida.re/docs/stalker/) to trace the execution of your program and instrument your harness.
 Thus, you have to compile your harness to a dynamic library. Frida instruments your PUT after dynamically loading it.
 
-For example in our `frida_libpng` example, we load the dynamic library and find the symbol to harness as follows:
+In our `frida_libpng` example, we load the dynamic library and find the symbol to harness as follows:
 
 ```rust,ignore
         let lib = libloading::Library::new(module_name).unwrap();
@@ -28,9 +28,9 @@ For example in our `frida_libpng` example, we load the dynamic library and find 
 
 ## `FridaInstrumentationHelper` and Runtimes
 
-To use functionalities that Frida offers, we'll first need to obtain `Gum` object by `Gum::obtain()`.
+To use functionalities that Frida offers, we'll first need to obtain a `Gum` object by `Gum::obtain()`.
 
-In LibAFL, we use the `FridaInstrumentationHelper` struct to manage frida-related state. `FridaInstrumentationHelper` is a key component that sets up the [__Transformer__](https://frida.re/docs/stalker/#transformer) that is used to generate the instrumented code. It also initializes the `Runtimes` that offer various instrumentation.
+In LibAFL, we use the `FridaInstrumentationHelper` struct to manage frida-related state. `FridaInstrumentationHelper` is a key component that sets up the [__Transformer__](https://frida.re/docs/stalker/#transformer) that is used to generate the instrumented code. It also initializes the `Runtimes` that offer various instrumentations.
 
 We have `CoverageRuntime` that can track the edge coverage,  `AsanRuntime` for address sanitizer, `DrCovRuntime` that uses [__DrCov__](https://dynamorio.org/page_drcov.html) for coverage collection (to be imported in coverage tools like Lighthouse, bncov, dragondance,...), and `CmpLogRuntime` for cmplog instrumentation.
 All of these runtimes can be slotted into `FridaInstrumentationHelper` at build time.
@@ -53,12 +53,12 @@ Combined with any `Runtime` you'd like to use, you can initialize the `FridaInst
 
 ## Running the Fuzzer
 
-After setting up the `FridaInstrumentationHelper`. You can obtain the pointer to the coverage map by calling `map_ptr_mut()`.
+After setting up the `FridaInstrumentationHelper` you can obtain the pointer to the coverage map by calling `map_mut_ptr()`.
 
 ```rust,ignore
-        let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+        let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
             "edges",
-            frida_helper.map_ptr_mut().unwrap(),
+            frida_helper.map_mut_ptr().unwrap(),
             MAP_SIZE,
         ));
 ```
@@ -83,5 +83,5 @@ You can then link this observer to `FridaInProcessExecutor` as follows:
         );
 ```
 
-And, finally you can run the fuzzer.
+And finally you can run the fuzzer.
 See the `frida_` examples in [`./fuzzers`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/) for more information and, for linux or full-system, play around with `libafl_qemu`, another binary-only tracer.

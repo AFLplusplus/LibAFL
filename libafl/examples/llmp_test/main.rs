@@ -3,43 +3,57 @@ This shows how llmp can be used directly, without libafl abstractions
 */
 extern crate alloc;
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(feature = "std")]
 use core::time::Duration;
-#[cfg(all(unix, feature = "std"))]
-use std::{thread, time};
+#[cfg(feature = "std")]
+use std::{num::NonZeroUsize, thread, time};
 
-use libafl::bolts::llmp::Tag;
-#[cfg(all(unix, feature = "std"))]
+#[cfg(feature = "std")]
 use libafl::{
     bolts::{
-        llmp,
+        llmp::{self, Tag},
         shmem::{ShMemProvider, StdShMemProvider},
+        ClientId, SimpleStderrLogger,
     },
     Error,
 };
 
-const _TAG_SIMPLE_U32_V1: Tag = 0x5130_0321;
-const _TAG_MATH_RESULT_V1: Tag = 0x7747_4331;
-const _TAG_1MEG_V1: Tag = 0xB111_1161;
+#[cfg(feature = "std")]
+const _TAG_SIMPLE_U32_V1: Tag = Tag(0x5130_0321);
+#[cfg(feature = "std")]
+const _TAG_MATH_RESULT_V1: Tag = Tag(0x7747_4331);
+#[cfg(feature = "std")]
+const _TAG_1MEG_V1: Tag = Tag(0xB111_1161);
 
-#[cfg(all(unix, feature = "std"))]
-fn adder_loop(port: u16) -> ! {
-    let shmem_provider = StdShMemProvider::new().unwrap();
-    let mut client = llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port).unwrap();
+/// The time the broker will wait for things to happen before printing a message
+#[cfg(feature = "std")]
+const BROKER_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// How long the broker may sleep between forwarding a new chunk of sent messages
+#[cfg(feature = "std")]
+const SLEEP_BETWEEN_FORWARDS: Duration = Duration::from_millis(5);
+
+#[cfg(feature = "std")]
+static LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
+
+#[cfg(feature = "std")]
+fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+    let shmem_provider = StdShMemProvider::new()?;
+    let mut client = llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
         let mut msg_counter = 0;
         loop {
-            let Some((sender, tag, buf)) = client.recv_buf().unwrap() else { break };
+            let Some((sender, tag, buf)) = client.recv_buf()? else { break };
             msg_counter += 1;
             match tag {
                 _TAG_SIMPLE_U32_V1 => {
                     current_result =
-                        current_result.wrapping_add(u32::from_le_bytes(buf.try_into().unwrap()));
+                        current_result.wrapping_add(u32::from_le_bytes(buf.try_into()?));
                 }
                 _ => println!(
-                    "Adder Client ignored unknown message {:#x} from client {} with {} bytes",
+                    "Adder Client ignored unknown message {:?} from client {:?} with {} bytes",
                     tag,
                     sender,
                     buf.len()
@@ -50,9 +64,7 @@ fn adder_loop(port: u16) -> ! {
         if current_result != last_result {
             println!("Adder handled {msg_counter} messages, reporting {current_result} to broker");
 
-            client
-                .send_buf(_TAG_MATH_RESULT_V1, &current_result.to_le_bytes())
-                .unwrap();
+            client.send_buf(_TAG_MATH_RESULT_V1, &current_result.to_le_bytes())?;
             last_result = current_result;
         }
 
@@ -60,112 +72,142 @@ fn adder_loop(port: u16) -> ! {
     }
 }
 
-#[cfg(all(unix, feature = "std"))]
-fn large_msg_loop(port: u16) -> ! {
-    let mut client =
-        llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new().unwrap(), port).unwrap();
+#[cfg(feature = "std")]
+fn large_msg_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+    let mut client = llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
 
-    #[allow(clippy::large_stack_arrays)]
-    let meg_buf = [1u8; 1 << 20];
+    #[cfg(not(target_vendor = "apple"))]
+    let meg_buf = vec![1u8; 1 << 20];
+    #[cfg(target_vendor = "apple")]
+    let meg_buf = vec![1u8; 1 << 19];
 
     loop {
-        client.send_buf(_TAG_1MEG_V1, &meg_buf).unwrap();
+        client.send_buf(_TAG_1MEG_V1, &meg_buf)?;
+        #[cfg(not(target_vendor = "apple"))]
         println!("Sending the next megabyte");
+        #[cfg(target_vendor = "apple")]
+        println!("Sending the next half megabyte (Apple had issues with >1 meg)");
         thread::sleep(time::Duration::from_millis(100));
     }
 }
 
 #[allow(clippy::unnecessary_wraps)]
-#[cfg(all(unix, feature = "std"))]
+#[cfg(feature = "std")]
 fn broker_message_hook(
-    client_id: u32,
-    tag: llmp::Tag,
-    _flags: llmp::Flags,
-    message: &[u8],
+    msg_or_timeout: Option<(ClientId, llmp::Tag, llmp::Flags, &[u8])>,
 ) -> Result<llmp::LlmpMsgHookResult, Error> {
+    let Some((client_id, tag, _flags, message)) = msg_or_timeout else {
+        println!(
+            "No client did anything for {} seconds..",
+            BROKER_TIMEOUT.as_secs()
+        );
+        return Ok(llmp::LlmpMsgHookResult::Handled);
+    };
+
     match tag {
         _TAG_SIMPLE_U32_V1 => {
             println!(
                 "Client {:?} sent message: {:?}",
                 client_id,
-                u32::from_le_bytes(message.try_into().unwrap())
+                u32::from_le_bytes(message.try_into()?)
             );
             Ok(llmp::LlmpMsgHookResult::ForwardToClients)
         }
         _TAG_MATH_RESULT_V1 => {
             println!(
                 "Adder Client has this current result: {:?}",
-                u32::from_le_bytes(message.try_into().unwrap())
+                u32::from_le_bytes(message.try_into()?)
             );
             Ok(llmp::LlmpMsgHookResult::Handled)
         }
         _ => {
-            println!("Unknwon message id received!");
+            println!("Unknown message id received: {tag:?}");
             Ok(llmp::LlmpMsgHookResult::ForwardToClients)
         }
     }
 }
 
-#[cfg(not(unix))]
+#[cfg(not(any(unix, windows)))]
 fn main() {
-    todo!("LLMP is not yet supported on this platform.");
+    eprintln!("LLMP example is currently not supported on no_std. Implement ShMem for no_std.");
 }
 
-#[cfg(unix)]
-fn main() {
+#[cfg(any(unix, windows))]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     /* The main node has a broker, and a few worker threads */
 
     let mode = std::env::args()
         .nth(1)
-        .expect("no mode specified, chose 'broker', 'b2b', 'ctr', 'adder', or 'large'");
+        .expect("no mode specified, chose 'broker', 'b2b', 'ctr', 'adder', 'large', or 'exiting'");
     let port: u16 = std::env::args()
         .nth(2)
         .unwrap_or_else(|| "1337".into())
-        .parse::<u16>()
-        .unwrap();
+        .parse::<u16>()?;
     // in the b2b use-case, this is our "own" port, we connect to the "normal" broker node on startup.
     let b2b_port: u16 = std::env::args()
         .nth(3)
         .unwrap_or_else(|| "4242".into())
-        .parse::<u16>()
-        .unwrap();
+        .parse::<u16>()?;
+
+    log::set_logger(&LOGGER).unwrap();
+    log::set_max_level(log::LevelFilter::Trace);
+
     println!("Launching in mode {mode} on port {port}");
 
     match mode.as_str() {
         "broker" => {
-            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
-            broker.launch_tcp_listener_on(port).unwrap();
-            broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)));
+            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new()?)?;
+            broker.launch_tcp_listener_on(port)?;
+            // Exit when we got at least _n_ nodes, and all of them quit.
+            broker.set_exit_cleanly_after(NonZeroUsize::new(1_usize).unwrap());
+            broker.loop_with_timeouts(
+                &mut broker_message_hook,
+                BROKER_TIMEOUT,
+                Some(SLEEP_BETWEEN_FORWARDS),
+            );
         }
         "b2b" => {
-            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
-            broker.launch_tcp_listener_on(b2b_port).unwrap();
+            let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new()?)?;
+            broker.launch_tcp_listener_on(b2b_port)?;
             // connect back to the main broker.
-            broker.connect_b2b(("127.0.0.1", port)).unwrap();
-            broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)));
+            broker.connect_b2b(("127.0.0.1", port))?;
+            broker.loop_with_timeouts(
+                &mut broker_message_hook,
+                BROKER_TIMEOUT,
+                Some(SLEEP_BETWEEN_FORWARDS),
+            );
         }
         "ctr" => {
             let mut client =
-                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new().unwrap(), port)
-                    .unwrap();
+                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
             let mut counter: u32 = 0;
             loop {
                 counter = counter.wrapping_add(1);
-                client
-                    .send_buf(_TAG_SIMPLE_U32_V1, &counter.to_le_bytes())
-                    .unwrap();
+                client.send_buf(_TAG_SIMPLE_U32_V1, &counter.to_le_bytes())?;
                 println!("CTR Client writing {counter}");
                 thread::sleep(Duration::from_secs(1));
             }
         }
         "adder" => {
-            adder_loop(port);
+            adder_loop(port)?;
         }
         "large" => {
-            large_msg_loop(port);
+            large_msg_loop(port)?;
+        }
+        "exiting" => {
+            let mut client =
+                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
+            for i in 0..10_u32 {
+                client.send_buf(_TAG_SIMPLE_U32_V1, &i.to_le_bytes())?;
+                println!("Exiting Client writing {i}");
+                thread::sleep(Duration::from_millis(10));
+            }
+            log::info!("Exiting Client exits");
+            client.sender.send_exiting()?;
         }
         _ => {
             println!("No valid mode supplied");
         }
     }
+    Ok(())
 }

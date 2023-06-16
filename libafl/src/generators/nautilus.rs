@@ -71,10 +71,6 @@ impl<'a, S> Generator<NautilusInput, S> for NautilusGenerator<'a> {
         self.generate_from_nonterminal(&mut input, nonterm, len);
         Ok(input)
     }
-
-    fn generate_dummy(&self, _state: &mut S) -> NautilusInput {
-        NautilusInput::empty()
-    }
 }
 
 impl<'a> NautilusGenerator<'a> {

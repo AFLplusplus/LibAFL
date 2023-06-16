@@ -16,6 +16,7 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 default = ["std", "sanitizers_flags"]
 std = ["libafl/std"]
 libfuzzer = []
+libfuzzer_no_link_main = ["libfuzzer"]
 sanitizers_flags = []
 pointer_maps = []
 sancov_pcguard_edges = []
@@ -25,13 +26,17 @@ sancov_8bit = []
 sancov_cmplog = []
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
 clippy = [] # Ignore compiler warnings during clippy
+observers = ["intervaltree", "ahash"]
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.8.2", default-features = false, features = [] }
+libafl = { path = "../libafl", version = "0.10.1", default-features = false, features = [] }
+log = "0.4.17"
 
 rangemap = "1.0"
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
+intervaltree = { version = "0.2.7", default-features = false, features = ["serde"], optional = true }
+ahash = { version = "0.8.3", default-features = false, optional = true }
 # serde-big-array = "0.3.2"

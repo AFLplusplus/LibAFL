@@ -13,7 +13,7 @@ pub fn main() {
         let is_cpp = match wrapper_name[wrapper_name.len()-2..].to_lowercase().as_str() {
             "cc" => false,
             "++" | "pp" | "xx" => true,
-            _ => panic!("Could not figure out if c or c++ warpper was called. Expected {:?} to end with c or cxx", dir),
+            _ => panic!("Could not figure out if c or c++ wrapper was called. Expected {dir:?} to end with c or cxx"),
         };
 
         dir.pop();
@@ -28,7 +28,7 @@ pub fn main() {
             .link_staticlib(&dir, "libfuzzer_libpng")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
             .add_pass(LLVMPasses::CoverageAccounting)
-            .add_passes_arg(format!("-granularity={}", GRANULARITY))
+            .add_passes_arg(format!("-granularity={GRANULARITY}"))
             .run()
             .expect("Failed to run the wrapped compiler")
         {

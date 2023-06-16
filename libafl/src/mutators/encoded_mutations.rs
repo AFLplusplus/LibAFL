@@ -14,6 +14,7 @@ use crate::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
         MutationResult, Mutator, Named,
     },
+    random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
@@ -22,7 +23,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct EncodedRandMutator;
 
-impl<S: HasRand + UsesInput<Input = EncodedInput>> Mutator<S> for EncodedRandMutator {
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -57,7 +58,7 @@ impl EncodedRandMutator {
 #[derive(Debug, Default)]
 pub struct EncodedIncMutator;
 
-impl<S: HasRand + UsesInput<Input = EncodedInput>> Mutator<S> for EncodedIncMutator {
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -92,7 +93,7 @@ impl EncodedIncMutator {
 #[derive(Debug, Default)]
 pub struct EncodedDecMutator;
 
-impl<S: HasRand + UsesInput<Input = EncodedInput>> Mutator<S> for EncodedDecMutator {
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -127,7 +128,7 @@ impl EncodedDecMutator {
 #[derive(Debug, Default)]
 pub struct EncodedAddMutator;
 
-impl<S: HasRand + UsesInput<Input = EncodedInput>> Mutator<S> for EncodedAddMutator {
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -166,7 +167,7 @@ impl EncodedAddMutator {
 #[derive(Debug, Default)]
 pub struct EncodedDeleteMutator;
 
-impl<S: HasRand + UsesInput<Input = EncodedInput>> Mutator<S> for EncodedDeleteMutator {
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -206,9 +207,9 @@ pub struct EncodedInsertCopyMutator {
     tmp_buf: Vec<u32>,
 }
 
-impl<S> Mutator<S> for EncodedInsertCopyMutator
+impl<S> Mutator<EncodedInput, S> for EncodedInsertCopyMutator
 where
-    S: UsesInput<Input = EncodedInput> + HasRand + HasMaxSize,
+    S: HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -240,10 +241,12 @@ where
 
         input.codes_mut().resize(size + len, 0);
         self.tmp_buf.resize(len, 0);
-        buffer_copy(&mut self.tmp_buf, input.codes(), from, 0, len);
+        unsafe {
+            buffer_copy(&mut self.tmp_buf, input.codes(), from, 0, len);
 
-        buffer_self_copy(input.codes_mut(), off, off + len, size - off);
-        buffer_copy(input.codes_mut(), &self.tmp_buf, 0, off, len);
+            buffer_self_copy(input.codes_mut(), off, off + len, size - off);
+            buffer_copy(input.codes_mut(), &self.tmp_buf, 0, off, len);
+        };
 
         Ok(MutationResult::Mutated)
     }
@@ -267,7 +270,7 @@ impl EncodedInsertCopyMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCopyMutator;
 
-impl<S: UsesInput<Input = EncodedInput> + HasRand> Mutator<S> for EncodedCopyMutator {
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -283,7 +286,9 @@ impl<S: UsesInput<Input = EncodedInput> + HasRand> Mutator<S> for EncodedCopyMut
         let to = state.rand_mut().below(size as u64) as usize;
         let len = 1 + state.rand_mut().below((size - max(from, to)) as u64) as usize;
 
-        buffer_self_copy(input.codes_mut(), from, to, len);
+        unsafe {
+            buffer_self_copy(input.codes_mut(), from, to, len);
+        }
 
         Ok(MutationResult::Mutated)
     }
@@ -307,7 +312,7 @@ impl EncodedCopyMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCrossoverInsertMutator;
 
-impl<S> Mutator<S> for EncodedCrossoverInsertMutator
+impl<S> Mutator<S::Input, S> for EncodedCrossoverInsertMutator
 where
     S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus + HasMaxSize,
 {
@@ -320,21 +325,18 @@ where
         let size = input.codes().len();
 
         // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
-        let other_size = state
-            .corpus()
-            .get(idx)?
-            .borrow_mut()
-            .load_input()?
-            .codes()
-            .len();
+        let other_size = {
+            let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+            other_testcase.load_input(state.corpus())?.codes().len()
+        };
+
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -344,9 +346,6 @@ where
         let to = state.rand_mut().below(size as u64) as usize;
         let mut len = 1 + state.rand_mut().below((other_size - from) as u64) as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-        let other = other_testcase.load_input()?;
-
         if size + len > max_size {
             if max_size > size {
                 len = max_size - size;
@@ -355,9 +354,15 @@ where
             }
         }
 
+        let other_testcase = state.corpus().get(idx)?.borrow_mut();
+        // no need to `load_input` again -  we did that above already.
+        let other = other_testcase.input().as_ref().unwrap();
+
         input.codes_mut().resize(size + len, 0);
-        buffer_self_copy(input.codes_mut(), to, to + len, size - to);
-        buffer_copy(input.codes_mut(), other.codes(), from, to, len);
+        unsafe {
+            buffer_self_copy(input.codes_mut(), to, to + len, size - to);
+            buffer_copy(input.codes_mut(), other.codes(), from, to, len);
+        }
 
         Ok(MutationResult::Mutated)
     }
@@ -381,7 +386,7 @@ impl EncodedCrossoverInsertMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCrossoverReplaceMutator;
 
-impl<S> Mutator<S> for EncodedCrossoverReplaceMutator
+impl<S> Mutator<S::Input, S> for EncodedCrossoverReplaceMutator
 where
     S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus,
 {
@@ -397,21 +402,19 @@ where
         }
 
         // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if idx == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
-        let other_size = state
-            .corpus()
-            .get(idx)?
-            .borrow_mut()
-            .load_input()?
-            .codes()
-            .len();
+        let other_size = {
+            // new scope to make the borrow checker happy
+            let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+            other_testcase.load_input(state.corpus())?.codes().len()
+        };
+
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -420,10 +423,13 @@ where
         let len = state.rand_mut().below(min(other_size - from, size) as u64) as usize;
         let to = state.rand_mut().below((size - len) as u64) as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-        let other = other_testcase.load_input()?;
+        let other_testcase = state.corpus().get(idx)?.borrow_mut();
+        // no need to load the input again, it'll already be present at this point.
+        let other = other_testcase.input().as_ref().unwrap();
 
-        buffer_copy(input.codes_mut(), other.codes(), from, to, len);
+        unsafe {
+            buffer_copy(input.codes_mut(), other.codes(), from, to, len);
+        }
 
         Ok(MutationResult::Mutated)
     }

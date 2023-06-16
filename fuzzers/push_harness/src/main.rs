@@ -2,7 +2,7 @@
 //! The target loops and the harness pulls inputs out of `LibAFL`, instead of being called by `LibAFL`.
 use std::path::PathBuf;
 
-use klo_routines::*;
+use klo_routines::{yield_, KloRoutine};
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -40,7 +40,7 @@ fn input_generator() {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
+    let observer = unsafe { StdMapObserver::new("signals", &mut SIGNALS) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -66,7 +66,7 @@ fn input_generator() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    let monitor = SimpleMonitor::new(|s| println!("{s}"));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
@@ -107,6 +107,7 @@ fn input_generator() {
 
 /// the main function loops independently of the fuzzer.
 /// `Klo` internally switches between the `LibAFL` and harness coroutines to generate the inputs.
+#[allow(clippy::manual_assert)]
 pub fn main() {
     // Set up the Klo-routines harness
     let mut input_generator = input_generator;

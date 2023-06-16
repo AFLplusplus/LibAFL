@@ -346,10 +346,10 @@ where
 mod tests {
     use crate::cfg::{ControlFlowGraph, HasWeight};
 
-    struct TestMetaData {}
+    struct TestMetadata {}
 
-    impl HasWeight<TestMetaData> for TestMetaData {
-        fn compute(_metadata: Option<&TestMetaData>) -> u32 {
+    impl HasWeight<TestMetadata> for TestMetadata {
+        fn compute(_metadata: Option<&TestMetadata>) -> u32 {
             1
         }
     }
@@ -362,8 +362,9 @@ mod tests {
     const TEST_GRAPH_STR: &str = "$$main+41864\n$$_ZN7MyClass1VEi+50306\n%%_ZN7MyClass1VEi+50306\n->19123\n%%main+41864\n->52706\n->26911\n%%main+52706\n%%main+26911\n->52706\n->41925\n";
 
     #[test]
+    #[cfg_attr(miri, ignore)] // Testcase takes long in miri.
     fn test_basic_cfg_from_str() {
-        let cfg: ControlFlowGraph<TestMetaData> = ControlFlowGraph::from_content(TEST_GRAPH_STR);
+        let cfg: ControlFlowGraph<TestMetadata> = ControlFlowGraph::from_content(TEST_GRAPH_STR);
         let entry = cfg.get_entry("main").unwrap();
         assert_eq!(entry.calling_func, "main");
         assert_eq!(entry.successor_edges.len(), 2);
@@ -391,8 +392,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // Testcase takes too long in miri. :/
     fn test_shortest_path() {
-        let cfg: ControlFlowGraph<TestMetaData> = ControlFlowGraph::from_content(TEST_GRAPH_STR);
+        let cfg: ControlFlowGraph<TestMetadata> = ControlFlowGraph::from_content(TEST_GRAPH_STR);
         let distances = cfg.calculate_distances_to_all_edges((41864 >> 1) ^ 26911);
         assert_eq!(*distances.get(&((41864 >> 1) ^ 26911)).unwrap(), 1);
         assert_eq!(*distances.get(&((26911 >> 1) ^ 52706)).unwrap(), 2);

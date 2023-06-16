@@ -3,7 +3,8 @@ use std::{cell::UnsafeCell, cmp::max};
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{inputs::UsesInput, state::HasMetadata};
 pub use libafl_targets::{
-    edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE, EDGES_MAP_SIZE, MAX_EDGES_NUM,
+    edges_map_mut_slice, edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_NUM,
+    EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
 use serde::{Deserialize, Serialize};
 
@@ -55,7 +56,7 @@ impl QemuEdgeCoverageHelper {
     }
 
     #[must_use]
-    pub fn must_instrument(&self, addr: u64) -> bool {
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
 }
@@ -111,7 +112,7 @@ impl QemuEdgeCoverageChildHelper {
     }
 
     #[must_use]
-    pub fn must_instrument(&self, addr: u64) -> bool {
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
 }
@@ -161,16 +162,16 @@ where
     QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.helpers().match_first_type::<QemuEdgeCoverageHelper>() {
-        if !h.must_instrument(src.into()) && !h.must_instrument(dest.into()) {
+        if !h.must_instrument(src) && !h.must_instrument(dest) {
             return None;
         }
     }
     let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
-    if state.metadata().get::<QemuEdgesMapMetadata>().is_none() {
+    if state.metadata_map().get::<QemuEdgesMapMetadata>().is_none() {
         state.add_metadata(QemuEdgesMapMetadata::new());
     }
     let meta = state
-        .metadata_mut()
+        .metadata_map_mut()
         .get_mut::<QemuEdgesMapMetadata>()
         .unwrap();
 
@@ -223,13 +224,13 @@ where
         .helpers()
         .match_first_type::<QemuEdgeCoverageChildHelper>()
     {
-        if !h.must_instrument(src.into()) && !h.must_instrument(dest.into()) {
+        if !h.must_instrument(src) && !h.must_instrument(dest) {
             return None;
         }
     }
     // GuestAddress is u32 for 32 bit guests
     #[allow(clippy::unnecessary_cast)]
-    Some((hash_me(src as u64) ^ hash_me(dest as u64)) & (unsafe { EDGES_MAP_PTR_SIZE } as u64 - 1))
+    Some((hash_me(src as u64) ^ hash_me(dest as u64)) & (unsafe { EDGES_MAP_PTR_NUM } as u64 - 1))
 }
 
 pub extern "C" fn trace_edge_hitcount_ptr(id: u64, _data: u64) {
@@ -277,7 +278,7 @@ where
 pub extern "C" fn trace_block_transition_hitcount(id: u64, _data: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
-            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_SIZE - 1);
+            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_NUM - 1);
             let entry = EDGES_MAP_PTR.add(x);
             *entry = (*entry).wrapping_add(1);
             *prev_loc.get() = id.overflowing_shr(1).0;
@@ -288,7 +289,7 @@ pub extern "C" fn trace_block_transition_hitcount(id: u64, _data: u64) {
 pub extern "C" fn trace_block_transition_single(id: u64, _data: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
-            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_SIZE - 1);
+            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_NUM - 1);
             let entry = EDGES_MAP_PTR.add(x);
             *entry = 1;
             *prev_loc.get() = id.overflowing_shr(1).0;

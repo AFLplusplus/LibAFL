@@ -84,9 +84,13 @@ fn main() {
     {
         println!("cargo:rerun-if-changed=src/libfuzzer.c");
 
-        cc::Build::new()
-            .file(src_dir.join("libfuzzer.c"))
-            .compile("libfuzzer");
+        let mut libfuzzer = cc::Build::new();
+        libfuzzer.file(src_dir.join("libfuzzer.c"));
+
+        #[cfg(feature = "libfuzzer_no_link_main")]
+        libfuzzer.define("FUZZER_NO_LINK_MAIN", "1");
+
+        libfuzzer.compile("libfuzzer");
     }
 
     println!("cargo:rerun-if-changed=src/common.h");

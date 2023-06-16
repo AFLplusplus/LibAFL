@@ -45,7 +45,7 @@ impl DrCovBasicBlock {
 
     /// Create a new [`DrCovBasicBlock`] with a given `start` address and a block size.
     #[must_use]
-    pub fn new_with_size(start: usize, size: usize) -> Self {
+    pub fn with_size(start: usize, size: usize) -> Self {
         Self::new(start, start + size)
     }
 }

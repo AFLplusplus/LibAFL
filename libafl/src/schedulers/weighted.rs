@@ -1,22 +1,22 @@
 //! The queue corpus scheduler with weighted queue item selection from aflpp (`https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32`)
 //! This queue corpus scheduler needs calibration stage.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata},
     inputs::UsesInput,
+    observers::{MapObserver, ObserversTuple},
+    random_corpus_id,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
-        Scheduler,
+        RemovableScheduler, Scheduler,
     },
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
@@ -29,9 +29,9 @@ pub struct WeightedScheduleMetadata {
     /// The fuzzer execution spent in the current cycles
     runs_in_current_cycle: usize,
     /// Alias table for weighted queue entry selection
-    alias_table: Vec<usize>,
+    alias_table: HashMap<CorpusId, CorpusId>,
     /// Probability for which queue entry is selected
-    alias_probability: Vec<f64>,
+    alias_probability: HashMap<CorpusId, f64>,
 }
 
 impl Default for WeightedScheduleMetadata {
@@ -46,8 +46,8 @@ impl WeightedScheduleMetadata {
     pub fn new() -> Self {
         Self {
             runs_in_current_cycle: 0,
-            alias_table: vec![0],
-            alias_probability: vec![0.0],
+            alias_table: HashMap::default(),
+            alias_probability: HashMap::default(),
         }
     }
 
@@ -64,23 +64,23 @@ impl WeightedScheduleMetadata {
 
     /// The getter for `alias_table`
     #[must_use]
-    pub fn alias_table(&self) -> &[usize] {
+    pub fn alias_table(&self) -> &HashMap<CorpusId, CorpusId> {
         &self.alias_table
     }
 
     /// The setter for `alias_table`
-    pub fn set_alias_table(&mut self, table: Vec<usize>) {
+    pub fn set_alias_table(&mut self, table: HashMap<CorpusId, CorpusId>) {
         self.alias_table = table;
     }
 
     /// The getter for `alias_probability`
     #[must_use]
-    pub fn alias_probability(&self) -> &[f64] {
+    pub fn alias_probability(&self) -> &HashMap<CorpusId, f64> {
         &self.alias_probability
     }
 
     /// The setter for `alias_probability`
-    pub fn set_alias_probability(&mut self, probability: Vec<f64>) {
+    pub fn set_alias_probability(&mut self, probability: HashMap<CorpusId, f64>) {
         self.alias_probability = probability;
     }
 }
@@ -89,42 +89,47 @@ crate::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
-pub struct WeightedScheduler<F, S> {
+pub struct WeightedScheduler<F, O, S> {
     strat: Option<PowerSchedule>,
-    phantom: PhantomData<(F, S)>,
+    map_observer_name: String,
+    last_hash: usize,
+    phantom: PhantomData<(F, O, S)>,
 }
 
-impl<F, S> Default for WeightedScheduler<F, S>
+impl<F, O, S> WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
+    O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand,
 {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<F, S> WeightedScheduler<F, S>
-where
-    F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand,
-{
-    /// Create a new [`WeightedScheduler`] without any scheduling strategy
+    /// Create a new [`WeightedScheduler`] without any power schedule
     #[must_use]
-    pub fn new() -> Self {
-        Self {
-            strat: None,
-            phantom: PhantomData,
-        }
+    pub fn new(state: &mut S, map_observer: &O) -> Self {
+        Self::with_schedule(state, map_observer, None)
     }
 
     /// Create a new [`WeightedScheduler`]
     #[must_use]
-    pub fn with_schedule(strat: PowerSchedule) -> Self {
+    pub fn with_schedule(state: &mut S, map_observer: &O, strat: Option<PowerSchedule>) -> Self {
+        if !state.has_metadata::<SchedulerMetadata>() {
+            state.add_metadata(SchedulerMetadata::new(strat));
+        }
+
+        if !state.has_metadata::<WeightedScheduleMetadata>() {
+            state.add_metadata(WeightedScheduleMetadata::new());
+        }
         Self {
-            strat: Some(strat),
+            strat,
+            map_observer_name: map_observer.name().to_string(),
+            last_hash: 0,
             phantom: PhantomData,
         }
+    }
+
+    #[must_use]
+    /// Getter for `strat`
+    pub fn strat(&self) -> &Option<PowerSchedule> {
+        &self.strat
     }
 
     /// Create a new alias table when the fuzzer finds a new corpus entry
@@ -137,25 +142,25 @@ where
     pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> {
         let n = state.corpus().count();
 
-        let mut alias_table: Vec<usize> = vec![0; n];
-        let mut alias_probability: Vec<f64> = vec![0.0; n];
-        let mut weights: Vec<f64> = vec![0.0; n];
+        let mut alias_table: HashMap<CorpusId, CorpusId> = HashMap::default();
+        let mut alias_probability: HashMap<CorpusId, f64> = HashMap::default();
+        let mut weights: HashMap<CorpusId, f64> = HashMap::default();
 
-        let mut p_arr: Vec<f64> = vec![0.0; n];
-        let mut s_arr: Vec<usize> = vec![0; n];
-        let mut l_arr: Vec<usize> = vec![0; n];
+        let mut p_arr: HashMap<CorpusId, f64> = HashMap::default();
+        let mut s_arr: HashMap<usize, CorpusId> = HashMap::default();
+        let mut l_arr: HashMap<usize, CorpusId> = HashMap::default();
 
         let mut sum: f64 = 0.0;
 
-        for (i, item) in weights.iter_mut().enumerate().take(n) {
+        for i in state.corpus().ids() {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
-            let weight = F::compute(&mut *testcase, state)?;
-            *item = weight;
+            let weight = F::compute(state, &mut *testcase)?;
+            weights.insert(i, weight);
             sum += weight;
         }
 
-        for i in 0..n {
-            p_arr[i] = weights[i] * (n as f64) / sum;
+        for (i, w) in weights.iter() {
+            p_arr.insert(*i, w * (n as f64) / sum);
         }
 
         // # of items in queue S
@@ -164,12 +169,12 @@ where
         // # of items in queue L
         let mut n_l = 0;
         // Divide P into two queues, S and L
-        for s in (0..n).rev() {
-            if p_arr[s] < 1.0 {
-                s_arr[n_s] = s;
+        for s in state.corpus().ids().rev() {
+            if *p_arr.get(&s).unwrap() < 1.0 {
+                s_arr.insert(n_s, s);
                 n_s += 1;
             } else {
-                l_arr[n_l] = s;
+                l_arr.insert(n_l, s);
                 n_l += 1;
             }
         }
@@ -177,38 +182,33 @@ where
         while n_s > 0 && n_l > 0 {
             n_s -= 1;
             n_l -= 1;
-            let a = s_arr[n_s];
-            let g = l_arr[n_l];
+            let a = *s_arr.get(&n_s).unwrap();
+            let g = *l_arr.get(&n_l).unwrap();
 
-            alias_probability[a] = p_arr[a];
-            alias_table[a] = g;
-            p_arr[g] = p_arr[g] + p_arr[a] - 1.0;
+            alias_probability.insert(a, *p_arr.get(&a).unwrap());
+            alias_table.insert(a, g);
+            *p_arr.get_mut(&g).unwrap() += p_arr.get(&a).unwrap() - 1.0;
 
-            if p_arr[g] < 1.0 {
-                s_arr[n_s] = g;
+            if *p_arr.get(&g).unwrap() < 1.0 {
+                *s_arr.get_mut(&n_s).unwrap() = g;
                 n_s += 1;
             } else {
-                l_arr[n_l] = g;
+                *l_arr.get_mut(&n_l).unwrap() = g;
                 n_l += 1;
             }
         }
 
         while n_l > 0 {
             n_l -= 1;
-            alias_probability[l_arr[n_l]] = 1.0;
+            alias_probability.insert(*l_arr.get(&n_l).unwrap(), 1.0);
         }
 
         while n_s > 0 {
             n_s -= 1;
-            alias_probability[s_arr[n_s]] = 1.0;
+            alias_probability.insert(*s_arr.get(&n_s).unwrap(), 1.0);
         }
 
-        let wsmeta = state
-            .metadata_mut()
-            .get_mut::<WeightedScheduleMetadata>()
-            .ok_or_else(|| {
-                Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
-            })?;
+        let wsmeta = state.metadata_mut::<WeightedScheduleMetadata>()?;
 
         // Update metadata
         wsmeta.set_alias_probability(alias_probability);
@@ -217,139 +217,210 @@ where
     }
 }
 
-impl<F, S> UsesState for WeightedScheduler<F, S>
+impl<F, O, S> UsesState for WeightedScheduler<F, O, S>
 where
     S: UsesInput,
 {
     type State = S;
 }
 
-impl<F, S> Scheduler for WeightedScheduler<F, S>
+impl<F, O, S> RemovableScheduler for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand,
+    O: MapObserver,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
-    /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
-        if !state.has_metadata::<SchedulerMetadata>() {
-            state.add_metadata(SchedulerMetadata::new(self.strat));
-        }
+    #[allow(clippy::cast_precision_loss)]
+    fn on_remove(
+        &mut self,
+        state: &mut Self::State,
+        _idx: CorpusId,
+        prev: &Option<crate::corpus::Testcase<<Self::State as UsesInput>::Input>>,
+    ) -> Result<(), Error> {
+        let prev = prev.as_ref().ok_or_else(|| {
+            Error::illegal_argument(
+                "Power schedulers must be aware of the removed corpus entry for reweighting.",
+            )
+        })?;
 
-        if !state.has_metadata::<WeightedScheduleMetadata>() {
-            state.add_metadata(WeightedScheduleMetadata::new());
-        }
+        let prev_meta = prev.metadata::<SchedulerTestcaseMetadata>()?;
 
-        let current_idx = *state.corpus().current();
+        // Use these to adjust `SchedulerMetadata`
+        let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
+        let prev_bitmap_size = prev_meta.bitmap_size();
+        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
 
-        let mut depth = match current_idx {
-            Some(parent_idx) => state
-                .corpus()
-                .get(parent_idx)?
-                .borrow_mut()
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?
-                .depth(),
-            None => 0,
-        };
+        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
 
-        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
-        depth += 1;
+        psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
+        psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
+        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
+        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
+        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
+
+        Ok(())
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    fn on_replace(
+        &mut self,
+        state: &mut Self::State,
+        idx: CorpusId,
+        prev: &crate::corpus::Testcase<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
+        let prev_meta = prev.metadata::<SchedulerTestcaseMetadata>()?;
+
+        // Next depth is + 1
+        let prev_depth = prev_meta.depth() + 1;
+
+        // Use these to adjust `SchedulerMetadata`
+        let (prev_total_time, prev_cycles) = prev_meta.cycle_and_time();
+        let prev_bitmap_size = prev_meta.bitmap_size();
+        let prev_bitmap_size_log = libm::log2(prev_bitmap_size as f64);
+
+        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
+
+        // We won't add new one because it'll get added when it gets executed in calirbation next time.
+        psmeta.set_exec_time(psmeta.exec_time() - prev_total_time);
+        psmeta.set_cycles(psmeta.cycles() - (prev_cycles as u64));
+        psmeta.set_bitmap_size(psmeta.bitmap_size() - prev_bitmap_size);
+        psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() - prev_bitmap_size_log);
+        psmeta.set_bitmap_entries(psmeta.bitmap_entries() - 1);
+
         state
             .corpus()
             .get(idx)?
             .borrow_mut()
-            .add_metadata(SchedulerTestcaseMetaData::new(depth));
+            .add_metadata(SchedulerTestcaseMetadata::new(prev_depth));
+        Ok(())
+    }
+}
+
+impl<F, O, S> Scheduler for WeightedScheduler<F, O, S>
+where
+    F: TestcaseScore<S>,
+    O: MapObserver,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
+{
+    /// Add an entry to the corpus and return its index
+    fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
+        let current_idx = *state.corpus().current();
+
+        let mut depth = match current_idx {
+            Some(parent_idx) => state
+                .testcase_mut(parent_idx)?
+                .metadata_mut::<SchedulerTestcaseMetadata>()?
+                .depth(),
+            None => 0,
+        };
+
+        // Attach a `SchedulerTestcaseMetadata` to the queue entry.
+        depth += 1;
+        {
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
+                depth,
+                self.last_hash,
+            ));
+            testcase.set_parent_id_optional(current_idx);
+        }
+
+        // TODO increase perf_score when finding new things like in AFL
+        // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
 
         // Recreate the alias table
         self.create_alias_table(state)?;
         Ok(())
     }
 
-    fn on_replace(
-        &self,
-        state: &mut S,
-        idx: usize,
-        _testcase: &Testcase<S::Input>,
-    ) -> Result<(), Error> {
-        // Recreate the alias table
-        self.on_add(state, idx)
-    }
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut Self::State,
+        _input: &<Self::State as UsesInput>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
+    where
+        OT: ObserversTuple<Self::State>,
+    {
+        let observer = observers
+            .match_name::<O>(&self.map_observer_name)
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
-    fn on_remove(
-        &self,
-        state: &mut S,
-        _idx: usize,
-        _testcase: &Option<Testcase<S::Input>>,
-    ) -> Result<(), Error> {
-        // Recreate the alias table
-        self.create_alias_table(state)?;
+        let mut hash = observer.hash() as usize;
+
+        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
+
+        hash %= psmeta.n_fuzz().len();
+        // Update the path frequency
+        psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
+
+        self.last_hash = hash;
+
         Ok(())
     }
 
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
-        if state.corpus().count() == 0 {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
+        let corpus_counts = state.corpus().count();
+        if corpus_counts == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
-            let corpus_counts = state.corpus().count();
-            let s = state.rand_mut().below(corpus_counts as u64) as usize;
+            let s = random_corpus_id!(state.corpus(), state.rand_mut());
+
             // Choose a random value between 0.000000000 and 1.000000000
             let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
 
-            let wsmeta = state
-                .metadata_mut()
-                .get_mut::<WeightedScheduleMetadata>()
-                .ok_or_else(|| {
-                    Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
-                })?;
+            let wsmeta = state.metadata_mut::<WeightedScheduleMetadata>()?;
 
             let current_cycles = wsmeta.runs_in_current_cycle();
 
+            // TODO deal with corpus_counts decreasing due to removals
             if current_cycles >= corpus_counts {
                 wsmeta.set_runs_current_cycle(0);
             } else {
                 wsmeta.set_runs_current_cycle(current_cycles + 1);
             }
 
-            let idx = if probability < wsmeta.alias_probability()[s] {
+            let idx = if probability < *wsmeta.alias_probability().get(&s).unwrap() {
                 s
             } else {
-                wsmeta.alias_table()[s]
+                *wsmeta.alias_table().get(&s).unwrap()
             };
 
             // Update depth
             if current_cycles > corpus_counts {
-                let psmeta = state
-                    .metadata_mut()
-                    .get_mut::<SchedulerMetadata>()
-                    .ok_or_else(|| {
-                        Error::key_not_found("SchedulerMetadata not found".to_string())
-                    })?;
+                let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }
-            *state.corpus_mut().current_mut() = Some(idx);
 
-            // Update the handicap
-            let mut testcase = state.corpus().get(idx)?.borrow_mut();
-            let tcmeta = testcase
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?;
+            self.set_current_scheduled(state, Some(idx))?;
+            Ok(idx)
+        }
+    }
+
+    /// Set current fuzzed corpus id and `scheduled_count`
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut Self::State,
+        next_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        let current_idx = *state.corpus().current();
+
+        if let Some(idx) = current_idx {
+            let mut testcase = state.testcase_mut(idx)?;
+            let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
 
             if tcmeta.handicap() >= 4 {
                 tcmeta.set_handicap(tcmeta.handicap() - 4);
             } else if tcmeta.handicap() > 0 {
                 tcmeta.set_handicap(tcmeta.handicap() - 1);
             }
-            Ok(idx)
         }
+
+        *state.corpus_mut().current_mut() = next_idx;
+        Ok(())
     }
 }
 
 /// The standard corpus weight, same as aflpp
-pub type StdWeightedScheduler<S> = WeightedScheduler<CorpusWeightTestcaseScore<S>, S>;
+pub type StdWeightedScheduler<O, S> = WeightedScheduler<CorpusWeightTestcaseScore<S>, O, S>;

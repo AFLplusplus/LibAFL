@@ -3,5 +3,5 @@ pub mod fuzzer;
 
 fn main() {
     #[cfg(target_os = "linux")]
-    fuzzer::main()
+    fuzzer::main();
 }

@@ -4,6 +4,7 @@ use std::{
     io::Write,
     path::PathBuf,
     process::{Child, Command, Stdio},
+    time::Duration,
 };
 
 use libafl::{
@@ -38,7 +39,7 @@ pub fn main() {
     let shmem_id = signals.id();
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", signals.as_mut_slice());
+    let observer = unsafe { StdMapObserver::new("signals", signals.as_mut_slice()) };
     // Create a stacktrace observer
     let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 
@@ -67,7 +68,7 @@ pub fn main() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
@@ -102,6 +103,10 @@ pub fn main() {
             let mut stdin = child.stdin.as_ref().unwrap();
             stdin.write_all(input.target_bytes().as_slice())?;
             Ok(child)
+        }
+
+        fn exec_timeout(&self) -> Duration {
+            Duration::from_secs(5)
         }
     }
 

@@ -1,6 +1,6 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{fs, io::Read, path::PathBuf};
+use std::{fs, io::Read, path::PathBuf, ptr::write};
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
@@ -9,7 +9,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-    inputs::{GeneralizedInput, HasTargetBytes},
+    inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
         havoc_mutations, scheduled::StdScheduledMutator, GrimoireExtensionMutator,
@@ -24,10 +24,10 @@ use libafl::{
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
-
+static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
-    unsafe { SIGNALS[idx] = 1 };
+    unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
 fn is_sub<T: PartialEq>(mut haystack: &[T], needle: &[T]) -> bool {
@@ -59,13 +59,13 @@ pub fn main() {
             let mut file = fs::File::open(path).expect("no file found");
             let mut buffer = vec![];
             file.read_to_end(&mut buffer).expect("buffer overflow");
-            let input = GeneralizedInput::new(buffer);
+            let input = BytesInput::new(buffer);
             initial_inputs.push(input);
         }
     }
 
     // The closure that we want to fuzz
-    let mut harness = |input: &GeneralizedInput| {
+    let mut harness = |input: &BytesInput| {
         let target_bytes = input.target_bytes();
         let bytes = target_bytes.as_slice();
 
@@ -77,21 +77,14 @@ pub fn main() {
             signals_set(3);
         }
 
-        unsafe {
-            if input.grimoire_mutated {
-                // println!(">>> {:?}", input.generalized());
-                println!(">>> {:?}", std::str::from_utf8_unchecked(bytes));
-            }
-        }
         signals_set(1);
         ExitKind::Ok
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
-
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
     // Feedback to rate the interestingness of an input
-    let mut feedback = MaxMapFeedback::new_tracking(&observer, false, true);
+    let mut feedback = MaxMapFeedback::tracking(&observer, false, true);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -113,12 +106,12 @@ pub fn main() {
     )
     .unwrap();
 
-    if state.metadata().get::<Tokens>().is_none() {
+    if state.metadata_map().get::<Tokens>().is_none() {
         state.add_metadata(Tokens::from([b"FOO".to_vec(), b"BAR".to_vec()]));
     }
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    let monitor = SimpleMonitor::new(|s| println!("{s}"));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
@@ -158,7 +151,7 @@ pub fn main() {
     let mut stages = tuple_list!(
         generalization,
         StdMutationalStage::new(mutator),
-        StdMutationalStage::new(grimoire_mutator)
+        StdMutationalStage::transforming(grimoire_mutator)
     );
 
     for input in initial_inputs {

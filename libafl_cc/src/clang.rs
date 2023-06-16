@@ -38,6 +38,8 @@ pub enum LLVMPasses {
     AutoTokens,
     /// The Coverage Accouting (BB metric) pass
     CoverageAccounting,
+    /// The dump cfg pass
+    DumpCfg,
 }
 
 impl LLVMPasses {
@@ -54,6 +56,9 @@ impl LLVMPasses {
             }
             LLVMPasses::CoverageAccounting => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("coverage-accounting-pass.{}", dll_extension())),
+            LLVMPasses::DumpCfg => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("dump-cfg-pass.{}", dll_extension()))
+            }
         }
     }
 }
@@ -69,6 +74,7 @@ pub struct ClangWrapper {
 
     name: String,
     is_cpp: bool,
+    is_asm: bool,
     linking: bool,
     shared: bool,
     x_set: bool,
@@ -83,6 +89,7 @@ pub struct ClangWrapper {
     link_args: Vec<String>,
     passes: Vec<LLVMPasses>,
     passes_args: Vec<String>,
+    passes_linking_args: Vec<String>,
 }
 
 #[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
@@ -138,6 +145,13 @@ impl CompilerWrapper for ClangWrapper {
         let mut suppress_linking = 0;
         let mut i = 1;
         while i < args.len() {
+            if std::path::Path::new(args[i].as_ref())
+                .extension()
+                .map_or(false, |ext| ext.eq_ignore_ascii_case("s"))
+            {
+                self.is_asm = true;
+            }
+
             match args[i].as_ref() {
                 "--libafl-no-link" => {
                     suppress_linking += 1;
@@ -167,8 +181,10 @@ impl CompilerWrapper for ClangWrapper {
                     i += 1;
                     continue;
                 }
-                "-z" => {
-                    if i + 1 < args.len() && args[i + 1].as_ref() == "defs" {
+                "-z" | "-Wl,-z" => {
+                    if i + 1 < args.len()
+                        && (args[i + 1].as_ref() == "defs" || args[i + 1].as_ref() == "-Wl,defs")
+                    {
                         i += 2;
                         continue;
                     }
@@ -231,7 +247,7 @@ impl CompilerWrapper for ClangWrapper {
             new_args.push("dynamic_lookup".into());
         }
 
-        self.base_args = new_args;
+        self.base_args.extend(new_args);
         Ok(self)
     }
 
@@ -287,6 +303,8 @@ impl CompilerWrapper for ClangWrapper {
 
     fn command(&mut self) -> Result<Vec<String>, Error> {
         let mut args = vec![];
+        let mut use_pass = false;
+
         if self.is_cpp {
             args.push(self.wrapped_cxx.clone());
         } else {
@@ -299,12 +317,17 @@ impl CompilerWrapper for ClangWrapper {
 
         if !self.passes.is_empty() {
             if self.use_new_pm {
-                args.push("-fexperimental-new-pass-manager".into());
+                if let Some(ver) = LIBAFL_CC_LLVM_VERSION {
+                    if ver < 16 {
+                        args.push("-fexperimental-new-pass-manager".into());
+                    }
+                }
             } else {
                 args.push("-flegacy-pass-manager".into());
             }
         }
         for pass in &self.passes {
+            use_pass = true;
             if self.use_new_pm {
                 // https://github.com/llvm/llvm-project/issues/56137
                 // Need this -Xclang -load -Xclang -<pass>.so thing even with the new PM
@@ -325,9 +348,11 @@ impl CompilerWrapper for ClangWrapper {
                 args.push(pass.path().into_os_string().into_string().unwrap());
             }
         }
-        for passes_arg in &self.passes_args {
-            args.push("-mllvm".into());
-            args.push(passes_arg.into());
+        if !self.is_asm && !self.passes.is_empty() {
+            for passes_arg in &self.passes_args {
+                args.push("-mllvm".into());
+                args.push(passes_arg.into());
+            }
         }
         if self.linking {
             if self.x_set {
@@ -336,6 +361,10 @@ impl CompilerWrapper for ClangWrapper {
             }
 
             args.extend_from_slice(self.link_args.as_slice());
+
+            if use_pass {
+                args.extend_from_slice(self.passes_linking_args.as_slice());
+            }
 
             if cfg!(unix) {
                 args.push("-pthread".into());
@@ -350,6 +379,13 @@ impl CompilerWrapper for ClangWrapper {
 
     fn is_linking(&self) -> bool {
         self.linking
+    }
+
+    fn filter(&self, args: &mut Vec<String>) {
+        let blocklist = ["-Werror=unused-command-line-argument", "-Werror"];
+        for item in blocklist {
+            args.retain(|x| x.clone() != item);
+        }
     }
 
     fn silence(&mut self, value: bool) -> &'_ mut Self {
@@ -388,6 +424,7 @@ impl ClangWrapper {
             wrapped_cxx: CLANGXX_PATH.into(),
             name: String::new(),
             is_cpp: false,
+            is_asm: false,
             linking: false,
             shared: false,
             x_set: false,
@@ -401,6 +438,7 @@ impl ClangWrapper {
             link_args: vec![],
             passes: vec![],
             passes_args: vec![],
+            passes_linking_args: vec![],
             is_silent: false,
         }
     }
@@ -444,6 +482,15 @@ impl ClangWrapper {
         self
     }
 
+    /// Add arguments for LLVM passes during linking. For example, ngram needs -lm
+    pub fn add_passes_linking_arg<S>(&mut self, arg: S) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        self.passes_linking_args.push(arg.as_ref().to_string());
+        self
+    }
+
     /// Set if linking
     pub fn linking(&mut self, value: bool) -> &'_ mut Self {
         self.linking = value;
@@ -468,6 +515,7 @@ mod tests {
     use crate::{ClangWrapper, CompilerWrapper};
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_clang_version() {
         if let Err(res) = ClangWrapper::new()
             .parse_args(&["my-clang", "-v"])

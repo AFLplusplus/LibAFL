@@ -3,28 +3,28 @@
 use alloc::string::{String, ToString};
 use core::{
     fmt::Debug,
-    hash::{Hash, Hasher},
+    hash::{BuildHasher, Hash, Hasher},
     marker::PhantomData,
 };
 
-use ahash::AHasher;
+use ahash::RandomState;
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::{tuples::Named, HasLen},
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, CorpusId, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverName},
     inputs::UsesInput,
     mark_feature_time,
-    mutators::Mutator,
+    mutators::{MutationResult, Mutator},
     observers::{MapObserver, ObserversTuple},
-    schedulers::Scheduler,
+    schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, HasSolutions, UsesState},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
 
@@ -34,14 +34,14 @@ use crate::{
 pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F2, CS::State, OT>
 where
-    Self::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    Self::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor,
     <Self::State as UsesInput>::Input: HasLen + Hash,
-    CS: Scheduler<State = Self::State>,
+    CS: Scheduler<State = Self::State> + RemovableScheduler,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
     EM: EventFirer<State = Self::State>,
     F1: Feedback<Self::State>,
     F2: Feedback<Self::State>,
-    M: Mutator<Self::State>,
+    M: Mutator<Self::Input, Self::State>,
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<OT, State = Self::State>
         + ExecutesInput<E, EM>
@@ -55,7 +55,7 @@ where
     fn mutator_mut(&mut self) -> &mut M;
 
     /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut CS::State, corpus_idx: usize) -> Result<usize, Error>;
+    fn iterations(&self, state: &mut CS::State, corpus_idx: CorpusId) -> Result<usize, Error>;
 
     /// Runs this (mutational) stage for new objectives
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
@@ -65,20 +65,15 @@ where
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-        base_corpus_idx: usize,
+        base_corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let orig_max_size = state.max_size();
         // basically copy-pasted from mutational.rs
         let num = self.iterations(state, base_corpus_idx)?;
 
         start_timer!(state);
-        let mut base = state
-            .corpus()
-            .get(base_corpus_idx)?
-            .borrow_mut()
-            .load_input()?
-            .clone();
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut base = state.corpus().cloned_input_for_id(base_corpus_idx)?;
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         base.hash(&mut hasher);
         let base_hash = hasher.finish();
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
@@ -102,8 +97,12 @@ where
             state.set_max_size(before_len);
 
             start_timer!(state);
-            self.mutator_mut().mutate(state, &mut input, i as i32)?;
+            let mutated = self.mutator_mut().mutate(state, &mut input, i as i32)?;
             mark_feature_time!(state, PerfFeature::Mutate);
+
+            if mutated == MutationResult::Skipped {
+                continue;
+            }
 
             let corpus_idx = if input.len() < before_len {
                 // run the input
@@ -112,6 +111,11 @@ where
 
                 // let the fuzzer process this execution -- it's possible that we find something
                 // interesting, or even a solution
+
+                // TODO replace if process_execution adds a return value for solution index
+                let solution_count = state.solutions().count();
+                let corpus_count = state.corpus().count();
+                *state.executions_mut() += 1;
                 let (_, corpus_idx) = fuzzer.process_execution(
                     state,
                     manager,
@@ -121,12 +125,17 @@ where
                     false,
                 )?;
 
-                if feedback.is_interesting(state, manager, &input, observers, &exit_kind)? {
-                    // we found a reduced corpus entry! use the smaller base
-                    base = input;
+                if state.corpus().count() == corpus_count
+                    && state.solutions().count() == solution_count
+                {
+                    // we do not care about interesting inputs!
+                    if feedback.is_interesting(state, manager, &input, observers, &exit_kind)? {
+                        // we found a reduced corpus entry! use the smaller base
+                        base = input;
 
-                    // do more runs! maybe we can minify further
-                    next_i = 0;
+                        // do more runs! maybe we can minify further
+                        next_i = 0;
+                    }
                 }
 
                 corpus_idx
@@ -143,14 +152,22 @@ where
             i = next_i;
         }
 
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         base.hash(&mut hasher);
         let new_hash = hasher.finish();
         if base_hash != new_hash {
+            let exit_kind = fuzzer.execute_input(state, executor, manager, &base)?;
+            let observers = executor.observers();
+            *state.executions_mut() += 1;
+            // assumption: this input should not be marked interesting because it was not
+            // marked as interesting above; similarly, it should not trigger objectives
+            fuzzer
+                .feedback_mut()
+                .is_interesting(state, manager, &base, observers, &exit_kind)?;
             let mut testcase = Testcase::with_executions(base, *state.executions());
             fuzzer
                 .feedback_mut()
-                .append_metadata(state, &mut testcase)?;
+                .append_metadata(state, observers, &mut testcase)?;
             let prev = state.corpus_mut().replace(base_corpus_idx, testcase)?;
             fuzzer
                 .scheduler_mut()
@@ -177,8 +194,9 @@ impl<CS, E, EM, F1, F2, FF, M, OT, Z> UsesState
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>,
+    CS::State: HasCorpus,
 {
     type State = CS::State;
 }
@@ -186,15 +204,16 @@ where
 impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
-    CS: Scheduler,
-    CS::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    CS: Scheduler + RemovableScheduler,
+    CS::State:
+        HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor + HasCorpus,
     <CS::State as UsesInput>::Input: HasLen + Hash,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,
     F2: Feedback<CS::State>,
     FF: FeedbackFactory<F2, CS::State, OT>,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>
         + ExecutesInput<E, EM>
@@ -207,7 +226,7 @@ where
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         self.perform_minification(fuzzer, executor, state, manager, corpus_idx)?;
 
@@ -234,16 +253,16 @@ where
 impl<CS, E, EM, F1, F2, FF, M, OT, Z> TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
-    CS: Scheduler,
+    CS: Scheduler + RemovableScheduler,
     E: HasObservers<Observers = OT, State = CS::State> + Executor<EM, Z>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,
     F2: Feedback<CS::State>,
     FF: FeedbackFactory<F2, CS::State, OT>,
     <CS::State as UsesInput>::Input: HasLen + Hash,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasSolutions + HasExecutions + HasMaxSize,
     Z: ExecutionProcessor<OT, State = CS::State>
         + ExecutesInput<E, EM>
         + HasFeedback<Feedback = F1>
@@ -262,7 +281,7 @@ where
     }
 
     /// Gets the number of iterations from a fixed number of runs
-    fn iterations(&self, _state: &mut CS::State, _corpus_idx: usize) -> Result<usize, Error> {
+    fn iterations(&self, _state: &mut CS::State, _corpus_idx: CorpusId) -> Result<usize, Error> {
         Ok(self.runs)
     }
 }
@@ -270,8 +289,9 @@ where
 impl<CS, E, EM, F1, F2, FF, M, OT, Z> StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler,
-    M: Mutator<CS::State>,
+    M: Mutator<CS::Input, CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>,
+    CS::State: HasCorpus,
 {
     /// Creates a new minimising mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
@@ -328,7 +348,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S as UsesInput>::Input,
+        _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -355,7 +375,7 @@ where
     M: MapObserver,
 {
     /// Creates a new map equality feedback for the given observer
-    pub fn new_from_observer(obs: &M) -> Self {
+    pub fn with_observer(obs: &M) -> Self {
         Self {
             obs_name: obs.name().to_string(),
             phantom: PhantomData,

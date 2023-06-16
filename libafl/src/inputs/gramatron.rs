@@ -1,8 +1,12 @@
 //! The gramatron grammar fuzzer
 use alloc::{rc::Rc, string::String, vec::Vec};
-use core::{cell::RefCell, convert::From, hash::Hasher};
+use core::{
+    cell::RefCell,
+    convert::From,
+    hash::{BuildHasher, Hasher},
+};
 
-use ahash::AHasher;
+use ahash::RandomState;
 use serde::{Deserialize, Serialize};
 
 use crate::{bolts::HasLen, inputs::Input, Error};
@@ -41,7 +45,7 @@ impl Input for GramatronInput {
     /// Generate a name for this input
     #[must_use]
     fn generate_name(&self, _idx: usize) -> String {
-        let mut hasher = AHasher::new_with_keys(0, 0);
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         for term in &self.terms {
             hasher.write(term.symbol.as_bytes());
         }

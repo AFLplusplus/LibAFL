@@ -28,6 +28,8 @@ pub fn build() {
         "i386".to_string()
     } else if cfg!(feature = "mips") {
         "mips".to_string()
+    } else if cfg!(feature = "ppc") {
+        "ppc".to_string()
     } else {
         env::var("CPU_TARGET").unwrap_or_else(|_| {
             "x86_64".to_string()

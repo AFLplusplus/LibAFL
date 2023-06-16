@@ -11,6 +11,7 @@ Welcome to `LibAFL`
 // For `std::simd`
 #![cfg_attr(unstable_feature, feature(portable_simd))]
 #![warn(clippy::cargo)]
+#![allow(ambiguous_glob_reexports)]
 #![deny(clippy::cargo_common_metadata)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
@@ -25,7 +26,7 @@ Welcome to `LibAFL`
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::unreadable_literal
+    clippy::ptr_cast_constness
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -46,7 +47,6 @@ Welcome to `LibAFL`
     unused_import_braces,
     unused_qualifications,
     unused_must_use,
-    missing_docs,
     //unused_results
 ))]
 #![cfg_attr(
@@ -77,10 +77,10 @@ Welcome to `LibAFL`
 #[macro_use]
 extern crate std;
 #[macro_use]
+#[doc(hidden)]
 pub extern crate alloc;
-#[macro_use]
-extern crate static_assertions;
 #[cfg(feature = "ctor")]
+#[doc(hidden)]
 pub use ctor::ctor;
 
 // Re-export derive(SerdeAny)
@@ -404,7 +404,7 @@ impl From<TryFromSliceError> for Error {
 #[cfg(windows)]
 impl From<windows::core::Error> for Error {
     fn from(err: windows::core::Error) -> Self {
-        Self::unknown(format!("Windows API error: {:?}", err))
+        Self::unknown(format!("Windows API error: {err:?}"))
     }
 }
 
@@ -519,6 +519,9 @@ mod tests {
             fuzzer
                 .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
                 .unwrap_or_else(|_| panic!("Error in iter {i}"));
+            if cfg!(miri) {
+                break;
+            }
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
@@ -537,7 +540,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, not(feature = "std")))]
+#[cfg(all(any(doctest, test), not(feature = "std")))]
 /// Provide custom time in `no_std` tests.
 #[no_mangle]
 pub extern "C" fn external_current_millis() -> u64 {

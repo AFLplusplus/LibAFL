@@ -9,19 +9,22 @@
 // == how to use it ===
 // This monitor should plug into any fuzzer similar to other monitors.
 // In your fuzzer, include:
+// ```rust,ignore
 // use libafl::monitors::PrometheusMonitor;
+// ```
 // as well as:
+// ```rust,ignore
 // let listener = "127.0.0.1:8080".to_string(); // point prometheus to scrape here in your prometheus.yml
-// let mon = PrometheusMonitor::new(listener, |s| println!("{}", s));
+// let mon = PrometheusMonitor::new(listener, |s| log::info!("{s}"));
 // and then like with any other monitor, pass it into the event manager like so:
 // let mut mgr = SimpleEventManager::new(mon);
+// ```
 // When using docker, you may need to point prometheus.yml to the docker0 interface or host.docker.internal
 // ====================
 
 use alloc::{fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
 use std::{
-    boxed::Box,
     sync::{atomic::AtomicU64, Arc},
     thread,
 };
@@ -30,7 +33,7 @@ use std::{
 use futures::executor::block_on;
 // using the official rust client library for Prometheus: https://github.com/prometheus/client_rust
 use prometheus_client::{
-    encoding::text::{encode, Encode, SendSyncEncodeMetric},
+    encoding::{text::encode, EncodeLabelSet},
     metrics::{family::Family, gauge::Gauge},
     registry::Registry,
 };
@@ -38,7 +41,7 @@ use prometheus_client::{
 use tide::Request;
 
 use crate::{
-    bolts::{current_time, format_duration_hms},
+    bolts::{current_time, format_duration_hms, ClientId},
     monitors::{ClientStats, Monitor, UserStats},
 };
 
@@ -54,7 +57,7 @@ where
     corpus_count: Family<Labels, Gauge>,
     objective_count: Family<Labels, Gauge>,
     executions: Family<Labels, Gauge>,
-    exec_rate: Family<Labels, Gauge>,
+    exec_rate: Family<Labels, Gauge<f64, AtomicU64>>,
     runtime: Family<Labels, Gauge>,
     clients_count: Family<Labels, Gauge>,
     custom_stat: Family<Labels, Gauge<f64, AtomicU64>>,
@@ -68,7 +71,7 @@ where
         f.debug_struct("PrometheusMonitor")
             .field("start_time", &self.start_time)
             .field("client_stats", &self.client_stats)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -91,48 +94,55 @@ where
         self.start_time
     }
 
-    fn display(&mut self, event_msg: String, sender_id: u32) {
+    #[allow(clippy::cast_sign_loss)]
+    fn display(&mut self, event_msg: String, sender_id: ClientId) {
         // Update the prometheus metrics
         // Label each metric with the sender / client_id
+        // The gauges must take signed i64's, with max value of 2^63-1 so it is
+        // probably fair to error out at a count of nine quintillion across any
+        // of these counts.
+        // realistically many of these metrics should be counters but would
+        // require a fair bit of logic to handle "amount to increment given
+        // time since last observation"
         let corpus_size = self.corpus_size();
         self.corpus_count
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
-            .set(corpus_size);
+            .set(corpus_size.try_into().unwrap());
         let objective_size = self.objective_size();
         self.objective_count
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
-            .set(objective_size);
+            .set(objective_size.try_into().unwrap());
         let total_execs = self.total_execs();
         self.executions
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
-            .set(total_execs);
+            .set(total_execs.try_into().unwrap());
         let execs_per_sec = self.execs_per_sec();
         self.exec_rate
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
             .set(execs_per_sec);
         let run_time = (current_time() - self.start_time).as_secs();
         self.runtime
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
-            .set(run_time); // run time in seconds, which can be converted to a time format by Grafana or similar
+            .set(run_time.try_into().unwrap()); // run time in seconds, which can be converted to a time format by Grafana or similar
         let total_clients = self.client_stats().len().try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
         self.clients_count
             .get_or_create(&Labels {
-                client: sender_id,
+                client: sender_id.0,
                 stat: String::new(),
             })
             .set(total_clients);
@@ -141,13 +151,13 @@ where
         let fmt = format!(
             "[Prometheus] [{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
-            sender_id,
+            sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec_pretty()
         );
         (self.print_fn)(fmt);
 
@@ -157,7 +167,7 @@ where
         for (key, val) in cur_client_clone.user_monitor {
             // Update metrics added to the user_stats hashmap by feedback event-fires
             // You can filter for each custom stat in promQL via labels of both the stat name and client id
-            println!("{key}: {val}");
+            log::info!("{key}: {val}");
             #[allow(clippy::cast_precision_loss)]
             let value: f64 = match val {
                 UserStats::Number(n) => n as f64,
@@ -167,7 +177,7 @@ where
             };
             self.custom_stat
                 .get_or_create(&Labels {
-                    client: sender_id,
+                    client: sender_id.0,
                     stat: key.clone(),
                 })
                 .set(value);
@@ -187,7 +197,7 @@ where
         let objective_count_clone = objective_count.clone();
         let executions = Family::<Labels, Gauge>::default();
         let executions_clone = executions.clone();
-        let exec_rate = Family::<Labels, Gauge>::default();
+        let exec_rate = Family::<Labels, Gauge<f64, AtomicU64>>::default();
         let exec_rate_clone = exec_rate.clone();
         let runtime = Family::<Labels, Gauge>::default();
         let runtime_clone = runtime.clone();
@@ -208,7 +218,7 @@ where
                 clients_count_clone,
                 custom_stat_clone,
             ))
-            .map_err(|err| println!("{err:?}"))
+            .map_err(|err| log::error!("{err:?}"))
             .ok();
         });
         Self {
@@ -232,7 +242,7 @@ where
         let objective_count_clone = objective_count.clone();
         let executions = Family::<Labels, Gauge>::default();
         let executions_clone = executions.clone();
-        let exec_rate = Family::<Labels, Gauge>::default();
+        let exec_rate = Family::<Labels, Gauge<f64, AtomicU64>>::default();
         let exec_rate_clone = exec_rate.clone();
         let runtime = Family::<Labels, Gauge>::default();
         let runtime_clone = runtime.clone();
@@ -252,7 +262,7 @@ where
                 clients_count_clone,
                 custom_stat_clone,
             ))
-            .map_err(|err| println!("{err:?}"))
+            .map_err(|err| log::error!("{err:?}"))
             .ok();
         });
         Self {
@@ -277,49 +287,41 @@ pub async fn serve_metrics(
     corpus: Family<Labels, Gauge>,
     objectives: Family<Labels, Gauge>,
     executions: Family<Labels, Gauge>,
-    exec_rate: Family<Labels, Gauge>,
+    exec_rate: Family<Labels, Gauge<f64, AtomicU64>>,
     runtime: Family<Labels, Gauge>,
     clients_count: Family<Labels, Gauge>,
     custom_stat: Family<Labels, Gauge<f64, AtomicU64>>,
 ) -> Result<(), std::io::Error> {
     tide::log::start();
 
-    let mut registry = <Registry>::default();
+    let mut registry = Registry::default();
 
-    registry.register(
-        "corpus_count",
-        "Number of test cases in the corpus",
-        Box::new(corpus),
-    );
+    registry.register("corpus_count", "Number of test cases in the corpus", corpus);
     registry.register(
         "objective_count",
         "Number of times the objective has been achieved (e.g., crashes)",
-        Box::new(objectives),
+        objectives,
     );
     registry.register(
         "executions_total",
         "Number of executions the fuzzer has done",
-        Box::new(executions),
+        executions,
     );
-    registry.register(
-        "execution_rate",
-        "Rate of executions per second",
-        Box::new(exec_rate),
-    );
+    registry.register("execution_rate", "Rate of executions per second", exec_rate);
     registry.register(
         "runtime",
         "How long the fuzzer has been running for (seconds)",
-        Box::new(runtime),
+        runtime,
     );
     registry.register(
         "clients_count",
         "How many clients have been spawned for the fuzzing job",
-        Box::new(clients_count),
+        clients_count,
     );
     registry.register(
         "custom_stat",
         "A metric to contain custom stats returned by feedbacks, filterable by label",
-        Box::new(custom_stat),
+        custom_stat,
     );
 
     let mut app = tide::with_state(State {
@@ -329,7 +331,7 @@ pub async fn serve_metrics(
     app.at("/")
         .get(|_| async { Ok("LibAFL Prometheus Monitor") });
     app.at("/metrics").get(|req: Request<State>| async move {
-        let mut encoded = Vec::new();
+        let mut encoded = String::new();
         encode(&mut encoded, &req.state().registry).unwrap();
         let response = tide::Response::builder(200)
             .body(encoded)
@@ -342,7 +344,7 @@ pub async fn serve_metrics(
     Ok(())
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, Encode, Debug)]
+#[derive(Clone, Hash, PartialEq, Eq, EncodeLabelSet, Debug)]
 pub struct Labels {
     client: u32, // sender_id: u32, to differentiate between clients when multiple are spawned.
     stat: String, // for custom_stat filtering.
@@ -350,6 +352,5 @@ pub struct Labels {
 
 #[derive(Clone)]
 struct State {
-    #[allow(dead_code)]
-    registry: Arc<Registry<Box<dyn SendSyncEncodeMetric>>>,
+    registry: Arc<Registry>,
 }

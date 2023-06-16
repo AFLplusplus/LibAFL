@@ -4,9 +4,9 @@ use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId, HasTestcase},
     inputs::UsesInput,
-    schedulers::Scheduler,
+    schedulers::{RemovableScheduler, Scheduler},
     state::{HasCorpus, UsesState},
     Error,
 };
@@ -24,26 +24,36 @@ where
     type State = S;
 }
 
+impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus + HasTestcase {}
+
 impl<S> Scheduler for QueueScheduler<S>
 where
-    S: HasCorpus,
+    S: HasCorpus + HasTestcase,
 {
+    fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
+        // Set parent id
+        let current_idx = *state.corpus().current();
+        state
+            .corpus()
+            .get(idx)?
+            .borrow_mut()
+            .set_parent_id_optional(current_idx);
+
+        Ok(())
+    }
+
     /// Gets the next entry in the queue
-    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
+    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
-            let id = match state.corpus().current() {
-                Some(cur) => {
-                    if *cur + 1 >= state.corpus().count() {
-                        0
-                    } else {
-                        *cur + 1
-                    }
-                }
-                None => 0,
-            };
-            *state.corpus_mut().current_mut() = Some(id);
+            let id = state
+                .corpus()
+                .current()
+                .map(|id| state.corpus().next(id))
+                .flatten()
+                .unwrap_or_else(|| state.corpus().first().unwrap());
+            self.set_current_scheduled(state, Some(id))?;
             Ok(id)
         }
     }
@@ -83,14 +93,11 @@ mod tests {
     #[test]
     fn test_queuecorpus() {
         let rand = StdRand::with_seed(4);
-        let scheduler = QueueScheduler::new();
+        let mut scheduler = QueueScheduler::new();
 
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();
-        let t = Testcase::with_filename(
-            BytesInput::new(vec![0_u8; 4]),
-            "target/.test/fancy/path/fancyfile".into(),
-        );
+        let t = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "fancyfile".into());
         q.add(t).unwrap();
 
         let objective_q =
@@ -113,8 +120,8 @@ mod tests {
             .unwrap()
             .clone();
 
-        assert_eq!(filename, "target/.test/fancy/path/fancyfile");
+        assert_eq!(filename, "fancyfile");
 
-        fs::remove_dir_all("target/.test/fancy").unwrap();
+        fs::remove_dir_all("target/.test/fancy/path").unwrap();
     }
 }

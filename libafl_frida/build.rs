@@ -1,7 +1,10 @@
 // build.rs
 
 fn main() {
-    cc::Build::new().file("src/gettls.c").compile("libgettls.a");
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
+    if target_os != "ios" {
+        cc::Build::new().file("src/gettls.c").compile("libgettls.a");
+    }
 
     // Force linking against libc++
     #[cfg(unix)]

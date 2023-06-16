@@ -18,9 +18,10 @@ use tui::{
 
 use super::{current_time, format_duration_hms, Duration, String, TimedStats, TuiContext};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct TuiUI {
     title: String,
+    version: String,
     enhanced_graphics: bool,
     show_logs: bool,
     clients_idx: usize,
@@ -32,16 +33,23 @@ pub struct TuiUI {
 }
 
 impl TuiUI {
+    #[must_use]
     pub fn new(title: String, enhanced_graphics: bool) -> Self {
+        Self::with_version(title, String::from("default"), enhanced_graphics)
+    }
+
+    // create the TuiUI with a given `version`.
+    #[must_use]
+    pub fn with_version(title: String, version: String, enhanced_graphics: bool) -> Self {
         Self {
             title,
+            version,
             enhanced_graphics,
             show_logs: true,
             clients_idx: 1,
             ..TuiUI::default()
         }
     }
-
     pub fn on_key(&mut self, c: char) {
         match c {
             'q' => {
@@ -106,8 +114,11 @@ impl TuiUI {
             .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
             .split(top_layout[0]);
 
+        let mut status_bar: String = self.title.clone();
+        status_bar = status_bar + " (" + self.version.as_str() + ")";
+
         let text = vec![Spans::from(Span::styled(
-            &self.title,
+            &status_bar,
             Style::default()
                 .fg(Color::LightMagenta)
                 .add_modifier(Modifier::BOLD),
@@ -265,7 +276,7 @@ impl TuiUI {
             }
         }
 
-        //println!("max_x: {}, len: {}", max_x, self.graph_data.len());
+        //log::trace!("max_x: {}, len: {}", max_x, self.graph_data.len());
 
         let datasets = vec![Dataset::default()
             //.name("data")
@@ -397,7 +408,7 @@ impl TuiUI {
                 ]));
                 client_items.push(Row::new(vec![
                     Cell::from(Span::raw("exec/sec")),
-                    Cell::from(Span::raw(format!("{}", client.exec_sec))),
+                    Cell::from(Span::raw(client.exec_sec.clone())),
                 ]));
                 client_items.push(Row::new(vec![
                     Cell::from(Span::raw("corpus")),

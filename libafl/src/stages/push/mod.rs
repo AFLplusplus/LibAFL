@@ -17,12 +17,13 @@ pub use mutational::StdMutationalPushStage;
 
 use crate::{
     bolts::current_time,
+    corpus::CorpusId,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -37,7 +38,7 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand,
+    CS::State: HasClientPerfMonitor + HasRand + HasCorpus,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -58,7 +59,7 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand,
+    CS::State: HasClientPerfMonitor + HasRand + HasCorpus,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -83,7 +84,7 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand,
+    CS::State: HasClientPerfMonitor + HasRand + HasCorpus,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -100,7 +101,7 @@ where
     pub errored: bool,
 
     /// The corpus index we're currently working on
-    pub current_corpus_idx: Option<usize>,
+    pub current_corpus_idx: Option<CorpusId>,
 
     /// The input we just ran
     pub current_input: Option<<CS::State as UsesInput>::Input>, // Todo: Get rid of copy
@@ -115,7 +116,7 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand,
+    CS::State: HasClientPerfMonitor + HasRand + HasCorpus,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -183,7 +184,7 @@ where
 pub trait PushStage<CS, EM, OT, Z>: Iterator
 where
     CS: Scheduler,
-    CS::State: HasClientPerfMonitor + HasRand + HasExecutions + HasMetadata,
+    CS::State: HasClientPerfMonitor + HasRand + HasExecutions + HasMetadata + HasCorpus,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>
@@ -196,7 +197,7 @@ where
     fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, OT, Z>;
 
     /// Set the current corpus index this stage works on
-    fn set_current_corpus_idx(&mut self, corpus_idx: usize) {
+    fn set_current_corpus_idx(&mut self, corpus_idx: CorpusId) {
         self.push_stage_helper_mut().current_corpus_idx = Some(corpus_idx);
     }
 

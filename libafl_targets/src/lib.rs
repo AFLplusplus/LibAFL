@@ -106,7 +106,7 @@ pub mod windows_asan;
 #[cfg(all(windows, feature = "std"))]
 pub use windows_asan::*;
 
-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+#[cfg(unix)]
 pub mod forkserver;
-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+#[cfg(unix)]
 pub use forkserver::*;
