@@ -4,11 +4,13 @@ use std::os::fd::{AsRawFd, FromRawFd};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env::temp_dir, ffi::c_int, fs};
 
+use crate::schedulers::MergeScheduler;
 use crate::{
     feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback},
     observers::{MappedEdgeMapObserver, SizeTimeValueObserver},
     options::LibfuzzerOptions,
 };
+use libafl::schedulers::RemovableScheduler;
 use libafl::{
     bolts::{
         rands::{Rand, RandomSeed, StdRand},
@@ -27,9 +29,8 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     observers::{MultiMapObserver, TimeObserver},
-    schedulers::QueueScheduler,
     state::{HasCorpus, HasRand, StdState},
-    Error, StdFuzzer,
+    Error, HasScheduler, StdFuzzer,
 };
 use libafl_targets::{OOMFeedback, OOMObserver, COUNTERS_MAPS};
 
@@ -133,7 +134,7 @@ pub fn merge(
     let edges_observer =
         MappedEdgeMapObserver::new(edges_observer, SizeTimeValueObserver::new(time));
 
-    let map_feedback = MinMapFeedback::new(&edges_observer);
+    let map_feedback = MinMapFeedback::tracking(&edges_observer, false, true);
 
     // Create an OOM observer to monitor if an OOM has occurred
     let oom_observer = OOMObserver::new(options.rss_limit(), options.malloc_limit());
@@ -153,7 +154,7 @@ pub fn merge(
     let observers = tuple_list!(edges_observer, oom_observer);
 
     // scheduler doesn't really matter here
-    let scheduler = QueueScheduler::new();
+    let scheduler = MergeScheduler::new();
 
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
@@ -209,6 +210,13 @@ pub fn merge(
                     )
                 });
         }
+    }
+
+    for idx in fuzzer.scheduler().removable() {
+        let testcase = state.corpus_mut().remove(idx)?;
+        fuzzer
+            .scheduler_mut()
+            .on_remove(&mut state, idx, &Some(testcase))?;
     }
 
     println!(

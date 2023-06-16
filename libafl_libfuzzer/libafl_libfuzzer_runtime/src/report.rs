@@ -1,6 +1,5 @@
 use std::ffi::c_int;
 
-use libafl::corpus::CorpusId;
 use libafl::{
     events::{ProgressReporter, SimpleEventManager},
     executors::HasObservers,

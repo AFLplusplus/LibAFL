@@ -15,6 +15,7 @@ mod misc;
 mod observers;
 mod options;
 mod report;
+mod schedulers;
 mod tmin;
 
 mod harness_wrap {
@@ -95,7 +96,7 @@ macro_rules! fuzz_with {
                 CalibrationStage, GeneralizationStage, IfStage, StdMutationalStage,
                 StdPowerMutationalStage, TracingStage,
             },
-            state::{HasCorpus, HasSolutions, StdState},
+            state::{HasCorpus, StdState},
             StdFuzzer,
         };
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OOMFeedback, OOMObserver};
