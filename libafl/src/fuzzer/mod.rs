@@ -506,7 +506,7 @@ where
         #[cfg(feature = "introspection")]
         let _is_solution = self
             .objective_mut()
-            .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
+            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
 
         #[cfg(not(feature = "introspection"))]
         let _is_corpus = self
@@ -516,7 +516,7 @@ where
         #[cfg(feature = "introspection")]
         let _is_corpus = self
             .feedback_mut()
-            .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
+            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
 
         // Not a solution
         self.objective_mut().discard_metadata(state, &input)?;
