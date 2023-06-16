@@ -34,6 +34,7 @@ where
     EM: UsesState,
     SP: ShMemProvider,
 {
+    must_ser_cnt: usize,
     inner: EM,
     sender_to_main: Option<LlmpSender<SP>>,
     receivers_from_secondary: Option<Vec<LlmpReceiver<SP>>>,
@@ -146,16 +147,25 @@ where
             .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
             .unwrap();
 
-        // eprintln!("serialize_observers: {:?}    {:?} {:?}", exec_time, self.serialization_time(), self.deserialization_time());
+        const SERIALIZE_TIME_FACTOR: u32 = 4;
+
+        let mut must_ser = (self.inner.serialization_time() + self.inner.deserialization_time()) * SERIALIZE_TIME_FACTOR < exec_time;
+        if must_ser { self.must_ser_cnt += 1; }
+        
+        if self.inner.serializations_cnt() > 256 {
+            must_ser = (self.must_ser_cnt * 100 / self.inner.serializations_cnt()) > 80;
+        }
+
+        eprintln!("serialize_observers: {:?}    {:?} {:?}   {} {} {}", exec_time, self.serialization_time(), self.deserialization_time(), self.must_ser_cnt, self.inner.serializations_cnt(), must_ser);
         if self.inner.serialization_time() == Duration::ZERO
-            || (self.inner.serialization_time() + self.inner.deserialization_time()) * 4 < exec_time // self.execution_time
+            || must_ser
             || self.inner.serializations_cnt().trailing_zeros() >= 8
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
             *self.inner.serialization_time_mut() = current_time() - start;
 
-            // eprintln!("serialized!   {:?} {:?}", ser.len(), (self.serialization_time() + self.deserialization_time()) * 4 < exec_time);
+            eprintln!("serialized!   {:?} {:?}", ser.len(), (self.serialization_time() + self.deserialization_time()) * 4 < exec_time);
 
             *self.inner.serializations_cnt_mut() += 1;
             Ok(Some(ser))
@@ -367,7 +377,7 @@ where
 {
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_main(inner: EM, receivers_from_secondary: Vec<LlmpReceiver<SP>>) -> Self {
-        Self {
+        Self {must_ser_cnt:0,
             inner,
             sender_to_main: None,
             receivers_from_secondary: Some(receivers_from_secondary),
@@ -376,7 +386,7 @@ where
 
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_secondary(inner: EM, sender_to_main: LlmpSender<SP>) -> Self {
-        Self {
+        Self {must_ser_cnt:0,
             inner,
             sender_to_main: Some(sender_to_main),
             receivers_from_secondary: None,
