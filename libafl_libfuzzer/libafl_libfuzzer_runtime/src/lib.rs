@@ -476,6 +476,11 @@ pub extern "C" fn LLVMFuzzerRunDriver(
             .map(|cstr| cstr.to_str().unwrap()),
     )
     .unwrap();
+
+    if !options.unknown().is_empty() {
+        println!("Unrecognised options: {}", options.unknown().join(" "));
+    }
+
     if *options.mode() != LibfuzzerMode::Tmin
         && !options.dirs().is_empty()
         && options.dirs().iter().all(|maybe_dir| maybe_dir.is_file())

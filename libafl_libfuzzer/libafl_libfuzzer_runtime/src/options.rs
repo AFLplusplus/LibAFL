@@ -159,10 +159,6 @@ impl LibfuzzerOptions {
         self.dict.as_ref()
     }
 
-    pub fn dirs_mut(&mut self) -> &mut Vec<PathBuf> {
-        &mut self.dirs
-    }
-
     pub fn dirs(&self) -> &[PathBuf] {
         &self.dirs
     }

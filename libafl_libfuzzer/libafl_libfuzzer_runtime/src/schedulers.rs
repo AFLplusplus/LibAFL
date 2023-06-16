@@ -50,7 +50,7 @@ where
         Ok(())
     }
 
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, _state: &mut Self::State) -> Result<CorpusId, Error> {
         unimplemented!("Not suitable for actual scheduling.");
     }
 }
