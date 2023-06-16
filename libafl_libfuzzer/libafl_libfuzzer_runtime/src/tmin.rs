@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::{
     ffi::c_int,
     fs::{read, write},
@@ -59,7 +60,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
         }
     };
 
-    let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), CrashFeedback::new(), ());
+    let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), (), ());
 
     let shmem_provider = StdShMemProvider::new()?;
     let mut executor = TimeoutInProcessForkExecutor::new(
@@ -109,44 +110,34 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     let input = testcase.load_input(state.corpus())?.bytes().to_vec();
     drop(testcase);
     if input.len() >= size {
-        mgr.log(
-            &mut state,
-            LogSeverity::Warn,
-            format!(
-                "Unable to reduce {}",
-                options.dirs()[0].as_path().as_os_str().to_str().unwrap()
-            ),
-        )?;
+        eprintln!(
+            "Unable to reduce {}",
+            options.dirs()[0].as_path().as_os_str().to_str().unwrap()
+        );
     } else {
-        if let Some(artifact_prefix) = options.artifact_prefix() {
-            let mut dest = artifact_prefix.dir().clone();
-            dest.push(
-                artifact_prefix
-                    .filename_prefix()
-                    .as_ref()
-                    .map(|s| {
-                        format!(
-                            "{}minimized-from-{}",
-                            s,
-                            options.dirs()[0].file_name().unwrap().to_str().unwrap()
-                        )
-                    })
-                    .unwrap_or_else(|| {
-                        options.dirs()[0]
-                            .file_name()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_string()
-                    }),
-            );
-            let message = format!(
-                "Wrote minimised input to {}",
-                dest.file_name().unwrap().to_str().unwrap()
-            );
-            write(dest, input)?;
-            mgr.log(&mut state, LogSeverity::Info, message)?;
-        }
+        let (mut dest, filename_prefix) = options
+            .artifact_prefix()
+            .map(|artifact_prefix| {
+                (
+                    artifact_prefix.dir().clone(),
+                    artifact_prefix
+                        .filename_prefix()
+                        .as_ref()
+                        .map(|s| s.as_str())
+                        .unwrap_or(""),
+                )
+            })
+            .unwrap_or_else(|| (PathBuf::default(), ""));
+        dest.push(format!(
+            "{}minimized-from-{}",
+            filename_prefix,
+            options.dirs()[0].file_name().unwrap().to_str().unwrap()
+        ));
+        write(&dest, input)?;
+        println!(
+            "Wrote minimised input to {}",
+            dest.file_name().unwrap().to_str().unwrap()
+        );
     }
 
     Ok(())
@@ -156,6 +147,17 @@ pub fn minimize_crash(
     options: LibfuzzerOptions,
     harness: &extern "C" fn(*const u8, usize) -> c_int,
 ) -> Result<(), Error> {
+    println!(
+        "Attempting to minimise a crash: {}",
+        options
+            .dirs()
+            .iter()
+            .map(|p| p
+                .to_str()
+                .expect("Couldn't render the filename as a string!"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     let mutator_status = CustomMutationStatus::new();
 
     let state = StdState::new(
