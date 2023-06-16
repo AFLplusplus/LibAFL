@@ -444,6 +444,10 @@ where
             .named_metadata_map_mut()
             .get_mut::<MapFeedbackMetadata<T>>(&self.name)
             .unwrap();
+        let len = observer.len();
+        if map_state.history_map.len() < len {
+            map_state.history_map.resize(len, observer.initial());
+        }
 
         let history_map = map_state.history_map.as_mut_slice();
         if self.indexes {

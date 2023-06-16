@@ -1,40 +1,60 @@
-use std::{fmt::Debug, hash::Hasher, marker::PhantomData};
+use std::hash::Hash;
+use std::{fmt::Debug, hash::Hasher};
 
 use ahash::AHasher;
 use libafl::{
     bolts::{tuples::Named, AsIter, HasLen},
+    executors::ExitKind,
     inputs::UsesInput,
+    observers::TimeObserver,
     observers::{MapObserver, Observer},
     state::UsesState,
     Error,
 };
+use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
-static INITIAL: usize = usize::MAX;
+static INITIAL_SIZE: usize = usize::MAX;
+static INITIAL_TIME: u64 = u64::MAX;
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SizeEdgeMapObserver<M, T> {
-    inner: M,
-    name: String,
-    size: usize,
-    phantom: PhantomData<T>,
+pub trait ValueObserver: for<'de> Deserialize<'de> + Serialize + Debug + Named {
+    type ValueType: Bounded
+        + Default
+        + Copy
+        + Serialize
+        + for<'de> Deserialize<'de>
+        + PartialEq
+        + Hash
+        + Debug
+        + 'static;
+
+    fn value(&self) -> &Self::ValueType;
+
+    fn default_value(&self) -> &Self::ValueType;
 }
 
-impl<M, T> SizeEdgeMapObserver<M, T>
+#[derive(Deserialize, Serialize, Debug)]
+pub struct MappedEdgeMapObserver<M, O> {
+    inner: M,
+    name: String,
+    value_observer: O,
+}
+
+impl<M, O> MappedEdgeMapObserver<M, O>
 where
-    M: MapObserver<Entry = T>,
+    M: MapObserver,
+    O: ValueObserver,
 {
-    pub fn new(obs: M) -> Self {
+    pub fn new(obs: M, value_obs: O) -> Self {
         Self {
-            name: format!("size_{}", obs.name()),
+            name: format!("{}_{}", value_obs.name(), obs.name()),
             inner: obs,
-            size: INITIAL,
-            phantom: PhantomData,
+            value_observer: value_obs,
         }
     }
 }
 
-impl<M, T> HasLen for SizeEdgeMapObserver<M, T>
+impl<M, O> HasLen for MappedEdgeMapObserver<M, O>
 where
     M: HasLen,
 {
@@ -43,25 +63,25 @@ where
     }
 }
 
-impl<M, T> Named for SizeEdgeMapObserver<M, T> {
+impl<M, O> Named for MappedEdgeMapObserver<M, O> {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<M, T> MapObserver for SizeEdgeMapObserver<M, T>
+impl<M, O> MapObserver for MappedEdgeMapObserver<M, O>
 where
-    M: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
-    T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
+    M: MapObserver + for<'it> AsIter<'it, Item = M::Entry>,
+    O: ValueObserver,
 {
-    type Entry = usize;
+    type Entry = O::ValueType;
 
     fn get(&self, idx: usize) -> &Self::Entry {
         let initial = self.inner.initial();
         if *self.inner.get(idx) == initial {
-            &INITIAL
+            self.value_observer.default_value()
         } else {
-            &self.size
+            self.value_observer.value()
         }
     }
 
@@ -82,27 +102,29 @@ where
         let initial = self.inner.initial();
         for e in self.inner.as_iter() {
             if *e == initial {
-                hasher.write_usize(INITIAL);
+                self.value_observer.default_value().hash(&mut hasher)
             } else {
-                hasher.write_usize(self.size);
+                self.value_observer.value().hash(&mut hasher)
             }
         }
         hasher.finish()
     }
 
     fn initial(&self) -> Self::Entry {
-        INITIAL
+        *self.value_observer.default_value()
     }
 
     fn reset_map(&mut self) -> Result<(), Error> {
-        Ok(())
+        self.inner.reset_map()
     }
 
     fn to_vec(&self) -> Vec<Self::Entry> {
         let initial = self.inner.initial();
+        let default = *self.value_observer.default_value();
+        let value = *self.value_observer.value();
         self.inner
             .as_iter()
-            .map(|&e| (e == initial).then_some(INITIAL).unwrap_or(self.size))
+            .map(|&e| (e == initial).then_some(default).unwrap_or(value))
             .collect()
     }
 
@@ -111,68 +133,232 @@ where
     }
 }
 
-impl<M, T> UsesState for SizeEdgeMapObserver<M, T>
+impl<M, O> UsesState for MappedEdgeMapObserver<M, O>
 where
     M: UsesState,
 {
     type State = M::State;
 }
 
-impl<M, S, T> Observer<S> for SizeEdgeMapObserver<M, T>
+impl<M, O, S> Observer<S> for MappedEdgeMapObserver<M, O>
 where
     M: Observer<S> + Debug,
+    O: Observer<S> + Debug,
     S: UsesInput,
-    T: Debug,
 {
-    // normally, you would reset the map here
-    // in our case, we know that the map has already been reset by the other map observer
+    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+        self.inner.pre_exec(state, input)?;
+        self.value_observer.pre_exec(state, input)
+    }
+
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        input: &S::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.inner.post_exec(state, input, exit_kind)?;
+        self.value_observer.post_exec(state, input, exit_kind)
+    }
 }
 
-pub struct SizeEdgeMapIter<'it, I, T> {
+pub struct MappedEdgeMapIter<'it, I, O, T> {
     inner: I,
     initial: T,
-    value: &'it usize,
-    phantom: PhantomData<T>,
+    value_obs: &'it O,
 }
 
-impl<'it, I, T> SizeEdgeMapIter<'it, I, T> {
-    fn new(iter: I, initial: T, value: &'it usize) -> Self {
+impl<'it, I, O, T> MappedEdgeMapIter<'it, I, O, T> {
+    fn new(iter: I, initial: T, value_obs: &'it O) -> Self {
         Self {
             inner: iter,
             initial,
-            value,
-            phantom: PhantomData,
+            value_obs,
         }
     }
 }
 
-impl<'it, I, T> Iterator for SizeEdgeMapIter<'it, I, T>
+impl<'it, I, O, T> Iterator for MappedEdgeMapIter<'it, I, O, T>
 where
     I: Iterator<Item = &'it T>,
-    T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
+    T: PartialEq + 'it,
+    O: ValueObserver,
 {
-    type Item = &'it usize;
+    type Item = &'it O::ValueType;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(|e| {
             (*e == self.initial)
-                .then_some(&INITIAL)
-                .unwrap_or(self.value)
+                .then(|| self.value_obs.default_value())
+                .unwrap_or_else(|| self.value_obs.value())
         })
     }
 }
 
-impl<'it, M, T> AsIter<'it> for SizeEdgeMapObserver<M, T>
+impl<'it, M, O> AsIter<'it> for MappedEdgeMapObserver<M, O>
 where
-    M: MapObserver<Entry = T> + for<'a> AsIter<'a, Item = T>,
-    T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
+    M: MapObserver + for<'a> AsIter<'a, Item = M::Entry>,
+    O: ValueObserver + 'it,
 {
-    type Item = usize;
-    type IntoIter = SizeEdgeMapIter<'it, <M as AsIter<'it>>::IntoIter, T>;
+    type Item = O::ValueType;
+    type IntoIter = MappedEdgeMapIter<'it, <M as AsIter<'it>>::IntoIter, O, M::Entry>;
 
     fn as_iter(&'it self) -> Self::IntoIter {
         let iter = self.inner.as_iter();
         let initial = self.inner.initial();
-        SizeEdgeMapIter::new(iter, initial, &self.size)
+        MappedEdgeMapIter::new(iter, initial, &self.value_observer)
+    }
+}
+
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, Default)]
+pub struct SizeValueObserver {
+    size: usize,
+}
+
+impl ValueObserver for SizeValueObserver {
+    type ValueType = usize;
+
+    fn value(&self) -> &Self::ValueType {
+        &self.size
+    }
+
+    fn default_value(&self) -> &Self::ValueType {
+        &INITIAL_SIZE
+    }
+}
+
+impl Named for SizeValueObserver {
+    fn name(&self) -> &str {
+        "size"
+    }
+}
+
+impl<S> Observer<S> for SizeValueObserver
+where
+    S: UsesInput,
+    S::Input: HasLen,
+{
+    fn pre_exec(&mut self, _state: &mut S, input: &S::Input) -> Result<(), Error> {
+        self.size = input.len();
+        Ok(())
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct TimeValueObserver {
+    time: u64,
+    time_obs: TimeObserver,
+}
+
+impl TimeValueObserver {
+    pub fn new(time_obs: TimeObserver) -> Self {
+        Self {
+            time: INITIAL_TIME,
+            time_obs,
+        }
+    }
+}
+
+impl ValueObserver for TimeValueObserver {
+    type ValueType = u64;
+
+    fn value(&self) -> &Self::ValueType {
+        &self.time
+    }
+
+    fn default_value(&self) -> &Self::ValueType {
+        &INITIAL_TIME
+    }
+}
+
+impl Named for TimeValueObserver {
+    fn name(&self) -> &str {
+        self.time_obs.name()
+    }
+}
+
+impl<S> Observer<S> for TimeValueObserver
+where
+    S: UsesInput,
+{
+    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+        self.time_obs.pre_exec(state, input)
+    }
+
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        input: &S::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.time_obs.post_exec(state, input, exit_kind)?;
+        self.time = self
+            .time_obs
+            .last_runtime()
+            .as_ref()
+            .map(|duration| u64::try_from(duration.as_micros()).unwrap_or(INITIAL_TIME))
+            .unwrap_or(INITIAL_TIME);
+        Ok(())
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct SizeTimeValueObserver {
+    value: u64,
+    size_obs: SizeValueObserver,
+    time_obs: TimeValueObserver,
+}
+
+impl SizeTimeValueObserver {
+    pub fn new(time_obs: TimeObserver) -> Self {
+        Self {
+            value: INITIAL_TIME,
+            size_obs: SizeValueObserver::default(),
+            time_obs: TimeValueObserver::new(time_obs),
+        }
+    }
+}
+
+impl ValueObserver for SizeTimeValueObserver {
+    type ValueType = u64;
+
+    fn value(&self) -> &Self::ValueType {
+        &self.value
+    }
+
+    fn default_value(&self) -> &Self::ValueType {
+        &INITIAL_TIME
+    }
+}
+
+impl Named for SizeTimeValueObserver {
+    fn name(&self) -> &str {
+        "size_time"
+    }
+}
+
+impl<S> Observer<S> for SizeTimeValueObserver
+where
+    S: UsesInput,
+    S::Input: HasLen,
+{
+    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+        self.size_obs.pre_exec(state, input)?;
+        self.time_obs.pre_exec(state, input)
+    }
+
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        input: &S::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.time_obs.post_exec(state, input, exit_kind)?;
+        self.size_obs.post_exec(state, input, exit_kind)?;
+        self.value = self
+            .time_obs
+            .value()
+            .saturating_mul(*self.size_obs.value() as u64);
+        Ok(())
     }
 }

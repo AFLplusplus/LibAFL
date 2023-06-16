@@ -28,7 +28,6 @@ fn parse_option(arg: &str) -> Option<RawOption> {
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum LibfuzzerMode {
     Fuzz,
-    #[cfg(feature = "merge")]
     Merge,
     Tmin,
     Report,
@@ -260,7 +259,6 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         self.dirs.push(dir);
                     }
                     Flag { name, value } => match name {
-                        #[cfg(feature = "merge")]
                         "merge" => {
                             if parse_or_bail!(name, value, u64) > 0
                                 && *self.mode.get_or_insert(LibfuzzerMode::Merge)

@@ -30,11 +30,8 @@ fn main() {
 
     command.arg("build");
 
-    if cfg!(any(feature = "merge", feature = "introspection")) {
+    if cfg!(any(feature = "introspection")) {
         command.arg("--features");
-        if cfg!(feature = "merge") {
-            command.arg("merge");
-        }
         if cfg!(feature = "introspection") {
             command.arg("libafl/introspection");
         }

@@ -11,6 +11,7 @@ use std::{
     os::fd::{AsRawFd, FromRawFd, IntoRawFd},
 };
 
+use libafl::corpus::CorpusId;
 use libafl::{
     bolts::{
         core_affinity::Cores,

@@ -8,7 +8,6 @@ publish = false
 
 [features]
 default = ["mimalloc"]
-merge = ["libafl/cmin"]
 
 [profile.release]
 lto = true
@@ -29,6 +28,7 @@ ahash = { version = "0.8.3", default-features = false }
 libc = "0.2.139"
 log = "0.4.17"
 mimalloc = { version = "0.1.34", default-features = false, optional = true }
+num-traits = "0.2.15"
 rand = "0.8.5"
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] } # serialization lib
 

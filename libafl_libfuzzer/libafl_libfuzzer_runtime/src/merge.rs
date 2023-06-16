@@ -1,68 +1,37 @@
-use std::{env::temp_dir, ffi::c_int, fmt::Debug, fs};
+use std::fs::File;
+use std::io::Write;
+use std::os::fd::{AsRawFd, FromRawFd};
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::{env::temp_dir, ffi::c_int, fs};
 
+use crate::{
+    feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback},
+    observers::{MappedEdgeMapObserver, SizeTimeValueObserver},
+    options::LibfuzzerOptions,
+};
 use libafl::{
     bolts::{
         rands::{Rand, RandomSeed, StdRand},
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Named},
-        AsIter, AsMutSlice, AsSlice,
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
+        AsSlice,
     },
-    corpus::{Corpus, CorpusMinimizer, OnDiskCorpus, StdCorpusMinimizer},
-    events::SimpleEventManager,
-    executors::{inprocess::TimeoutInProcessForkExecutor, ExitKind},
-    feedbacks::{MapFeedbackMetadata, MaxMapFeedback},
-    inputs::{BytesInput, HasTargetBytes, UsesInput},
-    observers::{
-        HitcountsIterableMapObserver, MapObserver, MultiMapObserver, Observer, StdMapObserver,
-        TimeObserver,
-    },
+    corpus::{Corpus, OnDiskCorpus},
+    events::EventRestarter,
+    events::SimpleRestartingEventManager,
+    executors::ExitKind,
+    executors::{InProcessExecutor, TimeoutExecutor},
+    feedback_and_fast, feedback_or_fast,
+    feedbacks::MinMapFeedback,
+    feedbacks::{CrashFeedback, TimeoutFeedback},
+    inputs::{BytesInput, HasTargetBytes},
+    monitors::MultiMonitor,
+    observers::{MultiMapObserver, TimeObserver},
     schedulers::QueueScheduler,
-    state::{HasCorpus, HasNamedMetadata, HasRand, StdState},
+    state::{HasCorpus, HasRand, StdState},
     Error, StdFuzzer,
 };
-use libafl_targets::COUNTERS_MAPS;
-use serde::{Deserialize, Serialize};
-
-use crate::options::LibfuzzerOptions;
-
-#[derive(Serialize, Deserialize, Debug)]
-struct EdgeCopyObserver<O> {
-    inner: O,
-    #[serde(skip, default = "core::ptr::null_mut")]
-    shmem: *mut u8,
-}
-
-impl<O> Named for EdgeCopyObserver<O>
-where
-    O: Named,
-{
-    fn name(&self) -> &str {
-        self.inner.name()
-    }
-}
-
-impl<O, S> Observer<S> for EdgeCopyObserver<O>
-where
-    O: MapObserver<Entry = u8> + for<'a> AsIter<'a, Item = u8> + Observer<S> + Named + Debug,
-    S: UsesInput,
-{
-    fn post_exec_child(
-        &mut self,
-        state: &mut S,
-        input: &S::Input,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        self.inner.post_exec(state, input, exit_kind)?;
-        for (i, e) in self
-            .inner
-            .as_iter()
-            .zip(unsafe { core::slice::from_raw_parts_mut(self.shmem, self.inner.usable_count()) })
-        {
-            *e = *i;
-        }
-        Ok(())
-    }
-}
+use libafl_targets::{OOMFeedback, OOMObserver, COUNTERS_MAPS};
 
 pub fn merge(
     options: LibfuzzerOptions,
@@ -107,50 +76,103 @@ pub fn merge(
         .unwrap()
     };
 
-    let mut shmem_provider = StdShMemProvider::new()?;
+    let keep_observer = LibfuzzerKeepFeedback::new();
+    let keep = keep_observer.keep();
+
+    let mut shmem_provider = StdShMemProvider::new().unwrap();
+
+    #[cfg(unix)]
+    let mut stderr = unsafe {
+        let new_fd = libc::dup(std::io::stderr().as_raw_fd().into());
+        File::from_raw_fd(new_fd.into())
+    };
+    let monitor = MultiMonitor::with_time(
+        move |s| {
+            #[cfg(unix)]
+            writeln!(stderr, "{s}").expect("Could not write to stderr???");
+            #[cfg(not(unix))]
+            eprintln!("{s}");
+        },
+        SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
+    );
+
+    let (state, mut mgr): (
+        Option<StdState<_, _, _, _>>,
+        SimpleRestartingEventManager<_, StdState<_, _, _, _>, _>,
+    ) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider) {
+        // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
+        Ok(res) => res,
+        Err(err) => match err {
+            Error::ShuttingDown => {
+                return Ok(());
+            }
+            _ => {
+                panic!("Failed to setup the restarter: {err}");
+            }
+        },
+    };
+    #[cfg(unix)]
+    {
+        if options.close_fd_mask() != 0 {
+            let file_null = File::open("/dev/null")?;
+            unsafe {
+                if options.close_fd_mask() & 1 != 0 {
+                    libc::dup2(file_null.as_raw_fd().into(), 1);
+                }
+                if options.close_fd_mask() & 2 != 0 {
+                    libc::dup2(file_null.as_raw_fd().into(), 2);
+                }
+            }
+        }
+    }
 
     let edges = unsafe { core::mem::take(&mut COUNTERS_MAPS) };
-    let edges_observer = HitcountsIterableMapObserver::new(MultiMapObserver::new("edges", edges));
-
-    let mut shmem = shmem_provider.new_shmem(edges_observer.usable_count())?;
-
-    let parent_edges = unsafe {
-        StdMapObserver::from_mut_ptr(
-            "parent-edges",
-            shmem.as_mut_slice().as_mut_ptr(),
-            shmem.len(),
-        )
-    };
-    let copier = EdgeCopyObserver {
-        inner: edges_observer,
-        shmem: shmem.as_mut_slice().as_mut_ptr(),
-    };
+    let edges_observer = MultiMapObserver::new("edges", edges);
 
     let time = TimeObserver::new("time");
+    let edges_observer =
+        MappedEdgeMapObserver::new(edges_observer, SizeTimeValueObserver::new(time));
 
-    let cmin = StdCorpusMinimizer::new(&parent_edges);
+    let map_feedback = MinMapFeedback::new(&edges_observer);
 
-    let mut map_feedback = MaxMapFeedback::new(&parent_edges);
-    let map_feedback_name = map_feedback.name().to_string();
+    // Create an OOM observer to monitor if an OOM has occurred
+    let oom_observer = OOMObserver::new(options.rss_limit(), options.malloc_limit());
 
-    let observers = tuple_list!(copier, parent_edges, time);
+    // Feedback to rate the interestingness of an input
+    // This one is composed by two Feedbacks in OR
+    let mut feedback = feedback_and_fast!(keep_observer, map_feedback);
 
-    let mut state = StdState::new(
-        rand,
-        OnDiskCorpus::new(corpus_dir.clone()).unwrap(),
-        crash_corpus,
-        &mut map_feedback,
-        &mut (), // no objectives
-    )?;
+    // A feedback to choose if an input is a solution or not
+    let mut objective = feedback_or_fast!(
+        LibfuzzerCrashCauseFeedback::new(options.artifact_prefix().cloned()),
+        OOMFeedback,
+        CrashFeedback::new(),
+        TimeoutFeedback::new()
+    );
 
-    let mut mgr = SimpleEventManager::printing();
+    let observers = tuple_list!(edges_observer, oom_observer);
 
     // scheduler doesn't really matter here
     let scheduler = QueueScheduler::new();
 
-    let mut fuzzer = StdFuzzer::new(scheduler, map_feedback, ());
+    let mut state = state.unwrap_or_else(|| {
+        StdState::new(
+            // RNG
+            StdRand::new(),
+            // Corpus that will be evolved, we keep it in memory for performance
+            OnDiskCorpus::with_meta_format_and_prefix(&corpus_dir, None, None, true).unwrap(),
+            // Corpus in which we store solutions (crashes in this example),
+            // on disk so the user can get them after stopping the fuzzer
+            crash_corpus,
+            // A reference to the feedbacks, to create their feedback state
+            &mut feedback,
+            // A reference to the objectives, to create their objective state
+            &mut objective,
+        )
+        .expect("Failed to create state")
+    });
 
-    // The wrapped harness function, calling out to the LLVM-style harness
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective); // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
@@ -160,36 +182,34 @@ pub fn merge(
         };
         match result {
             -2 => ExitKind::Crash,
-            _ => ExitKind::Ok,
+            _ => {
+                *keep.borrow_mut() = result == 0;
+                ExitKind::Ok
+            }
         }
     };
 
-    let mut executor = TimeoutInProcessForkExecutor::new(
-        &mut harness,
-        observers,
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
+    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
+    let mut executor = TimeoutExecutor::new(
+        InProcessExecutor::new(&mut harness, observers, &mut fuzzer, &mut state, &mut mgr)?,
         options.timeout(),
-        shmem_provider,
-    )?;
-
-    state.load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, options.dirs())?;
-
-    let edge_meta = state
-        .named_metadata::<MapFeedbackMetadata<u8>>(&map_feedback_name)
-        .unwrap();
-    let edges_max = edge_meta.history_map.len();
-    let edges = edges_max - bytecount::count(&edge_meta.history_map, 0);
-
-    println!(
-        "Loaded {} initial inputs with {}/{} edges; minimizing...",
-        state.corpus().count(),
-        edges,
-        edges_max
     );
 
-    cmin.minimize(&mut fuzzer, &mut executor, &mut mgr, &mut state)?;
+    // In case the corpus is empty (on first run) or crashed while loading, reset
+    if state.must_load_initial_inputs() {
+        if !options.dirs().is_empty() {
+            // Load from disk
+            state
+                .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, options.dirs())
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Failed to load initial corpus at {:?}: {}",
+                        options.dirs(),
+                        e
+                    )
+                });
+        }
+    }
 
     println!(
         "Minimization complete; reduced to {} inputs!",
@@ -212,5 +232,5 @@ pub fn merge(
         fs::rename(corpus_dir, &options.dirs()[0])?;
     }
 
-    Ok(())
+    mgr.send_exiting()
 }

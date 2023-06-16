@@ -10,7 +10,6 @@ use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
 mod feedbacks;
 mod fuzz;
-#[cfg(feature = "merge")]
 mod merge;
 mod misc;
 mod observers;
@@ -96,7 +95,7 @@ macro_rules! fuzz_with {
                 CalibrationStage, GeneralizationStage, IfStage, StdMutationalStage,
                 StdPowerMutationalStage, TracingStage,
             },
-            state::{HasCorpus, StdState},
+            state::{HasCorpus, HasSolutions, StdState},
             StdFuzzer,
         };
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OOMFeedback, OOMObserver};
@@ -106,7 +105,7 @@ macro_rules! fuzz_with {
         use crate::{BACKTRACE, CustomMutationStatus};
         use crate::feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback, ShrinkMapFeedback};
         use crate::misc::should_use_grimoire;
-        use crate::observers::SizeEdgeMapObserver;
+        use crate::observers::{MappedEdgeMapObserver, SizeValueObserver};
 
         let edge_maker = &$edge_maker;
 
@@ -116,7 +115,7 @@ macro_rules! fuzz_with {
             let grimoire = grimoire_metadata.should();
 
             let edges_observer = edge_maker();
-            let size_edges_observer = SizeEdgeMapObserver::new(edge_maker());
+            let size_edges_observer = MappedEdgeMapObserver::new(edge_maker(), SizeValueObserver::default());
 
             let keep_observer = LibfuzzerKeepFeedback::new();
             let keep = keep_observer.keep();
@@ -141,14 +140,11 @@ macro_rules! fuzz_with {
             let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, true);
             let shrinking_map_feedback = ShrinkMapFeedback::tracking(&size_edges_observer, false, false);
 
-            // let map_eq_factory = MapEqualityFactory::new_from_observer(&edges_observer);
-
             // Set up a generalization stage for grimoire
             let generalization = GeneralizationStage::new(&edges_observer);
             let generalization = IfStage::new(|_, _, _, _, _| Ok(grimoire.into()), (generalization, ()));
 
             let calibration = CalibrationStage::new(&map_feedback);
-            // let calibration2 = CalibrationStage::new(&map_feedback);
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
@@ -375,14 +371,6 @@ macro_rules! fuzz_with {
                 }
             }
 
-            // we don't support shrink as of now... it would require duplicating the mutators above
-            // let minimizer = StdScheduledMutator::new(havoc_mutations());
-            // let tmin = StdTMinMutationalStage::new(
-            //     minimizer,
-            //     map_eq_factory,
-            //     1 << 8
-            // );
-            // let tmin = IfStage::new(|_| mutator_status.std_mutational.into(), tmin);
 
             // Setup a tracing stage in which we log comparisons
             let tracing = IfStage::new(|_, _, _, _, _| Ok(!$options.skip_tracing()), (TracingStage::new(InProcessExecutor::new(
@@ -395,7 +383,6 @@ macro_rules! fuzz_with {
 
             // The order of the stages matter!
             let mut stages = tuple_list!(
-                // tmin,
                 calibration,
                 generalization,
                 tracing,
@@ -504,7 +491,6 @@ pub extern "C" fn LLVMFuzzerRunDriver(
     }
     let res = match options.mode() {
         LibfuzzerMode::Fuzz => fuzz::fuzz(options, harness),
-        #[cfg(feature = "merge")]
         LibfuzzerMode::Merge => merge::merge(options, harness),
         LibfuzzerMode::Tmin => tmin::minimize_crash(options, harness),
         LibfuzzerMode::Report => report::report(options, harness),

@@ -18,7 +18,7 @@ use libafl::{
 use libafl_targets::OOMFeedback;
 use serde::{Deserialize, Serialize};
 
-use crate::{observers::SizeEdgeMapObserver, options::ArtifactPrefix};
+use crate::{observers::MappedEdgeMapObserver, options::ArtifactPrefix};
 
 #[derive(Debug)]
 pub struct LibfuzzerKeepFeedback {
@@ -179,4 +179,4 @@ where
     }
 }
 
-pub type ShrinkMapFeedback<O, S, T> = MinMapFeedback<SizeEdgeMapObserver<O, T>, S, usize>;
+pub type ShrinkMapFeedback<O, S, T> = MinMapFeedback<MappedEdgeMapObserver<O, T>, S, usize>;
