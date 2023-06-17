@@ -178,7 +178,6 @@ where
                                 self,
                                 input.clone(),
                                 false,
-                                file_path.clone(),
                             )?;
                             if let Some(item) = res.1 {
                                 log::info!("Added received Testcase as item #{item}");

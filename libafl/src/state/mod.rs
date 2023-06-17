@@ -568,16 +568,9 @@ where
                     log::info!("Loading file {:?} ...", &path);
                     let input = loader(fuzzer, self, &path)?;
                     if forced {
-                        let _: CorpusId =
-                            fuzzer.add_input(self, executor, manager, input, Some(path))?;
+                        let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
                     } else {
-                        let (res, _) = fuzzer.evaluate_input(
-                            self,
-                            executor,
-                            manager,
-                            input,
-                            Some(path.clone()),
-                        )?;
+                        let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
                         if res == ExecuteInputResult::None {
                             log::warn!("File {:?} was not interesting, skipped.", &path);
                         }
@@ -725,10 +718,10 @@ where
         for _ in 0..num {
             let input = generator.generate(self)?;
             if forced {
-                let _: CorpusId = fuzzer.add_input(self, executor, manager, input, None)?;
+                let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
                 added += 1;
             } else {
-                let (res, _) = fuzzer.evaluate_input(self, executor, manager, input, None)?;
+                let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
                 if res != ExecuteInputResult::None {
                     added += 1;
                 }

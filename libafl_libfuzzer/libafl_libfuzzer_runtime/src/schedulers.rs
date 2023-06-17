@@ -70,4 +70,8 @@ impl<S> MergeScheduler<S> {
             .copied()
             .collect()
     }
+
+    pub fn current(&self) -> &BTreeSet<CorpusId> {
+        &self.all
+    }
 }

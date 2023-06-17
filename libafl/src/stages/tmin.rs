@@ -123,7 +123,6 @@ where
                     observers,
                     &exit_kind,
                     false,
-                    None,
                 )?;
 
                 if state.corpus().count() == corpus_count

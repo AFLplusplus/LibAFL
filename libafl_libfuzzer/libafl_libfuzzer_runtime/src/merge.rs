@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::{remove_file, rename, File};
 use std::io::Write;
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -217,6 +217,35 @@ pub fn merge(
         fuzzer
             .scheduler_mut()
             .on_remove(&mut state, idx, &Some(testcase))?;
+    }
+
+    for idx in fuzzer.scheduler().current().clone() {
+        let mut testcase = state.corpus_mut().get(idx)?.borrow_mut();
+        let file_path = testcase
+            .file_path_mut()
+            .as_mut()
+            .expect("No file backing for corpus entry");
+        if let Some((base, _)) = file_path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .rsplit_once("-")
+        {
+            let mut new_file_path = file_path.clone();
+            new_file_path.pop();
+            new_file_path.push(base);
+            if new_file_path.exists() {
+                drop(testcase);
+                let testcase = state.corpus_mut().remove(idx)?;
+                fuzzer
+                    .scheduler_mut()
+                    .on_remove(&mut state, idx, &Some(testcase))?;
+            } else {
+                rename(&file_path, &new_file_path)?;
+                *file_path = new_file_path;
+            }
+        }
     }
 
     println!(

@@ -2,7 +2,6 @@
 
 use alloc::string::ToString;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
-use std::path::PathBuf;
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -87,7 +86,6 @@ pub trait ExecutionProcessor<OT>: UsesState {
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
-        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>;
@@ -105,7 +103,6 @@ pub trait EvaluatorObservers<OT>: UsesState + Sized {
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
-        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
@@ -126,9 +123,8 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
-        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        self.evaluate_input_events(state, executor, manager, input, true, file_path)
+        self.evaluate_input_events(state, executor, manager, input, true)
     }
 
     /// Runs the input and triggers observers and feedback,
@@ -141,7 +137,6 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
-        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 
     /// Runs the input and triggers observers and feedback.
@@ -154,7 +149,6 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
-        file_path: Option<PathBuf>,
     ) -> Result<CorpusId, Error>;
 }
 
@@ -341,13 +335,12 @@ where
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
         &mut self,
-        state: &mut CS::State,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: <CS::State as UsesInput>::Input,
+        input: <Self::State as UsesInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
-        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>,
@@ -394,8 +387,6 @@ where
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-                *testcase.filename_mut() = file_path
-                    .and_then(|path| path.file_name().unwrap().to_str().map(|s| s.to_string()));
                 self.feedback_mut()
                     .append_metadata(state, observers, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
@@ -438,8 +429,6 @@ where
 
                 // The input is a solution, add it to the respective corpus
                 let mut testcase = Testcase::with_executions(input, *state.executions());
-                *testcase.filename_mut() = file_path
-                    .and_then(|path| path.file_name().unwrap().to_str().map(|s| s.to_string()));
                 testcase.set_parent_id_optional(*state.corpus().current());
                 self.objective_mut()
                     .append_metadata(state, observers, &mut testcase)?;
@@ -477,7 +466,6 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
-        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
@@ -488,15 +476,7 @@ where
 
         self.scheduler.on_evaluation(state, &input, observers)?;
 
-        self.process_execution(
-            state,
-            manager,
-            input,
-            observers,
-            &exit_kind,
-            send_events,
-            file_path,
-        )
+        self.process_execution(state, manager, input, observers, &exit_kind, send_events)
     }
 }
 
@@ -514,31 +494,27 @@ where
     #[inline]
     fn evaluate_input_events(
         &mut self,
-        state: &mut CS::State,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <CS::State as UsesInput>::Input,
+        input: <Self::State as UsesInput>::Input,
         send_events: bool,
-        file_path: Option<PathBuf>,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        self.evaluate_input_with_observers(state, executor, manager, input, send_events, file_path)
+        self.evaluate_input_with_observers(state, executor, manager, input, send_events)
     }
 
     /// Adds an input, even if it's not considered `interesting` by any of the executors
     fn add_input(
         &mut self,
-        state: &mut CS::State,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <CS::State as UsesInput>::Input,
-        file_path: Option<PathBuf>,
+        input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-        *testcase.filename_mut() =
-            file_path.and_then(|path| path.file_name().unwrap().to_str().map(|s| s.to_string()));
 
         // Maybe a solution
         if self
@@ -884,7 +860,6 @@ pub mod pybind {
                     py_executor,
                     py_mgr,
                     BytesInput::new(input),
-                    None,
                 )
                 .expect("Failed to add input")
                 .0

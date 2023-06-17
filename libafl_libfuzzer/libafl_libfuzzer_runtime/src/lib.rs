@@ -478,7 +478,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
     .unwrap();
 
     if !options.unknown().is_empty() {
-        println!("Unrecognised options: {}", options.unknown().join(" "));
+        println!("Unrecognised options: {:?}", options.unknown());
     }
 
     if *options.mode() != LibfuzzerMode::Tmin

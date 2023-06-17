@@ -470,18 +470,17 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                let _res =
-                    if client_config.match_with(&self.configuration) && observers_buf.is_some() {
-                        let observers: E::Observers =
-                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                        fuzzer.process_execution(
-                            state, self, input, &observers, &exit_kind, false, file_path,
-                        )?
-                    } else {
-                        fuzzer.evaluate_input_with_observers::<E, Self>(
-                            state, executor, self, input, false, file_path,
-                        )?
-                    };
+                let _res = if client_config.match_with(&self.configuration)
+                    && observers_buf.is_some()
+                {
+                    let observers: E::Observers =
+                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                    fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
+                } else {
+                    fuzzer.evaluate_input_with_observers::<E, Self>(
+                        state, executor, self, input, false,
+                    )?
+                };
                 if let Some(item) = _res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
@@ -1309,7 +1308,6 @@ where
                     manager,
                     converter.convert(input)?,
                     false,
-                    file_path,
                 )?;
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
