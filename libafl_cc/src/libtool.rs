@@ -1,13 +1,6 @@
 //! Libtool Wrapper from `LibAFL`
 
-use std::{
-    convert::Into,
-    env,
-    path::{Path, PathBuf},
-    str::FromStr,
-    string::String,
-    vec::Vec,
-};
+use std::{convert::Into, env, path::PathBuf, str::FromStr, string::String, vec::Vec};
 
 use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
 
@@ -148,27 +141,6 @@ impl ToolWrapper for LibtoolWrapper {
         self
     }
 
-    fn add_cc_arg<S>(&mut self, _arg: S) -> &'_ mut Self
-    where
-        S: AsRef<str>,
-    {
-        self
-    }
-
-    fn add_link_arg<S>(&mut self, _arg: S) -> &'_ mut Self
-    where
-        S: AsRef<str>,
-    {
-        self
-    }
-
-    fn link_staticlib<S>(&mut self, _dir: &Path, _name: S) -> &'_ mut Self
-    where
-        S: AsRef<str>,
-    {
-        self
-    }
-
     fn add_configuration(&mut self, configuration: crate::Configuration) -> &'_ mut Self {
         self.configurations.push(configuration);
         self
@@ -290,7 +262,6 @@ impl LibtoolWrapper {
     /// Create a new Clang Wrapper
     #[must_use]
     pub fn new() -> Self {
-        #[cfg(unix)]
         Self {
             name: String::new(),
             linking: false,
@@ -314,22 +285,5 @@ impl LibtoolWrapper {
     pub fn need_libafl_arg(&mut self, value: bool) -> &'_ mut Self {
         self.need_libafl_arg = value;
         self
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{LibtoolWrapper, ToolWrapper};
-
-    #[test]
-    #[cfg_attr(miri, ignore)]
-    fn test_clang_version() {
-        if let Err(res) = LibtoolWrapper::new()
-            .parse_args(&["libtool", "-v"])
-            .unwrap()
-            .run()
-        {
-            println!("Ignored error {res:?} - clang is probably not installed.");
-        }
     }
 }

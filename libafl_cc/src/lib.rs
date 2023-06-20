@@ -181,29 +181,19 @@ pub const LIB_PREFIX: &str = "";
 #[cfg(not(windows))]
 pub const LIB_PREFIX: &str = "lib";
 
-/// Wrap a compiler hijacking its arguments
+/// Wrap a tool hijacking its arguments
 pub trait ToolWrapper {
     /// Set the wrapper arguments parsing a command line set of arguments
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
         S: AsRef<str>;
 
-    /// Add a compiler argument
+    /// Add an argument
     fn add_arg<S>(&mut self, arg: S) -> &'_ mut Self
     where
         S: AsRef<str>;
 
-    /// Add a compiler argument only when compiling
-    fn add_cc_arg<S>(&mut self, arg: S) -> &'_ mut Self
-    where
-        S: AsRef<str>;
-
-    /// Add a compiler argument only when linking
-    fn add_link_arg<S>(&mut self, arg: S) -> &'_ mut Self
-    where
-        S: AsRef<str>;
-
-    /// Add compiler arguments
+    /// Add arguments
     fn add_args<S>(&mut self, args: &[S]) -> &'_ mut Self
     where
         S: AsRef<str>,
@@ -213,33 +203,6 @@ pub trait ToolWrapper {
         }
         self
     }
-
-    /// Add compiler arguments only when compiling
-    fn add_cc_args<S>(&mut self, args: &[S]) -> &'_ mut Self
-    where
-        S: AsRef<str>,
-    {
-        for arg in args {
-            self.add_cc_arg(arg);
-        }
-        self
-    }
-
-    /// Add compiler arguments only when linking
-    fn add_link_args<S>(&mut self, args: &[S]) -> &'_ mut Self
-    where
-        S: AsRef<str>,
-    {
-        for arg in args {
-            self.add_link_arg(arg);
-        }
-        self
-    }
-
-    /// Link static C lib
-    fn link_staticlib<S>(&mut self, dir: &Path, name: S) -> &'_ mut Self
-    where
-        S: AsRef<str>;
 
     /// Add a `Configuration`
     fn add_configuration(&mut self, configuration: Configuration) -> &'_ mut Self;
@@ -272,7 +235,7 @@ pub trait ToolWrapper {
     /// Returns `true` if `silence` was called with `true`
     fn is_silent(&self) -> bool;
 
-    /// Run the compiler
+    /// Run the tool
     fn run(&mut self) -> Result<Option<i32>, Error> {
         let mut last_status = Ok(None);
         let configurations = if self.ignore_configurations()? {
@@ -307,4 +270,44 @@ pub trait ToolWrapper {
         }
         last_status
     }
+}
+
+/// Wrap a compiler hijacking its arguments
+pub trait CompilerWrapper: ToolWrapper {
+    /// Add a compiler argument only when compiling
+    fn add_cc_arg<S>(&mut self, arg: S) -> &'_ mut Self
+    where
+        S: AsRef<str>;
+
+    /// Add a compiler argument only when linking
+    fn add_link_arg<S>(&mut self, arg: S) -> &'_ mut Self
+    where
+        S: AsRef<str>;
+
+    /// Add compiler arguments only when compiling
+    fn add_cc_args<S>(&mut self, args: &[S]) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        for arg in args {
+            self.add_cc_arg(arg);
+        }
+        self
+    }
+
+    /// Add compiler arguments only when linking
+    fn add_link_args<S>(&mut self, args: &[S]) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        for arg in args {
+            self.add_link_arg(arg);
+        }
+        self
+    }
+
+    /// Link static C lib
+    fn link_staticlib<S>(&mut self, dir: &Path, name: S) -> &'_ mut Self
+    where
+        S: AsRef<str>;
 }
