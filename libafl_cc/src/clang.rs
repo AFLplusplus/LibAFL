@@ -204,7 +204,7 @@ impl ToolWrapper for ClangWrapper {
                         self.configurations.extend(
                             args[i + 1]
                                 .as_ref()
-                                .split(",")
+                                .split(',')
                                 .map(|x| crate::Configuration::from_str(x).unwrap()),
                         );
                         i += 2;
@@ -325,7 +325,9 @@ impl ToolWrapper for ClangWrapper {
             .iter()
             .map(|r| {
                 let arg_as_path = std::path::PathBuf::from(r);
-                if !r.ends_with(".") {
+                if r.ends_with('.') {
+                    r.to_string()
+                } else {
                     if let Some(extension) = arg_as_path.extension() {
                         let extension = extension.to_str().unwrap();
                         let extension_lowercase = extension.to_lowercase();
@@ -339,8 +341,6 @@ impl ToolWrapper for ClangWrapper {
                     .into_os_string()
                     .into_string()
                     .unwrap()
-                } else {
-                    r.to_string()
                 }
             })
             .collect::<Vec<_>>();
@@ -358,7 +358,9 @@ impl ToolWrapper for ClangWrapper {
                     .iter()
                     .map(|r| {
                         let arg_as_path = std::path::PathBuf::from(r);
-                        if !r.ends_with(".") {
+                        if r.ends_with('.') {
+                            r.to_string()
+                        } else {
                             if let Some(extension) = arg_as_path.extension() {
                                 let extension = extension.to_str().unwrap();
                                 let extension_lowercase = extension.to_lowercase();
@@ -374,31 +376,14 @@ impl ToolWrapper for ClangWrapper {
                             .into_os_string()
                             .into_string()
                             .unwrap()
-                        } else {
-                            r.to_string()
                         }
                     })
                     .collect::<Vec<_>>(),
-            )
+            );
         }
 
-        // args.extend(self.base_args.iter().map(|x| {
-        //     let arg_as_path = std::path::Path::new(x);
-        //
-        //     let new_arg =
-        //         arg_as_path.with_extension(arg_as_path.extension().map_or("".to_string(), |ext| {
-        //             let ext = ext.to_str().unwrap();
-        //             println!("{:?}: {}", arg_as_path, ext);
-        //             match ext {
-        //                 "a" | "A" | "la" | "LA" | "o" | "O" | "lo" | "LO" => {
-        //                     format!("{}{}", configuration.to_extension(), ext)
-        //                 }
-        //                 _ => ext.to_string(),
-        //             }
-        //         }));
-        //     new_arg.into_os_string().into_string().unwrap()
-        // }));
         args.extend_from_slice(&configuration.to_flags()?);
+
         if self.need_libafl_arg && !self.has_libafl_arg {
             return Ok(args);
         }

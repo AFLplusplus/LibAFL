@@ -127,7 +127,8 @@ impl Configuration {
     }
 
     /// Insert a `Configuration` specific 'tag' in the extension of the given file
-    pub fn replace_extension(&self, path: std::path::PathBuf) -> std::path::PathBuf {
+    #[must_use]
+    pub fn replace_extension(&self, path: &std::path::PathBuf) -> std::path::PathBuf {
         let mut parent = if let Some(parent) = path.parent() {
             parent.to_path_buf()
         } else {
@@ -137,14 +138,16 @@ impl Configuration {
         let output = output.to_str().unwrap();
 
         let new_filename = if let Some((filename, extension)) = output.split_once(".") {
-            match self {
-                crate::Configuration::Default => format!("{}.{}", filename, extension),
-                _ => format!("{}.{}.{}", filename, self.to_str(), extension),
+            if let crate::Configuration::Default = self {
+                format!("{filename}.{extension}")
+            } else {
+                format!("{}.{}.{}", filename, self.to_str(), extension)
             }
         } else {
-            match self {
-                crate::Configuration::Default => output.to_string(),
-                _ => format!("{}.{}", output, self.to_str()),
+            if let crate::Configuration::Default = self {
+                output.to_string()
+            } else {
+                format!("{}.{}", output, self.to_str())
             }
         };
         parent.push(new_filename);
@@ -220,7 +223,7 @@ pub trait ToolWrapper {
     fn configurations(&self) -> Result<Vec<Configuration>, Error>;
 
     /// Whether to ignore the configured `Configurations`. Useful for e.g. nested calls to
-    /// libafl_cc from libafl_libtool.
+    /// `libafl_cc` from `libafl_libtool`.
     fn ignore_configurations(&self) -> Result<bool, Error>;
 
     /// Get if in linking mode

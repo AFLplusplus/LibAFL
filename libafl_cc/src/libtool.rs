@@ -93,7 +93,7 @@ impl ToolWrapper for LibtoolWrapper {
                         self.configurations.extend(
                             args[i + 1]
                                 .as_ref()
-                                .split(",")
+                                .split(',')
                                 .map(|x| crate::Configuration::from_str(x).unwrap()),
                         );
                         i += 2;
@@ -170,13 +170,15 @@ impl ToolWrapper for LibtoolWrapper {
             .iter()
             .map(|r| {
                 let arg_as_path = std::path::PathBuf::from(r);
-                if !r.ends_with(".") {
+                if r.ends_with('.') {
+                    r.to_string()
+                } else {
                     if let Some(extension) = arg_as_path.extension() {
                         let extension = extension.to_str().unwrap();
                         let extension_lowercase = extension.to_lowercase();
                         match &extension_lowercase[..] {
                             "o" | "lo" | "a" | "la" | "so" => {
-                                configuration.replace_extension(arg_as_path)
+                                configuration.replace_extension(&arg_as_path)
                             }
                             _ => arg_as_path,
                         }
@@ -186,25 +188,24 @@ impl ToolWrapper for LibtoolWrapper {
                     .into_os_string()
                     .into_string()
                     .unwrap()
-                } else {
-                    r.to_string()
                 }
             })
             .collect::<Vec<_>>();
 
         let libtool_path = if let Ok(libtool_dir) = std::env::var("LIBTOOL_DIR") {
-            format!("{}/libtool", libtool_dir)
+            format!("{libtool_dir}/libtool")
         } else {
             "./libtool".to_string()
         };
 
-        if !std::path::Path::new(&libtool_path).exists() {
-            panic!("Couldn't find libtool. Specify the `LIBTOOL_DIR` environment variable");
-        }
+        assert!(
+            std::path::Path::new(&libtool_path).exists(),
+            "Couldn't find libtool. Specify the `LIBTOOL_DIR` environment variable"
+        );
         args.push(libtool_path);
 
         if let Some(output) = self.output.clone() {
-            let output = configuration.replace_extension(output);
+            let output = configuration.replace_extension(&output);
             let new_filename = output.into_os_string().into_string().unwrap();
             let dash_c_position = base_args.iter().position(|x| x == "-c");
             if let Some(dash_c_position) = dash_c_position {
