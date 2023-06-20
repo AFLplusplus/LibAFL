@@ -332,7 +332,7 @@ impl ToolWrapper for ClangWrapper {
                         let extension = extension.to_str().unwrap();
                         let extension_lowercase = extension.to_lowercase();
                         match &extension_lowercase[..] {
-                            "a" | "la" => configuration.replace_extension(arg_as_path),
+                            "a" | "la" => configuration.replace_extension(&arg_as_path),
                             _ => arg_as_path,
                         }
                     } else {
@@ -346,7 +346,7 @@ impl ToolWrapper for ClangWrapper {
             .collect::<Vec<_>>();
 
         if let Some(output) = self.output.clone() {
-            let output = configuration.replace_extension(output);
+            let output = configuration.replace_extension(&output);
             let new_filename = output.into_os_string().into_string().unwrap();
             args.push("-o".to_string());
             args.push(new_filename);
@@ -366,7 +366,7 @@ impl ToolWrapper for ClangWrapper {
                                 let extension_lowercase = extension.to_lowercase();
                                 match &extension_lowercase[..] {
                                     "c" | "cc" | "cxx" | "cpp" => {
-                                        configuration.replace_extension(arg_as_path)
+                                        configuration.replace_extension(&arg_as_path)
                                     }
                                     _ => arg_as_path,
                                 }
