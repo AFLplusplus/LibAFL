@@ -66,4 +66,3 @@ impl Regs {
     pub const Fp: Regs = Regs::R30;
     pub const Lr: Regs = Regs::R31;
 }
-
