@@ -23,6 +23,7 @@ arm = ["libafl_qemu_sys/arm"] # build qemu for arm
 aarch64 = ["libafl_qemu_sys/aarch64"] # build qemu for aarch64
 mips = ["libafl_qemu_sys/mips"] # build qemu for mips (el, use with the 'be' feature of mips be)
 ppc = ["libafl_qemu_sys/ppc"] # build qemu for powerpc
+hexagon = ["libafl_qemu_sys/hexagon"] # build qemu for hexagon
 
 be = ["libafl_qemu_sys/be"]
 

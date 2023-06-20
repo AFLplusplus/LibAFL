@@ -12,6 +12,13 @@ pub fn build() {
             "usermode".to_string()
         })
     };
+
+    let asan = if cfg!(feature = "asan") {
+        true
+    } else {
+        false
+    };
+
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
@@ -30,6 +37,8 @@ pub fn build() {
         "mips".to_string()
     } else if cfg!(feature = "ppc") {
         "ppc".to_string()
+    } else if cfg!(feature = "hexagon") {
+        "hexagon".to_string()
     } else {
         env::var("CPU_TARGET").unwrap_or_else(|_| {
             "x86_64".to_string()
@@ -38,7 +47,7 @@ pub fn build() {
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
 
-    let cross_cc = if emulation_mode == "usermode" {
+    let cross_cc = if (emulation_mode == "usermode") && asan {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
         let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
             println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
@@ -62,7 +71,7 @@ pub fn build() {
     target_dir.pop();
     target_dir.pop();
 
-    if emulation_mode == "usermode" {
+    if (emulation_mode == "usermode") && asan {
         let qasan_dir = Path::new("libqasan");
         let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
 
