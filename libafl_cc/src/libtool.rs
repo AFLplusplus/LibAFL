@@ -1,4 +1,5 @@
 //! Libtool Wrapper from `LibAFL`
+// call make passing LIBTOOL=/path/to/target/release/libafl_libtool
 
 use std::{convert::Into, env, path::PathBuf, str::FromStr, string::String, vec::Vec};
 
