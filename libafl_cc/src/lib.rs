@@ -64,6 +64,8 @@ pub mod cfg;
 pub use cfg::{CfgEdge, ControlFlowGraph, EntryBasicBlockInfo, HasWeight};
 pub mod clang;
 pub use clang::{ClangWrapper, LLVMPasses};
+pub mod libtool;
+pub use libtool::LibtoolWrapper;
 
 /// `LibAFL` CC Error Type
 #[derive(Debug)]
@@ -74,6 +76,94 @@ pub enum Error {
     Io(std::io::Error),
     /// Something else happened
     Unknown(String),
+}
+
+/// `LibAFL` target configuration
+#[derive(Debug, Clone)]
+pub enum Configuration {
+    /// Default uninstrumented configurations
+    Default,
+    /// Sanitizing addresses
+    SanitizeAddresses,
+    /// Sanitizing undefined behavior
+    SanitizeUndefinedBehavior,
+    /// Generating a coverage map
+    GenerateCoverageMap,
+    /// Generating coverage profile data for `llvm-cov`
+    GenerateCoverageProfile,
+    /// Instrumenting for cmplog/redqueen
+    LogComparisons,
+}
+
+impl Configuration {
+    /// Get compiler flags for this `Configuration`
+    pub fn to_flags(&self) -> Result<Vec<String>, Error> {
+        Ok(match self {
+            Configuration::Default => vec![],
+            Configuration::SanitizeAddresses => vec!["-fsanitize=address".to_string()],
+            Configuration::SanitizeUndefinedBehavior => vec!["-fsanitize=undefined".to_string()],
+            Configuration::GenerateCoverageMap => {
+                vec!["-fsanitize-coverage=trace-pc-guard".to_string()]
+            }
+            Configuration::LogComparisons => vec!["-fsanitize-coverage=trace-cmp".to_string()],
+            Configuration::GenerateCoverageProfile => {
+                vec![
+                    "-fprofile-instr-generate".to_string(),
+                    "-fcoverage-mapping".to_string(),
+                ]
+            }
+        })
+    }
+    /// Get a string representation of this `Configuration`
+    fn to_str<'a>(&self) -> &'a str {
+        match self {
+            Configuration::Default => "",
+            Configuration::SanitizeAddresses => "asan",
+            Configuration::SanitizeUndefinedBehavior => "ubsan",
+            Configuration::GenerateCoverageMap => "coverage",
+            Configuration::GenerateCoverageProfile => "llvm-cov",
+            Configuration::LogComparisons => "cmplog",
+        }
+    }
+
+    /// Insert a `Configuration` specific 'tag' in the extension of the given file
+    pub fn replace_extension(&self, path: std::path::PathBuf) -> std::path::PathBuf {
+        let mut parent = if let Some(parent) = path.parent() {
+            parent.to_path_buf()
+        } else {
+            std::path::PathBuf::from("")
+        };
+        let output = path.file_name().unwrap();
+        let output = output.to_str().unwrap();
+
+        let new_filename = if let Some((filename, extension)) = output.split_once(".") {
+            match self {
+                crate::Configuration::Default => format!("{}.{}", filename, extension),
+                _ => format!("{}.{}.{}", filename, self.to_str(), extension),
+            }
+        } else {
+            match self {
+                crate::Configuration::Default => output.to_string(),
+                _ => format!("{}.{}", output, self.to_str()),
+            }
+        };
+        parent.push(new_filename);
+        parent
+    }
+}
+
+impl std::str::FromStr for Configuration {
+    type Err = ();
+    fn from_str(input: &str) -> Result<Configuration, Self::Err> {
+        Ok(match input {
+            "asan" => Configuration::SanitizeAddresses,
+            "ubsan" => Configuration::SanitizeUndefinedBehavior,
+            "coverage" => Configuration::GenerateCoverageMap,
+            "llvm-cov" => Configuration::GenerateCoverageProfile,
+            "cmplog" => Configuration::LogComparisons,
+            _ => Configuration::Default,
+        })
+    }
 }
 
 // TODO macOS
@@ -92,7 +182,7 @@ pub const LIB_PREFIX: &str = "";
 pub const LIB_PREFIX: &str = "lib";
 
 /// Wrap a compiler hijacking its arguments
-pub trait CompilerWrapper {
+pub trait ToolWrapper {
     /// Set the wrapper arguments parsing a command line set of arguments
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
@@ -151,8 +241,24 @@ pub trait CompilerWrapper {
     where
         S: AsRef<str>;
 
+    /// Add a `Configuration`
+    fn add_configuration(&mut self, configuration: Configuration) -> &'_ mut Self;
+
     /// Command to run the compiler
     fn command(&mut self) -> Result<Vec<String>, Error>;
+
+    /// Command to run the compiler for a given `Configuration`
+    fn command_for_configuration(
+        &mut self,
+        configuration: Configuration,
+    ) -> Result<Vec<String>, Error>;
+
+    /// Get the list of requested `Configuration`s
+    fn configurations(&self) -> Result<Vec<Configuration>, Error>;
+
+    /// Whether to ignore the configured `Configurations`. Useful for e.g. nested calls to
+    /// libafl_cc from libafl_libtool.
+    fn ignore_configurations(&self) -> Result<bool, Error>;
 
     /// Get if in linking mode
     fn is_linking(&self) -> bool;
@@ -168,24 +274,37 @@ pub trait CompilerWrapper {
 
     /// Run the compiler
     fn run(&mut self) -> Result<Option<i32>, Error> {
-        let mut args = self.command()?;
-        self.filter(&mut args);
-
-        if !self.is_silent() {
-            dbg!(args.clone());
-        }
-        if args.is_empty() {
-            return Err(Error::InvalidArguments(
-                "The number of arguments cannot be 0".into(),
-            ));
-        }
-        let status = match Command::new(&args[0]).args(&args[1..]).status() {
-            Ok(s) => s,
-            Err(e) => return Err(Error::Io(e)),
+        let mut last_status = Ok(None);
+        let configurations = if self.ignore_configurations()? {
+            vec![Configuration::Default]
+        } else {
+            self.configurations()?
         };
-        if !self.is_silent() {
-            dbg!(status);
+        for configuration in configurations {
+            let mut args = self.command_for_configuration(configuration)?;
+            self.filter(&mut args);
+
+            if !self.is_silent() {
+                dbg!(args.clone());
+            }
+            if args.is_empty() {
+                last_status = Err(Error::InvalidArguments(
+                    "The number of arguments cannot be 0".into(),
+                ));
+                continue;
+            }
+            let status = match Command::new(&args[0]).args(&args[1..]).status() {
+                Ok(s) => s,
+                Err(e) => {
+                    last_status = Err(Error::Io(e));
+                    continue;
+                }
+            };
+            if !self.is_silent() {
+                dbg!(status);
+            }
+            last_status = Ok(status.code());
         }
-        Ok(status.code())
+        last_status
     }
 }

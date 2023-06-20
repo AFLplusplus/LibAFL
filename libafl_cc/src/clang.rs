@@ -4,11 +4,12 @@ use std::{
     convert::Into,
     env,
     path::{Path, PathBuf},
+    str::FromStr,
     string::String,
     vec::Vec,
 };
 
-use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX};
+use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
 
 /// The `OUT_DIR` for `LLVM` compiler passes
 pub const OUT_DIR: &str = env!("OUT_DIR");
@@ -83,6 +84,9 @@ pub struct ClangWrapper {
     has_libafl_arg: bool,
     use_new_pm: bool,
 
+    output: Option<PathBuf>,
+    configurations: Vec<crate::Configuration>,
+    ignoring_configurations: bool,
     parse_args_called: bool,
     base_args: Vec<String>,
     cc_args: Vec<String>,
@@ -93,7 +97,7 @@ pub struct ClangWrapper {
 }
 
 #[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
-impl CompilerWrapper for ClangWrapper {
+impl ToolWrapper for ClangWrapper {
     #[allow(clippy::too_many_lines)]
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
@@ -108,15 +112,14 @@ impl CompilerWrapper for ClangWrapper {
 
         if self.parse_args_called {
             return Err(Error::Unknown(
-                "CompilerWrapper::parse_args cannot be called twice on the same instance"
-                    .to_string(),
+                "ToolWrapper::parse_args cannot be called twice on the same instance".to_string(),
             ));
         }
         self.parse_args_called = true;
 
         if args.len() == 1 {
             return Err(Error::InvalidArguments(
-                "LibAFL Compiler wrapper - no commands specified. Use me as compiler.".to_string(),
+                "LibAFL Tool wrapper - no commands specified. Use me as compiler.".to_string(),
             ));
         }
 
@@ -145,7 +148,9 @@ impl CompilerWrapper for ClangWrapper {
         let mut suppress_linking = 0;
         let mut i = 1;
         while i < args.len() {
-            if std::path::Path::new(args[i].as_ref())
+            let arg_as_path = std::path::Path::new(args[i].as_ref());
+
+            if arg_as_path
                 .extension()
                 .map_or(false, |ext| ext.eq_ignore_ascii_case("s"))
             {
@@ -185,6 +190,30 @@ impl CompilerWrapper for ClangWrapper {
                     if i + 1 < args.len()
                         && (args[i + 1].as_ref() == "defs" || args[i + 1].as_ref() == "-Wl,defs")
                     {
+                        i += 2;
+                        continue;
+                    }
+                }
+                "--libafl-ignore-configurations" => {
+                    self.ignoring_configurations = true;
+                    i += 1;
+                    continue;
+                }
+                "--libafl-configurations" => {
+                    if i + 1 < args.len() {
+                        self.configurations.extend(
+                            args[i + 1]
+                                .as_ref()
+                                .split(",")
+                                .map(|x| crate::Configuration::from_str(x).unwrap()),
+                        );
+                        i += 2;
+                        continue;
+                    }
+                }
+                "-o" => {
+                    if i + 1 < args.len() {
+                        self.output = Some(PathBuf::from(args[i + 1].as_ref()));
                         i += 2;
                         continue;
                     }
@@ -301,7 +330,29 @@ impl CompilerWrapper for ClangWrapper {
         }
     }
 
+    fn add_configuration(&mut self, configuration: crate::Configuration) -> &'_ mut Self {
+        self.configurations.push(configuration);
+        self
+    }
+
+    fn configurations(&self) -> Result<Vec<crate::Configuration>, Error> {
+        let mut configs = self.configurations.clone();
+        configs.reverse();
+        Ok(configs)
+    }
+
+    fn ignore_configurations(&self) -> Result<bool, Error> {
+        Ok(self.ignoring_configurations)
+    }
+
     fn command(&mut self) -> Result<Vec<String>, Error> {
+        self.command_for_configuration(crate::Configuration::Default)
+    }
+
+    fn command_for_configuration(
+        &mut self,
+        configuration: crate::Configuration,
+    ) -> Result<Vec<String>, Error> {
         let mut args = vec![];
         let mut use_pass = false;
 
@@ -310,7 +361,86 @@ impl CompilerWrapper for ClangWrapper {
         } else {
             args.push(self.wrapped_cc.clone());
         }
-        args.extend_from_slice(self.base_args.as_slice());
+
+        let base_args = self
+            .base_args
+            .iter()
+            .map(|r| {
+                let arg_as_path = std::path::PathBuf::from(r);
+                if !r.ends_with(".") {
+                    if let Some(extension) = arg_as_path.extension() {
+                        let extension = extension.to_str().unwrap();
+                        let extension_lowercase = extension.to_lowercase();
+                        match &extension_lowercase[..] {
+                            "a" | "la" => configuration.replace_extension(arg_as_path),
+                            _ => arg_as_path,
+                        }
+                    } else {
+                        arg_as_path
+                    }
+                    .into_os_string()
+                    .into_string()
+                    .unwrap()
+                } else {
+                    r.to_string()
+                }
+            })
+            .collect::<Vec<_>>();
+
+        if let Some(output) = self.output.clone() {
+            let output = configuration.replace_extension(output);
+            let new_filename = output.into_os_string().into_string().unwrap();
+            args.push("-o".to_string());
+            args.push(new_filename);
+            args.extend_from_slice(base_args.as_slice());
+        } else {
+            // No output specified, we need to rewrite the single .c file's name.
+            args.extend(
+                base_args
+                    .iter()
+                    .map(|r| {
+                        let arg_as_path = std::path::PathBuf::from(r);
+                        if !r.ends_with(".") {
+                            if let Some(extension) = arg_as_path.extension() {
+                                let extension = extension.to_str().unwrap();
+                                let extension_lowercase = extension.to_lowercase();
+                                match &extension_lowercase[..] {
+                                    "c" | "cc" | "cxx" | "cpp" => {
+                                        configuration.replace_extension(arg_as_path)
+                                    }
+                                    _ => arg_as_path,
+                                }
+                            } else {
+                                arg_as_path
+                            }
+                            .into_os_string()
+                            .into_string()
+                            .unwrap()
+                        } else {
+                            r.to_string()
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        }
+
+        // args.extend(self.base_args.iter().map(|x| {
+        //     let arg_as_path = std::path::Path::new(x);
+        //
+        //     let new_arg =
+        //         arg_as_path.with_extension(arg_as_path.extension().map_or("".to_string(), |ext| {
+        //             let ext = ext.to_str().unwrap();
+        //             println!("{:?}: {}", arg_as_path, ext);
+        //             match ext {
+        //                 "a" | "A" | "la" | "LA" | "o" | "O" | "lo" | "LO" => {
+        //                     format!("{}{}", configuration.to_extension(), ext)
+        //                 }
+        //                 _ => ext.to_string(),
+        //             }
+        //         }));
+        //     new_arg.into_os_string().into_string().unwrap()
+        // }));
+        args.extend_from_slice(&configuration.to_flags()?);
         if self.need_libafl_arg && !self.has_libafl_arg {
             return Ok(args);
         }
@@ -369,6 +499,7 @@ impl CompilerWrapper for ClangWrapper {
             if cfg!(unix) {
                 args.push("-pthread".into());
                 args.push("-ldl".into());
+                args.push("-lm".into());
             }
         } else {
             args.extend_from_slice(self.cc_args.as_slice());
@@ -432,6 +563,9 @@ impl ClangWrapper {
             need_libafl_arg: false,
             has_libafl_arg: false,
             use_new_pm,
+            output: None,
+            configurations: vec![crate::Configuration::Default],
+            ignoring_configurations: false,
             parse_args_called: false,
             base_args: vec![],
             cc_args: vec![],
@@ -512,7 +646,7 @@ impl ClangWrapper {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ClangWrapper, CompilerWrapper};
+    use crate::{ClangWrapper, ToolWrapper};
 
     #[test]
     #[cfg_attr(miri, ignore)]
