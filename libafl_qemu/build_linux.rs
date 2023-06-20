@@ -13,11 +13,7 @@ pub fn build() {
         })
     };
 
-    let asan = if cfg!(feature = "asan") {
-        true
-    } else {
-        false
-    };
+    let asan = cfg!(feature = "asan");
 
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
