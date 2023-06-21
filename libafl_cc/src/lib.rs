@@ -123,25 +123,6 @@ impl Configuration {
             }
         })
     }
-    /// Get a string representation of this `Configuration`
-    fn to_string(&self) -> String {
-        match self {
-            Configuration::Default => "".to_string(),
-            Configuration::SanitizeAddresses => "asan".to_string(),
-            Configuration::SanitizeUndefinedBehavior => "ubsan".to_string(),
-            Configuration::GenerateCoverageMap => "coverage".to_string(),
-            Configuration::GenerateCoverageProfile => "llvm-cov".to_string(),
-            Configuration::LogComparisons => "cmplog".to_string(),
-            Configuration::Compound(configurations) => {
-                let mut result: Vec<String> = vec![];
-                for configuration in configurations {
-                    result.push(configuration.to_string());
-                }
-                result.join("_")
-            }
-        }
-    }
-
     /// Insert a `Configuration` specific 'tag' in the extension of the given file
     #[must_use]
     pub fn replace_extension(&self, path: &Path) -> std::path::PathBuf {
@@ -180,6 +161,26 @@ impl std::str::FromStr for Configuration {
             "cmplog" => Configuration::LogComparisons,
             _ => Configuration::Default,
         })
+    }
+}
+
+impl std::fmt::Display for Configuration {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Configuration::Default => write!(f, ""),
+            Configuration::SanitizeAddresses => write!(f, "asan"),
+            Configuration::SanitizeUndefinedBehavior => write!(f, "ubsan"),
+            Configuration::GenerateCoverageMap => write!(f, "coverage"),
+            Configuration::GenerateCoverageProfile => write!(f, "llvm-cov"),
+            Configuration::LogComparisons => write!(f, "cmplog"),
+            Configuration::Compound(configurations) => {
+                let mut result: Vec<String> = vec![];
+                for configuration in configurations {
+                    result.push(format!("{configuration}"));
+                }
+                write!(f, result.join("_"))
+            }
+        }
     }
 }
 
