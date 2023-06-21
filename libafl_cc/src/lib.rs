@@ -93,6 +93,8 @@ pub enum Configuration {
     GenerateCoverageProfile,
     /// Instrumenting for cmplog/redqueen
     LogComparisons,
+    /// A compound `Configuration`, made up of a list of other `Configuration`s
+    Compound(Vec<Self>),
 }
 
 impl Configuration {
@@ -112,17 +114,31 @@ impl Configuration {
                     "-fcoverage-mapping".to_string(),
                 ]
             }
+            Configuration::Compound(configurations) => {
+                let mut result: Vec<String> = vec![];
+                for configuration in configurations {
+                    result.extend(configuration.to_flags()?);
+                }
+                result
+            }
         })
     }
     /// Get a string representation of this `Configuration`
-    fn to_str<'a>(&self) -> &'a str {
+    fn to_string(&self) -> String {
         match self {
-            Configuration::Default => "",
-            Configuration::SanitizeAddresses => "asan",
-            Configuration::SanitizeUndefinedBehavior => "ubsan",
-            Configuration::GenerateCoverageMap => "coverage",
-            Configuration::GenerateCoverageProfile => "llvm-cov",
-            Configuration::LogComparisons => "cmplog",
+            Configuration::Default => "".to_string(),
+            Configuration::SanitizeAddresses => "asan".to_string(),
+            Configuration::SanitizeUndefinedBehavior => "ubsan".to_string(),
+            Configuration::GenerateCoverageMap => "coverage".to_string(),
+            Configuration::GenerateCoverageProfile => "llvm-cov".to_string(),
+            Configuration::LogComparisons => "cmplog".to_string(),
+            Configuration::Compound(configurations) => {
+                let mut result: Vec<String> = vec![];
+                for configuration in configurations {
+                    result.push(configuration.to_string());
+                }
+                result.join("_")
+            }
         }
     }
 
@@ -141,12 +157,12 @@ impl Configuration {
             if let crate::Configuration::Default = self {
                 format!("{filename}.{extension}")
             } else {
-                format!("{}.{}.{}", filename, self.to_str(), extension)
+                format!("{}.{}.{}", filename, self.to_string(), extension)
             }
         } else if let crate::Configuration::Default = self {
             output.to_string()
         } else {
-            format!("{}.{}", output, self.to_str())
+            format!("{}.{}", output, self.to_string())
         };
         parent.push(new_filename);
         parent

@@ -25,7 +25,10 @@ pub fn main() {
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "libfuzzer_libpng")
             .add_configuration(Configuration::GenerateCoverageMap)
-            .add_configuration(Configuration::LogComparisons)
+            .add_configuration(Configuration::Compound(vec![
+                Configuration::GenerateCoverageMap,
+                Configuration::LogComparisons,
+            ]))
             .add_configuration(Configuration::SanitizeUndefinedBehavior)
             .add_configuration(Configuration::SanitizeAddresses)
             // .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")

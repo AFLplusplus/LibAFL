@@ -12,7 +12,10 @@ pub fn main() {
             .parse_args(&args)
             .expect("Failed to parse the command line")
             .add_configuration(Configuration::GenerateCoverageMap)
-            .add_configuration(Configuration::LogComparisons)
+            .add_configuration(Configuration::Compound(vec![
+                Configuration::GenerateCoverageMap,
+                Configuration::LogComparisons,
+            ]))
             .add_configuration(Configuration::SanitizeUndefinedBehavior)
             .add_configuration(Configuration::SanitizeAddresses)
             // .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
