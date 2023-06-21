@@ -307,6 +307,7 @@ impl ToolWrapper for ClangWrapper {
         self.command_for_configuration(crate::Configuration::Default)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn command_for_configuration(
         &mut self,
         configuration: crate::Configuration,
