@@ -138,12 +138,12 @@ impl Configuration {
             if let crate::Configuration::Default = self {
                 format!("{filename}.{extension}")
             } else {
-                format!("{}.{}.{}", filename, self, extension)
+                format!("{filename}.{self}.{extension}")
             }
         } else if let crate::Configuration::Default = self {
             output.to_string()
         } else {
-            format!("{}.{}", output, self)
+            format!("{output}.{self}")
         };
         parent.push(new_filename);
         parent
