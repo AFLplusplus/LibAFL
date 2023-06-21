@@ -178,7 +178,7 @@ impl std::fmt::Display for Configuration {
                 for configuration in configurations {
                     result.push(format!("{configuration}"));
                 }
-                write!(f, result.join("_"))
+                write!(f, "{}", result.join("_"))
             }
         }
     }
