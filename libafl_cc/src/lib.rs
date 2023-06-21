@@ -143,12 +143,10 @@ impl Configuration {
             } else {
                 format!("{}.{}.{}", filename, self.to_str(), extension)
             }
+        } else if let crate::Configuration::Default = self {
+            output.to_string()
         } else {
-            if let crate::Configuration::Default = self {
-                output.to_string()
-            } else {
-                format!("{}.{}", output, self.to_str())
-            }
+            format!("{}.{}", output, self.to_str())
         };
         parent.push(new_filename);
         parent
@@ -214,6 +212,7 @@ pub trait ToolWrapper {
     fn command(&mut self) -> Result<Vec<String>, Error>;
 
     /// Command to run the compiler for a given `Configuration`
+    #[allow(clippy::too_many_lines)]
     fn command_for_configuration(
         &mut self,
         configuration: Configuration,
