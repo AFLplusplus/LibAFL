@@ -128,7 +128,7 @@ impl Configuration {
 
     /// Insert a `Configuration` specific 'tag' in the extension of the given file
     #[must_use]
-    pub fn replace_extension(&self, path: &std::path::PathBuf) -> std::path::PathBuf {
+    pub fn replace_extension(&self, path: &Path) -> std::path::PathBuf {
         let mut parent = if let Some(parent) = path.parent() {
             parent.to_path_buf()
         } else {
@@ -137,7 +137,7 @@ impl Configuration {
         let output = path.file_name().unwrap();
         let output = output.to_str().unwrap();
 
-        let new_filename = if let Some((filename, extension)) = output.split_once(".") {
+        let new_filename = if let Some((filename, extension)) = output.split_once('.') {
             if let crate::Configuration::Default = self {
                 format!("{filename}.{extension}")
             } else {
