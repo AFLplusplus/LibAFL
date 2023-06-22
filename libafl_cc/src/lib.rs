@@ -84,15 +84,15 @@ pub enum Configuration {
     /// Default uninstrumented configurations
     Default,
     /// Sanitizing addresses
-    SanitizeAddresses,
+    AddressSanitizer,
     /// Sanitizing undefined behavior
-    SanitizeUndefinedBehavior,
+    UndefinedBehaviorSanitizer,
     /// Generating a coverage map
     GenerateCoverageMap,
     /// Generating coverage profile data for `llvm-cov`
     GenerateCoverageProfile,
     /// Instrumenting for cmplog/redqueen
-    LogComparisons,
+    CmpLog,
     /// A compound `Configuration`, made up of a list of other `Configuration`s
     Compound(Vec<Self>),
 }
@@ -102,12 +102,12 @@ impl Configuration {
     pub fn to_flags(&self) -> Result<Vec<String>, Error> {
         Ok(match self {
             Configuration::Default => vec![],
-            Configuration::SanitizeAddresses => vec!["-fsanitize=address".to_string()],
-            Configuration::SanitizeUndefinedBehavior => vec!["-fsanitize=undefined".to_string()],
+            Configuration::AddressSanitizer => vec!["-fsanitize=address".to_string()],
+            Configuration::UndefinedBehaviorSanitizer => vec!["-fsanitize=undefined".to_string()],
             Configuration::GenerateCoverageMap => {
                 vec!["-fsanitize-coverage=trace-pc-guard".to_string()]
             }
-            Configuration::LogComparisons => vec!["-fsanitize-coverage=trace-cmp".to_string()],
+            Configuration::CmpLog => vec!["-fsanitize-coverage=trace-cmp".to_string()],
             Configuration::GenerateCoverageProfile => {
                 vec![
                     "-fprofile-instr-generate".to_string(),
@@ -154,11 +154,11 @@ impl std::str::FromStr for Configuration {
     type Err = ();
     fn from_str(input: &str) -> Result<Configuration, Self::Err> {
         Ok(match input {
-            "asan" => Configuration::SanitizeAddresses,
-            "ubsan" => Configuration::SanitizeUndefinedBehavior,
+            "asan" => Configuration::AddressSanitizer,
+            "ubsan" => Configuration::UndefinedBehaviorSanitizer,
             "coverage" => Configuration::GenerateCoverageMap,
             "llvm-cov" => Configuration::GenerateCoverageProfile,
-            "cmplog" => Configuration::LogComparisons,
+            "cmplog" => Configuration::CmpLog,
             _ => Configuration::Default,
         })
     }
@@ -168,11 +168,11 @@ impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Configuration::Default => write!(f, ""),
-            Configuration::SanitizeAddresses => write!(f, "asan"),
-            Configuration::SanitizeUndefinedBehavior => write!(f, "ubsan"),
+            Configuration::AddressSanitizer => write!(f, "asan"),
+            Configuration::UndefinedBehaviorSanitizer => write!(f, "ubsan"),
             Configuration::GenerateCoverageMap => write!(f, "coverage"),
             Configuration::GenerateCoverageProfile => write!(f, "llvm-cov"),
-            Configuration::LogComparisons => write!(f, "cmplog"),
+            Configuration::CmpLog => write!(f, "cmplog"),
             Configuration::Compound(configurations) => {
                 let mut result: Vec<String> = vec![];
                 for configuration in configurations {

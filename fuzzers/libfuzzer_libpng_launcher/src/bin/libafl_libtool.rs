@@ -14,10 +14,10 @@ pub fn main() {
             .add_configuration(Configuration::GenerateCoverageMap)
             .add_configuration(Configuration::Compound(vec![
                 Configuration::GenerateCoverageMap,
-                Configuration::LogComparisons,
+                Configuration::CmpLog,
             ]))
-            .add_configuration(Configuration::SanitizeUndefinedBehavior)
-            .add_configuration(Configuration::SanitizeAddresses)
+            .add_configuration(Configuration::UndefinedBehaviorSanitizer)
+            .add_configuration(Configuration::AddressSanitizer)
             // .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
             // .add_arg("-fsanitize=address")
             .run()
