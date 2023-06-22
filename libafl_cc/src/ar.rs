@@ -93,7 +93,7 @@ impl ToolWrapper for ArWrapper {
                         self.configurations.extend(
                             args[i + 1]
                                 .as_ref()
-                                .split(",")
+                                .split(',')
                                 .map(|x| crate::Configuration::from_str(x).unwrap()),
                         );
                         i += 2;
@@ -185,9 +185,7 @@ impl ToolWrapper for ArWrapper {
             })
             .collect::<Vec<_>>();
 
-        let ar_path = if let Ok(ar_dir) = std::env::var("LLVM_AR_PATH") {
-            ar_dir
-        } else {
+        let Ok(ar_path) = std::env::var("LLVM_AR_PATH") else {
             panic!("Couldn't find llvm-ar. Specify the `LLVM_AR_PATH` environment variable");
         };
 
