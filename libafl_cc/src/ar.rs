@@ -1,14 +1,7 @@
 //! Ar Wrapper from `LibAFL`
 // pass to e.g. cmake with -DCMAKE_AR=/path/to/fuzzer/target/release/libafl_ar
 
-use std::{
-    convert::Into,
-    env,
-    path::{Path, PathBuf},
-    str::FromStr,
-    string::String,
-    vec::Vec,
-};
+use std::{convert::Into, env, path::PathBuf, str::FromStr, string::String, vec::Vec};
 
 use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
 
@@ -141,27 +134,6 @@ impl ToolWrapper for ArWrapper {
         self
     }
 
-    fn add_cc_arg<S>(&mut self, arg: S) -> &'_ mut Self
-    where
-        S: AsRef<str>,
-    {
-        self
-    }
-
-    fn add_link_arg<S>(&mut self, arg: S) -> &'_ mut Self
-    where
-        S: AsRef<str>,
-    {
-        self
-    }
-
-    fn link_staticlib<S>(&mut self, dir: &Path, name: S) -> &'_ mut Self
-    where
-        S: AsRef<str>,
-    {
-        self
-    }
-
     fn add_configuration(&mut self, configuration: crate::Configuration) -> &'_ mut Self {
         self.configurations.push(configuration);
         self
@@ -197,7 +169,7 @@ impl ToolWrapper for ArWrapper {
                         let extension_lowercase = extension.to_lowercase();
                         match &extension_lowercase[..] {
                             "o" | "lo" | "a" | "la" | "so" => {
-                                configuration.replace_extension(arg_as_path)
+                                configuration.replace_extension(&arg_as_path)
                             }
                             _ => arg_as_path,
                         }
