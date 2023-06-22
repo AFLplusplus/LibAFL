@@ -230,7 +230,6 @@ impl ArWrapper {
     /// Create a new Clang Wrapper
     #[must_use]
     pub fn new() -> Self {
-        #[cfg(unix)]
         Self {
             name: String::new(),
             linking: false,
