@@ -140,7 +140,7 @@ impl ToolWrapper for ArWrapper {
     }
 
     fn configurations(&self) -> Result<Vec<crate::Configuration>, Error> {
-        let mut configs = self.configurations.clone();
+        let configs = self.configurations.clone();
         Ok(configs)
     }
 
@@ -206,7 +206,7 @@ impl ToolWrapper for ArWrapper {
         self.linking
     }
 
-    fn filter(&self, args: &mut Vec<String>) {}
+    fn filter(&self, _args: &mut Vec<String>) {}
 
     fn silence(&mut self, value: bool) -> &'_ mut Self {
         self.is_silent = value;
