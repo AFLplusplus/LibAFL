@@ -163,7 +163,9 @@ impl ToolWrapper for ArWrapper {
             .iter()
             .map(|r| {
                 let arg_as_path = std::path::PathBuf::from(r);
-                if !r.ends_with('.') {
+                if r.ends_with('.') {
+                    r.to_string()
+                } else {
                     if let Some(extension) = arg_as_path.extension() {
                         let extension = extension.to_str().unwrap();
                         let extension_lowercase = extension.to_lowercase();
@@ -179,14 +181,12 @@ impl ToolWrapper for ArWrapper {
                     .into_os_string()
                     .into_string()
                     .unwrap()
-                } else {
-                    r.to_string()
                 }
             })
             .collect::<Vec<_>>();
 
         let ar_path = if let Ok(ar_dir) = std::env::var("LLVM_AR_PATH") {
-            ar_dir.to_string()
+            ar_dir
         } else {
             panic!("Couldn't find llvm-ar. Specify the `LLVM_AR_PATH` environment variable");
         };
