@@ -60,6 +60,8 @@
 
 use std::{convert::Into, path::Path, process::Command, string::String, vec::Vec};
 
+pub mod ar;
+pub use ar::ArWrapper;
 pub mod cfg;
 pub use cfg::{CfgEdge, ControlFlowGraph, EntryBasicBlockInfo, HasWeight};
 pub mod clang;
