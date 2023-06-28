@@ -51,8 +51,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    prelude::HasExecutions,
-    state::{HasClientPerfMonitor, HasCorpus, HasSolutions, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, UsesState},
     Error, HasFeedback,
 };
 
@@ -680,8 +679,7 @@ mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::{HasFeedback, HasObjective},
         inputs::UsesInput,
-        prelude::HasExecutions,
-        state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
+        state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -944,8 +942,7 @@ pub mod windows_asan_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        prelude::HasExecutions,
-        state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
+        state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     };
 
     /// # Safety
@@ -1059,8 +1056,7 @@ mod windows_exception_handler {
         feedbacks::Feedback,
         fuzzer::{HasFeedback, HasObjective},
         inputs::UsesInput,
-        prelude::HasExecutions,
-        state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
+        state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
