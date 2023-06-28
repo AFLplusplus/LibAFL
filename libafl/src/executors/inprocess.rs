@@ -48,11 +48,12 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
-    fuzzer::HasObjective,
+    fuzzer::{HasFeedback, HasObjective, HasScheduler},
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
+    schedulers::Scheduler,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, UsesState},
-    Error, HasFeedback,
+    Error,
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure
@@ -188,7 +189,9 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         CF: Feedback<S>,
         OF: Feedback<S>,
-        Z: HasObjective<Objective = OF, State = S> + HasFeedback<Feedback = CF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
     {
         let handlers = InProcessHandlers::new::<CF, Self, EM, OF, Z>()?;
         #[cfg(windows)]
@@ -351,7 +354,8 @@ impl InProcessHandlers {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
         Z: HasObjective<Objective = OF, State = E::State>
-            + HasFeedback<Feedback = CF, State = E::State>,
+            + HasFeedback<Feedback = CF, State = E::State>
+            + HasScheduler,
     {
         #[cfg(unix)]
         #[cfg_attr(miri, allow(unused_variables))]
@@ -383,7 +387,8 @@ impl InProcessHandlers {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
         Z: HasObjective<Objective = OF, State = E::State>
-            + HasFeedback<Feedback = CF, State = E::State>,
+            + HasFeedback<Feedback = CF, State = E::State>
+            + HasScheduler,
     {
         unsafe {
             let data = &mut GLOBAL_STATE;
@@ -580,7 +585,8 @@ pub fn run_observers_and_save_state<CF, E, EM, OF, Z>(
     OF: Feedback<E::State>,
     E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
     Z: HasObjective<Objective = OF, State = E::State>
-        + HasFeedback<Feedback = CF, State = E::State>,
+        + HasFeedback<Feedback = CF, State = E::State>
+        + HasScheduler,
 {
     let observers = executor.observers_mut();
 
@@ -588,22 +594,27 @@ pub fn run_observers_and_save_state<CF, E, EM, OF, Z>(
         .post_exec_all(state, input, &exitkind)
         .expect("Observers post_exec_all failed");
 
-    if fuzzer
+    let interesting_for_corpus = fuzzer
         .feedback_mut()
         .is_interesting(state, event_mgr, input, observers, &exitkind)
-        .expect("In run_observers_and_save_state feedback failure.")
-    {
-        let mut new_testcase = Testcase::new(input.clone());
+        .expect("In run_observers_and_save_state feedback failure.");
+
+    if interesting_for_corpus {
+        let mut new_testcase = Testcase::with_executions(input.clone(), *state.executions());
         new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
         fuzzer
             .feedback_mut()
             .append_metadata(state, observers, &mut new_testcase)
             .expect("Failed adding metadata");
-        state
+        let idx = state
             .corpus_mut()
             .add(new_testcase)
             .expect("In run_observers_and_save_state corpus failure.");
+        fuzzer
+            .scheduler_mut()
+            .on_add(state, idx)
+            .expect("Could not add to scheduler in run_observers_and_save_state.");
         event_mgr
             .fire(
                 state,
@@ -677,7 +688,7 @@ mod unix_signal_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::{HasFeedback, HasObjective},
+        fuzzer::{HasFeedback, HasObjective, HasScheduler},
         inputs::UsesInput,
         state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     };
@@ -741,7 +752,8 @@ mod unix_signal_handler {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
         Z: HasObjective<Objective = OF, State = E::State>
-            + HasFeedback<Feedback = CF, State = E::State>,
+            + HasFeedback<Feedback = CF, State = E::State>
+            + HasScheduler,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -784,7 +796,8 @@ mod unix_signal_handler {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
         Z: HasObjective<Objective = OF, State = E::State>
-            + HasFeedback<Feedback = CF, State = E::State>,
+            + HasFeedback<Feedback = CF, State = E::State>
+            + HasScheduler,
     {
         if !data.timeout_executor_ptr.is_null()
             && data.timeout_executor_mut::<E>().handle_timeout(data)
@@ -835,7 +848,8 @@ mod unix_signal_handler {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
         Z: HasObjective<Objective = OF, State = E::State>
-            + HasFeedback<Feedback = CF, State = E::State>,
+            + HasFeedback<Feedback = CF, State = E::State>
+            + HasScheduler,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
@@ -940,7 +954,7 @@ pub mod windows_asan_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::{HasFeedback, HasObjective},
+        fuzzer::{HasFeedback, HasObjective, HasScheduler},
         inputs::UsesInput,
         state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     };
@@ -955,7 +969,8 @@ pub mod windows_asan_handler {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
         Z: HasObjective<Objective = OF, State = E::State>
-            + HasFeedback<Feedback = CF, State = E::State>,
+            + HasFeedback<Feedback = CF, State = E::State>
+            + HasScheduler,
     {
         let data = &mut GLOBAL_STATE;
         // Have we set a timer_before?
@@ -1054,7 +1069,7 @@ mod windows_exception_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::{HasFeedback, HasObjective},
+        fuzzer::{HasFeedback, HasObjective, HasScheduler},
         inputs::UsesInput,
         state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     };
@@ -1098,7 +1113,8 @@ mod windows_exception_handler {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
         Z: HasObjective<Objective = OF, State = E::State>
-            + HasFeedback<Feedback = CF, State = E::State>,
+            + HasFeedback<Feedback = CF, State = E::State>
+            + HasScheduler,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -1159,7 +1175,8 @@ mod windows_exception_handler {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
         Z: HasObjective<Objective = OF, State = E::State>
-            + HasFeedback<Feedback = CF, State = E::State>,
+            + HasFeedback<Feedback = CF, State = E::State>
+            + HasScheduler,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -1236,7 +1253,8 @@ mod windows_exception_handler {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
         Z: HasObjective<Objective = OF, State = E::State>
-            + HasFeedback<Feedback = CF, State = E::State>,
+            + HasFeedback<Feedback = CF, State = E::State>
+            + HasScheduler,
     {
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
@@ -1844,7 +1862,7 @@ impl<'a, H, OT, S, SP> InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: UsesInput + HasCorpus,
     SP: ShMemProvider,
 {
     /// Creates a new [`InProcessForkExecutor`]
@@ -1861,7 +1879,9 @@ where
         CF: Feedback<S>,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S> + HasFeedback<Feedback = CF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
     {
         let handlers = InChildProcessHandlers::new::<Self>()?;
         Ok(Self {
@@ -1890,7 +1910,7 @@ where
 impl<'a, H, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    S: UsesInput,
+    S: UsesInput + HasCorpus,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
@@ -1910,7 +1930,9 @@ where
         CF: Feedback<S>,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S> + HasFeedback<Feedback = CF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
     {
         let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
         let milli_sec = timeout.as_millis();
@@ -1953,7 +1975,9 @@ where
         CF: Feedback<S>,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S> + HasFeedback<Feedback = CF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
     {
         let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
         let milli_sec = timeout.as_millis();
