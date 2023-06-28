@@ -44,14 +44,16 @@ use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
 use crate::{
+    bolts::current_time,
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
+    prelude::HasExecutions,
     state::{HasClientPerfMonitor, HasCorpus, HasSolutions, UsesState},
-    Error,
+    Error, HasFeedback,
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure
@@ -167,7 +169,7 @@ where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: HasSolutions + HasClientPerfMonitor + HasCorpus,
+    S: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -175,7 +177,7 @@ where
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
-    pub fn new<EM, OF, Z>(
+    pub fn new<CF, EM, OF, Z>(
         harness_fn: HB,
         observers: OT,
         _fuzzer: &mut Z,
@@ -185,10 +187,11 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
+        CF: Feedback<S>,
         OF: Feedback<S>,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasFeedback<Feedback = CF, State = S>,
     {
-        let handlers = InProcessHandlers::new::<Self, EM, OF, Z>()?;
+        let handlers = InProcessHandlers::new::<CF, Self, EM, OF, Z>()?;
         #[cfg(windows)]
         // Some initialization necessary for windows.
         unsafe {
@@ -251,7 +254,7 @@ where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: HasSolutions + HasClientPerfMonitor + HasCorpus,
+    S: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
 {
     /// the timeout handler
     #[inline]
@@ -341,27 +344,29 @@ impl InProcessHandlers {
 
     /// Create new [`InProcessHandlers`].
     #[cfg(not(all(windows, feature = "std")))]
-    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
+    pub fn new<CF, E, EM, OF, Z>() -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+        Z: HasObjective<Objective = OF, State = E::State>
+            + HasFeedback<Feedback = CF, State = E::State>,
     {
         #[cfg(unix)]
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut GLOBAL_STATE;
             #[cfg(feature = "std")]
-            unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
+            unix_signal_handler::setup_panic_hook::<CF, E, EM, OF, Z>();
             #[cfg(not(miri))]
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
-                crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z>
+                crash_handler: unix_signal_handler::inproc_crash_handler::<CF, E, EM, OF, Z>
                     as *const c_void,
-                timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>
+                timeout_handler: unix_signal_handler::inproc_timeout_handler::<CF, E, EM, OF, Z>
                     as *const _,
             })
         }
@@ -371,25 +376,27 @@ impl InProcessHandlers {
 
     /// Create new [`InProcessHandlers`].
     #[cfg(all(windows, feature = "std"))]
-    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
+    pub fn new<CF, E, EM, OF, Z>() -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers + HasInProcessHandlers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+        Z: HasObjective<Objective = OF, State = E::State>
+            + HasFeedback<Feedback = CF, State = E::State>,
     {
         unsafe {
             let data = &mut GLOBAL_STATE;
             #[cfg(feature = "std")]
-            windows_exception_handler::setup_panic_hook::<E, EM, OF, Z>();
+            windows_exception_handler::setup_panic_hook::<CF, E, EM, OF, Z>();
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
 
             Ok(Self {
-                crash_handler: windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
+                crash_handler: windows_exception_handler::inproc_crash_handler::<CF, E, EM, OF, Z>
                     as *const _,
-                timeout_handler: windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
+                timeout_handler: windows_exception_handler::inproc_timeout_handler::<CF, E, EM, OF, Z>
                     as *const c_void,
             })
         }
@@ -560,7 +567,7 @@ use crate::{
 #[inline]
 #[allow(clippy::too_many_arguments)]
 /// Save state if it is an objective
-pub fn run_observers_and_save_state<E, EM, OF, Z>(
+pub fn run_observers_and_save_state<CF, E, EM, OF, Z>(
     executor: &mut E,
     state: &mut E::State,
     input: &<E::State as UsesInput>::Input,
@@ -570,15 +577,50 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 ) where
     E: HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+    CF: Feedback<E::State>,
     OF: Feedback<E::State>,
-    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+    Z: HasObjective<Objective = OF, State = E::State>
+        + HasFeedback<Feedback = CF, State = E::State>,
 {
     let observers = executor.observers_mut();
 
     observers
         .post_exec_all(state, input, &exitkind)
         .expect("Observers post_exec_all failed");
+
+    if fuzzer
+        .feedback_mut()
+        .is_interesting(state, event_mgr, input, observers, &exitkind)
+        .expect("In run_observers_and_save_state feedback failure.")
+    {
+        let mut new_testcase = Testcase::new(input.clone());
+        new_testcase.add_metadata(exitkind);
+        new_testcase.set_parent_id_optional(*state.corpus().current());
+        fuzzer
+            .feedback_mut()
+            .append_metadata(state, observers, &mut new_testcase)
+            .expect("Failed adding metadata");
+        state
+            .corpus_mut()
+            .add(new_testcase)
+            .expect("In run_observers_and_save_state corpus failure.");
+        event_mgr
+            .fire(
+                state,
+                Event::NewTestcase {
+                    input: input.clone(),
+                    observers_buf: None,
+                    exit_kind: exitkind,
+                    corpus_size: state.corpus().count(),
+                    client_config: event_mgr.configuration(),
+                    time: current_time(),
+                    executions: *state.executions(),
+                    forward_id: None,
+                },
+            )
+            .expect("Could not add the testcase in run_observers_and_save_state");
+    }
 
     let interesting = fuzzer
         .objective_mut()
@@ -636,8 +678,9 @@ mod unix_signal_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
+        fuzzer::{HasFeedback, HasObjective},
         inputs::UsesInput,
+        prelude::HasExecutions,
         state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     };
 
@@ -692,13 +735,15 @@ mod unix_signal_handler {
 
     /// invokes the `post_exec` hook on all observer in case of panic
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, OF, Z>()
+    pub fn setup_panic_hook<CF, E, EM, OF, Z>()
     where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+        Z: HasObjective<Objective = OF, State = E::State>
+            + HasFeedback<Feedback = CF, State = E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -712,7 +757,7 @@ mod unix_signal_handler {
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
-                run_observers_and_save_state::<E, EM, OF, Z>(
+                run_observers_and_save_state::<CF, E, EM, OF, Z>(
                     executor,
                     state,
                     input,
@@ -729,7 +774,7 @@ mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-    pub(crate) unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
+    pub(crate) unsafe fn inproc_timeout_handler<CF, E, EM, OF, Z>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -737,9 +782,11 @@ mod unix_signal_handler {
     ) where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+        Z: HasObjective<Objective = OF, State = E::State>
+            + HasFeedback<Feedback = CF, State = E::State>,
     {
         if !data.timeout_executor_ptr.is_null()
             && data.timeout_executor_mut::<E>().handle_timeout(data)
@@ -760,7 +807,7 @@ mod unix_signal_handler {
 
         log::error!("Timeout in fuzz run.");
 
-        run_observers_and_save_state::<E, EM, OF, Z>(
+        run_observers_and_save_state::<CF, E, EM, OF, Z>(
             executor,
             state,
             input,
@@ -778,7 +825,7 @@ mod unix_signal_handler {
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
-    pub(crate) unsafe fn inproc_crash_handler<E, EM, OF, Z>(
+    pub(crate) unsafe fn inproc_crash_handler<CF, E, EM, OF, Z>(
         signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -786,9 +833,11 @@ mod unix_signal_handler {
     ) where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+        Z: HasObjective<Objective = OF, State = E::State>
+            + HasFeedback<Feedback = CF, State = E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
@@ -819,7 +868,7 @@ mod unix_signal_handler {
                 log::error!("{}", std::str::from_utf8(&bsod).unwrap());
             }
 
-            run_observers_and_save_state::<E, EM, OF, Z>(
+            run_observers_and_save_state::<CF, E, EM, OF, Z>(
                 executor,
                 state,
                 input,
@@ -895,18 +944,21 @@ pub mod windows_asan_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
+        prelude::HasExecutions,
         state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     };
 
     /// # Safety
     /// ASAN deatch handler
-    pub unsafe extern "C" fn asan_death_handler<E, EM, OF, Z>()
+    pub unsafe extern "C" fn asan_death_handler<CF, E, EM, OF, Z>()
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+        Z: HasObjective<Objective = OF, State = E::State>
+            + HasFeedback<Feedback = CF, State = E::State>,
     {
         let data = &mut GLOBAL_STATE;
         // Have we set a timer_before?
@@ -960,7 +1012,7 @@ pub mod windows_asan_handler {
             // Make sure we don't crash in the crash handler forever.
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-            run_observers_and_save_state::<E, EM, OF, Z>(
+            run_observers_and_save_state::<CF, E, EM, OF, Z>(
                 executor,
                 state,
                 input,
@@ -1005,8 +1057,9 @@ mod windows_exception_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
+        fuzzer::{HasFeedback, HasObjective},
         inputs::UsesInput,
+        prelude::HasExecutions,
         state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     };
 
@@ -1041,13 +1094,15 @@ mod windows_exception_handler {
 
     /// invokes the `post_exec` hook on all observer in case of panic
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, OF, Z>()
+    pub fn setup_panic_hook<CF, E, EM, OF, Z>()
     where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+        Z: HasObjective<Objective = OF, State = E::State>
+            + HasFeedback<Feedback = CF, State = E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -1079,7 +1134,7 @@ mod windows_exception_handler {
 
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-                run_observers_and_save_state::<E, EM, OF, Z>(
+                run_observers_and_save_state::<CF, E, EM, OF, Z>(
                     executor,
                     state,
                     input,
@@ -1097,16 +1152,18 @@ mod windows_exception_handler {
     }
 
     /// Timeout handler for windows
-    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, OF, Z>(
+    pub unsafe extern "system" fn inproc_timeout_handler<CF, E, EM, OF, Z>(
         _p0: *mut u8,
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
         E: HasObservers + HasInProcessHandlers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+        Z: HasObjective<Objective = OF, State = E::State>
+            + HasFeedback<Feedback = CF, State = E::State>,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -1148,7 +1205,7 @@ mod windows_exception_handler {
                     .unwrap();
                 data.timeout_input_ptr = ptr::null_mut();
 
-                run_observers_and_save_state::<E, EM, OF, Z>(
+                run_observers_and_save_state::<CF, E, EM, OF, Z>(
                     executor,
                     state,
                     input,
@@ -1173,15 +1230,17 @@ mod windows_exception_handler {
     }
 
     #[allow(clippy::too_many_lines)]
-    pub(crate) unsafe fn inproc_crash_handler<E, EM, OF, Z>(
+    pub(crate) unsafe fn inproc_crash_handler<CF, E, EM, OF, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+        Z: HasObjective<Objective = OF, State = E::State>
+            + HasFeedback<Feedback = CF, State = E::State>,
     {
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
@@ -1271,7 +1330,7 @@ mod windows_exception_handler {
             if is_crash {
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-                run_observers_and_save_state::<E, EM, OF, Z>(
+                run_observers_and_save_state::<CF, E, EM, OF, Z>(
                     executor,
                     state,
                     input,
@@ -1793,7 +1852,7 @@ where
     SP: ShMemProvider,
 {
     /// Creates a new [`InProcessForkExecutor`]
-    pub fn new<EM, OF, Z>(
+    pub fn new<CF, EM, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
@@ -1803,9 +1862,10 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
+        CF: Feedback<S>,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasFeedback<Feedback = CF, State = S>,
     {
         let handlers = InChildProcessHandlers::new::<Self>()?;
         Ok(Self {
@@ -1840,7 +1900,7 @@ where
 {
     /// Creates a new [`TimeoutInProcessForkExecutor`]
     #[cfg(target_os = "linux")]
-    pub fn new<EM, OF, Z>(
+    pub fn new<CF, EM, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
@@ -1851,9 +1911,10 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
+        CF: Feedback<S>,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasFeedback<Feedback = CF, State = S>,
     {
         let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
         let milli_sec = timeout.as_millis();
@@ -1882,7 +1943,7 @@ where
 
     /// Creates a new [`TimeoutInProcessForkExecutor`], non linux
     #[cfg(not(target_os = "linux"))]
-    pub fn new<EM, OF, Z>(
+    pub fn new<CF, EM, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
@@ -1893,9 +1954,10 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
+        CF: Feedback<S>,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S> + HasFeedback<Feedback = CF, State = S>,
     {
         let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
         let milli_sec = timeout.as_millis();
