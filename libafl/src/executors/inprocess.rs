@@ -940,7 +940,7 @@ pub mod windows_asan_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
+        fuzzer::{HasFeedback, HasObjective},
         inputs::UsesInput,
         state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     };
