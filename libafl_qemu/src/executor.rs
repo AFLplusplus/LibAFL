@@ -10,7 +10,7 @@ use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     feedbacks::Feedback,
-    fuzzer::{HasFeedback, HasObjective},
+    fuzzer::{HasFeedback, HasObjective, HasScheduler},
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State, UsesState},
@@ -66,7 +66,9 @@ where
         CF: Feedback<S>,
         OF: Feedback<S>,
         S: State + HasExecutions + HasCorpus + HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S> + HasFeedback<Feedback = CF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
     {
         Ok(Self {
             first_exec: true,
@@ -221,7 +223,9 @@ where
         CF: Feedback<S>,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S> + HasFeedback<Feedback = CF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
     {
         assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutor, the hooks must not do any side effect as they will happen in the child process and then discarded");
 
