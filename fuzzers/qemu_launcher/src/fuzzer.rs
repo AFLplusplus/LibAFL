@@ -17,7 +17,7 @@ use libafl::{
         AsSlice,
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::EventConfig,
+    events::{EventConfig, LlmpRestartingEventManager},
     executors::{ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -26,7 +26,6 @@ use libafl::{
     monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
-    prelude::LlmpRestartingEventManager,
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
@@ -91,8 +90,8 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Output directory")]
     output: String,
 
-    #[arg(long, help = "Timeout in seconds", default_value_t = 1_u64)]
-    timeout: u64,
+    #[arg(long, help = "Timeout in seconds", default_value = "1", value_parser = FuzzerOptions::parse_timeout)]
+    timeout: Duration,
 
     #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]
     port: u16,
@@ -105,6 +104,12 @@ pub struct FuzzerOptions {
 
     #[arg(last = true, help = "Arguments passed to the target")]
     args: Vec<String>,
+}
+
+impl FuzzerOptions {
+    fn parse_timeout(src: &str) -> Result<Duration, Error> {
+        Ok(Duration::from_secs(src.parse()?))
+    }
 }
 
 pub fn fuzz() {
@@ -366,7 +371,7 @@ pub fn fuzz() {
         .expect("Failed to create QemuExecutor");
 
         // Wrap the executor to keep track of the timeout
-        let mut executor = TimeoutExecutor::new(executor, Duration::from_secs(options.timeout));
+        let mut executor = TimeoutExecutor::new(executor, options.timeout);
 
         if state.must_load_initial_inputs() {
             state
