@@ -8,6 +8,7 @@ use std::{
     env,
     path::PathBuf,
     process::{Child, Command, Stdio},
+    time::Duration,
 };
 
 use clap::{self, Parser};
@@ -250,5 +251,9 @@ impl CommandConfigurator for MyCommandConfigurator {
             .env("SYMCC_INPUT_FILE", "cur_input")
             .spawn()
             .expect("failed to start process"))
+    }
+
+    fn exec_timeout(&self) -> Duration {
+        Duration::from_secs(5)
     }
 }

@@ -15,7 +15,7 @@ pub use crate::emu::SyscallHookResult;
 use crate::{
     emu::{Emulator, FatPtr, MemAccessInfo, SKIP_EXEC_HOOK},
     helper::QemuHelperTuple,
-    GuestAddr,
+    GuestAddr, GuestUsize,
 };
 
 // all kinds of hooks
@@ -64,13 +64,13 @@ where
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr) =
                     transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc);
+                func(hooks, inprocess_get_state::<S>(), pc);
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
                     dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr),
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc);
+                func(hooks, inprocess_get_state::<S>(), pc);
             }
             _ => (),
         }
@@ -95,7 +95,7 @@ where
                     GuestAddr,
                     GuestAddr,
                 ) -> Option<u64> = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
@@ -106,7 +106,7 @@ where
                         GuestAddr,
                     ) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
@@ -124,19 +124,19 @@ where
         match exec {
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), id);
+                func(hooks, inprocess_get_state::<S>(), id);
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64)> =
                     transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), id);
+                func(hooks, inprocess_get_state::<S>(), id);
             }
             _ => (),
         }
     }
 }
 
-static mut BLOCK_HOOKS: Vec<(Hook, Hook)> = vec![];
+static mut BLOCK_HOOKS: Vec<(Hook, Hook, Hook)> = vec![];
 
 extern "C" fn gen_block_hook_wrapper<QT, S>(pc: GuestAddr, index: u64) -> u64
 where
@@ -145,20 +145,48 @@ where
 {
     unsafe {
         let hooks = get_qemu_hooks::<QT, S>();
-        let (gen, _) = &mut BLOCK_HOOKS[index as usize];
+        let (gen, _, _) = &mut BLOCK_HOOKS[index as usize];
         match gen {
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr) -> Option<u64> =
                     transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
                     dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
+        }
+    }
+}
+
+extern "C" fn gen_post_block_hook_wrapper<QT, S>(
+    pc: GuestAddr,
+    block_length: GuestUsize,
+    index: u64,
+) where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    unsafe {
+        let hooks = get_qemu_hooks::<QT, S>();
+        let (_, post_gen, _) = &mut BLOCK_HOOKS[index as usize];
+        match post_gen {
+            Hook::Function(ptr) => {
+                let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr, GuestUsize) =
+                    transmute(*ptr);
+                func(hooks, inprocess_get_state::<S>(), pc, block_length);
+            }
+            Hook::Closure(ptr) => {
+                let func: &mut Box<
+                    dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr, GuestUsize),
+                > = transmute(ptr);
+                func(hooks, inprocess_get_state::<S>(), pc, block_length);
+            }
+            _ => (),
         }
     }
 }
@@ -170,16 +198,16 @@ where
 {
     unsafe {
         let hooks = get_qemu_hooks::<QT, S>();
-        let (_, exec) = &mut BLOCK_HOOKS[index as usize];
+        let (_, _, exec) = &mut BLOCK_HOOKS[index as usize];
         match exec {
             Hook::Function(ptr) => {
                 let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), id);
+                func(hooks, inprocess_get_state::<S>(), id);
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64)> =
                     transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), id);
+                func(hooks, inprocess_get_state::<S>(), id);
             }
             _ => (),
         }
@@ -205,7 +233,7 @@ where
                     GuestAddr,
                     MemAccessInfo,
                 ) -> Option<u64> = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
@@ -216,7 +244,7 @@ where
                         MemAccessInfo,
                     ) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
@@ -239,7 +267,7 @@ where
                     GuestAddr,
                     MemAccessInfo,
                 ) -> Option<u64> = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
@@ -250,7 +278,7 @@ where
                         MemAccessInfo,
                     ) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
@@ -271,13 +299,13 @@ macro_rules! define_rw_exec_hook {
                     Hook::Function(ptr) => {
                         let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64, GuestAddr) =
                             transmute(*ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, addr);
+                        func(hooks, inprocess_get_state::<S>(), id, addr);
                     }
                     Hook::Closure(ptr) => {
                         let func: &mut Box<
                             dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64, GuestAddr),
                         > = transmute(ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, addr);
+                        func(hooks, inprocess_get_state::<S>(), id, addr);
                     }
                     _ => (),
                 }
@@ -305,7 +333,7 @@ macro_rules! define_rw_exec_hook_n {
                             GuestAddr,
                             usize,
                         ) = transmute(*ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, addr, size);
+                        func(hooks, inprocess_get_state::<S>(), id, addr, size);
                     }
                     Hook::Closure(ptr) => {
                         let func: &mut Box<
@@ -317,7 +345,7 @@ macro_rules! define_rw_exec_hook_n {
                                 usize,
                             ),
                         > = transmute(ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, addr, size);
+                        func(hooks, inprocess_get_state::<S>(), id, addr, size);
                     }
                     _ => (),
                 }
@@ -356,7 +384,7 @@ where
                     GuestAddr,
                     usize,
                 ) -> Option<u64> = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
@@ -367,7 +395,7 @@ where
                         usize,
                     ) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+                func(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
@@ -393,7 +421,7 @@ macro_rules! define_cmp_exec_hook {
                             $itype,
                             $itype,
                         ) = transmute(*ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, v0, v1);
+                        func(hooks, inprocess_get_state::<S>(), id, v0, v1);
                     }
                     Hook::Closure(ptr) => {
                         let func: &mut Box<
@@ -405,7 +433,7 @@ macro_rules! define_cmp_exec_hook {
                                 $itype,
                             ),
                         > = transmute(ptr);
-                        (func)(hooks, inprocess_get_state::<S>(), id, v0, v1);
+                        func(hooks, inprocess_get_state::<S>(), id, v0, v1);
                     }
                     _ => (),
                 }
@@ -433,12 +461,12 @@ where
             match hook {
                 Hook::Function(ptr) => {
                     let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u32) = transmute(*ptr);
-                    (func)(hooks, inprocess_get_state::<S>(), tid);
+                    func(hooks, inprocess_get_state::<S>(), tid);
                 }
                 Hook::Closure(ptr) => {
                     let mut func: Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u32)> =
                         transmute(*ptr);
-                    (func)(hooks, inprocess_get_state::<S>(), tid);
+                    func(hooks, inprocess_get_state::<S>(), tid);
 
                     // Forget the closure so that drop is not called on captured variables.
                     core::mem::forget(func);
@@ -446,7 +474,7 @@ where
                 Hook::Once(ptr) => {
                     let func: Box<dyn FnOnce(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u32)> =
                         transmute(*ptr);
-                    (func)(hooks, inprocess_get_state::<S>(), tid);
+                    func(hooks, inprocess_get_state::<S>(), tid);
                     *hook = Hook::Empty;
                 }
                 Hook::Empty => (),
@@ -493,7 +521,7 @@ where
                         u64,
                         u64,
                     ) -> SyscallHookResult = transmute(*ptr);
-                    let r = (func)(
+                    let r = func(
                         hooks,
                         inprocess_get_state::<S>(),
                         sys_num,
@@ -528,7 +556,7 @@ where
                             u64,
                         ) -> SyscallHookResult,
                     > = transmute(*ptr);
-                    let r = (func)(
+                    let r = func(
                         hooks,
                         inprocess_get_state::<S>(),
                         sys_num,
@@ -597,7 +625,7 @@ where
                         u64,
                         u64,
                     ) -> u64 = transmute(*ptr);
-                    res = (func)(
+                    res = func(
                         hooks,
                         inprocess_get_state::<S>(),
                         res,
@@ -630,7 +658,7 @@ where
                             u64,
                         ) -> u64,
                     > = transmute(*ptr);
-                    res = (func)(
+                    res = func(
                         hooks,
                         inprocess_get_state::<S>(),
                         res,
@@ -779,16 +807,12 @@ where
         unsafe {
             let index = EDGE_HOOKS.len();
             self.emulator.add_edge_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_edge_hook_wrapper::<QT, S>)
-                },
-                if execution_hook.is_none() {
-                    None
-                } else {
-                    Some(exec_edge_hook_wrapper::<QT, S>)
-                },
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_edge_hook_wrapper::<QT, S> as _),
+                execution_hook
+                    .as_ref()
+                    .map(|_| exec_edge_hook_wrapper::<QT, S> as _),
                 index as u64,
             );
             EDGE_HOOKS.push((
@@ -811,16 +835,12 @@ where
     ) {
         let index = EDGE_HOOKS.len();
         self.emulator.add_edge_hooks(
-            if generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_edge_hook_wrapper::<QT, S>)
-            },
-            if execution_hook.is_none() {
-                None
-            } else {
-                Some(exec_edge_hook_wrapper::<QT, S>)
-            },
+            generation_hook
+                .as_ref()
+                .map(|_| gen_edge_hook_wrapper::<QT, S> as _),
+            execution_hook
+                .as_ref()
+                .map(|_| exec_edge_hook_wrapper::<QT, S> as _),
             index as u64,
         );
         EDGE_HOOKS.push((
@@ -839,11 +859,9 @@ where
         unsafe {
             let index = EDGE_HOOKS.len();
             self.emulator.add_edge_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_edge_hook_wrapper::<QT, S>)
-                },
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_edge_hook_wrapper::<QT, S> as _),
                 execution_hook,
                 index as u64,
             );
@@ -859,25 +877,30 @@ where
     pub fn blocks(
         &self,
         generation_hook: Option<fn(&mut Self, Option<&mut S>, pc: GuestAddr) -> Option<u64>>,
+        post_generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, block_length: GuestUsize),
+        >,
         execution_hook: Option<fn(&mut Self, Option<&mut S>, id: u64)>,
     ) {
         unsafe {
             let index = BLOCK_HOOKS.len();
             self.emulator.add_block_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_block_hook_wrapper::<QT, S>)
-                },
-                if execution_hook.is_none() {
-                    None
-                } else {
-                    Some(exec_block_hook_wrapper::<QT, S>)
-                },
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_block_hook_wrapper::<QT, S> as _),
+                post_generation_hook
+                    .as_ref()
+                    .map(|_| gen_post_block_hook_wrapper::<QT, S> as _),
+                execution_hook
+                    .as_ref()
+                    .map(|_| exec_block_hook_wrapper::<QT, S> as _),
                 index as u64,
             );
             BLOCK_HOOKS.push((
                 generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                post_generation_hook.map_or(Hook::Empty, |hook| {
                     Hook::Function(hook as *const libc::c_void)
                 }),
                 execution_hook.map_or(Hook::Empty, |hook| {
@@ -892,24 +915,27 @@ where
         generation_hook: Option<
             Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr) -> Option<u64>>,
         >,
+        post_generation_hook: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, GuestUsize)>,
+        >,
         execution_hook: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>>,
     ) {
         let index = BLOCK_HOOKS.len();
         self.emulator.add_block_hooks(
-            if generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_block_hook_wrapper::<QT, S>)
-            },
-            if execution_hook.is_none() {
-                None
-            } else {
-                Some(exec_block_hook_wrapper::<QT, S>)
-            },
+            generation_hook
+                .as_ref()
+                .map(|_| gen_block_hook_wrapper::<QT, S> as _),
+            post_generation_hook
+                .as_ref()
+                .map(|_| gen_post_block_hook_wrapper::<QT, S> as _),
+            execution_hook
+                .as_ref()
+                .map(|_| exec_block_hook_wrapper::<QT, S> as _),
             index as u64,
         );
         BLOCK_HOOKS.push((
             generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            post_generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
             execution_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
         ));
     }
@@ -917,21 +943,28 @@ where
     pub fn blocks_raw(
         &self,
         generation_hook: Option<fn(&mut Self, Option<&mut S>, pc: GuestAddr) -> Option<u64>>,
+        post_generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, block_length: GuestUsize),
+        >,
         execution_hook: Option<extern "C" fn(id: u64, data: u64)>,
     ) {
         unsafe {
             let index = BLOCK_HOOKS.len();
             self.emulator.add_block_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_block_hook_wrapper::<QT, S>)
-                },
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_block_hook_wrapper::<QT, S> as _),
+                post_generation_hook
+                    .as_ref()
+                    .map(|_| gen_post_block_hook_wrapper::<QT, S> as _),
                 execution_hook,
                 index as u64,
             );
             BLOCK_HOOKS.push((
                 generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                post_generation_hook.map_or(Hook::Empty, |hook| {
                     Hook::Function(hook as *const libc::c_void)
                 }),
                 Hook::Empty,
@@ -955,36 +988,24 @@ where
         unsafe {
             let index = READ_HOOKS.len();
             self.emulator.add_read_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_read_hook_wrapper::<QT, S>)
-                },
-                if execution_hook1.is_none() {
-                    None
-                } else {
-                    Some(exec_read1_hook_wrapper::<QT, S>)
-                },
-                if execution_hook2.is_none() {
-                    None
-                } else {
-                    Some(exec_read2_hook_wrapper::<QT, S>)
-                },
-                if execution_hook4.is_none() {
-                    None
-                } else {
-                    Some(exec_read4_hook_wrapper::<QT, S>)
-                },
-                if execution_hook8.is_none() {
-                    None
-                } else {
-                    Some(exec_read8_hook_wrapper::<QT, S>)
-                },
-                if execution_hook_n.is_none() {
-                    None
-                } else {
-                    Some(exec_read_n_hook_wrapper::<QT, S>)
-                },
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_read_hook_wrapper::<QT, S> as _),
+                execution_hook1
+                    .as_ref()
+                    .map(|_| exec_read1_hook_wrapper::<QT, S> as _),
+                execution_hook2
+                    .as_ref()
+                    .map(|_| exec_read2_hook_wrapper::<QT, S> as _),
+                execution_hook4
+                    .as_ref()
+                    .map(|_| exec_read4_hook_wrapper::<QT, S> as _),
+                execution_hook8
+                    .as_ref()
+                    .map(|_| exec_read8_hook_wrapper::<QT, S> as _),
+                execution_hook_n
+                    .as_ref()
+                    .map(|_| exec_read_n_hook_wrapper::<QT, S> as _),
                 index as u64,
             );
             READ_HOOKS.push((
@@ -1027,36 +1048,24 @@ where
     ) {
         let index = READ_HOOKS.len();
         self.emulator.add_read_hooks(
-            if generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_read_hook_wrapper::<QT, S>)
-            },
-            if execution_hook1.is_none() {
-                None
-            } else {
-                Some(exec_read1_hook_wrapper::<QT, S>)
-            },
-            if execution_hook2.is_none() {
-                None
-            } else {
-                Some(exec_read2_hook_wrapper::<QT, S>)
-            },
-            if execution_hook4.is_none() {
-                None
-            } else {
-                Some(exec_read4_hook_wrapper::<QT, S>)
-            },
-            if execution_hook8.is_none() {
-                None
-            } else {
-                Some(exec_read8_hook_wrapper::<QT, S>)
-            },
-            if execution_hook_n.is_none() {
-                None
-            } else {
-                Some(exec_read_n_hook_wrapper::<QT, S>)
-            },
+            generation_hook
+                .as_ref()
+                .map(|_| gen_read_hook_wrapper::<QT, S> as _),
+            execution_hook1
+                .as_ref()
+                .map(|_| exec_read1_hook_wrapper::<QT, S> as _),
+            execution_hook2
+                .as_ref()
+                .map(|_| exec_read2_hook_wrapper::<QT, S> as _),
+            execution_hook4
+                .as_ref()
+                .map(|_| exec_read4_hook_wrapper::<QT, S> as _),
+            execution_hook8
+                .as_ref()
+                .map(|_| exec_read8_hook_wrapper::<QT, S> as _),
+            execution_hook_n
+                .as_ref()
+                .map(|_| exec_read_n_hook_wrapper::<QT, S> as _),
             index as u64,
         );
         READ_HOOKS.push((
@@ -1083,11 +1092,9 @@ where
         unsafe {
             let index = READ_HOOKS.len();
             self.emulator.add_read_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_read_hook_wrapper::<QT, S>)
-                },
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_read_hook_wrapper::<QT, S> as _),
                 execution_hook1,
                 execution_hook2,
                 execution_hook4,
@@ -1124,36 +1131,24 @@ where
         unsafe {
             let index = WRITE_HOOKS.len();
             self.emulator.add_write_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_write_hook_wrapper::<QT, S>)
-                },
-                if execution_hook1.is_none() {
-                    None
-                } else {
-                    Some(exec_write1_hook_wrapper::<QT, S>)
-                },
-                if execution_hook2.is_none() {
-                    None
-                } else {
-                    Some(exec_write2_hook_wrapper::<QT, S>)
-                },
-                if execution_hook4.is_none() {
-                    None
-                } else {
-                    Some(exec_write4_hook_wrapper::<QT, S>)
-                },
-                if execution_hook8.is_none() {
-                    None
-                } else {
-                    Some(exec_write8_hook_wrapper::<QT, S>)
-                },
-                if execution_hook_n.is_none() {
-                    None
-                } else {
-                    Some(exec_write_n_hook_wrapper::<QT, S>)
-                },
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_write_hook_wrapper::<QT, S> as _),
+                execution_hook1
+                    .as_ref()
+                    .map(|_| exec_write1_hook_wrapper::<QT, S> as _),
+                execution_hook2
+                    .as_ref()
+                    .map(|_| exec_write2_hook_wrapper::<QT, S> as _),
+                execution_hook4
+                    .as_ref()
+                    .map(|_| exec_write4_hook_wrapper::<QT, S> as _),
+                execution_hook8
+                    .as_ref()
+                    .map(|_| exec_write8_hook_wrapper::<QT, S> as _),
+                execution_hook_n
+                    .as_ref()
+                    .map(|_| exec_write_n_hook_wrapper::<QT, S> as _),
                 index as u64,
             );
             WRITE_HOOKS.push((
@@ -1196,36 +1191,24 @@ where
     ) {
         let index = WRITE_HOOKS.len();
         self.emulator.add_write_hooks(
-            if generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_write_hook_wrapper::<QT, S>)
-            },
-            if execution_hook1.is_none() {
-                None
-            } else {
-                Some(exec_write1_hook_wrapper::<QT, S>)
-            },
-            if execution_hook2.is_none() {
-                None
-            } else {
-                Some(exec_write2_hook_wrapper::<QT, S>)
-            },
-            if execution_hook4.is_none() {
-                None
-            } else {
-                Some(exec_write4_hook_wrapper::<QT, S>)
-            },
-            if execution_hook8.is_none() {
-                None
-            } else {
-                Some(exec_write8_hook_wrapper::<QT, S>)
-            },
-            if execution_hook_n.is_none() {
-                None
-            } else {
-                Some(exec_write_n_hook_wrapper::<QT, S>)
-            },
+            generation_hook
+                .as_ref()
+                .map(|_| gen_write_hook_wrapper::<QT, S> as _),
+            execution_hook1
+                .as_ref()
+                .map(|_| exec_write1_hook_wrapper::<QT, S> as _),
+            execution_hook2
+                .as_ref()
+                .map(|_| exec_write2_hook_wrapper::<QT, S> as _),
+            execution_hook4
+                .as_ref()
+                .map(|_| exec_write4_hook_wrapper::<QT, S> as _),
+            execution_hook8
+                .as_ref()
+                .map(|_| exec_write8_hook_wrapper::<QT, S> as _),
+            execution_hook_n
+                .as_ref()
+                .map(|_| exec_write_n_hook_wrapper::<QT, S> as _),
             index as u64,
         );
         WRITE_HOOKS.push((
@@ -1252,11 +1235,9 @@ where
         unsafe {
             let index = WRITE_HOOKS.len();
             self.emulator.add_write_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_write_hook_wrapper::<QT, S>)
-                },
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_write_hook_wrapper::<QT, S> as _),
                 execution_hook1,
                 execution_hook2,
                 execution_hook4,
@@ -1290,31 +1271,21 @@ where
         unsafe {
             let index = CMP_HOOKS.len();
             self.emulator.add_cmp_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_cmp_hook_wrapper::<QT, S>)
-                },
-                if execution_hook1.is_none() {
-                    None
-                } else {
-                    Some(exec_cmp1_hook_wrapper::<QT, S>)
-                },
-                if execution_hook2.is_none() {
-                    None
-                } else {
-                    Some(exec_cmp2_hook_wrapper::<QT, S>)
-                },
-                if execution_hook4.is_none() {
-                    None
-                } else {
-                    Some(exec_cmp4_hook_wrapper::<QT, S>)
-                },
-                if execution_hook8.is_none() {
-                    None
-                } else {
-                    Some(exec_cmp8_hook_wrapper::<QT, S>)
-                },
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_cmp_hook_wrapper::<QT, S> as _),
+                execution_hook1
+                    .as_ref()
+                    .map(|_| exec_cmp1_hook_wrapper::<QT, S> as _),
+                execution_hook2
+                    .as_ref()
+                    .map(|_| exec_cmp2_hook_wrapper::<QT, S> as _),
+                execution_hook4
+                    .as_ref()
+                    .map(|_| exec_cmp4_hook_wrapper::<QT, S> as _),
+                execution_hook8
+                    .as_ref()
+                    .map(|_| exec_cmp8_hook_wrapper::<QT, S> as _),
                 index as u64,
             );
             CMP_HOOKS.push((
@@ -1349,31 +1320,21 @@ where
     ) {
         let index = CMP_HOOKS.len();
         self.emulator.add_cmp_hooks(
-            if generation_hook.is_none() {
-                None
-            } else {
-                Some(gen_cmp_hook_wrapper::<QT, S>)
-            },
-            if execution_hook1.is_none() {
-                None
-            } else {
-                Some(exec_cmp1_hook_wrapper::<QT, S>)
-            },
-            if execution_hook2.is_none() {
-                None
-            } else {
-                Some(exec_cmp2_hook_wrapper::<QT, S>)
-            },
-            if execution_hook4.is_none() {
-                None
-            } else {
-                Some(exec_cmp4_hook_wrapper::<QT, S>)
-            },
-            if execution_hook8.is_none() {
-                None
-            } else {
-                Some(exec_cmp8_hook_wrapper::<QT, S>)
-            },
+            generation_hook
+                .as_ref()
+                .map(|_| gen_cmp_hook_wrapper::<QT, S> as _),
+            execution_hook1
+                .as_ref()
+                .map(|_| exec_cmp1_hook_wrapper::<QT, S> as _),
+            execution_hook2
+                .as_ref()
+                .map(|_| exec_cmp2_hook_wrapper::<QT, S> as _),
+            execution_hook4
+                .as_ref()
+                .map(|_| exec_cmp4_hook_wrapper::<QT, S> as _),
+            execution_hook8
+                .as_ref()
+                .map(|_| exec_cmp8_hook_wrapper::<QT, S> as _),
             index as u64,
         );
         CMP_HOOKS.push((
@@ -1398,11 +1359,9 @@ where
         unsafe {
             let index = CMP_HOOKS.len();
             self.emulator.add_cmp_hooks(
-                if generation_hook.is_none() {
-                    None
-                } else {
-                    Some(gen_cmp_hook_wrapper::<QT, S>)
-                },
+                generation_hook
+                    .as_ref()
+                    .map(|_| gen_cmp_hook_wrapper::<QT, S> as _),
                 execution_hook1,
                 execution_hook2,
                 execution_hook4,

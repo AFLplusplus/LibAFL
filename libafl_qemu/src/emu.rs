@@ -85,7 +85,7 @@ impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
 }
 
 #[cfg(feature = "python")]
-use pyo3::{prelude::*, PyIterProtocol};
+use pyo3::prelude::*;
 
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
@@ -336,6 +336,7 @@ extern "C" {
     // void libafl_add_block_hook(uint64_t (*gen)(target_ulong pc), void (*exec)(uint64_t id));
     fn libafl_add_block_hook(
         gen: Option<extern "C" fn(GuestAddr, u64) -> u64>,
+        post_gen: Option<extern "C" fn(GuestAddr, GuestUsize, u64)>,
         exec: Option<extern "C" fn(u64, u64)>,
         data: u64,
     );
@@ -444,8 +445,8 @@ impl Iterator for GuestMaps {
 }
 
 #[cfg(all(emulation_mode = "usermode", feature = "python"))]
-#[pyproto]
-impl PyIterProtocol for GuestMaps {
+#[pymethods]
+impl GuestMaps {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
@@ -1037,10 +1038,11 @@ impl Emulator {
     pub fn add_block_hooks(
         &self,
         gen: Option<extern "C" fn(GuestAddr, u64) -> u64>,
+        post_gen: Option<extern "C" fn(GuestAddr, GuestUsize, u64)>,
         exec: Option<extern "C" fn(u64, u64)>,
         data: u64,
     ) {
-        unsafe { libafl_add_block_hook(gen, exec, data) }
+        unsafe { libafl_add_block_hook(gen, post_gen, exec, data) }
     }
 
     pub fn add_read_hooks(
@@ -1184,7 +1186,7 @@ pub mod pybind {
                     if any.is_none() {
                         SyscallHookResult::new(None)
                     } else {
-                        let a: Result<&PyInt, _> = any.cast_as();
+                        let a: Result<&PyInt, _> = any.downcast();
                         if let Ok(i) = a {
                             SyscallHookResult::new(Some(
                                 i.extract().expect("Invalid syscall hook return value"),

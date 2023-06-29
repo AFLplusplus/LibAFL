@@ -60,10 +60,14 @@
 
 use std::{convert::Into, path::Path, process::Command, string::String, vec::Vec};
 
+pub mod ar;
+pub use ar::ArWrapper;
 pub mod cfg;
 pub use cfg::{CfgEdge, ControlFlowGraph, EntryBasicBlockInfo, HasWeight};
 pub mod clang;
 pub use clang::{ClangWrapper, LLVMPasses};
+pub mod libtool;
+pub use libtool::LibtoolWrapper;
 
 /// `LibAFL` CC Error Type
 #[derive(Debug)]
@@ -74,6 +78,112 @@ pub enum Error {
     Io(std::io::Error),
     /// Something else happened
     Unknown(String),
+}
+
+/// `LibAFL` target configuration
+#[derive(Debug, Clone)]
+pub enum Configuration {
+    /// Default uninstrumented configurations
+    Default,
+    /// Sanitizing addresses
+    AddressSanitizer,
+    /// Sanitizing undefined behavior
+    UndefinedBehaviorSanitizer,
+    /// Generating a coverage map
+    GenerateCoverageMap,
+    /// Generating coverage profile data for `llvm-cov`
+    GenerateCoverageProfile,
+    /// Instrumenting for cmplog/redqueen
+    CmpLog,
+    /// A compound `Configuration`, made up of a list of other `Configuration`s
+    Compound(Vec<Self>),
+}
+
+impl Configuration {
+    /// Get compiler flags for this `Configuration`
+    pub fn to_flags(&self) -> Result<Vec<String>, Error> {
+        Ok(match self {
+            Configuration::Default => vec![],
+            Configuration::AddressSanitizer => vec!["-fsanitize=address".to_string()],
+            Configuration::UndefinedBehaviorSanitizer => vec!["-fsanitize=undefined".to_string()],
+            Configuration::GenerateCoverageMap => {
+                vec!["-fsanitize-coverage=trace-pc-guard".to_string()]
+            }
+            Configuration::CmpLog => vec!["-fsanitize-coverage=trace-cmp".to_string()],
+            Configuration::GenerateCoverageProfile => {
+                vec![
+                    "-fprofile-instr-generate".to_string(),
+                    "-fcoverage-mapping".to_string(),
+                ]
+            }
+            Configuration::Compound(configurations) => {
+                let mut result: Vec<String> = vec![];
+                for configuration in configurations {
+                    result.extend(configuration.to_flags()?);
+                }
+                result
+            }
+        })
+    }
+    /// Insert a `Configuration` specific 'tag' in the extension of the given file
+    #[must_use]
+    pub fn replace_extension(&self, path: &Path) -> std::path::PathBuf {
+        let mut parent = if let Some(parent) = path.parent() {
+            parent.to_path_buf()
+        } else {
+            std::path::PathBuf::from("")
+        };
+        let output = path.file_name().unwrap();
+        let output = output.to_str().unwrap();
+
+        let new_filename = if let Some((filename, extension)) = output.split_once('.') {
+            if let crate::Configuration::Default = self {
+                format!("{filename}.{extension}")
+            } else {
+                format!("{filename}.{self}.{extension}")
+            }
+        } else if let crate::Configuration::Default = self {
+            output.to_string()
+        } else {
+            format!("{output}.{self}")
+        };
+        parent.push(new_filename);
+        parent
+    }
+}
+
+impl std::str::FromStr for Configuration {
+    type Err = ();
+    fn from_str(input: &str) -> Result<Configuration, Self::Err> {
+        Ok(match input {
+            "asan" => Configuration::AddressSanitizer,
+            "ubsan" => Configuration::UndefinedBehaviorSanitizer,
+            "coverage" => Configuration::GenerateCoverageMap,
+            "llvm-cov" => Configuration::GenerateCoverageProfile,
+            "cmplog" => Configuration::CmpLog,
+            _ => Configuration::Default,
+        })
+    }
+}
+
+impl std::fmt::Display for Configuration {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Configuration::Default => write!(f, ""),
+            Configuration::AddressSanitizer => write!(f, "asan"),
+            Configuration::UndefinedBehaviorSanitizer => write!(f, "ubsan"),
+            Configuration::GenerateCoverageMap => write!(f, "coverage"),
+            Configuration::GenerateCoverageProfile => write!(f, "llvm-cov"),
+            Configuration::CmpLog => write!(f, "cmplog"),
+            Configuration::Compound(configurations) => {
+                let mut result: Vec<String> = vec![];
+                for configuration in configurations {
+                    result.push(format!("{configuration}"));
+                }
+                write!(f, "{}", result.join("_"))
+            }
+        }
+    }
 }
 
 // TODO macOS
@@ -91,29 +201,19 @@ pub const LIB_PREFIX: &str = "";
 #[cfg(not(windows))]
 pub const LIB_PREFIX: &str = "lib";
 
-/// Wrap a compiler hijacking its arguments
-pub trait CompilerWrapper {
+/// Wrap a tool hijacking its arguments
+pub trait ToolWrapper {
     /// Set the wrapper arguments parsing a command line set of arguments
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
         S: AsRef<str>;
 
-    /// Add a compiler argument
+    /// Add an argument
     fn add_arg<S>(&mut self, arg: S) -> &'_ mut Self
     where
         S: AsRef<str>;
 
-    /// Add a compiler argument only when compiling
-    fn add_cc_arg<S>(&mut self, arg: S) -> &'_ mut Self
-    where
-        S: AsRef<str>;
-
-    /// Add a compiler argument only when linking
-    fn add_link_arg<S>(&mut self, arg: S) -> &'_ mut Self
-    where
-        S: AsRef<str>;
-
-    /// Add compiler arguments
+    /// Add arguments
     fn add_args<S>(&mut self, args: &[S]) -> &'_ mut Self
     where
         S: AsRef<str>,
@@ -123,6 +223,87 @@ pub trait CompilerWrapper {
         }
         self
     }
+
+    /// Add a `Configuration`
+    fn add_configuration(&mut self, configuration: Configuration) -> &'_ mut Self;
+
+    /// Command to run the compiler
+    fn command(&mut self) -> Result<Vec<String>, Error>;
+
+    /// Command to run the compiler for a given `Configuration`
+    #[allow(clippy::too_many_lines)]
+    fn command_for_configuration(
+        &mut self,
+        configuration: Configuration,
+    ) -> Result<Vec<String>, Error>;
+
+    /// Get the list of requested `Configuration`s
+    fn configurations(&self) -> Result<Vec<Configuration>, Error>;
+
+    /// Whether to ignore the configured `Configurations`. Useful for e.g. nested calls to
+    /// `libafl_cc` from `libafl_libtool`.
+    fn ignore_configurations(&self) -> Result<bool, Error>;
+
+    /// Get if in linking mode
+    fn is_linking(&self) -> bool;
+
+    /// Filter out argumets
+    fn filter(&self, _args: &mut Vec<String>) {}
+
+    /// Silences `libafl_cc` output
+    fn silence(&mut self, value: bool) -> &'_ mut Self;
+
+    /// Returns `true` if `silence` was called with `true`
+    fn is_silent(&self) -> bool;
+
+    /// Run the tool
+    fn run(&mut self) -> Result<Option<i32>, Error> {
+        let mut last_status = Ok(None);
+        let configurations = if self.ignore_configurations()? {
+            vec![Configuration::Default]
+        } else {
+            self.configurations()?
+        };
+        for configuration in configurations {
+            let mut args = self.command_for_configuration(configuration)?;
+            self.filter(&mut args);
+
+            if !self.is_silent() {
+                dbg!(args.clone());
+            }
+            if args.is_empty() {
+                last_status = Err(Error::InvalidArguments(
+                    "The number of arguments cannot be 0".into(),
+                ));
+                continue;
+            }
+            let status = match Command::new(&args[0]).args(&args[1..]).status() {
+                Ok(s) => s,
+                Err(e) => {
+                    last_status = Err(Error::Io(e));
+                    continue;
+                }
+            };
+            if !self.is_silent() {
+                dbg!(status);
+            }
+            last_status = Ok(status.code());
+        }
+        last_status
+    }
+}
+
+/// Wrap a compiler hijacking its arguments
+pub trait CompilerWrapper: ToolWrapper {
+    /// Add a compiler argument only when compiling
+    fn add_cc_arg<S>(&mut self, arg: S) -> &'_ mut Self
+    where
+        S: AsRef<str>;
+
+    /// Add a compiler argument only when linking
+    fn add_link_arg<S>(&mut self, arg: S) -> &'_ mut Self
+    where
+        S: AsRef<str>;
 
     /// Add compiler arguments only when compiling
     fn add_cc_args<S>(&mut self, args: &[S]) -> &'_ mut Self
@@ -150,38 +331,4 @@ pub trait CompilerWrapper {
     fn link_staticlib<S>(&mut self, dir: &Path, name: S) -> &'_ mut Self
     where
         S: AsRef<str>;
-
-    /// Command to run the compiler
-    fn command(&mut self) -> Result<Vec<String>, Error>;
-
-    /// Get if in linking mode
-    fn is_linking(&self) -> bool;
-
-    /// Silences `libafl_cc` output
-    fn silence(&mut self, value: bool) -> &'_ mut Self;
-
-    /// Returns `true` if `silence` was called with `true`
-    fn is_silent(&self) -> bool;
-
-    /// Run the compiler
-    fn run(&mut self) -> Result<Option<i32>, Error> {
-        let args = self.command()?;
-
-        if !self.is_silent() {
-            dbg!(args.clone());
-        }
-        if args.is_empty() {
-            return Err(Error::InvalidArguments(
-                "The number of arguments cannot be 0".into(),
-            ));
-        }
-        let status = match Command::new(&args[0]).args(&args[1..]).status() {
-            Ok(s) => s,
-            Err(e) => return Err(Error::Io(e)),
-        };
-        if !self.is_silent() {
-            dbg!(status);
-        }
-        Ok(status.code())
-    }
 }

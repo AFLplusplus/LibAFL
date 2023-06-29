@@ -304,6 +304,7 @@ pub mod pybind {
 
     /// Python bindings for the `LibAFL` forkserver sugar
     #[pyclass(unsendable)]
+    #[derive(Debug)]
     struct ForkserverBytesCoverageSugar {
         input_dirs: Vec<PathBuf>,
         output_dir: PathBuf,

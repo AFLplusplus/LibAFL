@@ -122,8 +122,7 @@ where
         _executor: &mut E,
     ) -> Result<usize, Error> {
         let count = self.events.len();
-        while !self.events.is_empty() {
-            let event = self.events.pop().unwrap();
+        while let Some(event) = self.events.pop() {
             self.handle_in_client(state, event)?;
         }
         Ok(count)
@@ -506,6 +505,10 @@ where
                 let child_status = child_status.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst);
+
+                if staterestorer.wants_to_exit() {
+                    return Err(Error::shutting_down());
+                }
 
                 #[allow(clippy::manual_assert)]
                 if !staterestorer.has_content() {
