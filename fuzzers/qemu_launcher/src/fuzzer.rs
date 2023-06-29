@@ -90,7 +90,7 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Output directory")]
     output: String,
 
-    #[arg(long, help = "Timeout in seconds", default_value = "1", value_parser = FuzzerOptions::parse_timeout)]
+    #[arg(long, help = "Timeout in milli-seconds", default_value = "1000", value_parser = FuzzerOptions::parse_timeout)]
     timeout: Duration,
 
     #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]
@@ -108,7 +108,7 @@ pub struct FuzzerOptions {
 
 impl FuzzerOptions {
     fn parse_timeout(src: &str) -> Result<Duration, Error> {
-        Ok(Duration::from_secs(src.parse()?))
+        Ok(Duration::from_millis(src.parse()?))
     }
 }
 
