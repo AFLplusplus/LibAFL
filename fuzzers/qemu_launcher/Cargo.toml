@@ -7,6 +7,14 @@ edition = "2021"
 [features]
 default = ["std"]
 std = []
+be = []
+64bit = []
+arm = ["libafl_qemu/arm"]
+x86_64 = ["libafl_qemu/x86_64", "64bit"]
+i386 = ["libafl_qemu/i386"]
+aarch64 = ["libafl_qemu/aarch64", "64bit"]
+mips = ["libafl_qemu/mips"]
+ppc = ["libafl_qemu/ppc", "be"]
 
 [profile.release]
 lto = true
@@ -14,6 +22,19 @@ codegen-units = 1
 opt-level = 3
 debug = true
 
+[build-dependencies]
+vergen = { version = "8.2.1", features = ["build", "cargo", "git", "gitcl", "rustc", "si"] }
+
 [dependencies]
+clap = { version = "4.3.0", features = ["derive", "string"]}
 libafl = { path = "../../libafl/" }
-libafl_qemu = { path = "../../libafl_qemu/", features = ["x86_64", "usermode"] }
+libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode"] }
+rangemap = { version = "1.0.3" }
+
+
+
+
+
+
+
+

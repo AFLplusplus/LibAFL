@@ -1,6 +1,6 @@
 use std::{env, process::Command, str};
 
-use libafl_cc::{ClangWrapper, CompilerWrapper};
+use libafl_cc::{ClangWrapper, CompilerWrapper, ToolWrapper};
 
 fn find_libpython() -> Result<String, String> {
     match Command::new("python3")
