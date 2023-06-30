@@ -319,6 +319,8 @@ pub trait EventStatsCollector {
     fn deserialization_time(&self) -> Duration;
     /// How many times observers were serialized
     fn serializations_cnt(&self) -> usize;
+    /// How many times shoukd have been serialized an observer
+    fn should_serialize_cnt(&self) -> usize;
 
     /// Expose the collected observers serialization time (mut)
     fn serialization_time_mut(&mut self) -> &mut Duration;
@@ -326,6 +328,8 @@ pub trait EventStatsCollector {
     fn deserialization_time_mut(&mut self) -> &mut Duration;
     /// How many times observers were serialized (mut)
     fn serializations_cnt_mut(&mut self) -> &mut usize;
+    /// How many times shoukd have been serialized an observer (mut)
+    fn should_serialize_cnt_mut(&mut self) -> &mut usize;
 }
 
 /// Collected stats to decide if observers must be serialized or not
@@ -355,6 +359,8 @@ where
     deserialization_time: Duration,
     #[cfg(feature = "adaptive_serialization")]
     serializations_cnt: usize,
+    #[cfg(feature = "adaptive_serialization")]
+    should_serialize_cnt: usize,
     phantom: PhantomData<S>,
 }
 
@@ -373,6 +379,9 @@ where
     fn serializations_cnt(&self) -> usize {
         self.serializations_cnt
     }
+    fn should_serialize_cnt(&self) -> usize {
+        self.should_serialize_cnt
+    }
 
     fn serialization_time_mut(&mut self) -> &mut Duration {
         &mut self.serialization_time
@@ -382,6 +391,9 @@ where
     }
     fn serializations_cnt_mut(&mut self) -> &mut usize {
         &mut self.serializations_cnt
+    }
+    fn should_serialize_cnt_mut(&mut self) -> &mut usize {
+        &mut self.should_serialize_cnt
     }
 }
 
@@ -432,6 +444,8 @@ where
             deserialization_time: Duration::ZERO,
             #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
+            #[cfg(feature = "adaptive_serialization")]
+            should_serialize_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -458,6 +472,8 @@ where
             deserialization_time: Duration::ZERO,
             #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
+            #[cfg(feature = "adaptive_serialization")]
+            should_serialize_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -482,6 +498,8 @@ where
             deserialization_time: Duration::ZERO,
             #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
+            #[cfg(feature = "adaptive_serialization")]
+            should_serialize_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -509,6 +527,8 @@ where
             deserialization_time: Duration::ZERO,
             #[cfg(feature = "adaptive_serialization")]
             serializations_cnt: 0,
+            #[cfg(feature = "adaptive_serialization")]
+            should_serialize_cnt: 0,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
         })
@@ -555,37 +575,24 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                let res =
-                    if client_config.match_with(&self.configuration) && observers_buf.is_some() {
-                        #[cfg(feature = "adaptive_serialization")]
-                        let start = current_time();
-                        let observers: E::Observers =
-                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                        #[cfg(feature = "adaptive_serialization")]
-                        {
-                            self.deserialization_time = current_time() - start;
-                        }
+                let res = if client_config.match_with(&self.configuration)
+                    && observers_buf.is_some()
+                {
+                    #[cfg(feature = "adaptive_serialization")]
+                    let start = current_time();
+                    let observers: E::Observers =
+                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                    #[cfg(feature = "adaptive_serialization")]
+                    {
+                        self.deserialization_time = current_time() - start;
+                    }
 
-                        let res = fuzzer
-                            .process_execution(state, self, input, &observers, &exit_kind, false)?;
-
-                        // Count this as execution even if we are not actually executing nothing for the stats
-                        #[cfg(feature = "count_process_execution")]
-                        {
-                            *state.executions_mut() += 1;
-                        }
-                        res
-                    } else {
-                        let res = fuzzer.evaluate_input_with_observers::<E, Self>(
-                            state, executor, self, input, false,
-                        )?;
-
-                        #[cfg(feature = "no_count_newtestcases")]
-                        {
-                            *state.executions_mut() -= 1;
-                        }
-                        res
-                    };
+                    fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
+                } else {
+                    fuzzer.evaluate_input_with_observers::<E, Self>(
+                        state, executor, self, input, false,
+                    )?
+                };
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
                 }
@@ -664,36 +671,53 @@ where
         Ok(())
     }
 
+    #[cfg(not(feature = "adaptive_serialization"))]
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
-        #[cfg(feature = "adaptive_serialization")]
+        Ok(Some(postcard::to_allocvec(observers)?))
+    }
+
+    #[cfg(feature = "adaptive_serialization")]
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
+    where
+        OT: ObserversTuple<Self::State> + Serialize,
+    {
         let exec_time = observers
             .match_name::<crate::observers::TimeObserver>("time")
             .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
             .unwrap();
 
-        //eprintln!("{:?}    {:?} {:?}", exec_time, self.serialization_time, self.deserialization_time);
-        #[cfg(feature = "adaptive_serialization")]
-        if self.serialization_time == Duration::ZERO
-            || (self.serialization_time + self.deserialization_time) * 2 < exec_time // self.execution_time
-            || self.serializations_cnt.trailing_zeros() >= 8
+        const SERIALIZE_TIME_FACTOR: u32 = 2;
+        const SERIALIZE_PERCENTAGE_TRESHOLD: usize = 80;
+
+        let mut must_ser = (self.serialization_time() + self.deserialization_time())
+            * SERIALIZE_TIME_FACTOR
+            < exec_time;
+        if must_ser {
+            *self.should_serialize_cnt_mut() += 1;
+        }
+
+        if self.serializations_cnt() > 32 {
+            must_ser = (self.should_serialize_cnt() * 100 / self.serializations_cnt())
+                > SERIALIZE_PERCENTAGE_TRESHOLD;
+        }
+
+        if self.inner.serialization_time() == Duration::ZERO
+            || must_ser
+            || self.serializations_cnt().trailing_zeros() >= 8
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
-            //eprintln!("aaaaaaaaaa {:?} {:?}", ser.len(), (self.serialization_time + self.deserialization_time) * 4 < exec_time);
-            self.serialization_time = current_time() - start;
+            *self.inner.serialization_time_mut() = current_time() - start;
 
-            self.serializations_cnt += 1;
+            *self.serializations_cnt_mut() += 1;
             Ok(Some(ser))
         } else {
-            self.serializations_cnt += 1;
+            *self.serializations_cnt_mut() += 1;
             Ok(None)
         }
-
-        #[cfg(not(feature = "adaptive_serialization"))]
-        Ok(Some(postcard::to_allocvec(observers)?))
     }
 
     fn configuration(&self) -> EventConfig {
@@ -832,6 +856,9 @@ where
     fn serializations_cnt(&self) -> usize {
         self.llmp_mgr.serializations_cnt()
     }
+    fn should_serialize_cnt(&self) -> usize {
+        self.llmp_mgr.should_serialize_cnt()
+    }
 
     fn serialization_time_mut(&mut self) -> &mut Duration {
         self.llmp_mgr.serialization_time_mut()
@@ -841,6 +868,9 @@ where
     }
     fn serializations_cnt_mut(&mut self) -> &mut usize {
         self.llmp_mgr.serializations_cnt_mut()
+    }
+    fn should_serialize_cnt_mut(&mut self) -> &mut usize {
+        self.llmp_mgr.should_serialize_cnt_mut()
     }
 }
 

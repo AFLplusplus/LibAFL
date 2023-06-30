@@ -63,6 +63,9 @@ where
     fn serializations_cnt(&self) -> usize {
         self.inner.serializations_cnt()
     }
+    fn should_serialize_cnt(&self) -> usize {
+        self.inner.should_serialize_cnt()
+    }
 
     fn serialization_time_mut(&mut self) -> &mut Duration {
         self.inner.serialization_time_mut()
@@ -72,6 +75,9 @@ where
     }
     fn serializations_cnt_mut(&mut self) -> &mut usize {
         self.inner.serializations_cnt_mut()
+    }
+    fn should_serialize_cnt_mut(&mut self) -> &mut usize {
+        self.inner.should_serialize_cnt_mut()
     }
 }
 
@@ -101,7 +107,6 @@ where
                     client_config: _,
                     exit_kind: _,
                     corpus_size: _,
-                    observers_buf: _,
                     time: _,
                     executions: _,
                     forward_id,
@@ -150,33 +155,30 @@ where
         const SERIALIZE_TIME_FACTOR: u32 = 4;
         const SERIALIZE_PERCENTAGE_TRESHOLD: usize = 80;
 
-        let mut must_ser = (self.inner.serialization_time() + self.inner.deserialization_time())
+        let mut must_ser = (self.serialization_time() + self.deserialization_time())
             * SERIALIZE_TIME_FACTOR
             < exec_time;
         if must_ser {
-            self.must_ser_cnt += 1;
+            *self.should_serialize_cnt_mut() += 1;
         }
 
-        if self.inner.serializations_cnt() > 32 {
-            must_ser = (self.must_ser_cnt * 100 / self.inner.serializations_cnt())
+        if self.serializations_cnt() > 32 {
+            must_ser = (self.should_serialize_cnt() * 100 / self.serializations_cnt())
                 > SERIALIZE_PERCENTAGE_TRESHOLD;
         }
 
-        // eprintln!("serialize_observers: {:?}    {:?} {:?}   {} {} {}", exec_time, self.serialization_time(), self.deserialization_time(), self.must_ser_cnt, self.inner.serializations_cnt(), must_ser);
         if self.inner.serialization_time() == Duration::ZERO
             || must_ser
-            || self.inner.serializations_cnt().trailing_zeros() >= 8
+            || self.serializations_cnt().trailing_zeros() >= 8
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
             *self.inner.serialization_time_mut() = current_time() - start;
 
-            // eprintln!("serialized!   {:?} {:?}", ser.len(), (self.serialization_time() + self.deserialization_time()) * 4 < exec_time);
-
-            *self.inner.serializations_cnt_mut() += 1;
+            *self.serializations_cnt_mut() += 1;
             Ok(Some(ser))
         } else {
-            *self.inner.serializations_cnt_mut() += 1;
+            *self.serializations_cnt_mut() += 1;
             Ok(None)
         }
     }
@@ -265,35 +267,22 @@ where
                                     *self.inner.deserialization_time_mut() = current_time() - start;
                                 }
 
-                                let res = fuzzer.process_execution(
+                                fuzzer.process_execution(
                                     state,
                                     self,
                                     input.clone(),
                                     &observers,
                                     &exit_kind,
                                     false,
-                                )?;
-
-                                // Count this as execution even if we are not actually executing nothing for the stats
-                                #[cfg(feature = "count_process_execution")]
-                                {
-                                    *state.executions_mut() += 1;
-                                }
-                                res
+                                )?
                             } else {
-                                let res = fuzzer.evaluate_input_with_observers::<E, Self>(
+                                fuzzer.evaluate_input_with_observers::<E, Self>(
                                     state,
                                     executor,
                                     self,
                                     input.clone(),
                                     false,
-                                )?;
-
-                                #[cfg(feature = "no_count_newtestcases")]
-                                {
-                                    *state.executions_mut() -= 1;
-                                }
-                                res
+                                )?
                             };
                             if let Some(item) = res.1 {
                                 log::info!("Added received Testcase as item #{item}");
