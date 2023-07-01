@@ -420,7 +420,8 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.executor.pre_exec(fuzzer, state, mgr, input)
+        self.executor.pre_exec(fuzzer, state, mgr, input)?;
+        Ok(ExitKind::Ok)
     }
 
     /// Deletes this timer queue
@@ -434,10 +435,11 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.executor.post_exec(fuzzer, state, mgr, input);
         unsafe {
             SetThreadpoolTimer(self.tp_timer, None, 0, 0);
         }
+        self.executor.post_exec(fuzzer, state, mgr, input)?;
+        Ok(ExitKind::Ok)
     }
 
     #[inline]
@@ -577,6 +579,7 @@ where
     ) -> Result<ExitKind, Error> {
         self.executor.pre_exec(fuzzer, state, mgr, input)?;
         setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+        Ok(ExitKind::Ok)
     }
 
     #[inline]
@@ -591,6 +594,8 @@ where
             let mut itimerval_zero: Itimerval = zeroed();
             setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
         }
+        self.executor.post_exec(fuzzer, state, mgr, input)?;
+        Ok(ExitKind::Ok)
     }
 
     fn run_target(
