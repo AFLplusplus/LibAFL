@@ -31,7 +31,7 @@ errors_backtrace = ["backtrace", "libafl_bolts/errors_backtrace"]
 cmin = ["z3"] # corpus minimisation
 corpus_btreemap = [] # Switches from HashMap to BTreeMap for CorpusId
 gzip = ["miniz_oxide", "libafl_bolts/gzip"] # Enables gzip compression in certain parts of the lib
-regex = ["std", "dep:regex", "libafl_bolts/regex"] # enables the NaiveTokenizer and StacktraceObserver
+regex = ["std", "dep:regex"] # enables the NaiveTokenizer and StacktraceObserver
 casr = ["libcasr", "std", "regex"] # enables deduplication based on libcasr for StacktraceObserver
 tcp_manager = ["tokio", "std"] # A simple EventManager proxying everything via TCP
 

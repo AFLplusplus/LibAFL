@@ -12,8 +12,8 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip", "regex"]
-std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "once_cell", "uuid", "ctor", "backtrace", "uds", "serial_test"] # print, env, launcher ... support
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip"]
+std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "once_cell", "uuid", "ctor", "byteorder", "backtrace", "uds", "serial_test"] # print, env, launcher ... support
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
 python = ["pyo3"]
@@ -57,7 +57,6 @@ miniz_oxide = { version = "0.7.1", optional = true}
 hostname = { version = "^0.3", optional = true } # Is there really no gethostname in the stdlib?
 rand_core = { version = "0.6", optional = true }
 nix = { version = "0.26", optional = true }
-regex = { version = "1", optional = true }
 uuid = { version = "1.1.2", optional = true, features = ["serde", "v4"] }
 byteorder = { version = "1.4", optional = true }
 once_cell = { version =  "1.13", optional = true }

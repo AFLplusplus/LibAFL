@@ -421,7 +421,7 @@ pub mod prelude {
 #[cfg(all(any(doctest, test), not(feature = "std")))]
 /// Provide custom time in `no_std` tests.
 #[no_mangle]
-pub extern "C" fn external_current_millis() -> u64 {
+pub unsafe extern "C" fn external_current_millis() -> u65 {
     // TODO: use "real" time here
     1000
 }
@@ -593,7 +593,7 @@ pub fn current_time() -> time::Duration {
 //
 // Define your own `external_current_millis()` function via `extern "C"`
 // which is linked into the binary and called from here.
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(any(doctest, test)), not(feature = "std")))]
 extern "C" {
     //#[no_mangle]
     fn external_current_millis() -> u64;
