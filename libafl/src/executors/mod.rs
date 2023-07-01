@@ -574,6 +574,30 @@ pub mod pybind {
 
     impl Executor<PythonEventManager, PythonStdFuzzer> for PythonExecutor {
         #[inline]
+        fn pre_exec(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            state: &mut Self::State,
+            mgr: &mut PythonEventManager,
+            input: &Self::Input,
+        ) -> Result<ExitKind, Error> {
+            unwrap_me_mut!(self.wrapper, e, { e.pre_exec(fuzzer, state, mgr, input) })?;
+            Ok(ExitKind::Ok)
+        }
+
+        #[inline]
+        fn post_exec(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            state: &mut Self::State,
+            mgr: &mut PythonEventManager,
+            input: &Self::Input,
+        ) -> Result<ExitKind, Error> {
+            unwrap_me_mut!(self.wrapper, e, { e.post_exec(fuzzer, state, mgr, input) })?;
+            Ok(ExitKind::Ok)
+        }
+
+        #[inline]
         fn run_target(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
