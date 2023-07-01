@@ -13,3 +13,4 @@ log = { version = "0.4.19", default-features = false }
 nix = { version = "0.26.2", default-features = false, features = ["process", "personality"] }
 readonly = { version = "0.2.8", default-features = false }
 simplelog = { version = "0.12.1", default-features = false }
+libc = "0.2"
