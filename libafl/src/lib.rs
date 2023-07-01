@@ -84,12 +84,12 @@ pub extern crate alloc;
 pub use ctor::ctor;
 
 // Re-export derive(SerdeAny)
-#[cfg(feature = "libafl_derive")]
+#[cfg(feature = "derive")]
 #[allow(unused_imports)]
 #[macro_use]
 extern crate libafl_derive;
 pub use libafl_bolts as bolts;
-#[cfg(feature = "libafl_derive")]
+#[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use libafl_derive::*;
 
