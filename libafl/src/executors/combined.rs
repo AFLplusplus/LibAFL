@@ -69,7 +69,7 @@ where
                 return Err(e);
             }
         }
-        return Ok(ExitKind::Ok);
+        Ok(ExitKind::Ok)
     }
 
     #[inline]
@@ -94,7 +94,7 @@ where
                 return Err(e);
             }
         }
-        return Ok(ExitKind::Ok);
+        Ok(ExitKind::Ok)
     }
 
     fn run_target(
@@ -104,8 +104,7 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        let ret = self.primary.run_target(fuzzer, state, mgr, input);
-        ret
+        self.primary.run_target(fuzzer, state, mgr, input)
     }
 }
 

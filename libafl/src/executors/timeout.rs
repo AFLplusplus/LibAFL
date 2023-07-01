@@ -578,7 +578,9 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.pre_exec(fuzzer, state, mgr, input)?;
-        setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+        unsafe {
+            setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+        }
         Ok(ExitKind::Ok)
     }
 
