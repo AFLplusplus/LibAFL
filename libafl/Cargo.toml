@@ -118,8 +118,3 @@ windows = "0.44"
 #lto = true
 #opt-level = 3
 #debug = true
-
-[[example]]
-name = "llmp_test"
-path = "./examples/llmp_test/main.rs"
-required-features = ["std"]
