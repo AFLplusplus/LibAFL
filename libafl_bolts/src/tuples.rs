@@ -218,6 +218,13 @@ impl NamedTuple for () {
     }
 }
 
+impl Named for () {
+    #[inline]
+    fn name(&self) -> &str {
+        "Empty"
+    }
+}
+
 impl<Head, Tail> NamedTuple for (Head, Tail)
 where
     Head: Named,

@@ -26,7 +26,7 @@ use crate::{
     Error,
 };
 
-crate::impl_serdeany!(UnstableEntriesMetadata);
+libafl_bolts::impl_serdeany!(UnstableEntriesMetadata);
 /// The metadata to keep unstable entries
 /// In libafl, the stability is the number of the unstable entries divided by the size of the map
 /// This is different from AFL++, which shows the number of the unstable entries divided by the number of filled entries.

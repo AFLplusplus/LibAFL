@@ -5,12 +5,12 @@
 use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
+use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use super::RemovableScheduler;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
-    impl_serdeany,
     inputs::UsesInput,
     schedulers::Scheduler,
     state::{HasCorpus, HasMetadata, UsesState},

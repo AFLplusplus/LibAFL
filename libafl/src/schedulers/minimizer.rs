@@ -25,7 +25,7 @@ pub const DEFAULT_SKIP_NON_FAVORED_PROB: u64 = 95;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IsFavoredMetadata {}
 
-crate::impl_serdeany!(IsFavoredMetadata);
+libafl_bolts::impl_serdeany!(IsFavoredMetadata);
 
 /// A state metadata holding a map of favoreds testcases for each map entry
 #[derive(Debug, Serialize, Deserialize)]
@@ -34,7 +34,7 @@ pub struct TopRatedsMetadata {
     pub map: HashMap<usize, CorpusId>,
 }
 
-crate::impl_serdeany!(TopRatedsMetadata);
+libafl_bolts::impl_serdeany!(TopRatedsMetadata);
 
 impl TopRatedsMetadata {
     /// Creates a new [`struct@TopRatedsMetadata`]

@@ -85,7 +85,7 @@ impl WeightedScheduleMetadata {
     }
 }
 
-crate::impl_serdeany!(WeightedScheduleMetadata);
+libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]

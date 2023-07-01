@@ -438,7 +438,7 @@ where
 pub mod pybind {
     use std::path::PathBuf;
 
-    use libafl::bolts::core_affinity::Cores;
+    use libafl_bolts::core_affinity::Cores;
     use libafl_qemu::emu::pybind::Emulator;
     use pyo3::{prelude::*, types::PyBytes};
 

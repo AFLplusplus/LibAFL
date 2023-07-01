@@ -134,7 +134,7 @@ impl TaintMetadata {
     }
 }
 
-crate::impl_serdeany!(TaintMetadata);
+crate::bolts::impl_serdeany!(TaintMetadata);
 
 impl<EM, O, E, Z> ColorizationStage<EM, O, E, Z>
 where

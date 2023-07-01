@@ -39,11 +39,8 @@ use serde::{Deserialize, Serialize};
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 use crate::{
-    bolts::{
-        shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-        AsMutSlice, AsSlice,
-    },
-    Error,
+    shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+    AsMutSlice, AsSlice, Error,
 };
 
 /// The default server name for our abstract shmem server
@@ -739,7 +736,7 @@ TODO: Fix test
 mod tests {
     use serial_test::serial;
 
-    use crate::bolts::{
+    use crate::{
         os::unix_shmem_server::ServedShMemProvider,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     };

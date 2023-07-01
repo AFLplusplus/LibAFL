@@ -2,6 +2,7 @@
 
 use core::{marker::PhantomData, time::Duration};
 
+use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
@@ -9,7 +10,7 @@ use crate::monitors::PerfFeature;
 use crate::{
     bolts::{current_time, rands::Rand},
     corpus::{Corpus, CorpusId},
-    impl_serdeany, mark_feature_time,
+    mark_feature_time,
     mutators::{MutationResult, Mutator},
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},

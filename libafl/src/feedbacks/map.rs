@@ -229,7 +229,7 @@ pub struct MapIndexesMetadata {
     pub tcref: isize,
 }
 
-crate::impl_serdeany!(MapIndexesMetadata);
+libafl_bolts::impl_serdeany!(MapIndexesMetadata);
 
 impl AsSlice for MapIndexesMetadata {
     type Entry = usize;
@@ -271,7 +271,7 @@ pub struct MapNoveltiesMetadata {
     pub list: Vec<usize>,
 }
 
-crate::impl_serdeany!(MapNoveltiesMetadata);
+libafl_bolts::impl_serdeany!(MapNoveltiesMetadata);
 
 impl AsSlice for MapNoveltiesMetadata {
     type Entry = usize;
@@ -308,7 +308,7 @@ where
     pub history_map: Vec<T>,
 }
 
-crate::impl_serdeany!(
+libafl_bolts::impl_serdeany!(
     MapFeedbackMetadata<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned>,
     <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<f32>,<f64>,<bool>,<char>
 );

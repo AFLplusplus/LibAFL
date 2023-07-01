@@ -65,7 +65,7 @@ pub struct CmpValuesMetadata {
     pub list: Vec<CmpValues>,
 }
 
-crate::impl_serdeany!(CmpValuesMetadata);
+libafl_bolts::impl_serdeany!(CmpValuesMetadata);
 
 impl AsSlice for CmpValuesMetadata {
     type Entry = CmpValues;
@@ -578,7 +578,7 @@ pub struct AFLppCmpValuesMetadata {
     pub headers: Vec<(usize, AFLppCmpHeader)>,
 }
 
-crate::impl_serdeany!(AFLppCmpValuesMetadata);
+libafl_bolts::impl_serdeany!(AFLppCmpValuesMetadata);
 
 impl AFLppCmpValuesMetadata {
     /// Constructor for `AFLppCmpValuesMetadata`

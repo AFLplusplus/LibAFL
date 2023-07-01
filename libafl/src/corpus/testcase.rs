@@ -430,7 +430,7 @@ impl SchedulerTestcaseMetadata {
     }
 }
 
-crate::impl_serdeany!(SchedulerTestcaseMetadata);
+libafl_bolts::impl_serdeany!(SchedulerTestcaseMetadata);
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]

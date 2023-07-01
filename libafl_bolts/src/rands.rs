@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
-use crate::bolts::current_nanos;
+use crate::current_nanos;
 
 const HASH_CONST: u64 = 0xa5b35705;
 
@@ -340,14 +340,12 @@ impl Rand for RomuDuoJrRand {
 }
 
 /// fake rand, for testing purposes
-#[cfg(test)]
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct XkcdRand {
     val: u64,
 }
 
-#[cfg(test)]
 impl Rand for XkcdRand {
     fn set_seed(&mut self, val: u64) {
         self.val = val;
@@ -359,7 +357,6 @@ impl Rand for XkcdRand {
 }
 
 /// A test rng that will return the same value (chose by fair dice roll) for testing.
-#[cfg(test)]
 impl XkcdRand {
     /// Creates a new [`XkCDRand`] with the rand of 4, [chosen by fair dice roll, guaranteed to be random](https://xkcd.com/221/).
     /// Will always return this seed.
@@ -379,7 +376,7 @@ impl XkcdRand {
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;
 
-    use crate::bolts::rands::{
+    use crate::rands::{
         Rand, RomuDuoJrRand, RomuTrioRand, StdRand, XorShift64Rand, Xoshiro256StarRand,
     };
 
@@ -404,7 +401,7 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_random_seed() {
-        use crate::bolts::rands::RandomSeed;
+        use crate::rands::RandomSeed;
 
         let mut rand_fixed = StdRand::with_seed(0);
         let mut rand = StdRand::new();
@@ -419,7 +416,7 @@ mod tests {
     fn test_rgn_core_support() {
         use rand_core::RngCore;
 
-        use crate::bolts::rands::StdRand;
+        use crate::rands::StdRand;
         pub struct Mutator<R: RngCore> {
             rng: R,
         }
@@ -440,7 +437,7 @@ pub mod pybind {
     use serde::{Deserialize, Serialize};
 
     use super::Rand;
-    use crate::bolts::{current_nanos, rands::StdRand};
+    use crate::{current_nanos, rands::StdRand};
 
     #[pyclass(unsendable, name = "StdRand")]
     #[allow(clippy::unsafe_derive_deserialize)]

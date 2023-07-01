@@ -8,12 +8,12 @@ use core::{
     marker::PhantomData,
 };
 
+use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
     bolts::{calculate_cumulative_sum_in_place, rands::Rand},
-    impl_serdeany,
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },

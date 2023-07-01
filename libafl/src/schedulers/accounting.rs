@@ -29,7 +29,7 @@ pub struct AccountingIndexesMetadata {
     pub tcref: isize,
 }
 
-crate::impl_serdeany!(AccountingIndexesMetadata);
+libafl_bolts::impl_serdeany!(AccountingIndexesMetadata);
 
 impl AsSlice for AccountingIndexesMetadata {
     type Entry = usize;
@@ -82,7 +82,7 @@ pub struct TopAccountingMetadata {
     pub max_accounting: Vec<u32>,
 }
 
-crate::impl_serdeany!(TopAccountingMetadata);
+libafl_bolts::impl_serdeany!(TopAccountingMetadata);
 
 impl TopAccountingMetadata {
     /// Creates a new [`struct@TopAccountingMetadata`]

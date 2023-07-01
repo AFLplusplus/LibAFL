@@ -77,7 +77,7 @@ pub struct GramatronIdxMapMetadata {
     pub map: HashMap<usize, Vec<usize>>,
 }
 
-crate::impl_serdeany!(GramatronIdxMapMetadata);
+libafl_bolts::impl_serdeany!(GramatronIdxMapMetadata);
 
 impl GramatronIdxMapMetadata {
     /// Creates a new [`struct@GramatronIdxMapMetadata`].

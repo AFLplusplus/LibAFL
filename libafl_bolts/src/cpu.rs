@@ -4,7 +4,7 @@
 use core::arch::asm;
 
 #[cfg(not(any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))]
-use crate::bolts::current_nanos;
+use crate::current_nanos;
 
 // TODO: Add more architectures, using C code, see
 // https://github.com/google/benchmark/blob/master/src/cycleclock.h

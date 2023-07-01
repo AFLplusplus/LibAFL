@@ -777,13 +777,6 @@ where
     }
 }
 
-impl Named for () {
-    #[inline]
-    fn name(&self) -> &str {
-        "Empty"
-    }
-}
-
 /// A [`CrashFeedback`] reports as interesting if the target crashed.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CrashFeedback {}

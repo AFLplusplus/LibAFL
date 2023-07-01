@@ -1,13 +1,13 @@
 //! Generators may generate bytes or, in general, data, for inputs.
 
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use crate::{
     bolts::rands::Rand,
     inputs::{bytes::BytesInput, Input},
     state::HasRand,
-    Error, ErrorBacktrace,
+    Error,
 };
 
 pub mod gramatron;
@@ -39,9 +39,8 @@ where
     fn generate(&mut self, _state: &mut S) -> Result<I, Error> {
         match self.next() {
             Some(i) => Ok(i),
-            None => Err(Error::Empty(
-                String::from("No more items in iterator when generating inputs"),
-                ErrorBacktrace::new(),
+            None => Err(Error::empty(
+                "No more items in iterator when generating inputs",
             )),
         }
     }

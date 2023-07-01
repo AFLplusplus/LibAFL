@@ -37,7 +37,7 @@ impl Debug for NautilusChunksMetadata {
     }
 }
 
-crate::impl_serdeany!(NautilusChunksMetadata);
+libafl_bolts::impl_serdeany!(NautilusChunksMetadata);
 
 impl NautilusChunksMetadata {
     /// Creates a new [`NautilusChunksMetadata`]

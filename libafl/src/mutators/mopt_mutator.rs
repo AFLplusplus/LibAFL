@@ -91,7 +91,7 @@ pub struct MOpt {
     pub core_operator_cycles_v3: Vec<u64>,
 }
 
-crate::impl_serdeany!(MOpt);
+libafl_bolts::impl_serdeany!(MOpt);
 
 impl Debug for MOpt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

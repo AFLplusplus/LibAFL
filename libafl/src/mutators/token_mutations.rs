@@ -39,7 +39,7 @@ pub struct Tokens {
     tokens_set: HashSet<Vec<u8>>,
 }
 
-crate::impl_serdeany!(Tokens);
+libafl_bolts::impl_serdeany!(Tokens);
 
 /// The metadata used for token mutators
 impl Tokens {

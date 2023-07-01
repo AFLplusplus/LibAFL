@@ -34,7 +34,7 @@ pub struct ProbabilityMetadata {
     pub total_probability: f64,
 }
 
-crate::impl_serdeany!(ProbabilityMetadata);
+libafl_bolts::impl_serdeany!(ProbabilityMetadata);
 
 impl ProbabilityMetadata {
     /// Creates a new [`struct@ProbabilityMetadata`]

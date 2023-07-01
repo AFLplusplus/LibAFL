@@ -84,7 +84,7 @@ pub enum DiffExitKind {
     // Custom(Box<dyn SerdeAny>),
 }
 
-crate::impl_serdeany!(ExitKind);
+libafl_bolts::impl_serdeany!(ExitKind);
 
 impl From<ExitKind> for DiffExitKind {
     fn from(exitkind: ExitKind) -> Self {
@@ -98,7 +98,7 @@ impl From<ExitKind> for DiffExitKind {
     }
 }
 
-crate::impl_serdeany!(DiffExitKind);
+libafl_bolts::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers: UsesObservers {

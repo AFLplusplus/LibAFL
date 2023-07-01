@@ -36,7 +36,7 @@ pub struct NewHashFeedbackMetadata {
 }
 
 #[rustfmt::skip]
-crate::impl_serdeany!(NewHashFeedbackMetadata);
+libafl_bolts::impl_serdeany!(NewHashFeedbackMetadata);
 
 impl NewHashFeedbackMetadata {
     /// Create a new [`NewHashFeedbackMetadata`]

@@ -19,11 +19,8 @@ use ahash::RandomState;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    bolts::{
-        shmem::{ShMem, ShMemProvider},
-        AsSlice,
-    },
-    Error,
+    shmem::{ShMem, ShMemProvider},
+    AsSlice, Error,
 };
 
 /// If the saved page content equals exactly this buf, the restarted child wants to exit cleanly.
@@ -294,7 +291,7 @@ mod tests {
 
     use serial_test::serial;
 
-    use crate::bolts::{
+    use crate::{
         shmem::{ShMemProvider, StdShMemProvider},
         staterestore::StateRestorer,
     };

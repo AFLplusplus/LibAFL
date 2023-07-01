@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "libafl",
+    "libafl_bolts",
     "libafl_cc",
     "libafl_concolic/symcc_runtime",
     "libafl_concolic/symcc_libafl",
@@ -20,6 +21,7 @@ members = [
 ]
 default-members = [
     "libafl",
+    "libafl_bolts",
     "libafl_cc",
     "libafl_derive",
     "libafl_targets",
@@ -28,7 +30,7 @@ exclude = [
     "bindings",
     "fuzzers",
     "libafl_qemu/libafl_qemu_build",
-    "libafl_qemu/libafl_qemu_sys"
+    "libafl_qemu/libafl_qemu_sys",
     "scripts",
 ]
 

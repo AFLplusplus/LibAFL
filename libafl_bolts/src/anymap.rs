@@ -21,7 +21,7 @@ pub trait AsAny: Any {
 #[macro_export]
 macro_rules! impl_asany {
     ($struct_name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)?) => {
-        impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $crate::bolts::anymap::AsAny for $struct_name $(< $( $lt ),+ >)? {
+        impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $crate::anymap::AsAny for $struct_name $(< $( $lt ),+ >)? {
             fn as_any(&self) -> &dyn ::core::any::Any {
                 self
             }
@@ -92,7 +92,7 @@ macro_rules! create_anymap_for_trait {
             use hashbrown::hash_map::{Keys, Values, ValuesMut};
             use hashbrown::HashMap;
 
-            use $crate::bolts::anymap::{pack_type_id, unpack_type_id};
+            use $crate::anymap::{pack_type_id, unpack_type_id};
             use $crate::Error;
 
             use super::*;
