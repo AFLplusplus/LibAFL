@@ -47,6 +47,56 @@ where
     EM: UsesState<State = A::State>,
     Z: UsesState<State = A::State>,
 {
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        let p = self.primary.pre_exec(fuzzer, state, mgr, input);
+        match p {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(e);
+            }
+        }
+        let s = self.secondary.pre_exec(fuzzer, state, mgr, input);
+        match s {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(e);
+            }
+        }
+        return Ok(ExitKind::Ok);
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        let p = self.primary.post_exec(fuzzer, state, mgr, input);
+        match p {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(e);
+            }
+        }
+        let s = self.secondary.post_exec(fuzzer, state, mgr, input);
+        match s {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(e);
+            }
+        }
+        return Ok(ExitKind::Ok);
+    }
+
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
@@ -55,8 +105,6 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let ret = self.primary.run_target(fuzzer, state, mgr, input);
-        self.primary.post_run_reset();
-        self.secondary.post_run_reset();
         ret
     }
 }

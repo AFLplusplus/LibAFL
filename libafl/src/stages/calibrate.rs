@@ -122,7 +122,10 @@ where
 
         let mut start = current_time();
 
+        executor.pre_exec(fuzzer, state, mgr, &input)?;
         let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+        executor.post_exec(fuzzer, state, mgr, &input)?;
+
         let mut total_time = if exit_kind == ExitKind::Ok {
             current_time() - start
         } else {
@@ -158,7 +161,10 @@ where
             executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();
 
+            executor.pre_exec(fuzzer, state, mgr, &input)?;
             let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+            executor.post_exec(fuzzer, state, mgr, &input)?;
+
             if exit_kind != ExitKind::Ok {
                 if !has_errors {
                     mgr.log(

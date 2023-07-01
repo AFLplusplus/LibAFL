@@ -260,6 +260,39 @@ impl<E> TimeoutExecutor<E> {
             false
         }
     }
+
+    fn reset_timer(&mut self) {
+        if self.batch_mode {
+            unsafe {
+                let elapsed = current_time() - self.tmout_start_time;
+                // elapsed may be > than tmout in case of reveived but ingored signal
+                if elapsed > self.exec_tmout
+                    || self.exec_tmout - elapsed < self.avg_exec_time * self.avg_mul_k
+                {
+                    let disarmed: libc::itimerspec = zeroed();
+                    libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
+                    // set timer the next exec
+                    if self.executions > 0 {
+                        self.avg_exec_time = elapsed / self.executions;
+                        self.executions = 0;
+                    }
+                    // readjust K
+                    if self.last_signal_time > self.exec_tmout * self.avg_mul_k
+                        && self.avg_mul_k > 1
+                    {
+                        self.avg_mul_k -= 1;
+                    }
+                } else {
+                    self.executions += 1;
+                }
+            }
+        } else {
+            unsafe {
+                let disarmed: libc::itimerspec = zeroed();
+                libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
+            }
+        }
+    }
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
@@ -379,6 +412,36 @@ where
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.executor.pre_exec(fuzzer, state, mgr, input)
+    }
+
+    /// Deletes this timer queue
+    /// # Safety
+    /// Will dereference the given `tp_timer` pointer, unchecked.
+    #[inline]
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.executor.post_exec(fuzzer, state, mgr, input);
+        unsafe {
+            SetThreadpoolTimer(self.tp_timer, None, 0, 0);
+        }
+        self.executor.post_run_reset();
+    }
+
+    #[inline]
     #[allow(clippy::cast_sign_loss)]
     fn run_target(
         &mut self,
@@ -432,19 +495,8 @@ where
 
             write_volatile(&mut data.timeout_input_ptr, core::ptr::null_mut());
 
-            self.post_run_reset();
             ret
         }
-    }
-
-    /// Deletes this timer queue
-    /// # Safety
-    /// Will dereference the given `tp_timer` pointer, unchecked.
-    fn post_run_reset(&mut self) {
-        unsafe {
-            SetThreadpoolTimer(self.tp_timer, None, 0, 0);
-        }
-        self.executor.post_run_reset();
     }
 }
 
@@ -455,13 +507,15 @@ where
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
-    fn run_target(
+    #[inline]
+    fn pre_exec(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        self.executor.pre_exec(fuzzer, state, mgr, input)?;
         unsafe {
             if self.batch_mode {
                 let data = &mut GLOBAL_STATE;
@@ -478,46 +532,32 @@ where
             } else {
                 libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
             }
-
-            let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            // reset timer
-            self.post_run_reset();
-            ret
         }
+        Ok(ExitKind::Ok)
     }
 
-    fn post_run_reset(&mut self) {
-        if self.batch_mode {
-            unsafe {
-                let elapsed = current_time() - self.tmout_start_time;
-                // elapsed may be > than tmout in case of reveived but ingored signal
-                if elapsed > self.exec_tmout
-                    || self.exec_tmout - elapsed < self.avg_exec_time * self.avg_mul_k
-                {
-                    let disarmed: libc::itimerspec = zeroed();
-                    libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
-                    // set timer the next exec
-                    if self.executions > 0 {
-                        self.avg_exec_time = elapsed / self.executions;
-                        self.executions = 0;
-                    }
-                    // readjust K
-                    if self.last_signal_time > self.exec_tmout * self.avg_mul_k
-                        && self.avg_mul_k > 1
-                    {
-                        self.avg_mul_k -= 1;
-                    }
-                } else {
-                    self.executions += 1;
-                }
-            }
-        } else {
-            unsafe {
-                let disarmed: libc::itimerspec = zeroed();
-                libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
-            }
-        }
-        self.executor.post_run_reset();
+    #[inline]
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        // reset timer
+        self.reset_timer();
+        self.executor.post_exec(fuzzer, state, mgr, input)
+    }
+
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        let ret = self.executor.run_target(fuzzer, state, mgr, input);
+        ret
     }
 }
 
@@ -528,6 +568,33 @@ where
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.executor.pre_exec(fuzzer, state, mgr, input)?;
+        setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        unsafe {
+            let mut itimerval_zero: Itimerval = zeroed();
+            setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
+        }
+        self.executor.post_run_reset();
+    }
+
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
@@ -536,19 +603,9 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
-            setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            self.post_run_reset();
             ret
         }
-    }
-
-    fn post_run_reset(&mut self) {
-        unsafe {
-            let mut itimerval_zero: Itimerval = zeroed();
-            setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
-        }
-        self.executor.post_run_reset();
     }
 }
 

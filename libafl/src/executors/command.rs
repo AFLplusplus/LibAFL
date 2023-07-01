@@ -318,6 +318,26 @@ where
     OT: Debug + MatchName + ObserversTuple<S>,
     Z: UsesState<State = S>,
 {
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
@@ -706,14 +726,17 @@ mod tests {
             .input(InputLocation::Arg { argnum: 0 });
         let executor = executor.build(());
         let mut executor = executor.unwrap();
-
+        let input = BytesInput::new(b"test".to_vec());
+        let mut fuzzer = NopFuzzer::new();
+        let mut state = NopState::new();
         executor
-            .run_target(
-                &mut NopFuzzer::new(),
-                &mut NopState::new(),
-                &mut mgr,
-                &BytesInput::new(b"test".to_vec()),
-            )
+            .pre_exec(&mut fuzzer, &mut state, &mut mgr, &input)
+            .unwrap();
+        executor
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
+            .unwrap();
+        executor
+            .post_exec(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
     }
 
@@ -735,13 +758,17 @@ mod tests {
             Duration::from_secs(5),
         )
         .unwrap();
+        let input = BytesInput::new(b"test".to_vec());
+        let mut fuzzer = NopFuzzer::new();
+        let mut state = NopState::new();
         executor
-            .run_target(
-                &mut NopFuzzer::new(),
-                &mut NopState::new(),
-                &mut mgr,
-                &BytesInput::new(b"test".to_vec()),
-            )
+            .pre_exec(&mut fuzzer, &mut state, &mut mgr, &input)
+            .unwrap();
+        executor
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
+            .unwrap();
+        executor
+            .post_exec(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
     }
 }

@@ -63,6 +63,30 @@ where
     DOT: DifferentialObserversTuple<A::Observers, B::Observers, A::State>,
     Z: UsesState<State = A::State>,
 {
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.observers(); // update in advance
+
+        Ok(ExitKind::Ok)
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
@@ -70,14 +94,14 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.observers(); // update in advance
         let observers = self.observers.get_mut();
         observers
             .differential
             .pre_observe_first_all(observers.primary.as_mut())?;
         observers.primary.as_mut().pre_exec_all(state, input)?;
+        self.primary.pre_exec(fuzzer, state, mgr, input)?;
         let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
-        self.primary.post_run_reset();
+        self.primary.post_exec(fuzzer, state, mgr, input)?;
         observers
             .primary
             .as_mut()
@@ -89,8 +113,9 @@ where
             .differential
             .pre_observe_second_all(observers.secondary.as_mut())?;
         observers.secondary.as_mut().pre_exec_all(state, input)?;
+        self.secondary.pre_exec(fuzzer, state, mgr, input)?;
         let ret2 = self.secondary.run_target(fuzzer, state, mgr, input)?;
-        self.secondary.post_run_reset();
+        self.secondary.post_exec(fuzzer, state, mgr, input)?;
         observers
             .secondary
             .as_mut()

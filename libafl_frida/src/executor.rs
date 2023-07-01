@@ -69,13 +69,12 @@ where
     RT: FridaRuntimeTuple,
     Z: UsesState<State = S>,
 {
-    /// Instruct the target about the input and run
     #[inline]
-    fn run_target(
+    fn pre_exec(
         &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        mgr: &mut EM,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.helper.pre_exec(input)?;
@@ -88,7 +87,17 @@ where
                 self.stalker.follow_me::<NoneEventSink>(transformer, None);
             }
         }
-        let res = self.base.run_target(fuzzer, state, mgr, input);
+        Ok(ExitKind::Ok)
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }
@@ -100,6 +109,19 @@ where
             }
         }
         self.helper.post_exec(input)?;
+        Ok(ExitKind::Ok)
+    }
+
+    /// Instruct the target about the input and run
+    #[inline]
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        let res = self.base.run_target(fuzzer, state, mgr, input);
         res
     }
 }

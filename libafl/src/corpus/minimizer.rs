@@ -128,7 +128,9 @@ where
 
             // Execute the input; we cannot rely on the metadata already being present.
             executor.observers_mut().pre_exec_all(state, &input)?;
+            executor.pre_exec(fuzzer, state, manager, &input)?;
             let kind = executor.run_target(fuzzer, state, manager, &input)?;
+            executor.post_exec(fuzzer, state, manager, &input)?;
             executor
                 .observers_mut()
                 .post_exec_all(state, &input, &kind)?;

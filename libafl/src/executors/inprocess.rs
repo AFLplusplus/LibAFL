@@ -129,7 +129,7 @@ where
     S: UsesInput,
     Z: UsesState<State = S>,
 {
-    fn run_target(
+    fn pre_exec(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
@@ -138,10 +138,28 @@ where
     ) -> Result<ExitKind, Error> {
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
+        Ok(ExitKind::Ok)
+    }
 
-        let ret = (self.harness_fn.borrow_mut())(input);
-
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
         self.handlers.post_run_target();
+        Ok(ExitKind::Ok)
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        let ret = (self.harness_fn.borrow_mut())(input);
         Ok(ret)
     }
 }
@@ -859,11 +877,11 @@ mod unix_signal_handler {
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor
-            executor.post_run_reset();
             let state = data.state_mut::<E::State>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+            let _ = executor.post_exec(fuzzer, state, event_mgr, input);
 
             log::error!("Child crashed!");
 
@@ -1696,6 +1714,30 @@ where
     SP: ShMemProvider,
     Z: UsesState<State = S>,
 {
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        // You can't call handlers.pre_run_target here because you need to execute it in the child process
+
+        Ok(ExitKind::Ok)
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
     #[allow(unreachable_code)]
     #[inline]
     fn run_target(
@@ -1764,6 +1806,30 @@ where
     SP: ShMemProvider,
     Z: UsesState<State = S>,
 {
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        // You can't call handlers.pre_run_target here because you need to execute it in the child process
+
+        Ok(ExitKind::Ok)
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
     #[allow(unreachable_code)]
     #[inline]
     fn run_target(
@@ -2198,6 +2264,13 @@ mod tests {
             phantom: PhantomData,
         };
         let input = NopInput {};
+        let mut fuzzer = NopFuzzer::new();
+        let mut state = NopState::new();
+        let mut mgr = NopEventManager::new();
+
+        in_process_executor
+            .pre_exec(&mut fuzzer, &mut state, &mut mgr, &input)
+            .unwrap();
         in_process_executor
             .run_target(
                 &mut NopFuzzer::new(),
@@ -2205,6 +2278,9 @@ mod tests {
                 &mut NopEventManager::new(),
                 &input,
             )
+            .unwrap();
+        in_process_executor
+            .post_exec(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
     }
 
@@ -2236,7 +2312,13 @@ mod tests {
         let mut state = NopState::new();
         let mut mgr = SimpleEventManager::printing();
         in_process_fork_executor
+            .pre_exec(&mut fuzzer, &mut state, &mut mgr, &input)
+            .unwrap();
+        in_process_fork_executor
             .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
+            .unwrap();
+        in_process_fork_executor
+            .post_exec(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
     }
 }

@@ -115,6 +115,24 @@ where
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
 {
+    /// Routines executor performs before executing the harness function.
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error>;
+
+    /// Routines executor performs after executing the harness function.
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error>;
+
     /// Instruct the target about the input and run
     fn run_target(
         &mut self,
@@ -135,10 +153,6 @@ where
     {
         WithObservers::new(self, observers)
     }
-
-    /// Custom Reset Handler, e.g., to reset timers
-    #[inline]
-    fn post_run_reset(&mut self) {}
 }
 
 /// A simple executor that does nothing.
@@ -162,6 +176,28 @@ where
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
 {
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
@@ -194,7 +230,11 @@ mod test {
         let mut fuzzer = NopFuzzer::new();
 
         let mut state = NopState::new();
+        let mut mgr = NopEventManager::new();
 
+        executor
+            .pre_exec(&mut fuzzer, &mut state, &mut mgr, &empty_input)
+            .unwrap_err();
         executor
             .run_target(
                 &mut fuzzer,
@@ -204,6 +244,13 @@ mod test {
             )
             .unwrap_err();
         executor
+            .post_exec(&mut fuzzer, &mut state, &mut mgr, &empty_input)
+            .unwrap_err();
+
+        executor
+            .pre_exec(&mut fuzzer, &mut state, &mut mgr, &nonempty_input)
+            .unwrap_err();
+        executor
             .run_target(
                 &mut fuzzer,
                 &mut state,
@@ -211,6 +258,9 @@ mod test {
                 &nonempty_input,
             )
             .unwrap();
+        executor
+            .post_exec(&mut fuzzer, &mut state, &mut mgr, &nonempty_input)
+            .unwrap_err();
     }
 }
 
@@ -347,6 +397,60 @@ pub mod pybind {
 
     impl Executor<PythonEventManager, PythonStdFuzzer> for PyObjectExecutor {
         #[inline]
+        fn pre_exec(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            state: &mut Self::State,
+            mgr: &mut PythonEventManager,
+            input: &Self::Input,
+        ) -> Result<ExitKind, Error> {
+            let ek = Python::with_gil(|py| -> PyResult<_> {
+                let ek: PythonExitKind = self
+                    .inner
+                    .call_method1(
+                        py,
+                        "pre_exec",
+                        (
+                            PythonStdFuzzerWrapper::wrap(fuzzer),
+                            PythonStdStateWrapper::wrap(state),
+                            mgr.clone(),
+                            input.bytes(),
+                        ),
+                    )?
+                    .extract(py)?;
+                Ok(ek)
+            })?;
+            Ok(ek.inner)
+        }
+
+        #[inline]
+        fn post_exec(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            state: &mut Self::State,
+            mgr: &mut PythonEventManager,
+            input: &Self::Input,
+        ) -> Result<ExitKind, Error> {
+            let ek = Python::with_gil(|py| -> PyResult<_> {
+                let ek: PythonExitKind = self
+                    .inner
+                    .call_method1(
+                        py,
+                        "post_exec",
+                        (
+                            PythonStdFuzzerWrapper::wrap(fuzzer),
+                            PythonStdStateWrapper::wrap(state),
+                            mgr.clone(),
+                            input.bytes(),
+                        ),
+                    )?
+                    .extract(py)?;
+                Ok(ek)
+            })?;
+            Ok(ek.inner)
+        }
+
+        #[inline]
         fn run_target(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
@@ -477,7 +581,10 @@ pub mod pybind {
             mgr: &mut PythonEventManager,
             input: &Self::Input,
         ) -> Result<ExitKind, Error> {
-            unwrap_me_mut!(self.wrapper, e, { e.run_target(fuzzer, state, mgr, input) })
+            unwrap_me_mut!(self.wrapper, e, { e.pre_exec(fuzzer, state, mgr, input) })?;
+            unwrap_me_mut!(self.wrapper, e, { e.run_target(fuzzer, state, mgr, input) })?;
+            unwrap_me_mut!(self.wrapper, e, { e.post_exec(fuzzer, state, mgr, input) })?;
+            Ok(ExitKind::Ok)
         }
     }
 

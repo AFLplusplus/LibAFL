@@ -661,7 +661,9 @@ where
         *state.executions_mut() += 1;
 
         start_timer!(state);
+        executor.pre_exec(self, state, event_mgr, input)?;
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
+        executor.post_exec(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);
@@ -714,7 +716,9 @@ where
         *state.executions_mut() += 1;
 
         start_timer!(state);
+        executor.pre_exec(self, state, event_mgr, input)?;
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
+        executor.post_exec(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);

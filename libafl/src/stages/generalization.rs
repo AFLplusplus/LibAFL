@@ -354,7 +354,10 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
+        executor.pre_exec(fuzzer, state, manager, input)?;
         let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
+        executor.post_exec(fuzzer, state, manager, input)?;
+
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;

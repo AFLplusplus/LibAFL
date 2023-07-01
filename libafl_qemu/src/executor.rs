@@ -107,6 +107,28 @@ where
     QT: QemuHelperTuple<S>,
     Z: UsesState<State = S>,
 {
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
@@ -275,6 +297,28 @@ where
     SP: ShMemProvider,
     Z: UsesState<State = S>,
 {
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
     fn run_target(
         &mut self,
         fuzzer: &mut Z,

@@ -63,6 +63,16 @@ where
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.executor.pre_exec(fuzzer, state, mgr, input)
+    }
+
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
@@ -71,6 +81,16 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
+    }
+
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.executor.post_exec(fuzzer, state, mgr, input)
     }
 }
 

@@ -302,7 +302,9 @@ where
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
 
+        executor.pre_exec(fuzzer, state, manager, &input)?;
         let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+        executor.post_exec(fuzzer, state, manager, &input)?;
 
         let observer = executor
             .observers()

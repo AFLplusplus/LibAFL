@@ -52,6 +52,29 @@ where
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
 {
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
+        _input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        Ok(ExitKind::Ok)
+    }
+
+    #[inline]
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
