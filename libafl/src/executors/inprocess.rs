@@ -1027,20 +1027,20 @@ pub mod windows_asan_handler {
             // TODO tell the parent to not restart
         } else {
             let executor = data.executor_mut::<E>();
-            // reset timer
-            if !data.tp_timer.is_null() {
-                executor.post_run_reset();
-                data.tp_timer = ptr::null_mut();
-            }
-
             let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
+            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+
+            // reset timer
+            if !data.tp_timer.is_null() {
+                executor.post_exec(fuzzer, state, event_manager, input);
+                data.tp_timer = ptr::null_mut();
+            }
 
             log::error!("Child crashed!");
 
             // Make sure we don't crash in the crash handler forever.
-            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
             run_observers_and_save_state::<CF, E, EM, OF, Z>(
                 executor,
@@ -1342,15 +1342,16 @@ mod windows_exception_handler {
             // TODO tell the parent to not restart
         } else {
             let executor = data.executor_mut::<E>();
-            // reset timer
-            if !data.tp_timer.is_null() {
-                executor.post_run_reset();
-                data.tp_timer = ptr::null_mut();
-            }
-
             let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
+            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+
+            // reset timer
+            if !data.tp_timer.is_null() {
+                executor.post_exec(fuzzer, state, event_mgr, input);
+                data.tp_timer = ptr::null_mut();
+            }
 
             if is_crash {
                 log::error!("Child crashed!");
@@ -1360,8 +1361,6 @@ mod windows_exception_handler {
 
             // Make sure we don't crash in the crash handler forever.
             if is_crash {
-                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
-
                 run_observers_and_save_state::<CF, E, EM, OF, Z>(
                     executor,
                     state,
