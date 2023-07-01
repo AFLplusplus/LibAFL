@@ -607,10 +607,8 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        unsafe {
-            let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            ret
-        }
+        let ret = self.executor.run_target(fuzzer, state, mgr, input);
+        ret
     }
 }
 
