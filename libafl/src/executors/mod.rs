@@ -389,7 +389,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_body!($wrapper, $name, $body, PythonExecutorWrapper,
+            libafl_bolts::unwrap_me_body!($wrapper, $name, $body, PythonExecutorWrapper,
                 { InProcess },
                 {
                     Python(py_wrapper) => {
@@ -403,7 +403,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me_mut {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonExecutorWrapper,
+            libafl_bolts::unwrap_me_mut_body!($wrapper, $name, $body, PythonExecutorWrapper,
                 { InProcess },
                 {
                     Python(py_wrapper) => {

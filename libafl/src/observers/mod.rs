@@ -651,7 +651,7 @@ pub mod pybind {
         }
     }
 
-    crate::impl_serde_pyobjectwrapper!(PyObjectObserver, inner);
+    libafl_bolts::impl_serde_pyobjectwrapper!(PyObjectObserver, inner);
 
     impl Named for PyObjectObserver {
         fn name(&self) -> &str {

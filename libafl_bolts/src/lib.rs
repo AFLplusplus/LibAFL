@@ -792,3 +792,135 @@ pub mod bolts_prelude {
         anymap::*, cpu::*, llmp::*, os::*, ownedref::*, rands::*, serdeany::*, shmem::*, tuples::*,
     };
 }
+
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+pub mod pybind {
+
+    #[macro_export]
+    macro_rules! unwrap_me_body {
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),* }) => {
+            match &$wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let borrowed = py_wrapper.borrow(py);
+                            let $name = &borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+            }
+        };
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),* }, { $($wrapper_optional:tt($pw:ident) => $code_block:block)* }) => {
+            match &$wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let borrowed = py_wrapper.borrow(py);
+                            let $name = &borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+                $($wrapper_type::$wrapper_optional($pw) => { $code_block })*
+            }
+        };
+    }
+
+    #[macro_export]
+    macro_rules! unwrap_me_mut_body {
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}) => {
+            match &mut $wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let mut borrowed = py_wrapper.borrow_mut(py);
+                            let $name = &mut borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+            }
+        };
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}, { $($wrapper_optional:tt($pw:ident) => $code_block:block)* }) => {
+            match &mut $wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let mut borrowed = py_wrapper.borrow_mut(py);
+                            let $name = &mut borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+                $($wrapper_type::$wrapper_optional($pw) => { $code_block })*
+            }
+        };
+    }
+
+    #[macro_export]
+    macro_rules! impl_serde_pyobjectwrapper {
+        ($struct_name:ident, $inner:tt) => {
+            const _: () = {
+                use alloc::vec::Vec;
+
+                use pyo3::prelude::*;
+                use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+                impl Serialize for $struct_name {
+                    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                    where
+                        S: Serializer,
+                    {
+                        let buf = Python::with_gil(|py| -> PyResult<Vec<u8>> {
+                            let pickle = PyModule::import(py, "pickle")?;
+                            let buf: Vec<u8> =
+                                pickle.getattr("dumps")?.call1((&self.$inner,))?.extract()?;
+                            Ok(buf)
+                        })
+                        .unwrap();
+                        serializer.serialize_bytes(&buf)
+                    }
+                }
+
+                struct PyObjectVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for PyObjectVisitor {
+                    type Value = $struct_name;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter
+                            .write_str("Expecting some bytes to deserialize from the Python side")
+                    }
+
+                    fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        let obj = Python::with_gil(|py| -> PyResult<PyObject> {
+                            let pickle = PyModule::import(py, "pickle")?;
+                            let obj = pickle.getattr("loads")?.call1((v,))?.to_object(py);
+                            Ok(obj)
+                        })
+                        .unwrap();
+                        Ok($struct_name::new(obj))
+                    }
+                }
+
+                impl<'de> Deserialize<'de> for $struct_name {
+                    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                    where
+                        D: Deserializer<'de>,
+                    {
+                        deserializer.deserialize_byte_buf(PyObjectVisitor)
+                    }
+                }
+            };
+        };
+    }
+}

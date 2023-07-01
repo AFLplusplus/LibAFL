@@ -1395,7 +1395,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_body!($wrapper, $name, $body, PythonFeedbackWrapper,
+            libafl_bolts::unwrap_me_body!($wrapper, $name, $body, PythonFeedbackWrapper,
                 {
                     MaxMapI8,
                     MaxMapI16,
@@ -1425,7 +1425,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me_mut {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonFeedbackWrapper,
+            libafl_bolts::unwrap_me_mut_body!($wrapper, $name, $body, PythonFeedbackWrapper,
                 {
                     MaxMapI8,
                     MaxMapI16,

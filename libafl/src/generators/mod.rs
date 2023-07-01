@@ -281,7 +281,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me_mut {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonGeneratorWrapper,
+            libafl_bolts::unwrap_me_mut_body!($wrapper, $name, $body, PythonGeneratorWrapper,
                 { RandBytes, RandPrintables },
                 {
                     Python(py_wrapper) => {

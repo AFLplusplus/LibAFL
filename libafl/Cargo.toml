@@ -13,25 +13,25 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 
 [features]
 default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex"]
-std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "bincode", "wait-timeout", "byteorder", "once_cell", "uuid", "tui_monitor", "ctor", "backtrace", "uds", "serial_test"] # print, env, launcher ... support
-derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
-fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
-rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
+std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "bincode", "wait-timeout", "byteorder", "once_cell", "uuid", "tui_monitor", "ctor", "backtrace", "uds", "serial_test", "libafl_bolts/std"] # print, env, launcher ... support
+derive = ["libafl_derive", "libafl_bolts/derive"] # provide derive(SerdeAny) macro.
+fork = ["libafl_bolts/derive"] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
+rand_trait = ["rand_core", "libafl_bolts/rand_trait"] # If set, libafl's rand implementations will implement `rand::Rng`
 introspection = [] # Include performance statistics of the fuzzing pipeline
 concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
-python = ["pyo3", "concat-idents"]
-prelude = [] # Expose libafl::prelude for access without additional using directives
+python = ["pyo3", "concat-idents", "libafl_bolts/python"]
+prelude = ["libafl_bolts/prelude"] # Expose libafl::prelude for access without additional using directives
 tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
 prometheus_monitor = ["std", "async-std", "prometheus-client", "tide", "futures"]
-cli = ["clap"]  # expose bolts::cli for easy commandline parsing
-qemu_cli = ["cli"] # Commandline flags for qemu-based fuzzers
-frida_cli = ["cli"] # Commandline flags for frida-based fuzzers
+cli = ["libafl_bolts/cli"]  # expose bolts::cli for easy commandline parsing
+qemu_cli = ["cli", "libafl_bolts/qemu_cli"] # Commandline flags for qemu-based fuzzers
+frida_cli = ["cli", "libafl_bolts/frida_cli"] # Commandline flags for frida-based fuzzers
 afl_exec_sec = [] # calculate exec/sec like AFL
-errors_backtrace = ["backtrace"]
+errors_backtrace = ["backtrace", "libafl_bolts/errors_backtrace"]
 cmin = ["z3"] # corpus minimisation
 corpus_btreemap = [] # Switches from HashMap to BTreeMap for CorpusId
-gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
-regex = ["std", "dep:regex"] # enables the NaiveTokenizer and StacktraceObserver
+gzip = ["miniz_oxide", "libafl_bolts/gzip"] # Enables gzip compression in certain parts of the lib
+regex = ["std", "dep:regex", "libafl_bolts/regex"] # enables the NaiveTokenizer and StacktraceObserver
 casr = ["libcasr", "std", "regex"] # enables deduplication based on libcasr for StacktraceObserver
 tcp_manager = ["tokio", "std"] # A simple EventManager proxying everything via TCP
 
@@ -42,11 +42,11 @@ agpl = ["gpl", "nautilus"]
 nautilus = ["grammartec", "std", "serde_json/std"]
 
 # LLMP features
-llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
-llmp_compression = ["gzip"] # llmp compression using GZip
-llmp_debug = [] # Enables debug output for LLMP
-llmp_small_maps = [] # reduces initial map size for llmp
-llmp_broker_timeouts = ["std"] # The broker loop will yield occasionally, even without status messages from client nodes
+llmp_bind_public = ["libafl_bolts/llmp_bind_public"] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
+llmp_compression = ["libafl_bolts/llmp_compression"] # llmp compression using GZip
+llmp_debug = ["libafl_bolts/llmp_debug"] # Enables debug output for LLMP
+llmp_small_maps = ["libafl_bolts/llmp_small_maps"] # reduces initial map size for llmp
+llmp_broker_timeouts = ["std", "libafl_bolts/llmp_broker_timeouts"] # The broker loop will yield occasionally, even without status messages from client nodes
 
 [build-dependencies]
 rustversion = "1.0"
@@ -57,7 +57,7 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 bytecount = "0.6.3"
 
 [dependencies]
-libafl_bolts = { version = "0.10.1", path = "../libafl_bolts" }
+libafl_bolts = { version = "0.10.1", path = "../libafl_bolts", no-default-features = true }
 libafl_derive = { version = "0.10.1", path = "../libafl_derive", optional = true }
 
 rustversion = "1.0"

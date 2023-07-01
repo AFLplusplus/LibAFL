@@ -1060,13 +1060,15 @@ pub mod pybind {
 
     macro_rules! unwrap_me {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_body!($wrapper, $name, $body, PythonMonitorWrapper, { Simple })
+            libafl_bolts::unwrap_me_body!($wrapper, $name, $body, PythonMonitorWrapper, { Simple })
         };
     }
 
     macro_rules! unwrap_me_mut {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonMonitorWrapper, { Simple })
+            libafl_bolts::unwrap_me_mut_body!($wrapper, $name, $body, PythonMonitorWrapper, {
+                Simple
+            })
         };
     }
 
