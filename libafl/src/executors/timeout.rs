@@ -438,7 +438,6 @@ where
         unsafe {
             SetThreadpoolTimer(self.tp_timer, None, 0, 0);
         }
-        self.executor.post_run_reset();
     }
 
     #[inline]
@@ -592,7 +591,6 @@ where
             let mut itimerval_zero: Itimerval = zeroed();
             setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
         }
-        self.executor.post_run_reset();
     }
 
     fn run_target(

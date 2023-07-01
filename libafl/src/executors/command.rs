@@ -318,6 +318,7 @@ where
     OT: Debug + MatchName + ObserversTuple<S>,
     Z: UsesState<State = S>,
 {
+    #[inline]
     fn pre_exec(
         &mut self,
         _fuzzer: &mut Z,
@@ -328,6 +329,7 @@ where
         Ok(ExitKind::Ok)
     }
 
+    #[inline]
     fn post_exec(
         &mut self,
         _fuzzer: &mut Z,
@@ -338,6 +340,7 @@ where
         Ok(ExitKind::Ok)
     }
 
+    #[inline]
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,

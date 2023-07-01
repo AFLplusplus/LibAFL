@@ -234,7 +234,7 @@ mod test {
 
         executor
             .pre_exec(&mut fuzzer, &mut state, &mut mgr, &empty_input)
-            .unwrap_err();
+            .unwrap();
         executor
             .run_target(
                 &mut fuzzer,
@@ -245,7 +245,7 @@ mod test {
             .unwrap_err();
         executor
             .post_exec(&mut fuzzer, &mut state, &mut mgr, &empty_input)
-            .unwrap_err();
+            .unwrap();
 
         executor
             .pre_exec(&mut fuzzer, &mut state, &mut mgr, &nonempty_input)
@@ -581,9 +581,7 @@ pub mod pybind {
             mgr: &mut PythonEventManager,
             input: &Self::Input,
         ) -> Result<ExitKind, Error> {
-            unwrap_me_mut!(self.wrapper, e, { e.pre_exec(fuzzer, state, mgr, input) })?;
             unwrap_me_mut!(self.wrapper, e, { e.run_target(fuzzer, state, mgr, input) })?;
-            unwrap_me_mut!(self.wrapper, e, { e.post_exec(fuzzer, state, mgr, input) })?;
             Ok(ExitKind::Ok)
         }
     }

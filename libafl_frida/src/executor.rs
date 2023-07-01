@@ -98,9 +98,6 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        if self.helper.stalker_enabled() {
-            self.stalker.deactivate();
-        }
         #[cfg(unix)]
         unsafe {
             if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
@@ -122,6 +119,9 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let res = self.base.run_target(fuzzer, state, mgr, input);
+        if self.helper.stalker_enabled() {
+            self.stalker.deactivate();
+        }
         res
     }
 }
