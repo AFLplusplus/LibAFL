@@ -1034,7 +1034,7 @@ pub mod windows_asan_handler {
 
             // reset timer
             if !data.tp_timer.is_null() {
-                executor.post_exec(fuzzer, state, event_mgr, input);
+                let _ = executor.post_exec(fuzzer, state, event_mgr, input);
                 data.tp_timer = ptr::null_mut();
             }
 
@@ -1349,7 +1349,7 @@ mod windows_exception_handler {
 
             // reset timer
             if !data.tp_timer.is_null() {
-                executor.post_exec(fuzzer, state, event_mgr, input);
+                let _ = executor.post_exec(fuzzer, state, event_mgr, input);
                 data.tp_timer = ptr::null_mut();
             }
 
