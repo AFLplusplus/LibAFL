@@ -249,7 +249,7 @@ mod test {
 
         executor
             .pre_exec(&mut fuzzer, &mut state, &mut mgr, &nonempty_input)
-            .unwrap_err();
+            .unwrap();
         executor
             .run_target(
                 &mut fuzzer,
@@ -260,7 +260,7 @@ mod test {
             .unwrap();
         executor
             .post_exec(&mut fuzzer, &mut state, &mut mgr, &nonempty_input)
-            .unwrap_err();
+            .unwrap();
     }
 }
 
