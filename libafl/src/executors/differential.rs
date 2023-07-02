@@ -68,7 +68,7 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         self.observers(); // update in advance
         let observers = self.observers.get_mut();
@@ -128,7 +128,7 @@ where
     DOT: DifferentialObserversTuple<A, B, S>,
     S: UsesInput,
 {
-    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn pre_exec_all(&mut self, state: &mut S, input: &mut S::Input) -> Result<(), Error> {
         self.differential.pre_exec_all(state, input)
     }
 

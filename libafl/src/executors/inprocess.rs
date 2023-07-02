@@ -134,7 +134,7 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
@@ -1703,7 +1703,7 @@ where
         _fuzzer: &mut Z,
         state: &mut Self::State,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             self.shmem_provider.pre_fork()?;
@@ -1771,7 +1771,7 @@ where
         _fuzzer: &mut Z,
         state: &mut Self::State,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             self.shmem_provider.pre_fork()?;
@@ -2197,13 +2197,13 @@ mod tests {
             handlers: InProcessHandlers::nop(),
             phantom: PhantomData,
         };
-        let input = NopInput {};
+        let mut input = NopInput {};
         in_process_executor
             .run_target(
                 &mut NopFuzzer::new(),
                 &mut NopState::new(),
                 &mut NopEventManager::new(),
-                &input,
+                &mut input,
             )
             .unwrap();
     }
@@ -2231,12 +2231,12 @@ mod tests {
             handlers: InChildProcessHandlers::nop(),
             phantom: PhantomData,
         };
-        let input = NopInput {};
+        let mut input = NopInput {};
         let mut fuzzer = NopFuzzer::new();
         let mut state = NopState::new();
         let mut mgr = SimpleEventManager::printing();
         in_process_fork_executor
-            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &mut input)
             .unwrap();
     }
 }

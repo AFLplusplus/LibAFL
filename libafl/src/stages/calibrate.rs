@@ -115,14 +115,14 @@ where
 
         let mut iter = self.stage_max;
 
-        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let mut input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
         // Run once to get the initial calibration map
-        executor.observers_mut().pre_exec_all(state, &input)?;
+        executor.observers_mut().pre_exec_all(state, &mut input)?;
 
         let mut start = current_time();
 
-        let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+        let exit_kind = executor.run_target(fuzzer, state, mgr, &mut input)?;
         let mut total_time = if exit_kind == ExitKind::Ok {
             current_time() - start
         } else {
@@ -153,12 +153,12 @@ where
         let mut has_errors = false;
 
         while i < iter {
-            let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+            let mut input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
-            executor.observers_mut().pre_exec_all(state, &input)?;
+            executor.observers_mut().pre_exec_all(state, &mut input)?;
             start = current_time();
 
-            let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+            let exit_kind = executor.run_target(fuzzer, state, mgr, &mut input)?;
             if exit_kind != ExitKind::Ok {
                 if !has_errors {
                     mgr.log(

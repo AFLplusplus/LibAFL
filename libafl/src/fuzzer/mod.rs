@@ -456,14 +456,14 @@ where
         state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <Self::State as UsesInput>::Input,
+        mut input: <Self::State as UsesInput>::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
         EM: EventFirer<State = Self::State>,
     {
-        let exit_kind = self.execute_input(state, executor, manager, &input)?;
+        let exit_kind = self.execute_input(state, executor, manager, &mut input)?;
         let observers = executor.observers();
 
         self.scheduler.on_evaluation(state, &input, observers)?;
@@ -501,9 +501,9 @@ where
         state: &mut CS::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <CS::State as UsesInput>::Input,
+        mut input: <CS::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error> {
-        let exit_kind = self.execute_input(state, executor, manager, &input)?;
+        let exit_kind = self.execute_input(state, executor, manager, &mut input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
 
@@ -647,7 +647,7 @@ where
         state: &mut CS::State,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &<CS::State as UsesInput>::Input,
+        input: &mut <CS::State as UsesInput>::Input,
     ) -> Result<ExitKind, Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = CS::State>,
@@ -686,7 +686,7 @@ where
         state: &mut Self::State,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &<Self::State as UsesInput>::Input,
+        input: &mut <Self::State as UsesInput>::Input,
     ) -> Result<ExitKind, Error>;
 }
 
@@ -705,7 +705,7 @@ where
         state: &mut CS::State,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &<CS::State as UsesInput>::Input,
+        input: &mut <CS::State as UsesInput>::Input,
     ) -> Result<ExitKind, Error> {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;

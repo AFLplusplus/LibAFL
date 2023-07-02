@@ -51,20 +51,20 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         start_timer!(state);
-        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let mut input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         start_timer!(state);
         self.tracer_executor
             .observers_mut()
-            .pre_exec_all(state, &input)?;
+            .pre_exec_all(state, &mut input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
         let exit_kind = self
             .tracer_executor
-            .run_target(fuzzer, state, manager, &input)?;
+            .run_target(fuzzer, state, manager, &mut input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -138,7 +138,7 @@ where
     ) -> Result<(), Error> {
         // First run with the un-mutated input
 
-        let unmutated_input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let mut unmutated_input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
         if let Some(name) = &self.cmplog_observer_name {
             if let Some(ob) = self
@@ -156,11 +156,11 @@ where
 
         self.tracer_executor
             .observers_mut()
-            .pre_exec_all(state, &unmutated_input)?;
+            .pre_exec_all(state, &mut unmutated_input)?;
 
         let exit_kind =
             self.tracer_executor
-                .run_target(fuzzer, state, manager, &unmutated_input)?;
+                .run_target(fuzzer, state, manager, &mut unmutated_input)?;
 
         *state.executions_mut() += 1;
 
@@ -169,7 +169,7 @@ where
             .post_exec_all(state, &unmutated_input, &exit_kind)?;
 
         // Second run with the mutated input
-        let mutated_input = match state.metadata_map().get::<TaintMetadata>() {
+        let mut mutated_input = match state.metadata_map().get::<TaintMetadata>() {
             Some(meta) => BytesInput::from(meta.input_vec().as_ref()),
             None => return Err(Error::unknown("No metadata found")),
         };
@@ -190,11 +190,11 @@ where
 
         self.tracer_executor
             .observers_mut()
-            .pre_exec_all(state, &mutated_input)?;
+            .pre_exec_all(state, &mut mutated_input)?;
 
-        let exit_kind = self
-            .tracer_executor
-            .run_target(fuzzer, state, manager, &mutated_input)?;
+        let exit_kind =
+            self.tracer_executor
+                .run_target(fuzzer, state, manager, &mut mutated_input)?;
 
         *state.executions_mut() += 1;
 
@@ -268,19 +268,19 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         start_timer!(state);
-        let input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let mut input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         start_timer!(state);
         executor
             .shadow_observers_mut()
-            .pre_exec_all(state, &input)?;
-        executor.observers_mut().pre_exec_all(state, &input)?;
+            .pre_exec_all(state, &mut input)?;
+        executor.observers_mut().pre_exec_all(state, &mut input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, &mut input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
