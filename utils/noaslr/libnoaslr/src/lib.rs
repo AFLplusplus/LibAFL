@@ -1,3 +1,4 @@
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use {
     anyhow::{anyhow, Result},
     ctor::ctor,
@@ -8,6 +9,7 @@ use {
     std::{ffi::CString, fs::File, io::Read},
 };
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn read_null_lines(path: &str) -> Result<Vec<CString>> {
     let mut file = File::open(path).map_err(|e| anyhow!("Failed to open maps: {e:}"))?;
     let mut data = String::new();
@@ -20,6 +22,7 @@ fn read_null_lines(path: &str) -> Result<Vec<CString>> {
         .collect::<Result<Vec<CString>>>()
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn libnoaslr() -> Result<()> {
     let mut persona = personality::get().map_err(|e| anyhow!("Failed to get personality: {e:}"))?;
     if (persona & Persona::ADDR_NO_RANDOMIZE) == Persona::ADDR_NO_RANDOMIZE {
@@ -36,6 +39,7 @@ fn libnoaslr() -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[ctor]
 fn init() {
     libnoaslr().unwrap();
