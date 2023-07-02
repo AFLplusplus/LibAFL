@@ -70,7 +70,8 @@ where
         mgr: &mut EM,
         input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.executor.run_target(fuzzer, state, mgr, input)
+        let mut input = input.clone();
+        self.executor.run_target(fuzzer, state, mgr, &mut input)
     }
 }
 

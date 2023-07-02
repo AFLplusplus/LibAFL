@@ -77,7 +77,7 @@ where
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let (mut payload, mut original, novelties) = {
+        let (mut payload, original, novelties) = {
             start_timer!(state);
             {
                 let corpus = state.corpus();
@@ -103,7 +103,7 @@ where
         };
 
         // Do not generalized unstable inputs
-        if !self.verify_input(fuzzer, executor, state, manager, &novelties, &mut original)? {
+        if !self.verify_input(fuzzer, executor, state, manager, &novelties, &original)? {
             return Ok(());
         }
 
@@ -343,7 +343,7 @@ where
         state: &mut EM::State,
         manager: &mut EM,
         novelties: &[usize],
-        input: &mut BytesInput,
+        input: &BytesInput,
     ) -> Result<bool, Error>
     where
         E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
@@ -354,7 +354,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, &mut input.clone())?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -409,7 +409,7 @@ where
                 .bytes_mut()
                 .extend(payload[end..].iter().flatten());
 
-            if self.verify_input(fuzzer, executor, state, manager, novelties, &mut candidate)? {
+            if self.verify_input(fuzzer, executor, state, manager, novelties, &candidate)? {
                 for item in &mut payload[start..end] {
                     *item = None;
                 }
@@ -462,14 +462,7 @@ where
                         .bytes_mut()
                         .extend(payload[end..].iter().flatten());
 
-                    if self.verify_input(
-                        fuzzer,
-                        executor,
-                        state,
-                        manager,
-                        novelties,
-                        &mut candidate,
-                    )? {
+                    if self.verify_input(fuzzer, executor, state, manager, novelties, &candidate)? {
                         for item in &mut payload[start..end] {
                             *item = None;
                         }

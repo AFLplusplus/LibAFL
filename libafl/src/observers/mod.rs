@@ -141,7 +141,7 @@ where
     S: UsesInput,
 {
     /// This is called right before the next execution.
-    fn pre_exec_all(&mut self, state: &mut S, input: &mut S::Input) -> Result<(), Error>;
+    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error>;
 
     /// This is called right after the last execution
     fn post_exec_all(
@@ -177,7 +177,7 @@ impl<S> ObserversTuple<S> for ()
 where
     S: UsesInput,
 {
-    fn pre_exec_all(&mut self, _state: &mut S, _input: &mut S::Input) -> Result<(), Error> {
+    fn pre_exec_all(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
 
@@ -232,7 +232,7 @@ where
     Tail: ObserversTuple<S>,
     S: UsesInput,
 {
-    fn pre_exec_all(&mut self, state: &mut S, input: &mut S::Input) -> Result<(), Error> {
+    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.0.pre_exec(state, input)?;
         self.1.pre_exec_all(state, input)
     }
@@ -1140,7 +1140,7 @@ pub mod pybind {
         fn pre_exec_all(
             &mut self,
             state: &mut PythonStdState,
-            input: &mut BytesInput,
+            input: &BytesInput,
         ) -> Result<(), Error> {
             for ob in &mut self.list {
                 ob.pre_exec(state, input)?;

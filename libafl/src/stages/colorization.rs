@@ -297,12 +297,12 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        mut input: E::Input,
+        input: E::Input,
         name: &str,
     ) -> Result<usize, Error> {
-        executor.observers_mut().pre_exec_all(state, &mut input)?;
+        executor.observers_mut().pre_exec_all(state, &input)?;
 
-        let exit_kind = executor.run_target(fuzzer, state, manager, &mut input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, &mut input.clone())?;
 
         let observer = executor
             .observers()
