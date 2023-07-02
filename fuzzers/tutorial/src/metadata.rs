@@ -10,6 +10,7 @@ use libafl::{
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error, SerdeAny,
 };
+use libafl_bolts::SerdeAny;
 use serde::{Deserialize, Serialize};
 
 use crate::input::PacketData;

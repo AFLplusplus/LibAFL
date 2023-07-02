@@ -1187,11 +1187,8 @@ pub mod win32_shmem {
     use uuid::Uuid;
 
     use crate::{
-        bolts::{
-            shmem::{ShMem, ShMemId, ShMemProvider},
-            AsMutSlice, AsSlice,
-        },
-        Error,
+        shmem::{ShMem, ShMemId, ShMemProvider},
+        AsMutSlice, AsSlice, Error,
     };
 
     const INVALID_HANDLE_VALUE: isize = -1;

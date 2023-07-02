@@ -18,6 +18,7 @@ use libafl::{
     state::{HasClientPerfMonitor, HasMetadata},
     Error, SerdeAny,
 };
+use libafl_bolts::SerdeAny;
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 
