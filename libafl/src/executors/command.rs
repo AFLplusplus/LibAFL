@@ -566,9 +566,9 @@ impl CommandExecutorBuilder {
         S: UsesInput,
     {
         let Some(program) = &self.program else {
-             return Err(Error::illegal_argument(
+            return Err(Error::illegal_argument(
                 "CommandExecutor::builder: no program set!",
-           ));
+            ));
         };
 
         let mut command = Command::new(program);
