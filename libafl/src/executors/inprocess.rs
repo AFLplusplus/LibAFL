@@ -56,7 +56,7 @@ use crate::{
     Error,
 };
 
-// The process executor simply calls a target function, as mutable reference to a closure
+/// The process executor simply calls a target function, as mutable reference to a closure
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, OT, S>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
@@ -532,7 +532,7 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     timeout_executor_ptr: null_mut(),
 };
 
-// The process executor simply calls a target function, as mutable reference to a closure
+/// The process executor simply calls a target function, as mutable reference to a closure
 pub type InProcessExecutorMut<'a, H, OT, S> = GenericInProcessExecutorMut<H, &'a mut H, OT, S>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
