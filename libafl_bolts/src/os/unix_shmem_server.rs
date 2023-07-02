@@ -350,9 +350,11 @@ impl Drop for ShMemServiceThread {
     fn drop(&mut self) {
         if self.join_handle.is_some() {
             log::info!("Stopping ShMemService");
-            let Ok(mut stream) = UnixStream::connect_to_unix_addr(
-                &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
-            ) else { return };
+            let Ok(mut stream) =
+                UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap())
+            else {
+                return;
+            };
 
             let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
 

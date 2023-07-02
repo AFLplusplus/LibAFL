@@ -144,7 +144,9 @@ where
     fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
         if testcase.input_mut().is_none() {
             let Some(file_path) = testcase.file_path().as_ref() else {
-                return Err(Error::illegal_argument("No file path set for testcase. Could not load inputs."));
+                return Err(Error::illegal_argument(
+                    "No file path set for testcase. Could not load inputs.",
+                ));
             };
             let input = I::from_file(file_path)?;
             testcase.set_input(input);
@@ -155,10 +157,14 @@ where
     fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
         // Store the input to disk
         let Some(file_path) = testcase.file_path() else {
-            return Err(Error::illegal_argument("No file path set for testcase. Could not store input to disk."));
+            return Err(Error::illegal_argument(
+                "No file path set for testcase. Could not store input to disk.",
+            ));
         };
         let Some(input) = testcase.input() else {
-            return Err(Error::illegal_argument("No input available for testcase. Could not store anything."));
+            return Err(Error::illegal_argument(
+                "No input available for testcase. Could not store anything.",
+            ));
         };
         input.to_file(file_path)
     }

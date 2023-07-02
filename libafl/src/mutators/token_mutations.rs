@@ -169,13 +169,17 @@ impl Tokens {
             if line.is_empty() || start == Some('#') {
                 continue;
             }
-            let Some(pos_quote) = line.find('\"') else { return Err(Error::illegal_argument(format!("Illegal line: {line}"))) };
+            let Some(pos_quote) = line.find('\"') else {
+                return Err(Error::illegal_argument(format!("Illegal line: {line}")));
+            };
             if line.chars().nth(line.len() - 1) != Some('"') {
                 return Err(Error::illegal_argument(format!("Illegal line: {line}")));
             }
 
             // extract item
-            let Some(item) = line.get(pos_quote + 1..line.len() - 1) else { return Err(Error::illegal_argument(format!("Illegal line: {line}"))) };
+            let Some(item) = line.get(pos_quote + 1..line.len() - 1) else {
+                return Err(Error::illegal_argument(format!("Illegal line: {line}")));
+            };
             if item.is_empty() {
                 continue;
             }
