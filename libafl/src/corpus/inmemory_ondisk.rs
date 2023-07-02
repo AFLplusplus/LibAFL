@@ -22,7 +22,7 @@ use super::{
 use crate::bolts::compress::GzipCompressor;
 use crate::{
     bolts::serdeany::SerdeAnyMap,
-    corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
+    corpus::{Corpus, CorpusId, PrintingInMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
     state::HasMetadata,
     Error,
@@ -47,7 +47,7 @@ pub struct InMemoryOnDiskCorpus<I>
 where
     I: Input,
 {
-    inner: InMemoryCorpus<I>,
+    inner: PrintingInMemoryCorpus<I>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
 }
@@ -144,7 +144,9 @@ where
     fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
         if testcase.input_mut().is_none() {
             let Some(file_path) = testcase.file_path().as_ref() else {
-                return Err(Error::illegal_argument("No file path set for testcase. Could not load inputs."));
+                return Err(Error::illegal_argument(
+                    "No file path set for testcase. Could not load inputs.",
+                ));
             };
             let input = I::from_file(file_path)?;
             testcase.set_input(input);
@@ -155,10 +157,14 @@ where
     fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
         // Store the input to disk
         let Some(file_path) = testcase.file_path() else {
-            return Err(Error::illegal_argument("No file path set for testcase. Could not store input to disk."));
+            return Err(Error::illegal_argument(
+                "No file path set for testcase. Could not store input to disk.",
+            ));
         };
         let Some(input) = testcase.input() else {
-            return Err(Error::illegal_argument("No input available for testcase. Could not store anything."));
+            return Err(Error::illegal_argument(
+                "No input available for testcase. Could not store anything.",
+            ));
         };
         input.to_file(file_path)
     }
@@ -233,7 +239,7 @@ where
     fn _new(dir_path: &Path, meta_format: Option<OnDiskMetadataFormat>) -> Result<Self, Error> {
         fs::create_dir_all(dir_path)?;
         Ok(InMemoryOnDiskCorpus {
-            inner: InMemoryCorpus::new(),
+            inner: PrintingInMemoryCorpus::new(),
             dir_path: dir_path.into(),
             meta_format,
         })

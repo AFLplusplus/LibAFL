@@ -288,7 +288,7 @@ where
 /// A corpus handling all in memory.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct InMemoryCorpus<I>
+pub struct PrintingInMemoryCorpus<I>
 where
     I: Input,
 {
@@ -296,14 +296,14 @@ where
     current: Option<CorpusId>,
 }
 
-impl<I> UsesInput for InMemoryCorpus<I>
+impl<I> UsesInput for PrintingInMemoryCorpus<I>
 where
     I: Input,
 {
     type Input = I;
 }
 
-impl<I> Corpus for InMemoryCorpus<I>
+impl<I> Corpus for PrintingInMemoryCorpus<I>
 where
     I: Input,
 {
@@ -393,7 +393,7 @@ where
     }
 }
 
-impl<I> HasTestcase for InMemoryCorpus<I>
+impl<I> HasTestcase for PrintingInMemoryCorpus<I>
 where
     I: Input,
 {
@@ -412,7 +412,7 @@ where
     }
 }
 
-impl<I> InMemoryCorpus<I>
+impl<I> PrintingInMemoryCorpus<I>
 where
     I: Input,
 {
@@ -434,7 +434,7 @@ pub mod pybind {
     use serde::{Deserialize, Serialize};
 
     use crate::{
-        corpus::{pybind::PythonCorpus, InMemoryCorpus},
+        corpus::{pybind::PythonCorpus, PrintingInMemoryCorpus},
         inputs::BytesInput,
     };
 
@@ -444,7 +444,7 @@ pub mod pybind {
     /// Python class for InMemoryCorpus
     pub struct PythonInMemoryCorpus {
         /// Rust wrapped InMemoryCorpus object
-        pub inner: InMemoryCorpus<BytesInput>,
+        pub inner: PrintingInMemoryCorpus<BytesInput>,
     }
 
     #[pymethods]
@@ -452,7 +452,7 @@ pub mod pybind {
         #[new]
         fn new() -> Self {
             Self {
-                inner: InMemoryCorpus::new(),
+                inner: PrintingInMemoryCorpus::new(),
             }
         }
 

@@ -1504,7 +1504,7 @@ mod tests {
             tuples::tuple_list,
             ClientId,
         },
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, PrintingInMemoryCorpus, Testcase},
         events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
@@ -1523,11 +1523,11 @@ mod tests {
     fn test_mgr_state_restore() {
         let rand = StdRand::with_seed(0);
 
-        let mut corpus = InMemoryCorpus::<BytesInput>::new();
+        let mut corpus = PrintingInMemoryCorpus::<BytesInput>::new();
         let testcase = Testcase::new(vec![0; 4].into());
         corpus.add(testcase).unwrap();
 
-        let solutions = InMemoryCorpus::<BytesInput>::new();
+        let solutions = PrintingInMemoryCorpus::<BytesInput>::new();
 
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);

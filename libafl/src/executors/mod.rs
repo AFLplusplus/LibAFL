@@ -352,7 +352,7 @@ pub mod pybind {
             fuzzer: &mut PythonStdFuzzer,
             state: &mut Self::State,
             mgr: &mut PythonEventManager,
-            input: &Self::Input,
+            input: &mut Self::Input,
         ) -> Result<ExitKind, Error> {
             let ek = Python::with_gil(|py| -> PyResult<_> {
                 let ek: PythonExitKind = self
@@ -475,7 +475,7 @@ pub mod pybind {
             fuzzer: &mut PythonStdFuzzer,
             state: &mut Self::State,
             mgr: &mut PythonEventManager,
-            input: &Self::Input,
+            input: &mut Self::Input,
         ) -> Result<ExitKind, Error> {
             unwrap_me_mut!(self.wrapper, e, { e.run_target(fuzzer, state, mgr, input) })
         }

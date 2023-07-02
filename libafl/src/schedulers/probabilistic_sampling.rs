@@ -154,7 +154,7 @@ mod tests {
 
     use crate::{
         bolts::rands::StdRand,
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, PrintingInMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::{bytes::BytesInput, Input, UsesInput},
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
@@ -194,7 +194,7 @@ mod tests {
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);
 
-        let mut corpus = InMemoryCorpus::new();
+        let mut corpus = PrintingInMemoryCorpus::new();
         let t1 = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "1".into());
         let t2 = Testcase::with_filename(BytesInput::new(vec![1_u8; 4]), "2".into());
 
@@ -204,7 +204,7 @@ mod tests {
         let mut state = StdState::new(
             rand,
             corpus,
-            InMemoryCorpus::new(),
+            PrintingInMemoryCorpus::new(),
             &mut feedback,
             &mut objective,
         )

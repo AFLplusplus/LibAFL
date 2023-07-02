@@ -4,7 +4,7 @@ pub mod testcase;
 pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
 
 pub mod inmemory;
-pub use inmemory::InMemoryCorpus;
+pub use inmemory::PrintingInMemoryCorpus;
 
 #[cfg(feature = "std")]
 pub mod inmemory_ondisk;

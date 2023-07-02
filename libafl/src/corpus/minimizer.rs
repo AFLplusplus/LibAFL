@@ -113,7 +113,7 @@ where
 
         let mut cur_id = state.corpus().first();
         while let Some(idx) = cur_id {
-            let (weight, input) = {
+            let (weight, mut input) = {
                 let mut testcase = state.corpus().get(idx)?.borrow_mut();
                 let weight = TS::compute(state, &mut *testcase)?
                     .to_u64()
@@ -127,8 +127,8 @@ where
             };
 
             // Execute the input; we cannot rely on the metadata already being present.
-            executor.observers_mut().pre_exec_all(state, &input)?;
-            let kind = executor.run_target(fuzzer, state, manager, &input)?;
+            executor.observers_mut().pre_exec_all(state, &mut input)?;
+            let kind = executor.run_target(fuzzer, state, manager, &mut input)?;
             executor
                 .observers_mut()
                 .post_exec_all(state, &input, &kind)?;

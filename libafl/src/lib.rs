@@ -456,7 +456,7 @@ mod tests {
 
     use crate::{
         bolts::{rands::StdRand, tuples::tuple_list},
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, PrintingInMemoryCorpus, Testcase},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
@@ -475,7 +475,7 @@ mod tests {
     fn test_fuzzer() {
         let rand = StdRand::with_seed(0);
 
-        let mut corpus = InMemoryCorpus::<BytesInput>::new();
+        let mut corpus = PrintingInMemoryCorpus::<BytesInput>::new();
         let testcase = Testcase::new(vec![0; 4].into());
         corpus.add(testcase).unwrap();
 
@@ -485,7 +485,7 @@ mod tests {
         let mut state = StdState::new(
             rand,
             corpus,
-            InMemoryCorpus::<BytesInput>::new(),
+            PrintingInMemoryCorpus::<BytesInput>::new(),
             &mut feedback,
             &mut objective,
         )
@@ -527,14 +527,14 @@ mod tests {
         let state_serialized = postcard::to_allocvec(&state).unwrap();
         let state_deserialized: StdState<
             _,
-            InMemoryCorpus<BytesInput>,
+            PrintingInMemoryCorpus<BytesInput>,
             StdRand,
-            InMemoryCorpus<BytesInput>,
+            PrintingInMemoryCorpus<BytesInput>,
         > = postcard::from_bytes(state_serialized.as_slice()).unwrap();
         assert_eq!(state.corpus().count(), state_deserialized.corpus().count());
 
         let corpus_serialized = postcard::to_allocvec(state.corpus()).unwrap();
-        let corpus_deserialized: InMemoryCorpus<BytesInput> =
+        let corpus_deserialized: PrintingInMemoryCorpus<BytesInput> =
             postcard::from_bytes(corpus_serialized.as_slice()).unwrap();
         assert_eq!(state.corpus().count(), corpus_deserialized.count());
     }

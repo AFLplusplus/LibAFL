@@ -1140,7 +1140,7 @@ pub mod pybind {
         fn pre_exec_all(
             &mut self,
             state: &mut PythonStdState,
-            input: &BytesInput,
+            input: &mut BytesInput,
         ) -> Result<(), Error> {
             for ob in &mut self.list {
                 ob.pre_exec(state, input)?;
