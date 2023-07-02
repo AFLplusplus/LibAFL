@@ -11,7 +11,7 @@ use libafl::{
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
 };
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
+    executors::{Executor, ExitKind, HasObservers, InProcessExecutor, InProcessExecutorMut},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,
@@ -53,7 +53,7 @@ where
     OT: ObserversTuple<S>,
     'a: 'b,
 {
-    base: InProcessExecutor<'a, H, OT, S>,
+    base: InProcessExecutorMut<'a, H, OT, S>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -326,7 +326,7 @@ where
     /// Creates a new [`FridaInProcessExecutor`]
     pub fn new(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, OT, S>,
+        base: InProcessExecutorMut<'a, H, OT, S>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     ) -> Self {
         let mut stalker = Stalker::new(gum);

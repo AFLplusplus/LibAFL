@@ -3,12 +3,14 @@ use core::fmt::{self, Debug, Formatter};
 
 #[cfg(feature = "fork")]
 use libafl::{
-    bolts::shmem::ShMemProvider, events::EventManager, executors::InProcessForkExecutor,
+    bolts::shmem::ShMemProvider,
+    events::EventManager,
+    executors::{InProcessForkExecutor, InProcessForkExecutorMut},
     state::HasMetadata,
 };
 use libafl::{
     events::{EventFirer, EventRestarter},
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
+    executors::{Executor, ExitKind, HasObservers, InProcessExecutor, InProcessExecutorMut},
     feedbacks::Feedback,
     fuzzer::{HasFeedback, HasObjective, HasScheduler},
     inputs::UsesInput,
@@ -213,7 +215,7 @@ where
 impl<'a, EM, H, OT, QT, S, Z> Executor<EM, Z> for QemuExecutorMut<'a, H, OT, QT, S>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     S: UsesInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
@@ -255,7 +257,7 @@ where
 
 impl<'a, H, OT, QT, S> UsesState for QemuExecutorMut<'a, H, OT, QT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind,
+    H: FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     S: UsesInput,
