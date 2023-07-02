@@ -38,8 +38,8 @@ tcp_manager = ["tokio", "std"] # A simple EventManager proxying everything via T
 # features hiding dependencies licensed under GPL
 gpl = []
 # features hiding dependencies licensed under AGPL
-#agpl = ["gpl", "nautilus"]
-#nautilus = ["grammartec", "std", "serde_json/std"]
+agpl = ["gpl", "nautilus"]
+nautilus = ["grammartec", "std", "serde_json/std"]
 
 # LLMP features
 llmp_bind_public = ["libafl_bolts/llmp_bind_public"] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
