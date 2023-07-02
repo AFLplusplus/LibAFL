@@ -417,7 +417,7 @@ where
 mod tests {
     use crate::{
         bolts::rands::{Rand, StdRand, XkcdRand},
-        corpus::{Corpus, PrintingInMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasBytesVec},
         mutators::{
@@ -432,7 +432,7 @@ mod tests {
     fn test_mut_scheduled() {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let mut rand = XkcdRand::with_seed(5);
-        let mut corpus: PrintingInMemoryCorpus<BytesInput> = PrintingInMemoryCorpus::new();
+        let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
         corpus
             .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
             .unwrap();
@@ -448,7 +448,7 @@ mod tests {
         let mut state = StdState::new(
             rand,
             corpus,
-            PrintingInMemoryCorpus::new(),
+            InMemoryCorpus::new(),
             &mut feedback,
             &mut objective,
         )
@@ -470,7 +470,7 @@ mod tests {
     fn test_havoc() {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let rand = StdRand::with_seed(0x1337);
-        let mut corpus: PrintingInMemoryCorpus<BytesInput> = PrintingInMemoryCorpus::new();
+        let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
         corpus
             .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
             .unwrap();
@@ -487,7 +487,7 @@ mod tests {
         let mut state = StdState::new(
             rand,
             corpus,
-            PrintingInMemoryCorpus::new(),
+            InMemoryCorpus::new(),
             &mut feedback,
             &mut objective,
         )

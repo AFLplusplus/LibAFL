@@ -22,7 +22,7 @@ use super::{
 use crate::bolts::compress::GzipCompressor;
 use crate::{
     bolts::serdeany::SerdeAnyMap,
-    corpus::{Corpus, CorpusId, PrintingInMemoryCorpus, Testcase},
+    corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
     state::HasMetadata,
     Error,
@@ -47,7 +47,7 @@ pub struct InMemoryOnDiskCorpus<I>
 where
     I: Input,
 {
-    inner: PrintingInMemoryCorpus<I>,
+    inner: InMemoryCorpus<I>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
 }
@@ -239,7 +239,7 @@ where
     fn _new(dir_path: &Path, meta_format: Option<OnDiskMetadataFormat>) -> Result<Self, Error> {
         fs::create_dir_all(dir_path)?;
         Ok(InMemoryOnDiskCorpus {
-            inner: PrintingInMemoryCorpus::new(),
+            inner: InMemoryCorpus::new(),
             dir_path: dir_path.into(),
             meta_format,
         })

@@ -1374,7 +1374,7 @@ mod tests {
             rands::StdRand,
             tuples::{tuple_list, HasConstLen},
         },
-        corpus::{Corpus, PrintingInMemoryCorpus},
+        corpus::{Corpus, InMemoryCorpus},
         feedbacks::ConstFeedback,
         inputs::BytesInput,
         mutators::MutatorsTuple,
@@ -1416,7 +1416,7 @@ mod tests {
 
     fn test_state() -> impl HasCorpus + HasMetadata + HasRand + HasMaxSize {
         let rand = StdRand::with_seed(1337);
-        let mut corpus = PrintingInMemoryCorpus::new();
+        let mut corpus = InMemoryCorpus::new();
 
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);
@@ -1428,7 +1428,7 @@ mod tests {
         StdState::new(
             rand,
             corpus,
-            PrintingInMemoryCorpus::new(),
+            InMemoryCorpus::new(),
             &mut feedback,
             &mut objective,
         )
