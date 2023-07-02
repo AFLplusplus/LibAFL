@@ -31,6 +31,18 @@ where
     inner: InProcessExecutor<'a, H, OT, S>,
 }
 
+pub struct QemuExecutorMut<'a, H, OT, QT, S>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
+    S: UsesInput,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+{
+    first_exec: bool,
+    hooks: &'a mut QemuHooks<'a, QT, S>,
+    inner: InProcessExecutorMut<'a, H, OT, S>,
+}
+
 impl<'a, H, OT, QT, S> Debug for QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
@@ -40,6 +52,21 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuExecutor")
+            .field("hooks", &self.hooks)
+            .field("inner", &self.inner)
+            .finish()
+    }
+}
+
+impl<'a, H, OT, QT, S> Debug for QemuExecutorMut<'a, H, OT, QT, S>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
+    S: UsesInput,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("QemuExecutorMut")
             .field("hooks", &self.hooks)
             .field("inner", &self.inner)
             .finish()
@@ -98,6 +125,58 @@ where
     }
 }
 
+impl<'a, H, OT, QT, S> QemuExecutorMut<'a, H, OT, QT, S>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
+    S: UsesInput,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+{
+    pub fn new<CF, EM, OF, Z>(
+        hooks: &'a mut QemuHooks<'a, QT, S>,
+        harness_fn: &'a mut H,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        CF: Feedback<S>,
+        OF: Feedback<S>,
+        S: State + HasExecutions + HasCorpus + HasSolutions + HasClientPerfMonitor,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
+    {
+        Ok(Self {
+            first_exec: true,
+            hooks,
+            inner: InProcessExecutorMut::new(harness_fn, observers, fuzzer, state, event_mgr)?,
+        })
+    }
+
+    pub fn inner(&self) -> &InProcessExecutor<'a, H, OT, S> {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut InProcessExecutor<'a, H, OT, S> {
+        &mut self.inner
+    }
+
+    pub fn hooks(&self) -> &QemuHooks<'a, QT, S> {
+        self.hooks
+    }
+
+    pub fn hooks_mut(&mut self) -> &mut QemuHooks<'a, QT, S> {
+        self.hooks
+    }
+
+    pub fn emulator(&self) -> &Emulator {
+        self.hooks.emulator()
+    }
+}
+
 impl<'a, EM, H, OT, QT, S, Z> Executor<EM, Z> for QemuExecutor<'a, H, OT, QT, S>
 where
     EM: UsesState<State = S>,
@@ -112,7 +191,40 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
+    ) -> Result<ExitKind, Error> {
+        let emu = Emulator::new_empty();
+        if self.first_exec {
+            self.hooks.helpers().first_exec_all(self.hooks);
+            self.first_exec = false;
+        }
+        self.hooks.helpers_mut().pre_exec_all(&emu, input);
+        let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
+        self.hooks.helpers_mut().post_exec_all(
+            &emu,
+            input,
+            self.inner.observers_mut(),
+            &mut exit_kind,
+        );
+        Ok(exit_kind)
+    }
+}
+
+impl<'a, EM, H, OT, QT, S, Z> Executor<EM, Z> for QemuExecutorMut<'a, H, OT, QT, S>
+where
+    EM: UsesState<State = S>,
+    H: FnMut(&S::Input) -> ExitKind,
+    S: UsesInput,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    Z: UsesState<State = S>,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
         if self.first_exec {
@@ -141,6 +253,16 @@ where
     type State = S;
 }
 
+impl<'a, H, OT, QT, S> UsesState for QemuExecutorMut<'a, H, OT, QT, S>
+where
+    H: FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    S: UsesInput,
+{
+    type State = S;
+}
+
 impl<'a, H, OT, QT, S> UsesObservers for QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
@@ -151,9 +273,37 @@ where
     type Observers = OT;
 }
 
+impl<'a, H, OT, QT, S> UsesObservers for QemuExecutorMut<'a, H, OT, QT, S>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    S: UsesInput,
+{
+    type Observers = OT;
+}
+
 impl<'a, H, OT, QT, S> HasObservers for QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
+    S: UsesInput,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        self.inner.observers()
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        self.inner.observers_mut()
+    }
+}
+
+impl<'a, H, OT, QT, S> HasObservers for QemuExecutorMut<'a, H, OT, QT, S>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
     S: UsesInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
@@ -184,6 +334,20 @@ where
 }
 
 #[cfg(feature = "fork")]
+pub struct QemuForkExecutorMut<'a, H, OT, QT, S, SP>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
+    S: UsesInput,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    SP: ShMemProvider,
+{
+    first_exec: bool,
+    hooks: &'a mut QemuHooks<'a, QT, S>,
+    inner: InProcessForkExecutorMut<'a, H, OT, S, SP>,
+}
+
+#[cfg(feature = "fork")]
 impl<'a, H, OT, QT, S, SP> Debug for QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
@@ -194,6 +358,23 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuForkExecutor")
+            .field("hooks", &self.hooks)
+            .field("inner", &self.inner)
+            .finish()
+    }
+}
+
+#[cfg(feature = "fork")]
+impl<'a, H, OT, QT, S, SP> Debug for QemuForkExecutorMut<'a, H, OT, QT, S, SP>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
+    S: UsesInput,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    SP: ShMemProvider,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("QemuForkExecutorMut")
             .field("hooks", &self.hooks)
             .field("inner", &self.inner)
             .finish()
@@ -265,6 +446,70 @@ where
 }
 
 #[cfg(feature = "fork")]
+impl<'a, H, OT, QT, S, SP> QemuForkExecutorMut<'a, H, OT, QT, S, SP>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
+    S: UsesInput + HasCorpus,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    SP: ShMemProvider,
+{
+    pub fn new<CF, EM, OF, Z>(
+        hooks: &'a mut QemuHooks<'a, QT, S>,
+        harness_fn: &'a mut H,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        shmem_provider: SP,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<State = S> + EventRestarter,
+        CF: Feedback<S>,
+        OF: Feedback<S>,
+        S: HasSolutions + HasClientPerfMonitor,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
+    {
+        assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutorMut, the hooks must not do any side effect as they will happen in the child process and then discarded");
+
+        Ok(Self {
+            first_exec: true,
+            hooks,
+            inner: InProcessForkExecutorMut::new(
+                harness_fn,
+                observers,
+                fuzzer,
+                state,
+                event_mgr,
+                shmem_provider,
+            )?,
+        })
+    }
+
+    pub fn inner(&self) -> &InProcessForkExecutor<'a, H, OT, S, SP> {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut InProcessForkExecutor<'a, H, OT, S, SP> {
+        &mut self.inner
+    }
+
+    pub fn hooks(&self) -> &QemuHooks<'a, QT, S> {
+        self.hooks
+    }
+
+    pub fn hooks_mut(&mut self) -> &mut QemuHooks<'a, QT, S> {
+        self.hooks
+    }
+
+    pub fn emulator(&self) -> &Emulator {
+        self.hooks.emulator()
+    }
+}
+
+#[cfg(feature = "fork")]
 impl<'a, EM, H, OT, QT, S, Z, SP> Executor<EM, Z> for QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
     EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, Z, State = S>,
@@ -280,7 +525,42 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
+    ) -> Result<ExitKind, Error> {
+        let emu = Emulator::new_empty();
+        if self.first_exec {
+            self.hooks.helpers().first_exec_all(self.hooks);
+            self.first_exec = false;
+        }
+        self.hooks.helpers_mut().pre_exec_all(&emu, input);
+        let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
+        self.hooks.helpers_mut().post_exec_all(
+            &emu,
+            input,
+            self.inner.observers_mut(),
+            &mut exit_kind,
+        );
+        Ok(exit_kind)
+    }
+}
+
+#[cfg(feature = "fork")]
+impl<'a, EM, H, OT, QT, S, Z, SP> Executor<EM, Z> for QemuForkExecutorMut<'a, H, OT, QT, S, SP>
+where
+    EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, Z, State = S>,
+    H: FnMut(&mut S::Input) -> ExitKind,
+    S: UsesInput + HasClientPerfMonitor + HasMetadata + HasExecutions,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    SP: ShMemProvider,
+    Z: UsesState<State = S>,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
         if self.first_exec {
@@ -312,6 +592,18 @@ where
 }
 
 #[cfg(feature = "fork")]
+impl<'a, H, OT, QT, S, SP> UsesObservers for QemuForkExecutorMut<'a, H, OT, QT, S, SP>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    S: UsesInput,
+    SP: ShMemProvider,
+{
+    type Observers = OT;
+}
+
+#[cfg(feature = "fork")]
 impl<'a, H, OT, QT, S, SP> UsesState for QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
@@ -324,9 +616,41 @@ where
 }
 
 #[cfg(feature = "fork")]
+impl<'a, H, OT, QT, S, SP> UsesState for QemuForkExecutorMut<'a, H, OT, QT, S, SP>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    S: UsesInput,
+    SP: ShMemProvider,
+{
+    type State = S;
+}
+
+#[cfg(feature = "fork")]
 impl<'a, H, OT, QT, S, SP> HasObservers for QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
+    S: UsesInput,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    SP: ShMemProvider,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        self.inner.observers()
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        self.inner.observers_mut()
+    }
+}
+
+#[cfg(feature = "fork")]
+impl<'a, H, OT, QT, S, SP> HasObservers for QemuForkExecutorMut<'a, H, OT, QT, S, SP>
+where
+    H: FnMut(&mut S::Input) -> ExitKind,
     S: UsesInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
