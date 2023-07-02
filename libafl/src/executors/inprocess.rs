@@ -56,7 +56,7 @@ use crate::{
     Error,
 };
 
-/// The process executor simply calls a target function, as mutable reference to a closure
+// The process executor simply calls a target function, as mutable reference to a closure
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, OT, S>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
@@ -531,6 +531,215 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     #[cfg(any(unix, feature = "std"))]
     timeout_executor_ptr: null_mut(),
 };
+
+// The process executor simply calls a target function, as mutable reference to a closure
+pub type InProcessExecutorMut<'a, H, OT, S> = GenericInProcessExecutorMut<H, &'a mut H, OT, S>;
+
+/// The process executor simply calls a target function, as boxed `FnMut` trait object
+pub type OwnedInProcessExecutorMut<OT, S> = GenericInProcessExecutorMut<
+    dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
+    Box<dyn FnMut(&<S as UsesInput>::Input) -> ExitKind>,
+    OT,
+    S,
+>;
+
+/// The inmem executor simply calls a target function, then returns afterwards.
+#[allow(dead_code)]
+pub struct GenericInProcessExecutorMut<H, HB, OT, S>
+where
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+{
+    /// The harness function, being executed for each fuzzing loop execution
+    harness_fn: HB,
+    /// The observers, observing each run
+    observers: OT,
+    // Crash and timeout hah
+    handlers: InProcessHandlers,
+    phantom: PhantomData<(S, *const H)>,
+}
+
+impl<H, HB, OT, S> Debug for GenericInProcessExecutorMut<H, HB, OT, S>
+where
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GenericInProcessExecutor")
+            .field("harness_fn", &"<fn>")
+            .field("observers", &self.observers)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<H, HB, OT, S> UsesState for GenericInProcessExecutorMut<H, HB, OT, S>
+where
+    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
+    HB: BorrowMut<H>,
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<H, HB, OT, S> UsesObservers for GenericInProcessExecutorMut<H, HB, OT, S>
+where
+    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
+    HB: BorrowMut<H>,
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+{
+    type Observers = OT;
+}
+
+impl<EM, H, HB, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutorMut<H, HB, OT, S>
+where
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
+    EM: UsesState<State = S>,
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+    Z: UsesState<State = S>,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &mut Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.handlers
+            .pre_run_target(self, fuzzer, state, mgr, input);
+
+        let ret = (self.harness_fn.borrow_mut())(input);
+
+        self.handlers.post_run_target();
+        Ok(ret)
+    }
+}
+
+impl<H, HB, OT, S> HasObservers for GenericInProcessExecutorMut<H, HB, OT, S>
+where
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        &self.observers
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        &mut self.observers
+    }
+}
+
+impl<H, HB, OT, S> GenericInProcessExecutorMut<H, HB, OT, S>
+where
+    H: FnMut(&mut <S as UsesInput>::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
+    OT: ObserversTuple<S>,
+    S: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+{
+    /// Create a new in mem executor.
+    /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
+    /// depending on different corpus or state.
+    /// * `harness_fn` - the harness, executing the function
+    /// * `observers` - the observers observing the target during execution
+    /// This may return an error on unix, if signal handler setup fails
+    pub fn new<CF, EM, OF, Z>(
+        harness_fn: HB,
+        observers: OT,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+    ) -> Result<Self, Error>
+    where
+        Self: Executor<EM, Z, State = S>,
+        EM: EventFirer<State = S> + EventRestarter,
+        CF: Feedback<S>,
+        OF: Feedback<S>,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
+    {
+        let handlers = InProcessHandlers::new::<CF, Self, EM, OF, Z>()?;
+        #[cfg(windows)]
+        // Some initialization necessary for windows.
+        unsafe {
+            /*
+                See https://github.com/AFLplusplus/LibAFL/pull/403
+                This one reserves certain amount of memory for the stack.
+                If stack overflow happens during fuzzing on windows, the program is transferred to our exception handler for windows.
+                However, if we run out of the stack memory again in this exception handler, we'll crash with STATUS_ACCESS_VIOLATION.
+                We need this API call because with the llmp_compression
+                feature enabled, the exception handler uses a lot of stack memory (in the compression lib code) on release build.
+                As far as I have observed, the compression uses around 0x10000 bytes, but for safety let's just reserve 0x20000 bytes for our exception handlers.
+                This number 0x20000 could vary depending on the compilers optimization for future compression library changes.
+            */
+            let mut stack_reserved = 0x20000;
+            SetThreadStackGuarantee(&mut stack_reserved);
+        }
+        Ok(Self {
+            harness_fn,
+            observers,
+            handlers,
+            phantom: PhantomData,
+        })
+    }
+
+    /// Retrieve the harness function.
+    #[inline]
+    pub fn harness(&self) -> &H {
+        self.harness_fn.borrow()
+    }
+
+    /// Retrieve the harness function for a mutable reference.
+    #[inline]
+    pub fn harness_mut(&mut self) -> &mut H {
+        self.harness_fn.borrow_mut()
+    }
+
+    /// The inprocess handlers
+    #[inline]
+    pub fn handlers(&self) -> &InProcessHandlers {
+        &self.handlers
+    }
+
+    /// The inprocess handlers (mutable)
+    #[inline]
+    pub fn handlers_mut(&mut self) -> &mut InProcessHandlers {
+        &mut self.handlers
+    }
+}
+
+/// The struct has [`InProcessHandlers`].
+#[cfg(windows)]
+pub trait HasInProcessHandlers {
+    /// Get the in-process handlers.
+    fn inprocess_handlers(&self) -> &InProcessHandlers;
+}
+
+#[cfg(windows)]
+impl<H, HB, OT, S> HasInProcessHandlers for GenericInProcessExecutor<H, HB, OT, S>
+where
+    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
+    OT: ObserversTuple<S>,
+    S: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+{
+    /// the timeout handler
+    #[inline]
+    fn inprocess_handlers(&self) -> &InProcessHandlers {
+        &self.handlers
+    }
+}
 
 /// Get the inprocess [`crate::state::State`]
 #[must_use]
