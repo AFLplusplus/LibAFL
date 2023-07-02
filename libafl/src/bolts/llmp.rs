@@ -3045,11 +3045,12 @@ where
         let TcpResponse::BrokerConnectHello {
             broker_shmem_description,
             hostname: _,
-        } = recv_tcp_msg(&mut stream)?.try_into()? else {
+        } = recv_tcp_msg(&mut stream)?.try_into()?
+        else {
             return Err(Error::illegal_state(
                 "Received unexpected Broker Hello".to_string(),
             ));
-         };
+        };
 
         let map = LlmpSharedMap::existing(
             shmem_provider.shmem_from_description(broker_shmem_description)?,
@@ -3064,11 +3065,13 @@ where
 
         send_tcp_msg(&mut stream, &client_hello_req)?;
 
-        let TcpResponse::LocalClientAccepted { client_id } = recv_tcp_msg(&mut stream)?.try_into()? else {
-             return Err(Error::illegal_state(
-                 "Unexpected Response from Broker".to_string(),
+        let TcpResponse::LocalClientAccepted { client_id } =
+            recv_tcp_msg(&mut stream)?.try_into()?
+        else {
+            return Err(Error::illegal_state(
+                "Unexpected Response from Broker".to_string(),
             ));
-       };
+        };
 
         // Set our ID to the one the broker sent us..
         // This is mainly so we can filter out our own msgs later.
