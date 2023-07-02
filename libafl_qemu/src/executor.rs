@@ -158,11 +158,11 @@ where
         })
     }
 
-    pub fn inner(&self) -> &InProcessExecutor<'a, H, OT, S> {
+    pub fn inner(&self) -> &InProcessExecutorMut<'a, H, OT, S> {
         &self.inner
     }
 
-    pub fn inner_mut(&mut self) -> &mut InProcessExecutor<'a, H, OT, S> {
+    pub fn inner_mut(&mut self) -> &mut InProcessExecutorMut<'a, H, OT, S> {
         &mut self.inner
     }
 
@@ -490,11 +490,11 @@ where
         })
     }
 
-    pub fn inner(&self) -> &InProcessForkExecutor<'a, H, OT, S, SP> {
+    pub fn inner(&self) -> &InProcessForkExecutorMut<'a, H, OT, S, SP> {
         &self.inner
     }
 
-    pub fn inner_mut(&mut self) -> &mut InProcessForkExecutor<'a, H, OT, S, SP> {
+    pub fn inner_mut(&mut self) -> &mut InProcessForkExecutorMut<'a, H, OT, S, SP> {
         &mut self.inner
     }
 
