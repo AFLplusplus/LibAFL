@@ -377,7 +377,7 @@ fn fuzz(
                   corpus_id: CorpusId|
          -> Result<bool, libafl::Error> {
             let corpus = state.corpus().get(corpus_id)?.borrow();
-            let res = corpus.scheduled_count() == 5;
+            let res = corpus.scheduled_count() == 1; // let's try on the 2nd trial
 
             Ok(res)
         };

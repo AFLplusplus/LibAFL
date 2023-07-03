@@ -301,19 +301,15 @@ where
 
         let mut generated = vec![];
         let _ = self.mutator.mutate(state, &input, &mut generated, 0)?;
-        println!("Generated {}", generated.len());
-        let mut found = 0;
+        // println!("Generated {}", generated.len());
         for (i, new_input) in generated.into_iter().enumerate() {
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = new_input.try_transform_into(state)?;
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-            if corpus_idx.is_some() {
-                found += 1;
-            } 
             self.mutator.post_exec(state, i as i32, corpus_idx)?;
             post.post_exec(state, i as i32, corpus_idx)?;
         }
-        println!("Found {}", found);
+        // println!("Found {}", found);
 
         Ok(())
     }

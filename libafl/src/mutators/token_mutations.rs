@@ -1139,7 +1139,7 @@ where
         if stage_idx == 0 {
             self.text_type = check_if_text(orig_bytes, orig_bytes.len());
         }
-        println!("approximate size: {cmp_len} x {input_len}");
+        // println!("approximate size: {cmp_len} x {input_len}");
         for cmp_idx in 0..cmp_len {
             let (w_idx, header) = headers[cmp_idx];
 
@@ -1188,7 +1188,9 @@ where
                     let hshape = (header.shape() + 1) as usize;
 
                     match (&orig_val[cmp_h_idx], &new_val[cmp_h_idx]) {
-                        (CmpValues::U8(orig), CmpValues::U8(new)) => {
+                        (CmpValues::U8(_orig), CmpValues::U8(_new)) => {
+                            /* just don't do it for u8, not worth it. not even instrumented
+
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
                             let attribute = header.attribute() as u8;
 
@@ -1260,6 +1262,7 @@ where
                                     &mut vec,
                                 );
                             }
+                            */
 
                             /*
                             U8 or U16 is not worth
@@ -1280,10 +1283,9 @@ where
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
                             let attribute: u8 = header.attribute() as u8;
 
-                            let mut cmp_found = false;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                cmp_found |= self.cmp_extend_encoding(
+                                self.cmp_extend_encoding(
                                     orig_v0.into(),
                                     orig_v1.into(),
                                     new_v0.into(),
@@ -1300,7 +1302,7 @@ where
 
                                 // Swapped
                                 // Compare v0 against v1
-                                cmp_found |= self.cmp_extend_encoding(
+                                self.cmp_extend_encoding(
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
@@ -1318,7 +1320,7 @@ where
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                cmp_found |= self.cmp_extend_encoding(
+                                self.cmp_extend_encoding(
                                     orig_v1.into(),
                                     orig_v0.into(),
                                     new_v1.into(),
@@ -1334,7 +1336,7 @@ where
                                 );
 
                                 // Swapped
-                                cmp_found |= self.cmp_extend_encoding(
+                                self.cmp_extend_encoding(
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
@@ -1613,16 +1615,14 @@ where
 
                             if v0_len > 0
                                 && orig_v0 == new_v0
-                                && (!rtn_found
-                                || check_if_text(orig_v0, v0_len).size() == v0_len)
+                                && (!rtn_found || check_if_text(orig_v0, v0_len).size() == v0_len)
                             {
                                 Self::try_add_autotokens(&mut gathered_tokens, orig_v0, v0_len);
                             }
 
                             if v1_len > 0
                                 && orig_v1 == new_v1
-                                && (!rtn_found
-                                || check_if_text(orig_v1, v1_len).size() == v1_len)
+                                && (!rtn_found || check_if_text(orig_v1, v1_len).size() == v1_len)
                             {
                                 Self::try_add_autotokens(&mut gathered_tokens, orig_v1, v1_len);
                             }
@@ -1652,7 +1652,7 @@ where
         match state.metadata_mut::<Tokens>() {
             Ok(existing) => {
                 existing.add_tokens(&gathered_tokens);
-                println!("we have {} tokens", existing.len())
+                // println!("we have {} tokens", existing.len())
             }
             Err(_) => {
                 state.add_metadata(gathered_tokens);
