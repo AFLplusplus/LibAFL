@@ -549,7 +549,7 @@ where
 #[cfg(feature = "fork")]
 impl<'a, EM, H, OT, QT, S, Z, SP> Executor<EM, Z> for QemuForkExecutorMut<'a, H, OT, QT, S, SP>
 where
-    EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, Z, State = S>,
+    EM: EventManager<InProcessForkExecutorMut<'a, H, OT, S, SP>, Z, State = S>,
     H: FnMut(&mut S::Input) -> ExitKind,
     S: UsesInput + HasClientPerfMonitor + HasMetadata + HasExecutions,
     OT: ObserversTuple<S>,
