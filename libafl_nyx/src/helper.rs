@@ -60,15 +60,17 @@ impl NyxHelper {
         parent_cpu_id: Option<u32>,
         initial_timeout: Duration,
     ) -> Result<Self, Error> {
-        let Some(sharedir) = target_dir.to_str() else { return Err(Error::illegal_argument("can't convert sharedir to str")) };
+        let Some(sharedir) = target_dir.to_str() else {
+            return Err(Error::illegal_argument("can't convert sharedir to str"));
+        };
         let work_dir = target_dir.join("workdir");
         let work_dir = work_dir.to_str().expect("unable to convert workdir to str");
         let nyx_type = if parallel_mode {
             let Some(parent_cpu_id) = parent_cpu_id else {
                 return Err(Error::illegal_argument(
-                      "please set parent_cpu_id in nyx parallel mode",
-                   ))
-               };
+                    "please set parent_cpu_id in nyx parallel mode",
+                ));
+            };
             if cpu_id == parent_cpu_id {
                 NyxProcessType::PARENT
             } else {
