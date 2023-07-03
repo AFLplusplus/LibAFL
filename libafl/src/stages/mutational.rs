@@ -8,13 +8,14 @@ use crate::monitors::PerfFeature;
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, CorpusId, Testcase},
+    executors::ExitKind,
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasCurrentStageInfo, HasRand, UsesState},
     Error,
 };
 
@@ -22,11 +23,12 @@ use crate::{
 
 /// Action performed after the un-transformed input is executed (e.g., updating metadata)
 #[allow(unused_variables)]
-pub trait MutatedTransformPost<S>: Sized {
+pub trait MutatedTransformPost<S>: Sized + Clone {
     /// Perform any post-execution steps necessary for the transformed input (e.g., updating metadata)
     #[inline]
     fn post_exec(
         self,
+
         state: &mut S,
         stage_idx: i32,
         corpus_idx: Option<CorpusId>,
@@ -93,7 +95,7 @@ where
     M: Mutator<I, Self::State>,
     EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM, State = Self::State>,
-    Self::State: HasClientPerfMonitor + HasCorpus,
+    Self::State: HasClientPerfMonitor + HasCorpus + HasCurrentStageInfo,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     /// The mutator registered for this stage
@@ -104,47 +106,6 @@ where
 
     /// Gets the number of iterations this mutator should run for.
     fn iterations(&self, state: &mut Z::State, corpus_idx: CorpusId) -> Result<u64, Error>;
-
-    /// Runs this (mutational) stage for the given testcase
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
-    fn perform_mutational(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut Z::State,
-        manager: &mut EM,
-        corpus_idx: CorpusId,
-    ) -> Result<(), Error> {
-        let num = self.iterations(state, corpus_idx)?;
-
-        start_timer!(state);
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else { return Ok(()); };
-        drop(testcase);
-        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-
-        for i in 0..num {
-            let mut input = input.clone();
-
-            start_timer!(state);
-            let mutated = self.mutator_mut().mutate(state, &mut input, i as i32)?;
-            mark_feature_time!(state, PerfFeature::Mutate);
-
-            if mutated == MutationResult::Skipped {
-                continue;
-            }
-
-            // Time is measured directly the `evaluate_input` function
-            let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-
-            start_timer!(state);
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
-            post.post_exec(state, i as i32, corpus_idx)?;
-            mark_feature_time!(state, PerfFeature::MutatePostExec);
-        }
-        Ok(())
-    }
 }
 
 /// Default value, how many iterations each stage gets, as an upper bound.
@@ -153,20 +114,29 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<E, EM, I, M, Z> {
+pub struct StdMutationalStage<E, EM, I, M, MT, Z>
+where
+    E: UsesState,
+    Z: UsesState<State = E::State>,
+    MT: MutatedTransformPost<Z::State>,
+{
     mutator: M,
+    limit: usize,
+    corpus_idx: Option<CorpusId>,
+    new_corpus_idx: Option<CorpusId>,
+    post: Option<MT>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
 
-impl<E, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for StdMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for StdMutationalStage<E, EM, I, M, I::Post, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
-    I: MutatedTransform<Self::Input, Self::State> + Clone,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasCurrentStageInfo,
+    I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -186,52 +156,136 @@ where
     }
 }
 
-impl<E, EM, I, M, Z> UsesState for StdMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, MT, Z> UsesState for StdMutationalStage<E, EM, I, M, MT, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasCurrentStageInfo,
+    MT: MutatedTransformPost<Z::State>,
 {
     type State = Z::State;
 }
 
-impl<E, EM, I, M, Z> Stage<E, EM, Z> for StdMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, Z> Stage<E, EM, Z> for StdMutationalStage<E, EM, I, M, I::Post, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
-    I: MutatedTransform<Self::Input, Self::State> + Clone,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasCurrentStageInfo,
+    I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
+    type Context = I;
     #[inline]
-    #[allow(clippy::let_and_return)]
-    fn perform(
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<Self::Context, Error> {
+        self.limit = self.iterations(state, corpus_idx)? as usize;
+        self.corpus_idx = Some(corpus_idx);
+
+        start_timer!(state);
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+        let Ok(input) = Self::Context::try_transform_from(&mut testcase, state, corpus_idx) else { return Err(Error::unsupported("Can't transform the input")); };
+        drop(testcase);
+        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+        Ok(input.clone())
+    }
+
+    #[inline]
+    fn limit(&self) -> Result<usize, Error> {
+        Ok(self.limit)
+    }
+
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
+        mut input: Self::Context,
+        index: usize,
+    ) -> Result<(Self::Context, bool), Error> {
+        start_timer!(state);
+        let mutated = self.mutator_mut().mutate(state, &mut input, index as i32)?;
+        mark_feature_time!(state, PerfFeature::Mutate);
+
+        if mutated == MutationResult::Skipped {
+            Ok((input, false))
+        } else {
+            Ok((input, true))
+        }
+    }
+
+    #[inline]
+    fn run_target(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Z::State,
+        state: &mut Self::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
+        input: Self::Context,
+        _index: usize,
+    ) -> Result<(Self::Context, ExitKind), Error> {
+        // Time is measured directly the `evaluate_input` function
+        let (untransformed, post) = input.clone().try_transform_into(state)?;
+        let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+        self.post = Some(post);
+        self.new_corpus_idx = corpus_idx;
+        Ok((input, ExitKind::Ok))
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
+        input: Self::Context,
+        index: usize,
+        _exit_kind: ExitKind,
+    ) -> Result<(Self::Context, Option<usize>), Error> {
+        start_timer!(state);
+        let new_corpus_idx = self.new_corpus_idx;
+        self.mutator_mut()
+            .post_exec(state, index as i32, new_corpus_idx)?;
+        self.post
+            .as_mut()
+            .unwrap()
+            .clone()
+            .post_exec(state, index as i32, new_corpus_idx)?;
+        mark_feature_time!(state, PerfFeature::MutatePostExec);
+        Ok((input, None))
+    }
+
+    #[inline]
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
-
-        #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
-
-        ret
+        Ok(())
     }
 }
 
-impl<E, EM, M, Z> StdMutationalStage<E, EM, Z::Input, M, Z>
+impl<E, EM, M, MT, Z> StdMutationalStage<E, EM, Z::Input, M, MT, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     M: Mutator<Z::Input, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasCurrentStageInfo,
+    MT: MutatedTransformPost<Z::State>,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -239,18 +293,23 @@ where
     }
 }
 
-impl<E, EM, I, M, Z> StdMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, MT, Z> StdMutationalStage<E, EM, I, M, MT, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasCurrentStageInfo,
+    MT: MutatedTransformPost<Z::State>,
 {
     /// Creates a new transforming mutational stage
     pub fn transforming(mutator: M) -> Self {
         Self {
             mutator,
+            limit: 0,
+            corpus_idx: None,
+            new_corpus_idx: None,
+            post: None,
             phantom: PhantomData,
         }
     }
@@ -271,7 +330,7 @@ pub mod pybind {
         stages::{pybind::PythonStage, StdMutationalStage},
     };
 
-    #[pyclass(unsendable, name = "StdMutationalStage")]
+    #[pyclass(unsendable, name = " StdMutationalStage")]
     #[derive(Debug)]
     /// Python class for StdMutationalStage
     pub struct PythonStdMutationalStage {

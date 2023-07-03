@@ -6,13 +6,14 @@ use crate::{
     bolts::anymap::AsAny,
     corpus::CorpusId,
     stages::{Stage, StagesTuple},
-    state::UsesState,
+    state::{HasCurrentStageInfo, UsesState},
     Error,
 };
 
 /// Combine `Stage` and `AsAny`
 pub trait AnyStage<E, EM, Z>: Stage<E, EM, Z> + AsAny
 where
+    Self::State: HasCurrentStageInfo,
     E: UsesState<State = Self::State>,
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
@@ -25,10 +26,11 @@ where
 pub struct StagesOwnedList<E, EM, Z>
 where
     E: UsesState,
+    E::State: HasCurrentStageInfo,
 {
     /// The named trait objects map
     #[allow(clippy::type_complexity)]
-    pub list: Vec<Box<dyn AnyStage<E, EM, Z, State = E::State, Input = E::Input>>>,
+    pub list: Vec<Box<dyn AnyStage<E, EM, Z, State = E::State, Input = E::Input, Context = E::Input>>>,
 }
 
 impl<E, EM, Z> StagesTuple<E, EM, E::State, Z> for StagesOwnedList<E, EM, Z>
@@ -36,6 +38,8 @@ where
     E: UsesState,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
+
+    E::State: HasCurrentStageInfo,
 {
     fn perform_all(
         &mut self,
@@ -55,11 +59,14 @@ where
 impl<E, EM, Z> StagesOwnedList<E, EM, Z>
 where
     E: UsesState,
+    E::State: HasCurrentStageInfo,
 {
     /// Create a new instance
     #[must_use]
     #[allow(clippy::type_complexity)]
-    pub fn new(list: Vec<Box<dyn AnyStage<E, EM, Z, Input = E::Input, State = E::State>>>) -> Self {
+    pub fn new(
+        list: Vec<Box<dyn AnyStage<E, EM, Z, Input = E::Input, State = E::State, Context = E::Input>>>,
+    ) -> Self {
         Self { list }
     }
 }

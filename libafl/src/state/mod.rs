@@ -4,6 +4,7 @@ use core::{
     cell::{Ref, RefMut},
     fmt::Debug,
     marker::PhantomData,
+    str::FromStr,
     time::Duration,
 };
 #[cfg(feature = "std")]
@@ -71,6 +72,20 @@ pub trait HasMaxSize {
     fn max_size(&self) -> usize;
     /// Sets the maximum size hint for the items and mutations
     fn set_max_size(&mut self, max_size: usize);
+}
+
+/// Interact with the current stage information
+pub trait HasCurrentStageInfo {
+    /// The current stage iteration being executed
+    fn current_stage_iteration(&self) -> Option<usize>;
+    /// Sets the current stage iteration being executed
+    fn set_current_stage_iteration(&mut self, iteration: usize);
+    /// The name of the currently executing stage
+    fn current_stage_name(&self) -> Option<&str>;
+    /// Sets the name of the currently executing stage
+    fn set_current_stage_name(&mut self, name: &str);
+    /// Clear the currently running stage
+    fn clear_current_stage(&mut self);
 }
 
 /// Trait for elements offering a corpus of solutions
@@ -243,6 +258,10 @@ pub struct StdState<I, C, R, SC> {
     named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
+    /// Currently running stage name
+    stage_name: Option<alloc::string::String>,
+    /// Currently running stage iteration
+    stage_iteration: Option<usize>,
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
@@ -308,6 +327,28 @@ where
     }
 }
 
+impl<I, C, R, SC> HasCurrentStageInfo for StdState<I, C, R, SC> {
+    fn current_stage_iteration(&self) -> Option<usize> {
+        self.stage_iteration
+    }
+
+    fn set_current_stage_iteration(&mut self, iteration: usize) {
+        self.stage_iteration = Some(iteration);
+    }
+
+    fn current_stage_name(&self) -> Option<&str> {
+        self.stage_name.as_ref().map(|x| x.as_str())
+    }
+
+    fn set_current_stage_name(&mut self, name: &str) {
+        self.stage_name = Some(alloc::string::String::from_str(name).unwrap())
+    }
+
+    fn clear_current_stage(&mut self) {
+        self.stage_name = None;
+        self.stage_iteration = None;
+    }
+}
 impl<I, C, R, SC> HasTestcase for StdState<I, C, R, SC>
 where
     I: Input,
@@ -765,6 +806,8 @@ where
             corpus,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
+            stage_name: None,
+            stage_iteration: None,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "std")]

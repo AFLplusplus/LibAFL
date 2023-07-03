@@ -10,7 +10,7 @@ use crate::{
     corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     stages::Stage,
-    state::{HasCorpus, HasMetadata, HasRand, HasSolutions, UsesState},
+    state::{HasCorpus, HasCurrentStageInfo, HasMetadata, HasRand, HasSolutions, UsesState},
     Error,
 };
 
@@ -45,8 +45,10 @@ where
     EM: UsesState<State = Z::State>,
     E: UsesState<State = Z::State>,
     Z: UsesState,
-    Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    Z::State: HasCorpus + HasCurrentStageInfo + HasSolutions + HasRand + HasMetadata,
 {
+    type Context = Self::Input;
+
     #[inline]
     fn perform(
         &mut self,
@@ -109,13 +111,75 @@ where
 
         Ok(())
     }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        unimplemented!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        unimplemented!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        unimplemented!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, crate::executors::ExitKind), Error> {
+        unimplemented!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: crate::executors::ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        unimplemented!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        unimplemented!()
+    }
 }
 
 impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
 where
     EM: UsesState<State = Z::State>,
     Z: UsesState,
-    Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    Z::State: HasCorpus + HasCurrentStageInfo + HasSolutions + HasRand + HasMetadata,
 {
     /// Create a new [`DumpToDiskStage`]
     pub fn new<A, B>(to_bytes: CB, corpus_dir: A, solutions_dir: B) -> Result<Self, Error>

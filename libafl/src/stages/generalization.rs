@@ -18,7 +18,9 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, UsesState},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasCurrentStageInfo, HasExecutions, HasMetadata, UsesState,
+    },
     Error,
 };
 
@@ -61,12 +63,15 @@ where
     E::Observers: ObserversTuple<E::State>,
     E::State: UsesInput<Input = BytesInput>
         + HasClientPerfMonitor
+        + HasCurrentStageInfo
         + HasExecutions
         + HasMetadata
         + HasCorpus,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
+    type Context = Self::Input;
+
     #[inline]
     #[allow(clippy::too_many_lines)]
     fn perform(
@@ -305,6 +310,68 @@ where
 
         Ok(())
     }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        todo!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        todo!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        todo!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, crate::executors::ExitKind), Error> {
+        todo!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: crate::executors::ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        todo!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        todo!()
+    }
 }
 
 impl<EM, O, OT, Z> GeneralizationStage<EM, O, OT, Z>
@@ -314,6 +381,7 @@ where
     OT: ObserversTuple<EM::State>,
     EM::State: UsesInput<Input = BytesInput>
         + HasClientPerfMonitor
+        + HasCurrentStageInfo
         + HasExecutions
         + HasMetadata
         + HasCorpus,

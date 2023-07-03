@@ -53,12 +53,13 @@ pub use sync::*;
 
 #[cfg(feature = "std")]
 pub mod dump;
-use core::{convert::From, marker::PhantomData};
+use core::{convert::From, ffi::c_void, marker::PhantomData, ptr};
 
 #[cfg(feature = "std")]
 pub use dump::*;
 
 use self::push::PushStage;
+use crate::executors::ExitKind;
 use crate::{
     corpus::CorpusId,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
@@ -66,19 +67,84 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasCurrentStageInfo, HasExecutions, HasMetadata, HasRand,
+        UsesState,
+    },
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
+
+static mut CURRENT_STAGE: *mut c_void = ptr::null_mut();
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<E, EM, Z>: UsesState
 where
+    Self::State: HasCurrentStageInfo,
     E: UsesState<State = Self::State>,
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
 {
-    /// Run the stage
+    type Context;
+
+    /// Initialize the stage
+    fn init(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<Self::Context, Error>;
+
+    /// Retrieve the stage's iteration limit. For simple stages this will be 1.
+    fn limit(&self) -> Result<usize, Error>;
+
+    /// Executed at the beginning of each iteration, before the target is executed
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: Self::Context,
+        index: usize,
+    ) -> Result<(Self::Context, bool), Error>;
+
+    /// Run the target
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: Self::Context,
+        index: usize,
+    ) -> Result<(Self::Context, ExitKind), Error>;
+    /// Executed at the end of each iteration, after the target is executed. If the target crashes,
+    /// this function will not be executed automatically. It is the responsibility of the crash handler to
+    /// call this function to clean up from the iteration.
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: Self::Context,
+        index: usize,
+        exit_kind: ExitKind,
+    ) -> Result<(Self::Context, Option<usize>), Error>;
+
+    /// De-initialize the stage
+    fn deinit(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+    ) -> Result<(), Error>;
+
+    /// Run the target
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -86,7 +152,55 @@ where
         state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<(), Error>;
+    ) -> Result<(), Error> {
+        let start = if let Some(current_iteration) = state.current_stage_iteration() {
+            current_iteration + 1
+        } else {
+            0
+        };
+
+        let mut input = self.init(fuzzer, executor, state, manager, corpus_idx)?;
+
+        let mut idx = start;
+        while idx < self.limit()? {
+            state.set_current_stage_iteration(idx);
+
+            let (new_input, run_target) =
+                self.pre_exec(fuzzer, executor, state, manager, input, idx)?;
+            input = new_input;
+
+            let (new_input, exit_kind) = if run_target {
+                self.run_target(fuzzer, executor, state, manager, input, idx)?
+            } else {
+                (input, ExitKind::Ok)
+            };
+            input = new_input;
+
+            let (new_input, next_index) =
+                self.post_exec(fuzzer, executor, state, manager, input, idx, exit_kind)?;
+            input = new_input;
+
+            if let Some(next_index) = next_index {
+                idx = next_index;
+            } else {
+                idx += 1;
+            }
+        }
+
+        self.deinit(fuzzer, executor, state, manager)?;
+
+        Ok(())
+    }
+}
+
+/// Retrieve the current stage
+pub unsafe fn current_stage<'a, ST>() -> Option<&'a mut ST> {
+    let stage_ptr = CURRENT_STAGE as *mut ST;
+    if stage_ptr.is_null() {
+        None
+    } else {
+        Some(stage_ptr.as_mut().unwrap())
+    }
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
@@ -130,6 +244,7 @@ where
 impl<Head, Tail, E, EM, Z> StagesTuple<E, EM, Head::State, Z> for (Head, Tail)
 where
     Head: Stage<E, EM, Z>,
+    Head::State: HasCurrentStageInfo,
     Tail: StagesTuple<E, EM, Head::State, Z>,
     E: UsesState<State = Head::State>,
     EM: UsesState<State = Head::State>,
@@ -143,9 +258,27 @@ where
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        // Perform the current stage
-        self.0
-            .perform(fuzzer, executor, state, manager, corpus_idx)?;
+        if let Some(current_stage_name) = state.current_stage_name() {
+            if current_stage_name == core::any::type_name::<Head>() {
+                unsafe { CURRENT_STAGE = &mut self.0 as *mut _ as *mut c_void };
+                // Perform the current stage
+                self.0
+                    .perform(fuzzer, executor, state, manager, corpus_idx)?;
+                state.clear_current_stage();
+            } else {
+                // Skip this stage
+            }
+        } else {
+            // We don't have a current stage, so set the current stage name and run the next stage
+            state.set_current_stage_name(core::any::type_name::<Head>());
+            unsafe { CURRENT_STAGE = &mut self.0 as *mut _ as *mut c_void };
+            // Perform the current stage
+            self.0
+                .perform(fuzzer, executor, state, manager, corpus_idx)?;
+            state.clear_current_stage();
+        }
+
+        unsafe { CURRENT_STAGE = ptr::null_mut() };
 
         // Execute the remaining stages
         self.1
@@ -176,9 +309,12 @@ impl<CB, E, EM, Z> Stage<E, EM, Z> for ClosureStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
     E: UsesState,
+    E::State: HasCurrentStageInfo,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
+    type Context = Self::Input;
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -188,6 +324,68 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         (self.closure)(fuzzer, executor, state, manager, corpus_idx)
+    }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        todo!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        todo!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        todo!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, ExitKind), Error> {
+        todo!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        todo!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        todo!()
     }
 }
 
@@ -248,7 +446,12 @@ where
 impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
 where
     CS: Scheduler,
-    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasRand + HasCorpus,
+    CS::State: HasClientPerfMonitor
+        + HasExecutions
+        + HasMetadata
+        + HasRand
+        + HasCorpus
+        + HasCurrentStageInfo,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>
         + EventRestarter
@@ -261,6 +464,8 @@ where
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
+    type Context = Self::Input;
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -297,6 +502,68 @@ where
 
         self.push_stage
             .deinit(fuzzer, state, event_mgr, executor.observers_mut())
+    }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        todo!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        todo!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        todo!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, ExitKind), Error> {
+        todo!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        todo!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        todo!()
     }
 }
 
@@ -337,7 +604,7 @@ pub mod pybind {
         type State = PythonStdState;
     }
 
-    impl Stage<PythonExecutor, PythonEventManager, PythonStdFuzzer> for PyObjectStage {
+    impl Stage<PythonExecutor, PythonEventManager, PythonInput, PythonStdFuzzer> for PyObjectStage {
         #[inline]
         fn perform(
             &mut self,

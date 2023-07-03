@@ -2,41 +2,55 @@
 
 use core::{fmt::Debug, marker::PhantomData};
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId},
-    executors::{Executor, HasObservers},
+    executors::{Executor, ExitKind, HasObservers},
     fuzzer::Evaluator,
-    mutators::Mutator,
+    mark_feature_time,
+    mutators::{MutationResult, Mutator},
     schedulers::{
         ecofuzz::EcoTestcaseScore, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
     },
-    stages::{mutational::MutatedTransform, MutationalStage, Stage},
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
+    stages::{
+        mutational::{MutatedTransform, MutatedTransformPost},
+        MutationalStage, Stage,
+    },
+    start_timer,
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasCurrentStageInfo, HasMetadata, HasRand, UsesState,
+    },
     Error,
 };
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerMutationalStage<E, F, EM, I, M, Z> {
+pub struct PowerMutationalStage<E, F, EM, I, M, MTP, Z> {
     mutator: M,
+    limit: usize,
+    corpus_idx: Option<CorpusId>,
+    new_corpus_idx: Option<CorpusId>,
+    post: Option<MTP>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, F, EM, I, Z)>,
 }
 
-impl<E, F, EM, I, M, Z> UsesState for PowerMutationalStage<E, F, EM, I, M, Z>
+impl<E, F, EM, I, M, MTP, Z> UsesState for PowerMutationalStage<E, F, EM, I, M, MTP, Z>
 where
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E, F, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
+impl<E, F, EM, I, M, Z> MutationalStage<E, EM, I, M, Z>
+    for PowerMutationalStage<E, F, EM, I, M, I::Post, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasClientPerfMonitor + HasCurrentStageInfo + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
@@ -63,38 +77,127 @@ where
     }
 }
 
-impl<E, F, EM, I, M, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, I, M, Z>
+impl<E, F, EM, I, M, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, I, M, I::Post, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasClientPerfMonitor + HasCurrentStageInfo + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
+    type Context = I;
     #[inline]
-    #[allow(clippy::let_and_return)]
-    fn perform(
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<Self::Context, Error> {
+        self.limit = self.iterations(state, corpus_idx)? as usize;
+        self.corpus_idx = Some(corpus_idx);
+
+        start_timer!(state);
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+        let Ok(input) = Self::Context::try_transform_from(&mut testcase, state, corpus_idx) else { return Err(Error::unsupported("Couldn't transform testcase")); };
+        drop(testcase);
+
+        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+        Ok(input)
+    }
+
+    #[inline]
+    fn limit(&self) -> Result<usize, Error> {
+        Ok(self.limit)
+    }
+
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
+        input: Self::Context,
+        index: usize,
+    ) -> Result<(Self::Context, bool), Error> {
+        let mut input = input.clone();
+
+        start_timer!(state);
+        let mutated = self.mutator_mut().mutate(state, &mut input, index as i32)?;
+        mark_feature_time!(state, PerfFeature::Mutate);
+
+        if mutated == MutationResult::Skipped {
+            Ok((input, false))
+        } else {
+            Ok((input, true))
+        }
+    }
+
+    #[inline]
+    fn run_target(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut Self::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
+        input: Self::Context,
+        _index: usize,
+    ) -> Result<(Self::Context, ExitKind), Error> {
+        // Time is measured directly the `evaluate_input` function
+        let (untransformed, post) = input.clone().try_transform_into(state)?;
+        let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+        self.post = Some(post);
+        self.new_corpus_idx = corpus_idx;
+        Ok((input, ExitKind::Ok))
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
+        input: Self::Context,
+        index: usize,
+        _exit_kind: ExitKind,
+    ) -> Result<(Self::Context, Option<usize>), Error> {
+        start_timer!(state);
+        let new_corpus_idx = self.new_corpus_idx;
+        self.mutator_mut()
+            .post_exec(state, index as i32, new_corpus_idx)?;
+        self.post
+            .as_mut()
+            .unwrap()
+            .clone()
+            .post_exec(state, index as i32, new_corpus_idx)?;
+        mark_feature_time!(state, PerfFeature::MutatePostExec);
+        Ok((input, None))
+    }
+
+    #[inline]
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
-        ret
+        Ok(())
     }
 }
 
-impl<E, F, EM, M, Z> PowerMutationalStage<E, F, EM, E::Input, M, Z>
+impl<E, F, EM, M, MTP, Z> PowerMutationalStage<E, F, EM, E::Input, M, MTP, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::Input, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasClientPerfMonitor + HasCurrentStageInfo + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
@@ -103,28 +206,32 @@ where
     }
 }
 
-impl<E, F, EM, I, M, Z> PowerMutationalStage<E, F, EM, I, M, Z>
+impl<E, F, EM, I, M, MTP, Z> PowerMutationalStage<E, F, EM, I, M, MTP, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasClientPerfMonitor + HasCurrentStageInfo + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new transforming [`PowerMutationalStage`]
     pub fn transforming(mutator: M) -> Self {
         Self {
             mutator,
+            limit: 0,
+            corpus_idx: None,
+            new_corpus_idx: None,
+            post: None,
             phantom: PhantomData,
         }
     }
 }
 
 /// The standard powerscheduling stage
-pub type StdPowerMutationalStage<E, EM, I, M, Z> =
-    PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;
+pub type StdPowerMutationalStage<E, EM, I, M, MTP, Z> =
+    PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, I, M, MTP, Z>;
 
 /// Ecofuzz scheduling stage
-pub type EcoPowerMutationalStage<E, EM, I, M, Z> =
-    PowerMutationalStage<E, EcoTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;
+pub type EcoPowerMutationalStage<E, EM, I, M, MTP, Z> =
+    PowerMutationalStage<E, EcoTestcaseScore<<E as UsesState>::State>, EM, I, M, MTP, Z>;

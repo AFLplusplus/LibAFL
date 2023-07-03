@@ -24,7 +24,10 @@ use crate::{
     schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, HasSolutions, UsesState},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasCurrentStageInfo, HasExecutions, HasMaxSize,
+        HasSolutions, UsesState,
+    },
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
 
@@ -34,7 +37,12 @@ use crate::{
 pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F2, CS::State, OT>
 where
-    Self::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    Self::State: HasCorpus
+        + HasCurrentStageInfo
+        + HasSolutions
+        + HasExecutions
+        + HasMaxSize
+        + HasClientPerfMonitor,
     <Self::State as UsesInput>::Input: HasLen + Hash,
     CS: Scheduler<State = Self::State> + RemovableScheduler,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
@@ -56,57 +64,172 @@ where
 
     /// Gets the number of iterations this mutator should run for.
     fn iterations(&self, state: &mut CS::State, corpus_idx: CorpusId) -> Result<usize, Error>;
+}
 
-    /// Runs this (mutational) stage for new objectives
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
-    fn perform_minification(
+/// The default corpus entry minimising mutational stage
+#[derive(Clone, Debug)]
+pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z> {
+    mutator: M,
+    factory: FF,
+    limit: usize,
+    base_hash: u64,
+    feedback: Option<F2>,
+    corpus_idx: Option<CorpusId>,
+    orig_max_size: usize,
+    runs: usize,
+    #[allow(clippy::type_complexity)]
+    phantom: PhantomData<(CS, E, EM, F1, F2, OT, Z)>,
+}
+
+impl<CS, E, EM, F1, F2, FF, M, OT, Z> UsesState
+    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
+where
+    CS: Scheduler,
+    M: Mutator<CS::Input, CS::State>,
+    Z: ExecutionProcessor<OT, State = CS::State>,
+    CS::State: HasCorpus + HasCurrentStageInfo,
+{
+    type State = CS::State;
+}
+
+impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, Z>
+    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
+where
+    CS: Scheduler + RemovableScheduler,
+    CS::State: HasCorpus
+        + HasCurrentStageInfo
+        + HasSolutions
+        + HasExecutions
+        + HasMaxSize
+        + HasClientPerfMonitor
+        + HasCorpus,
+    <CS::State as UsesInput>::Input: HasLen + Hash,
+    E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
+    EM: EventFirer<State = CS::State>,
+    F1: Feedback<CS::State>,
+    F2: Feedback<CS::State>,
+    FF: FeedbackFactory<F2, CS::State, OT>,
+    M: Mutator<CS::Input, CS::State>,
+    OT: ObserversTuple<CS::State>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + ExecutesInput<E, EM>
+        + HasFeedback<Feedback = F1>
+        + HasScheduler<Scheduler = CS>,
+{
+    type Context = Self::Input;
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        self.orig_max_size = state.max_size();
+        // basically copy-pasted from mutational.rs
+        self.limit = self.iterations(state, corpus_idx)? + 1;
+        self.corpus_idx = Some(corpus_idx);
+
+        start_timer!(state);
+        let base = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+        base.hash(&mut hasher);
+        self.base_hash = hasher.finish();
+        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+        Ok(base)
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        Ok(self.limit)
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
+        input: E::Input,
+        index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        if index == self.limit()? {
+            let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+            input.hash(&mut hasher);
+            let new_hash = hasher.finish();
+            if self.base_hash != new_hash {
+                Ok((input, true))
+            } else {
+                Ok((input, false))
+            }
+        } else {
+            if index != 0 {
+                let mut input = input.clone();
+
+                let before_len = input.len();
+
+                state.set_max_size(before_len);
+
+                start_timer!(state);
+                let mutated = self.mutator_mut().mutate(state, &mut input, index as i32)?;
+                mark_feature_time!(state, PerfFeature::Mutate);
+
+                if mutated == MutationResult::Skipped || input.len() >= before_len {
+                    Ok((input, false))
+                } else {
+                    Ok((input, true))
+                }
+            } else {
+                Ok((input, true))
+            }
+        }
+    }
+
+    fn run_target(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut CS::State,
+        state: &mut Self::State,
         manager: &mut EM,
-        base_corpus_idx: CorpusId,
-    ) -> Result<(), Error> {
-        let orig_max_size = state.max_size();
-        // basically copy-pasted from mutational.rs
-        let num = self.iterations(state, base_corpus_idx)?;
+        input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, ExitKind), Error> {
+        let exit_kind = fuzzer.execute_input(state, executor, manager, &input)?;
+        Ok((input, exit_kind))
+    }
 
-        start_timer!(state);
-        let mut base = state.corpus().cloned_input_for_id(base_corpus_idx)?;
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        base.hash(&mut hasher);
-        let base_hash = hasher.finish();
-        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: E::Input,
+        index: usize,
+        exit_kind: ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        if index == self.limit()? {
+            let observers = executor.observers();
+            *state.executions_mut() += 1;
+            // assumption: this input should not be marked interesting because it was not
+            // marked as interesting above; similarly, it should not trigger objectives
+            fuzzer
+                .feedback_mut()
+                .is_interesting(state, manager, &input, observers, &exit_kind)?;
+            let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+            fuzzer
+                .feedback_mut()
+                .append_metadata(state, observers, &mut testcase)?;
+            let prev = state
+                .corpus_mut()
+                .replace(self.corpus_idx.unwrap(), testcase)?;
+            fuzzer
+                .scheduler_mut()
+                .on_replace(state, self.corpus_idx.unwrap(), &prev)?;
 
-        fuzzer.execute_input(state, executor, manager, &base)?;
-        let observers = executor.observers();
-
-        let mut feedback = self.create_feedback(observers);
-
-        let mut i = 0;
-        loop {
-            if i >= num {
-                break;
-            }
-
-            let mut next_i = i + 1;
-            let mut input = base.clone();
-
-            let before_len = input.len();
-
-            state.set_max_size(before_len);
-
-            start_timer!(state);
-            let mutated = self.mutator_mut().mutate(state, &mut input, i as i32)?;
-            mark_feature_time!(state, PerfFeature::Mutate);
-
-            if mutated == MutationResult::Skipped {
-                continue;
-            }
-
-            let corpus_idx = if input.len() < before_len {
-                // run the input
-                let exit_kind = fuzzer.execute_input(state, executor, manager, &input)?;
+            state.set_max_size(self.orig_max_size);
+            Ok((input, Some(self.limit()? + 1)))
+        } else {
+            let result = if index != 0 {
                 let observers = executor.observers();
 
                 // let the fuzzer process this execution -- it's possible that we find something
@@ -125,114 +248,49 @@ where
                     false,
                 )?;
 
+                self.corpus_idx = corpus_idx;
                 if state.corpus().count() == corpus_count
                     && state.solutions().count() == solution_count
                 {
                     // we do not care about interesting inputs!
-                    if feedback.is_interesting(state, manager, &input, observers, &exit_kind)? {
+                    if self
+                        .feedback
+                        .as_mut()
+                        .unwrap()
+                        .is_interesting(state, manager, &input, observers, &exit_kind)?
+                    {
                         // we found a reduced corpus entry! use the smaller base
-                        base = input;
-
                         // do more runs! maybe we can minify further
-                        next_i = 0;
+                        Ok((input, Some(0)))
+                    } else {
+                        Ok((input, None))
                     }
+                } else {
+                    Ok((input, None))
                 }
-
-                corpus_idx
             } else {
-                // we can't guarantee that the mutators provided will necessarily reduce size, so
-                // skip any mutations that actually increase size so we don't waste eval time
-                None
+                self.feedback = Some(self.create_feedback(executor.observers()));
+                self.corpus_idx = None;
+                Ok((input, None))
             };
-
             start_timer!(state);
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+            let corpus_idx = self.corpus_idx;
+            self.mutator_mut()
+                .post_exec(state, index as i32, corpus_idx)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
-
-            i = next_i;
+            result
         }
-
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        base.hash(&mut hasher);
-        let new_hash = hasher.finish();
-        if base_hash != new_hash {
-            let exit_kind = fuzzer.execute_input(state, executor, manager, &base)?;
-            let observers = executor.observers();
-            *state.executions_mut() += 1;
-            // assumption: this input should not be marked interesting because it was not
-            // marked as interesting above; similarly, it should not trigger objectives
-            fuzzer
-                .feedback_mut()
-                .is_interesting(state, manager, &base, observers, &exit_kind)?;
-            let mut testcase = Testcase::with_executions(base, *state.executions());
-            fuzzer
-                .feedback_mut()
-                .append_metadata(state, observers, &mut testcase)?;
-            let prev = state.corpus_mut().replace(base_corpus_idx, testcase)?;
-            fuzzer
-                .scheduler_mut()
-                .on_replace(state, base_corpus_idx, &prev)?;
-        }
-
-        state.set_max_size(orig_max_size);
-
-        Ok(())
     }
-}
 
-/// The default corpus entry minimising mutational stage
-#[derive(Clone, Debug)]
-pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z> {
-    mutator: M,
-    factory: FF,
-    runs: usize,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(CS, E, EM, F1, F2, OT, Z)>,
-}
-
-impl<CS, E, EM, F1, F2, FF, M, OT, Z> UsesState
-    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
-where
-    CS: Scheduler,
-    M: Mutator<CS::Input, CS::State>,
-    Z: ExecutionProcessor<OT, State = CS::State>,
-    CS::State: HasCorpus,
-{
-    type State = CS::State;
-}
-
-impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, Z>
-    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
-where
-    CS: Scheduler + RemovableScheduler,
-    CS::State:
-        HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor + HasCorpus,
-    <CS::State as UsesInput>::Input: HasLen + Hash,
-    E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
-    EM: EventFirer<State = CS::State>,
-    F1: Feedback<CS::State>,
-    F2: Feedback<CS::State>,
-    FF: FeedbackFactory<F2, CS::State, OT>,
-    M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
-    Z: ExecutionProcessor<OT, State = CS::State>
-        + ExecutesInput<E, EM>
-        + HasFeedback<Feedback = F1>
-        + HasScheduler<Scheduler = CS>,
-{
-    fn perform(
+    fn deinit(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut CS::State,
-        manager: &mut EM,
-        corpus_idx: CorpusId,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
     ) -> Result<(), Error> {
-        self.perform_minification(fuzzer, executor, state, manager, corpus_idx)?;
-
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
-
         Ok(())
     }
 }
@@ -262,7 +320,12 @@ where
     <CS::State as UsesInput>::Input: HasLen + Hash,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasSolutions + HasExecutions + HasMaxSize,
+    CS::State: HasClientPerfMonitor
+        + HasCurrentStageInfo
+        + HasCorpus
+        + HasSolutions
+        + HasExecutions
+        + HasMaxSize,
     Z: ExecutionProcessor<OT, State = CS::State>
         + ExecutesInput<E, EM>
         + HasFeedback<Feedback = F1>
@@ -298,6 +361,11 @@ where
         Self {
             mutator,
             factory,
+            limit: 0,
+            base_hash: 0,
+            feedback: None,
+            corpus_idx: None,
+            orig_max_size: 0,
             runs,
             phantom: PhantomData,
         }

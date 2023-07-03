@@ -17,7 +17,7 @@ use crate::{
     mutators::mutations::buffer_copy,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasCurrentStageInfo, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -72,11 +72,13 @@ impl<E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<EM, O, E, Z>
 where
     EM: UsesState<State = E::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasCurrentStageInfo + HasRand,
     E::Input: HasBytesVec,
     O: MapObserver,
     Z: UsesState<State = E::State>,
 {
+    type Context = Self::Input;
+
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -98,6 +100,68 @@ where
         )?;
 
         Ok(())
+    }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        todo!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        todo!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        todo!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, crate::executors::ExitKind), Error> {
+        todo!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: crate::executors::ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        todo!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        todo!()
     }
 }
 
@@ -141,7 +205,7 @@ where
     EM: UsesState<State = E::State> + EventFirer,
     O: MapObserver,
     E: HasObservers + Executor<EM, Z>,
-    E::State: HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasCurrentStageInfo + HasRand,
     E::Input: HasBytesVec,
     Z: UsesState<State = E::State>,
 {

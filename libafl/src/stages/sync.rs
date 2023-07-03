@@ -17,7 +17,10 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasCurrentStageInfo, HasExecutions, HasMetadata, HasRand,
+        UsesState,
+    },
     Error,
 };
 
@@ -59,8 +62,10 @@ where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasClientPerfMonitor + HasCurrentStageInfo + HasCorpus + HasRand + HasMetadata,
 {
+    type Context = Self::Input;
+
     #[inline]
     fn perform(
         &mut self,
@@ -96,6 +101,68 @@ where
 
         Ok(())
     }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        unimplemented!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        unimplemented!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        unimplemented!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, ExitKind), Error> {
+        unimplemented!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        unimplemented!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        unimplemented!()
+    }
 }
 
 impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z>
@@ -104,7 +171,7 @@ where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasClientPerfMonitor + HasCurrentStageInfo + HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
@@ -170,7 +237,7 @@ where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasClientPerfMonitor + HasCurrentStageInfo + HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
@@ -236,6 +303,7 @@ where
     EM: UsesState<State = S> + EventFirer,
     S: UsesInput
         + HasClientPerfMonitor
+        + HasCurrentStageInfo
         + HasExecutions
         + HasCorpus
         + HasRand
@@ -249,6 +317,8 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
+    type Context = Self::Input;
+
     #[inline]
     fn perform(
         &mut self,
@@ -305,6 +375,68 @@ where
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
         Ok(())
+    }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<Self::Input, Error> {
+        unimplemented!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        unimplemented!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        unimplemented!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, ExitKind), Error> {
+        unimplemented!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        unimplemented!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        unimplemented!()
     }
 }
 

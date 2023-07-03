@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use crate::{
     corpus::CorpusId,
     stages::{Stage, StagesTuple},
-    state::UsesState,
+    state::{HasCurrentStageInfo, UsesState},
     Error,
 };
 
@@ -39,10 +39,13 @@ impl<CB, E, EM, ST, Z> Stage<E, EM, Z> for WhileStage<CB, E, EM, ST, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
     E: UsesState,
+    E::State: HasCurrentStageInfo,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
+    type Context = Self::Input;
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -56,6 +59,68 @@ where
                 .perform_all(fuzzer, executor, state, manager, corpus_idx)?;
         }
         Ok(())
+    }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        todo!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        todo!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        todo!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, crate::executors::ExitKind), Error> {
+        todo!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: crate::executors::ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        todo!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        todo!()
     }
 }
 
@@ -108,10 +173,13 @@ impl<CB, E, EM, ST, Z> Stage<E, EM, Z> for IfStage<CB, E, EM, ST, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
     E: UsesState,
+    E::State: HasCurrentStageInfo,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
+    type Context = Self::Input;
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -126,12 +194,75 @@ where
         }
         Ok(())
     }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        todo!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        todo!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        todo!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, crate::executors::ExitKind), Error> {
+        todo!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: crate::executors::ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        todo!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        todo!()
+    }
 }
 
 impl<CB, E, EM, ST, Z> IfStage<CB, E, EM, ST, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
     E: UsesState,
+    E::State: HasCurrentStageInfo,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
@@ -180,11 +311,14 @@ impl<CB, E, EM, ST1, ST2, Z> Stage<E, EM, Z> for IfElseStage<CB, E, EM, ST1, ST2
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
     E: UsesState,
+    E::State: HasCurrentStageInfo,
     EM: UsesState<State = E::State>,
     ST1: StagesTuple<E, EM, E::State, Z>,
     ST2: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
+    type Context = Self::Input;
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -201,6 +335,68 @@ where
                 .perform_all(fuzzer, executor, state, manager, corpus_idx)?;
         }
         Ok(())
+    }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        todo!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        todo!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        todo!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, crate::executors::ExitKind), Error> {
+        todo!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: crate::executors::ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        todo!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        todo!()
     }
 }
 

@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasCurrentStageInfo, HasExecutions, HasMetadata},
     Error,
 };
 
@@ -35,9 +35,11 @@ where
     E: UsesState<State = TE::State>,
     EM: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus + HasCurrentStageInfo,
     Z: UsesState<State = TE::State>,
 {
+    type Context = Self::Input;
+
     #[inline]
     fn perform(
         &mut self,
@@ -65,6 +67,68 @@ where
                 .insert(metadata);
         }
         Ok(())
+    }
+
+    fn init(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        todo!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        todo!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        todo!()
+    }
+
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, crate::executors::ExitKind), Error> {
+        todo!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+        _input: E::Input,
+        _index: usize,
+        _exit_kind: crate::executors::ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        todo!()
+    }
+
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        _state: &mut Self::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        todo!()
     }
 }
 
@@ -352,7 +416,7 @@ where
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
     Z::Input: HasBytesVec,
-    Z::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    Z::State: HasClientPerfMonitor + HasExecutions + HasCorpus + HasCurrentStageInfo,
 {
     #[inline]
     fn perform(
@@ -390,6 +454,68 @@ where
             }
         }
         Ok(())
+    }
+
+    fn init(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<E::Input, Error> {
+        todo!()
+    }
+
+    fn limit(&self) -> Result<usize, Error> {
+        todo!()
+    }
+
+    fn pre_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: E::Input,
+        index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        todo!()
+    }
+
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: E::Input,
+        index: usize,
+    ) -> Result<(E::Input, crate::executors::ExitKind), Error> {
+        todo!()
+    }
+
+    fn post_exec(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: E::Input,
+        index: usize,
+        exit_kind: crate::executors::ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        todo!()
+    }
+
+    fn deinit(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+    ) -> Result<(), Error> {
+        todo!()
     }
 }
 
