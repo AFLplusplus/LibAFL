@@ -4,7 +4,7 @@ use std::{
     marker::PhantomData,
 };
 
-use libafl::bolts::shmem::ShMem;
+use libafl_bolts::shmem::ShMem;
 
 use super::Filter;
 

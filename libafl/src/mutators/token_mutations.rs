@@ -16,12 +16,12 @@ use std::{
 };
 
 use hashbrown::HashSet;
+use libafl_bolts::{rands::Rand, AsSlice};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
 use crate::{
-    bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
@@ -692,7 +692,7 @@ impl AFLppRedQueen {
                     )),
                     0xffff,
                 ),
-                4 | 5 | 6 | 7 => (
+                4..=7 => (
                     u64::from(u32::from_be_bytes(
                         buf[buf_idx..buf_idx + 4].try_into().unwrap(),
                     )),
@@ -843,7 +843,7 @@ impl AFLppRedQueen {
                     }
                 }
             }
-            4 | 5 | 6 | 7 => {
+            4..=7 => {
                 if its_len >= 4 {
                     let buf_32 = u32::from_be_bytes(buf[buf_idx..buf_idx + 4].try_into().unwrap());
                     let another_buf_32 =

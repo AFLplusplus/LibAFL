@@ -11,14 +11,12 @@ use core::{
 use std::{fs::File, io::Read, path::Path};
 
 use ahash::RandomState;
+use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
+use crate::inputs::{HasBytesVec, HasTargetBytes, Input};
 #[cfg(feature = "std")]
 use crate::{bolts::fs::write_file_atomic, Error};
-use crate::{
-    bolts::{ownedref::OwnedSlice, HasLen},
-    inputs::{HasBytesVec, HasTargetBytes, Input},
-};
 
 /// A bytes input is the basic input
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]

@@ -4,10 +4,10 @@ use alloc::vec::Vec;
 use core::cmp::max;
 
 use hashbrown::HashMap;
+use libafl_bolts::{rands::Rand, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{rands::Rand, tuples::Named},
     corpus::{Corpus, HasTestcase},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},

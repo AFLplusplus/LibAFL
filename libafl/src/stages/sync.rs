@@ -7,10 +7,10 @@ use std::{
     time::SystemTime,
 };
 
+use libafl_bolts::{current_time, shmem::ShMemProvider};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{current_time, shmem::ShMemProvider},
     corpus::{Corpus, CorpusId, HasTestcase},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},

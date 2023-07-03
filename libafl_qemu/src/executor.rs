@@ -3,7 +3,7 @@ use core::fmt::{self, Debug, Formatter};
 
 #[cfg(feature = "fork")]
 use libafl::{
-    bolts::shmem::ShMemProvider, events::EventManager, executors::InProcessForkExecutor,
+    events::EventManager, executors::InProcessForkExecutor, libafl_bolts::shmem::ShMemProvider,
     state::HasMetadata,
 };
 use libafl::{

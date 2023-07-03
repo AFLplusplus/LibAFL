@@ -7,17 +7,8 @@ use std::{env, fs::DirEntry, io, path::PathBuf, process};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
-        AsSlice,
-    },
     corpus::{Corpus, NopCorpus},
-    events::{EventConfig, EventRestarter},
+    events::{launcher::Launcher, EventConfig, EventRestarter},
     executors::{ExitKind, TimeoutExecutor},
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
@@ -26,6 +17,14 @@ use libafl::{
     schedulers::QueueScheduler,
     state::{HasCorpus, StdState},
     Error,
+};
+use libafl_bolts::{
+    core_affinity::Cores,
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsSlice,
 };
 use libafl_qemu::{
     drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, MmapPerms, QemuExecutor, QemuHooks,

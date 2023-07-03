@@ -11,11 +11,11 @@ use core::{
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
+use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;
 use crate::{
-    bolts::{serdeany::SerdeAnyMap, HasLen},
     corpus::CorpusId,
     inputs::{Input, UsesInput},
     state::HasMetadata,

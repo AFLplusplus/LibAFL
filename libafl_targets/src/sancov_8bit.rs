@@ -1,7 +1,7 @@
 //! [`LLVM` `8-bi-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
 
-use libafl::bolts::ownedref::OwnedMutSlice;
+use libafl_bolts::ownedref::OwnedMutSlice;
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
 /// They are initialized by calling [`__sanitizer_cov_8bit_counters_init`](
@@ -39,12 +39,12 @@ mod observers {
     use ahash::RandomState;
     use intervaltree::IntervalTree;
     use libafl::{
-        bolts::{
-            ownedref::OwnedMutSlice, tuples::Named, AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen,
-        },
         inputs::UsesInput,
         observers::{DifferentialObserver, MapObserver, Observer, ObserversTuple},
         Error,
+    };
+    use libafl_bolts::{
+        ownedref::OwnedMutSlice, AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named,
     };
     use serde::{Deserialize, Serialize};
 

@@ -29,6 +29,8 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
+use libafl_bolts::{core_affinity::Cores, shmem::ShMemProvider};
+
 use super::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
@@ -40,7 +42,6 @@ use crate::bolts::{
 use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
-    bolts::{core_affinity::Cores, shmem::ShMemProvider},
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     monitors::Monitor,
     state::{HasClientPerfMonitor, HasExecutions},

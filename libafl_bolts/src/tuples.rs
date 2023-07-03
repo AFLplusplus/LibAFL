@@ -8,6 +8,8 @@ use core::{
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 use xxhash_rust::xxh3::xxh3_64;
 
+use crate::Named;
+
 /// Returns if the type `T` is equal to `U`
 /// From <https://stackoverflow.com/a/60138532/7658998>
 #[rustversion::nightly]
@@ -198,12 +200,6 @@ where
         }
         self.1.match_type_mut::<T, FN>(f);
     }
-}
-
-/// We need fixed names for many parts of this lib.
-pub trait Named {
-    /// Provide the name of this element.
-    fn name(&self) -> &str;
 }
 
 /// A named tuple

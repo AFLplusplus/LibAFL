@@ -8,15 +8,11 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use c2rust_bitfields::BitfieldStruct;
 use hashbrown::HashMap;
+use libafl_bolts::{ownedref::OwnedRefMut, AsMutSlice, AsSlice, Named};
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named, AsMutSlice, AsSlice},
-    executors::ExitKind,
-    inputs::UsesInput,
-    observers::Observer,
-    state::HasMetadata,
-    Error,
+    executors::ExitKind, inputs::UsesInput, observers::Observer, state::HasMetadata, Error,
 };
 
 /// Compare values collected during a run

@@ -5,11 +5,11 @@ use core::{
     marker::PhantomData,
 };
 
+use libafl_bolts::rands::{Rand, StdRand};
 use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 use crate::{
-    bolts::rands::{Rand, StdRand},
     corpus::{Corpus, CorpusId},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},

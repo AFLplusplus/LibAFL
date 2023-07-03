@@ -6,10 +6,10 @@ use alloc::{
 };
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
+use libafl_bolts::{rands::Rand, tuples::MatchName};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{rands::Rand, tuples::MatchName},
     corpus::{Corpus, CorpusId},
     events::EventFirer,
     executors::{Executor, HasObservers},

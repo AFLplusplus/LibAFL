@@ -12,14 +12,15 @@ use std::{
 };
 
 use clap::{self, Parser};
-use libafl::{
-    bolts::{
+use     libafl_bolts::{
         current_nanos,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Named},
         AsMutSlice, AsSlice,
-    },
+    };
+use libafl::{
+
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{

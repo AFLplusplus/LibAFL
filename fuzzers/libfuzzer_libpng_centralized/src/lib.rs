@@ -11,18 +11,8 @@ use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{self, Parser};
 use libafl::{
-    bolts::{
-        core_affinity::{CoreId, Cores},
-        current_nanos,
-        launcher::Launcher,
-        llmp::{LlmpReceiver, LlmpSender},
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsSlice, ClientId,
-    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{CentralizedEventManager, EventConfig},
+    events::{launcher::Launcher, CentralizedEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -38,6 +28,15 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     Error,
+};
+use libafl_bolts::{
+    core_affinity::{CoreId, Cores},
+    current_nanos,
+    llmp::{LlmpReceiver, LlmpSender},
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsSlice, ClientId,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 

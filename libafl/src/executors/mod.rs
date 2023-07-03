@@ -35,10 +35,10 @@ use core::{fmt::Debug, marker::PhantomData};
 
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub use command::CommandExecutor;
+use libafl_bolts::AsSlice;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::AsSlice,
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,

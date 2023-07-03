@@ -18,6 +18,7 @@ use std::{
 };
 
 use backtrace::Backtrace;
+use libafl_bolts::{ownedref::OwnedRefMut, Named};
 #[cfg(feature = "casr")]
 use libcasr::{
     asan::AsanStacktrace,
@@ -38,13 +39,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use super::ObserverWithHashField;
-use crate::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named},
-    executors::ExitKind,
-    inputs::UsesInput,
-    observers::Observer,
-    Error,
-};
+use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error};
 
 #[cfg(not(feature = "casr"))]
 /// Collects the backtrace via [`Backtrace`] and [`Debug`]
@@ -244,7 +239,7 @@ pub fn get_asan_runtime_flags_with_log_path() -> String {
 /// returns the recommended ASAN runtime flags to capture the backtrace correctly
 #[must_use]
 pub fn get_asan_runtime_flags() -> String {
-    let flags = vec![
+    let flags = [
         "exitcode=0",
         "abort_on_error=1",
         "handle_abort=1",

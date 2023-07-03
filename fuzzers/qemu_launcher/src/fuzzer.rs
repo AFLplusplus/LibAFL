@@ -7,17 +7,8 @@ use std::{env, path::PathBuf, process};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
-        AsSlice,
-    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{EventConfig, LlmpRestartingEventManager},
+    events::{launcher::Launcher, EventConfig, LlmpRestartingEventManager},
     executors::{ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -30,6 +21,14 @@ use libafl::{
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
     Error,
+};
+use libafl_bolts::{
+    core_affinity::Cores,
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsSlice,
 };
 use libafl_qemu::{
     drcov::QemuDrCovHelper,

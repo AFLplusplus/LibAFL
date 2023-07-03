@@ -13,6 +13,7 @@ use core::ptr::write_volatile;
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{fmt::Debug, marker::PhantomData};
 
+use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer, ClientId};
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -25,8 +26,13 @@ use crate::bolts::os::unix_signals::setup_signal_handler;
 use crate::bolts::os::{fork, ForkResult};
 #[cfg(all(unix, feature = "std"))]
 use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
+#[cfg(feature = "std")]
 use crate::{
-    bolts::ClientId,
+    corpus::Corpus,
+    monitors::SimplePrintingMonitor,
+    state::{HasCorpus, HasSolutions},
+};
+use crate::{
     events::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
@@ -35,13 +41,6 @@ use crate::{
     monitors::Monitor,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
-};
-#[cfg(feature = "std")]
-use crate::{
-    bolts::{shmem::ShMemProvider, staterestore::StateRestorer},
-    corpus::Corpus,
-    monitors::SimplePrintingMonitor,
-    state::{HasCorpus, HasSolutions},
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it

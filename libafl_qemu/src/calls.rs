@@ -2,11 +2,11 @@ use core::fmt::Debug;
 
 use capstone::prelude::*;
 use libafl::{
-    bolts::tuples::{MatchFirstType, Named},
     executors::ExitKind,
     inputs::{Input, UsesInput},
     observers::{stacktrace::BacktraceObserver, ObserversTuple},
 };
+use libafl_bolts::{tuples::MatchFirstType, Named};
 
 use crate::{
     capstone,

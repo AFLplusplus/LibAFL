@@ -13,10 +13,10 @@ use core::{
     time::Duration,
 };
 
+use libafl_bolts::current_time;
 pub use mutational::StdMutationalPushStage;
 
 use crate::{
-    bolts::current_time,
     corpus::CorpusId,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,

@@ -5,10 +5,10 @@ use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
+use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
@@ -159,7 +159,7 @@ where
             sum += weight;
         }
 
-        for (i, w) in weights.iter() {
+        for (i, w) in &weights {
             p_arr.insert(*i, w * (n as f64) / sum);
         }
 

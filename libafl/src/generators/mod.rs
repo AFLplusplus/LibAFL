@@ -3,8 +3,9 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
+use libafl_bolts::rands::Rand;
+
 use crate::{
-    bolts::rands::Rand,
     inputs::{bytes::BytesInput, Input},
     state::HasRand,
     Error,

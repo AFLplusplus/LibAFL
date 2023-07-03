@@ -113,22 +113,11 @@ pub use libafl_bolts::Error;
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod prelude {
+    pub use libafl_bolts::{bolts_prelude::*, *};
+
     pub use super::{
-        bolts::{bolts_prelude::*, *},
-        corpus::*,
-        events::*,
-        executors::*,
-        feedbacks::*,
-        fuzzer::*,
-        generators::*,
-        inputs::*,
-        monitors::*,
-        mutators::*,
-        observers::*,
-        schedulers::*,
-        stages::*,
-        state::*,
-        *,
+        corpus::*, events::*, executors::*, feedbacks::*, fuzzer::*, generators::*, inputs::*,
+        monitors::*, mutators::*, observers::*, schedulers::*, stages::*, state::*, *,
     };
 }
 
@@ -137,8 +126,9 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
 
+    use libafl_bolts::{rands::StdRand, tuples::tuple_list};
+
     use crate::{
-        bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
@@ -252,28 +242,7 @@ pub mod pybind {
     #[pyo3(name = "libafl")]
     /// Register the classes to the python module
     pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-        observers::map::pybind::register(py, m)?;
-        observers::pybind::register(py, m)?;
-        feedbacks::map::pybind::register(py, m)?;
-        feedbacks::pybind::register(py, m)?;
-        state::pybind::register(py, m)?;
-        monitors::pybind::register(py, m)?;
-        events::pybind::register(py, m)?;
-        events::simple::pybind::register(py, m)?;
-        fuzzer::pybind::register(py, m)?;
-        executors::pybind::register(py, m)?;
-        executors::inprocess::pybind::register(py, m)?;
-        generators::pybind::register(py, m)?;
-        mutators::pybind::register(py, m)?;
-        mutators::scheduled::pybind::register(py, m)?;
-        corpus::pybind::register(py, m)?;
-        corpus::testcase::pybind::register(py, m)?;
-        corpus::ondisk::pybind::register(py, m)?;
-        corpus::inmemory::pybind::register(py, m)?;
-        corpus::cached::pybind::register(py, m)?;
-        bolts::rands::pybind::register(py, m)?;
-        stages::pybind::register(py, m)?;
-        stages::mutational::pybind::register(py, m)?;
+        libafl_bolts::rands::pybind::register(py, m)?;
         Ok(())
     }
 }

@@ -1,10 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use libafl::{
-    bolts::{
-        rands::{RandomSeed, StdRand},
-        tuples::tuple_list,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     feedbacks::{CrashFeedback, MaxMapFeedback},
@@ -16,6 +12,10 @@ use libafl::{
     stages::StdMutationalStage,
     state::StdState,
     Fuzzer, StdFuzzer,
+};
+use libafl_bolts::{
+    rands::{RandomSeed, StdRand},
+    tuples::tuple_list,
 };
 use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper};
 

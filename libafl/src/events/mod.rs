@@ -19,6 +19,7 @@ use core::{
 };
 
 use ahash::RandomState;
+use libafl_bolts::{current_time, ClientId};
 pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -29,7 +30,6 @@ use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 #[cfg(all(unix, feature = "std"))]
 use crate::bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 use crate::{
-    bolts::{current_time, ClientId},
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
@@ -499,7 +499,6 @@ where
 
             Ok(cur)
         } else {
-            if cur.as_millis() % 1000 == 0 {}
             Ok(last_report_time)
         }
     }
@@ -647,13 +646,10 @@ impl<S> HasEventManagerId for NopEventManager<S> {
 #[cfg(test)]
 mod tests {
 
+    use libafl_bolts::{current_time, tuples::tuple_list, Named};
     use tuple_list::tuple_list_type;
 
     use crate::{
-        bolts::{
-            current_time,
-            tuples::{tuple_list, Named},
-        },
         events::{Event, EventConfig},
         executors::ExitKind,
         inputs::bytes::BytesInput,

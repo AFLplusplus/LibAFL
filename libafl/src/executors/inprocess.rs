@@ -25,6 +25,7 @@ use core::{
 #[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
 
+use libafl_bolts::current_time;
 #[cfg(all(feature = "std", unix))]
 use libc::siginfo_t;
 #[cfg(all(feature = "std", unix))]
@@ -44,7 +45,6 @@ use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
 use crate::{
-    bolts::current_time,
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -676,12 +676,12 @@ mod unix_signal_handler {
     #[cfg(feature = "std")]
     use std::{io::Write, panic};
 
+    use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
     use libc::siginfo_t;
 
     #[cfg(feature = "std")]
     use crate::inputs::Input;
     use crate::{
-        bolts::os::unix_signals::{ucontext_t, Handler, Signal},
         events::{EventFirer, EventRestarter},
         executors::{
             inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
@@ -1052,14 +1052,14 @@ mod windows_exception_handler {
     #[cfg(feature = "std")]
     use std::panic;
 
+    use libafl_bolts::os::windows_exceptions::{
+        ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS,
+    };
     use windows::Win32::System::Threading::{
         EnterCriticalSection, ExitProcess, LeaveCriticalSection, RTL_CRITICAL_SECTION,
     };
 
     use crate::{
-        bolts::os::windows_exceptions::{
-            ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS,
-        },
         events::{EventFirer, EventRestarter},
         executors::{
             inprocess::{
@@ -2083,11 +2083,11 @@ pub mod child_signal_handlers {
     use alloc::boxed::Box;
     use std::panic;
 
+    use libafl_bolts::os::unix_signals::{ucontext_t, Signal};
     use libc::siginfo_t;
 
     use super::{InProcessForkExecutorGlobalData, FORK_EXECUTOR_GLOBAL_DATA};
     use crate::{
-        bolts::os::unix_signals::{ucontext_t, Signal},
         executors::{ExitKind, HasObservers},
         inputs::UsesInput,
         observers::ObserversTuple,
@@ -2171,11 +2171,11 @@ pub mod child_signal_handlers {
 mod tests {
     use core::marker::PhantomData;
 
+    use libafl_bolts::tuples::tuple_list;
     #[cfg(all(feature = "std", feature = "fork", unix))]
     use serial_test::serial;
 
     use crate::{
-        bolts::tuples::tuple_list,
         events::NopEventManager,
         executors::{inprocess::InProcessHandlers, Executor, ExitKind, InProcessExecutor},
         inputs::{NopInput, UsesInput},
@@ -2213,8 +2213,9 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
+        use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
+
         use crate::{
-            bolts::shmem::{ShMemProvider, StdShMemProvider},
             events::SimpleEventManager,
             executors::{inprocess::InChildProcessHandlers, InProcessForkExecutor},
             state::NopState,

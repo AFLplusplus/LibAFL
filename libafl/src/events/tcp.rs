@@ -15,6 +15,7 @@ use std::{
     net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
 };
 
+use libafl_bolts::{shmem::ShMemProvider, ClientId};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -38,7 +39,6 @@ use crate::bolts::{shmem::StdShMemProvider, staterestore::StateRestorer};
 #[cfg(all(unix, feature = "std"))]
 use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
 use crate::{
-    bolts::{shmem::ShMemProvider, ClientId},
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,

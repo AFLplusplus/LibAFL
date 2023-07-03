@@ -4,10 +4,10 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use hashbrown::HashMap;
+use libafl_bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
     corpus::{Corpus, CorpusId},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,

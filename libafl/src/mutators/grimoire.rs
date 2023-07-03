@@ -4,8 +4,9 @@
 use alloc::vec::Vec;
 use core::cmp::{max, min};
 
+use libafl_bolts::{rands::Rand, Named};
+
 use crate::{
-    bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
     inputs::{GeneralizedInputMetadata, GeneralizedItem},
     mutators::{token_mutations::Tokens, MutationResult, Mutator},

@@ -10,12 +10,6 @@ use std::ptr;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        tuples::{tuple_list, Merge},
-        AsSlice,
-    },
     corpus::{
         minimizer::{CorpusMinimizer, StdCorpusMinimizer},
         Corpus, InMemoryCorpus, OnDiskCorpus,
@@ -38,6 +32,12 @@ use libafl::{
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
+};
+use libafl_bolts::{
+    current_nanos,
+    rands::StdRand,
+    tuples::{tuple_list, Merge},
+    AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 

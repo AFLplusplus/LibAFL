@@ -4,10 +4,10 @@ use alloc::string::{String, ToString};
 use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;
+use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::Named,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverName},

@@ -19,6 +19,7 @@ pub use stacktrace::*;
 pub mod concolic;
 
 pub mod value;
+
 // Rust is breaking this with 'error: intrinsic safety mismatch between list of intrinsics within the compiler and core library intrinsics for intrinsic `type_id`' and so we disable this component for the moment
 //#[cfg(unstable_feature)]
 //pub mod owned;
@@ -32,21 +33,13 @@ use core::{fmt::Debug, time::Duration};
 #[cfg(feature = "std")]
 use std::time::Instant;
 
+use libafl_bolts::{ownedref::OwnedMutPtr, tuples::MatchName, Named};
 use serde::{Deserialize, Serialize};
 pub use value::*;
 
 #[cfg(feature = "no_std")]
 use crate::bolts::current_time;
-use crate::{
-    bolts::{
-        ownedref::OwnedMutPtr,
-        tuples::{MatchName, Named},
-    },
-    executors::ExitKind,
-    inputs::UsesInput,
-    state::UsesState,
-    Error,
-};
+use crate::{executors::ExitKind, inputs::UsesInput, state::UsesState, Error};
 
 /// Something that uses observer like mapfeedbacks
 pub trait UsesObserver<S>
@@ -607,12 +600,15 @@ where
 pub mod pybind {
     use std::cell::UnsafeCell;
 
+    use libafl_bolts::{
+        tuples::{type_eq, MatchName},
+        Named,
+    };
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
     use super::{Debug, Observer, ObserversTuple, String, Vec};
     use crate::{
-        bolts::tuples::{type_eq, MatchName, Named},
         executors::{pybind::PythonExitKind, ExitKind},
         inputs::{BytesInput, HasBytesVec},
         observers::map::pybind::{
@@ -1393,10 +1389,12 @@ pub mod pybind {
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        bolts::tuples::{tuple_list, tuple_list_type, Named},
-        observers::{StdMapObserver, TimeObserver},
+    use libafl_bolts::{
+        tuples::{tuple_list, tuple_list_type},
+        Named,
     };
+
+    use crate::observers::{StdMapObserver, TimeObserver};
 
     static mut MAP: [u32; 4] = [0; 4];
 

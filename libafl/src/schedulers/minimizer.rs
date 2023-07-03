@@ -5,10 +5,10 @@ use alloc::vec::Vec;
 use core::{any::type_name, cmp::Ordering, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
+use libafl_bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,

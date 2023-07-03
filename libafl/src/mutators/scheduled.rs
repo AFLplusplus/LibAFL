@@ -6,16 +6,16 @@ use core::{
     marker::PhantomData,
 };
 
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{tuple_list, tuple_list_type, NamedTuple},
+    AsMutSlice, AsSlice,
+};
 use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
-    bolts::{
-        rands::Rand,
-        tuples::{tuple_list, tuple_list_type, NamedTuple},
-        AsMutSlice, AsSlice,
-    },
     corpus::{Corpus, CorpusId},
     mutators::{MutationResult, Mutator, MutatorsTuple},
     state::{HasCorpus, HasMetadata, HasRand},

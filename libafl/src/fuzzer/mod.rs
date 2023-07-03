@@ -3,6 +3,7 @@
 use alloc::string::ToString;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
+use libafl_bolts::current_time;
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(test)]
@@ -12,7 +13,6 @@ use crate::monitors::PerfFeature;
 #[cfg(test)]
 use crate::state::NopState;
 use crate::{
-    bolts::current_time,
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
@@ -775,10 +775,10 @@ where
 pub mod pybind {
     use alloc::{boxed::Box, vec::Vec};
 
+    use libafl_bolts::ownedref::OwnedMutPtr;
     use pyo3::prelude::*;
 
     use crate::{
-        bolts::ownedref::OwnedMutPtr,
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
         feedbacks::pybind::PythonFeedback,

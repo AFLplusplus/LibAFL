@@ -11,6 +11,11 @@ use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 #[cfg(feature = "std")]
 use std::net::{SocketAddr, ToSocketAddrs};
 
+use libafl_bolts::{
+    llmp::{self, LlmpClient, LlmpClientDescription, Tag},
+    shmem::ShMemProvider,
+    ClientId,
+};
 use serde::Deserialize;
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
@@ -36,11 +41,6 @@ use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::
 #[cfg(all(unix, feature = "std"))]
 use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
 use crate::{
-    bolts::{
-        llmp::{self, LlmpClient, LlmpClientDescription, Tag},
-        shmem::ShMemProvider,
-        ClientId,
-    },
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
@@ -1493,17 +1493,17 @@ where
 mod tests {
     use core::sync::atomic::{compiler_fence, Ordering};
 
+    use libafl_bolts::{
+        llmp::{LlmpClient, LlmpSharedMap},
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        staterestore::StateRestorer,
+        tuples::tuple_list,
+        ClientId,
+    };
     use serial_test::serial;
 
     use crate::{
-        bolts::{
-            llmp::{LlmpClient, LlmpSharedMap},
-            rands::StdRand,
-            shmem::{ShMemProvider, StdShMemProvider},
-            staterestore::StateRestorer,
-            tuples::tuple_list,
-            ClientId,
-        },
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
         executors::{ExitKind, InProcessExecutor},

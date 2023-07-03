@@ -2,13 +2,12 @@
 
 use core::{marker::PhantomData, time::Duration};
 
-use libafl_bolts::impl_serdeany;
+use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    bolts::{current_time, rands::Rand},
     corpus::{Corpus, CorpusId},
     mark_feature_time,
     mutators::{MutationResult, Mutator},

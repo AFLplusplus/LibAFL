@@ -2,15 +2,15 @@
 
 use alloc::{boxed::Box, string::String, vec::Vec};
 
+use libafl_bolts::{
+    llmp::{LlmpReceiver, LlmpSender, Tag},
+    shmem::ShMemProvider,
+    ClientId,
+};
 use serde::{Deserialize, Serialize};
 
 use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
 use crate::{
-    bolts::{
-        llmp::{LlmpReceiver, LlmpSender, Tag},
-        shmem::ShMemProvider,
-        ClientId,
-    },
     events::{
         Event, EventConfig, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId, LogSeverity,

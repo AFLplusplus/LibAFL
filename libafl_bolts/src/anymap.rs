@@ -47,6 +47,7 @@ macro_rules! impl_asany {
 /// The size changed in later rust versions, see <https://github.com/rust-lang/compiler-team/issues/608>
 #[inline]
 #[must_use]
+#[allow(clippy::cast_ptr_alignment)]
 pub const fn pack_type_id(id: u128) -> TypeId {
     match size_of::<TypeId>() {
         8 => {

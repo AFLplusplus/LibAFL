@@ -99,9 +99,11 @@ use core::{
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
 
-#[cfg(feature = "libafl_derive")]
-#[doc(hidden)]
-pub use libafl_derive::*;
+/// We need fixed names for many parts of this lib.
+pub trait Named {
+    /// Provide the name of this element.
+    fn name(&self) -> &str;
+}
 
 #[cfg(feature = "errors_backtrace")]
 /// Error Backtrace type when `errors_backtrace` feature is enabled (== [`backtrace::Backtrace`])
@@ -651,6 +653,7 @@ pub fn format_duration_hms(duration: &time::Duration) -> String {
 ///
 /// So, to give an example:
 /// ```rust
+/// # extern crate libafl_bolts;
 /// use libafl_bolts::calculate_cumulative_sum_in_place;
 ///
 /// let mut value = [2, 4, 1, 3];
@@ -797,6 +800,8 @@ pub mod bolts_prelude {
 #[allow(missing_docs)]
 pub mod pybind {
 
+    use pyo3::{pymodule, types::PyModule, PyResult, Python};
+
     #[macro_export]
     macro_rules! unwrap_me_body {
         ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),* }) => {
@@ -922,5 +927,13 @@ pub mod pybind {
                 }
             };
         };
+    }
+
+    #[pymodule]
+    #[pyo3(name = "libafl_bolts")]
+    /// Register the classes to the python module
+    pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+        crate::rands::pybind::register(py, m)?;
+        Ok(())
     }
 }

@@ -8,12 +8,11 @@ use core::{
     marker::PhantomData,
 };
 
-use libafl_bolts::impl_serdeany;
+use libafl_bolts::{calculate_cumulative_sum_in_place, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
-    bolts::{calculate_cumulative_sum_in_place, rands::Rand},
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
@@ -324,11 +323,12 @@ where
 
 #[cfg(test)]
 mod test {
+    use libafl_bolts::tuples::tuple_list;
+
     use super::{
         BitFlipMutator, ByteDecMutator, TuneableScheduledMutator, TuneableScheduledMutatorMetadata,
     };
     use crate::{
-        bolts::tuples::tuple_list,
         inputs::BytesInput,
         mutators::{ByteRandMutator, ScheduledMutator},
         state::NopState,

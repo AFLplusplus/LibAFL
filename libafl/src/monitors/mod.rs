@@ -973,13 +973,11 @@ pub mod pybind {
     use alloc::{boxed::Box, string::String, vec::Vec};
     use core::time::Duration;
 
+    use libafl_bolts::ClientId;
     use pyo3::{prelude::*, types::PyUnicode};
 
     use super::ClientStats;
-    use crate::{
-        bolts::ClientId,
-        monitors::{Monitor, SimpleMonitor},
-    };
+    use crate::monitors::{Monitor, SimpleMonitor};
 
     // TODO create a PyObjectFnMut to pass, track stabilization of https://github.com/rust-lang/rust/issues/29625
 

@@ -29,12 +29,12 @@ use core::{
     marker::PhantomData,
 };
 
+use libafl_bolts::Named;
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::Named,
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -1099,6 +1099,7 @@ impl From<bool> for ConstFeedback {
 pub mod pybind {
     use std::cell::UnsafeCell;
 
+    use libafl_bolts::Named;
     use pyo3::prelude::*;
 
     use super::{
@@ -1106,7 +1107,6 @@ pub mod pybind {
         FastOrFeedback, Feedback, NotFeedback, String, ToString,
     };
     use crate::{
-        bolts::tuples::Named,
         corpus::{testcase::pybind::PythonTestcaseWrapper, Testcase},
         events::{pybind::PythonEventManager, EventFirer},
         executors::{pybind::PythonExitKind, ExitKind},

@@ -1,7 +1,7 @@
 use core::{fmt::Debug, ops::Range};
 
 use libafl::{
-    bolts::tuples::MatchFirstType, executors::ExitKind, inputs::UsesInput,
+    executors::ExitKind, inputs::UsesInput, libafl_bolts::tuples::MatchFirstType,
     observers::ObserversTuple,
 };
 

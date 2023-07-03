@@ -151,7 +151,7 @@ where
             let shmem_content = self.content_mut();
             unsafe {
                 ptr::copy_nonoverlapping(
-                    filename_buf.as_ptr() as *const u8,
+                    filename_buf.as_ptr(),
                     shmem_content.buf.as_mut_ptr(),
                     len,
                 );
@@ -163,11 +163,7 @@ where
             let len = serialized.len();
             let shmem_content = self.content_mut();
             unsafe {
-                ptr::copy_nonoverlapping(
-                    serialized.as_ptr() as *const u8,
-                    shmem_content.buf.as_mut_ptr(),
-                    len,
-                );
+                ptr::copy_nonoverlapping(serialized.as_ptr(), shmem_content.buf.as_mut_ptr(), len);
             }
             shmem_content.buf_len = len;
             shmem_content.is_disk = false;

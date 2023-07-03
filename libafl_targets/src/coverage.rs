@@ -146,11 +146,11 @@ mod swap {
     use core::fmt::Debug;
 
     use libafl::{
-        bolts::{ownedref::OwnedMutSlice, tuples::Named, AsMutSlice},
         inputs::UsesInput,
         observers::{DifferentialObserver, Observer, ObserversTuple, StdMapObserver},
         Error,
     };
+    use libafl_bolts::{ownedref::OwnedMutSlice, AsMutSlice, Named};
     use serde::{Deserialize, Serialize};
 
     use super::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};

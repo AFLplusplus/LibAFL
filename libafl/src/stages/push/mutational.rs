@@ -7,11 +7,12 @@ use core::{
     fmt::Debug,
 };
 
+use libafl_bolts::rands::Rand;
+
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, CorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
