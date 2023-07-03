@@ -4,8 +4,8 @@ use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{inprocess::windows_asan_handler::asan_death_handler, Executor, HasObservers},
     feedbacks::Feedback,
-    state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
-    HasObjective,
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
+    HasFeedback, HasObjective, HasScheduler,
 };
 
 /// Asan death callback type
@@ -27,13 +27,16 @@ extern "C" {
 ///
 /// # Safety
 /// Calls the unsafe `__sanitizer_set_death_callback` symbol, but should be safe to call otherwise.
-pub unsafe fn setup_asan_callback<E, EM, OF, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
+pub unsafe fn setup_asan_callback<CF, E, EM, OF, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
 where
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+    CF: Feedback<E::State>,
     OF: Feedback<E::State>,
-    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+    Z: HasObjective<Objective = OF, State = E::State>
+        + HasFeedback<Feedback = CF, State = E::State>
+        + HasScheduler,
 {
-    __sanitizer_set_death_callback(asan_death_handler::<E, EM, OF, Z>);
+    __sanitizer_set_death_callback(asan_death_handler::<CF, E, EM, OF, Z>);
 }

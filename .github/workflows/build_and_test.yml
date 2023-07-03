@@ -239,10 +239,13 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Fix python (macOS)
+      if: runner.os == 'macOS'
+      run: rm /usr/local/bin/2to3* /usr/local/bin/idle3* /usr/local/bin/pydoc3* /usr/local/bin/python3*
     - uses: lyricwulf/abc@v1
       with: 
         linux: llvm llvm-dev clang 
-        macos: llvm bash coreutils
+        macos: python@3.11 llvm bash coreutils
     - uses: actions/checkout@v3
       with:
         submodules: true # recursively checkout submodules
