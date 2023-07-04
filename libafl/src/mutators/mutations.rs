@@ -1243,6 +1243,7 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
     let mut first_diff: i64 = -1;
     let mut last_diff: i64 = -1;
     for (i, (this_el, other_el)) in this.iter().zip(other.iter()).enumerate() {
+        #[allow(clippy::cast_possible_wrap)]
         if this_el != other_el {
             if first_diff < 0 {
                 first_diff = i as i64;

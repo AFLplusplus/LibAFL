@@ -535,7 +535,6 @@ where
     /// Cache that indicates if we have a `ASan` observer registered.
     has_asan_observer: Option<bool>,
     map_size: Option<usize>,
-    max_input_size: usize,
 }
 
 impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
@@ -651,7 +650,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             has_asan_observer: None, // initialized on first use
             map_size: self.map_size,
-            max_input_size: self.max_input_size,
         })
     }
 
@@ -697,7 +695,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             has_asan_observer: None, // initialized on first use
             map_size: self.map_size,
-            max_input_size: self.max_input_size,
         })
     }
 
