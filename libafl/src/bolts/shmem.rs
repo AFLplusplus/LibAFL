@@ -2,11 +2,12 @@
 //! too.)
 
 use alloc::{rc::Rc, string::ToString};
+#[cfg(feature = "std")]
+use core::num::TryFromIntError;
 use core::{
     cell::RefCell,
     fmt::{self, Debug, Display},
     mem::ManuallyDrop,
-    num::TryFromIntError,
 };
 #[cfg(feature = "std")]
 use std::env;
