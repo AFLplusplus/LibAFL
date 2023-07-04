@@ -20,6 +20,8 @@ use typed_builder::TypedBuilder;
 use super::{CustomBufEventResult, CustomBufHandlerFn};
 #[cfg(feature = "std")]
 use crate::bolts::core_affinity::CoreId;
+#[cfg(feature = "adaptive_serialization")]
+use crate::bolts::current_time;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", not(miri)))]
@@ -37,7 +39,6 @@ use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::
 use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
 use crate::{
     bolts::{
-        current_time,
         llmp::{self, LlmpClient, LlmpClientDescription, Tag},
         shmem::ShMemProvider,
         ClientId,
@@ -704,13 +705,13 @@ where
                 > SERIALIZE_PERCENTAGE_TRESHOLD;
         }
 
-        if self.inner.serialization_time() == Duration::ZERO
+        if self.serialization_time() == Duration::ZERO
             || must_ser
             || self.serializations_cnt().trailing_zeros() >= 8
         {
             let start = current_time();
             let ser = postcard::to_allocvec(observers)?;
-            *self.inner.serialization_time_mut() = current_time() - start;
+            *self.serialization_time_mut() = current_time() - start;
 
             *self.serializations_cnt_mut() += 1;
             Ok(Some(ser))

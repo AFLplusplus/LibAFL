@@ -1,14 +1,16 @@
 //! A wrapper manager to implement a main-secondary architecture with point-to-point channels
 
 use alloc::{boxed::Box, string::String, vec::Vec};
+#[cfg(feature = "adaptive_serialization")]
 use core::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
+#[cfg(feature = "adaptive_serialization")]
+use crate::bolts::current_time;
 use crate::{
     bolts::{
-        current_time,
         llmp::{LlmpReceiver, LlmpSender, Tag},
         shmem::ShMemProvider,
         ClientId,
@@ -34,7 +36,6 @@ where
     EM: UsesState,
     SP: ShMemProvider,
 {
-    must_ser_cnt: usize,
     inner: EM,
     sender_to_main: Option<LlmpSender<SP>>,
     receivers_from_secondary: Option<Vec<LlmpReceiver<SP>>>,
@@ -109,6 +110,7 @@ where
                     corpus_size: _,
                     time: _,
                     executions: _,
+                    observers_buf: _,
                     forward_id,
                 } => {
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
@@ -373,7 +375,6 @@ where
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_main(inner: EM, receivers_from_secondary: Vec<LlmpReceiver<SP>>) -> Self {
         Self {
-            must_ser_cnt: 0,
             inner,
             sender_to_main: None,
             receivers_from_secondary: Some(receivers_from_secondary),
@@ -383,7 +384,6 @@ where
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_secondary(inner: EM, sender_to_main: LlmpSender<SP>) -> Self {
         Self {
-            must_ser_cnt: 0,
             inner,
             sender_to_main: Some(sender_to_main),
             receivers_from_secondary: None,
