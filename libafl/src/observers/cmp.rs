@@ -204,7 +204,7 @@ where
 /// A standard [`CmpObserver`] observer
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "CM: serde::de::DeserializeOwned")]
-pub struct StdCmpObserver<'a, CM, S>
+pub struct ForkserverCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize,
     S: UsesInput + HasMetadata,
@@ -216,7 +216,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<'a, CM, S> CmpObserver<CM, S> for StdCmpObserver<'a, CM, S>
+impl<'a, CM, S> CmpObserver<CM, S> for ForkserverCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
     S: UsesInput + Debug + HasMetadata,
@@ -238,7 +238,7 @@ where
     }
 }
 
-impl<'a, CM, S> Observer<S> for StdCmpObserver<'a, CM, S>
+impl<'a, CM, S> Observer<S> for ForkserverCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
     S: UsesInput + Debug + HasMetadata,
@@ -261,7 +261,7 @@ where
     }
 }
 
-impl<'a, CM, S> Named for StdCmpObserver<'a, CM, S>
+impl<'a, CM, S> Named for ForkserverCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
     S: UsesInput + HasMetadata,
@@ -271,12 +271,12 @@ where
     }
 }
 
-impl<'a, CM, S> StdCmpObserver<'a, CM, S>
+impl<'a, CM, S> ForkserverCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
     S: UsesInput + HasMetadata,
 {
-    /// Creates a new [`StdCmpObserver`] with the given name and map.
+    /// Creates a new [`ForkserverCmpObserver`] with the given name and map.
     #[must_use]
     pub fn new(name: &'static str, map: &'a mut CM, add_meta: bool) -> Self {
         Self {
@@ -288,7 +288,7 @@ where
         }
     }
 
-    /// Creates a new [`StdCmpObserver`] with the given name, map and reference to variable size.
+    /// Creates a new [`ForkserverCmpObserver`] with the given name, map and reference to variable size.
     #[must_use]
     pub fn with_size(
         name: &'static str,
@@ -354,7 +354,7 @@ struct cmp_map {
 
 /// A [`CmpObserver`] observer for AFL++ redqueen
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AFLppStdCmpObserver<'a, S>
+pub struct AFLppForkserverCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
@@ -366,7 +366,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<'a, S> CmpObserver<AFLppCmpMap, S> for AFLppStdCmpObserver<'a, S>
+impl<'a, S> CmpObserver<AFLppCmpMap, S> for AFLppForkserverCmpObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -417,13 +417,13 @@ where
 
         let count = self.usable_count();
         for i in 0..count {
-            if self.original {
-                // Update header
-                meta.headers.push((i, self.cmp_map().headers[i]));
-            }
-
             let execs = self.cmp_map().usable_executions_for(i);
             if execs > 0 {
+                if self.original {
+                    // Update header
+                    meta.headers.push((i, self.cmp_map().headers[i]));
+                }
+
                 // Recongize loops and discard if needed
                 if execs > 4 {
                     let mut increasing_v0 = 0;
@@ -492,7 +492,7 @@ where
     }
 }
 
-impl<'a, S> Observer<S> for AFLppStdCmpObserver<'a, S>
+impl<'a, S> Observer<S> for AFLppForkserverCmpObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -514,7 +514,7 @@ where
     }
 }
 
-impl<'a, S> Named for AFLppStdCmpObserver<'a, S>
+impl<'a, S> Named for AFLppForkserverCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
@@ -523,11 +523,11 @@ where
     }
 }
 
-impl<'a, S> AFLppStdCmpObserver<'a, S>
+impl<'a, S> AFLppForkserverCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
-    /// Creates a new [`StdCmpObserver`] with the given name and map.
+    /// Creates a new [`ForkserverCmpObserver`] with the given name and map.
     #[must_use]
     pub fn new(name: &'static str, map: &'a mut AFLppCmpMap, add_meta: bool) -> Self {
         Self {
@@ -544,7 +544,7 @@ where
         self.original = v;
     }
 
-    /// Creates a new [`StdCmpObserver`] with the given name, map and reference to variable size.
+    /// Creates a new [`ForkserverCmpObserver`] with the given name, map and reference to variable size.
     #[must_use]
     pub fn with_size(
         name: &'static str,
@@ -615,7 +615,7 @@ pub const AFL_CMP_MAP_W: usize = 65536;
 /// The AFL++ `CMP_MAP_H`
 pub const AFL_CMP_MAP_H: usize = 32;
 /// The AFL++ `CMP_MAP_RTN_H`
-pub const AFL_CMP_MAP_RTN_H: usize = AFL_CMP_MAP_H / 4;
+pub const AFL_CMP_MAP_RTN_H: usize = AFL_CMP_MAP_H / 2;
 
 /// The AFL++ `CMP_TYPE_INS`
 pub const AFL_CMP_TYPE_INS: u32 = 1;
@@ -722,7 +722,7 @@ impl Debug for AFLppCmpVals {
     }
 }
 
-/// The AFL++ `cmp_map` struct, use with `StdCmpObserver`
+/// The AFL++ `cmp_map` struct, use with `ForkserverCmpObserver`
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
 pub struct AFLppCmpMap {
@@ -806,13 +806,11 @@ impl CmpMap for AFLppCmpMap {
             }
         } else {
             unsafe {
+                let v0_len = self.vals.fn_operands[idx][execution].v0_len & (0x80 - 1);
+                let v1_len = self.vals.fn_operands[idx][execution].v1_len & (0x80 - 1);
                 Some(CmpValues::Bytes((
-                    self.vals.fn_operands[idx][execution].v0
-                        [..(self.vals.fn_operands[idx][execution].v0_len as usize)]
-                        .to_vec(),
-                    self.vals.fn_operands[idx][execution].v1
-                        [..(self.vals.fn_operands[idx][execution].v1_len as usize)]
-                        .to_vec(),
+                    self.vals.fn_operands[idx][execution].v0[..(v0_len as usize)].to_vec(),
+                    self.vals.fn_operands[idx][execution].v1[..(v1_len as usize)].to_vec(),
                 )))
             }
         }

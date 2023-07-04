@@ -12,9 +12,10 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["fork"]
+default = ["fork", "build_libqasan"]
 python = ["pyo3", "pyo3-build-config"]
 fork = ["libafl/fork"]
+build_libqasan = []
 
 # The following architecture features are mutually exclusive.
 x86_64 = ["libafl_qemu_sys/x86_64"] # build qemu for x86_64 (default)
@@ -23,6 +24,7 @@ arm = ["libafl_qemu_sys/arm"] # build qemu for arm
 aarch64 = ["libafl_qemu_sys/aarch64"] # build qemu for aarch64
 mips = ["libafl_qemu_sys/mips"] # build qemu for mips (el, use with the 'be' feature of mips be)
 ppc = ["libafl_qemu_sys/ppc"] # build qemu for powerpc
+hexagon = ["libafl_qemu_sys/hexagon"] # build qemu for hexagon
 
 be = ["libafl_qemu_sys/be"]
 
