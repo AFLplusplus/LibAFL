@@ -194,9 +194,9 @@ where
 }
 static mut CURRENT_STAGE: *mut c_void = ptr::null_mut();
 
-/// Retrieve the current stage
+/// Retrieve the current stage from the Global variable
 pub unsafe fn current_stage<'a, E, EM, Z>() -> Option<
-    &'a mut alloc::boxed::Box<
+    alloc::boxed::Box<
         &'a mut dyn Stage<
             E,
             EM,
@@ -210,36 +210,39 @@ pub unsafe fn current_stage<'a, E, EM, Z>() -> Option<
 where
     E: UsesState,
 {
+    log::error!("postexec  {}", core::any::type_name::<E>());
     log::error!("CURRENT_STAGE @ get: {:?}", CURRENT_STAGE);
     let stage_ptr = CURRENT_STAGE as *mut _
-        as *mut alloc::boxed::Box<
-            &mut dyn Stage<
-                E,
-                EM,
-                Z,
-                State = E::State,
-                Input = <E::State as UsesInput>::Input,
-                Context = <E::State as UsesInput>::Input,
-            >,
+        as *mut &mut dyn Stage<
+            E,
+            EM,
+            Z,
+            State = E::State,
+            Input = <E::State as UsesInput>::Input,
+            Context = <E::State as UsesInput>::Input,
         >;
     if CURRENT_STAGE.is_null() {
         None
     } else {
-        stage_ptr.as_mut()
+        Some(alloc::boxed::Box::from_raw(stage_ptr))
     }
 }
 
-pub fn set_current_stage<E, EM, Z>(
+/// Store the current stage in the Global variable.
+pub fn set_current_stage<C, E, EM, Z>(
     stage: &mut dyn Stage<
         E,
         EM,
         Z,
         State = E::State,
         Input = <E::State as UsesInput>::Input,
-        Context = <E::State as UsesInput>::Input,
+        Context = C,
     >,
 ) where
     E: UsesState,
+    E::State: HasCurrentStageInfo,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     unsafe { CURRENT_STAGE = alloc::boxed::Box::into_raw(alloc::boxed::Box::new(stage)) as *mut _ };
 }
@@ -299,11 +302,7 @@ where
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let mut stage_box = alloc::boxed::Box::new(&mut self.0);
-        unsafe {
-            CURRENT_STAGE = &mut stage_box as *mut _ as *mut c_void;
-            log::error!("CURRENT_STAGE: {:?}", CURRENT_STAGE);
-        };
+        set_current_stage::<Head::Context, E, EM, Z>(&mut self.0);
         if let Some(current_stage_name) = state.current_stage_name() {
             if current_stage_name == core::any::type_name::<Head>() {
                 // Perform the current stage

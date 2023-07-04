@@ -183,7 +183,10 @@ where
         index: usize,
         exit_kind: ExitKind,
     ) -> Result<(E::Input, Option<usize>), Error> {
-        log::error!("calibrating postexec index: {}", index);
+        log::error!(
+            "calibrating postexec index: {}",
+            core::any::type_name::<E>()
+        );
         if index == 0 {
             self.total_time = if exit_kind == ExitKind::Ok {
                 current_time() - self.start

@@ -52,9 +52,13 @@ use crate::{
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCurrentStageInfo,HasCorpus, HasExecutions, HasSolutions, UsesState},
+    stages::current_stage,
     stages::Stage,
-    Error, stages::current_stage,
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasCurrentStageInfo, HasExecutions, HasSolutions,
+        UsesState,
+    },
+    Error,
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure
@@ -210,7 +214,7 @@ where
         OF: Feedback<S>,
         Z: HasObjective<Objective = OF, State = S>
             + HasFeedback<Feedback = CF, State = S>
-            + HasScheduler ,
+            + HasScheduler,
     {
         let handlers = InProcessHandlers::new::<CF, Self, EM, OF, Z>()?;
         #[cfg(windows)]
@@ -371,10 +375,11 @@ impl InProcessHandlers {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions + HasCurrentStageInfo,
+        E::State:
+            HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions + HasCurrentStageInfo,
         Z: HasObjective<Objective = OF, State = E::State>
             + HasFeedback<Feedback = CF, State = E::State>
-            + HasScheduler ,
+            + HasScheduler,
     {
         #[cfg(unix)]
         #[cfg_attr(miri, allow(unused_variables))]
@@ -607,9 +612,19 @@ pub fn run_observers_and_save_state<CF, E, EM, OF, Z>(
         + HasFeedback<Feedback = CF, State = E::State>
         + HasScheduler,
 {
-    if let Some(stage) = unsafe {current_stage::<E, EM, Z>()} {
+    if let Some(stage) = unsafe { current_stage::<E, EM, Z>() } {
         log::info!("about to postexec stage");
-        stage.post_exec(fuzzer, executor, state, event_mgr, input.clone(), 0, exitkind).expect("Failed to post_exec the current stage");
+        stage
+            .post_exec(
+                fuzzer,
+                executor,
+                state,
+                event_mgr,
+                input.clone(),
+                state.current_stage_iteration().unwrap(),
+                exitkind,
+            )
+            .expect("Failed to post_exec the current stage");
         log::info!("back from postexec stage");
     }
     let observers = executor.observers_mut();
@@ -714,7 +729,9 @@ mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::{HasFeedback, HasObjective, HasScheduler},
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasCurrentStageInfo, HasCorpus, HasExecutions, HasSolutions},
+        state::{
+            HasClientPerfMonitor, HasCorpus, HasCurrentStageInfo, HasExecutions, HasSolutions,
+        },
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -774,10 +791,11 @@ mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions + HasCurrentStageInfo,
+        E::State:
+            HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions + HasCurrentStageInfo,
         Z: HasObjective<Objective = OF, State = E::State>
             + HasFeedback<Feedback = CF, State = E::State>
-            + HasScheduler ,
+            + HasScheduler,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -818,10 +836,11 @@ mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions + HasCurrentStageInfo,
+        E::State:
+            HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions + HasCurrentStageInfo,
         Z: HasObjective<Objective = OF, State = E::State>
             + HasFeedback<Feedback = CF, State = E::State>
-            + HasScheduler ,
+            + HasScheduler,
     {
         if !data.timeout_executor_ptr.is_null()
             && data.timeout_executor_mut::<E>().handle_timeout(data)
@@ -870,10 +889,11 @@ mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         CF: Feedback<E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions + HasCurrentStageInfo,
+        E::State:
+            HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions + HasCurrentStageInfo,
         Z: HasObjective<Objective = OF, State = E::State>
             + HasFeedback<Feedback = CF, State = E::State>
-            + HasScheduler ,
+            + HasScheduler,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)

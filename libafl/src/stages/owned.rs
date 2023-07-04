@@ -30,7 +30,8 @@ where
 {
     /// The named trait objects map
     #[allow(clippy::type_complexity)]
-    pub list: Vec<Box<dyn AnyStage<E, EM, Z, State = E::State, Input = E::Input, Context = E::Input>>>,
+    pub list:
+        Vec<Box<dyn AnyStage<E, EM, Z, State = E::State, Input = E::Input, Context = E::Input>>>,
 }
 
 impl<E, EM, Z> StagesTuple<E, EM, E::State, Z> for StagesOwnedList<E, EM, Z>
@@ -65,7 +66,9 @@ where
     #[must_use]
     #[allow(clippy::type_complexity)]
     pub fn new(
-        list: Vec<Box<dyn AnyStage<E, EM, Z, Input = E::Input, State = E::State, Context = E::Input>>>,
+        list: Vec<
+            Box<dyn AnyStage<E, EM, Z, Input = E::Input, State = E::State, Context = E::Input>>,
+        >,
     ) -> Self {
         Self { list }
     }
