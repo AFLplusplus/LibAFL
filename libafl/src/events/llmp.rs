@@ -842,7 +842,7 @@ where
     save_state: bool,
 }
 
-#[cfg(feature = "adaptive_serialization")]
+#[cfg(all(feature = "std", feature = "adaptive_serialization"))]
 impl<S, SP> EventStatsCollector for LlmpRestartingEventManager<S, SP>
 where
     SP: ShMemProvider + 'static,
@@ -875,7 +875,7 @@ where
     }
 }
 
-#[cfg(not(feature = "adaptive_serialization"))]
+#[cfg(all(feature = "std", not(feature = "adaptive_serialization")))]
 impl<S, SP> EventStatsCollector for LlmpRestartingEventManager<S, SP>
 where
     SP: ShMemProvider + 'static,
