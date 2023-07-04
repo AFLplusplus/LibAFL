@@ -37,7 +37,7 @@ pub fn main() {
     };
 
     // The closure that we want to fuzz
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |input: &mut BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         signals_set(0);

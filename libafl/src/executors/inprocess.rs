@@ -56,54 +56,25 @@ use crate::{
     Error,
 };
 
-/// The process executor simply calls a target function, as mutable reference to a closure
+/// [`InProcessExecutor`] calls a target function as a mutable reference to a closure with a
+/// mutable reference to the input as an argument to allow the harness to mutate the input
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, OT, S>;
 
-/// [`InProcessExecutorMut`] calls a target function as a mutable reference to a closure with a
-/// mutable reference to the input as an argument to allow the harness to mutate the input
-pub type InProcessExecutorMut<'a, H, OT, S> = GenericInProcessExecutorMut<H, &'a mut H, OT, S>;
-
-/// The process executor simply calls a target function, as boxed `FnMut` trait object
-pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
-    dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
-    Box<dyn FnMut(&<S as UsesInput>::Input) -> ExitKind>,
-    OT,
-    S,
->;
-
-/// [`OwnedInProcessExecutorMut`] calls a boxed target function as a mutable reference
+/// [`OwnedInProcessExecutor`] calls a boxed target function as a mutable reference
 /// to a closure with a mutable reference to the input as an argument to allow the
 /// harness to mutate the input
-pub type OwnedInProcessExecutorMut<OT, S> = GenericInProcessExecutorMut<
-    dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
-    Box<dyn FnMut(&<S as UsesInput>::Input) -> ExitKind>,
+pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
+    dyn FnMut(&mut <S as UsesInput>::Input) -> ExitKind,
+    Box<dyn FnMut(&mut <S as UsesInput>::Input) -> ExitKind>,
     OT,
     S,
 >;
 
-/// The inmem executor simply calls a target function, then returns afterwards.
-#[allow(dead_code)]
-pub struct GenericInProcessExecutor<H, HB, OT, S>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-{
-    /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: HB,
-    /// The observers, observing each run
-    observers: OT,
-    // Crash and timeout hah
-    handlers: InProcessHandlers,
-    phantom: PhantomData<(S, *const H)>,
-}
-
-/// The [`GenericInProcessExecutorMut`] calls a target function as a mutable reference
+/// The [`GenericInProcessExecutor`] calls a target function as a mutable reference
 /// to a closure with a mutable reference to the input as an argument to allow the
 /// harness to mutate the input, and returns afterwards
 #[allow(dead_code)]
-pub struct GenericInProcessExecutorMut<H, HB, OT, S>
+pub struct GenericInProcessExecutor<H, HB, OT, S>
 where
     H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
@@ -121,7 +92,7 @@ where
 
 impl<H, HB, OT, S> Debug for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -134,32 +105,7 @@ where
     }
 }
 
-impl<H, HB, OT, S> Debug for GenericInProcessExecutorMut<H, HB, OT, S>
-where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("GenericInProcessExecutorMut")
-            .field("harness_fn", &"<fn>")
-            .field("observers", &self.observers)
-            .finish_non_exhaustive()
-    }
-}
-
 impl<H, HB, OT, S> UsesState for GenericInProcessExecutor<H, HB, OT, S>
-where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
-    HB: BorrowMut<H>,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-{
-    type State = S;
-}
-
-impl<H, HB, OT, S> UsesState for GenericInProcessExecutorMut<H, HB, OT, S>
 where
     H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     HB: BorrowMut<H>,
@@ -171,16 +117,6 @@ where
 
 impl<H, HB, OT, S> UsesObservers for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
-    HB: BorrowMut<H>,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-{
-    type Observers = OT;
-}
-
-impl<H, HB, OT, S> UsesObservers for GenericInProcessExecutorMut<H, HB, OT, S>
-where
     H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
@@ -190,32 +126,6 @@ where
 }
 
 impl<EM, H, HB, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutor<H, HB, OT, S>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    EM: UsesState<State = S>,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    Z: UsesState<State = S>,
-{
-    fn run_target(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        mgr: &mut EM,
-        input: &mut Self::Input,
-    ) -> Result<ExitKind, Error> {
-        self.handlers
-            .pre_run_target(self, fuzzer, state, mgr, input);
-
-        let ret = (self.harness_fn.borrow_mut())(input);
-
-        self.handlers.post_run_target();
-        Ok(ret)
-    }
-}
-
-impl<EM, H, HB, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutorMut<H, HB, OT, S>
 where
     H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
@@ -242,85 +152,6 @@ where
 }
 
 impl<H, HB, OT, S> GenericInProcessExecutor<H, HB, OT, S>
-where
-    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    OT: ObserversTuple<S>,
-    S: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
-{
-    /// Create a new in mem executor.
-    /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
-    /// depending on different corpus or state.
-    /// * `harness_fn` - the harness, executing the function
-    /// * `observers` - the observers observing the target during execution
-    /// This may return an error on unix, if signal handler setup fails
-    pub fn new<CF, EM, OF, Z>(
-        harness_fn: HB,
-        observers: OT,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-    ) -> Result<Self, Error>
-    where
-        Self: Executor<EM, Z, State = S>,
-        EM: EventFirer<State = S> + EventRestarter,
-        CF: Feedback<S>,
-        OF: Feedback<S>,
-        Z: HasObjective<Objective = OF, State = S>
-            + HasFeedback<Feedback = CF, State = S>
-            + HasScheduler,
-    {
-        let handlers = InProcessHandlers::new::<CF, Self, EM, OF, Z>()?;
-        #[cfg(windows)]
-        // Some initialization necessary for windows.
-        unsafe {
-            /*
-                See https://github.com/AFLplusplus/LibAFL/pull/403
-                This one reserves certain amount of memory for the stack.
-                If stack overflow happens during fuzzing on windows, the program is transferred to our exception handler for windows.
-                However, if we run out of the stack memory again in this exception handler, we'll crash with STATUS_ACCESS_VIOLATION.
-                We need this API call because with the llmp_compression
-                feature enabled, the exception handler uses a lot of stack memory (in the compression lib code) on release build.
-                As far as I have observed, the compression uses around 0x10000 bytes, but for safety let's just reserve 0x20000 bytes for our exception handlers.
-                This number 0x20000 could vary depending on the compilers optimization for future compression library changes.
-            */
-            let mut stack_reserved = 0x20000;
-            SetThreadStackGuarantee(&mut stack_reserved);
-        }
-        Ok(Self {
-            harness_fn,
-            observers,
-            handlers,
-            phantom: PhantomData,
-        })
-    }
-
-    /// Retrieve the harness function.
-    #[inline]
-    pub fn harness(&self) -> &H {
-        self.harness_fn.borrow()
-    }
-
-    /// Retrieve the harness function for a mutable reference.
-    #[inline]
-    pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn.borrow_mut()
-    }
-
-    /// The inprocess handlers
-    #[inline]
-    pub fn handlers(&self) -> &InProcessHandlers {
-        &self.handlers
-    }
-
-    /// The inprocess handlers (mutable)
-    #[inline]
-    pub fn handlers_mut(&mut self) -> &mut InProcessHandlers {
-        &mut self.handlers
-    }
-}
-
-impl<H, HB, OT, S> GenericInProcessExecutorMut<H, HB, OT, S>
 where
     H: FnMut(&mut <S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
@@ -402,24 +233,6 @@ where
 
 impl<H, HB, OT, S> HasObservers for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-{
-    #[inline]
-    fn observers(&self) -> &OT {
-        &self.observers
-    }
-
-    #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
-    }
-}
-
-impl<H, HB, OT, S> HasObservers for GenericInProcessExecutorMut<H, HB, OT, S>
-where
     H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
@@ -445,21 +258,6 @@ pub trait HasInProcessHandlers {
 
 #[cfg(windows)]
 impl<H, HB, OT, S> HasInProcessHandlers for GenericInProcessExecutor<H, HB, OT, S>
-where
-    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    OT: ObserversTuple<S>,
-    S: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
-{
-    /// the timeout handler
-    #[inline]
-    fn inprocess_handlers(&self) -> &InProcessHandlers {
-        &self.handlers
-    }
-}
-
-#[cfg(windows)]
-impl<H, HB, OT, S> HasInProcessHandlers for GenericInProcessExecutorMut<H, HB, OT, S>
 where
     H: FnMut(&mut <S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
@@ -1792,26 +1590,10 @@ extern "C" {
 const ITIMER_REAL: libc::c_int = 0;
 
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
-#[cfg(all(feature = "std", unix))]
-pub struct InProcessForkExecutor<'a, H, OT, S, SP>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    harness_fn: &'a mut H,
-    shmem_provider: SP,
-    observers: OT,
-    handlers: InChildProcessHandlers,
-    phantom: PhantomData<S>,
-}
-
-/// [`InProcessForkExecutorMut`] is an executor that forks the current process before each execution.
 /// It is the same as [`InProcessForkExecutor`] except that it allows the harness input to be
 /// mutated.
 #[cfg(all(feature = "std", unix))]
-pub struct InProcessForkExecutorMut<'a, H, OT, S, SP>
+pub struct InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
@@ -1828,26 +1610,6 @@ where
 /// Timeout executor for [`InProcessForkExecutor`]
 #[cfg(all(feature = "std", unix))]
 pub struct TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    harness_fn: &'a mut H,
-    shmem_provider: SP,
-    observers: OT,
-    handlers: InChildProcessHandlers,
-    #[cfg(target_os = "linux")]
-    itimerspec: libc::itimerspec,
-    #[cfg(all(unix, not(target_os = "linux")))]
-    itimerval: Itimerval,
-    phantom: PhantomData<S>,
-}
-
-/// Timeout executor for [`InProcessForkExecutorMut`]
-#[cfg(all(feature = "std", unix))]
-pub struct TimeoutInProcessForkExecutorMut<'a, H, OT, S, SP>
 where
     H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
@@ -1868,7 +1630,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> Debug for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1882,25 +1644,9 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> Debug for InProcessForkExecutorMut<'a, H, OT, S, SP>
-where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("InProcessForkExecutorMut")
-            .field("observers", &self.observers)
-            .field("shmem_provider", &self.shmem_provider)
-            .finish()
-    }
-}
-
-#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1927,47 +1673,7 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> Debug for TimeoutInProcessForkExecutorMut<'a, H, OT, S, SP>
-where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    #[cfg(target_os = "linux")]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TimeoutInProcessForkExecutorMut")
-            .field("observers", &self.observers)
-            .field("shmem_provider", &self.shmem_provider)
-            .field("itimerspec", &self.itimerspec)
-            .finish()
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        #[cfg(not(target_os = "linux"))]
-        return f
-            .debug_struct("TimeoutInProcessForkExecutorMut")
-            .field("observers", &self.observers)
-            .field("shmem_provider", &self.shmem_provider)
-            .field("itimerval", &self.itimerval)
-            .finish();
-    }
-}
-
-#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesState for InProcessForkExecutor<'a, H, OT, S, SP>
-where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    type State = S;
-}
-
-#[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> UsesState for InProcessForkExecutorMut<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
@@ -1980,17 +1686,6 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesState for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    type State = S;
-}
-
-#[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> UsesState for TimeoutInProcessForkExecutorMut<'a, H, OT, S, SP>
-where
     H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -2001,74 +1696,6 @@ where
 
 #[cfg(all(feature = "std", unix))]
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for InProcessForkExecutor<'a, H, OT, S, SP>
-where
-    EM: UsesState<State = S>,
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-    Z: UsesState<State = S>,
-{
-    #[allow(unreachable_code)]
-    #[inline]
-    fn run_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut Self::State,
-        _mgr: &mut EM,
-        input: &mut Self::Input,
-    ) -> Result<ExitKind, Error> {
-        unsafe {
-            self.shmem_provider.pre_fork()?;
-            match fork() {
-                Ok(ForkResult::Child) => {
-                    // Child
-                    self.shmem_provider.post_fork(true)?;
-
-                    self.handlers.pre_run_target(self, state, input);
-
-                    self.observers
-                        .pre_exec_child_all(state, input)
-                        .expect("Failed to run post_exec on observers");
-
-                    (self.harness_fn)(input);
-
-                    self.observers
-                        .post_exec_child_all(state, input, &ExitKind::Ok)
-                        .expect("Failed to run post_exec on observers");
-
-                    libc::_exit(0);
-
-                    Ok(ExitKind::Ok)
-                }
-                Ok(ForkResult::Parent { child }) => {
-                    // Parent
-                    // log::info!("from parent {} child is {}", std::process::id(), child);
-                    self.shmem_provider.post_fork(false)?;
-
-                    let res = waitpid(child, None)?;
-
-                    match res {
-                        WaitStatus::Signaled(_, _, _) => Ok(ExitKind::Crash),
-                        WaitStatus::Exited(_, code) => {
-                            if code > 128 && code < 160 {
-                                // Signal exit codes
-                                Ok(ExitKind::Crash)
-                            } else {
-                                Ok(ExitKind::Ok)
-                            }
-                        }
-                        _ => Ok(ExitKind::Ok),
-                    }
-                }
-                Err(e) => Err(Error::from(e)),
-            }
-        }
-    }
-}
-
-#[cfg(all(feature = "std", unix))]
-impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for InProcessForkExecutorMut<'a, H, OT, S, SP>
 where
     EM: UsesState<State = S>,
     H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
@@ -2137,109 +1764,6 @@ where
 
 #[cfg(all(feature = "std", unix))]
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
-where
-    EM: UsesState<State = S>,
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-    Z: UsesState<State = S>,
-{
-    #[allow(unreachable_code)]
-    #[inline]
-    fn run_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut Self::State,
-        _mgr: &mut EM,
-        input: &mut Self::Input,
-    ) -> Result<ExitKind, Error> {
-        unsafe {
-            self.shmem_provider.pre_fork()?;
-            match fork() {
-                Ok(ForkResult::Child) => {
-                    // Child
-                    self.shmem_provider.post_fork(true)?;
-
-                    self.handlers.pre_run_target(self, state, input);
-
-                    self.observers
-                        .pre_exec_child_all(state, input)
-                        .expect("Failed to run post_exec on observers");
-
-                    #[cfg(target_os = "linux")]
-                    {
-                        let mut timerid: libc::timer_t = null_mut();
-                        // creates a new per-process interval timer
-                        // we can't do this from the parent, timerid is unique to each process.
-                        libc::timer_create(
-                            libc::CLOCK_MONOTONIC,
-                            null_mut(),
-                            addr_of_mut!(timerid),
-                        );
-
-                        // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-                        let _: i32 = libc::timer_settime(
-                            timerid,
-                            0,
-                            addr_of_mut!(self.itimerspec),
-                            null_mut(),
-                        );
-                    }
-                    #[cfg(not(target_os = "linux"))]
-                    {
-                        setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
-                    }
-                    // log::trace!("{v:#?} {}", nix::errno::errno());
-                    (self.harness_fn)(input);
-
-                    self.observers
-                        .post_exec_child_all(state, input, &ExitKind::Ok)
-                        .expect("Failed to run post_exec on observers");
-
-                    libc::_exit(0);
-
-                    Ok(ExitKind::Ok)
-                }
-                Ok(ForkResult::Parent { child }) => {
-                    // Parent
-                    // log::trace!("from parent {} child is {}", std::process::id(), child);
-                    self.shmem_provider.post_fork(false)?;
-
-                    let res = waitpid(child, None)?;
-                    log::trace!("{res:#?}");
-                    match res {
-                        WaitStatus::Signaled(_, signal, _) => match signal {
-                            nix::sys::signal::Signal::SIGALRM
-                            | nix::sys::signal::Signal::SIGUSR2 => Ok(ExitKind::Timeout),
-                            _ => Ok(ExitKind::Crash),
-                        },
-                        WaitStatus::Exited(_, code) => {
-                            if code > 128 && code < 160 {
-                                // Signal exit codes
-                                let signal = code - 128;
-                                if signal == Signal::SigAlarm as libc::c_int
-                                    || signal == Signal::SigUser2 as libc::c_int
-                                {
-                                    Ok(ExitKind::Timeout)
-                                } else {
-                                    Ok(ExitKind::Crash)
-                                }
-                            } else {
-                                Ok(ExitKind::Ok)
-                            }
-                        }
-                        _ => Ok(ExitKind::Ok),
-                    }
-                }
-                Err(e) => Err(Error::from(e)),
-            }
-        }
-    }
-}
-
-#[cfg(all(feature = "std", unix))]
-impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for TimeoutInProcessForkExecutorMut<'a, H, OT, S, SP>
 where
     EM: UsesState<State = S>,
     H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
@@ -2344,7 +1868,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput + HasCorpus,
     SP: ShMemProvider,
@@ -2391,58 +1915,9 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> InProcessForkExecutorMut<'a, H, OT, S, SP>
-where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
-    S: UsesInput + HasCorpus,
-    SP: ShMemProvider,
-{
-    /// Creates a new [`InProcessForkExecutorMut`]
-    pub fn new<CF, EM, OF, Z>(
-        harness_fn: &'a mut H,
-        observers: OT,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        shmem_provider: SP,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<State = S> + EventRestarter,
-        CF: Feedback<S>,
-        OF: Feedback<S>,
-        S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S>
-            + HasFeedback<Feedback = CF, State = S>
-            + HasScheduler,
-    {
-        let handlers = InChildProcessHandlers::new::<Self>()?;
-        Ok(Self {
-            harness_fn,
-            shmem_provider,
-            observers,
-            handlers,
-            phantom: PhantomData,
-        })
-    }
-
-    /// Retrieve the harness function.
-    #[inline]
-    pub fn harness(&self) -> &H {
-        self.harness_fn
-    }
-
-    /// Retrieve the harness function for a mutable reference.
-    #[inline]
-    pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn
-    }
-}
-
-#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     S: UsesInput + HasCorpus,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
@@ -2551,129 +2026,7 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> TimeoutInProcessForkExecutorMut<'a, H, OT, S, SP>
-where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
-    S: UsesInput + HasCorpus,
-    OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-{
-    /// Creates a new [`TimeoutInProcessForkExecutorMut`]
-    #[cfg(target_os = "linux")]
-    pub fn new<CF, EM, OF, Z>(
-        harness_fn: &'a mut H,
-        observers: OT,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        timeout: Duration,
-        shmem_provider: SP,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        CF: Feedback<S>,
-        OF: Feedback<S>,
-        S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S>
-            + HasFeedback<Feedback = CF, State = S>
-            + HasScheduler,
-    {
-        let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
-        let milli_sec = timeout.as_millis();
-        let it_value = libc::timespec {
-            tv_sec: (milli_sec / 1000) as _,
-            tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
-        };
-        let it_interval = libc::timespec {
-            tv_sec: 0,
-            tv_nsec: 0,
-        };
-        let itimerspec = libc::itimerspec {
-            it_interval,
-            it_value,
-        };
-
-        Ok(Self {
-            harness_fn,
-            shmem_provider,
-            observers,
-            handlers,
-            itimerspec,
-            phantom: PhantomData,
-        })
-    }
-
-    /// Creates a new [`TimeoutInProcessForkExecutorMut`], non linux
-    #[cfg(not(target_os = "linux"))]
-    pub fn new<CF, EM, OF, Z>(
-        harness_fn: &'a mut H,
-        observers: OT,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        timeout: Duration,
-        shmem_provider: SP,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        CF: Feedback<S>,
-        OF: Feedback<S>,
-        S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S>
-            + HasFeedback<Feedback = CF, State = S>
-            + HasScheduler,
-    {
-        let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
-        let milli_sec = timeout.as_millis();
-        let it_value = Timeval {
-            tv_sec: (milli_sec / 1000) as i64,
-            tv_usec: (milli_sec % 1000) as i64,
-        };
-        let it_interval = Timeval {
-            tv_sec: 0,
-            tv_usec: 0,
-        };
-        let itimerval = Itimerval {
-            it_interval,
-            it_value,
-        };
-
-        Ok(Self {
-            harness_fn,
-            shmem_provider,
-            observers,
-            handlers,
-            itimerval,
-            phantom: PhantomData,
-        })
-    }
-
-    /// Retrieve the harness function.
-    #[inline]
-    pub fn harness(&self) -> &H {
-        self.harness_fn
-    }
-
-    /// Retrieve the harness function for a mutable reference.
-    #[inline]
-    pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn
-    }
-}
-
-#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesObservers for InProcessForkExecutor<'a, H, OT, S, SP>
-where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    type Observers = OT;
-}
-
-#[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> UsesObservers for InProcessForkExecutorMut<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
@@ -2686,17 +2039,6 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: ?Sized + FnMut(&S::Input) -> ExitKind,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    type Observers = OT;
-}
-
-#[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> UsesObservers for TimeoutInProcessForkExecutorMut<'a, H, OT, S, SP>
-where
     H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -2707,25 +2049,6 @@ where
 
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, OT, S, SP>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    S: UsesInput,
-    OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-{
-    #[inline]
-    fn observers(&self) -> &OT {
-        &self.observers
-    }
-
-    #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
-    }
-}
-
-#[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> HasObservers for InProcessForkExecutorMut<'a, H, OT, S, SP>
 where
     H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     S: UsesInput,
@@ -2745,25 +2068,6 @@ where
 
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> HasObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    S: UsesInput,
-    OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-{
-    #[inline]
-    fn observers(&self) -> &OT {
-        &self.observers
-    }
-
-    #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
-    }
-}
-
-#[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> HasObservers for TimeoutInProcessForkExecutorMut<'a, H, OT, S, SP>
 where
     H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
     S: UsesInput,
@@ -2893,7 +2197,7 @@ mod tests {
 
     #[test]
     fn test_inmem_exec() {
-        let mut harness = |_buf: &NopInput| ExitKind::Ok;
+        let mut harness = |_buf: &mut NopInput| ExitKind::Ok;
 
         let mut in_process_executor = InProcessExecutor::<_, _, _> {
             harness_fn: &mut harness,
@@ -2927,7 +2231,7 @@ mod tests {
 
         let provider = StdShMemProvider::new().unwrap();
 
-        let mut harness = |_buf: &NopInput| ExitKind::Ok;
+        let mut harness = |_buf: &mut NopInput| ExitKind::Ok;
         let mut in_process_fork_executor = InProcessForkExecutor::<_, (), _, _> {
             harness_fn: &mut harness,
             shmem_provider: provider,
@@ -2982,7 +2286,7 @@ pub mod pybind {
         ) -> Self {
             Self {
                 inner: OwnedInProcessExecutor::new(
-                    Box::new(move |input: &BytesInput| {
+                    Box::new(move |input: &mut BytesInput| {
                         Python::with_gil(|py| -> PyResult<()> {
                             let args = (PyBytes::new(py, input.bytes()),);
                             harness.call1(py, args)?;

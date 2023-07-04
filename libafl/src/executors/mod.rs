@@ -1,12 +1,9 @@
 //! Executors take input, and run it in the target.
 
 pub mod inprocess;
-pub use inprocess::{InProcessExecutor, InProcessExecutorMut};
+pub use inprocess::InProcessExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
-pub use inprocess::{
-    InProcessForkExecutor, InProcessForkExecutorMut, TimeoutInProcessForkExecutor,
-    TimeoutInProcessForkExecutorMut,
-};
+pub use inprocess::{InProcessForkExecutor, TimeoutInProcessForkExecutor};
 
 pub mod differential;
 pub use differential::DiffExecutor;

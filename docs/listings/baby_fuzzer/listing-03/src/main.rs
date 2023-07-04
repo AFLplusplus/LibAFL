@@ -6,7 +6,7 @@ use libafl::{
 };
 
 fn main() {
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |input: &mut BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         if buf.len() > 0 && buf[0] == 'a' as u8 {

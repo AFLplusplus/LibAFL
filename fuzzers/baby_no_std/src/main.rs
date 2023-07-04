@@ -69,7 +69,7 @@ pub extern "C" fn external_current_millis() -> u64 {
 #[no_mangle]
 pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     // The closure that we want to fuzz
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |input: &mut BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         signals_set(0);
