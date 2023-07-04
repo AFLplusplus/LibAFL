@@ -64,12 +64,23 @@ impl UnstableEntriesMetadata {
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<O, OT, S> {
+pub struct CalibrationStage<O, OT, S>
+where
+    O: MapObserver,
+{
     map_observer_name: String,
     map_name: String,
     stage_max: usize,
     track_stability: bool,
     phantom: PhantomData<(O, OT, S)>,
+    iter_limit: usize,
+    corpus_idx: Option<CorpusId>,
+    unstable_entries: Vec<usize>,
+    map_first: Vec<O::Entry>,
+    map_len: usize,
+    start: Duration,
+    total_time: Duration,
+    has_errors: bool,
 }
 
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
@@ -78,6 +89,7 @@ const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 impl<O, OT, S> UsesState for CalibrationStage<O, OT, S>
 where
     S: UsesInput,
+    O: MapObserver,
 {
     type State = S;
 }
@@ -96,98 +108,123 @@ where
     type Context = Self::Input;
 
     #[inline]
-    #[allow(
-        clippy::let_and_return,
-        clippy::too_many_lines,
-        clippy::cast_precision_loss
-    )]
-    fn perform(
+    fn init(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut E::State,
-        mgr: &mut EM,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<(), Error> {
+    ) -> Result<Option<E::Input>, Error> {
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
             let corpus = state.corpus().get(corpus_idx)?.borrow();
             // println!("calibration; corpus.scheduled_count() : {}", corpus.scheduled_count());
 
             if corpus.scheduled_count() > 0 {
-                return Ok(());
+                return Ok(None);
             }
         }
-
-        let mut iter = self.stage_max;
+        self.iter_limit = self.stage_max;
+        self.corpus_idx = Some(corpus_idx);
 
         let input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
-        // Run once to get the initial calibration map
+        Ok(Some(input))
+    }
+
+    #[inline]
+    fn limit(&self) -> Result<usize, Error> {
+        Ok(self.iter_limit)
+    }
+
+    #[inline]
+    fn pre_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        _manager: &mut EM,
+        input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, bool), Error> {
+        log::error!("calibrating index: {}", _index);
         executor.observers_mut().pre_exec_all(state, &input)?;
 
-        let mut start = current_time();
+        self.start = current_time();
+        Ok((input, true))
+    }
 
-        executor.pre_exec(fuzzer, state, mgr, &input)?;
-        let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
-        executor.post_exec(fuzzer, state, mgr, &input)?;
+    #[inline]
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: E::Input,
+        _index: usize,
+    ) -> Result<(E::Input, ExitKind), Error> {
+        executor.pre_exec(fuzzer, state, manager, &input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+        executor.post_exec(fuzzer, state, manager, &input)?;
 
-        let mut total_time = if exit_kind == ExitKind::Ok {
-            current_time() - start
+        Ok((input, exit_kind))
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+        input: E::Input,
+        index: usize,
+        exit_kind: ExitKind,
+    ) -> Result<(E::Input, Option<usize>), Error> {
+        log::error!("calibrating postexec index: {}", index);
+        if index == 0 {
+            self.total_time = if exit_kind == ExitKind::Ok {
+                current_time() - self.start
+            } else {
+                manager.log(
+                    state,
+                    LogSeverity::Warn,
+                    "Corpus entry errored on execution!".into(),
+                )?;
+                // assume one second as default time
+                Duration::from_secs(1)
+            };
+
+            executor
+                .observers_mut()
+                .post_exec_all(state, &input, &exit_kind)?;
+
+            self.map_first = executor
+                .observers()
+                .match_name::<O>(&self.map_observer_name)
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+                .to_vec();
+            self.map_len = self.map_first.len();
         } else {
-            mgr.log(
-                state,
-                LogSeverity::Warn,
-                "Corpus entry errored on execution!".into(),
-            )?;
-            // assume one second as default time
-            Duration::from_secs(1)
-        };
-
-        executor
-            .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
-
-        let map_first = &executor
-            .observers()
-            .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
-            .to_vec();
-
-        let mut unstable_entries: Vec<usize> = vec![];
-        let map_len: usize = map_first.len();
-        // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
-        // run is found to be unstable or to crash with CAL_STAGE_MAX total runs.
-        let mut i = 1;
-        let mut has_errors = false;
-
-        while i < iter {
-            let input = state.corpus().cloned_input_for_id(corpus_idx)?;
-
-            executor.observers_mut().pre_exec_all(state, &input)?;
-            start = current_time();
-
-            executor.pre_exec(fuzzer, state, mgr, &input)?;
-            let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
-            executor.post_exec(fuzzer, state, mgr, &input)?;
-
             if exit_kind != ExitKind::Ok {
-                if !has_errors {
-                    mgr.log(
+                if !self.has_errors {
+                    manager.log(
                         state,
                         LogSeverity::Warn,
                         "Corpus entry errored on execution!".into(),
                     )?;
 
-                    has_errors = true;
+                    self.has_errors = true;
                 }
 
-                if iter < CAL_STAGE_MAX {
-                    iter += 2;
+                if self.iter_limit < CAL_STAGE_MAX {
+                    self.iter_limit += 2;
                 };
             };
 
-            total_time += current_time() - start;
+            self.total_time += current_time() - self.start;
 
             executor
                 .observers_mut()
@@ -206,43 +243,54 @@ where
                     .unwrap()
                     .history_map;
 
-                if history_map.len() < map_len {
-                    history_map.resize(map_len, O::Entry::default());
+                if history_map.len() < self.map_len {
+                    history_map.resize(self.map_len, O::Entry::default());
                 }
 
-                for (idx, (first, (cur, history))) in map_first
+                for (idx, (first, (cur, history))) in self
+                    .map_first
                     .iter()
                     .zip(map.iter().zip(history_map.iter_mut()))
                     .enumerate()
                 {
                     if *first != *cur && *history != O::Entry::max_value() {
                         *history = O::Entry::max_value();
-                        unstable_entries.push(idx);
+                        self.unstable_entries.push(idx);
                     };
                 }
 
-                if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
-                    iter += 2;
+                if !self.unstable_entries.is_empty() && self.iter_limit < CAL_STAGE_MAX {
+                    self.iter_limit += 2;
                 }
             }
-            i += 1;
         }
 
-        if !unstable_entries.is_empty() {
+        Ok((input, None))
+    }
+
+    #[inline]
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+    ) -> Result<(), Error> {
+        if !self.unstable_entries.is_empty() {
             // If we see new stable entries executing this new corpus entries, then merge with the existing one
             if state.has_metadata::<UnstableEntriesMetadata>() {
                 let existing = state
                     .metadata_map_mut()
                     .get_mut::<UnstableEntriesMetadata>()
                     .unwrap();
-                for item in unstable_entries {
-                    existing.unstable_entries.insert(item); // Insert newly found items
+                for item in &self.unstable_entries {
+                    existing.unstable_entries.insert(*item); // Insert newly found items
                 }
-                existing.map_len = map_len;
+                existing.map_len = self.map_len;
             } else {
                 state.add_metadata::<UnstableEntriesMetadata>(UnstableEntriesMetadata::new(
-                    HashSet::from_iter(unstable_entries),
-                    map_len,
+                    HashSet::from_iter(self.unstable_entries.clone()),
+                    self.map_len,
                 ));
             }
         };
@@ -262,15 +310,15 @@ where
                 .unwrap();
             let handicap = psmeta.queue_cycles();
 
-            psmeta.set_exec_time(psmeta.exec_time() + total_time);
-            psmeta.set_cycles(psmeta.cycles() + (iter as u64));
+            psmeta.set_exec_time(psmeta.exec_time() + self.total_time);
+            psmeta.set_cycles(psmeta.cycles() + (self.iter_limit as u64));
             psmeta.set_bitmap_size(psmeta.bitmap_size() + bitmap_size);
             psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() + libm::log2(bitmap_size as f64));
             psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
-            let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+            let mut testcase = state.corpus().get(self.corpus_idx.unwrap())?.borrow_mut();
 
-            testcase.set_exec_time(total_time / (iter as u32));
+            testcase.set_exec_time(self.total_time / (self.iter_limit as u32));
             // log::trace!("time: {:#?}", testcase.exec_time());
 
             // If the testcase doesn't have its own `SchedulerTestcaseMetadata`, create it.
@@ -296,7 +344,7 @@ where
                     .unwrap()
             };
 
-            data.set_cycle_and_time((total_time, iter));
+            data.set_cycle_and_time((self.total_time, self.iter_limit));
             data.set_bitmap_size(bitmap_size);
             data.set_handicap(handicap);
         }
@@ -305,7 +353,7 @@ where
         if let Some(meta) = state.metadata_map().get::<UnstableEntriesMetadata>() {
             let unstable_entries = meta.unstable_entries().len();
             let map_len = meta.map_len();
-            mgr.fire(
+            manager.fire(
                 state,
                 Event::UpdateUserStats {
                     name: "stability".to_string(),
@@ -316,68 +364,6 @@ where
         }
 
         Ok(())
-    }
-
-    fn init(
-        &mut self,
-        _fuzzer: &mut Z,
-        _executor: &mut E,
-        _state: &mut Self::State,
-        _manager: &mut EM,
-        _corpus_idx: CorpusId,
-    ) -> Result<Option<E::Input>, Error> {
-        todo!()
-    }
-
-    fn limit(&self) -> Result<usize, Error> {
-        todo!()
-    }
-
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _executor: &mut E,
-        _state: &mut Self::State,
-        _manager: &mut EM,
-        _input: E::Input,
-        _index: usize,
-    ) -> Result<(E::Input, bool), Error> {
-        todo!()
-    }
-
-    fn run_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        _executor: &mut E,
-        _state: &mut Self::State,
-        _manager: &mut EM,
-        _input: E::Input,
-        _index: usize,
-    ) -> Result<(E::Input, ExitKind), Error> {
-        todo!()
-    }
-
-    fn post_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _executor: &mut E,
-        _state: &mut Self::State,
-        _manager: &mut EM,
-        _input: E::Input,
-        _index: usize,
-        _exit_kind: ExitKind,
-    ) -> Result<(E::Input, Option<usize>), Error> {
-        todo!()
-    }
-
-    fn deinit(
-        &mut self,
-        _fuzzer: &mut Z,
-        _executor: &mut E,
-        _state: &mut Self::State,
-        _manager: &mut EM,
-    ) -> Result<(), Error> {
-        todo!()
     }
 }
 
@@ -400,6 +386,14 @@ where
             stage_max: CAL_STAGE_START,
             track_stability: true,
             phantom: PhantomData,
+            iter_limit: 0,
+            corpus_idx: None,
+            unstable_entries: vec![],
+            map_first: vec![],
+            map_len: 0,
+            start: Duration::from_secs(0),
+            total_time: Duration::from_secs(0),
+            has_errors: false,
         }
     }
 
@@ -416,6 +410,14 @@ where
             stage_max: CAL_STAGE_START,
             track_stability: false,
             phantom: PhantomData,
+            iter_limit: 0,
+            corpus_idx: None,
+            unstable_entries: vec![],
+            map_first: vec![],
+            map_len: 0,
+            start: Duration::from_secs(0),
+            total_time: Duration::from_secs(0),
+            has_errors: false,
         }
     }
 }
