@@ -160,12 +160,8 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
                 .unwrap()
             });
 
-            // Create a dictionary if not existing
-            if let Some(tokens_file) = &self.tokens_file {
-                if state.metadata_map().get::<Tokens>().is_none() {
-                    state.add_metadata(Tokens::from_file(tokens_file)?);
-                }
-            }
+            // Create an empty set of tokens, first populated by the target program
+            let mut tokens = Tokens::new();
 
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
@@ -177,6 +173,9 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
                 ForkserverExecutorBuilder::new()
                     .program(self.program.clone())
                     .parse_afl_cmdline(self.arguments)
+                    .is_deferred_frksrv(true)
+                    .is_persistent(true)
+                    .autotokens(&mut tokens)
                     .debug_child(self.debug_output)
                     .shmem_provider(&mut shmem_provider_client)
                     .build(tuple_list!(edges_observer, time_observer))
@@ -184,9 +183,22 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
                 ForkserverExecutorBuilder::new()
                     .program(self.program.clone())
                     .parse_afl_cmdline(self.arguments)
+                    .is_deferred_frksrv(true)
+                    .is_persistent(true)
+                    .autotokens(&mut tokens)
                     .debug_child(self.debug_output)
                     .build(tuple_list!(edges_observer, time_observer))
             };
+
+            if let Some(tokens_file) = &self.tokens_file {
+                // if a token file is provided, load it into our set of tokens
+                tokens.add_from_file(tokens_file)?;
+            }
+
+            if !tokens.is_empty() {
+                // add any known tokens to the state
+                state.add_metadata(tokens);
+            }
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = TimeoutForkserverExecutor::new(
