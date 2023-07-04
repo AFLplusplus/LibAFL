@@ -150,6 +150,7 @@ where
             if !was_fuzzed {
                 let selection = Some(id);
                 state.metadata_mut::<EcoMetadata>()?.state = EcoState::Exploration;
+                #[allow(clippy::explicit_iter_loop)]
                 return Ok(selection.expect("Error in the algorithm, this cannot be None"));
             }
         }
