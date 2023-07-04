@@ -11,7 +11,7 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     inputs::{BytesInput, UsesInput},
     mark_feature_time,
-    observers::{AFLppStdCmpObserver, ObserversTuple},
+    observers::{AFLppForkserverCmpObserver, ObserversTuple},
     stages::{colorization::TaintMetadata, Stage},
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, State, UsesState},
@@ -145,13 +145,13 @@ where
             if let Some(ob) = self
                 .tracer_executor
                 .observers_mut()
-                .match_name_mut::<AFLppStdCmpObserver<TE::State>>(name)
+                .match_name_mut::<AFLppForkserverCmpObserver<TE::State>>(name)
             {
                 // This is not the original input,
                 // Set it to false
                 ob.set_original(true);
             }
-            // I can't think of any use of this stage if you don't use AFLStdCmpObserver
+            // I can't think of any use of this stage if you don't use AFLForkserverCmpObserver
             // but do nothing ofcourse
         }
 
@@ -181,13 +181,13 @@ where
             if let Some(ob) = self
                 .tracer_executor
                 .observers_mut()
-                .match_name_mut::<AFLppStdCmpObserver<TE::State>>(name)
+                .match_name_mut::<AFLppForkserverCmpObserver<TE::State>>(name)
             {
                 // This is not the original input,
                 // Set it to false
                 ob.set_original(false);
             }
-            // I can't think of any use of this stage if you don't use AFLStdCmpObserver
+            // I can't think of any use of this stage if you don't use AFLForkserverCmpObserver
             // but do nothing ofcourse
         }
 

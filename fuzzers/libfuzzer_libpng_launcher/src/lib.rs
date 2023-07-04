@@ -2,9 +2,9 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
-use mimalloc::MiMalloc;
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
+//use mimalloc::MiMalloc;
+//#[global_allocator]
+//static GLOBAL: MiMalloc = MiMalloc;
 
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
@@ -197,7 +197,15 @@ pub fn libafl_main() {
         let mut harness = |input: &mut BytesInput| {
             let target = input.target_bytes();
             let buf = target.as_slice();
+
+            // Artificial timeout to check timeout
             libfuzzer_test_one_input(buf);
+
+            // We're timeouting
+            if buf.len() == 42 {
+                println!("TIMEOUT :)");
+                std::thread::sleep(Duration::from_millis(1_000_000));
+            }
             ExitKind::Ok
         };
 

@@ -1,4 +1,6 @@
-use {std::error::Error, vergen::EmitBuilder};
+use std::error::Error;
+
+use vergen::EmitBuilder;
 
 fn main() -> Result<(), Box<dyn Error>> {
     EmitBuilder::builder()

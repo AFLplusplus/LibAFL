@@ -1,7 +1,6 @@
-use {
-    clap::{builder::Str, Parser},
-    std::iter,
-};
+use std::iter;
+
+use clap::{builder::Str, Parser};
 
 #[derive(Default)]
 pub struct Version;
