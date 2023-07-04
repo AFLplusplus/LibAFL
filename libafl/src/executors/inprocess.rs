@@ -991,7 +991,7 @@ pub mod windows_asan_handler {
             + HasFeedback<Feedback = CF, State = E::State>
             + HasScheduler,
     {
-        let mut data = &mut GLOBAL_STATE;
+        let data = &mut GLOBAL_STATE;
         data.set_in_handler(true);
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
