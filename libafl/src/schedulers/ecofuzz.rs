@@ -148,9 +148,8 @@ where
         for id in state.corpus().ids() {
             let was_fuzzed = state.testcase(id)?.scheduled_count() > 0;
             if !was_fuzzed {
-                let selection = Some(id);
                 state.metadata_mut::<EcoMetadata>()?.state = EcoState::Exploration;
-                return Ok(selection.expect("Error in the algorithm, this cannot be None"));
+                return Ok(id);
             }
         }
 

@@ -499,7 +499,6 @@ where
 
             Ok(cur)
         } else {
-            if cur.as_millis() % 1000 == 0 {}
             Ok(last_report_time)
         }
     }

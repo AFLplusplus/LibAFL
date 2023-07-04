@@ -6,6 +6,7 @@ use core::{
     cell::RefCell,
     fmt::{self, Debug, Display},
     mem::ManuallyDrop,
+    num::TryFromIntError,
 };
 #[cfg(feature = "std")]
 use std::env;
@@ -1442,23 +1443,34 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
             std::io::SeekFrom::Start(s) => s,
             std::io::SeekFrom::End(offset) => {
                 let map_len = self.inner.as_slice().len();
-                i64::try_from(map_len).unwrap();
-                let signed_pos = map_len as i64;
-                let effective = signed_pos.checked_add(offset).unwrap();
+                let signed_pos: i64 = map_len.try_into().map_err(|e: TryFromIntError| {
+                    std::io::Error::new(std::io::ErrorKind::Other, e)
+                })?;
+                let effective = signed_pos.checked_add(offset).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::Other, "Invalid offset")
+                })?;
                 assert!(effective >= 0);
-                effective.try_into().unwrap()
+                effective.try_into().map_err(|e: TryFromIntError| {
+                    std::io::Error::new(std::io::ErrorKind::Other, e)
+                })?
             }
             std::io::SeekFrom::Current(offset) => {
                 let current_pos = self.pos;
-                i64::try_from(current_pos).unwrap();
-                let signed_pos = current_pos as i64;
-                let effective = signed_pos.checked_add(offset).unwrap();
+                let signed_pos: i64 = current_pos.try_into().map_err(|e: TryFromIntError| {
+                    std::io::Error::new(std::io::ErrorKind::Other, e)
+                })?;
+                let effective = signed_pos.checked_add(offset).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::Other, "Invalid offset")
+                })?;
                 assert!(effective >= 0);
-                effective.try_into().unwrap()
+                effective.try_into().map_err(|e: TryFromIntError| {
+                    std::io::Error::new(std::io::ErrorKind::Other, e)
+                })?
             }
         };
-        usize::try_from(effective_new_pos).unwrap();
-        self.pos = effective_new_pos as usize;
+        self.pos = effective_new_pos
+            .try_into()
+            .map_err(|e: TryFromIntError| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         Ok(effective_new_pos)
     }
 }
