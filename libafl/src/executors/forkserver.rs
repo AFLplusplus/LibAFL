@@ -65,7 +65,7 @@ const fn fs_opt_get_mapsize(x: i32) -> i32 {
 
 /// The length of header bytes which tells shmem size
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
-const MAX_FILE: usize = 1024 * 1024;
+const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
 
 /// Configure the target, `limit`, `setsid`, `pipe_stdin`, the code was borrowed from the [`Angora`](https://github.com/AngoraFuzzer/Angora) fuzzer
 pub trait ConfigTarget {
@@ -535,6 +535,7 @@ where
     /// Cache that indicates if we have a `ASan` observer registered.
     has_asan_observer: Option<bool>,
     map_size: Option<usize>,
+    max_input_size: usize,
 }
 
 impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
@@ -610,6 +611,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     autotokens: Option<&'a mut Tokens>,
     input_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
+    max_input_size: usize,
     map_size: Option<usize>,
     real_map_size: i32,
 }
@@ -649,6 +651,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             has_asan_observer: None, // initialized on first use
             map_size: self.map_size,
+            max_input_size: self.max_input_size,
         })
     }
 
@@ -694,6 +697,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             has_asan_observer: None, // initialized on first use
             map_size: self.map_size,
+            max_input_size: self.max_input_size,
         })
     }
 
@@ -716,10 +720,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             None => None,
             Some(provider) => {
                 // setup shared memory
-                let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
+                let mut shmem = provider.new_shmem(self.max_input_size + SHMEM_FUZZ_HDR_SIZE)?;
                 shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
 
-                let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
+                let size_in_bytes = (self.max_input_size + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
                 shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
                 Some(shmem)
             }
@@ -1035,6 +1039,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             shmem_provider: None,
             map_size: None,
             real_map_size: 0,
+            max_input_size: MAX_INPUT_SIZE_DEFAULT,
         }
     }
 
@@ -1057,6 +1062,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             shmem_provider: Some(shmem_provider),
             map_size: self.map_size,
             real_map_size: self.real_map_size,
+            max_input_size: MAX_INPUT_SIZE_DEFAULT,
         }
     }
 }
@@ -1091,16 +1097,17 @@ where
             let map = unsafe { self.map.as_mut().unwrap_unchecked() };
             let target_bytes = input.target_bytes();
             let mut size = target_bytes.as_slice().len();
-            if size > MAX_FILE {
+            let max_size = map.len() - SHMEM_FUZZ_HDR_SIZE;
+            if size > max_size {
                 // Truncate like AFL++ does
-                size = MAX_FILE;
+                size = max_size;
             }
             let size_in_bytes = size.to_ne_bytes();
             // The first four bytes tells the size of the shmem.
             map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
                 .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
             map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                .copy_from_slice(target_bytes.as_slice());
+                .copy_from_slice(&target_bytes.as_slice()[..size]);
         } else {
             self.input_file.write_buf(input.target_bytes().as_slice())?;
         }
