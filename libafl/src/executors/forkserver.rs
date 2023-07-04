@@ -436,14 +436,20 @@ where
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
 
         if self.executor.uses_shmem_testcase() {
-            let shmem = unsafe { self.executor.shmem_mut().as_mut().unwrap_unchecked() };
+            let map = unsafe { self.executor.shmem_mut().as_mut().unwrap_unchecked() };
             let target_bytes = input.target_bytes();
-            let size = target_bytes.as_slice().len();
+            let mut size = target_bytes.as_slice().len();
+            let max_size = map.len() - SHMEM_FUZZ_HDR_SIZE;
+            if size > max_size {
+                // Truncate like AFL++ does
+                size = max_size;
+            }
             let size_in_bytes = size.to_ne_bytes();
             // The first four bytes tells the size of the shmem.
-            shmem.as_mut_slice()[..4].copy_from_slice(&size_in_bytes[..4]);
-            shmem.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                .copy_from_slice(target_bytes.as_slice());
+            map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
+                .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
+            map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                .copy_from_slice(&target_bytes.as_slice()[..size]);
         } else {
             self.executor
                 .input_file_mut()
