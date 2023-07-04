@@ -176,14 +176,14 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             let forkserver = if self.shmem_testcase {
                 ForkserverExecutorBuilder::new()
                     .program(self.program.clone())
-                    .args(self.arguments)
+                    .parse_afl_cmdline(self.arguments)
                     .debug_child(self.debug_output)
                     .shmem_provider(&mut shmem_provider_client)
                     .build(tuple_list!(edges_observer, time_observer))
             } else {
                 ForkserverExecutorBuilder::new()
                     .program(self.program.clone())
-                    .args(self.arguments)
+                    .parse_afl_cmdline(self.arguments)
                     .debug_child(self.debug_output)
                     .build(tuple_list!(edges_observer, time_observer))
             };
