@@ -693,7 +693,7 @@ impl AFLppRedQueen {
                     )),
                     0xffff,
                 ),
-                4 | 5 | 6 | 7 => (
+                4..=7 => (
                     u64::from(u32::from_be_bytes(
                         buf[buf_idx..buf_idx + 4].try_into().unwrap(),
                     )),
@@ -852,7 +852,7 @@ impl AFLppRedQueen {
                     }
                 }
             }
-            4 | 5 | 6 | 7 => {
+            4..=7 => {
                 if its_len >= 4 {
                     let buf_32 = u32::from_be_bytes(buf[buf_idx..buf_idx + 4].try_into().unwrap());
                     let another_buf_32 =
@@ -1448,7 +1448,7 @@ where
 
                             if !cmp_found {
                                 if orig_v0 == new_v0
-                                    && check_if_text(&orig_v0.to_ne_bytes().to_vec(), hshape).size()
+                                    && check_if_text(orig_v0.to_ne_bytes().as_ref(), hshape).size()
                                         == hshape
                                 {
                                     let v = orig_v0.to_ne_bytes().to_vec();
@@ -1456,7 +1456,7 @@ where
                                 }
 
                                 if orig_v1 == new_v1
-                                    && check_if_text(&orig_v1.to_ne_bytes().to_vec(), hshape).size()
+                                    && check_if_text(orig_v1.to_ne_bytes().as_ref(), hshape).size()
                                         == hshape
                                 {
                                     let v = orig_v1.to_ne_bytes().to_vec();
@@ -1541,7 +1541,7 @@ where
 
                             if !cmp_found {
                                 if orig_v0 == new_v0
-                                    && check_if_text(&orig_v0.to_ne_bytes().to_vec(), hshape).size()
+                                    && check_if_text(orig_v0.to_ne_bytes().as_ref(), hshape).size()
                                         == hshape
                                 {
                                     let v = orig_v0.to_ne_bytes().to_vec();
@@ -1549,7 +1549,7 @@ where
                                 }
 
                                 if orig_v1 == new_v1
-                                    && check_if_text(&orig_v1.to_ne_bytes().to_vec(), hshape).size()
+                                    && check_if_text(orig_v1.to_ne_bytes().as_ref(), hshape).size()
                                         == hshape
                                 {
                                     let v = orig_v1.to_ne_bytes().to_vec();

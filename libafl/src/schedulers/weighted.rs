@@ -159,7 +159,7 @@ where
             sum += weight;
         }
 
-        for (i, w) in weights.iter() {
+        for (i, w) in &weights {
             p_arr.insert(*i, w * (n as f64) / sum);
         }
 
