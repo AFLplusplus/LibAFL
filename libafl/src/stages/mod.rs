@@ -74,8 +74,6 @@ use crate::{
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 
-static mut CURRENT_STAGE: *mut c_void = ptr::null_mut();
-
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<E, EM, Z>: UsesState
@@ -194,15 +192,56 @@ where
         Ok(())
     }
 }
+static mut CURRENT_STAGE: *mut c_void = ptr::null_mut();
 
 /// Retrieve the current stage
-pub unsafe fn current_stage<'a, ST>() -> Option<&'a mut ST> {
-    let stage_ptr = CURRENT_STAGE as *mut ST;
-    if stage_ptr.is_null() {
+pub unsafe fn current_stage<'a, E, EM, Z>() -> Option<
+    &'a mut alloc::boxed::Box<
+        &'a mut dyn Stage<
+            E,
+            EM,
+            Z,
+            State = E::State,
+            Input = <E::State as UsesInput>::Input,
+            Context = <E::State as UsesInput>::Input,
+        >,
+    >,
+>
+where
+    E: UsesState,
+{
+    log::error!("CURRENT_STAGE @ get: {:?}", CURRENT_STAGE);
+    let stage_ptr = CURRENT_STAGE as *mut _
+        as *mut alloc::boxed::Box<
+            &mut dyn Stage<
+                E,
+                EM,
+                Z,
+                State = E::State,
+                Input = <E::State as UsesInput>::Input,
+                Context = <E::State as UsesInput>::Input,
+            >,
+        >;
+    if CURRENT_STAGE.is_null() {
         None
     } else {
-        Some(stage_ptr.as_mut().unwrap())
+        stage_ptr.as_mut()
     }
+}
+
+pub fn set_current_stage<E, EM, Z>(
+    stage: &mut dyn Stage<
+        E,
+        EM,
+        Z,
+        State = E::State,
+        Input = <E::State as UsesInput>::Input,
+        Context = <E::State as UsesInput>::Input,
+    >,
+) where
+    E: UsesState,
+{
+    unsafe { CURRENT_STAGE = alloc::boxed::Box::into_raw(alloc::boxed::Box::new(stage)) as *mut _ };
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
@@ -260,9 +299,13 @@ where
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let mut stage_box = alloc::boxed::Box::new(&mut self.0);
+        unsafe {
+            CURRENT_STAGE = &mut stage_box as *mut _ as *mut c_void;
+            log::error!("CURRENT_STAGE: {:?}", CURRENT_STAGE);
+        };
         if let Some(current_stage_name) = state.current_stage_name() {
             if current_stage_name == core::any::type_name::<Head>() {
-                unsafe { CURRENT_STAGE = &mut self.0 as *mut _ as *mut c_void };
                 // Perform the current stage
                 self.0
                     .perform(fuzzer, executor, state, manager, corpus_idx)?;
@@ -273,14 +316,13 @@ where
         } else {
             // We don't have a current stage, so set the current stage name and run the next stage
             state.set_current_stage_name(core::any::type_name::<Head>());
-            unsafe { CURRENT_STAGE = &mut self.0 as *mut _ as *mut c_void };
             // Perform the current stage
             self.0
                 .perform(fuzzer, executor, state, manager, corpus_idx)?;
             state.clear_current_stage();
         }
 
-        unsafe { CURRENT_STAGE = ptr::null_mut() };
+        // unsafe { CURRENT_STAGE = ptr::null_mut() };
 
         // Execute the remaining stages
         self.1
