@@ -158,7 +158,7 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<Self::Context, Error> {
+    ) -> Result<Option<Self::Context>, Error> {
         let metadata: &TuneableMutationalStageMetadata = state.metadata()?;
 
         self.fuzz_time = metadata.fuzz_time;
@@ -178,7 +178,7 @@ where
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
-        Ok(input)
+        Ok(Some(input))
     }
 
     fn limit(&self) -> Result<usize, Error> {
@@ -261,11 +261,11 @@ where
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut Self::State,
+        _state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        _state.introspection_monitor_mut().finish_stage();
         Ok(())
     }
 }

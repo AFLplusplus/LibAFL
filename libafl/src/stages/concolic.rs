@@ -76,7 +76,7 @@ where
         _state: &mut Self::State,
         _manager: &mut EM,
         _corpus_idx: CorpusId,
-    ) -> Result<E::Input, Error> {
+    ) -> Result<Option<E::Input>, Error> {
         todo!()
     }
 
@@ -463,7 +463,7 @@ where
         state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<E::Input, Error> {
+    ) -> Result<Option<E::Input>, Error> {
         todo!()
     }
 

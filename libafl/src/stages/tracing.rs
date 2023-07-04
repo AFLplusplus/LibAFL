@@ -54,12 +54,12 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<E::Input, Error> {
+    ) -> Result<Option<E::Input>, Error> {
         start_timer!(state);
         let input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-        Ok(input)
+        Ok(Some(input))
     }
 
     #[inline]
@@ -200,12 +200,12 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<E::Input, Error> {
+    ) -> Result<Option<E::Input>, Error> {
         // First run with the un-mutated input
 
         let unmutated_input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
-        Ok(unmutated_input)
+        Ok(Some(unmutated_input))
     }
 
     #[inline]
@@ -368,11 +368,11 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<E::Input, Error> {
+    ) -> Result<Option<E::Input>, Error> {
         start_timer!(state);
         let input = state.corpus().cloned_input_for_id(corpus_idx)?;
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-        Ok(input)
+        Ok(Some(input))
     }
 
     #[inline]

@@ -124,7 +124,7 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<E::Input, Error> {
+    ) -> Result<Option<E::Input>, Error> {
         self.orig_max_size = state.max_size();
         // basically copy-pasted from mutational.rs
         self.limit = self.iterations(state, corpus_idx)? + 1;
@@ -136,7 +136,7 @@ where
         base.hash(&mut hasher);
         self.base_hash = hasher.finish();
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-        Ok(base)
+        Ok(Some(base))
     }
 
     fn limit(&self) -> Result<usize, Error> {
@@ -286,11 +286,11 @@ where
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut Self::State,
+        _state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        _state.introspection_monitor_mut().finish_stage();
         Ok(())
     }
 }

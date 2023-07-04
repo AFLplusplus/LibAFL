@@ -85,6 +85,7 @@ where
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
 {
+    /// The context passed from one phase of the stage to the next. Typically an Input.
     type Context;
 
     /// Initialize the stage
@@ -95,7 +96,7 @@ where
         state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<Self::Context, Error>;
+    ) -> Result<Option<Self::Context>, Error>;
 
     /// Retrieve the stage's iteration limit. For simple stages this will be 1.
     fn limit(&self) -> Result<usize, Error>;
@@ -159,31 +160,32 @@ where
             0
         };
 
-        let mut input = self.init(fuzzer, executor, state, manager, corpus_idx)?;
+        let input = self.init(fuzzer, executor, state, manager, corpus_idx)?;
+        if let Some(mut input) = input {
+            let mut idx = start;
+            while idx < self.limit()? {
+                state.set_current_stage_iteration(idx);
 
-        let mut idx = start;
-        while idx < self.limit()? {
-            state.set_current_stage_iteration(idx);
+                let (new_input, run_target) =
+                    self.pre_exec(fuzzer, executor, state, manager, input, idx)?;
+                input = new_input;
 
-            let (new_input, run_target) =
-                self.pre_exec(fuzzer, executor, state, manager, input, idx)?;
-            input = new_input;
+                let (new_input, exit_kind) = if run_target {
+                    self.run_target(fuzzer, executor, state, manager, input, idx)?
+                } else {
+                    (input, ExitKind::Ok)
+                };
+                input = new_input;
 
-            let (new_input, exit_kind) = if run_target {
-                self.run_target(fuzzer, executor, state, manager, input, idx)?
-            } else {
-                (input, ExitKind::Ok)
-            };
-            input = new_input;
+                let (new_input, next_index) =
+                    self.post_exec(fuzzer, executor, state, manager, input, idx, exit_kind)?;
+                input = new_input;
 
-            let (new_input, next_index) =
-                self.post_exec(fuzzer, executor, state, manager, input, idx, exit_kind)?;
-            input = new_input;
-
-            if let Some(next_index) = next_index {
-                idx = next_index;
-            } else {
-                idx += 1;
+                if let Some(next_index) = next_index {
+                    idx = next_index;
+                } else {
+                    idx += 1;
+                }
             }
         }
 
@@ -333,7 +335,7 @@ where
         _state: &mut Self::State,
         _manager: &mut EM,
         _corpus_idx: CorpusId,
-    ) -> Result<E::Input, Error> {
+    ) -> Result<Option<E::Input>, Error> {
         todo!()
     }
 
@@ -511,7 +513,7 @@ where
         _state: &mut Self::State,
         _manager: &mut EM,
         _corpus_idx: CorpusId,
-    ) -> Result<E::Input, Error> {
+    ) -> Result<Option<E::Input>, Error> {
         todo!()
     }
 

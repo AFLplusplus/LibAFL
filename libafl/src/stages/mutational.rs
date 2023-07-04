@@ -186,7 +186,7 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<Self::Context, Error> {
+    ) -> Result<Option<Self::Context>, Error> {
         self.limit = self.iterations(state, corpus_idx)? as usize;
         self.corpus_idx = Some(corpus_idx);
 
@@ -195,7 +195,7 @@ where
         let Ok(input) = Self::Context::try_transform_from(&mut testcase, state, corpus_idx) else { return Err(Error::unsupported("Can't transform the input")); };
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-        Ok(input.clone())
+        Ok(Some(input))
     }
 
     #[inline]

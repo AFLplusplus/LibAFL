@@ -96,7 +96,7 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
         corpus_idx: CorpusId,
-    ) -> Result<Self::Context, Error> {
+    ) -> Result<Option<Self::Context>, Error> {
         self.limit = self.iterations(state, corpus_idx)? as usize;
         self.corpus_idx = Some(corpus_idx);
 
@@ -106,7 +106,7 @@ where
         drop(testcase);
 
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-        Ok(input)
+        Ok(Some(input))
     }
 
     #[inline]
