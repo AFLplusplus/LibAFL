@@ -24,7 +24,7 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
@@ -39,7 +39,7 @@ pub const DEFAULT_MAP_SIZE: usize = 65536;
 
 /// Creates a Forkserver-based fuzzer.
 #[derive(Debug, TypedBuilder)]
-pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
+pub struct ForkserverBytesCoverageSugar<'a> {
     /// Laucher configuration (default is random)
     #[builder(default = None, setter(strip_option))]
     configuration: Option<String>,
@@ -80,10 +80,15 @@ pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
 }
 
 #[allow(clippy::similar_names)]
-impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
+impl<'a> ForkserverBytesCoverageSugar<'a> {
     /// Runs the fuzzer.
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
+        // a large initial map size that should be enough
+        // to house all potential coverage maps for our targets
+        // (we will eventually reduce the used size according to the actual map)
+        const MAP_SIZE: usize = 2_621_440;
+
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -121,13 +126,12 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             shmem.write_to_env("__AFL_SHM_ID").unwrap();
             let shmem_map = shmem.as_mut_slice();
 
+            // To let know the AFL++ binary that we have a big map
+            std::env::set_var("AFL_MAP_SIZE", format!("{}", MAP_SIZE));
+
             // Create an observation channel using the coverage map
-            let edges_observer = unsafe {
-                HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::from_mut_ptr(
-                    "shared_mem",
-                    shmem_map.as_mut_ptr(),
-                ))
-            };
+            let edges_observer =
+                unsafe { HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_map)) };
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
@@ -175,17 +179,19 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
                     .parse_afl_cmdline(self.arguments)
                     .is_persistent(true)
                     .autotokens(&mut tokens)
+                    .coverage_map_size(MAP_SIZE)
                     .debug_child(self.debug_output)
                     .shmem_provider(&mut shmem_provider_client)
-                    .build(tuple_list!(edges_observer, time_observer))
+                    .build_dynamic_map(edges_observer, tuple_list!(time_observer))
             } else {
                 ForkserverExecutorBuilder::new()
                     .program(self.program.clone())
                     .parse_afl_cmdline(self.arguments)
                     .is_persistent(true)
                     .autotokens(&mut tokens)
+                    .coverage_map_size(MAP_SIZE)
                     .debug_child(self.debug_output)
-                    .build(tuple_list!(edges_observer, time_observer))
+                    .build_dynamic_map(edges_observer, tuple_list!(time_observer))
             };
 
             if let Some(tokens_file) = &self.tokens_file {
@@ -356,7 +362,7 @@ pub mod pybind {
         /// Run the fuzzer
         #[allow(clippy::needless_pass_by_value)]
         pub fn run(&self, program: String, arguments: Vec<String>) {
-            forkserver::ForkserverBytesCoverageSugar::<{ forkserver::DEFAULT_MAP_SIZE }>::builder()
+            forkserver::ForkserverBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
                 .broker_port(self.broker_port)
