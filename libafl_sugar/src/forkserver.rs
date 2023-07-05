@@ -127,7 +127,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             let shmem_map = shmem.as_mut_slice();
 
             // To let know the AFL++ binary that we have a big map
-            std::env::set_var("AFL_MAP_SIZE", format!("{}", MAP_SIZE));
+            std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
 
             // Create an observation channel using the coverage map
             let edges_observer =
