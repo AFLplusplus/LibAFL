@@ -1,11 +1,6 @@
-use std::{
-    io,
-    error::Error,
-    process,
-};
+use std::{error::Error, io, process};
 
 use libafl_ftg::Question;
-use libafl_ftg::next_question;
 
 fn run() -> Result<(), Box<dyn Error>> {
     // Mutable because we have to update the index of the 'previous' field.
@@ -20,21 +15,23 @@ fn run() -> Result<(), Box<dyn Error>> {
     while q_index < q_diagram.len() {
         q_diagram[q_index].print_question();
 
-        io::stdin().read_line(&mut input).expect("Error reading input");
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Error reading input");
 
         while !q_diagram[q_index].validate_answer(&mut input) {
             println!("Please type a valid answer:");
             input = "".to_string();
-            io::stdin().read_line(&mut input).expect("Error reading input");
+            io::stdin()
+                .read_line(&mut input)
+                .expect("Error reading input");
         }
 
-        // :( I couldnt think another way to do it so for now I am cloning
-        let question: Question = q_diagram[q_index].clone();
-        
         if q_index < q_diagram.len() - 1 {
-            q_index = next_question(&mut q_diagram, &question, &input, q_index);
-        }
-        else {
+            q_index = q_diagram[q_index]
+                .clone()
+                .next_question(&mut q_diagram, &input, q_index);
+        } else {
             q_index += 1;
         }
 
