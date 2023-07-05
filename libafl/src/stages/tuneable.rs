@@ -239,11 +239,10 @@ where
         let corpus_idx = self.corpus_idx;
         self.mutator_mut()
             .post_exec(state, index as i32, corpus_idx)?;
-        self.post
-            .as_mut()
-            .unwrap()
-            .clone()
-            .post_exec(state, index as i32, corpus_idx)?;
+        if let Some(post) = self.post.as_mut() {
+            post.clone()
+                .post_exec(state, index as i32, new_corpus_idx)?;
+        }
         mark_feature_time!(state, PerfFeature::MutatePostExec);
 
         if let Some(start_time) = self.start_time {
