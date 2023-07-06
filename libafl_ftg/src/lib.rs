@@ -1,15 +1,21 @@
 use std::error::Error;
+use toml;
+use std::fs;
+use serde::Deserialize;
 
-// Used to copy the fields of a question.
-type QuestionTup = (String, String, String, String, usize, usize, usize);
+// Used to read the TOML file
+#[derive(Deserialize)]
+struct QuestionList {
+    question: Vec<Question>,
+}
 
 // This reresents a "node": the answer of a Question might lead to different Questions (different nodes).
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub struct Question {
     name: String,    // The question that will be asked.
     content: String, // Description related to the question, to help the user.
     answer1: String, // One of the possible answers that may result, either in another question, or a component.
-    answer2: String, // Same.
+    answer2: String, // Same (for now, only 2 possible answers).
     next1: usize, // The next question (or the choice of an specific component), if answer1 is chosen.
     next2: usize, // The next question (or the choice of an specific component), if answer2 is chosen.
     previous: usize, // The question that lead to the current one (possible UNDO functionality implementation).
@@ -20,27 +26,11 @@ impl Question {
     // The diagram is a vector of Questions (vector of nodes): each Question, depending on the answer, will have the index of the next Question
     // that should be asked.
     pub fn new() -> Result<Vec<Question>, Box<dyn Error>> {
-        let mut reader = csv::ReaderBuilder::new()
-            .delimiter(b';')
-            .from_path("questions.csv")?;
+        let contents = fs::read_to_string("questions.toml")?;
 
-        let mut questions_diagram: Vec<Question> = Vec::new();
+        let q_list: QuestionList = toml::from_str(&contents)?;
 
-        for result in reader.deserialize() {
-            let question: QuestionTup = result?;
-
-            questions_diagram.push(Question {
-                name: question.0,
-                content: question.1,
-                answer1: question.2,
-                answer2: question.3,
-                next1: question.4,
-                next2: question.5,
-                previous: question.6,
-            });
-        }
-
-        Ok(questions_diagram)
+        Ok(q_list.question)
     }
 
     pub fn print_question(&self) -> () {

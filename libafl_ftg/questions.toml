@@ -1,0 +1,251 @@
+[[question]]
+name = "Introduction"
+content = "Description"
+answer1 = "Yes"
+answer2 = "Sure"
+next1 = 1
+next2 = 1
+previous = 0
+
+[[question]]
+name = "Do you have the target's source code?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 2
+next2 = 3
+previous = 0
+
+[[question]]
+name = "Can you provide a harness function?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 3
+next2 = 3
+previous = 0
+
+[[question]]
+name = "Do you want to use a map to track coverage?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 4
+next2 = 7
+previous = 0
+
+[[question]]
+name = "Do you need multiple maps?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 5
+next2 = 5
+previous = 0
+
+[[question]]
+name = "Do you know the size of the map at compile time?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 6
+next2 = 6
+previous = 0
+
+[[question]]
+name = "Do you want to improve input selection by adding a hit counts map?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 7
+next2 = 7
+previous = 0
+
+[[question]]
+name = "Do you want to consider the logged values of CMP instructions?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 8
+next2 = 8
+previous = 0
+
+[[question]]
+name = "Do you want to consider the backtrace after the harness crashes?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 9
+next2 = 9
+previous = 0
+
+[[question]]
+name = "Do you want to keep track of the testcases' runtime?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 10
+next2 = 11
+previous = 0
+
+[[question]]
+name = "Do you want to consider a timeout as a solution?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 11
+next2 = 11
+previous = 0
+
+[[question]]
+name = "Do you want to consider a crash as a solution?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 12
+next2 = 12
+previous = 0
+
+[[question]]
+name = "Do you want to manage the testcases in memory or on disk?"
+content = "Description"
+answer1 = "In memory"
+answer2 = "On disk"
+next1 = 13
+next2 = 14
+previous = 0
+
+[[question]]
+name = "Do you want to manage only in memory or in memory and on disk?"
+content = "Description"
+answer1 = "In memory"
+answer2 = "Both"
+next1 = 16
+next2 = 16
+previous = 0
+
+[[question]]
+name = "Do you want to manage only on disk or on disk and in memory?"
+content = "Description"
+answer1 = "On disk"
+answer2 = "Both"
+next1 = 15
+next2 = 16
+previous = 0
+
+[[question]]
+name = "Do you want to load testcases from disk to memory using a cache?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 16
+next2 = 16
+previous = 0
+
+[[question]]
+name = "Do you want to see stats about the fuzzing campaign?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 17
+next2 = 20
+previous = 0
+
+[[question]]
+name = "Do you want to see the stats in a UI style?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 18
+next2 = 18
+previous = 0
+
+[[question]]
+name = "Do you want to store the stats to a file?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 19
+next2 = 20
+previous = 0
+
+[[question]]
+name = "Do you want to store them to a TOML or JSON file?"
+content = "Description"
+answer1 = "TOML"
+answer2 = "JSON"
+next1 = 20
+next2 = 20
+previous = 0
+
+[[question]]
+name = "Do you want to restart your fuzzer every time a solution is achieved?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 21
+next2 = 21
+previous = 0
+
+[[question]]
+name = "Do you want to load testcases from the corpus using a queue policy?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 22
+next2 = 22
+previous = 0
+
+[[question]]
+name = "Do you want to prioritize smaller and faster testcases?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 23
+next2 = 23
+previous = 0
+
+[[question]]
+name = "Can your target corrupt memory used by the fuzzer?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 24
+next2 = 24
+previous = 0
+
+[[question]]
+name = "Do you want to set a timeout before each run?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 25
+next2 = 25
+previous = 0
+
+[[question]]
+name = "Do you want to generate an initial set of inputs?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 26
+next2 = 26
+previous = 0
+
+[[question]]
+name = "Do you want to schedule mutations?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 27
+next2 = 27
+previous = 0
+
+[[question]]
+name = "Do you want to use the StdMutationalStage?"
+content = "Description"
+answer1 = "Yes"
+answer2 = "No"
+next1 = 28
+next2 = 28
+previous = 0
