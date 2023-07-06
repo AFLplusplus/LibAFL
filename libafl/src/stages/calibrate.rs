@@ -148,7 +148,6 @@ where
         input: E::Input,
         _index: usize,
     ) -> Result<(E::Input, bool), Error> {
-        log::error!("calibrating index: {}", _index);
         executor.observers_mut().pre_exec_all(state, &input)?;
 
         self.start = current_time();
@@ -183,10 +182,6 @@ where
         index: usize,
         exit_kind: ExitKind,
     ) -> Result<(E::Input, Option<usize>), Error> {
-        log::error!(
-            "calibrating postexec index: {}",
-            core::any::type_name::<E>()
-        );
         if index == 0 {
             self.total_time = if exit_kind == ExitKind::Ok {
                 current_time() - self.start

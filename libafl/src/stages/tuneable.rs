@@ -240,8 +240,7 @@ where
         self.mutator_mut()
             .post_exec(state, index as i32, corpus_idx)?;
         if let Some(post) = self.post.as_mut() {
-            post.clone()
-                .post_exec(state, index as i32, new_corpus_idx)?;
+            post.clone().post_exec(state, index as i32, corpus_idx)?;
         }
         mark_feature_time!(state, PerfFeature::MutatePostExec);
 

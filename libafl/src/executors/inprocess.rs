@@ -612,21 +612,21 @@ pub fn run_observers_and_save_state<CF, E, EM, OF, Z>(
         + HasFeedback<Feedback = CF, State = E::State>
         + HasScheduler,
 {
-    if let Some(stage) = unsafe { current_stage::<E, EM, Z>() } {
-        log::info!("about to postexec stage");
-        stage
-            .post_exec(
-                fuzzer,
-                executor,
-                state,
-                event_mgr,
-                input.clone(),
-                state.current_stage_iteration().unwrap(),
-                exitkind,
-            )
-            .expect("Failed to post_exec the current stage");
-        log::info!("back from postexec stage");
-    }
+    // if let Some(stage) = unsafe { current_stage::<E, EM, Z>() } {
+    //     log::info!("about to postexec stage");
+    //     stage
+    //         .post_exec(
+    //             fuzzer,
+    //             executor,
+    //             state,
+    //             event_mgr,
+    //             input.clone(),
+    //             state.current_stage_iteration().unwrap(),
+    //             exitkind,
+    //         )
+    //         .expect("Failed to post_exec the current stage");
+    //     log::info!("back from postexec stage");
+    // }
     let observers = executor.observers_mut();
 
     observers
