@@ -32,7 +32,7 @@ fn signals_set(idx: usize) {
 #[allow(clippy::similar_names)]
 fn input_generator() {
     // The closure that produced the input for the generator
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |input: &mut BytesInput| {
         // The `yield_` switches execution context back to the loop in `main`.
         // When `resume` is called, we return to this function.
         yield_(input);
