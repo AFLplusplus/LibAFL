@@ -173,6 +173,10 @@ jobs:
           os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
+    - name: Delete Dotnet
+      run: find / -name "dotnet" -type d -exec rm -rf {} \;
+    - name: Delete Haskell
+      run: find / -name "ghc" -type d -exec rm -rf {} \;
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
