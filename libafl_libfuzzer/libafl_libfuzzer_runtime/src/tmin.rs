@@ -1,7 +1,7 @@
-use std::path::PathBuf;
 use std::{
     ffi::c_int,
     fs::{read, write},
+    path::PathBuf,
 };
 
 use libafl::{
@@ -30,8 +30,8 @@ type TMinState =
     StdState<BytesInput, InMemoryCorpus<BytesInput>, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;
 
 fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
-    options: LibfuzzerOptions,
-    harness: &extern "C" fn(*const u8, usize) -> c_int,
+    options: &LibfuzzerOptions,
+    harness: extern "C" fn(*const u8, usize) -> c_int,
     mutator: M,
     mut state: TMinState,
 ) -> Result<(), Error> {
@@ -52,7 +52,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
         let buf = target.as_slice();
 
         let result = unsafe {
-            crate::libafl_libfuzzer_test_one_input(Some(*harness), buf.as_ptr(), buf.len())
+            crate::libafl_libfuzzer_test_one_input(Some(harness), buf.as_ptr(), buf.len())
         };
         match result {
             -2 => ExitKind::Crash,
@@ -84,9 +84,11 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
             let tmin = StdTMinMutationalStage::new(
                 mutator,
                 factory,
-                (options.runs() == 0)
-                    .then_some(128)
-                    .unwrap_or(options.runs()),
+                if options.runs() == 0 {
+                    128
+                } else {
+                    options.runs()
+                },
             );
             let mut stages = tuple_list!(tmin);
             fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
@@ -96,9 +98,11 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
             let tmin = StdTMinMutationalStage::new(
                 mutator,
                 factory,
-                (options.runs() == 0)
-                    .then_some(128)
-                    .unwrap_or(options.runs()),
+                if options.runs() == 0 {
+                    128
+                } else {
+                    options.runs()
+                },
             );
             let mut stages = tuple_list!(tmin);
             fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
@@ -115,19 +119,18 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
             options.dirs()[0].as_path().as_os_str().to_str().unwrap()
         );
     } else {
-        let (mut dest, filename_prefix) = options
-            .artifact_prefix()
-            .map(|artifact_prefix| {
+        let (mut dest, filename_prefix) = options.artifact_prefix().map_or_else(
+            || (PathBuf::default(), ""),
+            |artifact_prefix| {
                 (
                     artifact_prefix.dir().clone(),
                     artifact_prefix
                         .filename_prefix()
                         .as_ref()
-                        .map(|s| s.as_str())
-                        .unwrap_or(""),
+                        .map_or("", String::as_str),
                 )
-            })
-            .unwrap_or_else(|| (PathBuf::default(), ""));
+            },
+        );
         dest.push(format!(
             "{}minimized-from-{}",
             filename_prefix,
@@ -144,8 +147,8 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
 }
 
 pub fn minimize_crash(
-    options: LibfuzzerOptions,
-    harness: &extern "C" fn(*const u8, usize) -> c_int,
+    options: &LibfuzzerOptions,
+    harness: extern "C" fn(*const u8, usize) -> c_int,
 ) -> Result<(), Error> {
     println!(
         "Attempting to minimise a crash: {}",

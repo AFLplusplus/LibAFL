@@ -33,10 +33,10 @@ pub(crate) fn should_use_grimoire<S>(
 where
     S: HasMetadata,
 {
-    let mut metadata = maybe_state
+    let mut metadata: Box<ShouldUseGrimoireMetadata> = maybe_state
         .as_mut()
         .and_then(|state| state.metadata_map_mut().remove())
-        .unwrap_or_else(|| Box::new(ShouldUseGrimoireMetadata::default()));
+        .unwrap_or_default();
     let grimoire = if let Some(grimoire) = options.grimoire() {
         if grimoire && !mutator_status.std_mutational {
             eprintln!("WARNING: cowardly refusing to use grimoire after detecting the presence of a custom mutator");
@@ -62,16 +62,15 @@ where
                     && entry
                         .extension()
                         .map_or(true, |ext| ext != "metadata" && ext != "lafl_lock")
+                    && !metadata.checked.contains(&entry)
                 {
-                    if !metadata.checked.contains(&entry) {
-                        let mut reader = std::io::BufReader::new(std::fs::File::open(&entry)?);
-                        if reader.chars().all(|maybe_c| maybe_c.is_ok()) {
-                            metadata.utf8 += 1;
-                        } else {
-                            metadata.non_utf8 += 1;
-                        }
-                        metadata.checked.insert(entry);
+                    let mut reader = std::io::BufReader::new(std::fs::File::open(&entry)?);
+                    if reader.chars().all(|maybe_c| maybe_c.is_ok()) {
+                        metadata.utf8 += 1;
+                    } else {
+                        metadata.non_utf8 += 1;
                     }
+                    metadata.checked.insert(entry);
                 }
             }
             metadata.should = metadata.utf8 > metadata.non_utf8; // greater-than so zero testcases doesn't enable

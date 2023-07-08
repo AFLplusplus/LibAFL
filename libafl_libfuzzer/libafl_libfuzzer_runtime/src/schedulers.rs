@@ -1,11 +1,16 @@
-use libafl::corpus::{Corpus, CorpusId, Testcase};
-use libafl::feedbacks::MapNoveltiesMetadata;
-use libafl::inputs::UsesInput;
-use libafl::schedulers::{RemovableScheduler, Scheduler};
-use libafl::state::{HasCorpus, HasMetadata, UsesState};
-use libafl::Error;
-use std::collections::{BTreeSet, HashMap};
-use std::marker::PhantomData;
+use std::{
+    collections::{BTreeSet, HashMap},
+    marker::PhantomData,
+};
+
+use libafl::{
+    corpus::{Corpus, CorpusId, Testcase},
+    feedbacks::MapNoveltiesMetadata,
+    inputs::UsesInput,
+    schedulers::{RemovableScheduler, Scheduler},
+    state::{HasCorpus, HasMetadata, UsesState},
+    Error,
+};
 
 #[derive(Clone, Debug)]
 pub struct MergeScheduler<S> {
@@ -58,8 +63,8 @@ where
 impl<S> MergeScheduler<S> {
     pub fn new() -> Self {
         Self {
-            mapping: Default::default(),
-            all: Default::default(),
+            mapping: HashMap::default(),
+            all: BTreeSet::default(),
             phantom: PhantomData,
         }
     }

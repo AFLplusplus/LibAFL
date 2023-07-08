@@ -109,12 +109,12 @@ impl LibfuzzerCrashCauseFeedback {
             if let Some(filename_prefix) = artifact_prefix.filename_prefix() {
                 artifact_prefix
                     .dir()
-                    .join(format!("{}{}-{}", filename_prefix, prefix, base))
+                    .join(format!("{filename_prefix}{prefix}-{base}"))
             } else {
-                artifact_prefix.dir().join(format!("{}-{}", prefix, base))
+                artifact_prefix.dir().join(format!("{prefix}-{base}"))
             }
         } else {
-            PathBuf::from(format!("{}-{}", prefix, base))
+            PathBuf::from(format!("{prefix}-{base}"))
         };
         *testcase.file_path_mut() = Some(file_path);
     }

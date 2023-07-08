@@ -45,9 +45,7 @@ fn main() {
         .arg("--target")
         .arg(std::env::var_os("TARGET").unwrap());
 
-    if command.status().map(|s| !s.success()).unwrap_or(true) {
-        panic!("Couldn't build runtime crate! Did you remember to use nightly?");
-    }
+    assert!(!command.status().map(|s| !s.success()).unwrap_or(true), "Couldn't build runtime crate! Did you remember to use nightly?");
 
     let mut lib_path = custom_lib_dir.join(std::env::var_os("TARGET").unwrap());
     lib_path.push("release");
@@ -62,9 +60,7 @@ fn main() {
             .arg(lib_path)
             .args(["-o", custom_lib_dir.join("libFuzzer.o").to_str().expect("Invalid path characters present in your current directory prevent us from linking to the runtime")]);
 
-        if command.status().map(|s| !s.success()).unwrap_or(true) {
-            panic!("Couldn't link runtime crate!");
-        }
+        assert!(!command.status().map(|s| !s.success()).unwrap_or(true), "Couldn't link runtime crate!");
 
         let mut command = Command::new("ar");
         command
@@ -72,9 +68,7 @@ fn main() {
             .arg(custom_lib_dir.join("libFuzzer.a"))
             .arg(custom_lib_dir.join("libFuzzer.o"));
 
-        if command.status().map(|s| !s.success()).unwrap_or(true) {
-            panic!("Couldn't create runtime archive!");
-        }
+        assert!(!command.status().map(|s| !s.success()).unwrap_or(true), "Couldn't create runtime archive!");
     } else {
         std::fs::copy(lib_path, custom_lib_dir.join("libFuzzer.a")).unwrap();
     }
@@ -84,5 +78,5 @@ fn main() {
         custom_lib_dir.to_str().unwrap()
     );
     println!("cargo:rustc-link-lib=static=Fuzzer");
-    println!("cargo:rustc-link-lib=stdc++")
+    println!("cargo:rustc-link-lib=stdc++");
 }

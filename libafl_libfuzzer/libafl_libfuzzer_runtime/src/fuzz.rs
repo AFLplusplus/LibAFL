@@ -75,7 +75,7 @@ where
 }
 
 fn fuzz_single_forking<M>(
-    options: LibfuzzerOptions,
+    options: &LibfuzzerOptions,
     harness: &extern "C" fn(*const u8, usize) -> c_int,
     mut shmem_provider: StdShMemProvider,
     monitor: M,
@@ -105,10 +105,10 @@ where
                 let file_null = File::open("/dev/null")?;
                 unsafe {
                     if options.close_fd_mask() & 1 != 0 {
-                        libc::dup2(file_null.as_raw_fd().into(), 1);
+                        libc::dup2(file_null.as_raw_fd(), 1);
                     }
                     if options.close_fd_mask() & 2 != 0 {
-                        libc::dup2(file_null.as_raw_fd().into(), 2);
+                        libc::dup2(file_null.as_raw_fd(), 2);
                     }
                 }
             }
@@ -118,7 +118,7 @@ where
 }
 
 fn fuzz_many_forking<M>(
-    options: LibfuzzerOptions,
+    options: &LibfuzzerOptions,
     harness: &extern "C" fn(*const u8, usize) -> c_int,
     shmem_provider: StdShMemProvider,
     forks: usize,
@@ -155,7 +155,7 @@ where
 }
 
 pub fn fuzz(
-    options: LibfuzzerOptions,
+    options: &LibfuzzerOptions,
     harness: &extern "C" fn(*const u8, usize) -> c_int,
 ) -> Result<(), Error> {
     if let Some(forks) = options.forks() {
@@ -166,8 +166,8 @@ pub fn fuzz(
         } else if forks == 1 {
             #[cfg(unix)]
             let mut stderr = unsafe {
-                let new_fd = libc::dup(std::io::stderr().as_raw_fd().into());
-                File::from_raw_fd(new_fd.into())
+                let new_fd = libc::dup(std::io::stderr().as_raw_fd());
+                File::from_raw_fd(new_fd)
             };
             let monitor = MultiMonitor::with_time(
                 move |s| {
@@ -181,7 +181,7 @@ pub fn fuzz(
             fuzz_single_forking(options, harness, shmem_provider, monitor)
         } else {
             #[cfg(unix)]
-            let stderr_fd = unsafe { libc::dup(std::io::stderr().as_raw_fd().into()) };
+            let stderr_fd = unsafe { libc::dup(std::io::stderr().as_raw_fd()) };
             let monitor = MultiMonitor::with_time(
                 move |s| {
                     #[cfg(unix)]

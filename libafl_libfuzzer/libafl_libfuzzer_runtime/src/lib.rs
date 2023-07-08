@@ -1,3 +1,74 @@
+#![allow(incomplete_features)]
+// For `type_eq`
+#![cfg_attr(unstable_feature, feature(specialization))]
+// For `type_id` and owned things
+#![cfg_attr(unstable_feature, feature(intrinsics))]
+// For `std::simd`
+#![cfg_attr(unstable_feature, feature(portable_simd))]
+#![warn(clippy::cargo)]
+#![allow(ambiguous_glob_reexports)]
+#![deny(clippy::cargo_common_metadata)]
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::all)]
+#![deny(clippy::pedantic)]
+#![allow(
+    clippy::unreadable_literal,
+    clippy::type_repetition_in_bounds,
+    clippy::missing_errors_doc,
+    clippy::cast_possible_truncation,
+    clippy::used_underscore_binding,
+    clippy::ptr_as_ptr,
+    clippy::missing_panics_doc,
+    clippy::missing_docs_in_private_items,
+    clippy::module_name_repetitions,
+    clippy::ptr_cast_constness,
+    clippy::unsafe_derive_deserialize
+)]
+#![cfg_attr(not(test), warn(
+missing_debug_implementations,
+missing_docs,
+//trivial_casts,
+trivial_numeric_casts,
+unused_extern_crates,
+unused_import_braces,
+unused_qualifications,
+//unused_results
+))]
+#![cfg_attr(test, deny(
+missing_debug_implementations,
+missing_docs,
+//trivial_casts,
+trivial_numeric_casts,
+unused_extern_crates,
+unused_import_braces,
+unused_qualifications,
+unused_must_use,
+//unused_results
+))]
+#![cfg_attr(
+    test,
+    deny(
+        bad_style,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        private_in_public,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
+// Till they fix this buggy lint in clippy
+#![allow(clippy::borrow_as_ptr)]
+#![allow(clippy::borrow_deref_ref)]
+
 use core::ffi::{c_char, c_int, CStr};
 
 use libafl::{
@@ -38,6 +109,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 static mut BACKTRACE: Option<u64> = None;
 
+#[allow(clippy::struct_excessive_bools)]
 struct CustomMutationStatus {
     std_mutational: bool,
     std_no_mutate: bool,
@@ -400,6 +472,7 @@ macro_rules! fuzz_with {
             $operation(&$options, &mut fuzzer, &mut stages, &mut executor, &mut state, &mut mgr)
         };
 
+        #[allow(clippy::redundant_closure_call)]
         $and_then(closure)
     }};
 
@@ -432,7 +505,6 @@ macro_rules! fuzz_with {
 
 pub(crate) use fuzz_with;
 
-#[inline(always)]
 pub fn start_fuzzing_single<F, S, EM>(
     mut fuzz_single: F,
     initial_state: Option<S>,
@@ -449,9 +521,9 @@ extern "C" {
     fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
 }
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, clippy::similar_names, clippy::missing_safety_doc)]
 #[no_mangle]
-pub extern "C" fn LLVMFuzzerRunDriver(
+pub unsafe extern "C" fn LLVMFuzzerRunDriver(
     argc: *mut c_int,
     argv: *mut *mut *const c_char,
     harness_fn: Option<extern "C" fn(*const u8, usize) -> c_int>,
@@ -460,11 +532,9 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         .as_ref()
         .expect("Illegal harness provided to libafl.");
 
-    unsafe {
-        // it appears that no one, not even libfuzzer, uses this return value
-        // https://github.com/llvm/llvm-project/blob/llvmorg-15.0.7/compiler-rt/lib/fuzzer/FuzzerDriver.cpp#L648
-        libafl_targets_libfuzzer_init(argc, argv);
-    }
+    // it appears that no one, not even libfuzzer, uses this return value
+    // https://github.com/llvm/llvm-project/blob/llvmorg-15.0.7/compiler-rt/lib/fuzzer/FuzzerDriver.cpp#L648
+    libafl_targets_libfuzzer_init(argc, argv);
 
     let argc = unsafe { *argc } as isize;
     let argv = unsafe { *argv };
@@ -487,27 +557,23 @@ pub extern "C" fn LLVMFuzzerRunDriver(
     {
         // we've been requested to just run some inputs. Do so.
         for input in options.dirs() {
-            let input = BytesInput::from_file(input).expect(&format!(
-                "Couldn't load input {}",
-                input.to_string_lossy().as_ref()
-            ));
+            let input = BytesInput::from_file(input).unwrap_or_else(|_| {
+                panic!("Couldn't load input {}", input.to_string_lossy().as_ref())
+            });
             libafl_targets::libfuzzer::libfuzzer_test_one_input(input.target_bytes().as_slice());
         }
         return 0;
     }
     let res = match options.mode() {
-        LibfuzzerMode::Fuzz => fuzz::fuzz(options, harness),
-        LibfuzzerMode::Merge => merge::merge(options, harness),
-        LibfuzzerMode::Tmin => tmin::minimize_crash(options, harness),
-        LibfuzzerMode::Report => report::report(options, harness),
+        LibfuzzerMode::Fuzz => fuzz::fuzz(&options, harness),
+        LibfuzzerMode::Merge => merge::merge(&options, harness),
+        LibfuzzerMode::Tmin => tmin::minimize_crash(&options, *harness),
+        LibfuzzerMode::Report => report::report(&options, harness),
     };
     match res {
         Ok(()) | Err(Error::ShuttingDown) => 0,
         Err(err) => {
-            eprintln!(
-                "Encountered error while performing libfuzzer shimming: {}",
-                err
-            );
+            eprintln!("Encountered error while performing libfuzzer shimming: {err}");
             1
         }
     }

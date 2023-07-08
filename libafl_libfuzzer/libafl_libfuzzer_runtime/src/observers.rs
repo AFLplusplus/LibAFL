@@ -1,13 +1,14 @@
-use std::hash::Hash;
-use std::{fmt::Debug, hash::Hasher};
+use std::{
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
 
 use ahash::AHasher;
 use libafl::{
     bolts::{tuples::Named, AsIter, HasLen},
     executors::ExitKind,
     inputs::UsesInput,
-    observers::TimeObserver,
-    observers::{MapObserver, Observer},
+    observers::{MapObserver, Observer, TimeObserver},
     state::UsesState,
     Error,
 };
@@ -102,9 +103,9 @@ where
         let initial = self.inner.initial();
         for e in self.inner.as_iter() {
             if *e == initial {
-                self.value_observer.default_value().hash(&mut hasher)
+                self.value_observer.default_value().hash(&mut hasher);
             } else {
-                self.value_observer.value().hash(&mut hasher)
+                self.value_observer.value().hash(&mut hasher);
             }
         }
         hasher.finish()
@@ -124,7 +125,7 @@ where
         let value = *self.value_observer.value();
         self.inner
             .as_iter()
-            .map(|&e| (e == initial).then_some(default).unwrap_or(value))
+            .map(|&e| if e == initial { default } else { value })
             .collect()
     }
 
@@ -296,8 +297,9 @@ where
             .time_obs
             .last_runtime()
             .as_ref()
-            .map(|duration| u64::try_from(duration.as_micros()).unwrap_or(INITIAL_TIME))
-            .unwrap_or(INITIAL_TIME);
+            .map_or(INITIAL_TIME, |duration| {
+                u64::try_from(duration.as_micros()).unwrap_or(INITIAL_TIME)
+            });
         Ok(())
     }
 }

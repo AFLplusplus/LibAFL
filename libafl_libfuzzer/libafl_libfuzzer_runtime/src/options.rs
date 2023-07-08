@@ -90,6 +90,7 @@ impl ArtifactPrefix {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct LibfuzzerOptions {
     fuzzer_name: String,
     mode: LibfuzzerMode,
@@ -118,8 +119,8 @@ impl LibfuzzerOptions {
         let name = args.next().unwrap();
         let name = if let Some(executable) = std::env::current_exe().ok().and_then(|path| {
             path.file_name()
-                .and_then(|name| name.to_str())
-                .map(|name| name.to_string())
+                .and_then(std::ffi::OsStr::to_str)
+                .map(std::string::ToString::to_string)
         }) {
             executable
         } else {
@@ -128,7 +129,7 @@ impl LibfuzzerOptions {
         args.try_fold(LibfuzzerOptionsBuilder::default(), |builder, arg| {
             builder.consume(arg)
         })
-        .and_then(|builder| builder.build(name))
+        .map(|builder| builder.build(name))
     }
 
     pub fn fuzzer_name(&self) -> &str {
@@ -213,6 +214,7 @@ impl LibfuzzerOptions {
 }
 
 #[derive(Debug, Default)]
+#[allow(clippy::struct_excessive_bools)]
 struct LibfuzzerOptionsBuilder<'a> {
     mode: Option<LibfuzzerMode>,
     artifact_prefix: Option<&'a str>,
@@ -294,20 +296,20 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                             self.forks = Some(parse_or_bail!(name, value, usize));
                         }
                         "ignore_crashes" => {
-                            self.ignore_crashes = parse_or_bail!(name, value, u64) > 0
+                            self.ignore_crashes = parse_or_bail!(name, value, u64) > 0;
                         }
                         "ignore_timeouts" => {
-                            self.ignore_timeouts = parse_or_bail!(name, value, u64) > 0
+                            self.ignore_timeouts = parse_or_bail!(name, value, u64) > 0;
                         }
                         "ignore_ooms" => self.ignore_ooms = parse_or_bail!(name, value, u64) > 0,
                         "rss_limit_mb" => {
-                            self.rss_limit = Some(parse_or_bail!(name, value, usize) << 20)
+                            self.rss_limit = Some(parse_or_bail!(name, value, usize) << 20);
                         }
                         "malloc_limit_mb" => {
-                            self.malloc_limit = Some(parse_or_bail!(name, value, usize) << 20)
+                            self.malloc_limit = Some(parse_or_bail!(name, value, usize) << 20);
                         }
                         "ignore_remaining_args" => {
-                            self.ignore_remaining = parse_or_bail!(name, value, u64) > 0
+                            self.ignore_remaining = parse_or_bail!(name, value, u64) > 0;
                         }
                         "dedup" => self.dedup = parse_or_bail!(name, value, u64) > 0,
                         "shrink" => self.shrink = parse_or_bail!(name, value, u64) > 0,
@@ -316,20 +318,19 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         "runs" => self.runs = parse_or_bail!(name, value, usize),
                         "close_fd_mask" => self.close_fd_mask = parse_or_bail!(name, value, u8),
                         _ => {
-                            eprintln!("warning: unrecognised flag {name}");
-                            self.unknown.push(arg)
+                            self.unknown.push(arg);
                         }
                     },
                 }
             } else {
-                self.unknown.push(arg)
+                self.unknown.push(arg);
             }
         }
         Ok(self)
     }
 
-    fn build(self, fuzzer_name: String) -> Result<LibfuzzerOptions, OptionsParseError<'a>> {
-        Ok(LibfuzzerOptions {
+    fn build(self, fuzzer_name: String) -> LibfuzzerOptions {
+        LibfuzzerOptions {
             fuzzer_name,
             mode: self.mode.unwrap_or(LibfuzzerMode::Fuzz),
             artifact_prefix: self.artifact_prefix.map(ArtifactPrefix::new),
@@ -357,7 +358,11 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             tui: self.tui,
             runs: self.runs,
             close_fd_mask: self.close_fd_mask,
-            unknown: self.unknown.into_iter().map(|s| s.to_string()).collect(),
-        })
+            unknown: self
+                .unknown
+                .into_iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
+        }
     }
 }

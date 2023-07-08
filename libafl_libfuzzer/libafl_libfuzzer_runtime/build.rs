@@ -1,6 +1,6 @@
-use std::{env, error::Error, path::Path};
+use std::{env, path::Path};
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
 
     println!("cargo:rerun-if-changed=src/harness_wrap.h");
@@ -21,6 +21,4 @@ fn main() -> Result<(), Box<dyn Error>> {
         .cpp(true)
         .file("src/harness_wrap.cpp")
         .compile("harness_wrap");
-
-    Ok(())
 }

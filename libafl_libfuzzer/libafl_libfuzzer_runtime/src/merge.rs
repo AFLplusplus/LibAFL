@@ -1,16 +1,12 @@
-use std::fs::{rename, File};
-use std::io::Write;
-use std::os::fd::{AsRawFd, FromRawFd};
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{env::temp_dir, ffi::c_int, fs};
-
-use crate::schedulers::MergeScheduler;
-use crate::{
-    feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback},
-    observers::{MappedEdgeMapObserver, SizeTimeValueObserver},
-    options::LibfuzzerOptions,
+use std::{
+    env::temp_dir,
+    ffi::c_int,
+    fs::{rename, File},
+    io::Write,
+    os::fd::{AsRawFd, FromRawFd},
+    time::{SystemTime, UNIX_EPOCH},
 };
-use libafl::schedulers::RemovableScheduler;
+
 use libafl::{
     bolts::{
         rands::{Rand, RandomSeed, StdRand},
@@ -19,26 +15,32 @@ use libafl::{
         AsSlice,
     },
     corpus::{Corpus, OnDiskCorpus},
-    events::EventRestarter,
-    events::SimpleRestartingEventManager,
-    executors::ExitKind,
-    executors::{InProcessExecutor, TimeoutExecutor},
+    events::{EventRestarter, SimpleRestartingEventManager},
+    executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
     feedback_and_fast, feedback_or_fast,
-    feedbacks::MinMapFeedback,
-    feedbacks::{CrashFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MinMapFeedback, TimeoutFeedback},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     observers::{MultiMapObserver, TimeObserver},
+    schedulers::RemovableScheduler,
     state::{HasCorpus, HasRand, StdState},
     Error, HasScheduler, StdFuzzer,
 };
 use libafl_targets::{OOMFeedback, OOMObserver, COUNTERS_MAPS};
 
+use crate::{
+    feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback},
+    observers::{MappedEdgeMapObserver, SizeTimeValueObserver},
+    options::LibfuzzerOptions,
+    schedulers::MergeScheduler,
+};
+
+#[allow(clippy::too_many_lines)]
 pub fn merge(
-    options: LibfuzzerOptions,
+    options: &LibfuzzerOptions,
     harness: &extern "C" fn(*const u8, usize) -> c_int,
 ) -> Result<(), Error> {
-    if options.dirs().len() == 0 {
+    if options.dirs().is_empty() {
         return Err(Error::illegal_argument("Missing corpora to minimize; you should provide one directory to minimize into and one-to-many from which the inputs are loaded."));
     }
 
@@ -84,8 +86,8 @@ pub fn merge(
 
     #[cfg(unix)]
     let mut stderr = unsafe {
-        let new_fd = libc::dup(std::io::stderr().as_raw_fd().into());
-        File::from_raw_fd(new_fd.into())
+        let new_fd = libc::dup(std::io::stderr().as_raw_fd());
+        File::from_raw_fd(new_fd)
     };
     let monitor = MultiMonitor::with_time(
         move |s| {
@@ -118,10 +120,10 @@ pub fn merge(
             let file_null = File::open("/dev/null")?;
             unsafe {
                 if options.close_fd_mask() & 1 != 0 {
-                    libc::dup2(file_null.as_raw_fd().into(), 1);
+                    libc::dup2(file_null.as_raw_fd(), 1);
                 }
                 if options.close_fd_mask() & 2 != 0 {
-                    libc::dup2(file_null.as_raw_fd().into(), 2);
+                    libc::dup2(file_null.as_raw_fd(), 2);
                 }
             }
         }
@@ -181,12 +183,11 @@ pub fn merge(
         let result = unsafe {
             crate::libafl_libfuzzer_test_one_input(Some(*harness), buf.as_ptr(), buf.len())
         };
-        match result {
-            -2 => ExitKind::Crash,
-            _ => {
-                *keep.borrow_mut() = result == 0;
-                ExitKind::Ok
-            }
+        if result == -2 {
+            ExitKind::Crash
+        } else {
+            *keep.borrow_mut() = result == 0;
+            ExitKind::Ok
         }
     };
 
@@ -197,19 +198,17 @@ pub fn merge(
     );
 
     // In case the corpus is empty (on first run) or crashed while loading, reset
-    if state.must_load_initial_inputs() {
-        if !options.dirs().is_empty() {
-            // Load from disk
-            state
-                .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, options.dirs())
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "Failed to load initial corpus at {:?}: {}",
-                        options.dirs(),
-                        e
-                    )
-                });
-        }
+    if state.must_load_initial_inputs() && !options.dirs().is_empty() {
+        // Load from disk
+        state
+            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, options.dirs())
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed to load initial corpus at {:?}: {}",
+                    options.dirs(),
+                    e
+                )
+            });
     }
 
     for idx in fuzzer.scheduler().removable() {
@@ -230,7 +229,7 @@ pub fn merge(
             .unwrap()
             .to_str()
             .unwrap()
-            .rsplit_once("-")
+            .rsplit_once('-')
         {
             let mut new_file_path = file_path.clone();
             new_file_path.pop();
@@ -265,8 +264,8 @@ pub fn merge(
             temp.to_str().unwrap(),
             corpus_dir.to_str().unwrap()
         );
-        fs::rename(&options.dirs()[0], temp)?;
-        fs::rename(corpus_dir, &options.dirs()[0])?;
+        rename(&options.dirs()[0], temp)?;
+        rename(corpus_dir, &options.dirs()[0])?;
     }
 
     mgr.send_exiting()
