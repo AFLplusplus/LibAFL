@@ -1,11 +1,13 @@
 mod utils;
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
+    bolts::{
+        current_nanos, rands::StdRand, serdeany::RegistryBuilder, tuples::tuple_list, AsSlice,
+    },
     corpus::{Corpus, InMemoryCorpus},
     events::SimpleEventManager,
     executors::{ExitKind, InProcessExecutor},
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackMetadata, MaxMapFeedback},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -36,6 +38,7 @@ pub extern "C" fn external_current_millis() -> u64 {
 #[wasm_bindgen]
 pub fn fuzz() {
     set_panic_hook();
+    RegistryBuilder::register::<MapFeedbackMetadata<u8>>();
 
     let mut signals = [0u8; 64];
     let signals_ptr = signals.as_mut_ptr();
