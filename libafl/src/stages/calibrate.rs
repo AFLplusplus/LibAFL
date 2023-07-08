@@ -20,7 +20,7 @@ use crate::{
     inputs::UsesInput,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple, UsesObserver},
-    schedulers::powersched::SchedulerMetadata,
+    schedulers::{minimizer::IsFavoredMetadata, powersched::SchedulerMetadata},
     stages::Stage,
     state::{
         HasAFLStats, HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, UsesState,
@@ -106,6 +106,7 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let mut has_calibration = false;
+        let mut is_favored = false;
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
             let corpus = state.corpus().get(corpus_idx)?.borrow();
@@ -114,14 +115,26 @@ where
             if corpus.scheduled_count() > 0 {
                 has_calibration = true;
             }
+            if corpus.has_metadata::<IsFavoredMetadata>() {
+                is_favored = true;
+            }
         }
 
+        // The number of pending testcases decrease if this testcase has been calibrated
         if has_calibration {
             let pending_size = state.pending_mut();
             if *pending_size > 0 {
                 *pending_size -= 1;
             }
             return Ok(());
+        }
+
+        // The number of "pend_favored" testcases decrease if this testcase is favored and is firstly calibrated.
+        if is_favored {
+            let pend_favored_size = state.pend_favored_mut();
+            if *pend_favored_size > 0 {
+                *state.pend_favored_mut() -= 1;
+            }
         }
 
         *state.pending_mut() += 1;

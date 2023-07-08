@@ -470,8 +470,8 @@ where
         // default to 0 here to avoid crashes on clock skew
         if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
             let executions = *state.executions();
-
             let pending_size = *state.pending();
+            let pend_favored_size = *state.pend_favored();
             let own_finds_size = *state.own_finds();
             let imported_size = *state.imported();
             // Default no introspection implmentation
@@ -490,6 +490,15 @@ where
                 Event::UpdateUserStats {
                     name: "pending".to_string(),
                     value: UserStats::Number(pending_size as u64),
+                    phantom: PhantomData,
+                },
+            )?;
+
+            self.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: "pend_fav".to_string(),
+                    value: UserStats::Number(pend_favored_size as u64),
                     phantom: PhantomData,
                 },
             )?;

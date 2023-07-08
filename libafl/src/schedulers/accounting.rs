@@ -16,7 +16,7 @@ use crate::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasAFLStats, HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -123,7 +123,7 @@ where
 impl<'a, CS> Scheduler for CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
-    CS::State: HasCorpus + HasMetadata + HasRand + Debug,
+    CS::State: HasCorpus + HasMetadata + HasRand + Debug + HasAFLStats,
     <CS::State as UsesInput>::Input: HasLen,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
@@ -185,7 +185,7 @@ where
 impl<'a, CS> CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
-    CS::State: HasCorpus + HasMetadata + HasRand + Debug,
+    CS::State: HasCorpus + HasMetadata + HasRand + Debug + HasAFLStats,
     <CS::State as UsesInput>::Input: HasLen,
 {
     /// Update the `Corpus` score
