@@ -22,7 +22,9 @@ use crate::{
     observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, UsesState},
+    state::{
+        HasAFLStats, HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, UsesState,
+    },
     Error,
 };
 
@@ -86,7 +88,7 @@ where
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<E::State>,
-    E::State: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
+    E::State: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata + HasAFLStats,
     Z: Evaluator<E, EM, State = E::State>,
 {
     #[inline]
@@ -103,15 +105,28 @@ where
         mgr: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let mut has_calibration = false;
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
             let corpus = state.corpus().get(corpus_idx)?.borrow();
             // println!("calibration; corpus.scheduled_count() : {}", corpus.scheduled_count());
 
             if corpus.scheduled_count() > 0 {
-                return Ok(());
+                has_calibration = true;
             }
         }
+
+        if has_calibration {
+            let pending_size = state.pending_mut();
+            if *pending_size > 0 {
+                *pending_size -= 1;
+            }
+            return Ok(());
+        }
+
+        *state.pending_mut() += 1;
+
+        *state.own_finds_mut() = state.corpus().count() - state.imported();
 
         let mut iter = self.stage_max;
 

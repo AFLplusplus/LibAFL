@@ -94,6 +94,14 @@ pub struct ClientStats {
     pub prev_state_executions: u64,
     /// The size of the objectives corpus for this client
     pub objective_size: u64,
+    /// The number of test cases that have not gone through any fuzzing yet
+    pub pending: u64,
+    /// The number of `favored` test cases that have not gone through any fuzzing yet
+    pub pend_fav: u64,
+    /// The number of new test cases that found during this fuzzing section
+    pub own_finds: u64,
+    /// The number of new test cases that imported from other fuzzer instances.
+    pub imported: u64,
     /// The last reported executions for this client
     #[cfg(feature = "afl_exec_sec")]
     pub last_window_executions: u64,

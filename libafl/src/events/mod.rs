@@ -8,7 +8,11 @@ pub use centralized::*;
 pub mod llmp;
 #[cfg(feature = "tcp_manager")]
 pub mod tcp;
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::c_void;
 use core::{
@@ -34,7 +38,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
+    state::{HasAFLStats, HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
 
@@ -451,7 +455,7 @@ pub trait EventFirer: UsesState {
 /// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter: EventFirer
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasAFLStats,
 {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
@@ -462,10 +466,14 @@ where
         last_report_time: Duration,
         monitor_timeout: Duration,
     ) -> Result<Duration, Error> {
-        let executions = *state.executions();
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
         if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
+            let executions = *state.executions();
+
+            let pending_size = *state.pending();
+            let own_finds_size = *state.own_finds();
+            let imported_size = *state.imported();
             // Default no introspection implmentation
             #[cfg(not(feature = "introspection"))]
             self.fire(
@@ -473,6 +481,33 @@ where
                 Event::UpdateExecStats {
                     executions,
                     time: cur,
+                    phantom: PhantomData,
+                },
+            )?;
+
+            self.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: "pending".to_string(),
+                    value: UserStats::Number(pending_size as u64),
+                    phantom: PhantomData,
+                },
+            )?;
+
+            self.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: "own_finds".to_string(),
+                    value: UserStats::Number(own_finds_size as u64),
+                    phantom: PhantomData,
+                },
+            )?;
+
+            self.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: "imported".to_string(),
+                    value: UserStats::Number(imported_size as u64),
                     phantom: PhantomData,
                 },
             )?;
@@ -548,7 +583,7 @@ pub trait HasEventManagerId {
 pub trait EventManager<E, Z>:
     EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasAFLStats,
 {
 }
 
@@ -615,7 +650,7 @@ where
 }
 
 impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata + HasAFLStats
 {
 }
 
@@ -633,7 +668,7 @@ where
 }
 
 impl<S> ProgressReporter for NopEventManager<S> where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata + HasAFLStats
 {
 }
 

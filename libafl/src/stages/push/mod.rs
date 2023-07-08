@@ -23,7 +23,7 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
+    state::{HasAFLStats, HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -184,7 +184,8 @@ where
 pub trait PushStage<CS, EM, OT, Z>: Iterator
 where
     CS: Scheduler,
-    CS::State: HasClientPerfMonitor + HasRand + HasExecutions + HasMetadata + HasCorpus,
+    CS::State:
+        HasClientPerfMonitor + HasRand + HasExecutions + HasMetadata + HasCorpus + HasAFLStats,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>

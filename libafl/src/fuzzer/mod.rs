@@ -23,7 +23,10 @@ use crate::{
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions, UsesState},
+    state::{
+        HasAFLStats, HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions,
+        UsesState,
+    },
     Error,
 };
 
@@ -155,7 +158,7 @@ where
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasAFLStats,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,
@@ -330,7 +333,8 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasCorpus,
+    CS::State:
+        HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasCorpus + HasAFLStats,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -412,6 +416,9 @@ where
                             forward_id: None,
                         },
                     )?;
+                } else {
+                    // This testcase is from the other fuzzers.
+                    *state.imported_mut() += 1;
                 }
                 Ok((res, Some(idx)))
             }
@@ -447,7 +454,7 @@ where
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasAFLStats,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -480,7 +487,7 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasAFLStats,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -573,7 +580,8 @@ where
     EM: ProgressReporter + EventProcessor<E, Self, State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus + HasTestcase,
+    CS::State:
+        HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus + HasTestcase + HasAFLStats,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
     fn fuzz_one(
@@ -615,11 +623,9 @@ where
         {
             let mut testcase = state.testcase_mut(idx)?;
             let scheduled_count = testcase.scheduled_count();
-
             // increase scheduled count, this was fuzz_level in afl
             testcase.set_scheduled_count(scheduled_count + 1);
         }
-
         Ok(idx)
     }
 }
