@@ -101,6 +101,7 @@ fn main() {
 
         let build = bindgen::builder()
             .header("src/sanitizer_ifaces.h")
+            .use_core()
             .generate_comments(true)
             .parse_callbacks(Box::new(bindgen::CargoCallbacks))
             .generate()
