@@ -205,8 +205,10 @@ where
         Self {
             input: Some(input),
             filename: None,
+            #[cfg(feature = "std")]
             file_path: None,
             metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
             metadata_path: None,
             exec_time: None,
             cached_len: None,
@@ -223,8 +225,10 @@ where
         Testcase {
             input: Some(input),
             filename: None,
+            #[cfg(feature = "std")]
             file_path: None,
             metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
             metadata_path: None,
             exec_time: None,
             cached_len: None,
@@ -241,8 +245,10 @@ where
         Self {
             input: Some(input),
             filename: Some(filename),
+            #[cfg(feature = "std")]
             file_path: None,
             metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
             metadata_path: None,
             exec_time: None,
             cached_len: None,
@@ -259,8 +265,10 @@ where
         Self {
             input: Some(input),
             filename: None,
+            #[cfg(feature = "std")]
             file_path: None,
             metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
             metadata_path: None,
             exec_time: None,
             cached_len: None,

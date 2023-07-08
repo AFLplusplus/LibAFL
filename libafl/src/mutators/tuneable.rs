@@ -336,6 +336,9 @@ mod test {
 
     #[test]
     fn test_tuning() {
+        #[cfg(not(feature = "std"))]
+        crate::bolts::serdeany::RegistryBuilder::register::<TuneableScheduledMutatorMetadata>();
+
         let mut state: NopState<BytesInput> = NopState::new();
         let mutators = tuple_list!(
             BitFlipMutator::new(),

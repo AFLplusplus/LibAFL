@@ -4,13 +4,13 @@ use core::{
     cell::{Ref, RefMut},
     fmt::Debug,
     marker::PhantomData,
-    str::FromStr,
     time::Duration,
 };
 #[cfg(feature = "std")]
 use std::{
     fs,
     path::{Path, PathBuf},
+    str::FromStr,
     vec::Vec,
 };
 
