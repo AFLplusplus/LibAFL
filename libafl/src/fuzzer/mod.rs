@@ -517,9 +517,17 @@ where
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
 
         // Maybe a solution
-        if self
+        #[cfg(not(feature = "introspection"))]
+        let is_solution = self
             .objective_mut()
-            .is_interesting(state, manager, &input, observers, &exit_kind)?
+            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+
+        #[cfg(feature = "introspection")]
+        let is_solution = self
+            .objective_mut()
+            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+
+        if is_solution
         {
             self.objective_mut()
                 .append_metadata(state, observers, &mut testcase)?;
@@ -534,11 +542,20 @@ where
             return Ok(idx);
         }
 
+        // Not a solution
+        self.objective_mut().discard_metadata(state, &input)?;
+
         // several is_interesting implementations collect some data about the run, later used in
         // append_metadata; we *must* invoke is_interesting here to collect it
-        let _: bool = self
+        #[cfg(not(feature = "introspection"))]
+        let _is_corpus = self
             .feedback_mut()
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
+
+        #[cfg(feature = "introspection")]
+        let _is_corpus = self
+            .feedback_mut()
+            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
 
         // Add the input to the main corpus
         self.feedback_mut()

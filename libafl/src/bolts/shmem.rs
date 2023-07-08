@@ -1443,7 +1443,7 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
             std::io::SeekFrom::End(offset) => {
                 let map_len = self.inner.as_slice().len();
                 i64::try_from(map_len).unwrap();
-                let signed_pos = map_len as i64;
+                let signed_pos = i64::try_from(map_len).unwrap();
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
                 effective.try_into().unwrap()
@@ -1451,7 +1451,7 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
             std::io::SeekFrom::Current(offset) => {
                 let current_pos = self.pos;
                 i64::try_from(current_pos).unwrap();
-                let signed_pos = current_pos as i64;
+                let signed_pos = i64::try_from(current_pos).unwrap();
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
                 effective.try_into().unwrap()

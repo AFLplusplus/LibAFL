@@ -22,6 +22,8 @@ pub use tuneable::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+use alloc::vec::Vec;
+
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 
@@ -84,6 +86,29 @@ pub trait Mutator<I, S> {
         &mut self,
         state: &mut S,
         input: &mut I,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error>;
+
+    /// Post-process given the outcome of the execution
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _stage_idx: i32,
+        _corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// A mutator that takes input, and returns a vector of mutated inputs.
+/// Simple as that.
+pub trait MultipleMutator<I, S> {
+    /// Mutate a given input
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        vec: &mut Vec<I>,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 

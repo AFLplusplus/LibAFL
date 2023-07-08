@@ -11,7 +11,7 @@ use crate::{
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
-    mutators::{MutationResult, Mutator},
+    mutators::{MultipleMutator, MutationResult, Mutator},
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
@@ -119,7 +119,9 @@ where
 
         start_timer!(state);
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else { return Ok(()); };
+        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
+            return Ok(());
+        };
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
@@ -244,6 +246,98 @@ where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    /// Creates a new transforming mutational stage
+    pub fn transforming(mutator: M) -> Self {
+        Self {
+            mutator,
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// The default mutational stage
+#[derive(Clone, Debug)]
+pub struct MultipleMutationalStage<E, EM, I, M, Z> {
+    mutator: M,
+    #[allow(clippy::type_complexity)]
+    phantom: PhantomData<(E, EM, I, Z)>,
+}
+
+impl<E, EM, I, M, Z> UsesState for MultipleMutationalStage<E, EM, I, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: MultipleMutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    type State = Z::State;
+}
+
+impl<E, EM, I, M, Z> Stage<E, EM, Z> for MultipleMutationalStage<E, EM, I, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: MultipleMutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    I: MutatedTransform<Self::Input, Self::State> + Clone,
+{
+    #[inline]
+    #[allow(clippy::let_and_return)]
+    #[allow(clippy::cast_possible_wrap)]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Z::State,
+        manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<(), Error> {
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
+            return Ok(());
+        };
+        drop(testcase);
+
+        let mut generated = vec![];
+        let _ = self.mutator.mutate(state, &input, &mut generated, 0)?;
+        // println!("Generated {}", generated.len());
+        for (i, new_input) in generated.into_iter().enumerate() {
+            // Time is measured directly the `evaluate_input` function
+            let (untransformed, post) = new_input.try_transform_into(state)?;
+            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            self.mutator.post_exec(state, i as i32, corpus_idx)?;
+            post.post_exec(state, i as i32, corpus_idx)?;
+        }
+        // println!("Found {}", found);
+
+        Ok(())
+    }
+}
+
+impl<E, EM, M, Z> MultipleMutationalStage<E, EM, Z::Input, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: MultipleMutator<Z::Input, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    /// Creates a new default mutational stage
+    pub fn new(mutator: M) -> Self {
+        Self::transforming(mutator)
+    }
+}
+
+impl<E, EM, I, M, Z> MultipleMutationalStage<E, EM, I, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: MultipleMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {

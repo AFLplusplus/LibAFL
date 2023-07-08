@@ -322,7 +322,9 @@ where
     /// Cull the `Corpus` using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
     pub fn cull(&self, state: &mut CS::State) -> Result<(), Error> {
-        let Some(top_rated) = state.metadata_map().get::<TopRatedsMetadata>() else { return Ok(()) };
+        let Some(top_rated) = state.metadata_map().get::<TopRatedsMetadata>() else {
+            return Ok(());
+        };
 
         let mut acc = HashSet::new();
 

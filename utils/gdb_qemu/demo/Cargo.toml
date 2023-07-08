@@ -1,0 +1,11 @@
+[package]
+name = "demo"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+vergen = { version = "8.1.1", features = ["build", "cargo", "git", "gitcl", "rustc", "si"] }
+
+[dependencies]
+anyhow = { version = "1.0.71", default-features = false }
+clap = { version = "4.2.0", default-features = false, features = ["derive", "string", "std", "help"] }

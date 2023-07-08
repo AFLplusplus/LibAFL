@@ -177,6 +177,12 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Remove Dotnet (macOS)
+      if: runner.os == 'macOS'
+      run: rm -rf /usr/local/bin/dotnet
+    - name: Remove Dotnet & Haskell (Linux)
+      if: runner.os == 'Linux'
+      run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Add no_std toolchain
@@ -239,10 +245,13 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Fix python (macOS)
+      if: runner.os == 'macOS'
+      run: rm /usr/local/bin/2to3* /usr/local/bin/idle3* /usr/local/bin/pydoc3* /usr/local/bin/python3*
     - uses: lyricwulf/abc@v1
       with: 
         linux: llvm llvm-dev clang 
-        macos: llvm bash coreutils
+        macos: python@3.11 llvm bash coreutils
     - uses: actions/checkout@v3
       with:
         submodules: true # recursively checkout submodules

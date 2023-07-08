@@ -10,7 +10,7 @@ use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     feedbacks::Feedback,
-    fuzzer::HasObjective,
+    fuzzer::{HasFeedback, HasObjective, HasScheduler},
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State, UsesState},
@@ -53,7 +53,7 @@ where
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
 {
-    pub fn new<EM, OF, Z>(
+    pub fn new<CF, EM, OF, Z>(
         hooks: &'a mut QemuHooks<'a, QT, S>,
         harness_fn: &'a mut H,
         observers: OT,
@@ -63,9 +63,12 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
+        CF: Feedback<S>,
         OF: Feedback<S>,
         S: State + HasExecutions + HasCorpus + HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
     {
         Ok(Self {
             first_exec: true,
@@ -201,12 +204,12 @@ where
 impl<'a, H, OT, QT, S, SP> QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: UsesInput,
+    S: UsesInput + HasCorpus,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     SP: ShMemProvider,
 {
-    pub fn new<EM, OF, Z>(
+    pub fn new<CF, EM, OF, Z>(
         hooks: &'a mut QemuHooks<'a, QT, S>,
         harness_fn: &'a mut H,
         observers: OT,
@@ -217,9 +220,12 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
+        CF: Feedback<S>,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasFeedback<Feedback = CF, State = S>
+            + HasScheduler,
     {
         assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutor, the hooks must not do any side effect as they will happen in the child process and then discarded");
 
