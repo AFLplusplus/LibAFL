@@ -7,8 +7,9 @@
 //! The internal crate must be built separately to ensure flags from dependent crates are not leaked
 //! to the runtime (e.g., to prevent coverage being collected on the runtime).
 
-pub use libfuzzer_sys::*;
 use std::ffi::{c_char, c_int};
+
+pub use libfuzzer_sys::*;
 
 extern "C" {
     pub fn LLVMFuzzerRunDriver(

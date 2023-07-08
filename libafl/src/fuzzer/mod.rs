@@ -399,13 +399,6 @@ where
                     } else {
                         Some(manager.serialize_observers::<OT>(observers)?)
                     };
-                    let file_path = state
-                        .corpus()
-                        .get(idx)
-                        .unwrap()
-                        .borrow()
-                        .file_path()
-                        .clone();
                     manager.fire(
                         state,
                         Event::NewTestcase {
@@ -416,7 +409,6 @@ where
                             client_config: manager.configuration(),
                             time: current_time(),
                             executions: *state.executions(),
-                            file_path,
                             forward_id: None,
                         },
                     )?;
@@ -527,8 +519,7 @@ where
             .objective_mut()
             .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
 
-        if is_solution
-        {
+        if is_solution {
             self.objective_mut()
                 .append_metadata(state, observers, &mut testcase)?;
             let idx = state.solutions_mut().add(testcase)?;
@@ -568,13 +559,6 @@ where
         } else {
             Some(manager.serialize_observers::<OT>(observers)?)
         };
-        let file_path = state
-            .corpus()
-            .get(idx)
-            .unwrap()
-            .borrow()
-            .file_path()
-            .clone();
         manager.fire(
             state,
             Event::NewTestcase {
@@ -585,7 +569,6 @@ where
                 client_config: manager.configuration(),
                 time: current_time(),
                 executions: *state.executions(),
-                file_path,
                 forward_id: None,
             },
         )?;

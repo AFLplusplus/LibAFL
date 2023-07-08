@@ -17,7 +17,6 @@ use core::{
     marker::PhantomData,
     time::Duration,
 };
-use std::path::PathBuf;
 
 use ahash::RandomState;
 pub use llmp::*;
@@ -292,8 +291,6 @@ where
         time: Duration,
         /// The executions of this client
         executions: usize,
-        /// The path to this input
-        file_path: Option<PathBuf>,
         /// The original sender if, if forwarded
         forward_id: Option<ClientId>,
     },
@@ -370,7 +367,6 @@ where
                 observers_buf: _,
                 time: _,
                 executions: _,
-                file_path: _,
                 forward_id: _,
             } => "Testcase",
             Event::UpdateExecStats {

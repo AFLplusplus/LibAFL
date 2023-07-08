@@ -141,7 +141,7 @@ void __libafl_targets_cmplog_routines_len(uintptr_t k, const uint8_t *ptr1,
   __libafl_targets_cmplog_routines_checked(k, ptr1, ptr2, len);
 }
 
-inline void __cmplog_rtn_hook(const uint8_t *ptr1, const uint8_t *ptr2) {
+static inline void __cmplog_rtn_hook(const uint8_t *ptr1, const uint8_t *ptr2) {
   uintptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;

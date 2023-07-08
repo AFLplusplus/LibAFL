@@ -1,4 +1,4 @@
-use std::fs::{remove_file, rename, File};
+use std::fs::{rename, File};
 use std::io::Write;
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::time::{SystemTime, UNIX_EPOCH};

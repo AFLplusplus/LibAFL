@@ -11,7 +11,7 @@ use libafl::{
     state::HasClientPerfMonitor,
     Error,
 };
-use libc::SIGILL;
+use libc::SIGABRT;
 use serde::{Deserialize, Serialize};
 
 extern "C" {
@@ -26,6 +26,9 @@ static MALLOC_MAX: AtomicUsize = AtomicUsize::new(2 << 30);
 
 static MALLOC_SIZE: AtomicUsize = AtomicUsize::new(0);
 
+/// malloc hook which will be invoked if ASAN is present. Used to detect if the target makes a malloc call that will
+/// exceed the permissible size
+#[no_mangle]
 pub extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = match unsafe { libafl_check_malloc_size(ptr) } {
@@ -39,13 +42,15 @@ pub extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize) {
         {
             unsafe {
                 // we need to kill the process in a way that immediately triggers the crash handler
-                libc::raise(SIGILL);
-                panic!("We somehow didn't crash on a null pointer write. Strange...");
+                libc::raise(SIGABRT);
             }
         }
     }
 }
 
+/// free hook which will be invoked if ASAN is present. Used to detect if the target makes a malloc call that will
+/// exceed the permissible size
+#[no_mangle]
 pub extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = unsafe { libafl_check_malloc_size(ptr) };
@@ -61,12 +66,15 @@ pub extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
 
 const OOM_OBS_NAME: &str = "libfuzzer-like-oom";
 
+/// Observer which detects if the target would run out of memory or otherwise violate the permissible usage of malloc
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OOMObserver {
     oomed: bool,
 }
 
 impl OOMObserver {
+    /// Create a OOM observer with the provided rss_max (total heap size) and malloc_max (largest permissible malloc
+    /// allocation size)
     pub fn new(rss_max: usize, malloc_max: usize) -> Self {
         RSS_MAX.store(rss_max, Ordering::Relaxed);
         MALLOC_MAX.store(malloc_max, Ordering::Relaxed);
@@ -75,6 +83,7 @@ impl OOMObserver {
 }
 
 impl Named for OOMObserver {
+    // strictly one name to prevent two from being registered
     fn name(&self) -> &str {
         OOM_OBS_NAME
     }
@@ -117,10 +126,12 @@ where
     }
 }
 
+/// Feedback for the similarly named [OOMObserver] to detect if the target crashed due to an observed OOM
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, Default)]
 pub struct OOMFeedback;
 
 impl OOMFeedback {
+    /// Whether the target OOM'd in the last execution
     pub fn oomed() -> bool {
         OOMED.load(Ordering::Relaxed)
     }

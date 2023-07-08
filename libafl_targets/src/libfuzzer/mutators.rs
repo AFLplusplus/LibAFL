@@ -210,6 +210,7 @@ pub struct LLVMCustomMutator<MT, SM, const CROSSOVER: bool> {
 }
 
 impl<MT, SM> LLVMCustomMutator<MT, SM, false> {
+    /// Create the mutator which will invoke the custom mutator, emitting an error if the custom mutator is not present
     pub unsafe fn mutate(mutator: SM) -> Result<Self, Error> {
         if libafl_targets_has_libfuzzer_custom_mutator() {
             Ok(Self::mutate_unchecked(mutator))
@@ -220,6 +221,7 @@ impl<MT, SM> LLVMCustomMutator<MT, SM, false> {
         }
     }
 
+    /// Create the mutator which will invoke the custom mutator without checking if it exists first
     pub unsafe fn mutate_unchecked(mutator: SM) -> Self {
         LLVMCustomMutator {
             mutator: Rc::new(RefCell::new(mutator)),
@@ -229,6 +231,7 @@ impl<MT, SM> LLVMCustomMutator<MT, SM, false> {
 }
 
 impl<MT, SM> LLVMCustomMutator<MT, SM, true> {
+    /// Create the mutator which will invoke the custom crossover, emitting an error if the custom crossover is not present
     pub unsafe fn crossover(mutator: SM) -> Result<Self, Error> {
         if libafl_targets_has_libfuzzer_custom_crossover() {
             Ok(Self::crossover_unchecked(mutator))
@@ -239,6 +242,7 @@ impl<MT, SM> LLVMCustomMutator<MT, SM, true> {
         }
     }
 
+    /// Create the mutator which will invoke the custom crossover without checking if it exists first
     pub unsafe fn crossover_unchecked(mutator: SM) -> Self {
         LLVMCustomMutator {
             mutator: Rc::new(RefCell::new(mutator)),

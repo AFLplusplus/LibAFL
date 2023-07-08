@@ -378,8 +378,7 @@ where
         if testcase
             .file_path()
             .as_ref()
-            .map(|path| !path.starts_with(&self.dir_path))
-            .unwrap_or(true)
+            .map_or(true, |path| !path.starts_with(&self.dir_path))
         {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
         }
