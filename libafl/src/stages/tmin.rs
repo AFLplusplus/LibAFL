@@ -78,7 +78,7 @@ where
         let base_hash = hasher.finish();
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
-        fuzzer.execute_input(state, executor, manager, &mut base)?;
+        fuzzer.execute_input(state, executor, manager, &base)?;
         let observers = executor.observers();
 
         let mut feedback = self.create_feedback(observers);
@@ -106,7 +106,7 @@ where
 
             let corpus_idx = if input.len() < before_len {
                 // run the input
-                let exit_kind = fuzzer.execute_input(state, executor, manager, &mut input)?;
+                let exit_kind = fuzzer.execute_input(state, executor, manager, &input)?;
                 let observers = executor.observers();
 
                 // let the fuzzer process this execution -- it's possible that we find something
@@ -156,7 +156,7 @@ where
         base.hash(&mut hasher);
         let new_hash = hasher.finish();
         if base_hash != new_hash {
-            let exit_kind = fuzzer.execute_input(state, executor, manager, &mut base)?;
+            let exit_kind = fuzzer.execute_input(state, executor, manager, &base)?;
             let observers = executor.observers();
             *state.executions_mut() += 1;
             // assumption: this input should not be marked interesting because it was not

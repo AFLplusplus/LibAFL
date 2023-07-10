@@ -56,27 +56,22 @@ use crate::{
     Error,
 };
 
-/// [`InProcessExecutor`] calls a target function as a mutable reference to a closure with a
-/// mutable reference to the input as an argument to allow the harness to mutate the input
+/// The process executor simply calls a target function, as mutable reference to a closure
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, OT, S>;
 
-/// [`OwnedInProcessExecutor`] calls a boxed target function as a mutable reference
-/// to a closure with a mutable reference to the input as an argument to allow the
-/// harness to mutate the input
+/// The process executor simply calls a target function, as boxed `FnMut` trait object
 pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
-    dyn FnMut(&mut <S as UsesInput>::Input) -> ExitKind,
-    Box<dyn FnMut(&mut <S as UsesInput>::Input) -> ExitKind>,
+    dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
+    Box<dyn FnMut(&<S as UsesInput>::Input) -> ExitKind>,
     OT,
     S,
 >;
 
-/// The [`GenericInProcessExecutor`] calls a target function as a mutable reference
-/// to a closure with a mutable reference to the input as an argument to allow the
-/// harness to mutate the input, and returns afterwards
+/// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
 pub struct GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -92,7 +87,7 @@ where
 
 impl<H, HB, OT, S> Debug for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -107,7 +102,7 @@ where
 
 impl<H, HB, OT, S> UsesState for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -117,7 +112,7 @@ where
 
 impl<H, HB, OT, S> UsesObservers for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: UsesInput,
@@ -127,7 +122,7 @@ where
 
 impl<EM, H, HB, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     EM: UsesState<State = S>,
     OT: ObserversTuple<S>,
@@ -139,7 +134,7 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &mut Self::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
@@ -151,9 +146,27 @@ where
     }
 }
 
+impl<H, HB, OT, S> HasObservers for GenericInProcessExecutor<H, HB, OT, S>
+where
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        &self.observers
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        &mut self.observers
+    }
+}
+
 impl<H, HB, OT, S> GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&mut <S as UsesInput>::Input) -> ExitKind + ?Sized,
+    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
@@ -161,8 +174,7 @@ where
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
-    /// * `harness_fn` - the harness, executing the function. The harness may also mutate the
-    ///   input.
+    /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<CF, EM, OF, Z>(
@@ -231,24 +243,6 @@ where
     }
 }
 
-impl<H, HB, OT, S> HasObservers for GenericInProcessExecutor<H, HB, OT, S>
-where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-{
-    #[inline]
-    fn observers(&self) -> &OT {
-        &self.observers
-    }
-
-    #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
-    }
-}
-
 /// The struct has [`InProcessHandlers`].
 #[cfg(windows)]
 pub trait HasInProcessHandlers {
@@ -259,7 +253,7 @@ pub trait HasInProcessHandlers {
 #[cfg(windows)]
 impl<H, HB, OT, S> HasInProcessHandlers for GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&mut <S as UsesInput>::Input) -> ExitKind + ?Sized,
+    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
@@ -1615,12 +1609,10 @@ extern "C" {
 const ITIMER_REAL: libc::c_int = 0;
 
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
-/// It is the same as [`InProcessForkExecutor`] except that it allows the harness input to be
-/// mutated.
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1636,7 +1628,7 @@ where
 #[cfg(all(feature = "std", unix))]
 pub struct TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1655,7 +1647,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> Debug for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1671,7 +1663,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1700,7 +1692,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesState for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1711,7 +1703,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesState for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1723,7 +1715,7 @@ where
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1736,7 +1728,7 @@ where
         _fuzzer: &mut Z,
         state: &mut Self::State,
         _mgr: &mut EM,
-        input: &mut Self::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             self.shmem_provider.pre_fork()?;
@@ -1791,7 +1783,7 @@ where
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -1804,7 +1796,7 @@ where
         _fuzzer: &mut Z,
         state: &mut Self::State,
         _mgr: &mut EM,
-        input: &mut Self::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             self.shmem_provider.pre_fork()?;
@@ -1893,7 +1885,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: UsesInput + HasCorpus,
     SP: ShMemProvider,
@@ -1942,7 +1934,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     S: UsesInput + HasCorpus,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
@@ -2053,7 +2045,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesObservers for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -2064,7 +2056,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> UsesObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: ?Sized + FnMut(&mut S::Input) -> ExitKind,
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
     S: UsesInput,
     SP: ShMemProvider,
@@ -2075,7 +2067,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     S: UsesInput,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
@@ -2094,7 +2086,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> HasObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    H: FnMut(&mut S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
     S: UsesInput,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
@@ -2222,7 +2214,7 @@ mod tests {
 
     #[test]
     fn test_inmem_exec() {
-        let mut harness = |_buf: &mut NopInput| ExitKind::Ok;
+        let mut harness = |_buf: &NopInput| ExitKind::Ok;
 
         let mut in_process_executor = InProcessExecutor::<_, _, _> {
             harness_fn: &mut harness,
@@ -2230,13 +2222,13 @@ mod tests {
             handlers: InProcessHandlers::nop(),
             phantom: PhantomData,
         };
-        let mut input = NopInput {};
+        let input = NopInput {};
         in_process_executor
             .run_target(
                 &mut NopFuzzer::new(),
                 &mut NopState::new(),
                 &mut NopEventManager::new(),
-                &mut input,
+                &input,
             )
             .unwrap();
     }
@@ -2256,7 +2248,7 @@ mod tests {
 
         let provider = StdShMemProvider::new().unwrap();
 
-        let mut harness = |_buf: &mut NopInput| ExitKind::Ok;
+        let mut harness = |_buf: &NopInput| ExitKind::Ok;
         let mut in_process_fork_executor = InProcessForkExecutor::<_, (), _, _> {
             harness_fn: &mut harness,
             shmem_provider: provider,
@@ -2264,12 +2256,12 @@ mod tests {
             handlers: InChildProcessHandlers::nop(),
             phantom: PhantomData,
         };
-        let mut input = NopInput {};
+        let input = NopInput {};
         let mut fuzzer = NopFuzzer::new();
         let mut state = NopState::new();
         let mut mgr = SimpleEventManager::printing();
         in_process_fork_executor
-            .run_target(&mut fuzzer, &mut state, &mut mgr, &mut input)
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
     }
 }
@@ -2311,7 +2303,7 @@ pub mod pybind {
         ) -> Self {
             Self {
                 inner: OwnedInProcessExecutor::new(
-                    Box::new(move |input: &mut BytesInput| {
+                    Box::new(move |input: &BytesInput| {
                         Python::with_gil(|py| -> PyResult<()> {
                             let args = (PyBytes::new(py, input.bytes()),);
                             harness.call1(py, args)?;

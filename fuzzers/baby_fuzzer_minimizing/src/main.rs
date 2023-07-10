@@ -16,7 +16,7 @@ fn signals_set(idx: usize) {
 #[allow(clippy::similar_names)]
 pub fn main() -> Result<(), Error> {
     // The closure that we want to fuzz
-    let mut harness = |input: &mut BytesInput| {
+    let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         signals_set(0);

@@ -52,7 +52,7 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &mut Self::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let ret = self.primary.run_target(fuzzer, state, mgr, input);
         self.primary.post_run_reset();

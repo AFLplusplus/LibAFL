@@ -68,10 +68,9 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &mut Self::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        let mut input = input.clone();
-        self.executor.run_target(fuzzer, state, mgr, &mut input)
+        self.executor.run_target(fuzzer, state, mgr, input)
     }
 }
 

@@ -1867,13 +1867,13 @@ mod tests {
     #[test]
     fn test_read_tokens() {
         let _res = fs::remove_file("test.tkns");
-        let data = r#"
+        let data = r###"
 # comment
 token1@123="AAA"
 token1="A\x41A"
 "A\AA"
 token2="B"
-        "#;
+        "###;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
         let tokens = Tokens::from_file("test.tkns").unwrap();
         log::info!("Token file entries: {:?}", tokens.tokens());

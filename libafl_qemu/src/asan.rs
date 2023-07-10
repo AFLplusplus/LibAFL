@@ -395,7 +395,7 @@ impl AsanGiovese {
         if self.snapshot_shadow {
             let set = self.dirty_shadow.lock().unwrap();
 
-            for &page in &*set {
+            for &page in set.iter() {
                 let data = Self::get_shadow_page(emu, page).to_vec();
                 self.saved_shadow.insert(page, data);
             }
@@ -425,7 +425,7 @@ impl AsanGiovese {
         if self.snapshot_shadow {
             let mut set = self.dirty_shadow.lock().unwrap();
 
-            for &page in &*set {
+            for &page in set.iter() {
                 let original = self.saved_shadow.get(&page);
                 if let Some(data) = original {
                     let cur = Self::get_shadow_page(emu, page);
@@ -472,7 +472,7 @@ pub fn init_with_asan(
         |e: &str| "LD_PRELOAD=".to_string() + &asan_lib + " " + &e["LD_PRELOAD=".len()..];
 
     let mut added = false;
-    for (k, v) in &mut *env {
+    for (k, v) in env.iter_mut() {
         if k == "QEMU_SET_ENV" {
             let mut new_v = vec![];
             for e in v.split(',') {

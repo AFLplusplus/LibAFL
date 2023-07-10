@@ -28,7 +28,7 @@ extern "C" {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let mut harness = |input: &mut BytesInput| {
+    let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         unsafe { c_harness(buf.as_ptr()) }

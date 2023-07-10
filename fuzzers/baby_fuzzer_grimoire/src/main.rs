@@ -65,7 +65,7 @@ pub fn main() {
     }
 
     // The closure that we want to fuzz
-    let mut harness = |input: &mut BytesInput| {
+    let mut harness = |input: &BytesInput| {
         let target_bytes = input.target_bytes();
         let bytes = target_bytes.as_slice();
 

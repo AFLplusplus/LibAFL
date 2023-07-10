@@ -1239,20 +1239,20 @@ impl CrossoverReplaceMutator {
 }
 
 /// Returns the first and last diff position between the given vectors, stopping at the min len
-fn locate_diffs(this: &[u8], other: &[u8]) -> Result<(i64, i64), Error> {
+fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
     let mut first_diff: i64 = -1;
     let mut last_diff: i64 = -1;
     for (i, (this_el, other_el)) in this.iter().zip(other.iter()).enumerate() {
         #[allow(clippy::cast_possible_wrap)]
         if this_el != other_el {
             if first_diff < 0 {
-                first_diff = i.try_into()?;
+                first_diff = i as i64;
             }
-            last_diff = i.try_into()?;
+            last_diff = i as i64;
         }
     }
 
-    Ok((first_diff, last_diff))
+    (first_diff, last_diff)
 }
 
 /// Splice mutation for inputs with a bytes vector
@@ -1285,7 +1285,7 @@ where
 
             let mut counter: u32 = 0;
             loop {
-                let (f, l) = locate_diffs(input.bytes(), other.bytes())?;
+                let (f, l) = locate_diffs(input.bytes(), other.bytes());
 
                 if f != l && f >= 0 && l >= 2 {
                     break (f as u64, l as u64);

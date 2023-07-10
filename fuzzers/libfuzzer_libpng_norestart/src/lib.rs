@@ -215,7 +215,7 @@ pub fn libafl_main() {
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |input: &mut BytesInput| {
+        let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
             let buf = target.as_slice();
             libfuzzer_test_one_input(buf);
