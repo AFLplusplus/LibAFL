@@ -67,7 +67,7 @@ use slicemap::{HitcountsMapObserver, EDGES};
 #[allow(clippy::too_many_lines)]
 pub fn main() {
     // The closure that we want to fuzz
-    let mut first_harness = |input: &mut BytesInput| {
+    let mut first_harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         if unsafe { inspect_first(buf.as_ptr(), buf.len()) } {
@@ -76,7 +76,7 @@ pub fn main() {
             ExitKind::Ok
         }
     };
-    let mut second_harness = |input: &mut BytesInput| {
+    let mut second_harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         if unsafe { inspect_second(buf.as_ptr(), buf.len()) } {

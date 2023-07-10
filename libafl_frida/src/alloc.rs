@@ -385,13 +385,14 @@ impl Allocator {
         metadatas.sort_by(|a, b| a.address.cmp(&b.address));
         let mut offset_to_closest = i64::max_value();
         let mut closest = None;
-        let ptr: i64 = ptr.try_into().unwrap();
         for metadata in metadatas {
-            let address: i64 = metadata.address.try_into().unwrap();
             let new_offset = if hint_base == metadata.address {
-                (ptr - address).abs()
+                (ptr as i64 - metadata.address as i64).abs()
             } else {
-                std::cmp::min(offset_to_closest, (ptr - address).abs())
+                std::cmp::min(
+                    offset_to_closest,
+                    (ptr as i64 - metadata.address as i64).abs(),
+                )
             };
             if new_offset < offset_to_closest {
                 offset_to_closest = new_offset;

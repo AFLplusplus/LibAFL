@@ -57,7 +57,7 @@ pub fn main() {
     }
 
     // The closure that we want to fuzz
-    let mut harness = |input: &mut EncodedInput| {
+    let mut harness = |input: &EncodedInput| {
         decoded_bytes.clear();
         encoder_decoder.decode(input, &mut decoded_bytes).unwrap();
         unsafe {

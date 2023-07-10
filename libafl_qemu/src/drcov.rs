@@ -102,8 +102,8 @@ where
         if self.full_trace {
             if DRCOV_IDS.lock().unwrap().as_ref().unwrap().len() > self.drcov_len {
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
-                for id in DRCOV_IDS.lock().unwrap().as_ref().unwrap() {
-                    'pcs_full: for (pc, idm) in DRCOV_MAP.lock().unwrap().as_ref().unwrap() {
+                for id in DRCOV_IDS.lock().unwrap().as_ref().unwrap().iter() {
+                    'pcs_full: for (pc, idm) in DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() {
                         let mut module_found = false;
                         for module in self.module_mapping.iter() {
                             let (range, (_, _)) = module;
@@ -141,7 +141,7 @@ where
         } else {
             if DRCOV_MAP.lock().unwrap().as_ref().unwrap().len() > self.drcov_len {
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
-                'pcs: for (pc, _) in DRCOV_MAP.lock().unwrap().as_ref().unwrap() {
+                'pcs: for (pc, _) in DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() {
                     let mut module_found = false;
                     for module in self.module_mapping.iter() {
                         let (range, (_, _)) = module;

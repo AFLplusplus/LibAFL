@@ -62,9 +62,9 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind =
-            self.tracer_executor
-                .run_target(fuzzer, state, manager, &mut input.clone())?;
+        let exit_kind = self
+            .tracer_executor
+            .run_target(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -138,8 +138,7 @@ where
     ) -> Result<(), Error> {
         // First run with the un-mutated input
 
-        let original_unmutated_input = state.corpus().cloned_input_for_id(corpus_idx)?;
-        let mut unmutated_input = state.corpus().cloned_input_for_id(corpus_idx)?;
+        let unmutated_input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
         if let Some(name) = &self.cmplog_observer_name {
             if let Some(ob) = self
@@ -157,19 +156,17 @@ where
 
         self.tracer_executor
             .observers_mut()
-            .pre_exec_all(state, &original_unmutated_input)?;
+            .pre_exec_all(state, &unmutated_input)?;
 
         let exit_kind =
             self.tracer_executor
-                .run_target(fuzzer, state, manager, &mut unmutated_input)?;
+                .run_target(fuzzer, state, manager, &unmutated_input)?;
 
         *state.executions_mut() += 1;
 
-        self.tracer_executor.observers_mut().post_exec_all(
-            state,
-            &original_unmutated_input,
-            &exit_kind,
-        )?;
+        self.tracer_executor
+            .observers_mut()
+            .post_exec_all(state, &unmutated_input, &exit_kind)?;
 
         // Second run with the mutated input
         let mutated_input = match state.metadata_map().get::<TaintMetadata>() {
@@ -195,9 +192,9 @@ where
             .observers_mut()
             .pre_exec_all(state, &mutated_input)?;
 
-        let exit_kind =
-            self.tracer_executor
-                .run_target(fuzzer, state, manager, &mut mutated_input.clone())?;
+        let exit_kind = self
+            .tracer_executor
+            .run_target(fuzzer, state, manager, &mutated_input)?;
 
         *state.executions_mut() += 1;
 
@@ -283,7 +280,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(fuzzer, state, manager, &mut input.clone())?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;

@@ -17,7 +17,7 @@ use std::path::PathBuf;
 /* ANCHOR_END: use */
 
 fn main() {
-    let mut harness = |input: &mut BytesInput| {
+    let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         if buf.len() > 0 && buf[0] == 'a' as u8 {

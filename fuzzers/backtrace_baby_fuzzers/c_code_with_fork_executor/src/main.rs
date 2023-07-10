@@ -38,7 +38,7 @@ pub fn main() {
     let mut shmem_provider = StdShMemProvider::new().unwrap();
     unsafe { create_shmem_array() };
     let map_ptr = unsafe { get_ptr() };
-    let mut harness = |input: &mut BytesInput| {
+    let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         unsafe { c_harness(buf.as_ptr()) }

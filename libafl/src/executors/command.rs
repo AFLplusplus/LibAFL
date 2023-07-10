@@ -323,7 +323,7 @@ where
         _fuzzer: &mut Z,
         _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &mut Self::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
@@ -712,7 +712,7 @@ mod tests {
                 &mut NopFuzzer::new(),
                 &mut NopState::new(),
                 &mut mgr,
-                &mut BytesInput::new(b"test".to_vec()),
+                &BytesInput::new(b"test".to_vec()),
             )
             .unwrap();
     }
@@ -740,7 +740,7 @@ mod tests {
                 &mut NopFuzzer::new(),
                 &mut NopState::new(),
                 &mut mgr,
-                &mut BytesInput::new(b"test".to_vec()),
+                &BytesInput::new(b"test".to_vec()),
             )
             .unwrap();
     }

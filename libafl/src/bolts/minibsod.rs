@@ -54,11 +54,11 @@ pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    for reg in 0..31_usize {
+    for reg in 0..31 {
         write!(
             writer,
             "x{:02}: 0x{:016x} ",
-            reg, ucontext.uc_mcontext.regs[reg]
+            reg, ucontext.uc_mcontext.regs[reg as usize]
         )?;
         if reg % 4 == 3 {
             writeln!(writer)?;

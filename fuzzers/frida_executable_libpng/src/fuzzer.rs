@@ -55,7 +55,7 @@ pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -
 
     let options = parse_args();
 
-    let mut frida_harness = |input: &mut BytesInput| {
+    let mut frida_harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         let len = buf.len().to_string();
@@ -87,7 +87,7 @@ pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 unsafe fn fuzz(
     options: &FuzzerOptions,
-    mut frida_harness: &dyn Fn(&mut BytesInput) -> ExitKind,
+    mut frida_harness: &dyn Fn(&BytesInput) -> ExitKind,
 ) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{s}"));
