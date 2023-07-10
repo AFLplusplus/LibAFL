@@ -135,7 +135,7 @@ pub fn libafl_main() {
         let mut bytes = vec![];
 
         // The closure that we want to fuzz
-        let mut harness = |input: &NautilusInput| {
+        let mut harness = |input: &mut NautilusInput| {
             input.unparse(&context, &mut bytes);
             libfuzzer_test_one_input(&bytes);
             ExitKind::Ok

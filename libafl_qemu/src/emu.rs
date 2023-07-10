@@ -739,18 +739,10 @@ impl Emulator {
         envp.push(null());
         unsafe {
             #[cfg(emulation_mode = "usermode")]
-            qemu_user_init(
-                argc,
-                argv.as_ptr() as *const *const u8,
-                envp.as_ptr() as *const *const u8,
-            );
+            qemu_user_init(argc, argv.as_ptr(), envp.as_ptr());
             #[cfg(emulation_mode = "systemmode")]
             {
-                qemu_init(
-                    argc,
-                    argv.as_ptr() as *const *const u8,
-                    envp.as_ptr() as *const *const u8,
-                );
+                qemu_init(argc, argv.as_ptr(), envp.as_ptr());
                 libc::atexit(qemu_cleanup_atexit);
                 libafl_qemu_sys::syx_snapshot_init();
             }

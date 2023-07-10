@@ -49,7 +49,7 @@ pub fn main() {
     let mut bytes = vec![];
 
     // The closure that we want to fuzz
-    let mut harness = |input: &GramatronInput| {
+    let mut harness = |input: &mut GramatronInput| {
         input.unparse(&mut bytes);
         unsafe {
             println!(">>> {}", std::str::from_utf8_unchecked(&bytes));

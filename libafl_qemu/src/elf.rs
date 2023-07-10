@@ -41,7 +41,7 @@ impl<'a> EasyElf<'a> {
 
     #[must_use]
     pub fn resolve_symbol(&self, name: &str, load_addr: GuestAddr) -> Option<GuestAddr> {
-        for sym in self.elf.syms.iter() {
+        for sym in &self.elf.syms {
             if let Some(sym_name) = self.elf.strtab.get_at(sym.st_name) {
                 if sym_name == name {
                     return if sym.st_value == 0 {

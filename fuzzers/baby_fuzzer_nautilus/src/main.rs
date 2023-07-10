@@ -38,7 +38,7 @@ pub fn main() {
     let mut bytes = vec![];
 
     // The closure that we want to fuzz
-    let mut harness = |input: &NautilusInput| {
+    let mut harness = |input: &mut NautilusInput| {
         input.unparse(&context, &mut bytes);
         unsafe {
             println!(">>> {}", std::str::from_utf8_unchecked(&bytes));
