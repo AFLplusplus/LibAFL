@@ -685,13 +685,13 @@ where
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
+        const SERIALIZE_TIME_FACTOR: u32 = 2;
+        const SERIALIZE_PERCENTAGE_TRESHOLD: usize = 80;
+
         let exec_time = observers
             .match_name::<crate::observers::TimeObserver>("time")
             .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
             .unwrap();
-
-        const SERIALIZE_TIME_FACTOR: u32 = 2;
-        const SERIALIZE_PERCENTAGE_TRESHOLD: usize = 80;
 
         let mut must_ser = (self.serialization_time() + self.deserialization_time())
             * SERIALIZE_TIME_FACTOR
