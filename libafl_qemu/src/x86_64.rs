@@ -2,6 +2,7 @@ use capstone::arch::BuildsCapstone;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+use std::mem::size_of;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86_64::*;
 
@@ -49,4 +50,41 @@ pub fn capstone() -> capstone::arch::x86::ArchCapstoneBuilder {
     capstone::Capstone::new()
         .x86()
         .mode(capstone::arch::x86::ArchMode::Mode64)
+}
+
+pub type GuestReg = u64;
+
+impl crate::ArchExtras for crate::CPU {
+    fn read_return_address<T>(&self) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        let stack_ptr: GuestReg = self.read_reg(Regs::Rsp)?;
+        let mut ret_addr = [0; size_of::<GuestReg>()];
+        unsafe { self.read_mem(stack_ptr, &mut ret_addr) };
+        Ok(GuestReg::from_le_bytes(ret_addr).into())
+    }
+
+    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        let stack_ptr: GuestReg = self.read_reg(Regs::Rsp)?;
+        let val: GuestReg = val.into();
+        let ret_addr = val.to_le_bytes();
+        unsafe { self.write_mem(stack_ptr, &ret_addr) };
+        Ok(())
+    }
+
+    fn write_function_argument<T>(&self, idx: i32, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        let val: GuestReg = val.into();
+        match idx {
+            0 => self.write_reg(Regs::Rdi, val),
+            1 => self.write_reg(Regs::Rsi, val),
+            _ => Err(format!("Unsupported argument: {idx:}")),
+        }
+    }
 }

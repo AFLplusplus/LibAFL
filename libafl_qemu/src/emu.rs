@@ -17,6 +17,8 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
 use strum_macros::EnumIter;
 
+use crate::GuestReg;
+
 pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
 pub type GuestIsize = libafl_qemu_sys::target_long;
@@ -485,6 +487,18 @@ pub struct CPU {
     ptr: CPUStatePtr,
 }
 
+pub trait ArchExtras {
+    fn read_return_address<T>(&self) -> Result<T, String>
+    where
+        T: From<GuestReg>;
+    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>;
+    fn write_function_argument<T>(&self, idx: i32, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>;
+}
+
 #[allow(clippy::unused_self)]
 impl CPU {
     #[must_use]
@@ -617,8 +631,15 @@ impl CPU {
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
     where
         R: Into<i32>,
+        T: Into<GuestReg>,
     {
         let reg = reg.into();
+        #[cfg(feature = "be")]
+        let val = GuestReg::to_be(val.into());
+
+        #[cfg(not(feature = "be"))]
+        let val = GuestReg::to_le(val.into());
+
         let success = unsafe { libafl_qemu_write_reg(self.ptr, reg, addr_of!(val) as *const u8) };
         if success == 0 {
             Err(format!("Failed to write to register {reg}"))
@@ -630,6 +651,7 @@ impl CPU {
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
         R: Into<i32>,
+        T: From<GuestReg>,
     {
         unsafe {
             let reg = reg.into();
@@ -638,7 +660,11 @@ impl CPU {
             if success == 0 {
                 Err(format!("Failed to read register {reg}"))
             } else {
-                Ok(val.assume_init())
+                #[cfg(feature = "be")]
+                return Ok(GuestReg::from_be(val.assume_init()).into());
+
+                #[cfg(not(feature = "be"))]
+                return Ok(GuestReg::from_le(val.assume_init()).into());
             }
         }
     }
@@ -861,7 +887,7 @@ impl Emulator {
 
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
     where
-        T: Num + PartialOrd + Copy,
+        T: Num + PartialOrd + Copy + Into<GuestReg>,
         R: Into<i32>,
     {
         self.current_cpu().unwrap().write_reg(reg, val)
@@ -869,7 +895,7 @@ impl Emulator {
 
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
-        T: Num + PartialOrd + Copy,
+        T: Num + PartialOrd + Copy + From<GuestReg>,
         R: Into<i32>,
     {
         self.current_cpu().unwrap().read_reg(reg)
@@ -1151,6 +1177,35 @@ impl Emulator {
 
     pub fn gdb_reply(&self, output: &str) {
         unsafe { libafl_qemu_gdb_reply(output.as_bytes().as_ptr(), output.len()) };
+    }
+}
+
+impl ArchExtras for Emulator {
+    fn read_return_address<T>(&self) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        self.current_cpu()
+            .ok_or("Failed to get current CPU")?
+            .read_return_address::<T>()
+    }
+
+    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        self.current_cpu()
+            .ok_or("Failed to get current CPU")?
+            .write_return_address::<T>(val)
+    }
+
+    fn write_function_argument<T>(&self, idx: i32, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        self.current_cpu()
+            .ok_or("Failed to get current CPU")?
+            .write_function_argument::<T>(idx, val)
     }
 }
 

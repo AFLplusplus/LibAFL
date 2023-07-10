@@ -66,3 +66,28 @@ impl Regs {
     pub const Fp: Regs = Regs::R30;
     pub const Lr: Regs = Regs::R31;
 }
+
+pub type GuestReg = u32;
+
+impl crate::ArchExtras for crate::CPU {
+    fn read_return_address<T>(&self) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        self.read_reg(Regs::Lr)
+    }
+
+    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        self.write_reg(Regs::Lr, val)
+    }
+
+    fn write_function_argument<T>(&self, idx: i32, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        Err(format!("Unsupported argument: {idx:}"))
+    }
+}
