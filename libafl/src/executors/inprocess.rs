@@ -500,6 +500,7 @@ impl InProcessExecutorHandlerData {
         }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn set_in_handler(&mut self, v: bool) -> bool {
         let old = self.in_handler;
         self.in_handler = v;
