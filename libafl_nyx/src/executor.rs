@@ -57,7 +57,7 @@ where
         _fuzzer: &mut Z,
         _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         let input_owned = input.target_bytes();
         let input = input_owned.as_slice();

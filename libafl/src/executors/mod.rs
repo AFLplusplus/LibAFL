@@ -3,7 +3,7 @@
 pub mod inprocess;
 pub use inprocess::InProcessExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
-pub use inprocess::InProcessForkExecutor;
+pub use inprocess::{InProcessForkExecutor, TimeoutInProcessForkExecutor};
 
 pub mod differential;
 pub use differential::DiffExecutor;
@@ -121,7 +121,7 @@ where
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error>;
 
     /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
@@ -167,7 +167,7 @@ where
         _fuzzer: &mut Z,
         _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &mut Self::Input,
     ) -> Result<ExitKind, Error> {
         if input.target_bytes().as_slice().is_empty() {
             Err(Error::empty("Input Empty"))
@@ -186,8 +186,8 @@ mod test {
 
     #[test]
     fn nop_executor() {
-        let empty_input = BytesInput::new(vec![]);
-        let nonempty_input = BytesInput::new(vec![1u8]);
+        let mut empty_input = BytesInput::new(vec![]);
+        let mut nonempty_input = BytesInput::new(vec![1u8]);
         let mut executor = NopExecutor {
             phantom: PhantomData,
         };
@@ -200,7 +200,7 @@ mod test {
                 &mut fuzzer,
                 &mut state,
                 &mut NopEventManager::new(),
-                &empty_input,
+                &mut empty_input,
             )
             .unwrap_err();
         executor
@@ -208,7 +208,7 @@ mod test {
                 &mut fuzzer,
                 &mut state,
                 &mut NopEventManager::new(),
-                &nonempty_input,
+                &mut nonempty_input,
             )
             .unwrap();
     }
@@ -352,7 +352,7 @@ pub mod pybind {
             fuzzer: &mut PythonStdFuzzer,
             state: &mut Self::State,
             mgr: &mut PythonEventManager,
-            input: &Self::Input,
+            input: &mut Self::Input,
         ) -> Result<ExitKind, Error> {
             let ek = Python::with_gil(|py| -> PyResult<_> {
                 let ek: PythonExitKind = self
@@ -475,7 +475,7 @@ pub mod pybind {
             fuzzer: &mut PythonStdFuzzer,
             state: &mut Self::State,
             mgr: &mut PythonEventManager,
-            input: &Self::Input,
+            input: &mut Self::Input,
         ) -> Result<ExitKind, Error> {
             unwrap_me_mut!(self.wrapper, e, { e.run_target(fuzzer, state, mgr, input) })
         }

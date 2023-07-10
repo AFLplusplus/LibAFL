@@ -85,7 +85,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
         > = lib.get(options.harness_function.as_bytes()).unwrap();
 
-        let mut frida_harness = |input: &BytesInput| {
+        let mut frida_harness = |input: &mut BytesInput| {
             let target = input.target_bytes();
             let buf = target.as_slice();
             (target_func)(buf.as_ptr(), buf.len());

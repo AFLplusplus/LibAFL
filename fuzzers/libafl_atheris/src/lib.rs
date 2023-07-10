@@ -249,7 +249,7 @@ pub fn LLVMFuzzerRunDriver(
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |input: &BytesInput| {
+        let mut harness = |input: &mut BytesInput| {
             let target = input.target_bytes();
             let buf = target.as_slice();
             harness_fn(buf.as_ptr(), buf.len());
@@ -269,7 +269,7 @@ pub fn LLVMFuzzerRunDriver(
         );
 
         // Secondary harness due to mut ownership
-        let mut harness = |input: &BytesInput| {
+        let mut harness = |input: &mut BytesInput| {
             let target = input.target_bytes();
             let buf = target.as_slice();
             harness_fn(buf.as_ptr(), buf.len());

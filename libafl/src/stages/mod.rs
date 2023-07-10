@@ -276,14 +276,14 @@ where
         push_stage.init(fuzzer, state, event_mgr, executor.observers_mut())?;
 
         loop {
-            let input =
+            let mut input =
                 match push_stage.pre_exec(fuzzer, state, event_mgr, executor.observers_mut()) {
                     Some(Ok(next_input)) => next_input,
                     Some(Err(err)) => return Err(err),
                     None => break,
                 };
 
-            let exit_kind = fuzzer.execute_input(state, executor, event_mgr, &input)?;
+            let exit_kind = fuzzer.execute_input(state, executor, event_mgr, &mut input)?;
 
             push_stage.post_exec(
                 fuzzer,
