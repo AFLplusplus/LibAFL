@@ -451,6 +451,7 @@ pub(crate) struct InProcessExecutorHandlerData {
     fuzzer_ptr: *mut c_void,
     executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
+    pub in_handler: bool,
 
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
@@ -516,6 +517,13 @@ impl InProcessExecutorHandlerData {
                 .unwrap()
         }
     }
+
+    #[cfg(any(unix, feature = "std"))]
+    fn set_in_handler(&mut self, v: bool) -> bool {
+        let old = self.in_handler;
+        self.in_handler = v;
+        old
+    }
 }
 
 /// Exception handling needs some nasty unsafe.
@@ -530,6 +538,8 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     executor_ptr: ptr::null(),
     /// The current input for signal handling
     current_input_ptr: ptr::null(),
+
+    in_handler: false,
 
     /// The crash handler fn
     #[cfg(any(unix, feature = "std"))]
@@ -578,6 +588,12 @@ pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
 #[must_use]
 pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
     unsafe { (GLOBAL_STATE.current_input_ptr as *const I).as_ref() }
+}
+
+/// Know if we ar eexecuting in a crash/timeout handler
+#[must_use]
+pub fn inprocess_in_handler() -> bool {
+    unsafe { GLOBAL_STATE.in_handler }
 }
 
 use crate::{
@@ -728,6 +744,7 @@ mod unix_signal_handler {
         fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
+                let in_handler = data.set_in_handler(true);
                 match signal {
                     Signal::SigUser2 | Signal::SigAlarm => {
                         if !data.timeout_handler.is_null() {
@@ -742,6 +759,7 @@ mod unix_signal_handler {
                         }
                     }
                 }
+                data.set_in_handler(in_handler);
             }
         }
 
@@ -777,6 +795,7 @@ mod unix_signal_handler {
         panic::set_hook(Box::new(move |panic_info| {
             old_hook(panic_info);
             let data = unsafe { &mut GLOBAL_STATE };
+            let in_handler = data.set_in_handler(true);
             if data.is_valid() {
                 // We are fuzzing!
                 let executor = data.executor_mut::<E>();
@@ -798,6 +817,7 @@ mod unix_signal_handler {
                     libc::_exit(128 + 6);
                 } // SIGABRT exit code
             }
+            data.set_in_handler(in_handler);
         }));
     }
 
@@ -991,6 +1011,7 @@ pub mod windows_asan_handler {
             + HasScheduler,
     {
         let data = &mut GLOBAL_STATE;
+        data.set_in_handler(true);
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
             /*
@@ -1107,10 +1128,12 @@ mod windows_exception_handler {
         fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
+                let in_handler = data.set_in_handler(true);
                 if !data.crash_handler.is_null() {
                     let func: HandlerFuncPtr = transmute(data.crash_handler);
                     (func)(exception_pointers, data);
                 }
+                data.set_in_handler(in_handler);
             }
         }
 
@@ -1137,6 +1160,7 @@ mod windows_exception_handler {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
             let data = unsafe { &mut GLOBAL_STATE };
+            let in_handler = data.set_in_handler(true);
             // Have we set a timer_before?
             unsafe {
                 if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
@@ -1178,6 +1202,7 @@ mod windows_exception_handler {
                 }
             }
             old_hook(panic_info);
+            data.set_in_handler(in_handler);
         }));
     }
 
