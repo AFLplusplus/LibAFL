@@ -145,7 +145,6 @@ pub fn fuzz() {
     println!("Break at {pc:#x}");
 
     let ret_addr: GuestAddr = emu.read_return_address().unwrap();
-
     println!("Return address = {ret_addr:#x}");
 
     emu.remove_breakpoint(test_one_input_ptr);
