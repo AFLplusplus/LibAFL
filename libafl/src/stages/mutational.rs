@@ -298,7 +298,9 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else { return Ok(()); };
+        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
+            return Ok(());
+        };
         drop(testcase);
 
         let mut generated = vec![];

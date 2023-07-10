@@ -353,7 +353,7 @@ where
         let cnt = self.usable_count();
         let map = self.as_slice();
         let mut res = 0;
-        for x in map[0..cnt].iter() {
+        for x in &map[0..cnt] {
             if *x != initial {
                 res += 1;
             }
@@ -386,7 +386,7 @@ where
         let initial = self.initial();
         let cnt = self.usable_count();
         let map = self.as_mut_slice();
-        for x in map[0..cnt].iter_mut() {
+        for x in &mut map[0..cnt] {
             *x = initial;
         }
         Ok(())
@@ -815,7 +815,7 @@ where
         let cnt = self.usable_count();
         let map = self.as_slice();
         let mut res = 0;
-        for x in map[0..cnt].iter() {
+        for x in &map[0..cnt] {
             if *x != initial {
                 res += 1;
             }
@@ -838,7 +838,7 @@ where
         let initial = self.initial();
         let cnt = self.usable_count();
         let map = self.as_mut_slice();
-        for x in map[0..cnt].iter_mut() {
+        for x in &mut map[0..cnt] {
             *x = initial;
         }
         Ok(())
@@ -1091,7 +1091,7 @@ where
         let cnt = self.usable_count();
         let map = self.as_slice();
         let mut res = 0;
-        for x in map[0..cnt].iter() {
+        for x in &map[0..cnt] {
             if *x != initial {
                 res += 1;
             }
@@ -1109,7 +1109,7 @@ where
         let initial = self.initial();
         let cnt = self.usable_count();
         let map = self.as_mut_slice();
-        for x in map[0..cnt].iter_mut() {
+        for x in &mut map[0..cnt] {
             *x = initial;
         }
         Ok(())
@@ -2082,7 +2082,7 @@ where
         let cnt = self.usable_count();
         let map = self.as_slice();
         let mut res = 0;
-        for x in map[0..cnt].iter() {
+        for x in &map[0..cnt] {
             if *x != initial {
                 res += 1;
             }
@@ -2111,7 +2111,7 @@ where
         let initial = self.initial();
         let cnt = self.usable_count();
         let map = self.as_mut_slice();
-        for x in map[0..cnt].iter_mut() {
+        for x in &mut map[0..cnt] {
             *x = initial;
         }
         Ok(())

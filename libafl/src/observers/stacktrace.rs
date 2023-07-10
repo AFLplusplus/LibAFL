@@ -244,7 +244,7 @@ pub fn get_asan_runtime_flags_with_log_path() -> String {
 /// returns the recommended ASAN runtime flags to capture the backtrace correctly
 #[must_use]
 pub fn get_asan_runtime_flags() -> String {
-    let flags = vec![
+    let flags = [
         "exitcode=0",
         "abort_on_error=1",
         "handle_abort=1",

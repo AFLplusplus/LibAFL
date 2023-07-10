@@ -124,7 +124,7 @@ where
             let threshold = meta.total_probability * rand_prob;
             let mut k: f64 = 0.0;
             let mut ret = *meta.map.keys().last().unwrap();
-            for (idx, prob) in meta.map.iter() {
+            for (idx, prob) in &meta.map {
                 k += prob;
                 if k >= threshold {
                     ret = *idx;
