@@ -1,8 +1,9 @@
+use std::mem::size_of;
+
 use capstone::arch::BuildsCapstone;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
-use std::mem::size_of;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86_64::*;
 

@@ -251,14 +251,13 @@ impl AsanErrors {
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
                 let start_pc = error.pc - 4 * 5;
-                for insn in cs
+                for insn in &*cs
                     .disasm_count(
                         unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
                         start_pc as u64,
                         11,
                     )
                     .expect("failed to disassemble instructions")
-                    .iter()
                 {
                     if insn.address() as usize == error.pc {
                         output
@@ -505,14 +504,13 @@ impl AsanErrors {
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
                 let start_pc = pc;
-                for insn in cs
+                for insn in &*cs
                     .disasm_count(
                         unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
                         start_pc as u64,
                         11,
                     )
                     .expect("failed to disassemble instructions")
-                    .iter()
                 {
                     if insn.address() as usize == pc {
                         output
