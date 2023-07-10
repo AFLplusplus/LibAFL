@@ -34,8 +34,8 @@ use libafl_qemu::{
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
     emu::Emulator,
-    ArchExtras, GuestAddr, GuestReg, MmapPerms, QemuExecutor, QemuHooks, QemuInstrumentationFilter,
-    Regs,
+    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, QemuExecutor, QemuHooks,
+    QemuInstrumentationFilter, Regs,
 };
 use rangemap::RangeMap;
 
@@ -161,8 +161,8 @@ pub fn fuzz() {
             emu.write_reg(Regs::Pc, test_one_input_ptr)?;
             emu.write_reg(Regs::Sp, stack_ptr)?;
             emu.write_return_address(ret_addr)?;
-            emu.write_function_argument(0, input_addr)?;
-            emu.write_function_argument(1, len)?;
+            emu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
+            emu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
             emu.run();
             Ok(())
         }

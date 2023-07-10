@@ -3,6 +3,8 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 
+use crate::CallingConvention;
+
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Regs {
@@ -84,10 +86,19 @@ impl crate::ArchExtras for crate::CPU {
         self.write_reg(Regs::Lr, val)
     }
 
-    fn write_function_argument<T>(&self, idx: i32, val: T) -> Result<(), String>
+    fn write_function_argument<T>(
+        &self,
+        conv: CallingConvention,
+        idx: i32,
+        val: T,
+    ) -> Result<(), String>
     where
         T: Into<GuestReg>,
     {
+        if conv != CallingConvention::Cdecl {
+            return Err(format!("Unsupported calling convention: {conv:#?}"));
+        }
+
         Err(format!("Unsupported argument: {idx:}"))
     }
 }

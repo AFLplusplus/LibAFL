@@ -487,6 +487,11 @@ pub struct CPU {
     ptr: CPUStatePtr,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum CallingConvention {
+    Cdecl,
+}
+
 pub trait ArchExtras {
     fn read_return_address<T>(&self) -> Result<T, String>
     where
@@ -494,7 +499,12 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), String>
     where
         T: Into<GuestReg>;
-    fn write_function_argument<T>(&self, idx: i32, val: T) -> Result<(), String>
+    fn write_function_argument<T>(
+        &self,
+        conv: CallingConvention,
+        idx: i32,
+        val: T,
+    ) -> Result<(), String>
     where
         T: Into<GuestReg>;
 }
@@ -1195,13 +1205,18 @@ impl ArchExtras for Emulator {
             .write_return_address::<T>(val)
     }
 
-    fn write_function_argument<T>(&self, idx: i32, val: T) -> Result<(), String>
+    fn write_function_argument<T>(
+        &self,
+        conv: CallingConvention,
+        idx: i32,
+        val: T,
+    ) -> Result<(), String>
     where
         T: Into<GuestReg>,
     {
         self.current_cpu()
             .ok_or("Failed to get current CPU")?
-            .write_function_argument::<T>(idx, val)
+            .write_function_argument::<T>(conv, idx, val)
     }
 }
 

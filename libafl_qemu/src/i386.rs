@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86::*;
 
-use crate::GuestAddr;
+use crate::{CallingConvention, GuestAddr};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -70,10 +70,19 @@ impl crate::ArchExtras for crate::CPU {
         Ok(())
     }
 
-    fn write_function_argument<T>(&self, idx: i32, val: T) -> Result<(), String>
+    fn write_function_argument<T>(
+        &self,
+        conv: CallingConvention,
+        idx: i32,
+        val: T,
+    ) -> Result<(), String>
     where
         T: Into<GuestReg>,
     {
+        if conv != CallingConvention::Cdecl {
+            return Err(format!("Unsupported calling convention: {conv:#?}"));
+        }
+
         match idx {
             0..=1 => {
                 let val: GuestReg = val.into();
