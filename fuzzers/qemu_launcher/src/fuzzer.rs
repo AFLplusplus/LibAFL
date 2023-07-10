@@ -210,7 +210,7 @@ pub fn fuzz() {
     let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
     println!("Placing input at {input_addr:#x}");
 
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |input: &mut BytesInput| {
         let target = input.target_bytes();
         let buf = target
             .as_slice()

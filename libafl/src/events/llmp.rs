@@ -1558,7 +1558,7 @@ mod tests {
 
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut harness = |_buf: &BytesInput| ExitKind::Ok;
+        let mut harness = |_buf: &mut BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
             &mut harness,
             tuple_list!(),

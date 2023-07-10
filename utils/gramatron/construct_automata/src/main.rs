@@ -208,7 +208,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
         //let mut culled_pda_unique = HashSet::new();
 
         for final_state in &finals {
-            for transition in pda.iter() {
+            for transition in pda {
                 if transition.dest == *final_state && transition.stack.len() > 0 {
                     blocklist.insert(transition.dest);
                 } else {
@@ -267,7 +267,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
         }
     } else {
         // Running FSA construction in exact approximation mode and postprocessing it like so
-        for transition in pda.iter() {
+        for transition in pda {
             num_transition += 1;
             let state = transition.source;
             if state >= memoized.len() {
