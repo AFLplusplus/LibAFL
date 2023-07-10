@@ -275,7 +275,9 @@ impl AsanErrors {
 
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
-                let offset: i64 = fault_address as i64 - (error.metadata.address + 0x1000) as i64;
+                let fault_address: i64 = fault_address.try_into().unwrap();
+                let metadata_address: i64 = error.metadata.address.try_into().unwrap();
+                let offset: i64 = fault_address - (metadata_address + 0x1000);
                 let direction = if offset > 0 { "right" } else { "left" };
                 writeln!(
                     output,
