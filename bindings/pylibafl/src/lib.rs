@@ -40,6 +40,10 @@ class BaseExecutor:
         raise NotImplementedError('Implement this yourself')
     def run_target(self, fuzzer, state, mgr, input) -> ExitKind:
         raise NotImplementedError('Implement this yourself')
+    def pre_exec(self, fuzzer, state, mgr, input) -> ExitKind:
+        pass
+    def post_exec(self, fuzzer, state, mgr, input) -> ExitKind:
+        pass
     def as_executor(self):
         return Executor.new_py(self)
 
