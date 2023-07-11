@@ -281,6 +281,13 @@ where
             ret_addr
         };
 
+        #[cfg(cpu_target = "hexagon")]
+        let ret_addr = {
+            let emu = hooks.emulator();
+            let ret_addr: GuestAddr = emu.read_reg(Regs::Lr).unwrap();
+            ret_addr
+        };
+
         // log::info!("RET @ 0x{:#x}", ret_addr);
 
         let mut collectors = if let Some(h) = hooks.helpers_mut().match_first_type_mut::<Self>() {

@@ -31,7 +31,7 @@ libafl = { path = "../libafl", version = "0.10.1" }
 libafl_targets = { path = "../libafl_targets", version = "0.10.1" }
 libafl_qemu = { path = "../libafl_qemu", version = "0.10.1" }
 
-typed-builder = "0.12" # Implement the builder pattern at compiletime
+typed-builder = "0.14" # Implement the builder pattern at compiletime
 pyo3 = { version = "0.18.3", optional = true }
 log = "0.4.17"
 
