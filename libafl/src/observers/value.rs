@@ -25,7 +25,7 @@ use crate::{
 /// A simple observer with a single value.
 ///
 /// The intent is that the value is something with interior mutability which the target could write to even though this
-/// observer has a reference to it. Use [RefCellValueObserver] if using a RefCell around the value.
+/// observer has a reference to it. Use [`RefCellValueObserver`] if using a [`RefCell`] around the value.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct ValueObserver<'a, T>
@@ -106,7 +106,7 @@ where
     }
 }
 
-/// A simple observer with a single RefCell'd value.
+/// A simple observer with a single [`RefCell`]'d value.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct RefCellValueObserver<'a, T>
