@@ -118,7 +118,8 @@ char TamingParsingTables::ID = 0;
 #endif
 
 #ifdef USE_NEW_PM
-PreservedAnalyses TamingParsingTables::run(Module &M, ModuleAnalysisManager &MAM) {
+PreservedAnalyses TamingParsingTables::run(Module                &M,
+                                           ModuleAnalysisManager &MAM) {
 #else
 bool TamingParsingTables::runOnModule(Module &M) {
 #endif
@@ -130,9 +131,10 @@ bool TamingParsingTables::runOnModule(Module &M) {
   IntegerType *Int16Ty = IntegerType::getInt16Ty(C);
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
   IntegerType *Int1Ty = IntegerType::getInt1Ty(C);
-  Type *VoidTy = Type::getVoidTy(C);
+  Type        *VoidTy = Type::getVoidTy(C);
 
-  FunctionCallee LogFunc = M.getOrInsertFunction("__libafl_tables_transition", VoidTy, Int32Ty, Int32Ty);
+  FunctionCallee LogFunc = M.getOrInsertFunction("__libafl_tables_transition",
+                                                 VoidTy, Int32Ty, Int32Ty);
 
 #ifdef USE_NEW_PM
   auto PA = PreservedAnalyses::all();
@@ -162,7 +164,7 @@ bool TamingParsingTables::runOnModule(Module &M) {
           // TODO handle multiple idxs
           Value *IDX = *GEP->idx_begin();
           IDX = recurseCast(IDX);
-          
+
           if ((LI = dyn_cast<LoadInst>(IDX)) && loads.find(LI) != loads.end()) {
             geps.insert(GEP);
           }
@@ -171,7 +173,7 @@ bool TamingParsingTables::runOnModule(Module &M) {
           Value    *VAL = recurseCast(ST->getValueOperand());
           LoadInst *GL = nullptr;
           Value    *V = nullptr;
-          
+
           if ((GL = dyn_cast<LoadInst>(VAL))) {
             V = GL->getPointerOperand();
             if (V == nullptr || geps.find(V) == geps.end()) { continue; }
@@ -190,17 +192,19 @@ bool TamingParsingTables::runOnModule(Module &M) {
               recurseCast(ST->getPointerOperand()))
             continue;
 
-          std::string location = std::string("UNKNOWN");
-          if (DILocation *Loc = GEP->getDebugLoc().get()) {
-            location = std::string(Loc->getFilename().data()) +
-                       std::string(":") + std::to_string(Loc->getLine());
+          if (Debug) {
+            std::string location = std::string("UNKNOWN");
+            if (DILocation *Loc = GEP->getDebugLoc().get()) {
+              location = std::string(Loc->getFilename().data()) +
+                         std::string(":") + std::to_string(Loc->getLine());
+            }
+
+            errs() << "FOUND " << location << "\n\t" << *LI << "\n\t" << *GEP
+                   << "\n\t" << *ST << "\n\n";
           }
 
-          errs() << "FOUND " << location << "\n\t" << *LI << "\n\t" << *GEP
-                 << "\n\t" << *ST << "\n\n";
-          
           IRBuilder<> IRB(ST);
-          Value *A1 = IRB.CreateIntCast(LI, Int32Ty, false);
+          Value      *A1 = IRB.CreateIntCast(LI, Int32Ty, false);
           Value *A2 = IRB.CreateIntCast(ST->getValueOperand(), Int32Ty, false);
           IRB.CreateCall(LogFunc, {A1, A2});
         }
@@ -217,7 +221,7 @@ bool TamingParsingTables::runOnModule(Module &M) {
 
 #ifndef USE_NEW_PM
 static void registerTablesPass(const PassManagerBuilder &,
-                            legacy::PassManagerBase &PM) {
+                               legacy::PassManagerBase &PM) {
   PM.add(new TamingParsingTables());
 }
 
