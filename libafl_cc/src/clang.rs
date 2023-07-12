@@ -39,6 +39,8 @@ pub enum LLVMPasses {
     AutoTokens,
     /// The Coverage Accouting (BB metric) pass
     CoverageAccounting,
+    /// Coverage from parsing tables
+    Tables,
     /// The dump cfg pass
     DumpCfg,
 }
@@ -57,6 +59,9 @@ impl LLVMPasses {
             }
             LLVMPasses::CoverageAccounting => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("coverage-accounting-pass.{}", dll_extension())),
+            LLVMPasses::Tables => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("tabes-pass.{}", dll_extension()))
+            }
             LLVMPasses::DumpCfg => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("dump-cfg-pass.{}", dll_extension()))
             }
