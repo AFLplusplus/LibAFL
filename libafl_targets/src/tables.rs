@@ -6,14 +6,14 @@ use crate::TABLES_MAP_SIZE;
 pub static mut TABLES_MAP: [u8; TABLES_MAP_SIZE] = [0; TABLES_MAP_SIZE];
 
 fn merge_u32(a: u32, b: u32) -> u64 {
-    (a as u64) << 32 + (b as u64)
+    (u64::from(a) << 32) + u64::from(b)
 }
 
-/// From https://sair.synerise.com/efficient-integer-pairs-hashing/
+/// From <https://sair.synerise.com/efficient-integer-pairs-hashing/>
 fn splitmix64(target: u64, seed: u64) -> u64 {
     let sp_step = 0x9E3779B97F4A7C15_u64;
     let mut out = target;
-    out = out + seed * sp_step;
+    out += seed * sp_step;
     out ^= out >> 30;
     out *= 0xBF58476D1CE4E5B9_u64;
     out ^= out >> 27;
