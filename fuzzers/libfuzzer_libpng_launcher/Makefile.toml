@@ -1,7 +1,7 @@
 # Variables
 [env]
 FUZZER_NAME='fuzzer_libpng_launcher'
-CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target/x86_64-unknown-linux-gnu", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 LIBAFL_CC = '${CARGO_TARGET_DIR}/release/libafl_cc'
 LIBAFL_CXX = '${CARGO_TARGET_DIR}/release/libafl_cxx'
 LIBAFL_LIBTOOL = '${CARGO_TARGET_DIR}/release/libafl_libtool'
@@ -35,9 +35,8 @@ mac_alias = "cxx_unix"
 windows_alias = "unsupported"
 
 [tasks.cxx_unix]
-script="RUSTFLAGS=-Zsanitizer=address cargo +nightly build -Zbuild-std --target x86_64-unknown-linux-gnu --release"
-#command = "cargo"
-#args = ["build" , "--release"]
+command = "cargo"
+args = ["build" , "--release"]
 
 [tasks.cc]
 linux_alias = "cc_unix"
@@ -45,9 +44,8 @@ mac_alias = "cc_unix"
 windows_alias = "unsupported"
 
 [tasks.cc_unix]
-script="RUSTFLAGS=-Zsanitizer=address cargo +nightly build -Zbuild-std --target x86_64-unknown-linux-gnu --release"
-#command = "cargo"
-#args = ["build" , "--release"]
+command = "cargo"
+args = ["build" , "--release"]
 
 # Library
 [tasks.lib]
@@ -57,7 +55,7 @@ windows_alias = "unsupported"
 
 [tasks.lib_unix]
 script_runner="@shell"
-cript='''
+script='''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
 cd "${PROJECT_DIR}"
 make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/release/libafl_cc" CXX="${CARGO_TARGET_DIR}/release/libafl_cxx" LIBTOOL=${CARGO_TARGET_DIR}/release/libafl_libtool
@@ -73,7 +71,7 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
 command = "${CARGO_TARGET_DIR}/release/libafl_cxx"
-args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz", "-fsanitize=address"]
+args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
 dependencies = [ "lib", "cxx", "cc" ]
 
 # Run the fuzzer

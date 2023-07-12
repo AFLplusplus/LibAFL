@@ -8,7 +8,7 @@ pub mod build_id;
     feature = "std"
 ))]
 pub mod cli;
-#[cfg(feature = "llmp_compression")]
+#[cfg(feature = "gzip")]
 pub mod compress;
 #[cfg(feature = "std")]
 pub mod core_affinity;

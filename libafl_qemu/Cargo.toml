@@ -43,11 +43,11 @@ libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.10.1" }
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.13", features = ["serde"] } # A faster hashmap, nostd compatible
 num-traits = "0.2"
-num_enum = "0.5.7"
+num_enum = "0.6"
 goblin = "0.6"
 libc = "0.2"
-strum = "0.24"
-strum_macros = "0.24"
+strum = "0.25"
+strum_macros = "0.25"
 syscall-numbers = "3.0"
 meminterval = "0.3"
 thread_local = "1.1.4"
