@@ -1,5 +1,5 @@
 /*
-   LibAFL - Coverage accounting LLVM pass
+   LibAFL - Parsing tables coverage LLVM pass
    --------------------------------------------------
 
    Written by Andrea Fioraldi <andreafioraldi@gmail.com>
@@ -163,7 +163,7 @@ bool TamingParsingTables::runOnModule(Module &M) {
           Value *IDX = *GEP->idx_begin();
           IDX = recurseCast(IDX);
           
-          if ((LI = dyn_cast<LoadInst>(IDX)) && loads.contains(LI)) {
+          if ((LI = dyn_cast<LoadInst>(IDX)) && loads.find(LI) != loads.end()) {
             geps.insert(GEP);
           }
         } else if ((ST = dyn_cast<StoreInst>(&I))) {
@@ -174,7 +174,7 @@ bool TamingParsingTables::runOnModule(Module &M) {
           
           if ((GL = dyn_cast<LoadInst>(VAL))) {
             V = GL->getPointerOperand();
-            if (V == nullptr || !geps.contains(V)) { continue; }
+            if (V == nullptr || geps.find(V) == geps.end()) { continue; }
           } else {
             continue;
           }
@@ -216,14 +216,14 @@ bool TamingParsingTables::runOnModule(Module &M) {
 }
 
 #ifndef USE_NEW_PM
-static void registerAFLPass(const PassManagerBuilder &,
+static void registerTablesPass(const PassManagerBuilder &,
                             legacy::PassManagerBase &PM) {
   PM.add(new TamingParsingTables());
 }
 
-static RegisterStandardPasses RegisterAFLPass(
-    PassManagerBuilder::EP_OptimizerLast, registerAFLPass);
+static RegisterStandardPasses RegisterTablesPass(
+    PassManagerBuilder::EP_OptimizerLast, registerTablesPass);
 
-static RegisterStandardPasses RegisterAFLPass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerAFLPass);
+static RegisterStandardPasses RegisterTablesPass0(
+    PassManagerBuilder::EP_EnabledOnOptLevel0, registerTablesPass);
 #endif

@@ -60,7 +60,7 @@ impl LLVMPasses {
             LLVMPasses::CoverageAccounting => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("coverage-accounting-pass.{}", dll_extension())),
             LLVMPasses::Tables => {
-                PathBuf::from(env!("OUT_DIR")).join(format!("tabes-pass.{}", dll_extension()))
+                PathBuf::from(env!("OUT_DIR")).join(format!("tables-pass.{}", dll_extension()))
             }
             LLVMPasses::DumpCfg => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("dump-cfg-pass.{}", dll_extension()))

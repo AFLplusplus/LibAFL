@@ -27,6 +27,6 @@ fn splitmix64(target: u64, seed: u64) -> u64 {
 pub extern "C" fn __libafl_tables_transition(cur: u32, next: u32) {
     let hash = splitmix64(merge_u32(cur, next), 52) as usize % TABLES_MAP_SIZE;
     unsafe {
-        TABLES_MAP[hash] += 1;
+        TABLES_MAP[hash] = 1;
     }
 }
