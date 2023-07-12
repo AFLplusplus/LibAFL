@@ -14,3 +14,6 @@ crate-type = ["dylib"]
 anyhow = { version = "1.0.71", default-features = false }
 ctor = { version = "0.2.2", default-features = false }
 nix = { version = "0.26.2", default-features = false, features = ["process", "personality"] }
+
+[target.'cfg(target_os = "freebsd")'.dependencies]
+libc = "0.2" 
