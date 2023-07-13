@@ -8,6 +8,7 @@ use {
     nix::unistd::execvp,
     std::ffi::CString,
 };
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use {
     crate::args::Args,
@@ -28,7 +29,7 @@ fn disable_aslr() -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
+#[cfg(target_os = "freebsd")]
 fn disable_aslr() -> Result<()> {
     let mut status = libc::PROC_ASLR_FORCE_DISABLE;
     let r = unsafe {
@@ -41,6 +42,27 @@ fn disable_aslr() -> Result<()> {
     };
     if r < 0 {
         return Err(anyhow!("Failed to set aslr control"));
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "dragonfly")]
+fn disable_aslr() -> Result<()> {
+    unsafe {
+        let disable: i32 = 0;
+        let s = std::mem::size_of::<i32>();
+        let nm = CString::new("vm.randomize_mmap")
+            .map_err(|e| anyhow!("Failed to create sysctl oid: {e:}"))
+            .unwrap();
+        if libc::sysctlbyname(
+            nm.as_ptr(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &disable as *const i32 as _,
+            s,
+        ) < 0 {
+            return Err(anyhow!("Failed to disable aslr"));
+        }
     }
     Ok(())
 }
