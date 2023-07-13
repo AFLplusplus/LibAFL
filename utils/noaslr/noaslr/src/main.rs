@@ -8,7 +8,6 @@ use {
     nix::unistd::execvp,
     std::ffi::CString,
 };
-
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use {
     crate::args::Args,
@@ -60,7 +59,8 @@ fn disable_aslr() -> Result<()> {
             std::ptr::null_mut(),
             &disable as *const i32 as _,
             s,
-        ) < 0 {
+        ) < 0
+        {
             return Err(anyhow!("Failed to disable aslr"));
         }
     }
