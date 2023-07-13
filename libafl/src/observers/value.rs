@@ -123,7 +123,7 @@ impl<'a, T> RefCellValueObserver<'a, T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
-    /// Creates a new [`ValueObserver`] with the given name.
+    /// Creates a new [`RefCellValueObserver`] with the given name.
     #[must_use]
     pub fn new(name: &'static str, value: &'a RefCell<T>) -> Self {
         Self {
