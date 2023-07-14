@@ -48,7 +48,7 @@ use libafl_targets::{
 
 /// Set up our coverage map.
 #[no_mangle]
-pub fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
+pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
         EDGES_MAP_PTR = start;
         MAX_EDGES_NUM = (stop as usize - start as usize) / 8;
@@ -58,7 +58,7 @@ pub fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
 /// `pcs` tables seem to be unused by `Atheris`, so we can ignore this setup function,
 /// but the symbol is still being called and, hence, required.
 #[no_mangle]
-pub fn __sanitizer_cov_pcs_init(_pcs_beg: *mut u8, _pcs_end: *mut u8) {
+pub extern "C" fn __sanitizer_cov_pcs_init(_pcs_beg: *mut u8, _pcs_end: *mut u8) {
     // noop
 }
 
@@ -66,7 +66,7 @@ pub fn __sanitizer_cov_pcs_init(_pcs_beg: *mut u8, _pcs_end: *mut u8) {
 /// This is a PoC implementation and could be improved.
 /// For example, it only takes up to 8 bytes into consideration.
 #[no_mangle]
-pub fn __sanitizer_weak_hook_memcmp(
+pub extern "C" fn __sanitizer_weak_hook_memcmp(
     _caller_pc: *const c_void,
     s1: *const c_void,
     s2: *const c_void,
@@ -104,7 +104,7 @@ pub fn __sanitizer_weak_hook_memcmp(
 /// and jumps back into `Atheris'` instrumented python code.
 #[no_mangle]
 #[allow(non_snake_case)]
-pub fn LLVMFuzzerRunDriver(
+pub extern "C" fn LLVMFuzzerRunDriver(
     _argc: *const c_int,
     _argv: *const *const c_char,
     harness_fn: Option<extern "C" fn(*const u8, usize) -> c_int>,
