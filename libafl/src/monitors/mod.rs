@@ -686,6 +686,7 @@ impl ClientPerfMonitor {
             stages_used: vec![],
             feedbacks: HashMap::new(),
             timer_start: None,
+            last_report_time: None,
         }
     }
 
