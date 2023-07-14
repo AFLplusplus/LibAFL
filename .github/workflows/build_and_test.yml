@@ -21,6 +21,9 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
+      - name: Install mimetype
+        if: runner.os == 'Linux'
+        run: sudo apt-get install libfile-mimeinfo-perl
       - name: install mdbook
         uses: baptiste0928/cargo-install@v1.3.0
         with:
@@ -31,9 +34,6 @@ jobs:
           crate: mdbook-linkcheck
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
-      - name: Install mimetype
-        if: runner.os == 'Linux'
-        run: sudo apt-get install libfile-mimeinfo-perl
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
@@ -67,8 +67,8 @@ jobs:
         packages: llvm llvm-dev clang ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: get clang version
       run: command -v llvm-config && clang -v
-    - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
+    - name: Add nightly rustfmt
+      run: rustup toolchain install nightly --component rustfmt --component miri --allow-downgrade
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
 
@@ -84,8 +84,6 @@ jobs:
       run: clang-format-13 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
     - name: run shellcheck
       run: shellcheck ./scripts/*.sh
-    - name: Run clippy
-      run: ./scripts/clippy.sh
       
     # ---- doc check ----
     - name: Build Docs
@@ -102,6 +100,29 @@ jobs:
     # --- miri undefined behavior test --
     - name: Run miri tests
       run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
+  
+  ubuntu-clippy:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Remove Dotnet & Haskell
+      run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - name: Install and cache deps
+      uses: awalsh128/cache-apt-pkgs-action@v1.1.0
+      with:
+        packages: llvm llvm-dev clang ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+    - name: get clang version
+      run: command -v llvm-config && clang -v
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component clippy --allow-downgrade
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Run clippy
+      run: ./scripts/clippy.sh
 
   ubuntu-check:
     runs-on: ubuntu-22.04
@@ -272,7 +293,7 @@ jobs:
         profile: minimal
         toolchain: nightly
         override: true
-        components: rustfmt, clippy, rust-src
+        components: rustfmt, rust-src
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Add targets
@@ -283,6 +304,20 @@ jobs:
       run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
     - name: no_std tests
       run: cd ./libafl && cargo test --no-default-features 
+
+  nostd-clippy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: nightly
+        override: true
+        components: rustfmt, clippy, rust-src
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+    - name: Add targets
+      run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
     - name: libafl armv6m-none-eabi (32 bit no_std) clippy
       run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
 
@@ -304,10 +339,6 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Windows Build
       run: cargo build --verbose
-    - name: Run clippy
-      uses: actions-rs/cargo@v1
-      with:
-        command: clippy
     - name: Build docs
       run: cargo doc
     - name: Set LIBCLANG_PATH
@@ -323,7 +354,21 @@ jobs:
       run: cd fuzzers/frida_gdiplus/ && cargo make test
     - name: Build fuzzers/tinyinst_simple
       run: cd fuzzers/tinyinst_simple/ && cargo make test
-      
+
+  windows-clippy:
+    runs-on: windows-latest
+    steps:
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+    - name: Run clippy
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
+ 
   macos:
     runs-on: macOS-latest
     steps:
@@ -332,7 +377,7 @@ jobs:
         profile: minimal
         toolchain: stable
     - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+      run: rustup toolchain install nightly --component rustfmt --allow-downgrade
     - name: Install deps
       run: brew install z3 gtk+3
     - name: Install cxxbridge
@@ -341,12 +386,28 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: MacOS Build
       run: cargo build --verbose
-    - name: Run clippy
-      run: ./scripts/clippy.sh
     - name: Increase map sizes
       run: ./scripts/shmem_limits_macos.sh
     - name: Run Tests
       run: cargo test
+
+  macos-clippy:
+    runs-on: macOS-latest
+    steps:
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component clippy --allow-downgrade
+    - name: Install deps
+      run: brew install z3 gtk+3
+    - name: Install cxxbridge
+      run: cargo install cxxbridge-cmd
+    - uses: actions/checkout@v3
+    - uses: Swatinem/rust-cache@v2
+    - name: Run clippy
+      run: ./scripts/clippy.sh
 
   other_targets:
     runs-on: macOS-latest
