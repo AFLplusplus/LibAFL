@@ -15,7 +15,7 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 [features]
 default = ["std", "sanitizers_flags"]
 std = ["libafl/std"]
-libfuzzer = ["std", "sanitizer_ifaces"]
+libfuzzer = ["std", "sanitizer_interfaces"]
 libfuzzer_no_link_main = ["libfuzzer"]
 libfuzzer_define_run_driver = ["libfuzzer"]
 libfuzzer_oom = ["libfuzzer"]
@@ -27,7 +27,7 @@ sancov_value_profile = []
 sancov_8bit = []
 sancov_cmplog = []
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
-sanitizer_ifaces = []
+sanitizer_interfaces = []
 clippy = [] # Ignore compiler warnings during clippy
 observers = ["intervaltree", "ahash"]
 

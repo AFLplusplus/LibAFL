@@ -95,12 +95,12 @@ fn main() {
     println!("cargo:rerun-if-changed=src/common.h");
     println!("cargo:rerun-if-changed=src/common.c");
 
-    #[cfg(feature = "sanitizer_ifaces")]
+    #[cfg(feature = "sanitizer_interfaces")]
     {
-        println!("cargo:rerun-if-changed=src/sanitizer_ifaces.h");
+        println!("cargo:rerun-if-changed=src/sanitizer_interfaces.h");
 
         let build = bindgen::builder()
-            .header("src/sanitizer_ifaces.h")
+            .header("src/sanitizer_interfaces.h")
             .use_core()
             .generate_comments(true)
             .parse_callbacks(Box::new(bindgen::CargoCallbacks))
@@ -108,7 +108,7 @@ fn main() {
             .expect("Couldn't generate the sanitizer headers!");
 
         build
-            .write_to_file(Path::new(&out_dir).join("sanitizer_ifaces.rs"))
+            .write_to_file(Path::new(&out_dir).join("sanitizer_interfaces.rs"))
             .expect("Couldn't write the sanitizer headers!");
     }
 
