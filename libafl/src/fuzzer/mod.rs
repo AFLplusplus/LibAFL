@@ -185,11 +185,10 @@ where
         state: &mut EM::State,
         manager: &mut EM,
     ) -> Result<CorpusId, Error> {
-        let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
+            manager.maybe_report_progress(state, monitor_timeout)?;
             self.fuzz_one(stages, executor, state, manager)?;
-            last = manager.maybe_report_progress(state, last, monitor_timeout)?;
         }
     }
 
@@ -217,12 +216,11 @@ where
         }
 
         let mut ret = None;
-        let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
+            manager.maybe_report_progress(state, monitor_timeout)?;
             ret = Some(self.fuzz_one(stages, executor, state, manager)?);
-            last = manager.maybe_report_progress(state, last, monitor_timeout)?;
         }
 
         manager.report_progress(state)?;

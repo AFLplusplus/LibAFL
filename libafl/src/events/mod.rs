@@ -459,18 +459,20 @@ where
     fn maybe_report_progress(
         &mut self,
         state: &mut Self::State,
-        last_report_time: Duration,
         monitor_timeout: Duration,
-    ) -> Result<Duration, Error> {
+    ) -> Result<(), Error> {
+        let Some(last_report_time) = state.introspection_monitor().last_report_time else {
+            // this is the first time we execute, no need to report progress just yet.
+            state.introspection_monitor_mut().last_report_time = Some(current_time());
+            return Ok(());
+        };
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
         if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
+            // report_progress sets a new `last_report_time` internally.
             self.report_progress(state)?;
-
-            Ok(cur)
-        } else {
-            Ok(last_report_time)
         }
+        Ok(())
     }
 
     /// Send off an info/monitor/heartbeat message to the broker.
@@ -509,6 +511,8 @@ where
                 },
             )?;
         }
+
+        state.introspection_monitor_mut().last_report_time = Some(cur);
 
         Ok(())
     }
