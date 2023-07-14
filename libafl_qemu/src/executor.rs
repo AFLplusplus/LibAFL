@@ -13,7 +13,10 @@ use libafl::{
     fuzzer::{HasFeedback, HasObjective, HasScheduler},
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State, UsesState, HasLastReportTime},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasSolutions, State,
+        UsesState,
+    },
     Error,
 };
 
