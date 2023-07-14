@@ -861,11 +861,22 @@ where
 #[cfg(test)]
 impl<I> HasExecutions for NopState<I> {
     fn executions(&self) -> &usize {
-        unimplemented!()
+        unimplemented!();
     }
 
     fn executions_mut(&mut self) -> &mut usize {
-        unimplemented!()
+        unimplemented!();
+    }
+}
+
+#[cfg(test)]
+impl<I> HasLastReportTime for NopState<I> {
+    fn last_report_time(&self) -> &Option<Duration> {
+        unimplemented!();
+    }
+
+    fn last_report_time_mut(&mut self) -> &mut Option<Duration> {
+        unimplemented!();
     }
 }
 
