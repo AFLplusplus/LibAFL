@@ -33,6 +33,7 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
+    prelude::HasLastReportTime,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
 };
@@ -132,7 +133,7 @@ where
 impl<E, MT, S, Z> EventManager<E, Z> for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata,
 {
 }
 
@@ -155,7 +156,7 @@ where
 impl<MT, S> ProgressReporter for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
 {
 }
 
@@ -379,7 +380,12 @@ where
 impl<E, MT, S, SP, Z> EventManager<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize,
+    S: UsesInput
+        + HasExecutions
+        + HasClientPerfMonitor
+        + HasMetadata
+        + HasLastReportTime
+        + Serialize,
     SP: ShMemProvider,
 {
 }
@@ -403,7 +409,7 @@ where
 impl<MT, S, SP> ProgressReporter for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
 {
 }

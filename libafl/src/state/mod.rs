@@ -219,6 +219,17 @@ pub trait HasStartTime {
     fn start_time_mut(&mut self) -> &mut Duration;
 }
 
+/// Trait for the last report time, the last time this node reported progress
+pub trait HasLastReportTime {
+    /// The last time we reported progress,if available/used.
+    /// This information is used by fuzzer `maybe_report_progress`.
+    fn last_report_time(&self) -> &Option<Duration>;
+
+    /// The last time we reported progress,if available/used (mutable).
+    /// This information is used by fuzzer `maybe_report_progress`.
+    fn last_report_time_mut(&mut self) -> &mut Option<Duration>;
+}
+
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "
@@ -249,6 +260,9 @@ pub struct StdState<I, C, R, SC> {
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
+    /// The last time we reported progress (if available/used).
+    /// This information is used by fuzzer `maybe_report_progress`.
+    last_report_time: Option<Duration>,
     phantom: PhantomData<I>,
 }
 
@@ -387,6 +401,20 @@ impl<I, C, R, SC> HasExecutions for StdState<I, C, R, SC> {
     #[inline]
     fn executions_mut(&mut self) -> &mut usize {
         &mut self.executions
+    }
+}
+
+impl<I, C, R, SC> HasLastReportTime for StdState<I, C, R, SC> {
+    /// The last time we reported progress,if available/used.
+    /// This information is used by fuzzer `maybe_report_progress`.
+    fn last_report_time(&self) -> &Option<Duration> {
+        &self.last_report_time
+    }
+
+    /// The last time we reported progress,if available/used (mutable).
+    /// This information is used by fuzzer `maybe_report_progress`.
+    fn last_report_time_mut(&mut self) -> &mut Option<Duration> {
+        &mut self.last_report_time
     }
 }
 
@@ -770,6 +798,7 @@ where
             #[cfg(feature = "std")]
             remaining_initial_files: None,
             phantom: PhantomData,
+            last_report_time: None,
         };
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;

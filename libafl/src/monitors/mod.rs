@@ -576,10 +576,6 @@ pub struct ClientPerfMonitor {
 
     /// Current time set by `start_timer`
     timer_start: Option<u64>,
-
-    /// The last time we reported progress (if available/used).
-    /// This information is used by fuzzer `maybe_report_progress`.
-    pub last_report_time: Option<Duration>,
 }
 
 /// Various features that are measured for performance
@@ -686,7 +682,6 @@ impl ClientPerfMonitor {
             stages_used: vec![],
             feedbacks: HashMap::new(),
             timer_start: None,
-            last_report_time: None,
         }
     }
 
