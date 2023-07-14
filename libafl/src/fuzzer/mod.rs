@@ -23,7 +23,10 @@ use crate::{
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions, UsesState},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata,
+        HasSolutions, UsesState,
+    },
     Error,
 };
 
@@ -155,7 +158,7 @@ where
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,
@@ -185,11 +188,10 @@ where
         state: &mut EM::State,
         manager: &mut EM,
     ) -> Result<CorpusId, Error> {
-        let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
+            manager.maybe_report_progress(state, monitor_timeout)?;
             self.fuzz_one(stages, executor, state, manager)?;
-            last = manager.maybe_report_progress(state, last, monitor_timeout)?;
         }
     }
 
@@ -217,12 +219,11 @@ where
         }
 
         let mut ret = None;
-        let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
+            manager.maybe_report_progress(state, monitor_timeout)?;
             ret = Some(self.fuzz_one(stages, executor, state, manager)?);
-            last = manager.maybe_report_progress(state, last, monitor_timeout)?;
         }
 
         manager.report_progress(state)?;
@@ -575,7 +576,12 @@ where
     EM: ProgressReporter + EventProcessor<E, Self, State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus + HasTestcase,
+    CS::State: HasClientPerfMonitor
+        + HasExecutions
+        + HasMetadata
+        + HasCorpus
+        + HasTestcase
+        + HasLastReportTime,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
     fn fuzz_one(
