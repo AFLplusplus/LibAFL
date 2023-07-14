@@ -52,8 +52,7 @@ use crate::{
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
     observers::ObserversTuple,
-    prelude::HasLastReportTime,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
+    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
 

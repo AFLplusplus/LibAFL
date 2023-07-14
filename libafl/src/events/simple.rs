@@ -33,8 +33,7 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
-    prelude::HasLastReportTime,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
+    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
 #[cfg(feature = "std")]

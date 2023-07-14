@@ -19,10 +19,11 @@ use crate::{
     mark_feature_time,
     mutators::Mutator,
     observers::ObserversTuple,
-    prelude::HasLastReportTime,
     schedulers::Scheduler,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand,
+    },
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 

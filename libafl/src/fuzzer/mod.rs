@@ -20,11 +20,13 @@ use crate::{
     inputs::UsesInput,
     mark_feature_time,
     observers::ObserversTuple,
-    prelude::HasLastReportTime,
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions, UsesState},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata,
+        HasSolutions, UsesState,
+    },
     Error,
 };
 
