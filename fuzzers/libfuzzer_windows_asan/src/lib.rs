@@ -27,7 +27,7 @@ use libafl::{
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 #[no_mangle]
-pub fn libafl_main() {
+pub extern "C" fn libafl_main() {
     println!(
         "Workdir: {:?}",
         env::current_dir().unwrap().to_string_lossy().to_string()
