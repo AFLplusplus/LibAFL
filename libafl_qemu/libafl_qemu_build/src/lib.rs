@@ -1,3 +1,4 @@
+#![allow(clippy::missing_panics_doc)]
 use std::{
     fs,
     path::{Path, PathBuf},

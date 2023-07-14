@@ -179,7 +179,7 @@ mod observers {
             let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
             for map in unsafe { &COUNTERS_MAPS } {
                 let slice = map.as_slice();
-                let ptr = slice.as_ptr() as *const u8;
+                let ptr = slice.as_ptr();
                 let map_size = slice.len() / core::mem::size_of::<u8>();
                 unsafe {
                     hasher.write(from_raw_parts(ptr, map_size));

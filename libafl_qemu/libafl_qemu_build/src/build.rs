@@ -16,7 +16,7 @@ fn build_dep_check(tools: &[&str]) {
     }
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
 #[must_use]
 pub fn build(
     cpu_target: &str,
