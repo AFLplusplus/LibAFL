@@ -797,8 +797,8 @@ where
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "std")]
             remaining_initial_files: None,
-            phantom: PhantomData,
             last_report_time: None,
+            phantom: PhantomData,
         };
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;
