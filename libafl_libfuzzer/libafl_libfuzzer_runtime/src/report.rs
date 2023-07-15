@@ -7,7 +7,9 @@ use libafl::{
     inputs::UsesInput,
     monitors::SimpleMonitor,
     stages::StagesTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasNamedMetadata},
+    state::{
+        HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, HasNamedMetadata,
+    },
     Error, Fuzzer,
 };
 
@@ -24,7 +26,12 @@ fn do_report<F, ST, E, S, EM>(
 ) -> Result<(), Error>
 where
     F: Fuzzer<E, EM, ST, State = S>,
-    S: HasClientPerfMonitor + HasMetadata + HasNamedMetadata + HasExecutions + UsesInput,
+    S: HasClientPerfMonitor
+        + HasMetadata
+        + HasNamedMetadata
+        + HasExecutions
+        + UsesInput
+        + HasLastReportTime,
     E: HasObservers<State = S>,
     EM: ProgressReporter<State = S>,
     ST: StagesTuple<E, EM, S, F>,

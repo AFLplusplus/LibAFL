@@ -26,7 +26,10 @@ use libafl::{
         Monitor, MultiMonitor, SimpleMonitor,
     },
     stages::StagesTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasSolutions, UsesState},
+    state::{
+        HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, HasSolutions,
+        UsesState,
+    },
     Error, Fuzzer,
 };
 
@@ -42,7 +45,12 @@ fn do_fuzz<F, ST, E, S, EM>(
 ) -> Result<(), Error>
 where
     F: Fuzzer<E, EM, ST, State = S>,
-    S: HasClientPerfMonitor + HasMetadata + HasExecutions + UsesInput + HasSolutions,
+    S: HasClientPerfMonitor
+        + HasMetadata
+        + HasExecutions
+        + UsesInput
+        + HasSolutions
+        + HasLastReportTime,
     E: UsesState<State = S>,
     EM: ProgressReporter<State = S>,
     ST: StagesTuple<E, EM, S, F>,
