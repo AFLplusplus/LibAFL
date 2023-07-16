@@ -16,7 +16,6 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     ClientId,
 };
-use serde::Deserialize;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};

@@ -22,9 +22,9 @@ pub use tuneable::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
-use libafl_bolts::{tuples::HasConstLen, Named};
 use alloc::vec::Vec;
 
+use libafl_bolts::{tuples::HasConstLen, Named};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 
