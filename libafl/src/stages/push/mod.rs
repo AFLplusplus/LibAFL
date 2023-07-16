@@ -23,7 +23,9 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand,
+    },
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -92,8 +94,6 @@ where
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
     pub initialized: bool,
-    /// The last time the monitor was updated
-    pub last_monitor_time: Duration,
     /// The shared state, keeping track of the corpus and the fuzzer
     #[allow(clippy::type_complexity)]
     pub shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, OT, Z>>>>,
@@ -132,7 +132,6 @@ where
             shared_state,
             initialized: false,
             phantom: PhantomData,
-            last_monitor_time: current_time(),
             exit_kind: exit_kind_ref,
             errored: false,
             current_input: None,
@@ -184,7 +183,12 @@ where
 pub trait PushStage<CS, EM, OT, Z>: Iterator
 where
     CS: Scheduler,
-    CS::State: HasClientPerfMonitor + HasRand + HasExecutions + HasMetadata + HasCorpus,
+    CS::State: HasClientPerfMonitor
+        + HasRand
+        + HasExecutions
+        + HasMetadata
+        + HasCorpus
+        + HasLastReportTime,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>
@@ -307,22 +311,13 @@ where
                 return Some(Err(err));
             };
 
-            let last_monitor_time = self.push_stage_helper().last_monitor_time;
-
-            let new_monitor_time = match shared_state.event_mgr.maybe_report_progress(
-                &mut shared_state.state,
-                last_monitor_time,
-                STATS_TIMEOUT_DEFAULT,
-            ) {
-                Ok(new_time) => new_time,
-                Err(err) => {
-                    self.push_stage_helper_mut().end_of_iter(shared_state, true);
-                    return Some(Err(err));
-                }
+            if let Err(err) = shared_state
+                .event_mgr
+                .maybe_report_progress(&mut shared_state.state, STATS_TIMEOUT_DEFAULT)
+            {
+                self.push_stage_helper_mut().end_of_iter(shared_state, true);
+                return Some(Err(err));
             };
-
-            self.push_stage_helper_mut().last_monitor_time = new_monitor_time;
-            //self.fuzzer.maybe_report_monitor();
         } else {
             self.push_stage_helper_mut().reset_exit_kind();
         }

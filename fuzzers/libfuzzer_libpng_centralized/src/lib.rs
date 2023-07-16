@@ -111,7 +111,7 @@ struct Opt {
 
 /// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
-pub fn libafl_main() {
+pub extern "C" fn libafl_main() {
     env_logger::init();
 
     // Registry the metadata types used in this fuzzer

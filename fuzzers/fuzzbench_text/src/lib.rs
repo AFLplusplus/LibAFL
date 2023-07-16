@@ -64,7 +64,7 @@ use nix::{self, unistd::dup};
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
 #[allow(clippy::too_many_lines)]
-pub fn libafl_main() {
+pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();

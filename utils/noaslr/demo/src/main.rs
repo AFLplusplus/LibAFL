@@ -1,15 +1,15 @@
 mod args;
 
-use {
-    crate::args::Args,
-    anyhow::{anyhow, Result},
-    clap::Parser,
-    std::{
-        env,
-        fs::File,
-        io::{BufRead, BufReader},
-    },
+use std::{
+    env,
+    fs::File,
+    io::{BufRead, BufReader},
 };
+
+use anyhow::{anyhow, Result};
+use clap::Parser;
+
+use crate::args::Args;
 
 fn main() -> Result<()> {
     let args = Args::parse();

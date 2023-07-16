@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "9302a3a8174a45a14c77be316126f2673248be51";
+const QEMU_REVISION: &str = "98efc72c4ca20b60c80dd16e2c88af114b8b2ae7";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -16,7 +16,7 @@ fn build_dep_check(tools: &[&str]) {
     }
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
 #[must_use]
 pub fn build(
     cpu_target: &str,

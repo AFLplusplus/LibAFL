@@ -2,11 +2,9 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
-pub use syscall_numbers::powerpc::*;
 
 use crate::CallingConvention;
 
-/// Registers for the MIPS instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Regs {
@@ -42,67 +40,33 @@ pub enum Regs {
     R29 = 29,
     R30 = 30,
     R31 = 31,
-
-    F0 = 32,
-    F1 = 33,
-    F2 = 34,
-    F3 = 35,
-    F4 = 36,
-    F5 = 37,
-    F6 = 38,
-    F7 = 39,
-    F8 = 40,
-    F9 = 41,
-    F10 = 42,
-    F11 = 43,
-    F12 = 44,
-    F13 = 45,
-    F14 = 46,
-    F15 = 47,
-    F16 = 48,
-    F17 = 49,
-    F18 = 50,
-    F19 = 51,
-    F20 = 52,
-    F21 = 53,
-    F22 = 54,
-    F23 = 55,
-    F24 = 56,
-    F25 = 57,
-    F26 = 58,
-    F27 = 59,
-    F28 = 60,
-    F29 = 61,
-    F30 = 62,
-    F31 = 63,
-
-    Nip = 64,
-    Msr = 65,
-    Cr = 66,
-    Lr = 67,
-    Ctr = 68,
-    Xer = 69,
-    Fpscr = 70,
+    Sa0 = 32,
+    Lc0 = 33,
+    Sa1 = 34,
+    Lc1 = 35,
+    P3_0 = 36,
+    M0 = 38,
+    M1 = 39,
+    Usr = 40,
+    Pc = 41,
+    Ugp = 42,
+    Gp = 43,
+    Cs0 = 44,
+    Cs1 = 45,
+    UpcycleLo = 46,
+    UpcycleHi = 47,
+    Framelimit = 48,
+    Framekey = 49,
+    Pktcntlo = 50,
+    Pktcnthi = 51,
 }
 
 /// alias registers
 #[allow(non_upper_case_globals)]
 impl Regs {
-    pub const Pc: Regs = Regs::Nip;
-    pub const Sp: Regs = Regs::R1;
-}
-
-#[cfg(feature = "python")]
-impl IntoPy<PyObject> for Regs {
-    fn into_py(self, py: Python) -> PyObject {
-        let n: i32 = self.into();
-        n.into_py(py)
-    }
-}
-
-/// Return an MIPS ArchCapstoneBuilder
-pub fn capstone() -> capstone::arch::ppc::ArchCapstoneBuilder {
-    capstone::Capstone::new().ppc()
+    pub const Sp: Regs = Regs::R29;
+    pub const Fp: Regs = Regs::R30;
+    pub const Lr: Regs = Regs::R31;
 }
 
 pub type GuestReg = u32;
@@ -135,11 +99,6 @@ impl crate::ArchExtras for crate::CPU {
             return Err(format!("Unsupported calling convention: {conv:#?}"));
         }
 
-        let val: GuestReg = val.into();
-        match idx {
-            0 => self.write_reg(Regs::R3, val),
-            1 => self.write_reg(Regs::R4, val),
-            _ => Err(format!("Unsupported argument: {idx:}")),
-        }
+        Err(format!("Unsupported argument: {idx:}"))
     }
 }

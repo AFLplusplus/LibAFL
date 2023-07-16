@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use core::slice::from_raw_parts;
 use core::{
+    fmt::Debug,
     mem::size_of,
     ops::{Add, AddAssign},
     slice::Iter,
@@ -23,10 +24,12 @@ use serde::{Deserialize, Serialize};
 use crate::mutators::str_decode;
 use crate::{
     inputs::{HasBytesVec, UsesInput},
-    mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
+    mutators::{
+        buffer_self_copy, mutations::buffer_copy, MultipleMutator, MutationResult, Mutator, Named,
+    },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
-    state::{HasMaxSize, HasMetadata, HasRand},
+    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
     Error,
 };
 
@@ -620,12 +623,9 @@ const CMP_ATTRIBUTE_IS_TRANSFORM: u8 = 64;
 /// AFL++ redqueen mutation
 #[derive(Debug, Default)]
 pub struct AFLppRedQueen {
-    cmp_start_idx: usize,
-    cmp_h_start_idx: usize,
-    cmp_buf_start_idx: usize,
-    taint_idx: usize,
     enable_transform: bool,
     enable_arith: bool,
+    text_type: TextType,
 }
 
 impl AFLppRedQueen {
@@ -649,11 +649,12 @@ impl AFLppRedQueen {
         changed_val: u64,
         attr: u8,
         another_buf: &[u8],
-        buf: &mut [u8], // Unlike AFL++ we change the original buf (it's named buf here)
+        buf: &[u8],
         buf_idx: usize,
         taint_len: usize,
         input_len: usize,
         hshape: usize,
+        vec: &mut Vec<Vec<u8>>,
     ) -> bool {
         // TODO: ascii2num (we need check q->is_ascii (in calibration stage(?)))
 
@@ -727,6 +728,7 @@ impl AFLppRedQueen {
                     taint_len,
                     input_len,
                     hshape,
+                    vec,
                 );
                 if ret {
                     return true;
@@ -753,6 +755,7 @@ impl AFLppRedQueen {
                     taint_len,
                     input_len,
                     hshape,
+                    vec,
                 );
 
                 if ret {
@@ -780,6 +783,7 @@ impl AFLppRedQueen {
                     taint_len,
                     input_len,
                     hshape,
+                    vec,
                 );
 
                 if ret {
@@ -807,6 +811,7 @@ impl AFLppRedQueen {
                     taint_len,
                     input_len,
                     hshape,
+                    vec,
                 );
 
                 if ret {
@@ -826,7 +831,9 @@ impl AFLppRedQueen {
                 let buf_8 = buf[buf_idx];
                 let another_buf_8 = another_buf[buf_idx];
                 if buf_8 == pattern as u8 && another_buf_8 == another_pattern as u8 {
-                    buf[buf_idx] = repl as u8;
+                    let mut cloned = buf.to_vec();
+                    cloned[buf_idx] = repl as u8;
+                    vec.push(cloned);
                     return true;
                 }
             }
@@ -837,8 +844,10 @@ impl AFLppRedQueen {
                         u16::from_be_bytes(another_buf[buf_idx..buf_idx + 2].try_into().unwrap());
 
                     if buf_16 == pattern as u16 && another_buf_16 == another_pattern as u16 {
-                        buf[buf_idx] = (repl & 0xff) as u8;
-                        buf[buf_idx + 1] = (repl >> 8 & 0xff) as u8;
+                        let mut cloned = buf.to_vec();
+                        cloned[buf_idx + 1] = (repl & 0xff) as u8;
+                        cloned[buf_idx] = (repl >> 8 & 0xff) as u8;
+                        vec.push(cloned);
                         return true;
                     }
                 }
@@ -850,11 +859,12 @@ impl AFLppRedQueen {
                         u32::from_be_bytes(another_buf[buf_idx..buf_idx + 4].try_into().unwrap());
                     // println!("buf: {buf_32} {another_buf_32} {pattern} {another_pattern}");
                     if buf_32 == pattern as u32 && another_buf_32 == another_pattern as u32 {
-                        // println!("Matched!");
-                        buf[buf_idx] = (repl & 0xff) as u8;
-                        buf[buf_idx + 1] = (repl >> 8 & 0xff) as u8;
-                        buf[buf_idx + 2] = (repl >> 16 & 0xff) as u8;
-                        buf[buf_idx + 3] = (repl >> 24 & 0xff) as u8;
+                        let mut cloned = buf.to_vec();
+                        cloned[buf_idx + 3] = (repl & 0xff) as u8;
+                        cloned[buf_idx + 2] = (repl >> 8 & 0xff) as u8;
+                        cloned[buf_idx + 1] = (repl >> 16 & 0xff) as u8;
+                        cloned[buf_idx] = (repl >> 24 & 0xff) as u8;
+                        vec.push(cloned);
 
                         return true;
                     }
@@ -867,14 +877,18 @@ impl AFLppRedQueen {
                         u64::from_be_bytes(another_buf[buf_idx..buf_idx + 8].try_into().unwrap());
 
                     if buf_64 == pattern && another_buf_64 == another_pattern {
-                        buf[buf_idx] = (repl & 0xff) as u8;
-                        buf[buf_idx + 1] = (repl >> 8 & 0xff) as u8;
-                        buf[buf_idx + 2] = (repl >> 16 & 0xff) as u8;
-                        buf[buf_idx + 3] = (repl >> 24 & 0xff) as u8;
-                        buf[buf_idx + 4] = (repl >> 32 & 0xff) as u8;
-                        buf[buf_idx + 5] = (repl >> 32 & 0xff) as u8;
-                        buf[buf_idx + 6] = (repl >> 40 & 0xff) as u8;
-                        buf[buf_idx + 7] = (repl >> 48 & 0xff) as u8;
+                        let mut cloned = buf.to_vec();
+
+                        cloned[buf_idx + 7] = (repl & 0xff) as u8;
+                        cloned[buf_idx + 6] = (repl >> 8 & 0xff) as u8;
+                        cloned[buf_idx + 5] = (repl >> 16 & 0xff) as u8;
+                        cloned[buf_idx + 4] = (repl >> 24 & 0xff) as u8;
+                        cloned[buf_idx + 3] = (repl >> 32 & 0xff) as u8;
+                        cloned[buf_idx + 2] = (repl >> 32 & 0xff) as u8;
+                        cloned[buf_idx + 1] = (repl >> 40 & 0xff) as u8;
+                        cloned[buf_idx] = (repl >> 48 & 0xff) as u8;
+
+                        vec.push(cloned);
                         return true;
                     }
                 }
@@ -929,6 +943,7 @@ impl AFLppRedQueen {
                         taint_len,
                         input_len,
                         hshape,
+                        vec,
                     );
                     if ret {
                         return true;
@@ -958,6 +973,7 @@ impl AFLppRedQueen {
                         taint_len,
                         input_len,
                         hshape,
+                        vec,
                     );
                     if ret {
                         return true;
@@ -979,6 +995,7 @@ impl AFLppRedQueen {
                         taint_len,
                         input_len,
                         hshape,
+                        vec,
                     );
 
                     if ret {
@@ -999,6 +1016,7 @@ impl AFLppRedQueen {
                         taint_len,
                         input_len,
                         hshape,
+                        vec,
                     );
 
                     if ret {
@@ -1022,17 +1040,15 @@ impl AFLppRedQueen {
         o_pattern: &[u8],
         _changed_val: &[u8],
         o_buf: &[u8],
-        buf: &mut [u8],
+        buf: &[u8],
         buf_idx: usize,
         taint_len: usize,
         input_len: usize,
         hshape: usize,
+        vec: &mut Vec<Vec<u8>>,
     ) -> bool {
         let l0 = pattern.len();
-        let ol0 = repl.len();
-        // let l1 = o_pattern.len();
-        // let ol1 = changed_val.len();
-
+        let ol0 = o_pattern.len();
         let lmax = core::cmp::max(l0, ol0);
         let its_len = core::cmp::min(
             core::cmp::min(input_len - buf_idx, taint_len),
@@ -1042,7 +1058,10 @@ impl AFLppRedQueen {
         // TODO: Match before (This: https://github.com/AFLplusplus/AFLplusplus/blob/ea14f3fd40e32234989043a525e3853fcb33c1b6/src/afl-fuzz-redqueen.c#L2047)
         let mut copy_len = 0;
         for i in 0..its_len {
-            if pattern[i] != buf[buf_idx + i] && o_pattern[i] != o_buf[buf_idx + i] {
+            let b1 = i < pattern.len() && pattern[i] != buf[buf_idx + i];
+            let b2 = i < o_pattern.len() && o_pattern[i] != o_buf[buf_idx + i];
+
+            if b1 || b2 {
                 break;
             }
             copy_len += 1;
@@ -1050,7 +1069,12 @@ impl AFLppRedQueen {
 
         if copy_len > 0 {
             unsafe {
-                buffer_copy(buf, repl, 0, buf_idx, copy_len);
+                for l in 1..=copy_len {
+                    let mut cloned = buf.to_vec();
+                    buffer_copy(&mut cloned, repl, 0, buf_idx, l);
+                    vec.push(cloned);
+                }
+                // vec.push(cloned);
             }
             true
         } else {
@@ -1066,23 +1090,22 @@ impl AFLppRedQueen {
     }
 }
 
-impl<I, S> Mutator<I, S> for AFLppRedQueen
+impl<I, S> MultipleMutator<I, S> for AFLppRedQueen
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
-    I: HasBytesVec,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus,
+    I: HasBytesVec + From<Vec<u8>>,
 {
     #[allow(clippy::needless_range_loop)]
     #[allow(clippy::too_many_lines)]
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &I,
+        ret: &mut Vec<I>,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO
-        // add autotokens (https://github.com/AFLplusplus/AFLplusplus/blob/3881ccd0b7520f67fd0b34f010443dc249cbc8f1/src/afl-fuzz-redqueen.c#L1903)
         // handle 128-bits logs
-
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -1103,27 +1126,25 @@ where
         };
 
         // These idxes must saved in this mutator itself!
-        let (cmp_start_idx, cmp_h_start_idx, cmp_buf_start_idx, mut taint_idx) = if stage_idx == 0 {
-            (0, 0, 0, 0)
-        } else {
-            (
-                self.cmp_start_idx,
-                self.cmp_h_start_idx,
-                self.cmp_buf_start_idx,
-                self.taint_idx,
-            )
-        };
-
+        let mut taint_idx = 0;
         let orig_cmpvals = cmp_meta.orig_cmpvals();
         let new_cmpvals = cmp_meta.new_cmpvals();
         let headers = cmp_meta.headers();
         let input_len = input.bytes().len();
         let new_bytes = taint_meta.input_vec();
-        let orig_bytes = input.bytes_mut();
-        // TODO: Swap this.
+        let orig_bytes = input.bytes();
+
         let taint = taint_meta.ranges();
+        let mut vec = vec![];
+        let mut gathered_tokens = Tokens::new();
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
-        for cmp_idx in cmp_start_idx..cmp_len {
+
+        // Compute when mutating it for the 1st time.
+        if stage_idx == 0 {
+            self.text_type = check_if_text(orig_bytes, orig_bytes.len());
+        }
+        // println!("approximate size: {cmp_len} x {input_len}");
+        for cmp_idx in 0..cmp_len {
             let (w_idx, header) = headers[cmp_idx];
 
             if orig_cmpvals.get(&w_idx).is_none() || new_cmpvals.get(&w_idx).is_none() {
@@ -1138,7 +1159,7 @@ where
 
             let logged = core::cmp::min(orig_val.len(), new_val.len());
 
-            for cmp_h_idx in cmp_h_start_idx..logged {
+            for cmp_h_idx in 0..logged {
                 let mut skip_opt = false;
                 for prev_idx in 0..cmp_h_idx {
                     if new_val[prev_idx] == new_val[cmp_h_idx] {
@@ -1150,7 +1171,7 @@ where
                     continue;
                 }
 
-                for cmp_buf_idx in cmp_buf_start_idx..input_len {
+                for cmp_buf_idx in 0..input_len {
                     let taint_len = match taint.get(taint_idx) {
                         Some(t) => {
                             if cmp_buf_idx < t.start {
@@ -1169,15 +1190,18 @@ where
                     };
 
                     let hshape = (header.shape() + 1) as usize;
-                    let mut matched = false;
-                    match (&orig_val[cmp_h_idx], &new_val[cmp_h_idx]) {
-                        (CmpValues::U8(orig), CmpValues::U8(new)) => {
-                            let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
 
+                    match (&orig_val[cmp_h_idx], &new_val[cmp_h_idx]) {
+                        (CmpValues::U8(_orig), CmpValues::U8(_new)) => {
+                            /* just don't do it for u8, not worth it. not even instrumented
+
+                            let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
                             let attribute = header.attribute() as u8;
+
+                            let mut cmp_found = false;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.into(),
                                     orig_v1.into(),
                                     new_v0.into(),
@@ -1189,12 +1213,11 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
 
                                 // Swapped
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
@@ -1206,14 +1229,13 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.into(),
                                     orig_v0.into(),
                                     new_v1.into(),
@@ -1225,12 +1247,11 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
 
                                 // Swapped
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
@@ -1242,17 +1263,33 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
+                                    &mut vec,
+                                );
+                            }
+                            */
+
+                            /*
+                            U8 or U16 is not worth
+                            if !cmp_found && self.text_type.is_ascii_or_utf8() {
+                                if orig_v0 == new_v0 {
+                                    let v = orig_v0.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+
+                                if orig_v1 == new_v1 {
+                                    let v = orig_v1.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
                             }
+                            */
                         }
                         (CmpValues::U16(orig), CmpValues::U16(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
                             let attribute: u8 = header.attribute() as u8;
+
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                if self.cmp_extend_encoding(
+                                self.cmp_extend_encoding(
                                     orig_v0.into(),
                                     orig_v1.into(),
                                     new_v0.into(),
@@ -1264,13 +1301,12 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
 
                                 // Swapped
                                 // Compare v0 against v1
-                                if self.cmp_extend_encoding(
+                                self.cmp_extend_encoding(
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
@@ -1282,14 +1318,13 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                if self.cmp_extend_encoding(
+                                self.cmp_extend_encoding(
                                     orig_v1.into(),
                                     orig_v0.into(),
                                     new_v1.into(),
@@ -1301,12 +1336,11 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
 
                                 // Swapped
-                                if self.cmp_extend_encoding(
+                                self.cmp_extend_encoding(
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
@@ -1318,17 +1352,33 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
+                                    &mut vec,
+                                );
+                            }
+
+                            /*
+                            U8 or U16 is not worth
+                            if !cmp_found && self.text_type.is_ascii_or_utf8() {
+                                if orig_v0 == new_v0 {
+                                    let v = orig_v0.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+
+                                if orig_v1 == new_v1 {
+                                    let v = orig_v1.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
                             }
+                            */
                         }
                         (CmpValues::U32(orig), CmpValues::U32(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
                             let attribute = header.attribute() as u8;
+
+                            let mut cmp_found = false;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.into(),
                                     orig_v1.into(),
                                     new_v0.into(),
@@ -1340,13 +1390,12 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
 
                                 // swapped
                                 // Compare v0 against v1
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.swap_bytes().into(),
                                     orig_v1.swap_bytes().into(),
                                     new_v0.swap_bytes().into(),
@@ -1358,14 +1407,13 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.into(),
                                     orig_v0.into(),
                                     new_v1.into(),
@@ -1377,13 +1425,12 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
 
                                 // Swapped
                                 // Compare v1 against v0
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.swap_bytes().into(),
                                     orig_v0.swap_bytes().into(),
                                     new_v1.swap_bytes().into(),
@@ -1395,17 +1442,36 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
+                                    &mut vec,
+                                );
+                            }
+
+                            if !cmp_found {
+                                if orig_v0 == new_v0
+                                    && check_if_text(orig_v0.to_ne_bytes().as_ref(), hshape).size()
+                                        == hshape
+                                {
+                                    let v = orig_v0.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+
+                                if orig_v1 == new_v1
+                                    && check_if_text(orig_v1.to_ne_bytes().as_ref(), hshape).size()
+                                        == hshape
+                                {
+                                    let v = orig_v1.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
                             }
                         }
                         (CmpValues::U64(orig), CmpValues::U64(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
                             let attribute = header.attribute() as u8;
+
+                            let mut cmp_found = false;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0,
                                     orig_v1,
                                     new_v0,
@@ -1417,13 +1483,12 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
 
                                 // Swapped
                                 // Compare v0 against v1
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v0.swap_bytes(),
                                     orig_v1.swap_bytes(),
                                     new_v0.swap_bytes(),
@@ -1435,14 +1500,13 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
                             }
 
                             if new_v1 != orig_v1 && orig_v0 != orig_v1 {
                                 // Compare v1 against v0
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1,
                                     orig_v0,
                                     new_v1,
@@ -1454,13 +1518,12 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
-                                }
+                                    &mut vec,
+                                );
 
                                 // Swapped
                                 // Compare v1 against v0
-                                if self.cmp_extend_encoding(
+                                cmp_found |= self.cmp_extend_encoding(
                                     orig_v1.swap_bytes(),
                                     orig_v0.swap_bytes(),
                                     new_v1.swap_bytes(),
@@ -1472,8 +1535,25 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                ) {
-                                    matched = true;
+                                    &mut vec,
+                                );
+                            }
+
+                            if !cmp_found {
+                                if orig_v0 == new_v0
+                                    && check_if_text(orig_v0.to_ne_bytes().as_ref(), hshape).size()
+                                        == hshape
+                                {
+                                    let v = orig_v0.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
+                                }
+
+                                if orig_v1 == new_v1
+                                    && check_if_text(orig_v1.to_ne_bytes().as_ref(), hshape).size()
+                                        == hshape
+                                {
+                                    let v = orig_v1.to_ne_bytes().to_vec();
+                                    Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
                             }
                         }
@@ -1481,47 +1561,82 @@ where
                             let (orig_v0, orig_v1, new_v0, new_v1) =
                                 (&orig.0, &orig.1, &new.0, &new.1);
                             // let attribute = header.attribute() as u8;
-                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
-                                // Compare v0 against v1
-                                if self.rtn_extend_encoding(
-                                    orig_v0,
-                                    orig_v1,
-                                    new_v0,
-                                    new_v1,
-                                    new_bytes,
-                                    orig_bytes,
-                                    cmp_buf_idx,
-                                    taint_len,
-                                    input_len,
-                                    hshape,
-                                ) {
-                                    matched = true;
+                            let mut rtn_found = false;
+                            // Compare v0 against v1
+                            rtn_found |= self.rtn_extend_encoding(
+                                orig_v0,
+                                orig_v1,
+                                new_v0,
+                                new_v1,
+                                new_bytes,
+                                orig_bytes,
+                                cmp_buf_idx,
+                                taint_len,
+                                input_len,
+                                hshape,
+                                &mut vec,
+                            );
+
+                            // Compare v1 against v0
+                            rtn_found |= self.rtn_extend_encoding(
+                                orig_v1,
+                                orig_v0,
+                                new_v1,
+                                new_v0,
+                                new_bytes,
+                                orig_bytes,
+                                cmp_buf_idx,
+                                taint_len,
+                                input_len,
+                                hshape,
+                                &mut vec,
+                            );
+
+                            let is_ascii_or_utf8 = self.text_type.is_ascii_or_utf8();
+                            let mut v0_len = orig_v0.len();
+                            let mut v1_len = orig_v1.len();
+                            if v0_len > 0
+                                && (is_ascii_or_utf8
+                                    || check_if_text(orig_v0, v0_len).size() == hshape)
+                            {
+                                // this is not utf8.
+                                let v = strlen(orig_v0);
+                                if v > 0 {
+                                    v0_len = v;
                                 }
                             }
 
-                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
-                                // Compare v1 against v0
-                                if self.rtn_extend_encoding(
-                                    orig_v1,
-                                    orig_v0,
-                                    new_v1,
-                                    new_v0,
-                                    new_bytes,
-                                    orig_bytes,
-                                    cmp_buf_idx,
-                                    taint_len,
-                                    input_len,
-                                    hshape,
-                                ) {
-                                    matched = true;
+                            if v1_len > 0
+                                && (is_ascii_or_utf8
+                                    || check_if_text(orig_v1, v1_len).size() == hshape)
+                            {
+                                // this is not utf8.
+                                let v = strlen(orig_v1);
+                                if v > 0 {
+                                    v1_len = v;
                                 }
+                            }
+
+                            if v0_len > 0
+                                && orig_v0 == new_v0
+                                && (!rtn_found || check_if_text(orig_v0, v0_len).size() == v0_len)
+                            {
+                                Self::try_add_autotokens(&mut gathered_tokens, orig_v0, v0_len);
+                            }
+
+                            if v1_len > 0
+                                && orig_v1 == new_v1
+                                && (!rtn_found || check_if_text(orig_v1, v1_len).size() == v1_len)
+                            {
+                                Self::try_add_autotokens(&mut gathered_tokens, orig_v1, v1_len);
                             }
                         }
                         (_, _) => {
-                            // It shouldn't have different shape!
+                            // not gonna happen
                         }
                     }
 
+                    /*
                     if matched {
                         // before returning the result
                         // save indexes
@@ -1532,12 +1647,33 @@ where
 
                         return Ok(MutationResult::Mutated);
                     }
+                    */
                     // if no match then go to next round
                 }
             }
         }
 
-        Ok(MutationResult::Skipped)
+        match state.metadata_mut::<Tokens>() {
+            Ok(existing) => {
+                existing.add_tokens(&gathered_tokens);
+                // println!("we have {} tokens", existing.len())
+            }
+            Err(_) => {
+                state.add_metadata(gathered_tokens);
+            }
+        }
+
+        let mut mutated = false;
+        for item in vec {
+            ret.push(I::from(item));
+            mutated = true;
+        }
+
+        if mutated {
+            Ok(MutationResult::Mutated)
+        } else {
+            Ok(MutationResult::Skipped)
+        }
     }
 }
 
@@ -1552,12 +1688,9 @@ impl AFLppRedQueen {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            cmp_start_idx: 0,
-            cmp_h_start_idx: 0,
-            cmp_buf_start_idx: 0,
-            taint_idx: 0,
             enable_transform: false,
             enable_arith: false,
+            text_type: TextType::None,
         }
     }
 
@@ -1565,14 +1698,161 @@ impl AFLppRedQueen {
     #[must_use]
     pub fn with_cmplog_options(transform: bool, arith: bool) -> Self {
         Self {
-            cmp_start_idx: 0,
-            cmp_h_start_idx: 0,
-            cmp_buf_start_idx: 0,
-            taint_idx: 0,
             enable_transform: transform,
             enable_arith: arith,
+            text_type: TextType::None,
         }
     }
+
+    #[allow(clippy::needless_range_loop)]
+    fn try_add_autotokens(tokens: &mut Tokens, b: &[u8], shape: usize) {
+        let mut cons_ff = 0;
+        let mut cons_0 = 0;
+
+        for idx in 0..shape {
+            if b[idx] == 0 {
+                cons_0 += 1;
+            } else if b[idx] == 0xff {
+                cons_ff += 1;
+            } else {
+                cons_0 = 0;
+                cons_ff = 0;
+            }
+
+            if cons_0 > 1 || cons_ff > 1 {
+                return;
+            }
+        }
+        let mut v = b.to_vec();
+        tokens.add_token(&v);
+        v.reverse();
+        tokens.add_token(&v);
+    }
+}
+#[derive(Debug, Copy, Clone)]
+enum TextType {
+    None,
+    Ascii(usize),
+    UTF8(usize),
+}
+
+impl Default for TextType {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+impl TextType {
+    fn is_ascii_or_utf8(self) -> bool {
+        match self {
+            Self::None => false,
+            Self::Ascii(_) | Self::UTF8(_) => true,
+        }
+    }
+
+    fn size(self) -> usize {
+        match self {
+            Self::None => 0,
+            Self::Ascii(sz) | Self::UTF8(sz) => sz,
+        }
+    }
+}
+
+#[inline]
+fn isascii(c: u8) -> bool {
+    c <= 0x7F
+}
+
+#[inline]
+fn isprint(c: u8) -> bool {
+    (0x20..=0x7e).contains(&c)
+}
+
+#[inline]
+fn strlen(buf: &[u8]) -> usize {
+    let mut count = 0;
+    while count < buf.len() {
+        if buf[count] == 0x0 {
+            break;
+        }
+        count += 1;
+    }
+    count
+}
+
+fn check_if_text(buf: &[u8], max_len: usize) -> TextType {
+    // assert!(buf.len() >= max_len);
+    let len = max_len;
+    let mut offset: usize = 0;
+    let mut ascii = 0;
+    let mut utf8 = 0;
+    let mut comp = len;
+
+    while offset < max_len {
+        if buf[offset] == 0x09
+            || buf[offset] == 0x0A
+            || buf[offset] == 0x0D
+            || (0x20 <= buf[offset] && buf[offset] <= 0x7E)
+        {
+            offset += 1;
+            utf8 += 1;
+            ascii += 1;
+            continue;
+        }
+
+        if isascii(buf[offset]) || isprint(buf[offset]) {
+            ascii += 1;
+        }
+
+        // non-overlong 2-byte
+        if len - offset > 1
+            && ((0xC2 <= buf[offset] && buf[offset] <= 0xDF)
+                && (0x80 <= buf[offset + 1] && buf[offset + 1] <= 0xBF))
+        {
+            offset += 2;
+            utf8 += 1;
+            comp -= 1;
+            continue;
+        }
+
+        // excluding overlongs
+
+        if (len - offset > 2)
+            && ((buf[offset] == 0xE0 && (0xA0 <= buf[offset + 1] && buf[offset + 1] <= 0xBF) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF)) ||  // straight 3-byte
+            (((0xE1 <= buf[offset] && buf[offset] <= 0xEC) || buf[offset] == 0xEE || buf[offset] == 0xEF) && (0x80 <= buf[offset + 1] && buf[offset + 1] <= 0xBF) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF)) ||  // excluding surrogates
+            (buf[offset] == 0xED && (0x80 <= buf[offset + 1] && buf[offset + 1] <= 0x9F) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF)))
+        {
+            offset += 3;
+            utf8 += 1;
+            comp -= 2;
+            continue;
+        }
+
+        // planes 1-3
+        if (len - offset > 3)
+            && ((buf[offset] == 0xF0 && (0x90 <= buf[offset + 1] && buf[offset + 1] <= 0xBF) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF) && (0x80 <= buf[offset + 3] && buf[offset + 3] <= 0xBF)) ||  // planes 4-15
+            ((0xF1 <= buf[offset] && buf[offset] <= 0xF3) && (0x80 <= buf[offset + 1] && buf[offset + 1] <= 0xBF) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF) && (0x80 <= buf[offset + 3] && buf[offset + 3] <= 0xBF)) ||  // plane 16
+            (buf[offset] == 0xF4 && (0x80 <= buf[offset + 1] && buf[offset + 1] <= 0x8F) && (0x80 <= buf[offset + 2] && buf[offset + 2] <= 0xBF) && (0x80 <= buf[offset + 3] && buf[offset + 3] <= 0xBF)))
+        {
+            offset += 4;
+            utf8 += 1;
+            comp -= 3;
+            continue;
+        }
+
+        offset += 1;
+    }
+    let percent_utf8 = (utf8 * 100) / comp;
+    let percent_ascii = (ascii * 100) / len;
+
+    if percent_utf8 >= percent_ascii && percent_utf8 >= 99 {
+        // utf
+        return TextType::UTF8(utf8);
+    }
+    if percent_ascii >= 99 {
+        return TextType::Ascii(ascii);
+    };
+    TextType::None
 }
 
 #[cfg(test)]
@@ -1587,13 +1867,13 @@ mod tests {
     #[test]
     fn test_read_tokens() {
         let _res = fs::remove_file("test.tkns");
-        let data = r###"
+        let data = r#"
 # comment
 token1@123="AAA"
 token1="A\x41A"
 "A\AA"
 token2="B"
-        "###;
+        "#;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
         let tokens = Tokens::from_file("test.tkns").unwrap();
         log::info!("Token file entries: {:?}", tokens.tokens());

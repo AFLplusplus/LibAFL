@@ -10,10 +10,10 @@ use libafl_bolts::{tuples::MatchFirstType, Named};
 
 use crate::{
     capstone,
-    emu::Emulator,
+    emu::{ArchExtras, Emulator},
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
-    GuestAddr, Regs,
+    GuestAddr,
 };
 
 pub trait CallTraceCollector: 'static + Debug {
@@ -242,44 +242,7 @@ where
         S: UsesInput,
         QT: QemuHelperTuple<S>,
     {
-        #[cfg(cpu_target = "x86_64")]
-        let ret_addr = {
-            let emu = hooks.emulator();
-            let stack_ptr: GuestAddr = emu.read_reg(Regs::Rsp).unwrap();
-            let mut ret_addr = [0; 8];
-            unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
-            GuestAddr::from_le_bytes(ret_addr)
-        };
-
-        #[cfg(cpu_target = "i386")]
-        let ret_addr = {
-            let emu = hooks.emulator();
-            let stack_ptr: GuestAddr = emu.read_reg(Regs::Esp).unwrap();
-            let mut ret_addr = [0; 4];
-            unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
-            GuestAddr::from_le_bytes(ret_addr)
-        };
-
-        #[cfg(any(cpu_target = "arm", cpu_target = "aarch64"))]
-        let ret_addr = {
-            let emu = hooks.emulator();
-            let ret_addr: GuestAddr = emu.read_reg(Regs::Lr).unwrap();
-            ret_addr
-        };
-
-        #[cfg(cpu_target = "mips")]
-        let ret_addr = {
-            let emu = hooks.emulator();
-            let ret_addr: GuestAddr = emu.read_reg(Regs::Ra).unwrap();
-            ret_addr
-        };
-
-        #[cfg(cpu_target = "ppc")]
-        let ret_addr = {
-            let emu = hooks.emulator();
-            let ret_addr: GuestAddr = emu.read_reg(Regs::Lr).unwrap();
-            ret_addr
-        };
+        let ret_addr: GuestAddr = hooks.emulator().read_return_address().unwrap();
 
         // log::info!("RET @ 0x{:#x}", ret_addr);
 

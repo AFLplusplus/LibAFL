@@ -251,14 +251,13 @@ impl AsanErrors {
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
                 let start_pc = error.pc - 4 * 5;
-                for insn in cs
+                for insn in &*cs
                     .disasm_count(
                         unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
                         start_pc as u64,
                         11,
                     )
                     .expect("failed to disassemble instructions")
-                    .iter()
                 {
                     if insn.address() as usize == error.pc {
                         output
@@ -276,7 +275,9 @@ impl AsanErrors {
 
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
-                let offset: i64 = fault_address as i64 - (error.metadata.address + 0x1000) as i64;
+                let fault_address: i64 = fault_address.try_into().unwrap();
+                let metadata_address: i64 = error.metadata.address.try_into().unwrap();
+                let offset: i64 = fault_address - (metadata_address + 0x1000);
                 let direction = if offset > 0 { "right" } else { "left" };
                 writeln!(
                     output,
@@ -505,14 +506,13 @@ impl AsanErrors {
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
                 let start_pc = pc;
-                for insn in cs
+                for insn in &*cs
                     .disasm_count(
                         unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
                         start_pc as u64,
                         11,
                     )
                     .expect("failed to disassemble instructions")
-                    .iter()
                 {
                     if insn.address() as usize == pc {
                         output
