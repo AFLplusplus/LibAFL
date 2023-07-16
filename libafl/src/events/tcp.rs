@@ -47,7 +47,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
-    state::{HasAFLStats, HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
+    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState,HasAFLStats},
     Error,
 };
 
@@ -622,7 +622,7 @@ impl<E, S, Z> EventManager<E, Z> for TcpEventManager<S>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasAFLStats,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime + HasAFLStats,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
 }
@@ -640,7 +640,7 @@ where
 }
 
 impl<S> ProgressReporter for TcpEventManager<S> where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasAFLStats
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime + HasAFLStats
 {
 }
 
@@ -683,7 +683,13 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> ProgressReporter for TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize + HasAFLStats,
+    S: UsesInput
+        + HasExecutions
+        + HasClientPerfMonitor
+        + HasMetadata
+        + HasLastReportTime
+        + HasAFLStats
+        + Serialize,
     SP: ShMemProvider,
 {
 }
@@ -758,7 +764,13 @@ impl<E, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize + HasAFLStats,
+    S: UsesInput
+        + HasExecutions
+        + HasClientPerfMonitor
+        + HasMetadata
+        + HasLastReportTime
+        + HasAFLStats
+        + Serialize,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {

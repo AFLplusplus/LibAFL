@@ -5,6 +5,8 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::arm::*;
 
+use crate::CallingConvention;
+
 /// Registers for the ARM instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -61,4 +63,43 @@ pub fn capstone_thumb() -> capstone::arch::arm::ArchCapstoneBuilder {
     capstone::Capstone::new()
         .arm()
         .mode(capstone::arch::arm::ArchMode::Thumb)
+}
+
+pub type GuestReg = u32;
+
+impl crate::ArchExtras for crate::CPU {
+    fn read_return_address<T>(&self) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        self.read_reg(Regs::Lr)
+    }
+
+    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        self.write_reg(Regs::Lr, val)
+    }
+
+    fn write_function_argument<T>(
+        &self,
+        conv: CallingConvention,
+        idx: i32,
+        val: T,
+    ) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        if conv != CallingConvention::Cdecl {
+            return Err(format!("Unsupported calling convention: {conv:#?}"));
+        }
+
+        let val: GuestReg = val.into();
+        match idx {
+            0 => self.write_reg(Regs::R0, val),
+            1 => self.write_reg(Regs::R1, val),
+            _ => Err(format!("Unsupported argument: {idx:}")),
+        }
+    }
 }

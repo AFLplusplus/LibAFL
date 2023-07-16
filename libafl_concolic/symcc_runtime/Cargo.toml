@@ -20,7 +20,7 @@ no-cpp-runtime = []
 
 [dependencies]
 unchecked_unwrap = "4"
-ctor = "0.1"
+ctor = "0.2"
 libc = "0.2"
 libafl = { path = "../../libafl", version = "0.10.1", default-features=false, features=["std"] }
 

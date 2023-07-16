@@ -211,7 +211,7 @@ impl QemuSnapshotHelper {
         {
             let new_maps = self.new_maps.get_mut().unwrap();
 
-            for acc in self.accesses.iter_mut() {
+            for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
                         // TODO avoid duplicated memcpy
@@ -251,7 +251,7 @@ impl QemuSnapshotHelper {
         self.reset_maps(emulator);
 
         // This one is after that we remapped potential regions mapped at snapshot time but unmapped during execution
-        for acc in self.accesses.iter_mut() {
+        for acc in &mut self.accesses {
             for page in unsafe { &(*acc.get()).dirty } {
                 for entry in self
                     .maps

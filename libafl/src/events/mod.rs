@@ -38,7 +38,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasAFLStats, HasClientPerfMonitor, HasExecutions, HasMetadata},
+    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata,HasAFLStats},
     Error,
 };
 
@@ -439,11 +439,11 @@ pub trait EventFirer: UsesState {
     }
 
     /// Serialize all observers for this type and manager
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
-        Ok(postcard::to_allocvec(observers)?)
+        Ok(Some(postcard::to_allocvec(observers)?))
     }
 
     /// Get the configuration
@@ -455,7 +455,7 @@ pub trait EventFirer: UsesState {
 /// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter: EventFirer
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasAFLStats,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + HasAFLStats,
 {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
@@ -463,24 +463,61 @@ where
     fn maybe_report_progress(
         &mut self,
         state: &mut Self::State,
-        last_report_time: Duration,
         monitor_timeout: Duration,
     ) -> Result<Duration, Error> {
+        let Some(last_report_time) = state.last_report_time() else {
+            // this is the first time we execute, no need to report progress just yet.
+            *state.last_report_time_mut() = Some(current_time());
+            return Ok(());
+        };
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
-        if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
-            let executions = *state.executions();
-            let pending_size = *state.pending();
-            let pend_favored_size = *state.pend_favored();
-            let own_finds_size = *state.own_finds();
-            let imported_size = *state.imported();
-            // Default no introspection implmentation
-            #[cfg(not(feature = "introspection"))]
+        if cur.checked_sub(*last_report_time).unwrap_or_default() > monitor_timeout {
+            // report_progress sets a new `last_report_time` internally.
+            self.report_progress(state)?;
+        }
+        Ok(())
+    }
+
+    /// Send off an info/monitor/heartbeat message to the broker.
+    /// Will return an [`crate::Error`], if the stats could not be sent.
+    fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        let executions = *state.executions();
+        let cur = current_time();
+
+        let executions = *state.executions();
+        let pending_size = *state.pending();
+        let pend_favored_size = *state.pend_favored();
+        let own_finds_size = *state.own_finds();
+        let imported_size = *state.imported();
+
+
+        // Default no introspection implmentation
+        #[cfg(not(feature = "introspection"))]
+        self.fire(
+            state,
+            Event::UpdateExecStats {
+                executions,
+                time: cur,
+                phantom: PhantomData,
+            },
+        )?;
+
+        // If performance monitor are requested, fire the `UpdatePerfMonitor` event
+        #[cfg(feature = "introspection")]
+        {
+            state
+                .introspection_monitor_mut()
+                .set_current_time(crate::bolts::cpu::read_time_counter());
+
+            // Send the current monitor over to the manager. This `.clone` shouldn't be
+            // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s
             self.fire(
                 state,
-                Event::UpdateExecStats {
+                Event::UpdatePerfMonitor {
                     executions,
                     time: cur,
+                    introspection_monitor: Box::new(state.introspection_monitor().clone()),
                     phantom: PhantomData,
                 },
             )?;
@@ -540,11 +577,11 @@ where
                     },
                 )?;
             }
-
-            Ok(cur)
-        } else {
-            Ok(last_report_time)
         }
+
+        *state.last_report_time_mut() = Some(cur);
+
+        Ok(())
     }
 }
 
@@ -592,7 +629,7 @@ pub trait HasEventManagerId {
 pub trait EventManager<E, Z>:
     EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasAFLStats,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + HasAFLStats,
 {
 }
 
@@ -659,7 +696,7 @@ where
 }
 
 impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata + HasAFLStats
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata + HasAFLStats,
 {
 }
 
@@ -677,7 +714,7 @@ where
 }
 
 impl<S> ProgressReporter for NopEventManager<S> where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata + HasAFLStats
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata + HasAFLStats
 {
 }
 

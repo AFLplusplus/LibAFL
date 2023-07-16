@@ -67,8 +67,8 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     state::{
-        HasAFLStats, HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand,
-        UsesState,
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand,
+        UsesState, HasAFLStats,
     },
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
@@ -251,8 +251,13 @@ where
 impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
 where
     CS: Scheduler,
-    CS::State:
-        HasClientPerfMonitor + HasExecutions + HasMetadata + HasRand + HasCorpus + HasAFLStats,
+    CS::State: HasClientPerfMonitor
+        + HasExecutions
+        + HasMetadata
+        + HasRand
+        + HasCorpus
+        + HasAFLStats
+        + HasLastReportTime,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>
         + EventRestarter

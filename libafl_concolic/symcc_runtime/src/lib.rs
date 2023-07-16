@@ -27,6 +27,7 @@
 //! # SymCC and SymQEMU expect to runtime file to be called `libSymRuntime.so`. Setting the name to `SymRuntime` achieves this.
 //! name = "SymRuntime"
 //! ```
+#![allow(clippy::module_name_repetitions, clippy::missing_panics_doc)]
 pub mod filter;
 pub mod tracing;
 

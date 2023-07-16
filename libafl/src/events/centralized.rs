@@ -1,10 +1,14 @@
 //! A wrapper manager to implement a main-secondary architecture with point-to-point channels
 
 use alloc::{boxed::Box, string::String, vec::Vec};
+#[cfg(feature = "adaptive_serialization")]
+use core::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
+#[cfg(feature = "adaptive_serialization")]
+use crate::bolts::current_time;
 use crate::{
     bolts::{
         llmp::{LlmpReceiver, LlmpSender, Tag},
@@ -12,14 +16,14 @@ use crate::{
         ClientId,
     },
     events::{
-        Event, EventConfig, EventFirer, EventManager, EventManagerId, EventProcessor,
-        EventRestarter, HasEventManagerId, LogSeverity,
+        llmp::EventStatsCollector, Event, EventConfig, EventFirer, EventManager, EventManagerId,
+        EventProcessor, EventRestarter, HasEventManagerId, LogSeverity,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::UsesInput,
     observers::ObserversTuple,
-    state::{HasAFLStats, HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
+    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
 
@@ -45,9 +49,50 @@ where
     type State = EM::State;
 }
 
+#[cfg(feature = "adaptive_serialization")]
+impl<EM, SP> EventStatsCollector for CentralizedEventManager<EM, SP>
+where
+    EM: EventStatsCollector + UsesState,
+    SP: ShMemProvider,
+{
+    fn serialization_time(&self) -> Duration {
+        self.inner.serialization_time()
+    }
+    fn deserialization_time(&self) -> Duration {
+        self.inner.deserialization_time()
+    }
+    fn serializations_cnt(&self) -> usize {
+        self.inner.serializations_cnt()
+    }
+    fn should_serialize_cnt(&self) -> usize {
+        self.inner.should_serialize_cnt()
+    }
+
+    fn serialization_time_mut(&mut self) -> &mut Duration {
+        self.inner.serialization_time_mut()
+    }
+    fn deserialization_time_mut(&mut self) -> &mut Duration {
+        self.inner.deserialization_time_mut()
+    }
+    fn serializations_cnt_mut(&mut self) -> &mut usize {
+        self.inner.serializations_cnt_mut()
+    }
+    fn should_serialize_cnt_mut(&mut self) -> &mut usize {
+        self.inner.should_serialize_cnt_mut()
+    }
+}
+
+#[cfg(not(feature = "adaptive_serialization"))]
+impl<EM, SP> EventStatsCollector for CentralizedEventManager<EM, SP>
+where
+    EM: EventStatsCollector + UsesState,
+    SP: ShMemProvider,
+{
+}
+
 impl<EM, SP> EventFirer for CentralizedEventManager<EM, SP>
 where
-    EM: EventFirer + HasEventManagerId,
+    EM: EventStatsCollector + EventFirer + HasEventManagerId,
     SP: ShMemProvider,
 {
     fn fire(
@@ -63,9 +108,9 @@ where
                     client_config: _,
                     exit_kind: _,
                     corpus_size: _,
-                    observers_buf: _,
                     time: _,
                     executions: _,
+                    observers_buf: _,
                     forward_id,
                 } => {
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
@@ -91,11 +136,53 @@ where
         self.inner.log(state, severity_level, message)
     }
 
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
+    #[cfg(not(feature = "adaptive_serialization"))]
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
         OT: ObserversTuple<Self::State> + Serialize,
     {
         self.inner.serialize_observers(observers)
+    }
+
+    #[cfg(feature = "adaptive_serialization")]
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
+    where
+        OT: ObserversTuple<Self::State> + Serialize,
+    {
+        const SERIALIZE_TIME_FACTOR: u32 = 4;
+        const SERIALIZE_PERCENTAGE_TRESHOLD: usize = 80;
+
+        let exec_time = observers
+            .match_name::<crate::observers::TimeObserver>("time")
+            .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
+            .unwrap();
+
+        let mut must_ser = (self.serialization_time() + self.deserialization_time())
+            * SERIALIZE_TIME_FACTOR
+            < exec_time;
+        if must_ser {
+            *self.should_serialize_cnt_mut() += 1;
+        }
+
+        if self.serializations_cnt() > 32 {
+            must_ser = (self.should_serialize_cnt() * 100 / self.serializations_cnt())
+                > SERIALIZE_PERCENTAGE_TRESHOLD;
+        }
+
+        if self.inner.serialization_time() == Duration::ZERO
+            || must_ser
+            || self.serializations_cnt().trailing_zeros() >= 8
+        {
+            let start = current_time();
+            let ser = postcard::to_allocvec(observers)?;
+            *self.inner.serialization_time_mut() = current_time() - start;
+
+            *self.serializations_cnt_mut() += 1;
+            Ok(Some(ser))
+        } else {
+            *self.serializations_cnt_mut() += 1;
+            Ok(None)
+        }
     }
 
     fn configuration(&self) -> EventConfig {
@@ -125,12 +212,13 @@ where
 
 impl<E, EM, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, SP>
 where
-    EM: EventProcessor<E, Z> + EventFirer + HasEventManagerId,
+    EM: EventStatsCollector + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
     SP: ShMemProvider,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
         + ExecutionProcessor<E::Observers, State = Self::State>,
+    Self::State: HasExecutions + HasMetadata,
 {
     fn process(
         &mut self,
@@ -168,15 +256,36 @@ where
                                 "Received new Testcase to evaluate from secondary node {idx:?}"
                             );
 
-                            // TODO check the config and use the serialized observers
+                            let res = if client_config.match_with(&self.configuration())
+                                && observers_buf.is_some()
+                            {
+                                #[cfg(feature = "adaptive_serialization")]
+                                let start = current_time();
+                                let observers: E::Observers =
+                                    postcard::from_bytes(observers_buf.as_ref().unwrap())?;
 
-                            let res = fuzzer.evaluate_input_with_observers::<E, Self>(
-                                state,
-                                executor,
-                                self,
-                                input.clone(),
-                                false,
-                            )?;
+                                #[cfg(feature = "adaptive_serialization")]
+                                {
+                                    *self.inner.deserialization_time_mut() = current_time() - start;
+                                }
+
+                                fuzzer.process_execution(
+                                    state,
+                                    self,
+                                    input.clone(),
+                                    &observers,
+                                    &exit_kind,
+                                    false,
+                                )?
+                            } else {
+                                fuzzer.evaluate_input_with_observers::<E, Self>(
+                                    state,
+                                    executor,
+                                    self,
+                                    input.clone(),
+                                    false,
+                                )?
+                            };
                             if let Some(item) = res.1 {
                                 log::info!("Added received Testcase as item #{item}");
 
@@ -214,8 +323,8 @@ where
 
 impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
 where
-    EM: EventManager<E, Z>,
-    EM::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasAFLStats,
+    EM: EventStatsCollector + EventManager<E, Z>,
+    EM::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasLastReportTime + HaF,
     SP: ShMemProvider,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -242,8 +351,8 @@ where
 
 impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
 where
-    EM: ProgressReporter + HasEventManagerId,
-    EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasAFLStats,
+    EM: EventStatsCollector + ProgressReporter + HasEventManagerId,
+    EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + HasAFLStats,
     SP: ShMemProvider,
 {
 }

@@ -33,7 +33,7 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
-    state::{HasAFLStats, HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
+    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState,HasAFLStats},
     Error,
 };
 #[cfg(feature = "std")]
@@ -132,7 +132,7 @@ where
 impl<E, MT, S, Z> EventManager<E, Z> for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata + HasAFLStats,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata + HasAFLStats,
 {
 }
 
@@ -155,7 +155,7 @@ where
 impl<MT, S> ProgressReporter for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasAFLStats,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime + HasAFLStats,
 {
 }
 
@@ -379,7 +379,13 @@ where
 impl<E, MT, S, SP, Z> EventManager<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize + HasAFLStats,
+    S: UsesInput
+        + HasExecutions
+        + HasClientPerfMonitor
+        + HasMetadata
+        + HasLastReportTime
+        + HasAFLStats
+        + Serialize,
     SP: ShMemProvider,
 {
 }
@@ -403,7 +409,7 @@ where
 impl<MT, S, SP> ProgressReporter for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasAFLStats,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime + HasAFLStats,
     SP: ShMemProvider,
 {
 }

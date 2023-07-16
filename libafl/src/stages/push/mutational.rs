@@ -21,7 +21,9 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasAFLStats, HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand, HasAFLStats,
+    },
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -92,10 +94,11 @@ where
         + HasCorpus
         + HasRand
         + HasExecutions
+        + HasLastReportTime
         + HasMetadata
+        + HasAFLStats
         + Clone
-        + Debug
-        + HasAFLStats,
+        + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -213,9 +216,10 @@ where
         + HasRand
         + HasExecutions
         + HasMetadata
+        + HasLastReportTime
         + Clone
-        + Debug
-        + HasAFLStats,
+        + HasAFLStats
+        + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
