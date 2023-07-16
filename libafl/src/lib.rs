@@ -218,11 +218,6 @@ mod tests {
 pub mod pybind {
     use pyo3::prelude::*;
 
-    use super::{
-        bolts, corpus, events, executors, feedbacks, fuzzer, generators, monitors, mutators,
-        observers, stages, state,
-    };
-
     #[derive(Debug, Clone)]
     pub struct PythonMetadata {
         pub map: PyObject,

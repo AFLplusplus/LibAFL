@@ -29,9 +29,6 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-use libafl_bolts::{core_affinity::Cores, shmem::ShMemProvider};
-
-use super::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -47,6 +44,7 @@ use crate::{
     state::{HasClientPerfMonitor, HasExecutions},
     Error,
 };
+use libafl_bolts::{core_affinity::CoreId, core_affinity::Cores, shmem::ShMemProvider};
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";

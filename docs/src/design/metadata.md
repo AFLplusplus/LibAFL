@@ -8,7 +8,7 @@ In terms of code, a metadata can be defined as a Rust struct registered in the S
 extern crate libafl_bolts;
 extern crate serde;
 
-use libafl_bolts::SerdeAny;
+use libafl_bolts::serdeany::SerdeAny;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize, SerdeAny)]

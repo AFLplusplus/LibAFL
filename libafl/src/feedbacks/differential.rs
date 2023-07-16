@@ -155,7 +155,7 @@ mod tests {
     use alloc::string::{String, ToString};
     use core::marker::PhantomData;
 
-    use libafl_bolts::tuples::{tuple_list, Named};
+    use libafl_bolts::{tuples::tuple_list, Named};
 
     use crate::{
         events::EventFirer,
