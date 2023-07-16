@@ -15,9 +15,9 @@ use libafl::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{Observer, ObserversTuple},
     state::{HasClientPerfMonitor, HasMetadata},
-    Error, SerdeAny,
+    Error,
 };
-use libafl_bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, Named, SerdeAny};
+use libafl_bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, serdeany::SerdeAny, Named};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 

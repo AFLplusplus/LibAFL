@@ -7,9 +7,9 @@ use libafl::{
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
-    Error, SerdeAny,
+    Error,
 };
-use libafl_bolts::{Named, SerdeAny};
+use libafl_bolts::{Named, serdeany::SerdeAny};
 use serde::{Deserialize, Serialize};
 
 use crate::input::PacketData;
