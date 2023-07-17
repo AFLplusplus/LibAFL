@@ -28,16 +28,10 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, MmapPerms, QemuExecutor, QemuHooks,
-    QemuInstrumentationFilter, Regs,
+    drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, ArchExtras, CallingConvention, GuestAddr,
+    GuestReg, MmapPerms, QemuExecutor, QemuHooks, QemuInstrumentationFilter, Regs,
 };
 use rangemap::RangeMap;
-
-#[cfg(feature = "64bit")]
-type GuestReg = u64;
-
-#[cfg(not(feature = "64bit"))]
-type GuestReg = u32;
 
 #[derive(Default)]
 pub struct Version;
@@ -141,60 +135,10 @@ pub fn fuzz() {
         );
     }
 
-    let read_reg = |emu: &Emulator, reg: Regs| -> GuestReg {
-        let val: GuestReg = emu.read_reg(reg).unwrap();
+    let pc: GuestReg = emu.read_reg(Regs::Pc).unwrap();
+    println!("Break at {pc:#x}");
 
-        #[cfg(feature = "be")]
-        return GuestReg::from_be(val);
-
-        #[cfg(not(feature = "be"))]
-        return GuestReg::from_le(val);
-    };
-
-    let write_reg = |emu: &Emulator, reg: Regs, val: GuestReg| {
-        #[cfg(feature = "be")]
-        let val = GuestReg::to_be(val);
-
-        #[cfg(not(feature = "be"))]
-        let val = GuestReg::to_le(val);
-
-        emu.write_reg(reg, val).unwrap();
-    };
-
-    println!("Break at {:#x}", read_reg(&emu, Regs::Pc));
-
-    #[cfg(feature = "arm")]
-    let ret_addr: u32 = read_reg(&emu, Regs::Lr);
-
-    #[cfg(feature = "aarch64")]
-    let ret_addr: u64 = read_reg(&emu, Regs::Lr);
-
-    #[cfg(feature = "x86_64")]
-    let stack_ptr: u64 = read_reg(&emu, Regs::Rsp);
-
-    #[cfg(feature = "x86_64")]
-    let ret_addr: u64 = {
-        let mut ret_addr = [0; 8];
-        unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
-        u64::from_le_bytes(ret_addr)
-    };
-
-    #[cfg(feature = "i386")]
-    let stack_ptr: u32 = read_reg(&emu, Regs::Esp);
-
-    #[cfg(feature = "i386")]
-    let ret_addr: u32 = {
-        let mut ret_addr = [0; 4];
-        unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
-        u32::from_le_bytes(ret_addr)
-    };
-
-    #[cfg(feature = "mips")]
-    let ret_addr: u32 = read_reg(&emu, Regs::Ra);
-
-    #[cfg(feature = "ppc")]
-    let ret_addr: u32 = read_reg(&emu, Regs::Lr);
-
+    let ret_addr: GuestAddr = emu.read_return_address().unwrap();
     println!("Return address = {ret_addr:#x}");
 
     emu.remove_breakpoint(test_one_input_ptr);
@@ -202,6 +146,21 @@ pub fn fuzz() {
 
     let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
     println!("Placing input at {input_addr:#x}");
+
+    let stack_ptr: GuestAddr = emu.read_reg(Regs::Sp).unwrap();
+
+    let reset = |buf: &[u8], len: GuestReg| -> Result<(), String> {
+        unsafe {
+            emu.write_mem(input_addr, buf);
+            emu.write_reg(Regs::Pc, test_one_input_ptr)?;
+            emu.write_reg(Regs::Sp, stack_ptr)?;
+            emu.write_return_address(ret_addr)?;
+            emu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
+            emu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
+            emu.run();
+            Ok(())
+        }
+    };
 
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -211,65 +170,7 @@ pub fn fuzz() {
             .next()
             .expect("Failed to get chunk");
         let len = buf.len() as GuestReg;
-
-        unsafe {
-            emu.write_mem(input_addr, buf);
-
-            #[cfg(feature = "arm")]
-            {
-                write_reg(&emu, Regs::R0, input_addr);
-                write_reg(&emu, Regs::R1, len);
-                write_reg(&emu, Regs::Pc, test_one_input_ptr);
-                write_reg(&emu, Regs::Lr, ret_addr);
-            }
-
-            #[cfg(feature = "aarch64")]
-            {
-                write_reg(&emu, Regs::X0, input_addr);
-                write_reg(&emu, Regs::X1, len);
-                write_reg(&emu, Regs::Pc, test_one_input_ptr);
-                write_reg(&emu, Regs::Lr, ret_addr);
-            }
-
-            #[cfg(feature = "x86_64")]
-            {
-                write_reg(&emu, Regs::Rdi, input_addr);
-                write_reg(&emu, Regs::Rsi, len);
-                write_reg(&emu, Regs::Rip, test_one_input_ptr);
-                write_reg(&emu, Regs::Rsp, stack_ptr);
-            }
-
-            #[cfg(feature = "i386")]
-            {
-                let input_addr_bytes = input_addr.to_le_bytes();
-                emu.write_mem(stack_ptr + (size_of::<u32>() as u32), &input_addr_bytes);
-
-                let len_bytes = len.to_le_bytes();
-                emu.write_mem(stack_ptr + ((2 * size_of::<u32>()) as u32), &len_bytes);
-
-                write_reg(&emu, Regs::Eip, test_one_input_ptr);
-                write_reg(&emu, Regs::Esp, stack_ptr);
-            }
-
-            #[cfg(feature = "mips")]
-            {
-                write_reg(&emu, Regs::A0, input_addr);
-                write_reg(&emu, Regs::A1, len);
-                write_reg(&emu, Regs::Pc, test_one_input_ptr);
-                write_reg(&emu, Regs::Ra, ret_addr);
-            }
-
-            #[cfg(feature = "ppc")]
-            {
-                write_reg(&emu, Regs::R3, input_addr);
-                write_reg(&emu, Regs::R4, len);
-                write_reg(&emu, Regs::Pc, test_one_input_ptr);
-                write_reg(&emu, Regs::Lr, ret_addr);
-            }
-
-            emu.run();
-        }
-
+        reset(buf, len).unwrap();
         ExitKind::Ok
     };
 

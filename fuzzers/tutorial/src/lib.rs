@@ -36,7 +36,7 @@ use metadata::*;
 /// The main fn, `no_mangle` as it is a C main
 #[cfg(not(test))]
 #[no_mangle]
-pub fn libafl_main() {
+pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
