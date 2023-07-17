@@ -1,0 +1,150 @@
+@startuml Fuzzer Template Generator Questions Diagram
+hide empty description
+
+state "Introduction" as State0
+[*] --> State0
+
+state InitialConsiderations {
+    'Restricts in memory fuzzing
+    state "Do you have the target's source code?" as State1
+    State0 --> State1: Let's Begin
+
+    'Restricts in memory fuzzing
+    state "Can you provide a harness function?" as State2
+    State1 --> State2: Yes
+}
+
+state Observers {
+    state "Do you want to use a map to track coverage?" as State3
+    State1 --> State3: No
+    State2 --> State3: No
+    State2 --> State3: Yes
+
+    state "Do you need multiple maps?" as State4
+    State3 --> State4: Yes
+
+    state "Do you know the size of the map\n at compile time?" as State5
+    State4 --> State5: No
+    State4 --> State5: Yes
+
+    state "Do you want to improve input\n selection by adding a hit counts map?" as State6
+    State5 --> State6: No
+    State5 --> State6: Yes
+
+    state "Do you want to consider the logged\n values of CMP instructions?" as State7
+    State3 --> State7: No
+    State6 --> State7: No
+    State6 --> State7: Yes
+
+    state ForkState1 <<fork>>
+    State7 --> ForkState1: No
+    State7 --> ForkState1: Yes
+
+    'BacktraceObserver requires a harness
+    state "Do you want to consider the backtrace\n after the harness crashes?" as State8
+    ForkState1 --> State8: (if the user can\n provide a harness)
+
+    'Restricts the use of timeout
+    state "Do you want to keep track of\n the testcases' runtime?" as State9
+    ForkState1 --> State9: (if the user can not\n provide a harness)
+    State8 --> State9: No
+    State8 --> State9: Yes
+
+}
+
+state Feedbacks {
+    'Depends if the fuzzer is observing the runtime of the testcases
+    state "Do you want to consider a timeout\n as a solution?" as State10
+    State9 --> State10: Yes
+
+    state "Do you want to consider a crash\n as a solution?" as State11
+    State9 --> State11: No
+    State10 --> State11: No
+    State10 --> State11: Yes
+
+}
+
+state States {
+    state "Do you want to manage the testcases\n in memory, on disk or both?" as State12
+    State11 --> State12: No
+    State11 --> State12: Yes
+
+    state "Do you want to load testcases from\ndisk to memory using a cache?" as State13
+    State12 --> State13: On disk
+}
+
+state Monitors {
+    state "Do you want to see stats about\n the fuzzing campaign?" as State14
+    State12 --> State14: Both
+    State12 --> State14: In memory
+    State13 --> State14: No
+    State13 --> State14: Yes
+
+    state "Do you want to see the stats in a UI style?" as State15
+    State14 --> State15: Yes
+
+    state "Do you want to store the stats to a file?" as State16
+    State15 --> State16: No
+    State15 --> State16: Yes
+
+    state "Do you want to store them to\n a TOML or JSON file?" as State17
+    State16 --> State17: Yes
+}
+
+State Events {
+    state ForkState2 <<fork>>
+    State14 --> ForkState2: No
+    State16 --> ForkState2: No
+    State17 --> ForkState2: TOML
+    State17 --> ForkState2: JSON
+
+    'Depends on whether in memorry fuzzing is possible or not
+    state "Do you want to restart your fuzzer\n every time a solution is achieved?" as State18
+    ForkState2 --> State18: (if in memory fuzzing is possible, then use\n a Simple event manager, whereas if not,\n use a LLMP one)
+}
+
+State Schedulers {
+    state "Do you want to load testcases from the\ncorpus using a queue policy?" as State19
+    State18 --> State19: No
+    State18 --> State19: Yes
+
+    state "Do you want to prioritize smaller\n and faster testcases?" as State20
+    State19 --> State20: No
+    State19 --> State20: Yes
+}
+
+State Executors {
+    state ForkState3 <<fork>>
+    State20 --> ForkState3: No
+    State20 --> ForkState3: Yes
+
+    state "Can your target corrupt memory\n used by the fuzzer?" as State21
+    ForkState3 --> State21: (if in memory fuzzing is possible)
+
+    state "Do you want to set a timeout\n before each run?" as State22
+    ForkState3 --> State22: (if in memory fuzzing is not possible)
+    State21 --> State22: No
+    State21 --> State22: Yes
+}
+
+State Generators {
+    state "Do you want to generate\n an initial set of inputs?" as State23
+    State22 --> State23: No
+    State22 --> State23: Yes
+}
+
+State Mutators {
+    state "Do you want to schedule mutations?" as State24
+    State23 --> State24: No
+    State23 --> State24: Yes
+}
+
+State Stages {
+    state "StdMutationalStage" as State25
+    State24 --> State25: No
+    State24 --> State25: Yes
+}
+
+State25 --> [*]
+
+@enduml

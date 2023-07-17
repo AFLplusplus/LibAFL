@@ -14,10 +14,8 @@ struct QuestionList {
 pub struct Question {
     name: String,    // The question that will be asked.
     content: String, // Description related to the question, to help the user.
-    answer1: String, // One of the possible answers that may result, either in another question, or a component.
-    answer2: String, // Same (for now, only 2 possible answers).
-    next1: usize, // The next question (or the choice of an specific component), if answer1 is chosen.
-    next2: usize, // The next question (or the choice of an specific component), if answer2 is chosen.
+    answers: Vec<String>, // A vector containing all the possible answers for this question.
+    next: Vec<usize>, // A vector containing the next question for all the possible answers (for answer[0] the next question is next[0]...).
     previous: usize, // The question that lead to the current one (possible UNDO functionality implementation).
 }
 
@@ -38,7 +36,12 @@ impl Question {
         println!("=========================\nFuzzer Template Generator\n=========================");
         println!("{}\n", self.name);
         println!("{}\n", self.content);
-        println!("\t{}\t{}\tUndo", self.answer1, self.answer2);
+
+        for ans in &self.answers {
+            print!("\t{}", ans);
+        }
+
+        println!("\tUndo");
     }
 
     // Checks if the answer given by the user is one of the possibilities that the generator expects.
@@ -49,11 +52,17 @@ impl Question {
             input.truncate(input.len() - 1);
         }
 
-        // For now we dont check for variants (with the implementation of an interface this wont be necessary).
-        // The "Undo" option makes the generator go back to the previous question, so if the user do something
-        // by mistake, they can correct it.
-        if (input == &self.answer1) || (input == &self.answer2) || (input == "Undo") {
+        // The "Undo" option makes the generator go back to the previous question, so if the user do something by mistake, they can correct it.
+        if input == "Undo" {
             return true;
+        }
+
+        // Checks if the user typed one of the acceptable answers.
+        // For now we dont check for variants (with the implementation of an interface this wont be necessary).
+        for ans in &self.answers {
+            if input == ans {
+                return true;
+            }
         }
 
         false
@@ -65,20 +74,21 @@ impl Question {
         input: &String,
         q_index: usize,
     ) -> usize {
-        // If it's equal to answer1, we go to next1, which is the next question if answer1 is chosen.
-        if input == &self.answer1 {
-            // We save the index of the current question in the 'previous' field of the next one.
-            q_diagram[self.next1].previous = q_index;
 
-            self.next1
-        } else if input == &self.answer2 {
-            q_diagram[self.next2].previous = q_index;
+        if input == "Undo" {
+            return self.previous;
+        }
 
-            self.next2
+        // Checks which of the acceptable answers the user chose, then sets the 'previous' field for the next question as the current one and
+        // returns the index of the next question.
+        for (i, ans) in self.answers.iter().enumerate() {
+            if input == ans {
+                q_diagram[self.next[i]].previous = q_index;
+                return self.next[i];
+            }
         }
-        // Undo option.
-        else {
-            self.previous
-        }
+
+        // The compiler complained about the base case so I'll probably change the logic of this method.
+        self.next[0]
     }
 }
