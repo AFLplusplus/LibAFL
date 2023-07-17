@@ -24,6 +24,10 @@ use std::process::Stdio;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use std::{fs::File, os::unix::io::AsRawFd};
 
+use libafl_bolts::{
+    core_affinity::{CoreId, Cores},
+    shmem::ShMemProvider,
+};
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
@@ -44,7 +48,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasExecutions},
     Error,
 };
-use libafl_bolts::{core_affinity::CoreId, core_affinity::Cores, shmem::ShMemProvider};
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";

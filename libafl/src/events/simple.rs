@@ -13,7 +13,9 @@ use core::ptr::write_volatile;
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{fmt::Debug, marker::PhantomData};
 
-use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer, ClientId};
+use libafl_bolts::ClientId;
+#[cfg(feature = "std")]
+use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 

@@ -5,6 +5,7 @@ pub mod simple;
 pub use simple::*;
 pub mod centralized;
 pub use centralized::*;
+#[cfg(feature = "std")]
 pub mod launcher;
 pub mod llmp;
 #[cfg(feature = "tcp_manager")]
@@ -19,11 +20,11 @@ use core::{
     time::Duration,
 };
 
-pub use launcher::*;
-pub use llmp::*;
-
 use ahash::RandomState;
+#[cfg(feature = "std")]
+pub use launcher::*;
 use libafl_bolts::{current_time, ClientId};
+pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
