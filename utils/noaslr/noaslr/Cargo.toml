@@ -14,5 +14,5 @@ nix = { version = "0.26.2", default-features = false, features = ["process", "pe
 readonly = { version = "0.2.8", default-features = false }
 simplelog = { version = "0.12.1", default-features = false }
 
-[target.'cfg(any(target_os = "freebsd", target_os = "dragonfly"))'.dependencies]
+[target.'cfg(any(target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd"))'.dependencies]
 libc = "0.2"
