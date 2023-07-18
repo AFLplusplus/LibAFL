@@ -24,8 +24,8 @@ use crate::{
     stages::StagesTuple,
     start_timer,
     state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata,
-        HasSolutions, UsesState,HasAFLStats,
+        HasAFLStats, HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime,
+        HasMetadata, HasSolutions, UsesState,
     },
     Error,
 };
@@ -158,7 +158,8 @@ where
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + HasAFLStats,
+    Self::State:
+        HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + HasAFLStats,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,

@@ -47,7 +47,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState,HasAFLStats},
+    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
 
@@ -622,7 +622,7 @@ impl<E, S, Z> EventManager<E, Z> for TcpEventManager<S>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime + HasAFLStats,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
 }
@@ -640,7 +640,7 @@ where
 }
 
 impl<S> ProgressReporter for TcpEventManager<S> where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime + HasAFLStats
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime
 {
 }
 
@@ -688,7 +688,6 @@ where
         + HasClientPerfMonitor
         + HasMetadata
         + HasLastReportTime
-        + HasAFLStats
         + Serialize,
     SP: ShMemProvider,
 {
@@ -769,7 +768,6 @@ where
         + HasClientPerfMonitor
         + HasMetadata
         + HasLastReportTime
-        + HasAFLStats
         + Serialize,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,

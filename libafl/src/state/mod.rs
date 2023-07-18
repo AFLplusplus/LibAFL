@@ -969,49 +969,6 @@ impl<I> HasLastReportTime for NopState<I> {
 }
 
 #[cfg(test)]
-impl<I> HasAFLStats for NopState<I> {
-    /// Return the number of testcases that have not gone through any fuzzing yet
-    fn pending(&self) -> &usize {
-        unimplemented!()
-    }
-
-    /// Return the number of testcases that have not gone through any fuzzing yet (mutable)
-    fn pending_mut(&mut self) -> &mut usize {
-        unimplemented!()
-    }
-
-    /// Return the number of `favored` testcases that have not gone through any fuzzing yet
-    fn pend_favored(&self) -> &usize {
-        unimplemented!()
-    }
-
-    /// Return the number of `favored` testcases that have not gone through any fuzzing yet (mutable)
-    fn pend_favored_mut(&mut self) -> &mut usize {
-        unimplemented!()
-    }
-
-    /// Return the number of new paths found during this fuzzing section
-    fn own_finds(&self) -> &usize {
-        unimplemented!()
-    }
-
-    /// Return the number of new paths found during this fuzzing section (mutable)
-    fn own_finds_mut(&mut self) -> &mut usize {
-        unimplemented!()
-    }
-
-    /// Return the number of new paths that imported from other fuzzers
-    fn imported(&self) -> &usize {
-        unimplemented!()
-    }
-
-    /// Return the number of new paths that imported from other fuzzers
-    fn imported_mut(&mut self) -> &mut usize {
-        unimplemented!()
-    }
-}
-
-#[cfg(test)]
 impl<I> HasMetadata for NopState<I> {
     fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata

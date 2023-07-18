@@ -324,7 +324,7 @@ where
 impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventManager<E, Z>,
-    EM::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasLastReportTime + HaF,
+    EM::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -352,7 +352,7 @@ where
 impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + ProgressReporter + HasEventManagerId,
-    EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + HasAFLStats,
+    EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
     SP: ShMemProvider,
 {
 }

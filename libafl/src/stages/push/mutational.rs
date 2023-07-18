@@ -22,7 +22,7 @@ use crate::{
     schedulers::Scheduler,
     start_timer,
     state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand, HasAFLStats,
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand,
     },
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
@@ -67,7 +67,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + Clone + Debug + HasAFLStats,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -96,7 +96,6 @@ where
         + HasExecutions
         + HasLastReportTime
         + HasMetadata
-        + HasAFLStats
         + Clone
         + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
@@ -218,7 +217,6 @@ where
         + HasMetadata
         + HasLastReportTime
         + Clone
-        + HasAFLStats
         + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>

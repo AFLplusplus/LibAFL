@@ -192,6 +192,7 @@ where
     /// Add an entry to the corpus and return its index
     fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
         self.base.on_add(state, idx)?;
+        *state.pending_mut() += 1;
         self.update_score(state, idx)
     }
 

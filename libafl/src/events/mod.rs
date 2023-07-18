@@ -8,11 +8,7 @@ pub use centralized::*;
 pub mod llmp;
 #[cfg(feature = "tcp_manager")]
 pub mod tcp;
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::c_void;
 use core::{
@@ -38,7 +34,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata,HasAFLStats},
+    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata},
     Error,
 };
 
@@ -455,7 +451,7 @@ pub trait EventFirer: UsesState {
 /// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter: EventFirer
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + HasAFLStats,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
 {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
@@ -464,7 +460,7 @@ where
         &mut self,
         state: &mut Self::State,
         monitor_timeout: Duration,
-    ) -> Result<Duration, Error> {
+    ) -> Result<(), Error> {
         let Some(last_report_time) = state.last_report_time() else {
             // this is the first time we execute, no need to report progress just yet.
             *state.last_report_time_mut() = Some(current_time());
@@ -484,13 +480,6 @@ where
     fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         let executions = *state.executions();
         let cur = current_time();
-
-        let executions = *state.executions();
-        let pending_size = *state.pending();
-        let pend_favored_size = *state.pend_favored();
-        let own_finds_size = *state.own_finds();
-        let imported_size = *state.imported();
-
 
         // Default no introspection implmentation
         #[cfg(not(feature = "introspection"))]
@@ -521,62 +510,6 @@ where
                     phantom: PhantomData,
                 },
             )?;
-
-            self.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: "pending".to_string(),
-                    value: UserStats::Number(pending_size as u64),
-                    phantom: PhantomData,
-                },
-            )?;
-
-            self.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: "pend_fav".to_string(),
-                    value: UserStats::Number(pend_favored_size as u64),
-                    phantom: PhantomData,
-                },
-            )?;
-
-            self.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: "own_finds".to_string(),
-                    value: UserStats::Number(own_finds_size as u64),
-                    phantom: PhantomData,
-                },
-            )?;
-
-            self.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: "imported".to_string(),
-                    value: UserStats::Number(imported_size as u64),
-                    phantom: PhantomData,
-                },
-            )?;
-
-            // If performance monitor are requested, fire the `UpdatePerfMonitor` event
-            #[cfg(feature = "introspection")]
-            {
-                state
-                    .introspection_monitor_mut()
-                    .set_current_time(crate::bolts::cpu::read_time_counter());
-
-                // Send the current monitor over to the manager. This `.clone` shouldn't be
-                // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s
-                self.fire(
-                    state,
-                    Event::UpdatePerfMonitor {
-                        executions,
-                        time: cur,
-                        introspection_monitor: Box::new(state.introspection_monitor().clone()),
-                        phantom: PhantomData,
-                    },
-                )?;
-            }
         }
 
         *state.last_report_time_mut() = Some(cur);
@@ -629,7 +562,7 @@ pub trait HasEventManagerId {
 pub trait EventManager<E, Z>:
     EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + HasAFLStats,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
 {
 }
 
@@ -696,7 +629,7 @@ where
 }
 
 impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata + HasAFLStats,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata
 {
 }
 
@@ -714,7 +647,7 @@ where
 }
 
 impl<S> ProgressReporter for NopEventManager<S> where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata + HasAFLStats
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata
 {
 }
 

@@ -70,8 +70,8 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand,
-        UsesState, HasAFLStats,
+        HasAFLStats, HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime,
+        HasMetadata, HasRand, UsesState,
     },
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
