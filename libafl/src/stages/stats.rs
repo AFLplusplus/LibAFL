@@ -46,11 +46,10 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasAFLStats + HasCorpus + HasMetadata,
 {
-    #[allow(unused_variables)]
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
