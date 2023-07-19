@@ -34,7 +34,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
+    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata},
     Error,
 };
 
@@ -451,7 +451,7 @@ pub trait EventFirer: UsesState {
 /// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter: EventFirer
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
 {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
@@ -459,18 +459,20 @@ where
     fn maybe_report_progress(
         &mut self,
         state: &mut Self::State,
-        last_report_time: Duration,
         monitor_timeout: Duration,
-    ) -> Result<Duration, Error> {
+    ) -> Result<(), Error> {
+        let Some(last_report_time) = state.last_report_time() else {
+            // this is the first time we execute, no need to report progress just yet.
+            *state.last_report_time_mut() = Some(current_time());
+            return Ok(());
+        };
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
-        if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
+        if cur.checked_sub(*last_report_time).unwrap_or_default() > monitor_timeout {
+            // report_progress sets a new `last_report_time` internally.
             self.report_progress(state)?;
-
-            Ok(cur)
-        } else {
-            Ok(last_report_time)
         }
+        Ok(())
     }
 
     /// Send off an info/monitor/heartbeat message to the broker.
@@ -509,6 +511,8 @@ where
                 },
             )?;
         }
+
+        *state.last_report_time_mut() = Some(cur);
 
         Ok(())
     }
@@ -558,7 +562,7 @@ pub trait HasEventManagerId {
 pub trait EventManager<E, Z>:
     EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
 {
 }
 
@@ -625,7 +629,7 @@ where
 }
 
 impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata
 {
 }
 
@@ -643,7 +647,7 @@ where
 }
 
 impl<S> ProgressReporter for NopEventManager<S> where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata
 {
 }
 
