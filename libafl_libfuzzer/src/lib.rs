@@ -1,4 +1,4 @@
-//! libafl_libfuzzer offers a "permanent" replacement for the now-deprecated libfuzzer
+//! `libafl_libfuzzer` offers a "permanent" replacement for the now-deprecated libfuzzer
 //!
 //! This crate only offers sufficient functionality to replace libfuzzer for cargo-fuzz in its
 //! current state, but may be expanded to handle other flags in the future.
@@ -12,6 +12,7 @@ use std::ffi::{c_char, c_int};
 pub use libfuzzer_sys::*;
 
 extern "C" {
+    /// `LLVMFuzzerRunDriver` allows for harnesses which specify their own main. See: https://llvm.org/docs/LibFuzzer.html#using-libfuzzer-as-a-library
     pub fn LLVMFuzzerRunDriver(
         argc: *mut c_int,
         argv: *mut *mut *const c_char,

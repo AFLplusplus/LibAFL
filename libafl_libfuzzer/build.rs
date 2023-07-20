@@ -1,6 +1,9 @@
 use std::{path::PathBuf, process::Command};
 
 fn main() {
+    if cfg!(feature = "cargo-clippy") {
+        return; // skip when clippy is running
+    }
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/src");
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/Cargo.toml");
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/build.rs");
