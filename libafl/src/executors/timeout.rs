@@ -218,7 +218,7 @@ impl<E> TimeoutExecutor<E> {
         self.exec_tmout = exec_tmout;
     }
 
-    pub(crate) fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool {
+    pub(crate) fn handle_timeout(&mut self, data: &InProcessExecutorHandlerData) -> bool {
         if !self.batch_mode {
             return false;
         }
