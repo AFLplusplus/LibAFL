@@ -202,7 +202,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
 
 impl<Head, Tail, I, S> MutatorsTuple<I, S> for (Head, Tail)
 where
-    Head: Mutator<I, S> + Named,
+    Head: Mutator<I, S>,
     Tail: MutatorsTuple<I, S>,
 {
     fn mutate_all(
