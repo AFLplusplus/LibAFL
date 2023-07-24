@@ -280,7 +280,7 @@ where
 
     /// Cull the `Corpus`
     #[allow(clippy::unused_self)]
-    pub fn accounting_cull(&self, state: &mut CS::State) -> Result<(), Error> {
+    pub fn accounting_cull(&self, state: &CS::State) -> Result<(), Error> {
         let Some(top_rated) = state.metadata_map().get::<TopAccountingMetadata>() else {
             return Ok(());
         };
