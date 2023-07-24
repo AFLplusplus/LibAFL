@@ -27,7 +27,7 @@ struct Bigger(Range<usize>);
 
 impl PartialOrd for Bigger {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.len().partial_cmp(&other.0.len())
+        Some(self.cmp(other))
     }
 }
 
@@ -43,7 +43,7 @@ struct Earlier(Range<usize>);
 
 impl PartialOrd for Earlier {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.0.start.partial_cmp(&self.0.start)
+        Some(self.cmp(other))
     }
 }
 

@@ -72,7 +72,7 @@ pub unsafe fn shutdown_handler<SP>(
     signal: Signal,
     _info: siginfo_t,
     _context: &mut ucontext_t,
-    data: &mut ShutdownSignalData,
+    data: &ShutdownSignalData,
 ) where
     SP: ShMemProvider,
 {
