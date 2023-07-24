@@ -3,6 +3,8 @@
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
+use serde_json::json;
+
 use crate::{
     bolts::current_time,
     corpus::{Corpus, CorpusId},
@@ -10,7 +12,7 @@ use crate::{
     monitors::UserStats,
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,
-    state::{HasAFLStats, HasCorpus, HasMetadata, UsesState},
+    state::{HasCorpus, HasImported, HasMetadata, UsesState},
     Error,
 };
 
@@ -22,6 +24,14 @@ where
     EM: EventFirer<State = E::State>,
     Z: UsesState<State = E::State>,
 {
+    // the number of testcases that have been fuzzed
+    has_fuzzed_size: usize,
+    // the number of "favored" testcases
+    is_favored_size: usize,
+    // the number of testcases found by itself
+    own_finds_size: usize,
+    // the number of testcases imported by other fuzzers
+    imported_size: usize,
     // the last time that we report all stats
     last_report_time: Duration,
     // the interval that we report all stats
@@ -44,7 +54,7 @@ where
     E: UsesState,
     EM: EventFirer<State = E::State>,
     Z: UsesState<State = E::State>,
-    E::State: HasAFLStats + HasCorpus + HasMetadata,
+    E::State: HasImported + HasCorpus + HasMetadata,
 {
     fn perform(
         &mut self,
@@ -57,69 +67,36 @@ where
         // Report your stats every `STATS_REPORT_INTERVAL`
         // compute pending, pending_favored, imported, own_finds
 
-        let mut is_scheduled = false;
-        let mut is_favored = false;
         {
             let testcase = state.corpus().get(corpus_idx)?.borrow();
             if testcase.scheduled_count() == 0 {
-                is_scheduled = true;
+                self.has_fuzzed_size += 1;
                 if testcase.has_metadata::<IsFavoredMetadata>() {
-                    is_favored = true;
+                    self.is_favored_size += 1;
                 }
             }
         }
 
-        if is_scheduled {
-            let pending_size = state.pending_mut();
-            if *pending_size > 0 {
-                *pending_size -= 1;
-            }
-        }
-
-        if is_favored {
-            let pend_favored_size = state.pend_favored_mut();
-            if *pend_favored_size > 0 {
-                *state.pend_favored_mut() -= 1;
-            }
-        }
-
-        *state.own_finds_mut() = state.corpus().count() - state.imported();
+        let corpus_size = state.corpus().count();
+        let pending_size = corpus_size - self.has_fuzzed_size;
+        let pend_favored_size = pending_size - self.is_favored_size;
+        self.imported_size = *state.imported();
+        self.own_finds_size = corpus_size - self.own_finds_size;
 
         let cur = current_time();
 
         if cur.checked_sub(self.last_report_time).unwrap_or_default() > self.stats_report_interval {
+            let json = json!({
+                    "pending":pending_size,
+                    "pend_favored":pend_favored_size,
+                    "own_finds":self.own_finds_size,
+                    "imported":self.imported_size,
+            });
             manager.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: "pending".to_string(),
-                    value: UserStats::Number(*state.pending() as u64),
-                    phantom: PhantomData,
-                },
-            )?;
-
-            manager.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: "pend_fav".to_string(),
-                    value: UserStats::Number(*state.pend_favored() as u64),
-                    phantom: PhantomData,
-                },
-            )?;
-
-            manager.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: "own_finds".to_string(),
-                    value: UserStats::Number(*state.own_finds() as u64),
-                    phantom: PhantomData,
-                },
-            )?;
-
-            manager.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: "imported".to_string(),
-                    value: UserStats::Number(*state.imported() as u64),
+                    name: "AflStats".to_string(),
+                    value: UserStats::String(json.to_string()),
                     phantom: PhantomData,
                 },
             )?;
@@ -135,7 +112,7 @@ where
     E: UsesState,
     EM: EventFirer<State = E::State>,
     Z: UsesState<State = E::State>,
-    E::State: HasAFLStats + HasCorpus + HasMetadata,
+    E::State: HasImported + HasCorpus + HasMetadata,
 {
     /// create a new instance of the [`AFLStatsStage`]
     #[must_use]
@@ -152,12 +129,16 @@ where
     E: UsesState,
     EM: EventFirer<State = E::State>,
     Z: UsesState<State = E::State>,
-    E::State: HasAFLStats + HasCorpus + HasMetadata,
+    E::State: HasImported + HasCorpus + HasMetadata,
 {
     /// the default instance of the [`AFLStatsStage`]
     #[must_use]
     fn default() -> Self {
         Self {
+            has_fuzzed_size: 0,
+            is_favored_size: 0,
+            own_finds_size: 0,
+            imported_size: 0,
             last_report_time: current_time(),
             stats_report_interval: Duration::from_secs(15),
             phantom: PhantomData,

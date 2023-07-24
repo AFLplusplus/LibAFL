@@ -211,25 +211,7 @@ pub trait HasExecutions {
 }
 
 /// Trait for some stats of AFL
-pub trait HasAFLStats {
-    /// the pending testcases counter
-    fn pending(&self) -> &usize;
-
-    /// the pending testcases counter (mutable)
-    fn pending_mut(&mut self) -> &mut usize;
-
-    /// the pending `favored` tesecases counter
-    fn pend_favored(&self) -> &usize;
-
-    /// the pending `favored` tesecases counter (mutable)
-    fn pend_favored_mut(&mut self) -> &mut usize;
-
-    /// the `own_finds` testcases counter
-    fn own_finds(&self) -> &usize;
-
-    /// the `own_finds` testcases counter (mutable)
-    fn own_finds_mut(&mut self) -> &mut usize;
-
+pub trait HasImported {
     ///the imported testcases counter
     fn imported(&self) -> &usize;
 
@@ -271,12 +253,6 @@ pub struct StdState<I, C, R, SC> {
     executions: usize,
     /// At what time the fuzzing started
     start_time: Duration,
-    /// the number of testcases that have not gone through any fuzzing yet
-    pending: usize,
-    /// The number of `favored` testcases that have not gone through any fuzzing yet
-    pend_favored: usize,
-    /// the number of new paths found during this fuzzing section
-    own_finds: usize,
     /// the number of new paths that imported from other fuzzers
     imported: usize,
     /// The corpus
@@ -439,44 +415,9 @@ impl<I, C, R, SC> HasExecutions for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasAFLStats for StdState<I, C, R, SC> {
-    /// Return the number of pending testcases that have not gone through any fuzzing yet
-    #[inline]
-    fn pending(&self) -> &usize {
-        &self.pending
-    }
-
-    /// Return the number of pending testcases that have not gone through any fuzzing yet (mutable)
-    #[inline]
-    fn pending_mut(&mut self) -> &mut usize {
-        &mut self.pending
-    }
-    /// Return the number of `favored` testcases that have not gone through any fuzzing yet
-    #[inline]
-    fn pend_favored(&self) -> &usize {
-        &self.pend_favored
-    }
-
-    /// Return the number of `favored` testcases that have not gone through any fuzzing yet (mutable)
-    #[inline]
-    fn pend_favored_mut(&mut self) -> &mut usize {
-        &mut self.pend_favored
-    }
-
-    /// Return the number of new paths found during this fuzzing section
-    #[inline]
-    fn own_finds(&self) -> &usize {
-        &self.own_finds
-    }
-
-    /// Return the number of new paths found during this fuzzing section (mutable)
-    #[inline]
-    fn own_finds_mut(&mut self) -> &mut usize {
-        &mut self.own_finds
-    }
-
-    #[inline]
+impl<I, C, R, SC> HasImported for StdState<I, C, R, SC> {
     /// Return the number of new paths that imported from other fuzzers
+    #[inline]
     fn imported(&self) -> &usize {
         &self.imported
     }
@@ -871,9 +812,6 @@ where
         let mut state = Self {
             rand,
             executions: 0,
-            pending: 0,
-            pend_favored: 0,
-            own_finds: 0,
             imported: 0,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),

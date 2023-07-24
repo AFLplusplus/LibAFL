@@ -14,7 +14,7 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasAFLStats, HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -80,7 +80,7 @@ where
     CS: RemovableScheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
-    CS::State: HasCorpus + HasMetadata + HasRand + HasAFLStats,
+    CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Replaces the testcase at the given idx
     fn on_replace(
@@ -187,12 +187,11 @@ where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
-    CS::State: HasCorpus + HasMetadata + HasRand + HasAFLStats,
+    CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
         self.base.on_add(state, idx)?;
-        *state.pending_mut() += 1;
         self.update_score(state, idx)
     }
 
@@ -243,7 +242,7 @@ where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
-    CS::State: HasCorpus + HasMetadata + HasRand + HasAFLStats,
+    CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Update the `Corpus` score using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
@@ -329,7 +328,6 @@ where
 
         let mut acc = HashSet::new();
 
-        let mut pend_favored_counter: usize = 0;
         for (key, idx) in &top_rated.map {
             if !acc.contains(key) {
                 let mut entry = state.corpus().get(*idx)?.borrow_mut();
@@ -344,11 +342,8 @@ where
                 }
 
                 entry.add_metadata(IsFavoredMetadata {});
-                pend_favored_counter += 1;
             }
         }
-
-        *state.pend_favored_mut() = pend_favored_counter;
 
         Ok(())
     }

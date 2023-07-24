@@ -70,7 +70,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     state::{
-        HasAFLStats, HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime,
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasImported, HasLastReportTime,
         HasMetadata, HasRand, UsesState,
     },
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
@@ -259,7 +259,7 @@ where
         + HasMetadata
         + HasRand
         + HasCorpus
-        + HasAFLStats
+        + HasImported
         + HasLastReportTime,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>

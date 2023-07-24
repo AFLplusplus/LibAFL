@@ -24,7 +24,7 @@ use crate::{
     stages::StagesTuple,
     start_timer,
     state::{
-        HasAFLStats, HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime,
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasImported, HasLastReportTime,
         HasMetadata, HasSolutions, UsesState,
     },
     Error,
@@ -334,7 +334,7 @@ where
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     CS::State:
-        HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasCorpus + HasAFLStats,
+        HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasCorpus + HasImported,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -454,7 +454,7 @@ where
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasAFLStats,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasImported,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -487,7 +487,7 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasAFLStats,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasImported,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -585,7 +585,7 @@ where
         + HasMetadata
         + HasCorpus
         + HasTestcase
-        + HasAFLStats
+        + HasImported
         + HasLastReportTime,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
