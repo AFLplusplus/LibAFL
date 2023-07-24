@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "7dd994beba39003671726993096a11e788e9741d";
+const QEMU_REVISION: &str = "3a774d591acb9770eeeb286ec88c657271c398d8";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -59,6 +59,8 @@ pub fn build(
     target_dir.pop();
 
     build_dep_check(&["git", "make"]);
+
+    let cpp_compiler = cc::Build::new().cpp(true).get_compiler();
 
     let qemu_path = if let Some(qemu_dir) = custum_qemu_dir.as_ref() {
         Path::new(&qemu_dir).to_path_buf()
@@ -136,6 +138,12 @@ pub fn build(
             let mut cmd = Command::new("./configure");
             cmd.current_dir(&qemu_path)
                 //.arg("--as-static-lib")
+                .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
+                .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
+                .arg(&format!(
+                    "--cxx={}",
+                    qemu_path.join("linker_interceptor.py").display()
+                ))
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
                 .args([
@@ -152,6 +160,12 @@ pub fn build(
             let mut cmd = Command::new("./configure");
             cmd.current_dir(&qemu_path)
                 //.arg("--as-static-lib")
+                .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
+                .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
+                .arg(&format!(
+                    "--cxx={}",
+                    qemu_path.join("linker_interceptor.py").display()
+                )) // TODO set __LIBAFL_QEMU_BUILD_CXX
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
                 .arg(if cfg!(feature = "slirp") {
@@ -277,6 +291,7 @@ pub fn build(
                 .current_dir(&build_dir)
                 .arg("-j")
                 .arg(&format!("{j}"))
+                .env("V", "1")
                 .status()
                 .expect("Make failed");
         } else {
@@ -309,6 +324,31 @@ pub fn build(
         }
     }
 
+    let compile_commands_string =
+        &fs::read_to_string(build_dir.join("linkinfo.json")).expect("Failed to read linkinfo.json");
+
+    let linkinfo = json::parse(compile_commands_string).expect("Failed to parse linkinfo.json");
+
+    let mut cmd = vec![];
+    for arg in linkinfo["cmd"].members() {
+        cmd.push(
+            arg.as_str()
+                .expect("linkinfo.json `cmd` values must be strings"),
+        );
+    }
+
+    assert!(cpp_compiler
+        .to_command()
+        .current_dir(&build_dir)
+        .arg("-o")
+        .arg("libqemu-partially-linked.o")
+        .arg("-r")
+        .args(cmd)
+        .status()
+        .expect("Partial linked failure")
+        .success());
+
+    /* // Old manual linking, kept here for reference and debugging
     if is_usermode {
         Command::new("ld")
             .current_dir(out_dir_path)
@@ -390,18 +430,34 @@ pub fn build(
             .arg("--end-group")
             .status()
             .expect("Partial linked failure");
-    }
+    }*/
 
     Command::new("ar")
         .current_dir(out_dir_path)
         .arg("crs")
         .arg("libqemu-partially-linked.a")
-        .arg("libqemu-partially-linked.o")
+        .arg(build_dir.join("libqemu-partially-linked.o"))
         .status()
         .expect("Ar creation");
 
     println!("cargo:rustc-link-search=native={out_dir}");
     println!("cargo:rustc-link-lib=static=qemu-partially-linked");
+
+    for arg in linkinfo["search"].members() {
+        let val = arg
+            .as_str()
+            .expect("linkinfo.json `search` values must be strings");
+        println!("cargo:rustc-link-search={val}");
+    }
+
+    for arg in linkinfo["libs"].members() {
+        let val = arg
+            .as_str()
+            .expect("linkinfo.json `libs` values must be strings");
+        println!("cargo:rustc-link-lib={val}");
+    }
+
+    /*
     println!("cargo:rustc-link-lib=rt");
     println!("cargo:rustc-link-lib=gmodule-2.0");
     println!("cargo:rustc-link-lib=glib-2.0");
@@ -411,12 +467,13 @@ pub fn build(
     // therefore, we need to link with keyutils if our system have libkeyutils.
     let _: Result<pkg_config::Library, pkg_config::Error> =
         pkg_config::Config::new().probe("libkeyutils");
+    */
 
     if !is_usermode {
-        println!("cargo:rustc-link-lib=pixman-1");
-        if env::var("LINK_SLIRP").is_ok() || cfg!(feature = "slirp") {
-            println!("cargo:rustc-link-lib=slirp");
-        }
+        //println!("cargo:rustc-link-lib=pixman-1");
+        //if env::var("LINK_SLIRP").is_ok() || cfg!(feature = "slirp") {
+        //    println!("cargo:rustc-link-lib=slirp");
+        //}
 
         fs::create_dir_all(target_dir.join("pc-bios")).unwrap();
         for path in fs::read_dir(build_dir.join("pc-bios")).unwrap() {
