@@ -303,6 +303,7 @@ pub fn build(
         }
     }
 
+    /*
     let mut objects = vec![];
     for dir in &[
         build_dir.join("libcommon.fa.p"),
@@ -323,6 +324,7 @@ pub fn build(
             }
         }
     }
+    */
 
     let compile_commands_string =
         &fs::read_to_string(build_dir.join("linkinfo.json")).expect("Failed to read linkinfo.json");
