@@ -80,7 +80,7 @@ pub fn read_time_counter() -> u64 {
              "rdcycleh {hg}",
              "rdcycle {lw}",
              "rdcycleh {cmp}",
-             "bne {hg} {cmp}, jmp%=",
+             "bne {hg}, {cmp}, jmp%=",
              hg = out(reg) hg,
              lw = out(reg) lw,
              cmp = out(reg) cmp);
