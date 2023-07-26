@@ -321,7 +321,7 @@ where
 
     /// Cull the `Corpus` using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
-    pub fn cull(&self, state: &mut CS::State) -> Result<(), Error> {
+    pub fn cull(&self, state: &CS::State) -> Result<(), Error> {
         let Some(top_rated) = state.metadata_map().get::<TopRatedsMetadata>() else {
             return Ok(());
         };
