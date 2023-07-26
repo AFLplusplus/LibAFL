@@ -1,20 +1,23 @@
 //! Stage to compute/report AFL stats
 
+#[cfg(feature = "std")]
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
+#[cfg(feature = "std")]
 use serde_json::json;
 
 use crate::{
     bolts::current_time,
     corpus::{Corpus, CorpusId},
-    events::{Event, EventFirer},
-    monitors::UserStats,
+    events::EventFirer,
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,
     state::{HasCorpus, HasImported, HasMetadata, UsesState},
     Error,
 };
+#[cfg(feature = "std")]
+use crate::{events::Event, monitors::UserStats};
 
 /// The [`AFLStatsStage`] is a simple stage that computes and reports some stats.
 #[derive(Debug, Clone)]
@@ -61,7 +64,7 @@ where
         _fuzzer: &mut Z,
         _executor: &mut E,
         state: &mut E::State,
-        manager: &mut EM,
+        _manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         // Report your stats every `STATS_REPORT_INTERVAL`
@@ -86,20 +89,31 @@ where
         let cur = current_time();
 
         if cur.checked_sub(self.last_report_time).unwrap_or_default() > self.stats_report_interval {
-            let json = json!({
-                    "pending":pending_size,
-                    "pend_favored":pend_favored_size,
-                    "own_finds":self.own_finds_size,
-                    "imported":self.imported_size,
-            });
-            manager.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: "AflStats".to_string(),
-                    value: UserStats::String(json.to_string()),
-                    phantom: PhantomData,
-                },
-            )?;
+            #[cfg(feature = "std")]
+            {
+                let json = json!({
+                        "pending":pending_size,
+                        "pend_favored":pend_favored_size,
+                        "own_finds":self.own_finds_size,
+                        "imported":self.imported_size,
+                });
+                _manager.fire(
+                    state,
+                    Event::UpdateUserStats {
+                        name: "AflStats".to_string(),
+                        value: UserStats::String(json.to_string()),
+                        phantom: PhantomData,
+                    },
+                )?;
+            }
+            #[cfg(not(feature = "std"))]
+            log::info!(
+                "pending: {}, pend_favored: {}, own_finds: {}, imported: {}",
+                pending_size,
+                pend_favored_size,
+                self.own_finds_size,
+                self.imported_size
+            );
         }
         self.last_report_time = cur;
 
