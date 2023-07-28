@@ -16,7 +16,7 @@ use backtrace::Backtrace;
 #[cfg(target_arch = "x86_64")]
 use capstone::{
     arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
-    Capstone, Insn, RegAccessType, RegId,
+    Capstone, RegAccessType, RegId,
 };
 #[cfg(target_arch = "aarch64")]
 use capstone::{
@@ -25,7 +25,7 @@ use capstone::{
         ArchOperand::Arm64Operand,
         BuildsCapstone,
     },
-    Capstone, Insn,
+    Capstone,
 };
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
@@ -2197,7 +2197,7 @@ impl AsanRuntime {
     pub fn asan_is_interesting_instruction(
         capstone: &Capstone,
         _address: u64,
-        instr: &Insn,
+        instr: &frida_gum_sys::Insn,
     ) -> Option<(
         capstone::RegId,
         capstone::RegId,
@@ -2206,6 +2206,11 @@ impl AsanRuntime {
         Arm64Shift,
         Arm64Extender,
     )> {
+        let instructions = capstone
+            .disasm_all(instr.bytes(), instr.address())
+            .expect("couldn't disassemble output of frida's capstone with our capstone");
+        assert_eq!(instructions.len(), 1);
+        let instr = &instructions[0];
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
         match instr.mnemonic().unwrap() {
@@ -2248,10 +2253,15 @@ impl AsanRuntime {
     pub fn asan_is_interesting_instruction(
         capstone: &Capstone,
         _address: u64,
-        instr: &Insn,
+        instr: &frida_gum_sys::Insn,
     ) -> Option<(RegId, u8, RegId, RegId, i32, i64)> {
+        let instructions = capstone
+            .disasm_all(instr.bytes(), instr.address())
+            .expect("couldn't disassemble output of frida's capstone with our capstone");
+        assert_eq!(instructions.len(), 1);
+        let instr = &instructions[0];
         let operands = capstone
-            .insn_detail(instr)
+            .insn_detail(&instr)
             .unwrap()
             .arch_detail()
             .operands();
@@ -2317,9 +2327,9 @@ impl AsanRuntime {
         basereg: RegId,
         indexreg: RegId,
         scale: i32,
-        disp: i64,
+        disp: isize,
     ) {
-        let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
+        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as isize;
         let writer = output.writer();
         let true_rip = address;
 
@@ -2365,7 +2375,7 @@ impl AsanRuntime {
                                         | addr  | rip   |
                                         | Rcx   | Rax   |
                                         | Rsi   | Rdx   |
-            Old Rsp - (redsone_size) -> | flags | Rdi   |
+            Old Rsp - (redzone_size) -> | flags | Rdi   |
                                         |       |       |
             Old Rsp                  -> |       |       |
         */
@@ -2498,8 +2508,7 @@ impl AsanRuntime {
             i32::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).is_ok(),
             "GUM_RED_ZONE_SIZE is bigger than i32::max"
         );
-        #[allow(clippy::cast_possible_wrap)]
-        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
+        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE;
         let writer = output.writer();
 
         let basereg = writer_register(basereg);
@@ -2534,7 +2543,7 @@ impl AsanRuntime {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            i64::from(-(16 + redzone_size)),
+            -(16 + redzone_size),
             IndexMode::PreAdjust,
         );
 
