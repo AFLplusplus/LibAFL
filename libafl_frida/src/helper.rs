@@ -1,12 +1,10 @@
 use core::fmt::{self, Debug, Formatter};
-use std::{rc::Rc, borrow::BorrowMut, cell::{RefCell, Ref, RefMut}};
-
-#[cfg(target_arch = "aarch64")]
-use capstone::{
-    arch::{self, BuildsCapstone},
-    Capstone,
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    rc::Rc,
 };
-#[cfg(all(target_arch = "x86_64", unix))]
+
+#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))]
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone,
@@ -116,9 +114,6 @@ where
 
 /// An helper that feeds `FridaInProcessExecutor` with edge-coverage instrumentation
 pub struct FridaInstrumentationHelper<'a, RT: 'a> {
-    #[cfg(unix)]
-    capstone: Rc<Capstone>,
-    module_map: ModuleMap,
     options: &'a FuzzerOptions,
     transformer: Transformer<'a>,
     ranges: Rc<RefCell<RangeMap<usize, (u16, String)>>>,
@@ -211,16 +206,14 @@ where
                 let range = module.range();
                 let start = range.base_address().0 as usize;
                 // log::trace!("start: {:x}", start);
-                ranges
-                    .insert(start..(start + range.size()), (i as u16, module.path()));
+                ranges.insert(start..(start + range.size()), (i as u16, module.path()));
             }
             if !options.dont_instrument.is_empty() {
                 for (module_name, offset) in options.dont_instrument.clone() {
                     let module_details = ModuleDetails::with_name(module_name).unwrap();
                     let lib_start = module_details.range().base_address().0 as usize;
                     // log::info!("removing address: {:#x}", lib_start + offset);
-                    ranges
-                        .remove((lib_start + offset)..(lib_start + offset + 4));
+                    ranges.remove((lib_start + offset)..(lib_start + offset + 4));
                 }
             }
 
@@ -230,10 +223,8 @@ where
                 "instrumented libraries must not include the fuzzer"
             );
 
-            runtimes
-                .init_all(gum, &ranges, &modules_to_instrument);
+            runtimes.init_all(gum, &ranges, &modules_to_instrument);
         }
-
 
         #[cfg(target_arch = "aarch64")]
         let capstone = Capstone::new()
@@ -250,20 +241,15 @@ where
             .build()
             .expect("Failed to create Capstone object");
 
-
         // Wrap ranges and runtimes in reference-counted refcells in order to move
         // these references both into the struct that we return and the transformer callback
         // that we pass to frida-gum.
         let ranges = Rc::new(RefCell::new(ranges));
         let runtimes = Rc::new(RefCell::new(runtimes));
-        #[cfg(any(target_arch = "aarch64", all(target_arch="x86_64", unix)))]
-        let capstone = Rc::new(capstone);
 
         let transformer = {
             let ranges = Rc::clone(&ranges);
             let runtimes = Rc::clone(&runtimes);
-            #[cfg(any(target_arch = "aarch64", all(target_arch="x86_64", unix)))]
-            let capstone = Rc::clone(&capstone);
             Transformer::from_callback(gum, move |basic_block, output| {
                 let mut first = true;
                 for instruction in basic_block {
@@ -302,11 +288,7 @@ where
 
                         #[cfg(unix)]
                         let res = if let Some(_rt) = rts.match_first_type_mut::<AsanRuntime>() {
-                            AsanRuntime::asan_is_interesting_instruction(
-                                &*capstone,
-                                address,
-                                instr,
-                            )
+                            AsanRuntime::asan_is_interesting_instruction(&capstone, address, instr)
                         } else {
                             None
                         };
@@ -315,13 +297,21 @@ where
                         if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
                             if let Some(rt) = rts.match_first_type_mut::<AsanRuntime>() {
                                 rt.emit_shadow_check(
-                                    address, &output, segment, width, basereg, indexreg, scale, disp as isize,
+                                    address,
+                                    &output,
+                                    segment,
+                                    width,
+                                    basereg,
+                                    indexreg,
+                                    scale,
+                                    disp as isize,
                                 );
                             }
                         }
 
                         #[cfg(target_arch = "aarch64")]
-                        if let Some((basereg, indexreg, displacement, width, shift, extender)) = res {
+                        if let Some((basereg, indexreg, displacement, width, shift, extender)) = res
+                        {
                             if let Some(rt) = rts.match_first_type_mut::<AsanRuntime>() {
                                 rt.emit_shadow_check(
                                     address,
@@ -346,7 +336,13 @@ where
                                 )
                             {
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                                rt.emit_comparison_handling(address, &output, &op1, &op2, special_case);
+                                rt.emit_comparison_handling(
+                                    address,
+                                    &output,
+                                    &op1,
+                                    &op2,
+                                    special_case,
+                                );
                             }
                         }
 
@@ -372,9 +368,6 @@ where
         };
 
         Self {
-            module_map: ModuleMap::new_from_names(gum, &modules_to_instrument),
-            #[cfg(any(target_arch = "aarch64", all(target_arch="x86_64", unix)))]
-            capstone,
             options,
             transformer,
             ranges,
@@ -401,7 +394,7 @@ where
     */
 
     /// Returns ref to the Transformer
-    pub fn transformer(&mut self) -> &Transformer<'a> {
+    pub fn transformer(&self) -> &Transformer<'a> {
         &self.transformer
     }
 
@@ -412,7 +405,9 @@ where
         ranges: &RangeMap<usize, (u16, String)>,
         modules_to_instrument: &'a [&str],
     ) {
-        (*self.runtimes).borrow_mut().init_all(gum, ranges, modules_to_instrument);
+        (*self.runtimes)
+            .borrow_mut()
+            .init_all(gum, ranges, modules_to_instrument);
     }
 
     /// Method called before execution
@@ -432,7 +427,9 @@ where
 
     /// Pointer to coverage map
     pub fn map_mut_ptr(&mut self) -> Option<*mut u8> {
-        (*self.runtimes).borrow_mut().match_first_type_mut::<CoverageRuntime>()
+        (*self.runtimes)
+            .borrow_mut()
+            .match_first_type_mut::<CoverageRuntime>()
             .map(CoverageRuntime::map_mut_ptr)
     }
 
