@@ -304,7 +304,7 @@ where
                                     basereg,
                                     indexreg,
                                     scale,
-                                    disp as isize,
+                                    disp,
                                 );
                             }
                         }
