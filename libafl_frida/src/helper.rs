@@ -260,7 +260,7 @@ where
                     //log::trace!("block @ {:x} transformed to {:x}", address, output.writer().pc());
 
                     if ranges.borrow().contains_key(&(address as usize)) {
-                        let mut rts = (*runtimes).borrow_mut();
+                        let mut runtimes = (*runtimes).borrow_mut();
                         if first {
                             first = false;
                             // log::info!(
@@ -268,12 +268,12 @@ where
                             //     address,
                             //     output.writer().pc()
                             // );
-                            if let Some(rt) = rts.match_first_type_mut::<CoverageRuntime>() {
+                            if let Some(rt) = runtimes.match_first_type_mut::<CoverageRuntime>() {
                                 rt.emit_coverage_mapping(address, &output);
                             }
 
                             #[cfg(unix)]
-                            if let Some(rt) = rts.match_first_type_mut::<DrCovRuntime>() {
+                            if let Some(rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
                                 instruction.put_callout(|context| {
                                     let real_address = rt.real_address_for_stalked(pc(&context));
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
@@ -287,7 +287,8 @@ where
                         }
 
                         #[cfg(unix)]
-                        let res = if let Some(_rt) = rts.match_first_type_mut::<AsanRuntime>() {
+                        let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>()
+                        {
                             AsanRuntime::asan_is_interesting_instruction(&capstone, address, instr)
                         } else {
                             None
@@ -295,7 +296,7 @@ where
 
                         #[cfg(all(target_arch = "x86_64", unix))]
                         if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
-                            if let Some(rt) = rts.match_first_type_mut::<AsanRuntime>() {
+                            if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                                 rt.emit_shadow_check(
                                     address, &output, segment, width, basereg, indexreg, scale,
                                     disp,
@@ -306,7 +307,7 @@ where
                         #[cfg(target_arch = "aarch64")]
                         if let Some((basereg, indexreg, displacement, width, shift, extender)) = res
                         {
-                            if let Some(rt) = rts.match_first_type_mut::<AsanRuntime>() {
+                            if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                                 rt.emit_shadow_check(
                                     address,
                                     &output,
@@ -321,7 +322,7 @@ where
                         }
 
                         #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-                        if let Some(rt) = rts.match_first_type_mut::<CmpLogRuntime>() {
+                        if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>() {
                             if let Some((op1, op2, special_case)) =
                                 CmpLogRuntime::cmplog_is_interesting_instruction(
                                     &helper.capstone,
@@ -341,7 +342,7 @@ where
                         }
 
                         #[cfg(unix)]
-                        if let Some(rt) = rts.match_first_type_mut::<AsanRuntime>() {
+                        if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                             rt.add_stalked_address(
                                 output.writer().pc() as usize - instr_size,
                                 address as usize,
@@ -349,7 +350,7 @@ where
                         }
 
                         #[cfg(unix)]
-                        if let Some(rt) = rts.match_first_type_mut::<DrCovRuntime>() {
+                        if let Some(rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
                             rt.add_stalked_address(
                                 output.writer().pc() as usize - instr_size,
                                 address as usize,
