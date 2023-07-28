@@ -2251,7 +2251,7 @@ impl AsanRuntime {
         instr: &Insn,
     ) -> Option<(RegId, u8, RegId, RegId, i32, i64)> {
         let operands = capstone
-            .insn_detail(&instr)
+            .insn_detail(instr)
             .unwrap()
             .arch_detail()
             .operands();
