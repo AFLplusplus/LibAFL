@@ -60,7 +60,7 @@ pub fn set_seed_fuzz_time<S: HasMetadata>(state: &mut S, fuzz_time: Duration) ->
 }
 
 /// Get the time for a single seed to be used by this mutational stage
-pub fn get_seed_fuzz_time<S: HasMetadata>(state: &mut S) -> Result<Option<Duration>, Error> {
+pub fn get_seed_fuzz_time<S: HasMetadata>(state: &S) -> Result<Option<Duration>, Error> {
     state
         .metadata_map()
         .get::<TuneableMutationalStageMetadata>()
@@ -262,7 +262,7 @@ impl TuneableMutationalStage<(), (), (), (), ()> {
     }
 
     /// Set the time to mutate a single input in this mutational stage
-    pub fn seed_fuzz_time<S: HasMetadata>(state: &mut S) -> Result<Option<Duration>, Error> {
+    pub fn seed_fuzz_time<S: HasMetadata>(state: &S) -> Result<Option<Duration>, Error> {
         get_seed_fuzz_time(state)
     }
 }
