@@ -2365,7 +2365,7 @@ impl AsanRuntime {
                                         | addr  | rip   |
                                         | Rcx   | Rax   |
                                         | Rsi   | Rdx   |
-            Old Rsp - (redsone_size) -> | flags | Rdi   |
+            Old Rsp - (redzone_size) -> | flags | Rdi   |
                                         |       |       |
             Old Rsp                  -> |       |       |
         */
