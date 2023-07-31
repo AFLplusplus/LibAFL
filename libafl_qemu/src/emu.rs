@@ -8,7 +8,10 @@ use core::{
     ptr::{addr_of, copy_nonoverlapping, null},
 };
 #[cfg(emulation_mode = "systemmode")]
-use std::ffi::CString;
+use std::{
+    ffi::{CStr, CString},
+    ptr::null_mut,
+};
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
@@ -41,21 +44,27 @@ pub enum DeviceSnapshotFilter {
 impl DeviceSnapshotFilter {
     fn enum_id(&self) -> libafl_qemu_sys::device_snapshot_kind_t {
         match self {
-            All => libafl_qemu_sys::DEVICE_SNAPSHOT_ALL,
-            AllowList(_) => libafl_qemu_sys::DEVICE_SNAPSHOT_ALLOWLIST,
-            DenyList(_) => libafl_qemu_sys::DEVICE_SNAPSHOT_DENYLIST,
+            DeviceSnapshotFilter::All => {
+                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_ALL
+            }
+            DeviceSnapshotFilter::AllowList(_) => {
+                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_ALLOWLIST
+            }
+            DeviceSnapshotFilter::DenyList(_) => {
+                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_DENYLIST
+            }
         }
     }
 
-    fn devices(&self, v: &mut Vec<*const u8>) -> *const *const u8 {
+    fn devices(&self, v: &mut Vec<*mut i8>) -> *mut *mut i8 {
         v.clear();
         match self {
-            All => ptr::null(),
-            AllowList(l) | DenyList(l) => {
+            DeviceSnapshotFilter::All => null_mut(),
+            DeviceSnapshotFilter::AllowList(l) | DeviceSnapshotFilter::DenyList(l) => {
                 for name in l {
-                    v.push(name.as_bytes().as_ptr() as *const u8);
+                    v.push(name.as_bytes().as_ptr() as *mut i8);
                 }
-                v.as_ptr()
+                v.as_mut_ptr()
             }
         }
     }
@@ -1176,8 +1185,8 @@ impl Emulator {
         unsafe {
             libafl_qemu_sys::syx_snapshot_create(
                 track,
-                libafl_qemu_sys::DEVICE_SNAPSHOT_ALL,
-                ptr::null(),
+                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_ALL,
+                null_mut(),
             )
         }
     }
@@ -1189,11 +1198,12 @@ impl Emulator {
         track: bool,
         device_filter: &DeviceSnapshotFilter,
     ) -> FastSnapshot {
+        let mut v = vec![];
         unsafe {
             libafl_qemu_sys::syx_snapshot_create(
                 track,
                 device_filter.enum_id(),
-                device_filter.devices(),
+                device_filter.devices(&mut v),
             )
         }
     }
@@ -1201,6 +1211,29 @@ impl Emulator {
     #[cfg(emulation_mode = "systemmode")]
     pub fn restore_fast_snapshot(&self, snapshot: FastSnapshot) {
         unsafe { libafl_qemu_sys::syx_snapshot_root_restore(snapshot) }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    pub fn list_devices(&self) -> Vec<String> {
+        let mut r = vec![];
+        unsafe {
+            let devices = libafl_qemu_sys::device_list_all();
+            if devices.is_null() {
+                return r;
+            }
+
+            let mut ptr = devices;
+            while !(*ptr).is_null() {
+                let c_str: &CStr = CStr::from_ptr(*ptr);
+                let name = c_str.to_str().unwrap().to_string();
+                r.push(name);
+
+                ptr = ptr.add(1);
+            }
+
+            libc::free(devices as *mut c_void);
+            r
+        }
     }
 
     #[cfg(emulation_mode = "usermode")]
