@@ -80,7 +80,7 @@ pub enum MutationResult {
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<I, S> {
+pub trait Mutator<I, S>: Named {
     /// Mutate a given input
     fn mutate(
         &mut self,
@@ -102,7 +102,7 @@ pub trait Mutator<I, S> {
 
 /// A mutator that takes input, and returns a vector of mutated inputs.
 /// Simple as that.
-pub trait MultipleMutator<I, S> {
+pub trait MultiMutator<I, S>: Named {
     /// Mutate a given input
     fn mutate(
         &mut self,
@@ -158,6 +158,9 @@ pub trait MutatorsTuple<I, S>: HasConstLen {
         stage_idx: i32,
         corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error>;
+
+    /// Gets all names of the wrapped [`Mutator`]`s`.
+    fn names(&self) -> Vec<&str>;
 }
 
 impl<I, S> MutatorsTuple<I, S> for () {
@@ -198,11 +201,15 @@ impl<I, S> MutatorsTuple<I, S> for () {
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    fn names(&self) -> Vec<&str> {
+        Vec::new()
+    }
 }
 
 impl<Head, Tail, I, S> MutatorsTuple<I, S> for (Head, Tail)
 where
-    Head: Mutator<I, S> + Named,
+    Head: Mutator<I, S>,
     Tail: MutatorsTuple<I, S>,
 {
     fn mutate_all(
@@ -257,6 +264,12 @@ where
             self.1
                 .get_and_post_exec(index - 1, state, stage_idx, corpus_idx)
         }
+    }
+
+    fn names(&self) -> Vec<&str> {
+        let mut ret = self.1.names();
+        ret.insert(0, self.0.name());
+        ret
     }
 }
 

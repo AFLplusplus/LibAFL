@@ -25,7 +25,7 @@ use crate::{
     bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, UsesInput},
     mutators::{
-        buffer_self_copy, mutations::buffer_copy, MultipleMutator, MutationResult, Mutator, Named,
+        buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
@@ -1090,7 +1090,7 @@ impl AFLppRedQueen {
     }
 }
 
-impl<I, S> MultipleMutator<I, S> for AFLppRedQueen
+impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus,
     I: HasBytesVec + From<Vec<u8>>,
