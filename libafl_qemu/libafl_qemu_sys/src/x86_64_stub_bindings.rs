@@ -1294,6 +1294,11 @@ impl Default for _GSList {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct AddressSpace {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct Clock {
     _unused: [u8; 0],
 }
@@ -1314,32 +1319,22 @@ pub struct CPUJumpCache {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct DumpState {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
 pub struct Error {
     _unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct JSONWriter {
+pub struct MemoryRegion {
     _unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct MemoryMappingList {
+pub struct MemoryRegionSection {
     _unused: [u8; 0],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct QDict {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct QEMUFile {
     _unused: [u8; 0],
 }
 #[repr(C)]
@@ -1355,6 +1350,16 @@ pub struct RAMBlock {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Visitor {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct VMChangeStateEntry {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct VMStateDescription {
     _unused: [u8; 0],
 }
 #[repr(C)]
@@ -1424,7 +1429,6 @@ impl Default for QEnumLookup {
         }
     }
 }
-pub type Int128 = __int128_t;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct QemuMutex {
@@ -1603,7 +1607,6 @@ fn bindgen_test_layout_QemuLockCnt() {
         )
     );
 }
-pub type hwaddr = u64;
 #[repr(C)]
 #[repr(align(4))]
 #[derive(Debug, Default, Copy, Clone)]
@@ -1776,7 +1779,6 @@ impl MemTxAttrs {
         __bindgen_bitfield_unit
     }
 }
-pub type MemTxResult = u32;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct QTailQLink {
@@ -1819,6 +1821,109 @@ fn bindgen_test_layout_QTailQLink() {
     );
 }
 impl Default for QTailQLink {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct Notifier {
+    pub notify: ::std::option::Option<
+        unsafe extern "C" fn(notifier: *mut Notifier, data: *mut ::std::os::raw::c_void),
+    >,
+    pub node: Notifier__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct Notifier__bindgen_ty_1 {
+    pub le_next: *mut Notifier,
+    pub le_prev: *mut *mut Notifier,
+}
+#[test]
+fn bindgen_test_layout_Notifier__bindgen_ty_1() {
+    const UNINIT: ::std::mem::MaybeUninit<Notifier__bindgen_ty_1> =
+        ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<Notifier__bindgen_ty_1>(),
+        16usize,
+        concat!("Size of: ", stringify!(Notifier__bindgen_ty_1))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<Notifier__bindgen_ty_1>(),
+        8usize,
+        concat!("Alignment of ", stringify!(Notifier__bindgen_ty_1))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).le_next) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(Notifier__bindgen_ty_1),
+            "::",
+            stringify!(le_next)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).le_prev) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(Notifier__bindgen_ty_1),
+            "::",
+            stringify!(le_prev)
+        )
+    );
+}
+impl Default for Notifier__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[test]
+fn bindgen_test_layout_Notifier() {
+    const UNINIT: ::std::mem::MaybeUninit<Notifier> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<Notifier>(),
+        24usize,
+        concat!("Size of: ", stringify!(Notifier))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<Notifier>(),
+        8usize,
+        concat!("Alignment of ", stringify!(Notifier))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).notify) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(Notifier),
+            "::",
+            stringify!(notify)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).node) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(Notifier),
+            "::",
+            stringify!(node)
+        )
+    );
+}
+impl Default for Notifier {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {
@@ -4252,46 +4357,6 @@ impl Default for disassemble_info {
 }
 #[doc = " vaddr:\n Type wide enough to contain any #target_ulong virtual address."]
 pub type vaddr = u64;
-pub const device_endian_DEVICE_NATIVE_ENDIAN: device_endian = device_endian(0);
-pub const device_endian_DEVICE_BIG_ENDIAN: device_endian = device_endian(1);
-pub const device_endian_DEVICE_LITTLE_ENDIAN: device_endian = device_endian(2);
-impl ::std::ops::BitOr<device_endian> for device_endian {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, other: Self) -> Self {
-        device_endian(self.0 | other.0)
-    }
-}
-impl ::std::ops::BitOrAssign for device_endian {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: device_endian) {
-        self.0 |= rhs.0;
-    }
-}
-impl ::std::ops::BitAnd<device_endian> for device_endian {
-    type Output = Self;
-    #[inline]
-    fn bitand(self, other: Self) -> Self {
-        device_endian(self.0 & other.0)
-    }
-}
-impl ::std::ops::BitAndAssign for device_endian {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: device_endian) {
-        self.0 &= rhs.0;
-    }
-}
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct device_endian(pub ::std::os::raw::c_uint);
-extern "C" {
-    pub fn cpu_physical_memory_rw(
-        addr: hwaddr,
-        buf: *mut ::std::os::raw::c_void,
-        len: hwaddr,
-        is_write: bool,
-    );
-}
 extern "C" {
     pub fn cpu_memory_rw_debug(
         cpu: *mut CPUState,
@@ -4301,353 +4366,15 @@ extern "C" {
         is_write: bool,
     ) -> ::std::os::raw::c_int;
 }
-pub const GuestPanicInformationType_GUEST_PANIC_INFORMATION_TYPE_HYPER_V:
-    GuestPanicInformationType = GuestPanicInformationType(0);
-pub const GuestPanicInformationType_GUEST_PANIC_INFORMATION_TYPE_S390: GuestPanicInformationType =
-    GuestPanicInformationType(1);
-pub const GuestPanicInformationType_GUEST_PANIC_INFORMATION_TYPE__MAX: GuestPanicInformationType =
-    GuestPanicInformationType(2);
-impl ::std::ops::BitOr<GuestPanicInformationType> for GuestPanicInformationType {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, other: Self) -> Self {
-        GuestPanicInformationType(self.0 | other.0)
-    }
-}
-impl ::std::ops::BitOrAssign for GuestPanicInformationType {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: GuestPanicInformationType) {
-        self.0 |= rhs.0;
-    }
-}
-impl ::std::ops::BitAnd<GuestPanicInformationType> for GuestPanicInformationType {
-    type Output = Self;
-    #[inline]
-    fn bitand(self, other: Self) -> Self {
-        GuestPanicInformationType(self.0 & other.0)
-    }
-}
-impl ::std::ops::BitAndAssign for GuestPanicInformationType {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: GuestPanicInformationType) {
-        self.0 &= rhs.0;
-    }
-}
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct GuestPanicInformationType(pub ::std::os::raw::c_uint);
-pub const S390CrashReason_S390_CRASH_REASON_UNKNOWN: S390CrashReason = S390CrashReason(0);
-pub const S390CrashReason_S390_CRASH_REASON_DISABLED_WAIT: S390CrashReason = S390CrashReason(1);
-pub const S390CrashReason_S390_CRASH_REASON_EXTINT_LOOP: S390CrashReason = S390CrashReason(2);
-pub const S390CrashReason_S390_CRASH_REASON_PGMINT_LOOP: S390CrashReason = S390CrashReason(3);
-pub const S390CrashReason_S390_CRASH_REASON_OPINT_LOOP: S390CrashReason = S390CrashReason(4);
-pub const S390CrashReason_S390_CRASH_REASON__MAX: S390CrashReason = S390CrashReason(5);
-impl ::std::ops::BitOr<S390CrashReason> for S390CrashReason {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, other: Self) -> Self {
-        S390CrashReason(self.0 | other.0)
-    }
-}
-impl ::std::ops::BitOrAssign for S390CrashReason {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: S390CrashReason) {
-        self.0 |= rhs.0;
-    }
-}
-impl ::std::ops::BitAnd<S390CrashReason> for S390CrashReason {
-    type Output = Self;
-    #[inline]
-    fn bitand(self, other: Self) -> Self {
-        S390CrashReason(self.0 & other.0)
-    }
-}
-impl ::std::ops::BitAndAssign for S390CrashReason {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: S390CrashReason) {
-        self.0 &= rhs.0;
-    }
-}
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct S390CrashReason(pub ::std::os::raw::c_uint);
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct GuestPanicInformationHyperV {
-    pub arg1: u64,
-    pub arg2: u64,
-    pub arg3: u64,
-    pub arg4: u64,
-    pub arg5: u64,
-}
-#[test]
-fn bindgen_test_layout_GuestPanicInformationHyperV() {
-    const UNINIT: ::std::mem::MaybeUninit<GuestPanicInformationHyperV> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<GuestPanicInformationHyperV>(),
-        40usize,
-        concat!("Size of: ", stringify!(GuestPanicInformationHyperV))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<GuestPanicInformationHyperV>(),
-        8usize,
-        concat!("Alignment of ", stringify!(GuestPanicInformationHyperV))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).arg1) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformationHyperV),
-            "::",
-            stringify!(arg1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).arg2) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformationHyperV),
-            "::",
-            stringify!(arg2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).arg3) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformationHyperV),
-            "::",
-            stringify!(arg3)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).arg4) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformationHyperV),
-            "::",
-            stringify!(arg4)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).arg5) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformationHyperV),
-            "::",
-            stringify!(arg5)
-        )
-    );
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct GuestPanicInformationS390 {
-    pub core: u32,
-    pub psw_mask: u64,
-    pub psw_addr: u64,
-    pub reason: S390CrashReason,
-}
-#[test]
-fn bindgen_test_layout_GuestPanicInformationS390() {
-    const UNINIT: ::std::mem::MaybeUninit<GuestPanicInformationS390> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<GuestPanicInformationS390>(),
-        32usize,
-        concat!("Size of: ", stringify!(GuestPanicInformationS390))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<GuestPanicInformationS390>(),
-        8usize,
-        concat!("Alignment of ", stringify!(GuestPanicInformationS390))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).core) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformationS390),
-            "::",
-            stringify!(core)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).psw_mask) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformationS390),
-            "::",
-            stringify!(psw_mask)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).psw_addr) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformationS390),
-            "::",
-            stringify!(psw_addr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).reason) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformationS390),
-            "::",
-            stringify!(reason)
-        )
-    );
-}
-impl Default for GuestPanicInformationS390 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct GuestPanicInformation {
-    pub type_: GuestPanicInformationType,
-    pub u: GuestPanicInformation__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union GuestPanicInformation__bindgen_ty_1 {
-    pub hyper_v: GuestPanicInformationHyperV,
-    pub s390: GuestPanicInformationS390,
-}
-#[test]
-fn bindgen_test_layout_GuestPanicInformation__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<GuestPanicInformation__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<GuestPanicInformation__bindgen_ty_1>(),
-        40usize,
-        concat!("Size of: ", stringify!(GuestPanicInformation__bindgen_ty_1))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<GuestPanicInformation__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(GuestPanicInformation__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hyper_v) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformation__bindgen_ty_1),
-            "::",
-            stringify!(hyper_v)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).s390) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformation__bindgen_ty_1),
-            "::",
-            stringify!(s390)
-        )
-    );
-}
-impl Default for GuestPanicInformation__bindgen_ty_1 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for GuestPanicInformation__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "GuestPanicInformation__bindgen_ty_1 {{ union }}")
-    }
-}
-#[test]
-fn bindgen_test_layout_GuestPanicInformation() {
-    const UNINIT: ::std::mem::MaybeUninit<GuestPanicInformation> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<GuestPanicInformation>(),
-        48usize,
-        concat!("Size of: ", stringify!(GuestPanicInformation))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<GuestPanicInformation>(),
-        8usize,
-        concat!("Alignment of ", stringify!(GuestPanicInformation))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).type_) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformation),
-            "::",
-            stringify!(type_)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).u) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(GuestPanicInformation),
-            "::",
-            stringify!(u)
-        )
-    );
-}
-impl Default for GuestPanicInformation {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for GuestPanicInformation {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "GuestPanicInformation {{ type: {:?}, u: {:?} }}",
-            self.type_, self.u
-        )
-    }
-}
-pub type WriteCoreDumpFunction = ::std::option::Option<
-    unsafe extern "C" fn(
-        buf: *const ::std::os::raw::c_void,
-        size: usize,
-        opaque: *mut ::std::os::raw::c_void,
-    ) -> ::std::os::raw::c_int,
->;
+pub type hwaddr = u64;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct TCGCPUOps {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct SysemuCPUOps {
     _unused: [u8; 0],
 }
 #[doc = " CPUClass:\n @class_by_name: Callback to map -cpu command line model name to an\n instantiatable CPU type.\n @parse_features: Callback to parse command line arguments.\n @reset_dump_flags: #CPUDumpFlags to use for reset logging.\n @has_work: Callback for checking if there is work to do.\n @memory_rw_debug: Callback for GDB memory access.\n @dump_state: Callback for dumping state.\n @query_cpu_fast:\n       Fill in target specific information for the \"query-cpus-fast\"\n       QAPI call.\n @get_arch_id: Callback for getting architecture-dependent CPU ID.\n @set_pc: Callback for setting the Program Counter register. This\n       should have the semantics used by the target architecture when\n       setting the PC from a source such as an ELF file entry point;\n       for example on Arm it will also set the Thumb mode bit based\n       on the least significant bit of the new PC value.\n       If the target behaviour here is anything other than \"set\n       the PC register to the value passed in\" then the target must\n       also implement the synchronize_from_tb hook.\n @get_pc: Callback for getting the Program Counter register.\n       As above, with the semantics of the target architecture.\n @gdb_read_register: Callback for letting GDB read a register.\n @gdb_write_register: Callback for letting GDB write a register.\n @gdb_adjust_breakpoint: Callback for adjusting the address of a\n       breakpoint.  Used by AVR to handle a gdb mis-feature with\n       its Harvard architecture split code and data.\n @gdb_num_core_regs: Number of core registers accessible to GDB.\n @gdb_core_xml_file: File name for core registers GDB XML description.\n @gdb_stop_before_watchpoint: Indicates whether GDB expects the CPU to stop\n           before the insn which triggers a watchpoint rather than after it.\n @gdb_arch_name: Optional callback that returns the architecture name known\n to GDB. The caller must free the returned string with g_free.\n @gdb_get_dynamic_xml: Callback to return dynamically generated XML for the\n   gdb stub. Returns a pointer to the XML contents for the specified XML file\n   or NULL if the CPU doesn't have a dynamically generated content for it.\n @disas_set_info: Setup architecture specific components of disassembly info\n @adjust_watchpoint_address: Perform a target-specific adjustment to an\n address before attempting to match it against watchpoints.\n @deprecation_note: If this CPUClass is deprecated, this field provides\n                    related information.\n\n Represents a CPU family or model."]
@@ -6446,19 +6173,87 @@ impl ::std::fmt::Debug for CPUState {
     }
 }
 extern "C" {
-    #[doc = " cpu_get_phys_page_attrs_debug:\n @cpu: The CPU to obtain the physical page address for.\n @addr: The virtual address.\n @attrs: Updated on return with the memory transaction attributes to use\n         for this access.\n\n Obtains the physical page corresponding to a virtual one, together\n with the corresponding memory transaction attributes to use for the access.\n Use it only for debugging because no protection checks are done.\n\n Returns: Corresponding physical page address or -1 if no page found."]
-    pub fn cpu_get_phys_page_attrs_debug(
-        cpu: *mut CPUState,
-        addr: vaddr,
-        attrs: *mut MemTxAttrs,
-    ) -> hwaddr;
-}
-extern "C" {
     #[doc = " cpu_reset:\n @cpu: The CPU whose state is to be reset."]
     pub fn cpu_reset(cpu: *mut CPUState);
 }
-pub type target_long = i32;
-pub type target_ulong = u32;
+pub type target_long = i64;
+pub type target_ulong = u64;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct CPUTLB {}
+#[test]
+fn bindgen_test_layout_CPUTLB() {
+    assert_eq!(
+        ::std::mem::size_of::<CPUTLB>(),
+        0usize,
+        concat!("Size of: ", stringify!(CPUTLB))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<CPUTLB>(),
+        1usize,
+        concat!("Alignment of ", stringify!(CPUTLB))
+    );
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct CPUNegativeOffsetState {
+    pub tlb: CPUTLB,
+    pub icount_decr: IcountDecr,
+}
+#[test]
+fn bindgen_test_layout_CPUNegativeOffsetState() {
+    const UNINIT: ::std::mem::MaybeUninit<CPUNegativeOffsetState> =
+        ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<CPUNegativeOffsetState>(),
+        4usize,
+        concat!("Size of: ", stringify!(CPUNegativeOffsetState))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<CPUNegativeOffsetState>(),
+        4usize,
+        concat!("Alignment of ", stringify!(CPUNegativeOffsetState))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tlb) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUNegativeOffsetState),
+            "::",
+            stringify!(tlb)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).icount_decr) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUNegativeOffsetState),
+            "::",
+            stringify!(icount_decr)
+        )
+    );
+}
+impl Default for CPUNegativeOffsetState {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ::std::fmt::Debug for CPUNegativeOffsetState {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(
+            f,
+            "CPUNegativeOffsetState {{ tlb: {:?}, icount_decr: {:?} }}",
+            self.tlb, self.icount_decr
+        )
+    }
+}
 #[doc = " Property:\n @set_default: true if the default value should be set from @defval,\n    in which case @info->set_default_value must not be NULL\n    (if false then no default value is set by the property system\n     and the field retains whatever value it was given by instance_init).\n @defval: default value for the property. This is used only if @set_default\n     is true."]
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -6822,3254 +6617,84 @@ impl Default for PropertyInfo {
         }
     }
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct VMStateInfo {
-    pub name: *const ::std::os::raw::c_char,
-    pub get: ::std::option::Option<
-        unsafe extern "C" fn(
-            f: *mut QEMUFile,
-            pv: *mut ::std::os::raw::c_void,
-            size: usize,
-            field: *const VMStateField,
-        ) -> ::std::os::raw::c_int,
-    >,
-    pub put: ::std::option::Option<
-        unsafe extern "C" fn(
-            f: *mut QEMUFile,
-            pv: *mut ::std::os::raw::c_void,
-            size: usize,
-            field: *const VMStateField,
-            vmdesc: *mut JSONWriter,
-        ) -> ::std::os::raw::c_int,
-    >,
-}
-#[test]
-fn bindgen_test_layout_VMStateInfo() {
-    const UNINIT: ::std::mem::MaybeUninit<VMStateInfo> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<VMStateInfo>(),
-        24usize,
-        concat!("Size of: ", stringify!(VMStateInfo))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<VMStateInfo>(),
-        8usize,
-        concat!("Alignment of ", stringify!(VMStateInfo))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateInfo),
-            "::",
-            stringify!(name)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).get) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateInfo),
-            "::",
-            stringify!(get)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).put) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateInfo),
-            "::",
-            stringify!(put)
-        )
-    );
-}
-impl Default for VMStateInfo {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-pub const VMStateFlags_VMS_SINGLE: VMStateFlags = VMStateFlags(1);
-pub const VMStateFlags_VMS_POINTER: VMStateFlags = VMStateFlags(2);
-pub const VMStateFlags_VMS_ARRAY: VMStateFlags = VMStateFlags(4);
-pub const VMStateFlags_VMS_STRUCT: VMStateFlags = VMStateFlags(8);
-pub const VMStateFlags_VMS_VARRAY_INT32: VMStateFlags = VMStateFlags(16);
-pub const VMStateFlags_VMS_BUFFER: VMStateFlags = VMStateFlags(32);
-pub const VMStateFlags_VMS_ARRAY_OF_POINTER: VMStateFlags = VMStateFlags(64);
-pub const VMStateFlags_VMS_VARRAY_UINT16: VMStateFlags = VMStateFlags(128);
-pub const VMStateFlags_VMS_VBUFFER: VMStateFlags = VMStateFlags(256);
-pub const VMStateFlags_VMS_MULTIPLY: VMStateFlags = VMStateFlags(512);
-pub const VMStateFlags_VMS_VARRAY_UINT8: VMStateFlags = VMStateFlags(1024);
-pub const VMStateFlags_VMS_VARRAY_UINT32: VMStateFlags = VMStateFlags(2048);
-pub const VMStateFlags_VMS_MUST_EXIST: VMStateFlags = VMStateFlags(4096);
-pub const VMStateFlags_VMS_ALLOC: VMStateFlags = VMStateFlags(8192);
-pub const VMStateFlags_VMS_MULTIPLY_ELEMENTS: VMStateFlags = VMStateFlags(16384);
-pub const VMStateFlags_VMS_VSTRUCT: VMStateFlags = VMStateFlags(32768);
-pub const VMStateFlags_VMS_END: VMStateFlags = VMStateFlags(65536);
-impl ::std::ops::BitOr<VMStateFlags> for VMStateFlags {
+#[doc = " X86CPU:\n @env: #CPUX86State\n @migratable: If set, only migratable flags will be accepted when \"enforce\"\n mode is used, and only migratable flags will be included in the \"host\"\n CPU model.\n\n An x86 CPU."]
+pub type X86CPU = ArchCPU;
+pub const OnOffAuto_ON_OFF_AUTO_AUTO: OnOffAuto = OnOffAuto(0);
+pub const OnOffAuto_ON_OFF_AUTO_ON: OnOffAuto = OnOffAuto(1);
+pub const OnOffAuto_ON_OFF_AUTO_OFF: OnOffAuto = OnOffAuto(2);
+pub const OnOffAuto_ON_OFF_AUTO__MAX: OnOffAuto = OnOffAuto(3);
+impl ::std::ops::BitOr<OnOffAuto> for OnOffAuto {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
-        VMStateFlags(self.0 | other.0)
+        OnOffAuto(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for VMStateFlags {
+impl ::std::ops::BitOrAssign for OnOffAuto {
     #[inline]
-    fn bitor_assign(&mut self, rhs: VMStateFlags) {
+    fn bitor_assign(&mut self, rhs: OnOffAuto) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<VMStateFlags> for VMStateFlags {
+impl ::std::ops::BitAnd<OnOffAuto> for OnOffAuto {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
-        VMStateFlags(self.0 & other.0)
+        OnOffAuto(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for VMStateFlags {
+impl ::std::ops::BitAndAssign for OnOffAuto {
     #[inline]
-    fn bitand_assign(&mut self, rhs: VMStateFlags) {
+    fn bitand_assign(&mut self, rhs: OnOffAuto) {
         self.0 &= rhs.0;
     }
 }
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct VMStateFlags(pub ::std::os::raw::c_uint);
-pub const MigrationPriority_MIG_PRI_DEFAULT: MigrationPriority = MigrationPriority(0);
-pub const MigrationPriority_MIG_PRI_IOMMU: MigrationPriority = MigrationPriority(1);
-pub const MigrationPriority_MIG_PRI_PCI_BUS: MigrationPriority = MigrationPriority(2);
-pub const MigrationPriority_MIG_PRI_VIRTIO_MEM: MigrationPriority = MigrationPriority(3);
-pub const MigrationPriority_MIG_PRI_GICV3_ITS: MigrationPriority = MigrationPriority(4);
-pub const MigrationPriority_MIG_PRI_GICV3: MigrationPriority = MigrationPriority(5);
-pub const MigrationPriority_MIG_PRI_MAX: MigrationPriority = MigrationPriority(6);
-impl ::std::ops::BitOr<MigrationPriority> for MigrationPriority {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, other: Self) -> Self {
-        MigrationPriority(self.0 | other.0)
-    }
-}
-impl ::std::ops::BitOrAssign for MigrationPriority {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: MigrationPriority) {
-        self.0 |= rhs.0;
-    }
-}
-impl ::std::ops::BitAnd<MigrationPriority> for MigrationPriority {
-    type Output = Self;
-    #[inline]
-    fn bitand(self, other: Self) -> Self {
-        MigrationPriority(self.0 & other.0)
-    }
-}
-impl ::std::ops::BitAndAssign for MigrationPriority {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: MigrationPriority) {
-        self.0 &= rhs.0;
-    }
-}
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct MigrationPriority(pub ::std::os::raw::c_uint);
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct VMStateField {
-    pub name: *const ::std::os::raw::c_char,
-    pub err_hint: *const ::std::os::raw::c_char,
-    pub offset: usize,
-    pub size: usize,
-    pub start: usize,
-    pub num: ::std::os::raw::c_int,
-    pub num_offset: usize,
-    pub size_offset: usize,
-    pub info: *const VMStateInfo,
-    pub flags: VMStateFlags,
-    pub vmsd: *const VMStateDescription,
-    pub version_id: ::std::os::raw::c_int,
-    pub struct_version_id: ::std::os::raw::c_int,
-    pub field_exists: ::std::option::Option<
-        unsafe extern "C" fn(
-            opaque: *mut ::std::os::raw::c_void,
-            version_id: ::std::os::raw::c_int,
-        ) -> bool,
-    >,
-}
-#[test]
-fn bindgen_test_layout_VMStateField() {
-    const UNINIT: ::std::mem::MaybeUninit<VMStateField> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<VMStateField>(),
-        104usize,
-        concat!("Size of: ", stringify!(VMStateField))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<VMStateField>(),
-        8usize,
-        concat!("Alignment of ", stringify!(VMStateField))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(name)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).err_hint) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(err_hint)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).offset) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(offset)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).size) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(size)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).start) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(start)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).num) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(num)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).num_offset) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(num_offset)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).size_offset) as usize - ptr as usize },
-        56usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(size_offset)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).info) as usize - ptr as usize },
-        64usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(info)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
-        72usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(flags)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vmsd) as usize - ptr as usize },
-        80usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(vmsd)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).version_id) as usize - ptr as usize },
-        88usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(version_id)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).struct_version_id) as usize - ptr as usize },
-        92usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(struct_version_id)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).field_exists) as usize - ptr as usize },
-        96usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateField),
-            "::",
-            stringify!(field_exists)
-        )
-    );
-}
-impl Default for VMStateField {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct VMStateDescription {
-    pub name: *const ::std::os::raw::c_char,
-    pub unmigratable: bool,
-    pub early_setup: bool,
-    pub version_id: ::std::os::raw::c_int,
-    pub minimum_version_id: ::std::os::raw::c_int,
-    pub priority: MigrationPriority,
-    pub pre_load: ::std::option::Option<
-        unsafe extern "C" fn(opaque: *mut ::std::os::raw::c_void) -> ::std::os::raw::c_int,
-    >,
-    pub post_load: ::std::option::Option<
-        unsafe extern "C" fn(
-            opaque: *mut ::std::os::raw::c_void,
-            version_id: ::std::os::raw::c_int,
-        ) -> ::std::os::raw::c_int,
-    >,
-    pub pre_save: ::std::option::Option<
-        unsafe extern "C" fn(opaque: *mut ::std::os::raw::c_void) -> ::std::os::raw::c_int,
-    >,
-    pub post_save: ::std::option::Option<
-        unsafe extern "C" fn(opaque: *mut ::std::os::raw::c_void) -> ::std::os::raw::c_int,
-    >,
-    pub needed:
-        ::std::option::Option<unsafe extern "C" fn(opaque: *mut ::std::os::raw::c_void) -> bool>,
-    pub dev_unplug_pending:
-        ::std::option::Option<unsafe extern "C" fn(opaque: *mut ::std::os::raw::c_void) -> bool>,
-    pub fields: *const VMStateField,
-    pub subsections: *mut *const VMStateDescription,
-}
-#[test]
-fn bindgen_test_layout_VMStateDescription() {
-    const UNINIT: ::std::mem::MaybeUninit<VMStateDescription> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<VMStateDescription>(),
-        88usize,
-        concat!("Size of: ", stringify!(VMStateDescription))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<VMStateDescription>(),
-        8usize,
-        concat!("Alignment of ", stringify!(VMStateDescription))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(name)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).unmigratable) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(unmigratable)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).early_setup) as usize - ptr as usize },
-        9usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(early_setup)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).version_id) as usize - ptr as usize },
-        12usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(version_id)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).minimum_version_id) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(minimum_version_id)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).priority) as usize - ptr as usize },
-        20usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(priority)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pre_load) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(pre_load)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).post_load) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(post_load)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pre_save) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(pre_save)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).post_save) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(post_save)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).needed) as usize - ptr as usize },
-        56usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(needed)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dev_unplug_pending) as usize - ptr as usize },
-        64usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(dev_unplug_pending)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fields) as usize - ptr as usize },
-        72usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(fields)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).subsections) as usize - ptr as usize },
-        80usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(VMStateDescription),
-            "::",
-            stringify!(subsections)
-        )
-    );
-}
-impl Default for VMStateDescription {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
+pub struct OnOffAuto(pub ::std::os::raw::c_uint);
+pub type float16 = u16;
+pub type float32 = u32;
+pub type float64 = u64;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-pub struct EventNotifier {
-    pub rfd: ::std::os::raw::c_int,
-    pub wfd: ::std::os::raw::c_int,
-    pub initialized: bool,
+pub struct floatx80 {
+    pub low: u64,
+    pub high: u16,
 }
 #[test]
-fn bindgen_test_layout_EventNotifier() {
-    const UNINIT: ::std::mem::MaybeUninit<EventNotifier> = ::std::mem::MaybeUninit::uninit();
+fn bindgen_test_layout_floatx80() {
+    const UNINIT: ::std::mem::MaybeUninit<floatx80> = ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
-        ::std::mem::size_of::<EventNotifier>(),
-        12usize,
-        concat!("Size of: ", stringify!(EventNotifier))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<EventNotifier>(),
-        4usize,
-        concat!("Alignment of ", stringify!(EventNotifier))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rfd) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(EventNotifier),
-            "::",
-            stringify!(rfd)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).wfd) as usize - ptr as usize },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(EventNotifier),
-            "::",
-            stringify!(wfd)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).initialized) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(EventNotifier),
-            "::",
-            stringify!(initialized)
-        )
-    );
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct SysemuCPUOps {
-    #[doc = " @get_memory_mapping: Callback for obtaining the memory mappings."]
-    pub get_memory_mapping: ::std::option::Option<
-        unsafe extern "C" fn(
-            cpu: *mut CPUState,
-            list: *mut MemoryMappingList,
-            errp: *mut *mut Error,
-        ),
-    >,
-    #[doc = " @get_paging_enabled: Callback for inquiring whether paging is enabled."]
-    pub get_paging_enabled:
-        ::std::option::Option<unsafe extern "C" fn(cpu: *const CPUState) -> bool>,
-    #[doc = " @get_phys_page_debug: Callback for obtaining a physical address."]
-    pub get_phys_page_debug:
-        ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState, addr: vaddr) -> hwaddr>,
-    #[doc = " @get_phys_page_attrs_debug: Callback for obtaining a physical address\n       and the associated memory transaction attributes to use for the\n       access.\n CPUs which use memory transaction attributes should implement this\n instead of get_phys_page_debug."]
-    pub get_phys_page_attrs_debug: ::std::option::Option<
-        unsafe extern "C" fn(cpu: *mut CPUState, addr: vaddr, attrs: *mut MemTxAttrs) -> hwaddr,
-    >,
-    #[doc = " @asidx_from_attrs: Callback to return the CPU AddressSpace to use for\n       a memory access with the specified memory transaction attributes."]
-    pub asidx_from_attrs: ::std::option::Option<
-        unsafe extern "C" fn(cpu: *mut CPUState, attrs: MemTxAttrs) -> ::std::os::raw::c_int,
-    >,
-    #[doc = " @get_crash_info: Callback for reporting guest crash information in\n GUEST_PANICKED events."]
-    pub get_crash_info: ::std::option::Option<
-        unsafe extern "C" fn(cpu: *mut CPUState) -> *mut GuestPanicInformation,
-    >,
-    #[doc = " @write_elf32_note: Callback for writing a CPU-specific ELF note to a\n 32-bit VM coredump."]
-    pub write_elf32_note: ::std::option::Option<
-        unsafe extern "C" fn(
-            f: WriteCoreDumpFunction,
-            cpu: *mut CPUState,
-            cpuid: ::std::os::raw::c_int,
-            s: *mut DumpState,
-        ) -> ::std::os::raw::c_int,
-    >,
-    #[doc = " @write_elf64_note: Callback for writing a CPU-specific ELF note to a\n 64-bit VM coredump."]
-    pub write_elf64_note: ::std::option::Option<
-        unsafe extern "C" fn(
-            f: WriteCoreDumpFunction,
-            cpu: *mut CPUState,
-            cpuid: ::std::os::raw::c_int,
-            s: *mut DumpState,
-        ) -> ::std::os::raw::c_int,
-    >,
-    #[doc = " @write_elf32_qemunote: Callback for writing a CPU- and QEMU-specific ELF\n note to a 32-bit VM coredump."]
-    pub write_elf32_qemunote: ::std::option::Option<
-        unsafe extern "C" fn(
-            f: WriteCoreDumpFunction,
-            cpu: *mut CPUState,
-            s: *mut DumpState,
-        ) -> ::std::os::raw::c_int,
-    >,
-    #[doc = " @write_elf64_qemunote: Callback for writing a CPU- and QEMU-specific ELF\n note to a 64-bit VM coredump."]
-    pub write_elf64_qemunote: ::std::option::Option<
-        unsafe extern "C" fn(
-            f: WriteCoreDumpFunction,
-            cpu: *mut CPUState,
-            s: *mut DumpState,
-        ) -> ::std::os::raw::c_int,
-    >,
-    #[doc = " @virtio_is_big_endian: Callback to return %true if a CPU which supports\n runtime configurable endianness is currently big-endian.\n Non-configurable CPUs can use the default implementation of this method.\n This method should not be used by any callers other than the pre-1.0\n virtio devices."]
-    pub virtio_is_big_endian:
-        ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> bool>,
-    #[doc = " @legacy_vmsd: Legacy state for migration.\n               Do not use in new targets, use #DeviceClass::vmsd instead."]
-    pub legacy_vmsd: *const VMStateDescription,
-}
-#[test]
-fn bindgen_test_layout_SysemuCPUOps() {
-    const UNINIT: ::std::mem::MaybeUninit<SysemuCPUOps> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<SysemuCPUOps>(),
-        96usize,
-        concat!("Size of: ", stringify!(SysemuCPUOps))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<SysemuCPUOps>(),
-        8usize,
-        concat!("Alignment of ", stringify!(SysemuCPUOps))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).get_memory_mapping) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(get_memory_mapping)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).get_paging_enabled) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(get_paging_enabled)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).get_phys_page_debug) as usize - ptr as usize },
+        ::std::mem::size_of::<floatx80>(),
         16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(get_phys_page_debug)
-        )
+        concat!("Size of: ", stringify!(floatx80))
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).get_phys_page_attrs_debug) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(get_phys_page_attrs_debug)
-        )
+        ::std::mem::align_of::<floatx80>(),
+        8usize,
+        concat!("Alignment of ", stringify!(floatx80))
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).asidx_from_attrs) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(asidx_from_attrs)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).get_crash_info) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(get_crash_info)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).write_elf32_note) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(write_elf32_note)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).write_elf64_note) as usize - ptr as usize },
-        56usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(write_elf64_note)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).write_elf32_qemunote) as usize - ptr as usize },
-        64usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(write_elf32_qemunote)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).write_elf64_qemunote) as usize - ptr as usize },
-        72usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(write_elf64_qemunote)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).virtio_is_big_endian) as usize - ptr as usize },
-        80usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(virtio_is_big_endian)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).legacy_vmsd) as usize - ptr as usize },
-        88usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(SysemuCPUOps),
-            "::",
-            stringify!(legacy_vmsd)
-        )
-    );
-}
-impl Default for SysemuCPUOps {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-pub const MemOp_MO_8: MemOp = MemOp(0);
-pub const MemOp_MO_16: MemOp = MemOp(1);
-pub const MemOp_MO_32: MemOp = MemOp(2);
-pub const MemOp_MO_64: MemOp = MemOp(3);
-pub const MemOp_MO_128: MemOp = MemOp(4);
-pub const MemOp_MO_256: MemOp = MemOp(5);
-pub const MemOp_MO_512: MemOp = MemOp(6);
-pub const MemOp_MO_1024: MemOp = MemOp(7);
-pub const MemOp_MO_SIZE: MemOp = MemOp(7);
-pub const MemOp_MO_SIGN: MemOp = MemOp(8);
-pub const MemOp_MO_BSWAP: MemOp = MemOp(16);
-pub const MemOp_MO_LE: MemOp = MemOp(0);
-pub const MemOp_MO_BE: MemOp = MemOp(16);
-pub const MemOp_MO_TE: MemOp = MemOp(0);
-pub const MemOp_MO_ASHIFT: MemOp = MemOp(5);
-pub const MemOp_MO_AMASK: MemOp = MemOp(224);
-pub const MemOp_MO_UNALN: MemOp = MemOp(0);
-pub const MemOp_MO_ALIGN_2: MemOp = MemOp(32);
-pub const MemOp_MO_ALIGN_4: MemOp = MemOp(64);
-pub const MemOp_MO_ALIGN_8: MemOp = MemOp(96);
-pub const MemOp_MO_ALIGN_16: MemOp = MemOp(128);
-pub const MemOp_MO_ALIGN_32: MemOp = MemOp(160);
-pub const MemOp_MO_ALIGN_64: MemOp = MemOp(192);
-pub const MemOp_MO_ALIGN: MemOp = MemOp(224);
-pub const MemOp_MO_ATOM_SHIFT: MemOp = MemOp(8);
-pub const MemOp_MO_ATOM_IFALIGN: MemOp = MemOp(0);
-pub const MemOp_MO_ATOM_IFALIGN_PAIR: MemOp = MemOp(256);
-pub const MemOp_MO_ATOM_WITHIN16: MemOp = MemOp(512);
-pub const MemOp_MO_ATOM_WITHIN16_PAIR: MemOp = MemOp(768);
-pub const MemOp_MO_ATOM_SUBALIGN: MemOp = MemOp(1024);
-pub const MemOp_MO_ATOM_NONE: MemOp = MemOp(1280);
-pub const MemOp_MO_ATOM_MASK: MemOp = MemOp(1792);
-pub const MemOp_MO_UB: MemOp = MemOp(0);
-pub const MemOp_MO_UW: MemOp = MemOp(1);
-pub const MemOp_MO_UL: MemOp = MemOp(2);
-pub const MemOp_MO_UQ: MemOp = MemOp(3);
-pub const MemOp_MO_UO: MemOp = MemOp(4);
-pub const MemOp_MO_SB: MemOp = MemOp(8);
-pub const MemOp_MO_SW: MemOp = MemOp(9);
-pub const MemOp_MO_SL: MemOp = MemOp(10);
-pub const MemOp_MO_SQ: MemOp = MemOp(11);
-pub const MemOp_MO_SO: MemOp = MemOp(12);
-pub const MemOp_MO_LEUW: MemOp = MemOp(1);
-pub const MemOp_MO_LEUL: MemOp = MemOp(2);
-pub const MemOp_MO_LEUQ: MemOp = MemOp(3);
-pub const MemOp_MO_LESW: MemOp = MemOp(9);
-pub const MemOp_MO_LESL: MemOp = MemOp(10);
-pub const MemOp_MO_LESQ: MemOp = MemOp(11);
-pub const MemOp_MO_BEUW: MemOp = MemOp(17);
-pub const MemOp_MO_BEUL: MemOp = MemOp(18);
-pub const MemOp_MO_BEUQ: MemOp = MemOp(19);
-pub const MemOp_MO_BESW: MemOp = MemOp(25);
-pub const MemOp_MO_BESL: MemOp = MemOp(26);
-pub const MemOp_MO_BESQ: MemOp = MemOp(27);
-pub const MemOp_MO_TEUW: MemOp = MemOp(1);
-pub const MemOp_MO_TEUL: MemOp = MemOp(2);
-pub const MemOp_MO_TEUQ: MemOp = MemOp(3);
-pub const MemOp_MO_TEUO: MemOp = MemOp(4);
-pub const MemOp_MO_TESW: MemOp = MemOp(9);
-pub const MemOp_MO_TESL: MemOp = MemOp(10);
-pub const MemOp_MO_TESQ: MemOp = MemOp(11);
-pub const MemOp_MO_SSIZE: MemOp = MemOp(15);
-impl ::std::ops::BitOr<MemOp> for MemOp {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, other: Self) -> Self {
-        MemOp(self.0 | other.0)
-    }
-}
-impl ::std::ops::BitOrAssign for MemOp {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: MemOp) {
-        self.0 |= rhs.0;
-    }
-}
-impl ::std::ops::BitAnd<MemOp> for MemOp {
-    type Output = Self;
-    #[inline]
-    fn bitand(self, other: Self) -> Self {
-        MemOp(self.0 & other.0)
-    }
-}
-impl ::std::ops::BitAndAssign for MemOp {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: MemOp) {
-        self.0 &= rhs.0;
-    }
-}
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct MemOp(pub ::std::os::raw::c_uint);
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct RamDiscardManager {
-    _unused: [u8; 0],
-}
-#[doc = " struct MemoryRegionSection: describes a fragment of a #MemoryRegion\n\n @mr: the region, or %NULL if empty\n @fv: the flat view of the address space the region is mapped in\n @offset_within_region: the beginning of the section, relative to @mr's start\n @size: the size of the section; will not exceed @mr's boundaries\n @offset_within_address_space: the address of the first byte of the section\n     relative to the region's address space\n @readonly: writes to this section are ignored\n @nonvolatile: this section is non-volatile"]
-#[repr(C)]
-#[repr(align(16))]
-#[derive(Debug, Copy, Clone)]
-pub struct MemoryRegionSection {
-    pub size: Int128,
-    pub mr: *mut MemoryRegion,
-    pub fv: *mut FlatView,
-    pub offset_within_region: hwaddr,
-    pub offset_within_address_space: hwaddr,
-    pub readonly: bool,
-    pub nonvolatile: bool,
-}
-#[test]
-fn bindgen_test_layout_MemoryRegionSection() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryRegionSection> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryRegionSection>(),
-        64usize,
-        concat!("Size of: ", stringify!(MemoryRegionSection))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryRegionSection>(),
-        16usize,
-        concat!("Alignment of ", stringify!(MemoryRegionSection))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).size) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).low) as usize - ptr as usize },
         0usize,
         concat!(
             "Offset of field: ",
-            stringify!(MemoryRegionSection),
+            stringify!(floatx80),
             "::",
-            stringify!(size)
+            stringify!(low)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mr) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionSection),
-            "::",
-            stringify!(mr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fv) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionSection),
-            "::",
-            stringify!(fv)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).offset_within_region) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionSection),
-            "::",
-            stringify!(offset_within_region)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).offset_within_address_space) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionSection),
-            "::",
-            stringify!(offset_within_address_space)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).readonly) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionSection),
-            "::",
-            stringify!(readonly)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).nonvolatile) as usize - ptr as usize },
-        49usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionSection),
-            "::",
-            stringify!(nonvolatile)
-        )
-    );
-}
-impl Default for MemoryRegionSection {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct MemoryRegionOps {
-    pub read: ::std::option::Option<
-        unsafe extern "C" fn(
-            opaque: *mut ::std::os::raw::c_void,
-            addr: hwaddr,
-            size: ::std::os::raw::c_uint,
-        ) -> u64,
-    >,
-    pub write: ::std::option::Option<
-        unsafe extern "C" fn(
-            opaque: *mut ::std::os::raw::c_void,
-            addr: hwaddr,
-            data: u64,
-            size: ::std::os::raw::c_uint,
-        ),
-    >,
-    pub read_with_attrs: ::std::option::Option<
-        unsafe extern "C" fn(
-            opaque: *mut ::std::os::raw::c_void,
-            addr: hwaddr,
-            data: *mut u64,
-            size: ::std::os::raw::c_uint,
-            attrs: MemTxAttrs,
-        ) -> MemTxResult,
-    >,
-    pub write_with_attrs: ::std::option::Option<
-        unsafe extern "C" fn(
-            opaque: *mut ::std::os::raw::c_void,
-            addr: hwaddr,
-            data: u64,
-            size: ::std::os::raw::c_uint,
-            attrs: MemTxAttrs,
-        ) -> MemTxResult,
-    >,
-    pub endianness: device_endian,
-    pub valid: MemoryRegionOps__bindgen_ty_1,
-    pub impl_: MemoryRegionOps__bindgen_ty_2,
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct MemoryRegionOps__bindgen_ty_1 {
-    pub min_access_size: ::std::os::raw::c_uint,
-    pub max_access_size: ::std::os::raw::c_uint,
-    pub unaligned: bool,
-    pub accepts: ::std::option::Option<
-        unsafe extern "C" fn(
-            opaque: *mut ::std::os::raw::c_void,
-            addr: hwaddr,
-            size: ::std::os::raw::c_uint,
-            is_write: bool,
-            attrs: MemTxAttrs,
-        ) -> bool,
-    >,
-}
-#[test]
-fn bindgen_test_layout_MemoryRegionOps__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryRegionOps__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryRegionOps__bindgen_ty_1>(),
-        24usize,
-        concat!("Size of: ", stringify!(MemoryRegionOps__bindgen_ty_1))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryRegionOps__bindgen_ty_1>(),
-        8usize,
-        concat!("Alignment of ", stringify!(MemoryRegionOps__bindgen_ty_1))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).min_access_size) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps__bindgen_ty_1),
-            "::",
-            stringify!(min_access_size)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).max_access_size) as usize - ptr as usize },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps__bindgen_ty_1),
-            "::",
-            stringify!(max_access_size)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).unaligned) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).high) as usize - ptr as usize },
         8usize,
         concat!(
             "Offset of field: ",
-            stringify!(MemoryRegionOps__bindgen_ty_1),
+            stringify!(floatx80),
             "::",
-            stringify!(unaligned)
+            stringify!(high)
         )
     );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).accepts) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps__bindgen_ty_1),
-            "::",
-            stringify!(accepts)
-        )
-    );
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct MemoryRegionOps__bindgen_ty_2 {
-    pub min_access_size: ::std::os::raw::c_uint,
-    pub max_access_size: ::std::os::raw::c_uint,
-    pub unaligned: bool,
-}
-#[test]
-fn bindgen_test_layout_MemoryRegionOps__bindgen_ty_2() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryRegionOps__bindgen_ty_2> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryRegionOps__bindgen_ty_2>(),
-        12usize,
-        concat!("Size of: ", stringify!(MemoryRegionOps__bindgen_ty_2))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryRegionOps__bindgen_ty_2>(),
-        4usize,
-        concat!("Alignment of ", stringify!(MemoryRegionOps__bindgen_ty_2))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).min_access_size) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps__bindgen_ty_2),
-            "::",
-            stringify!(min_access_size)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).max_access_size) as usize - ptr as usize },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps__bindgen_ty_2),
-            "::",
-            stringify!(max_access_size)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).unaligned) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps__bindgen_ty_2),
-            "::",
-            stringify!(unaligned)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_MemoryRegionOps() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryRegionOps> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryRegionOps>(),
-        80usize,
-        concat!("Size of: ", stringify!(MemoryRegionOps))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryRegionOps>(),
-        8usize,
-        concat!("Alignment of ", stringify!(MemoryRegionOps))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).read) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps),
-            "::",
-            stringify!(read)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).write) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps),
-            "::",
-            stringify!(write)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).read_with_attrs) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps),
-            "::",
-            stringify!(read_with_attrs)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).write_with_attrs) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps),
-            "::",
-            stringify!(write_with_attrs)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).endianness) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps),
-            "::",
-            stringify!(endianness)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).valid) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps),
-            "::",
-            stringify!(valid)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).impl_) as usize - ptr as usize },
-        64usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegionOps),
-            "::",
-            stringify!(impl_)
-        )
-    );
-}
-impl Default for MemoryRegionOps {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct CoalescedMemoryRange {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct MemoryRegionIoeventfd {
-    _unused: [u8; 0],
-}
-#[doc = " MemoryRegion:\n\n A struct representing a memory region."]
-#[repr(C)]
-#[repr(align(16))]
-#[derive(Copy, Clone)]
-pub struct MemoryRegion {
-    pub parent_obj: Object,
-    pub romd_mode: bool,
-    pub ram: bool,
-    pub subpage: bool,
-    pub readonly: bool,
-    pub nonvolatile: bool,
-    pub rom_device: bool,
-    pub flush_coalesced_mmio: bool,
-    pub dirty_log_mask: u8,
-    pub is_iommu: bool,
-    pub ram_block: *mut RAMBlock,
-    pub owner: *mut Object,
-    pub dev: *mut DeviceState,
-    pub ops: *const MemoryRegionOps,
-    pub opaque: *mut ::std::os::raw::c_void,
-    pub container: *mut MemoryRegion,
-    pub mapped_via_alias: ::std::os::raw::c_int,
-    pub __bindgen_padding_0: [u64; 0usize],
-    pub size: Int128,
-    pub addr: hwaddr,
-    pub destructor: ::std::option::Option<unsafe extern "C" fn(mr: *mut MemoryRegion)>,
-    pub align: u64,
-    pub terminates: bool,
-    pub ram_device: bool,
-    pub enabled: bool,
-    pub warning_printed: bool,
-    pub vga_logging_count: u8,
-    pub alias: *mut MemoryRegion,
-    pub alias_offset: hwaddr,
-    pub priority: i32,
-    pub subregions: MemoryRegion__bindgen_ty_1,
-    pub subregions_link: MemoryRegion__bindgen_ty_2,
-    pub coalesced: MemoryRegion__bindgen_ty_3,
-    pub name: *const ::std::os::raw::c_char,
-    pub ioeventfd_nb: ::std::os::raw::c_uint,
-    pub ioeventfds: *mut MemoryRegionIoeventfd,
-    pub rdm: *mut RamDiscardManager,
-    pub disable_reentrancy_guard: bool,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union MemoryRegion__bindgen_ty_1 {
-    pub tqh_first: *mut MemoryRegion,
-    pub tqh_circ: QTailQLink,
-}
-#[test]
-fn bindgen_test_layout_MemoryRegion__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryRegion__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryRegion__bindgen_ty_1>(),
-        16usize,
-        concat!("Size of: ", stringify!(MemoryRegion__bindgen_ty_1))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryRegion__bindgen_ty_1>(),
-        8usize,
-        concat!("Alignment of ", stringify!(MemoryRegion__bindgen_ty_1))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqh_first) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion__bindgen_ty_1),
-            "::",
-            stringify!(tqh_first)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqh_circ) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion__bindgen_ty_1),
-            "::",
-            stringify!(tqh_circ)
-        )
-    );
-}
-impl Default for MemoryRegion__bindgen_ty_1 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for MemoryRegion__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "MemoryRegion__bindgen_ty_1 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union MemoryRegion__bindgen_ty_2 {
-    pub tqe_next: *mut MemoryRegion,
-    pub tqe_circ: QTailQLink,
-}
-#[test]
-fn bindgen_test_layout_MemoryRegion__bindgen_ty_2() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryRegion__bindgen_ty_2> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryRegion__bindgen_ty_2>(),
-        16usize,
-        concat!("Size of: ", stringify!(MemoryRegion__bindgen_ty_2))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryRegion__bindgen_ty_2>(),
-        8usize,
-        concat!("Alignment of ", stringify!(MemoryRegion__bindgen_ty_2))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqe_next) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion__bindgen_ty_2),
-            "::",
-            stringify!(tqe_next)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqe_circ) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion__bindgen_ty_2),
-            "::",
-            stringify!(tqe_circ)
-        )
-    );
-}
-impl Default for MemoryRegion__bindgen_ty_2 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for MemoryRegion__bindgen_ty_2 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "MemoryRegion__bindgen_ty_2 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union MemoryRegion__bindgen_ty_3 {
-    pub tqh_first: *mut CoalescedMemoryRange,
-    pub tqh_circ: QTailQLink,
-}
-#[test]
-fn bindgen_test_layout_MemoryRegion__bindgen_ty_3() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryRegion__bindgen_ty_3> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryRegion__bindgen_ty_3>(),
-        16usize,
-        concat!("Size of: ", stringify!(MemoryRegion__bindgen_ty_3))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryRegion__bindgen_ty_3>(),
-        8usize,
-        concat!("Alignment of ", stringify!(MemoryRegion__bindgen_ty_3))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqh_first) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion__bindgen_ty_3),
-            "::",
-            stringify!(tqh_first)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqh_circ) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion__bindgen_ty_3),
-            "::",
-            stringify!(tqh_circ)
-        )
-    );
-}
-impl Default for MemoryRegion__bindgen_ty_3 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for MemoryRegion__bindgen_ty_3 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "MemoryRegion__bindgen_ty_3 {{ union }}")
-    }
-}
-#[test]
-fn bindgen_test_layout_MemoryRegion() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryRegion> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryRegion>(),
-        272usize,
-        concat!("Size of: ", stringify!(MemoryRegion))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryRegion>(),
-        16usize,
-        concat!("Alignment of ", stringify!(MemoryRegion))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).parent_obj) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(parent_obj)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).romd_mode) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(romd_mode)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ram) as usize - ptr as usize },
-        41usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(ram)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).subpage) as usize - ptr as usize },
-        42usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(subpage)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).readonly) as usize - ptr as usize },
-        43usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(readonly)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).nonvolatile) as usize - ptr as usize },
-        44usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(nonvolatile)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rom_device) as usize - ptr as usize },
-        45usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(rom_device)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).flush_coalesced_mmio) as usize - ptr as usize },
-        46usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(flush_coalesced_mmio)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dirty_log_mask) as usize - ptr as usize },
-        47usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(dirty_log_mask)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).is_iommu) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(is_iommu)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ram_block) as usize - ptr as usize },
-        56usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(ram_block)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).owner) as usize - ptr as usize },
-        64usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(owner)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dev) as usize - ptr as usize },
-        72usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(dev)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ops) as usize - ptr as usize },
-        80usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(ops)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).opaque) as usize - ptr as usize },
-        88usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(opaque)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).container) as usize - ptr as usize },
-        96usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(container)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mapped_via_alias) as usize - ptr as usize },
-        104usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(mapped_via_alias)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).size) as usize - ptr as usize },
-        112usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(size)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).addr) as usize - ptr as usize },
-        128usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(addr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).destructor) as usize - ptr as usize },
-        136usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(destructor)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).align) as usize - ptr as usize },
-        144usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(align)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).terminates) as usize - ptr as usize },
-        152usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(terminates)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ram_device) as usize - ptr as usize },
-        153usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(ram_device)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).enabled) as usize - ptr as usize },
-        154usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(enabled)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).warning_printed) as usize - ptr as usize },
-        155usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(warning_printed)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vga_logging_count) as usize - ptr as usize },
-        156usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(vga_logging_count)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).alias) as usize - ptr as usize },
-        160usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(alias)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).alias_offset) as usize - ptr as usize },
-        168usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(alias_offset)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).priority) as usize - ptr as usize },
-        176usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(priority)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).subregions) as usize - ptr as usize },
-        184usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(subregions)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).subregions_link) as usize - ptr as usize },
-        200usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(subregions_link)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).coalesced) as usize - ptr as usize },
-        216usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(coalesced)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
-        232usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(name)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ioeventfd_nb) as usize - ptr as usize },
-        240usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(ioeventfd_nb)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ioeventfds) as usize - ptr as usize },
-        248usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(ioeventfds)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rdm) as usize - ptr as usize },
-        256usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(rdm)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).disable_reentrancy_guard) as usize - ptr as usize },
-        264usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryRegion),
-            "::",
-            stringify!(disable_reentrancy_guard)
-        )
-    );
-}
-impl Default for MemoryRegion {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for MemoryRegion {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "MemoryRegion {{ parent_obj: {:?}, romd_mode: {:?}, ram: {:?}, subpage: {:?}, readonly: {:?}, nonvolatile: {:?}, rom_device: {:?}, flush_coalesced_mmio: {:?}, is_iommu: {:?}, ram_block: {:?}, owner: {:?}, dev: {:?}, ops: {:?}, opaque: {:?}, container: {:?}, mapped_via_alias: {:?}, size: {:?}, destructor: {:?}, terminates: {:?}, ram_device: {:?}, enabled: {:?}, warning_printed: {:?}, alias: {:?}, subregions: {:?}, subregions_link: {:?}, coalesced: {:?}, name: {:?}, ioeventfd_nb: {:?}, ioeventfds: {:?}, rdm: {:?}, disable_reentrancy_guard: {:?} }}" , self . parent_obj , self . romd_mode , self . ram , self . subpage , self . readonly , self . nonvolatile , self . rom_device , self . flush_coalesced_mmio , self . is_iommu , self . ram_block , self . owner , self . dev , self . ops , self . opaque , self . container , self . mapped_via_alias , self . size , self . destructor , self . terminates , self . ram_device , self . enabled , self . warning_printed , self . alias , self . subregions , self . subregions_link , self . coalesced , self . name , self . ioeventfd_nb , self . ioeventfds , self . rdm , self . disable_reentrancy_guard)
-    }
-}
-#[doc = " struct MemoryListener: callbacks structure for updates to the physical memory map\n\n Allows a component to adjust to changes in the guest-visible memory map.\n Use with memory_listener_register() and memory_listener_unregister()."]
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct MemoryListener {
-    #[doc = " @begin:\n\n Called at the beginning of an address space update transaction.\n Followed by calls to #MemoryListener.region_add(),\n #MemoryListener.region_del(), #MemoryListener.region_nop(),\n #MemoryListener.log_start() and #MemoryListener.log_stop() in\n increasing address order.\n\n @listener: The #MemoryListener."]
-    pub begin: ::std::option::Option<unsafe extern "C" fn(listener: *mut MemoryListener)>,
-    #[doc = " @commit:\n\n Called at the end of an address space update transaction,\n after the last call to #MemoryListener.region_add(),\n #MemoryListener.region_del() or #MemoryListener.region_nop(),\n #MemoryListener.log_start() and #MemoryListener.log_stop().\n\n @listener: The #MemoryListener."]
-    pub commit: ::std::option::Option<unsafe extern "C" fn(listener: *mut MemoryListener)>,
-    #[doc = " @region_add:\n\n Called during an address space update transaction,\n for a section of the address space that is new in this address space\n space since the last transaction.\n\n @listener: The #MemoryListener.\n @section: The new #MemoryRegionSection."]
-    pub region_add: ::std::option::Option<
-        unsafe extern "C" fn(listener: *mut MemoryListener, section: *mut MemoryRegionSection),
-    >,
-    #[doc = " @region_del:\n\n Called during an address space update transaction,\n for a section of the address space that has disappeared in the address\n space since the last transaction.\n\n @listener: The #MemoryListener.\n @section: The old #MemoryRegionSection."]
-    pub region_del: ::std::option::Option<
-        unsafe extern "C" fn(listener: *mut MemoryListener, section: *mut MemoryRegionSection),
-    >,
-    #[doc = " @region_nop:\n\n Called during an address space update transaction,\n for a section of the address space that is in the same place in the address\n space as in the last transaction.\n\n @listener: The #MemoryListener.\n @section: The #MemoryRegionSection."]
-    pub region_nop: ::std::option::Option<
-        unsafe extern "C" fn(listener: *mut MemoryListener, section: *mut MemoryRegionSection),
-    >,
-    #[doc = " @log_start:\n\n Called during an address space update transaction, after\n one of #MemoryListener.region_add(), #MemoryListener.region_del() or\n #MemoryListener.region_nop(), if dirty memory logging clients have\n become active since the last transaction.\n\n @listener: The #MemoryListener.\n @section: The #MemoryRegionSection.\n @old: A bitmap of dirty memory logging clients that were active in\n the previous transaction.\n @new: A bitmap of dirty memory logging clients that are active in\n the current transaction."]
-    pub log_start: ::std::option::Option<
-        unsafe extern "C" fn(
-            listener: *mut MemoryListener,
-            section: *mut MemoryRegionSection,
-            old: ::std::os::raw::c_int,
-            new: ::std::os::raw::c_int,
-        ),
-    >,
-    #[doc = " @log_stop:\n\n Called during an address space update transaction, after\n one of #MemoryListener.region_add(), #MemoryListener.region_del() or\n #MemoryListener.region_nop() and possibly after\n #MemoryListener.log_start(), if dirty memory logging clients have\n become inactive since the last transaction.\n\n @listener: The #MemoryListener.\n @section: The #MemoryRegionSection.\n @old: A bitmap of dirty memory logging clients that were active in\n the previous transaction.\n @new: A bitmap of dirty memory logging clients that are active in\n the current transaction."]
-    pub log_stop: ::std::option::Option<
-        unsafe extern "C" fn(
-            listener: *mut MemoryListener,
-            section: *mut MemoryRegionSection,
-            old: ::std::os::raw::c_int,
-            new: ::std::os::raw::c_int,
-        ),
-    >,
-    #[doc = " @log_sync:\n\n Called by memory_region_snapshot_and_clear_dirty() and\n memory_global_dirty_log_sync(), before accessing QEMU's \"official\"\n copy of the dirty memory bitmap for a #MemoryRegionSection.\n\n @listener: The #MemoryListener.\n @section: The #MemoryRegionSection."]
-    pub log_sync: ::std::option::Option<
-        unsafe extern "C" fn(listener: *mut MemoryListener, section: *mut MemoryRegionSection),
-    >,
-    #[doc = " @log_sync_global:\n\n This is the global version of @log_sync when the listener does\n not have a way to synchronize the log with finer granularity.\n When the listener registers with @log_sync_global defined, then\n its @log_sync must be NULL.  Vice versa.\n\n @listener: The #MemoryListener.\n @last_stage: The last stage to synchronize the log during migration.\n The caller should gurantee that the synchronization with true for\n @last_stage is triggered for once after all VCPUs have been stopped."]
-    pub log_sync_global: ::std::option::Option<
-        unsafe extern "C" fn(listener: *mut MemoryListener, last_stage: bool),
-    >,
-    #[doc = " @log_clear:\n\n Called before reading the dirty memory bitmap for a\n #MemoryRegionSection.\n\n @listener: The #MemoryListener.\n @section: The #MemoryRegionSection."]
-    pub log_clear: ::std::option::Option<
-        unsafe extern "C" fn(listener: *mut MemoryListener, section: *mut MemoryRegionSection),
-    >,
-    #[doc = " @log_global_start:\n\n Called by memory_global_dirty_log_start(), which\n enables the %DIRTY_LOG_MIGRATION client on all memory regions in\n the address space.  #MemoryListener.log_global_start() is also\n called when a #MemoryListener is added, if global dirty logging is\n active at that time.\n\n @listener: The #MemoryListener."]
-    pub log_global_start:
-        ::std::option::Option<unsafe extern "C" fn(listener: *mut MemoryListener)>,
-    #[doc = " @log_global_stop:\n\n Called by memory_global_dirty_log_stop(), which\n disables the %DIRTY_LOG_MIGRATION client on all memory regions in\n the address space.\n\n @listener: The #MemoryListener."]
-    pub log_global_stop: ::std::option::Option<unsafe extern "C" fn(listener: *mut MemoryListener)>,
-    #[doc = " @log_global_after_sync:\n\n Called after reading the dirty memory bitmap\n for any #MemoryRegionSection.\n\n @listener: The #MemoryListener."]
-    pub log_global_after_sync:
-        ::std::option::Option<unsafe extern "C" fn(listener: *mut MemoryListener)>,
-    #[doc = " @eventfd_add:\n\n Called during an address space update transaction,\n for a section of the address space that has had a new ioeventfd\n registration since the last transaction.\n\n @listener: The #MemoryListener.\n @section: The new #MemoryRegionSection.\n @match_data: The @match_data parameter for the new ioeventfd.\n @data: The @data parameter for the new ioeventfd.\n @e: The #EventNotifier parameter for the new ioeventfd."]
-    pub eventfd_add: ::std::option::Option<
-        unsafe extern "C" fn(
-            listener: *mut MemoryListener,
-            section: *mut MemoryRegionSection,
-            match_data: bool,
-            data: u64,
-            e: *mut EventNotifier,
-        ),
-    >,
-    #[doc = " @eventfd_del:\n\n Called during an address space update transaction,\n for a section of the address space that has dropped an ioeventfd\n registration since the last transaction.\n\n @listener: The #MemoryListener.\n @section: The new #MemoryRegionSection.\n @match_data: The @match_data parameter for the dropped ioeventfd.\n @data: The @data parameter for the dropped ioeventfd.\n @e: The #EventNotifier parameter for the dropped ioeventfd."]
-    pub eventfd_del: ::std::option::Option<
-        unsafe extern "C" fn(
-            listener: *mut MemoryListener,
-            section: *mut MemoryRegionSection,
-            match_data: bool,
-            data: u64,
-            e: *mut EventNotifier,
-        ),
-    >,
-    #[doc = " @coalesced_io_add:\n\n Called during an address space update transaction,\n for a section of the address space that has had a new coalesced\n MMIO range registration since the last transaction.\n\n @listener: The #MemoryListener.\n @section: The new #MemoryRegionSection.\n @addr: The starting address for the coalesced MMIO range.\n @len: The length of the coalesced MMIO range."]
-    pub coalesced_io_add: ::std::option::Option<
-        unsafe extern "C" fn(
-            listener: *mut MemoryListener,
-            section: *mut MemoryRegionSection,
-            addr: hwaddr,
-            len: hwaddr,
-        ),
-    >,
-    #[doc = " @coalesced_io_del:\n\n Called during an address space update transaction,\n for a section of the address space that has dropped a coalesced\n MMIO range since the last transaction.\n\n @listener: The #MemoryListener.\n @section: The new #MemoryRegionSection.\n @addr: The starting address for the coalesced MMIO range.\n @len: The length of the coalesced MMIO range."]
-    pub coalesced_io_del: ::std::option::Option<
-        unsafe extern "C" fn(
-            listener: *mut MemoryListener,
-            section: *mut MemoryRegionSection,
-            addr: hwaddr,
-            len: hwaddr,
-        ),
-    >,
-    #[doc = " @priority:\n\n Govern the order in which memory listeners are invoked. Lower priorities\n are invoked earlier for \"add\" or \"start\" callbacks, and later for \"delete\"\n or \"stop\" callbacks."]
-    pub priority: ::std::os::raw::c_uint,
-    #[doc = " @name:\n\n Name of the listener.  It can be used in contexts where we'd like to\n identify one memory listener with the rest."]
-    pub name: *const ::std::os::raw::c_char,
-    pub address_space: *mut AddressSpace,
-    pub link: MemoryListener__bindgen_ty_1,
-    pub link_as: MemoryListener__bindgen_ty_2,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union MemoryListener__bindgen_ty_1 {
-    pub tqe_next: *mut MemoryListener,
-    pub tqe_circ: QTailQLink,
-}
-#[test]
-fn bindgen_test_layout_MemoryListener__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryListener__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryListener__bindgen_ty_1>(),
-        16usize,
-        concat!("Size of: ", stringify!(MemoryListener__bindgen_ty_1))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryListener__bindgen_ty_1>(),
-        8usize,
-        concat!("Alignment of ", stringify!(MemoryListener__bindgen_ty_1))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqe_next) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener__bindgen_ty_1),
-            "::",
-            stringify!(tqe_next)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqe_circ) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener__bindgen_ty_1),
-            "::",
-            stringify!(tqe_circ)
-        )
-    );
-}
-impl Default for MemoryListener__bindgen_ty_1 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for MemoryListener__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "MemoryListener__bindgen_ty_1 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union MemoryListener__bindgen_ty_2 {
-    pub tqe_next: *mut MemoryListener,
-    pub tqe_circ: QTailQLink,
-}
-#[test]
-fn bindgen_test_layout_MemoryListener__bindgen_ty_2() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryListener__bindgen_ty_2> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryListener__bindgen_ty_2>(),
-        16usize,
-        concat!("Size of: ", stringify!(MemoryListener__bindgen_ty_2))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryListener__bindgen_ty_2>(),
-        8usize,
-        concat!("Alignment of ", stringify!(MemoryListener__bindgen_ty_2))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqe_next) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener__bindgen_ty_2),
-            "::",
-            stringify!(tqe_next)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqe_circ) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener__bindgen_ty_2),
-            "::",
-            stringify!(tqe_circ)
-        )
-    );
-}
-impl Default for MemoryListener__bindgen_ty_2 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for MemoryListener__bindgen_ty_2 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "MemoryListener__bindgen_ty_2 {{ union }}")
-    }
-}
-#[test]
-fn bindgen_test_layout_MemoryListener() {
-    const UNINIT: ::std::mem::MaybeUninit<MemoryListener> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<MemoryListener>(),
-        192usize,
-        concat!("Size of: ", stringify!(MemoryListener))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<MemoryListener>(),
-        8usize,
-        concat!("Alignment of ", stringify!(MemoryListener))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).begin) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(begin)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).commit) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(commit)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).region_add) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(region_add)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).region_del) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(region_del)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).region_nop) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(region_nop)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).log_start) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(log_start)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).log_stop) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(log_stop)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).log_sync) as usize - ptr as usize },
-        56usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(log_sync)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).log_sync_global) as usize - ptr as usize },
-        64usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(log_sync_global)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).log_clear) as usize - ptr as usize },
-        72usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(log_clear)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).log_global_start) as usize - ptr as usize },
-        80usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(log_global_start)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).log_global_stop) as usize - ptr as usize },
-        88usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(log_global_stop)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).log_global_after_sync) as usize - ptr as usize },
-        96usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(log_global_after_sync)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).eventfd_add) as usize - ptr as usize },
-        104usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(eventfd_add)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).eventfd_del) as usize - ptr as usize },
-        112usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(eventfd_del)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).coalesced_io_add) as usize - ptr as usize },
-        120usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(coalesced_io_add)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).coalesced_io_del) as usize - ptr as usize },
-        128usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(coalesced_io_del)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).priority) as usize - ptr as usize },
-        136usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(priority)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
-        144usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(name)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).address_space) as usize - ptr as usize },
-        152usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(address_space)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).link) as usize - ptr as usize },
-        160usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(link)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).link_as) as usize - ptr as usize },
-        176usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(MemoryListener),
-            "::",
-            stringify!(link_as)
-        )
-    );
-}
-impl Default for MemoryListener {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for MemoryListener {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "MemoryListener {{ begin: {:?}, commit: {:?}, region_add: {:?}, region_del: {:?}, region_nop: {:?}, log_start: {:?}, log_stop: {:?}, log_sync: {:?}, log_sync_global: {:?}, log_clear: {:?}, log_global_start: {:?}, log_global_stop: {:?}, log_global_after_sync: {:?}, eventfd_add: {:?}, eventfd_del: {:?}, coalesced_io_add: {:?}, coalesced_io_del: {:?}, priority: {:?}, name: {:?}, address_space: {:?}, link: {:?}, link_as: {:?} }}" , self . begin , self . commit , self . region_add , self . region_del , self . region_nop , self . log_start , self . log_stop , self . log_sync , self . log_sync_global , self . log_clear , self . log_global_start , self . log_global_stop , self . log_global_after_sync , self . eventfd_add , self . eventfd_del , self . coalesced_io_add , self . coalesced_io_del , self . priority , self . name , self . address_space , self . link , self . link_as)
-    }
-}
-#[doc = " struct AddressSpace: describes a mapping of addresses to #MemoryRegion objects"]
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct AddressSpace {
-    pub rcu: rcu_head,
-    pub name: *mut ::std::os::raw::c_char,
-    pub root: *mut MemoryRegion,
-    pub current_map: *mut FlatView,
-    pub ioeventfd_nb: ::std::os::raw::c_int,
-    pub ioeventfds: *mut MemoryRegionIoeventfd,
-    pub listeners: AddressSpace__bindgen_ty_1,
-    pub address_spaces_link: AddressSpace__bindgen_ty_2,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union AddressSpace__bindgen_ty_1 {
-    pub tqh_first: *mut MemoryListener,
-    pub tqh_circ: QTailQLink,
-}
-#[test]
-fn bindgen_test_layout_AddressSpace__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<AddressSpace__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<AddressSpace__bindgen_ty_1>(),
-        16usize,
-        concat!("Size of: ", stringify!(AddressSpace__bindgen_ty_1))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<AddressSpace__bindgen_ty_1>(),
-        8usize,
-        concat!("Alignment of ", stringify!(AddressSpace__bindgen_ty_1))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqh_first) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace__bindgen_ty_1),
-            "::",
-            stringify!(tqh_first)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqh_circ) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace__bindgen_ty_1),
-            "::",
-            stringify!(tqh_circ)
-        )
-    );
-}
-impl Default for AddressSpace__bindgen_ty_1 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for AddressSpace__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "AddressSpace__bindgen_ty_1 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union AddressSpace__bindgen_ty_2 {
-    pub tqe_next: *mut AddressSpace,
-    pub tqe_circ: QTailQLink,
-}
-#[test]
-fn bindgen_test_layout_AddressSpace__bindgen_ty_2() {
-    const UNINIT: ::std::mem::MaybeUninit<AddressSpace__bindgen_ty_2> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<AddressSpace__bindgen_ty_2>(),
-        16usize,
-        concat!("Size of: ", stringify!(AddressSpace__bindgen_ty_2))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<AddressSpace__bindgen_ty_2>(),
-        8usize,
-        concat!("Alignment of ", stringify!(AddressSpace__bindgen_ty_2))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqe_next) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace__bindgen_ty_2),
-            "::",
-            stringify!(tqe_next)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tqe_circ) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace__bindgen_ty_2),
-            "::",
-            stringify!(tqe_circ)
-        )
-    );
-}
-impl Default for AddressSpace__bindgen_ty_2 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for AddressSpace__bindgen_ty_2 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "AddressSpace__bindgen_ty_2 {{ union }}")
-    }
-}
-#[test]
-fn bindgen_test_layout_AddressSpace() {
-    const UNINIT: ::std::mem::MaybeUninit<AddressSpace> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<AddressSpace>(),
-        88usize,
-        concat!("Size of: ", stringify!(AddressSpace))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<AddressSpace>(),
-        8usize,
-        concat!("Alignment of ", stringify!(AddressSpace))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rcu) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace),
-            "::",
-            stringify!(rcu)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace),
-            "::",
-            stringify!(name)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).root) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace),
-            "::",
-            stringify!(root)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).current_map) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace),
-            "::",
-            stringify!(current_map)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ioeventfd_nb) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace),
-            "::",
-            stringify!(ioeventfd_nb)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ioeventfds) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace),
-            "::",
-            stringify!(ioeventfds)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).listeners) as usize - ptr as usize },
-        56usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace),
-            "::",
-            stringify!(listeners)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).address_spaces_link) as usize - ptr as usize },
-        72usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(AddressSpace),
-            "::",
-            stringify!(address_spaces_link)
-        )
-    );
-}
-impl Default for AddressSpace {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for AddressSpace {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "AddressSpace {{ rcu: {:?}, name: {:?}, root: {:?}, current_map: {:?}, ioeventfd_nb: {:?}, ioeventfds: {:?}, listeners: {:?}, address_spaces_link: {:?} }}" , self . rcu , self . name , self . root , self . current_map , self . ioeventfd_nb , self . ioeventfds , self . listeners , self . address_spaces_link)
-    }
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct AddressSpaceDispatch {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct FlatRange {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct FlatView {
-    pub rcu: rcu_head,
-    pub ref_: ::std::os::raw::c_uint,
-    pub ranges: *mut FlatRange,
-    pub nr: ::std::os::raw::c_uint,
-    pub nr_allocated: ::std::os::raw::c_uint,
-    pub dispatch: *mut AddressSpaceDispatch,
-    pub root: *mut MemoryRegion,
-}
-#[test]
-fn bindgen_test_layout_FlatView() {
-    const UNINIT: ::std::mem::MaybeUninit<FlatView> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<FlatView>(),
-        56usize,
-        concat!("Size of: ", stringify!(FlatView))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<FlatView>(),
-        8usize,
-        concat!("Alignment of ", stringify!(FlatView))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rcu) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(FlatView),
-            "::",
-            stringify!(rcu)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ref_) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(FlatView),
-            "::",
-            stringify!(ref_)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ranges) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(FlatView),
-            "::",
-            stringify!(ranges)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).nr) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(FlatView),
-            "::",
-            stringify!(nr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).nr_allocated) as usize - ptr as usize },
-        36usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(FlatView),
-            "::",
-            stringify!(nr_allocated)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dispatch) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(FlatView),
-            "::",
-            stringify!(dispatch)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).root) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(FlatView),
-            "::",
-            stringify!(root)
-        )
-    );
-}
-impl Default for FlatView {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct device_save_state_s {
-    pub kind: u8,
-    pub save_buffer: *mut u8,
-    pub save_buffer_size: usize,
-}
-#[test]
-fn bindgen_test_layout_device_save_state_s() {
-    const UNINIT: ::std::mem::MaybeUninit<device_save_state_s> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<device_save_state_s>(),
-        24usize,
-        concat!("Size of: ", stringify!(device_save_state_s))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<device_save_state_s>(),
-        8usize,
-        concat!("Alignment of ", stringify!(device_save_state_s))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).kind) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(device_save_state_s),
-            "::",
-            stringify!(kind)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).save_buffer) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(device_save_state_s),
-            "::",
-            stringify!(save_buffer)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).save_buffer_size) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(device_save_state_s),
-            "::",
-            stringify!(save_buffer_size)
-        )
-    );
-}
-impl Default for device_save_state_s {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-pub type device_save_state_t = device_save_state_s;
-pub const device_snapshot_kind_e_DEVICE_SNAPSHOT_ALL: device_snapshot_kind_e =
-    device_snapshot_kind_e(0);
-pub const device_snapshot_kind_e_DEVICE_SNAPSHOT_ALLOWLIST: device_snapshot_kind_e =
-    device_snapshot_kind_e(1);
-pub const device_snapshot_kind_e_DEVICE_SNAPSHOT_DENYLIST: device_snapshot_kind_e =
-    device_snapshot_kind_e(2);
-impl ::std::ops::BitOr<device_snapshot_kind_e> for device_snapshot_kind_e {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, other: Self) -> Self {
-        device_snapshot_kind_e(self.0 | other.0)
-    }
-}
-impl ::std::ops::BitOrAssign for device_snapshot_kind_e {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: device_snapshot_kind_e) {
-        self.0 |= rhs.0;
-    }
-}
-impl ::std::ops::BitAnd<device_snapshot_kind_e> for device_snapshot_kind_e {
-    type Output = Self;
-    #[inline]
-    fn bitand(self, other: Self) -> Self {
-        device_snapshot_kind_e(self.0 & other.0)
-    }
-}
-impl ::std::ops::BitAndAssign for device_snapshot_kind_e {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: device_snapshot_kind_e) {
-        self.0 &= rhs.0;
-    }
-}
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct device_snapshot_kind_e(pub ::std::os::raw::c_uint);
-pub use self::device_snapshot_kind_e as device_snapshot_kind_t;
-extern "C" {
-    pub fn device_list_all() -> *mut *mut ::std::os::raw::c_char;
-}
-#[doc = " Saved ramblock"]
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct syx_snapshot_ramblock_s {
-    pub ram: *mut u8,
-    pub used_length: u64,
-    pub idstr: [::std::os::raw::c_char; 256usize],
-}
-#[test]
-fn bindgen_test_layout_syx_snapshot_ramblock_s() {
-    const UNINIT: ::std::mem::MaybeUninit<syx_snapshot_ramblock_s> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<syx_snapshot_ramblock_s>(),
-        272usize,
-        concat!("Size of: ", stringify!(syx_snapshot_ramblock_s))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<syx_snapshot_ramblock_s>(),
-        8usize,
-        concat!("Alignment of ", stringify!(syx_snapshot_ramblock_s))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ram) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_ramblock_s),
-            "::",
-            stringify!(ram)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).used_length) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_ramblock_s),
-            "::",
-            stringify!(used_length)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).idstr) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_ramblock_s),
-            "::",
-            stringify!(idstr)
-        )
-    );
-}
-impl Default for syx_snapshot_ramblock_s {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[doc = " Saved ramblock"]
-pub type syx_snapshot_ramblock_t = syx_snapshot_ramblock_s;
-#[doc = " A root snapshot representation."]
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct syx_snapshot_root_s {
-    pub ram_blocks: *mut syx_snapshot_ramblock_t,
-    pub nb_ram_blocks: u64,
-    pub dss: *mut device_save_state_t,
-}
-#[test]
-fn bindgen_test_layout_syx_snapshot_root_s() {
-    const UNINIT: ::std::mem::MaybeUninit<syx_snapshot_root_s> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<syx_snapshot_root_s>(),
-        24usize,
-        concat!("Size of: ", stringify!(syx_snapshot_root_s))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<syx_snapshot_root_s>(),
-        8usize,
-        concat!("Alignment of ", stringify!(syx_snapshot_root_s))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ram_blocks) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_root_s),
-            "::",
-            stringify!(ram_blocks)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).nb_ram_blocks) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_root_s),
-            "::",
-            stringify!(nb_ram_blocks)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dss) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_root_s),
-            "::",
-            stringify!(dss)
-        )
-    );
-}
-impl Default for syx_snapshot_root_s {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[doc = " A root snapshot representation."]
-pub type syx_snapshot_root_t = syx_snapshot_root_s;
-#[doc = " A snapshot's dirty list. It only stores dirty addresses\n (without data). It is the developer's responsibility to\n to effectively save dirty pages when it is necessary."]
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct syx_snapshot_dirty_list_s {
-    pub dirty_addr: *mut hwaddr,
-    pub length: u64,
-    pub capacity: u64,
-}
-#[test]
-fn bindgen_test_layout_syx_snapshot_dirty_list_s() {
-    const UNINIT: ::std::mem::MaybeUninit<syx_snapshot_dirty_list_s> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<syx_snapshot_dirty_list_s>(),
-        24usize,
-        concat!("Size of: ", stringify!(syx_snapshot_dirty_list_s))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<syx_snapshot_dirty_list_s>(),
-        8usize,
-        concat!("Alignment of ", stringify!(syx_snapshot_dirty_list_s))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dirty_addr) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_dirty_list_s),
-            "::",
-            stringify!(dirty_addr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).length) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_dirty_list_s),
-            "::",
-            stringify!(length)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).capacity) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_dirty_list_s),
-            "::",
-            stringify!(capacity)
-        )
-    );
-}
-impl Default for syx_snapshot_dirty_list_s {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[doc = " A snapshot's dirty list. It only stores dirty addresses\n (without data). It is the developer's responsibility to\n to effectively save dirty pages when it is necessary."]
-pub type syx_snapshot_dirty_list_t = syx_snapshot_dirty_list_s;
-#[doc = " A list of dirty pages with their old data."]
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct syx_snapshot_dirty_page_s {
-    pub addr: hwaddr,
-    pub data: *mut u8,
-}
-#[test]
-fn bindgen_test_layout_syx_snapshot_dirty_page_s() {
-    const UNINIT: ::std::mem::MaybeUninit<syx_snapshot_dirty_page_s> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<syx_snapshot_dirty_page_s>(),
-        16usize,
-        concat!("Size of: ", stringify!(syx_snapshot_dirty_page_s))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<syx_snapshot_dirty_page_s>(),
-        8usize,
-        concat!("Alignment of ", stringify!(syx_snapshot_dirty_page_s))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).addr) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_dirty_page_s),
-            "::",
-            stringify!(addr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).data) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_dirty_page_s),
-            "::",
-            stringify!(data)
-        )
-    );
-}
-impl Default for syx_snapshot_dirty_page_s {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[doc = " A list of dirty pages with their old data."]
-pub type syx_snapshot_dirty_page_t = syx_snapshot_dirty_page_s;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct syx_snapshot_dirty_page_list_s {
-    pub dirty_pages: *mut syx_snapshot_dirty_page_t,
-    pub length: u64,
-}
-#[test]
-fn bindgen_test_layout_syx_snapshot_dirty_page_list_s() {
-    const UNINIT: ::std::mem::MaybeUninit<syx_snapshot_dirty_page_list_s> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<syx_snapshot_dirty_page_list_s>(),
-        16usize,
-        concat!("Size of: ", stringify!(syx_snapshot_dirty_page_list_s))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<syx_snapshot_dirty_page_list_s>(),
-        8usize,
-        concat!("Alignment of ", stringify!(syx_snapshot_dirty_page_list_s))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dirty_pages) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_dirty_page_list_s),
-            "::",
-            stringify!(dirty_pages)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).length) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_dirty_page_list_s),
-            "::",
-            stringify!(length)
-        )
-    );
-}
-impl Default for syx_snapshot_dirty_page_list_s {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-pub type syx_snapshot_dirty_page_list_t = syx_snapshot_dirty_page_list_s;
-#[doc = " A snapshot increment. It is used to quickly\n save a VM state."]
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct syx_snapshot_increment_s {
-    pub parent: *mut syx_snapshot_increment_s,
-    pub dss: *mut device_save_state_t,
-    pub dirty_page_list: syx_snapshot_dirty_page_list_t,
-}
-#[test]
-fn bindgen_test_layout_syx_snapshot_increment_s() {
-    const UNINIT: ::std::mem::MaybeUninit<syx_snapshot_increment_s> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<syx_snapshot_increment_s>(),
-        32usize,
-        concat!("Size of: ", stringify!(syx_snapshot_increment_s))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<syx_snapshot_increment_s>(),
-        8usize,
-        concat!("Alignment of ", stringify!(syx_snapshot_increment_s))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).parent) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_increment_s),
-            "::",
-            stringify!(parent)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dss) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_increment_s),
-            "::",
-            stringify!(dss)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dirty_page_list) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_increment_s),
-            "::",
-            stringify!(dirty_page_list)
-        )
-    );
-}
-impl Default for syx_snapshot_increment_s {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[doc = " A snapshot increment. It is used to quickly\n save a VM state."]
-pub type syx_snapshot_increment_t = syx_snapshot_increment_s;
-#[doc = " A snapshot. It is the main object used in this API to\n handle snapshoting."]
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct syx_snapshot_s {
-    pub root_snapshot: syx_snapshot_root_t,
-    pub last_incremental_snapshot: *mut syx_snapshot_increment_t,
-    pub dirty_list: syx_snapshot_dirty_list_t,
-}
-#[test]
-fn bindgen_test_layout_syx_snapshot_s() {
-    const UNINIT: ::std::mem::MaybeUninit<syx_snapshot_s> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<syx_snapshot_s>(),
-        56usize,
-        concat!("Size of: ", stringify!(syx_snapshot_s))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<syx_snapshot_s>(),
-        8usize,
-        concat!("Alignment of ", stringify!(syx_snapshot_s))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).root_snapshot) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_s),
-            "::",
-            stringify!(root_snapshot)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).last_incremental_snapshot) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_s),
-            "::",
-            stringify!(last_incremental_snapshot)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dirty_list) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(syx_snapshot_s),
-            "::",
-            stringify!(dirty_list)
-        )
-    );
-}
-impl Default for syx_snapshot_s {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[doc = " A snapshot. It is the main object used in this API to\n handle snapshoting."]
-pub type syx_snapshot_t = syx_snapshot_s;
-extern "C" {
-    pub fn syx_snapshot_init();
-}
-extern "C" {
-    pub fn syx_snapshot_create(
-        track: bool,
-        kind: device_snapshot_kind_t,
-        devices: *mut *mut ::std::os::raw::c_char,
-    ) -> *mut syx_snapshot_t;
-}
-extern "C" {
-    pub fn syx_snapshot_root_restore(snapshot: *mut syx_snapshot_t);
-}
-extern "C" {
-    #[doc = " @brief Add a dirty physical address to the list\n\n @param paddr The physical address to add"]
-    pub fn syx_snapshot_dirty_list_add(paddr: hwaddr);
 }
 pub const FloatRoundMode_float_round_nearest_even: FloatRoundMode = FloatRoundMode(0);
 pub const FloatRoundMode_float_round_down: FloatRoundMode = FloatRoundMode(1);
@@ -10299,3198 +6924,1157 @@ impl Default for float_status {
         }
     }
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct arm_boot_info {
-    _unused: [u8; 0],
-}
+pub type FeatureWordArray = [u64; 38usize];
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-pub struct ARMGenericTimer {
-    pub cval: u64,
-    pub ctl: u64,
+pub struct SegmentCache {
+    pub selector: u32,
+    pub base: target_ulong,
+    pub limit: u32,
+    pub flags: u32,
 }
 #[test]
-fn bindgen_test_layout_ARMGenericTimer() {
-    const UNINIT: ::std::mem::MaybeUninit<ARMGenericTimer> = ::std::mem::MaybeUninit::uninit();
+fn bindgen_test_layout_SegmentCache() {
+    const UNINIT: ::std::mem::MaybeUninit<SegmentCache> = ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
-        ::std::mem::size_of::<ARMGenericTimer>(),
-        16usize,
-        concat!("Size of: ", stringify!(ARMGenericTimer))
+        ::std::mem::size_of::<SegmentCache>(),
+        24usize,
+        concat!("Size of: ", stringify!(SegmentCache))
     );
     assert_eq!(
-        ::std::mem::align_of::<ARMGenericTimer>(),
+        ::std::mem::align_of::<SegmentCache>(),
         8usize,
-        concat!("Alignment of ", stringify!(ARMGenericTimer))
+        concat!("Alignment of ", stringify!(SegmentCache))
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cval) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).selector) as usize - ptr as usize },
         0usize,
         concat!(
             "Offset of field: ",
-            stringify!(ARMGenericTimer),
+            stringify!(SegmentCache),
             "::",
-            stringify!(cval)
+            stringify!(selector)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ctl) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).base) as usize - ptr as usize },
         8usize,
         concat!(
             "Offset of field: ",
-            stringify!(ARMGenericTimer),
+            stringify!(SegmentCache),
             "::",
-            stringify!(ctl)
+            stringify!(base)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).limit) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(SegmentCache),
+            "::",
+            stringify!(limit)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
+        20usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(SegmentCache),
+            "::",
+            stringify!(flags)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union MMXReg {
+    pub _b_MMXReg: [u8; 8usize],
+    pub _w_MMXReg: [u16; 4usize],
+    pub _l_MMXReg: [u32; 2usize],
+    pub _q_MMXReg: [u64; 1usize],
+    pub _s_MMXReg: [float32; 2usize],
+    pub _d_MMXReg: [float64; 1usize],
+}
+#[test]
+fn bindgen_test_layout_MMXReg() {
+    const UNINIT: ::std::mem::MaybeUninit<MMXReg> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<MMXReg>(),
+        8usize,
+        concat!("Size of: ", stringify!(MMXReg))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<MMXReg>(),
+        8usize,
+        concat!("Alignment of ", stringify!(MMXReg))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._b_MMXReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(MMXReg),
+            "::",
+            stringify!(_b_MMXReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._w_MMXReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(MMXReg),
+            "::",
+            stringify!(_w_MMXReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._l_MMXReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(MMXReg),
+            "::",
+            stringify!(_l_MMXReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._q_MMXReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(MMXReg),
+            "::",
+            stringify!(_q_MMXReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._s_MMXReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(MMXReg),
+            "::",
+            stringify!(_s_MMXReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._d_MMXReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(MMXReg),
+            "::",
+            stringify!(_d_MMXReg)
+        )
+    );
+}
+impl Default for MMXReg {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ::std::fmt::Debug for MMXReg {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "MMXReg {{ union }}")
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union XMMReg {
+    pub _q_XMMReg: [u64; 2usize],
+}
+#[test]
+fn bindgen_test_layout_XMMReg() {
+    const UNINIT: ::std::mem::MaybeUninit<XMMReg> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<XMMReg>(),
+        16usize,
+        concat!("Size of: ", stringify!(XMMReg))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<XMMReg>(),
+        8usize,
+        concat!("Alignment of ", stringify!(XMMReg))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._q_XMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(XMMReg),
+            "::",
+            stringify!(_q_XMMReg)
+        )
+    );
+}
+impl Default for XMMReg {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ::std::fmt::Debug for XMMReg {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "XMMReg {{ union }}")
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union YMMReg {
+    pub _q_YMMReg: [u64; 4usize],
+    pub _x_YMMReg: [XMMReg; 2usize],
+}
+#[test]
+fn bindgen_test_layout_YMMReg() {
+    const UNINIT: ::std::mem::MaybeUninit<YMMReg> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<YMMReg>(),
+        32usize,
+        concat!("Size of: ", stringify!(YMMReg))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<YMMReg>(),
+        8usize,
+        concat!("Alignment of ", stringify!(YMMReg))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._q_YMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(YMMReg),
+            "::",
+            stringify!(_q_YMMReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._x_YMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(YMMReg),
+            "::",
+            stringify!(_x_YMMReg)
+        )
+    );
+}
+impl Default for YMMReg {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ::std::fmt::Debug for YMMReg {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "YMMReg {{ union }}")
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union ZMMReg {
+    pub _b_ZMMReg: [u8; 64usize],
+    pub _w_ZMMReg: [u16; 32usize],
+    pub _l_ZMMReg: [u32; 16usize],
+    pub _q_ZMMReg: [u64; 8usize],
+    pub _h_ZMMReg: [float16; 32usize],
+    pub _s_ZMMReg: [float32; 16usize],
+    pub _d_ZMMReg: [float64; 8usize],
+    pub _x_ZMMReg: [XMMReg; 4usize],
+    pub _y_ZMMReg: [YMMReg; 2usize],
+}
+#[test]
+fn bindgen_test_layout_ZMMReg() {
+    const UNINIT: ::std::mem::MaybeUninit<ZMMReg> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<ZMMReg>(),
+        64usize,
+        concat!("Size of: ", stringify!(ZMMReg))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<ZMMReg>(),
+        8usize,
+        concat!("Alignment of ", stringify!(ZMMReg))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._b_ZMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ZMMReg),
+            "::",
+            stringify!(_b_ZMMReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._w_ZMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ZMMReg),
+            "::",
+            stringify!(_w_ZMMReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._l_ZMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ZMMReg),
+            "::",
+            stringify!(_l_ZMMReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._q_ZMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ZMMReg),
+            "::",
+            stringify!(_q_ZMMReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._h_ZMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ZMMReg),
+            "::",
+            stringify!(_h_ZMMReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._s_ZMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ZMMReg),
+            "::",
+            stringify!(_s_ZMMReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._d_ZMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ZMMReg),
+            "::",
+            stringify!(_d_ZMMReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._x_ZMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ZMMReg),
+            "::",
+            stringify!(_x_ZMMReg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr)._y_ZMMReg) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ZMMReg),
+            "::",
+            stringify!(_y_ZMMReg)
+        )
+    );
+}
+impl Default for ZMMReg {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ::std::fmt::Debug for ZMMReg {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "ZMMReg {{ union }}")
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct BNDReg {
+    pub lb: u64,
+    pub ub: u64,
+}
+#[test]
+fn bindgen_test_layout_BNDReg() {
+    const UNINIT: ::std::mem::MaybeUninit<BNDReg> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<BNDReg>(),
+        16usize,
+        concat!("Size of: ", stringify!(BNDReg))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<BNDReg>(),
+        8usize,
+        concat!("Alignment of ", stringify!(BNDReg))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).lb) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(BNDReg),
+            "::",
+            stringify!(lb)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ub) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(BNDReg),
+            "::",
+            stringify!(ub)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct BNDCSReg {
+    pub cfgu: u64,
+    pub sts: u64,
+}
+#[test]
+fn bindgen_test_layout_BNDCSReg() {
+    const UNINIT: ::std::mem::MaybeUninit<BNDCSReg> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<BNDCSReg>(),
+        16usize,
+        concat!("Size of: ", stringify!(BNDCSReg))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<BNDCSReg>(),
+        8usize,
+        concat!("Alignment of ", stringify!(BNDCSReg))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cfgu) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(BNDCSReg),
+            "::",
+            stringify!(cfgu)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).sts) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(BNDCSReg),
+            "::",
+            stringify!(sts)
         )
     );
 }
 #[repr(C)]
 #[repr(align(16))]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct ARMVectorReg {
-    pub d: [u64; 2usize],
+#[derive(Copy, Clone)]
+pub union FPReg {
+    pub d: floatx80,
+    pub mmx: MMXReg,
 }
 #[test]
-fn bindgen_test_layout_ARMVectorReg() {
-    const UNINIT: ::std::mem::MaybeUninit<ARMVectorReg> = ::std::mem::MaybeUninit::uninit();
+fn bindgen_test_layout_FPReg() {
+    const UNINIT: ::std::mem::MaybeUninit<FPReg> = ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
-        ::std::mem::size_of::<ARMVectorReg>(),
+        ::std::mem::size_of::<FPReg>(),
         16usize,
-        concat!("Size of: ", stringify!(ARMVectorReg))
+        concat!("Size of: ", stringify!(FPReg))
     );
     assert_eq!(
-        ::std::mem::align_of::<ARMVectorReg>(),
+        ::std::mem::align_of::<FPReg>(),
         16usize,
-        concat!("Alignment of ", stringify!(ARMVectorReg))
+        concat!("Alignment of ", stringify!(FPReg))
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).d) as usize - ptr as usize },
         0usize,
+        concat!("Offset of field: ", stringify!(FPReg), "::", stringify!(d))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mmx) as usize - ptr as usize },
+        0usize,
         concat!(
             "Offset of field: ",
-            stringify!(ARMVectorReg),
+            stringify!(FPReg),
             "::",
-            stringify!(d)
+            stringify!(mmx)
+        )
+    );
+}
+impl Default for FPReg {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ::std::fmt::Debug for FPReg {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "FPReg {{ union }}")
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct MTRRVar {
+    pub base: u64,
+    pub mask: u64,
+}
+#[test]
+fn bindgen_test_layout_MTRRVar() {
+    const UNINIT: ::std::mem::MaybeUninit<MTRRVar> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<MTRRVar>(),
+        16usize,
+        concat!("Size of: ", stringify!(MTRRVar))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<MTRRVar>(),
+        8usize,
+        concat!("Alignment of ", stringify!(MTRRVar))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).base) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(MTRRVar),
+            "::",
+            stringify!(base)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mask) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(MTRRVar),
+            "::",
+            stringify!(mask)
         )
     );
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-pub struct CPUARMTBFlags {
-    pub flags: u32,
-    pub flags2: target_ulong,
+pub struct LBREntry {
+    pub from: u64,
+    pub to: u64,
+    pub info: u64,
 }
 #[test]
-fn bindgen_test_layout_CPUARMTBFlags() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUARMTBFlags> = ::std::mem::MaybeUninit::uninit();
+fn bindgen_test_layout_LBREntry() {
+    const UNINIT: ::std::mem::MaybeUninit<LBREntry> = ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
-        ::std::mem::size_of::<CPUARMTBFlags>(),
+        ::std::mem::size_of::<LBREntry>(),
+        24usize,
+        concat!("Size of: ", stringify!(LBREntry))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<LBREntry>(),
         8usize,
-        concat!("Size of: ", stringify!(CPUARMTBFlags))
+        concat!("Alignment of ", stringify!(LBREntry))
     );
     assert_eq!(
-        ::std::mem::align_of::<CPUARMTBFlags>(),
-        4usize,
-        concat!("Alignment of ", stringify!(CPUARMTBFlags))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).from) as usize - ptr as usize },
         0usize,
         concat!(
             "Offset of field: ",
-            stringify!(CPUARMTBFlags),
+            stringify!(LBREntry),
             "::",
-            stringify!(flags)
+            stringify!(from)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).flags2) as usize - ptr as usize },
-        4usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).to) as usize - ptr as usize },
+        8usize,
         concat!(
             "Offset of field: ",
-            stringify!(CPUARMTBFlags),
+            stringify!(LBREntry),
             "::",
-            stringify!(flags2)
+            stringify!(to)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).info) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(LBREntry),
+            "::",
+            stringify!(info)
         )
     );
 }
+pub const TPRAccess_TPR_ACCESS_READ: TPRAccess = TPRAccess(0);
+pub const TPRAccess_TPR_ACCESS_WRITE: TPRAccess = TPRAccess(1);
+impl ::std::ops::BitOr<TPRAccess> for TPRAccess {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        TPRAccess(self.0 | other.0)
+    }
+}
+impl ::std::ops::BitOrAssign for TPRAccess {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: TPRAccess) {
+        self.0 |= rhs.0;
+    }
+}
+impl ::std::ops::BitAnd<TPRAccess> for TPRAccess {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, other: Self) -> Self {
+        TPRAccess(self.0 & other.0)
+    }
+}
+impl ::std::ops::BitAndAssign for TPRAccess {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: TPRAccess) {
+        self.0 &= rhs.0;
+    }
+}
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct TPRAccess(pub ::std::os::raw::c_uint);
+pub const CacheType_DATA_CACHE: CacheType = CacheType(0);
+pub const CacheType_INSTRUCTION_CACHE: CacheType = CacheType(1);
+pub const CacheType_UNIFIED_CACHE: CacheType = CacheType(2);
+impl ::std::ops::BitOr<CacheType> for CacheType {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        CacheType(self.0 | other.0)
+    }
+}
+impl ::std::ops::BitOrAssign for CacheType {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: CacheType) {
+        self.0 |= rhs.0;
+    }
+}
+impl ::std::ops::BitAnd<CacheType> for CacheType {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, other: Self) -> Self {
+        CacheType(self.0 & other.0)
+    }
+}
+impl ::std::ops::BitAndAssign for CacheType {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: CacheType) {
+        self.0 &= rhs.0;
+    }
+}
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct CacheType(pub ::std::os::raw::c_uint);
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct ARMMMUFaultInfo {
-    _unused: [u8; 0],
+pub struct CPUCacheInfo {
+    pub type_: CacheType,
+    pub level: u8,
+    pub size: u32,
+    pub line_size: u16,
+    pub associativity: u8,
+    pub partitions: u8,
+    pub sets: u32,
+    pub lines_per_tag: u8,
+    pub self_init: bool,
+    pub no_invd_sharing: bool,
+    pub inclusive: bool,
+    pub complex_indexing: bool,
+}
+#[test]
+fn bindgen_test_layout_CPUCacheInfo() {
+    const UNINIT: ::std::mem::MaybeUninit<CPUCacheInfo> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<CPUCacheInfo>(),
+        28usize,
+        concat!("Size of: ", stringify!(CPUCacheInfo))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<CPUCacheInfo>(),
+        4usize,
+        concat!("Alignment of ", stringify!(CPUCacheInfo))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).type_) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(type_)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).level) as usize - ptr as usize },
+        4usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(level)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).size) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(size)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).line_size) as usize - ptr as usize },
+        12usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(line_size)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).associativity) as usize - ptr as usize },
+        14usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(associativity)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).partitions) as usize - ptr as usize },
+        15usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(partitions)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).sets) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(sets)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).lines_per_tag) as usize - ptr as usize },
+        20usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(lines_per_tag)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).self_init) as usize - ptr as usize },
+        21usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(self_init)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).no_invd_sharing) as usize - ptr as usize },
+        22usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(no_invd_sharing)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).inclusive) as usize - ptr as usize },
+        23usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(inclusive)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).complex_indexing) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCacheInfo),
+            "::",
+            stringify!(complex_indexing)
+        )
+    );
+}
+impl Default for CPUCacheInfo {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct NVICState {
-    _unused: [u8; 0],
+pub struct CPUCaches {
+    pub l1d_cache: *mut CPUCacheInfo,
+    pub l1i_cache: *mut CPUCacheInfo,
+    pub l2_cache: *mut CPUCacheInfo,
+    pub l3_cache: *mut CPUCacheInfo,
+}
+#[test]
+fn bindgen_test_layout_CPUCaches() {
+    const UNINIT: ::std::mem::MaybeUninit<CPUCaches> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<CPUCaches>(),
+        32usize,
+        concat!("Size of: ", stringify!(CPUCaches))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<CPUCaches>(),
+        8usize,
+        concat!("Alignment of ", stringify!(CPUCaches))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).l1d_cache) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCaches),
+            "::",
+            stringify!(l1d_cache)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).l1i_cache) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCaches),
+            "::",
+            stringify!(l1i_cache)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).l2_cache) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCaches),
+            "::",
+            stringify!(l2_cache)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).l3_cache) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUCaches),
+            "::",
+            stringify!(l3_cache)
+        )
+    );
+}
+impl Default for CPUCaches {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
 }
 #[repr(C)]
 #[repr(align(16))]
 #[derive(Copy, Clone)]
 pub struct CPUArchState {
-    pub regs: [u32; 16usize],
-    pub xregs: [u64; 32usize],
-    pub pc: u64,
-    pub pstate: u32,
-    pub aarch64: bool,
-    pub thumb: bool,
-    pub hflags: CPUARMTBFlags,
-    pub uncached_cpsr: u32,
-    pub spsr: u32,
-    pub banked_spsr: [u64; 8usize],
-    pub banked_r13: [u32; 8usize],
-    pub banked_r14: [u32; 8usize],
-    pub usr_regs: [u32; 5usize],
-    pub fiq_regs: [u32; 5usize],
-    pub CF: u32,
-    pub VF: u32,
-    pub NF: u32,
-    pub ZF: u32,
-    pub QF: u32,
-    pub GE: u32,
-    pub condexec_bits: u32,
-    pub btype: u32,
-    pub daif: u64,
-    pub svcr: u64,
-    pub elr_el: [u64; 4usize],
-    pub sp_el: [u64; 4usize],
-    pub cp15: CPUArchState__bindgen_ty_1,
-    pub v7m: CPUArchState__bindgen_ty_2,
-    pub exception: CPUArchState__bindgen_ty_3,
-    pub serror: CPUArchState__bindgen_ty_4,
-    pub ext_dabt_raised: u8,
-    pub irq_line_state: u32,
-    pub teecr: u32,
-    pub teehbr: u32,
+    pub regs: [target_ulong; 16usize],
+    pub eip: target_ulong,
+    pub eflags: target_ulong,
+    pub cc_dst: target_ulong,
+    pub cc_src: target_ulong,
+    pub cc_src2: target_ulong,
+    pub cc_op: u32,
+    pub df: i32,
+    pub hflags: u32,
+    pub hflags2: u32,
+    pub segs: [SegmentCache; 6usize],
+    pub ldt: SegmentCache,
+    pub tr: SegmentCache,
+    pub gdt: SegmentCache,
+    pub idt: SegmentCache,
+    pub cr: [target_ulong; 5usize],
+    pub pdptrs_valid: bool,
+    pub pdptrs: [u64; 4usize],
+    pub a20_mask: i32,
+    pub bnd_regs: [BNDReg; 4usize],
+    pub bndcs_regs: BNDCSReg,
+    pub msr_bndcfgs: u64,
+    pub efer: u64,
+    pub start_init_save: CPUArchState__bindgen_ty_1,
+    pub fpstt: ::std::os::raw::c_uint,
+    pub fpus: u16,
+    pub fpuc: u16,
+    pub fptags: [u8; 8usize],
+    pub fpregs: [FPReg; 8usize],
+    pub fpop: u16,
+    pub fpcs: u16,
+    pub fpds: u16,
+    pub fpip: u64,
+    pub fpdp: u64,
+    pub fp_status: float_status,
+    pub ft0: floatx80,
+    pub mmx_status: float_status,
+    pub sse_status: float_status,
+    pub mxcsr: u32,
     pub __bindgen_padding_0: u64,
-    pub vfp: CPUArchState__bindgen_ty_5,
-    pub exclusive_addr: u64,
-    pub exclusive_val: u64,
-    pub exclusive_high: u64,
-    pub iwmmxt: CPUArchState__bindgen_ty_6,
-    pub cpu_breakpoint: [*mut CPUBreakpoint; 16usize],
-    pub cpu_watchpoint: [*mut CPUWatchpoint; 16usize],
-    pub tlb_fi: *mut ARMMMUFaultInfo,
-    pub end_reset_fields: CPUArchState__bindgen_ty_7,
-    pub features: u64,
-    pub pmsav7: CPUArchState__bindgen_ty_8,
-    pub pmsav8: CPUArchState__bindgen_ty_9,
-    pub sau: CPUArchState__bindgen_ty_10,
-    pub nvic: *mut NVICState,
-    pub boot_info: *const arm_boot_info,
-    pub gicv3state: *mut ::std::os::raw::c_void,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1 {
-    pub c0_cpuid: u32,
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_1,
-    pub __bindgen_anon_2: CPUArchState__bindgen_ty_1__bindgen_ty_2,
-    pub vsctlr: u64,
-    pub cpacr_el1: u64,
-    pub cptr_el: [u64; 4usize],
-    pub c1_xscaleauxcr: u32,
-    pub sder: u64,
-    pub nsacr: u32,
-    pub __bindgen_anon_3: CPUArchState__bindgen_ty_1__bindgen_ty_3,
-    pub __bindgen_anon_4: CPUArchState__bindgen_ty_1__bindgen_ty_4,
-    pub vttbr_el2: u64,
-    pub vsttbr_el2: u64,
-    pub tcr_el: [u64; 4usize],
-    pub vtcr_el2: u64,
-    pub vstcr_el2: u64,
-    pub c2_data: u32,
-    pub c2_insn: u32,
-    pub __bindgen_anon_5: CPUArchState__bindgen_ty_1__bindgen_ty_5,
-    pub pmsav5_data_ap: u32,
-    pub pmsav5_insn_ap: u32,
-    pub hcr_el2: u64,
-    pub hcrx_el2: u64,
-    pub scr_el3: u64,
-    pub __bindgen_anon_6: CPUArchState__bindgen_ty_1__bindgen_ty_6,
-    pub __bindgen_anon_7: CPUArchState__bindgen_ty_1__bindgen_ty_7,
-    pub c6_region: [u32; 8usize],
-    pub __bindgen_anon_8: CPUArchState__bindgen_ty_1__bindgen_ty_8,
-    pub hpfar_el2: u64,
-    pub hstr_el2: u64,
-    pub __bindgen_anon_9: CPUArchState__bindgen_ty_1__bindgen_ty_9,
-    pub c9_insn: u32,
-    pub c9_data: u32,
-    pub c9_pmcr: u64,
-    pub c9_pmcnten: u64,
-    pub c9_pmovsr: u64,
-    pub c9_pmuserenr: u64,
-    pub c9_pmselr: u64,
-    pub c9_pminten: u64,
-    pub __bindgen_anon_10: CPUArchState__bindgen_ty_1__bindgen_ty_10,
-    pub __bindgen_anon_11: CPUArchState__bindgen_ty_1__bindgen_ty_11,
-    pub mvbar: u32,
-    pub rvbar: u64,
-    pub __bindgen_anon_12: CPUArchState__bindgen_ty_1__bindgen_ty_12,
-    pub __bindgen_anon_13: CPUArchState__bindgen_ty_1__bindgen_ty_13,
-    pub __bindgen_anon_14: CPUArchState__bindgen_ty_1__bindgen_ty_14,
-    pub tpidr2_el0: u64,
-    pub tpidrurw_s: u64,
-    pub tpidrprw_s: u64,
-    pub tpidruro_s: u64,
-    pub __bindgen_anon_15: CPUArchState__bindgen_ty_1__bindgen_ty_15,
-    pub c14_cntfrq: u64,
-    pub c14_cntkctl: u64,
-    pub cnthctl_el2: u64,
-    pub cntvoff_el2: u64,
-    pub c14_timer: [ARMGenericTimer; 5usize],
-    pub c15_cpar: u32,
-    pub c15_ticonfig: u32,
-    pub c15_i_max: u32,
-    pub c15_i_min: u32,
-    pub c15_threadid: u32,
-    pub c15_config_base_address: u32,
-    pub c15_diagnostic: u32,
-    pub c15_power_diagnostic: u32,
-    pub c15_power_control: u32,
-    pub dbgbvr: [u64; 16usize],
-    pub dbgbcr: [u64; 16usize],
-    pub dbgwvr: [u64; 16usize],
-    pub dbgwcr: [u64; 16usize],
-    pub dbgclaim: u64,
-    pub mdscr_el1: u64,
-    pub oslsr_el1: u64,
-    pub osdlr_el1: u64,
-    pub mdcr_el2: u64,
-    pub mdcr_el3: u64,
-    pub c15_ccnt: u64,
-    pub c15_ccnt_delta: u64,
-    pub c14_pmevcntr: [u64; 31usize],
-    pub c14_pmevcntr_delta: [u64; 31usize],
-    pub c14_pmevtyper: [u64; 31usize],
-    pub pmccfiltr_el0: u64,
-    pub vpidr_el2: u64,
-    pub vmpidr_el2: u64,
-    pub tfsr_el: [u64; 4usize],
-    pub gcr_el1: u64,
-    pub rgsr_el1: u64,
-    pub disr_el1: u64,
-    pub vdisr_el2: u64,
-    pub vsesr_el2: u64,
-    pub fgt_read: [u64; 2usize],
-    pub fgt_write: [u64; 2usize],
-    pub fgt_exec: [u64; 1usize],
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_1 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1,
-    pub csselr_el: [u64; 4usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
-    pub _unused_csselr0: u64,
-    pub csselr_ns: u64,
-    pub _unused_csselr1: u64,
-    pub csselr_s: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_csselr0) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1),
-            "::",
-            stringify!(_unused_csselr0)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).csselr_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1),
-            "::",
-            stringify!(csselr_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_csselr1) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1),
-            "::",
-            stringify!(_unused_csselr1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).csselr_s) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1),
-            "::",
-            stringify!(csselr_s)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).csselr_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_1),
-            "::",
-            stringify!(csselr_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_1 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_1 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_2 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1,
-    pub sctlr_el: [u64; 4usize],
+    pub xmm_regs: [ZMMReg; 32usize],
+    pub xmm_t0: ZMMReg,
+    pub mmx_t0: MMXReg,
+    pub opmask_regs: [u64; 8usize],
+    pub xtilecfg: [u8; 64usize],
+    pub xtiledata: [u8; 8192usize],
+    pub sysenter_cs: u32,
+    pub sysenter_esp: target_ulong,
+    pub sysenter_eip: target_ulong,
+    pub star: u64,
+    pub vm_hsave: u64,
+    pub lstar: target_ulong,
+    pub cstar: target_ulong,
+    pub fmask: target_ulong,
+    pub kernelgsbase: target_ulong,
+    pub tsc_adjust: u64,
+    pub tsc_deadline: u64,
+    pub tsc_aux: u64,
+    pub xcr0: u64,
+    pub mcg_status: u64,
+    pub msr_ia32_misc_enable: u64,
+    pub msr_ia32_feature_control: u64,
+    pub msr_ia32_sgxlepubkeyhash: [u64; 4usize],
+    pub msr_fixed_ctr_ctrl: u64,
+    pub msr_global_ctrl: u64,
+    pub msr_global_status: u64,
+    pub msr_global_ovf_ctrl: u64,
+    pub msr_fixed_counters: [u64; 3usize],
+    pub msr_gp_counters: [u64; 18usize],
+    pub msr_gp_evtsel: [u64; 18usize],
+    pub pat: u64,
+    pub smbase: u32,
+    pub msr_smi_count: u64,
+    pub pkru: u32,
+    pub pkrs: u32,
+    pub tsx_ctrl: u32,
+    pub spec_ctrl: u64,
+    pub amd_tsc_scale_msr: u64,
+    pub virt_ssbd: u64,
+    pub end_init_save: CPUArchState__bindgen_ty_2,
+    pub system_time_msr: u64,
+    pub wall_clock_msr: u64,
+    pub steal_time_msr: u64,
+    pub async_pf_en_msr: u64,
+    pub async_pf_int_msr: u64,
+    pub pv_eoi_en_msr: u64,
+    pub poll_control_msr: u64,
+    pub msr_hv_hypercall: u64,
+    pub msr_hv_guest_os_id: u64,
+    pub msr_hv_tsc: u64,
+    pub msr_hv_syndbg_control: u64,
+    pub msr_hv_syndbg_status: u64,
+    pub msr_hv_syndbg_send_page: u64,
+    pub msr_hv_syndbg_recv_page: u64,
+    pub msr_hv_syndbg_pending_page: u64,
+    pub msr_hv_syndbg_options: u64,
+    pub msr_hv_vapic: u64,
+    pub msr_hv_crash_params: [u64; 5usize],
+    pub msr_hv_runtime: u64,
+    pub msr_hv_synic_control: u64,
+    pub msr_hv_synic_evt_page: u64,
+    pub msr_hv_synic_msg_page: u64,
+    pub msr_hv_synic_sint: [u64; 16usize],
+    pub msr_hv_stimer_config: [u64; 4usize],
+    pub msr_hv_stimer_count: [u64; 4usize],
+    pub msr_hv_reenlightenment_control: u64,
+    pub msr_hv_tsc_emulation_control: u64,
+    pub msr_hv_tsc_emulation_status: u64,
+    pub msr_rtit_ctrl: u64,
+    pub msr_rtit_status: u64,
+    pub msr_rtit_output_base: u64,
+    pub msr_rtit_output_mask: u64,
+    pub msr_rtit_cr3_match: u64,
+    pub msr_rtit_addrs: [u64; 8usize],
+    pub msr_xfd: u64,
+    pub msr_xfd_err: u64,
+    pub msr_lbr_ctl: u64,
+    pub msr_lbr_depth: u64,
+    pub lbr_records: [LBREntry; 32usize],
+    pub error_code: ::std::os::raw::c_int,
+    pub exception_is_int: ::std::os::raw::c_int,
+    pub exception_next_eip: target_ulong,
+    pub dr: [target_ulong; 8usize],
+    pub __bindgen_anon_1: CPUArchState__bindgen_ty_3,
+    pub old_exception: ::std::os::raw::c_int,
+    pub vm_vmcb: u64,
+    pub tsc_offset: u64,
+    pub intercept: u64,
+    pub intercept_cr_read: u16,
+    pub intercept_cr_write: u16,
+    pub intercept_dr_read: u16,
+    pub intercept_dr_write: u16,
+    pub intercept_exceptions: u32,
+    pub nested_cr3: u64,
+    pub nested_pg_mode: u32,
+    pub v_tpr: u8,
+    pub int_ctl: u32,
+    pub nmi_injected: u8,
+    pub nmi_pending: u8,
+    pub retaddr: usize,
+    pub end_reset_fields: CPUArchState__bindgen_ty_4,
+    pub cpuid_level_func7: u32,
+    pub cpuid_min_level_func7: u32,
+    pub cpuid_min_level: u32,
+    pub cpuid_min_xlevel: u32,
+    pub cpuid_min_xlevel2: u32,
+    pub cpuid_max_level: u32,
+    pub cpuid_max_xlevel: u32,
+    pub cpuid_max_xlevel2: u32,
+    pub cpuid_level: u32,
+    pub cpuid_xlevel: u32,
+    pub cpuid_xlevel2: u32,
+    pub cpuid_vendor1: u32,
+    pub cpuid_vendor2: u32,
+    pub cpuid_vendor3: u32,
+    pub cpuid_version: u32,
+    pub features: FeatureWordArray,
+    pub user_features: FeatureWordArray,
+    pub cpuid_model: [u32; 12usize],
+    pub cache_info_cpuid2: CPUCaches,
+    pub cache_info_cpuid4: CPUCaches,
+    pub cache_info_amd: CPUCaches,
+    pub mtrr_fixed: [u64; 11usize],
+    pub mtrr_deftype: u64,
+    pub mtrr_var: [MTRRVar; 8usize],
+    pub mp_state: u32,
+    pub exception_nr: i32,
+    pub interrupt_injected: i32,
+    pub soft_interrupt: u8,
+    pub exception_pending: u8,
+    pub exception_injected: u8,
+    pub has_error_code: u8,
+    pub exception_has_payload: u8,
+    pub exception_payload: u64,
+    pub triple_fault_pending: u8,
+    pub ins_len: u32,
+    pub sipi_vector: u32,
+    pub tsc_valid: bool,
+    pub tsc_khz: i64,
+    pub user_tsc_khz: i64,
+    pub apic_bus_freq: u64,
+    pub tsc: u64,
+    pub mcg_cap: u64,
+    pub mcg_ctl: u64,
+    pub mcg_ext_ctl: u64,
+    pub mce_banks: [u64; 40usize],
+    pub xstate_bv: u64,
+    pub fpus_vmstate: u16,
+    pub fptag_vmstate: u16,
+    pub fpregs_format_vmstate: u16,
+    pub xss: u64,
+    pub umwait: u32,
+    pub tpr_access_type: TPRAccess,
+    pub nr_dies: ::std::os::raw::c_uint,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1 {
-    pub _unused_sctlr: u64,
-    pub sctlr_ns: u64,
-    pub hsctlr: u64,
-    pub sctlr_s: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_sctlr) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1),
-            "::",
-            stringify!(_unused_sctlr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).sctlr_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1),
-            "::",
-            stringify!(sctlr_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hsctlr) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1),
-            "::",
-            stringify!(hsctlr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).sctlr_s) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_2__bindgen_ty_1),
-            "::",
-            stringify!(sctlr_s)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_2() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_2> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_2>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_2)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_2>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).sctlr_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_2),
-            "::",
-            stringify!(sctlr_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_2 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_2 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_2 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_3 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1,
-    pub ttbr0_el: [u64; 4usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1 {
-    pub _unused_ttbr0_0: u64,
-    pub ttbr0_ns: u64,
-    pub _unused_ttbr0_1: u64,
-    pub ttbr0_s: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_ttbr0_0) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1),
-            "::",
-            stringify!(_unused_ttbr0_0)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ttbr0_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1),
-            "::",
-            stringify!(ttbr0_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_ttbr0_1) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1),
-            "::",
-            stringify!(_unused_ttbr0_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ttbr0_s) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_3__bindgen_ty_1),
-            "::",
-            stringify!(ttbr0_s)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_3() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_3> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_3>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_3)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_3>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_3)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ttbr0_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_3),
-            "::",
-            stringify!(ttbr0_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_3 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_3 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_3 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_4 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1,
-    pub ttbr1_el: [u64; 4usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1 {
-    pub _unused_ttbr1_0: u64,
-    pub ttbr1_ns: u64,
-    pub _unused_ttbr1_1: u64,
-    pub ttbr1_s: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_ttbr1_0) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1),
-            "::",
-            stringify!(_unused_ttbr1_0)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ttbr1_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1),
-            "::",
-            stringify!(ttbr1_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_ttbr1_1) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1),
-            "::",
-            stringify!(_unused_ttbr1_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ttbr1_s) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_4__bindgen_ty_1),
-            "::",
-            stringify!(ttbr1_s)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_4() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_4> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_4>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_4)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_4>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_4)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ttbr1_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_4),
-            "::",
-            stringify!(ttbr1_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_4 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_4 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_4 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_5 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1,
-    pub __bindgen_anon_2: CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_2,
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1 {
-    pub dacr_ns: u64,
-    pub dacr_s: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1>(),
-        16usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dacr_ns) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1),
-            "::",
-            stringify!(dacr_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dacr_s) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1),
-            "::",
-            stringify!(dacr_s)
-        )
-    );
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_2 {
-    pub dacr32_el2: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_2() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_2> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_2>(),
-        8usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_2)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_2>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dacr32_el2) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_5__bindgen_ty_2),
-            "::",
-            stringify!(dacr32_el2)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_5() {
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_5>(),
-        16usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_5)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_5>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_5)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_5 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_5 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_5 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_6 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_1,
-    pub __bindgen_anon_2: CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_2,
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_1 {
-    pub ifsr_ns: u64,
-    pub ifsr_s: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_1>(),
-        16usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ifsr_ns) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_1),
-            "::",
-            stringify!(ifsr_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ifsr_s) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_1),
-            "::",
-            stringify!(ifsr_s)
-        )
-    );
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_2 {
-    pub ifsr32_el2: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_2() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_2> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_2>(),
-        8usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_2)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_2>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ifsr32_el2) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_6__bindgen_ty_2),
-            "::",
-            stringify!(ifsr32_el2)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_6() {
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_6>(),
-        16usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_6)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_6>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_6)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_6 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_6 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_6 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_7 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1,
-    pub esr_el: [u64; 4usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1 {
-    pub _unused_dfsr: u64,
-    pub dfsr_ns: u64,
-    pub hsr: u64,
-    pub dfsr_s: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_dfsr) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1),
-            "::",
-            stringify!(_unused_dfsr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dfsr_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1),
-            "::",
-            stringify!(dfsr_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hsr) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1),
-            "::",
-            stringify!(hsr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dfsr_s) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_7__bindgen_ty_1),
-            "::",
-            stringify!(dfsr_s)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_7() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_7> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_7>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_7)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_7>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_7)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).esr_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_7),
-            "::",
-            stringify!(esr_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_7 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_7 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_7 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_8 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1,
-    pub far_el: [u64; 4usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1 {
-    pub _unused_far0: u64,
-    pub dfar_ns: u32,
-    pub ifar_ns: u32,
-    pub dfar_s: u32,
-    pub ifar_s: u32,
-    pub _unused_far3: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_far0) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1),
-            "::",
-            stringify!(_unused_far0)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dfar_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1),
-            "::",
-            stringify!(dfar_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ifar_ns) as usize - ptr as usize },
-        12usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1),
-            "::",
-            stringify!(ifar_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dfar_s) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1),
-            "::",
-            stringify!(dfar_s)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ifar_s) as usize - ptr as usize },
-        20usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1),
-            "::",
-            stringify!(ifar_s)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_far3) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8__bindgen_ty_1),
-            "::",
-            stringify!(_unused_far3)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_8() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_8> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_8>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_8>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).far_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_8),
-            "::",
-            stringify!(far_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_8 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_8 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_8 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_9 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1,
-    pub par_el: [u64; 4usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1 {
-    pub _unused_par_0: u64,
-    pub par_ns: u64,
-    pub _unused_par_1: u64,
-    pub par_s: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_par_0) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1),
-            "::",
-            stringify!(_unused_par_0)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).par_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1),
-            "::",
-            stringify!(par_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_par_1) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1),
-            "::",
-            stringify!(_unused_par_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).par_s) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_9__bindgen_ty_1),
-            "::",
-            stringify!(par_s)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_9() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_9> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_9>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_9)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_9>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_9)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).par_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_9),
-            "::",
-            stringify!(par_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_9 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_9 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_9 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_10 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1,
-    pub mair_el: [u64; 4usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1 {
-    pub _unused_mair_0: u64,
-    pub mair0_ns: u32,
-    pub mair1_ns: u32,
-    pub _unused_mair_1: u64,
-    pub mair0_s: u32,
-    pub mair1_s: u32,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_mair_0) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1),
-            "::",
-            stringify!(_unused_mair_0)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mair0_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1),
-            "::",
-            stringify!(mair0_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mair1_ns) as usize - ptr as usize },
-        12usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1),
-            "::",
-            stringify!(mair1_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_mair_1) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1),
-            "::",
-            stringify!(_unused_mair_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mair0_s) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1),
-            "::",
-            stringify!(mair0_s)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mair1_s) as usize - ptr as usize },
-        28usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10__bindgen_ty_1),
-            "::",
-            stringify!(mair1_s)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_10() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_10> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_10>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_10>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mair_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_10),
-            "::",
-            stringify!(mair_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_10 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_10 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_10 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_11 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1,
-    pub vbar_el: [u64; 4usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1 {
-    pub _unused_vbar: u64,
-    pub vbar_ns: u64,
-    pub hvbar: u64,
-    pub vbar_s: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_vbar) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1),
-            "::",
-            stringify!(_unused_vbar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vbar_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1),
-            "::",
-            stringify!(vbar_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hvbar) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1),
-            "::",
-            stringify!(hvbar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vbar_s) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_11__bindgen_ty_1),
-            "::",
-            stringify!(vbar_s)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_11() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_11> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_11>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_11)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_11>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_11)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vbar_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_11),
-            "::",
-            stringify!(vbar_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_11 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_11 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_11 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_12 {
-    pub fcseidr_ns: u32,
-    pub fcseidr_s: u32,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_12() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_12> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_12>(),
-        8usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_12)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_12>(),
-        4usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_12)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fcseidr_ns) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_12),
-            "::",
-            stringify!(fcseidr_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fcseidr_s) as usize - ptr as usize },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_12),
-            "::",
-            stringify!(fcseidr_s)
-        )
-    );
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_13 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1,
-    pub contextidr_el: [u64; 4usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1 {
-    pub _unused_contextidr_0: u64,
-    pub contextidr_ns: u64,
-    pub _unused_contextidr_1: u64,
-    pub contextidr_s: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_contextidr_0) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1),
-            "::",
-            stringify!(_unused_contextidr_0)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).contextidr_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1),
-            "::",
-            stringify!(contextidr_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._unused_contextidr_1) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1),
-            "::",
-            stringify!(_unused_contextidr_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).contextidr_s) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_13__bindgen_ty_1),
-            "::",
-            stringify!(contextidr_s)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_13() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_13> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_13>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_13)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_13>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_13)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).contextidr_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_13),
-            "::",
-            stringify!(contextidr_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_13 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_13 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_13 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_14 {
-    pub __bindgen_anon_1: CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1,
-    pub tpidr_el: [u64; 4usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1 {
-    pub tpidrurw_ns: u64,
-    pub tpidrprw_ns: u64,
-    pub htpidr: u64,
-    pub _tpidr_el3: u64,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tpidrurw_ns) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1),
-            "::",
-            stringify!(tpidrurw_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tpidrprw_ns) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1),
-            "::",
-            stringify!(tpidrprw_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).htpidr) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1),
-            "::",
-            stringify!(htpidr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr)._tpidr_el3) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_14__bindgen_ty_1),
-            "::",
-            stringify!(_tpidr_el3)
-        )
-    );
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_14() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_14> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_14>(),
-        32usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_14)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_14>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_14)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tpidr_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_14),
-            "::",
-            stringify!(tpidr_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_14 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_14 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_14 {{ union }}")
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union CPUArchState__bindgen_ty_1__bindgen_ty_15 {
-    pub tpidruro_ns: u64,
-    pub tpidrro_el: [u64; 1usize],
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_1__bindgen_ty_15() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1__bindgen_ty_15> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_1__bindgen_ty_15>(),
-        8usize,
-        concat!(
-            "Size of: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_15)
-        )
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_1__bindgen_ty_15>(),
-        8usize,
-        concat!(
-            "Alignment of ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_15)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tpidruro_ns) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_15),
-            "::",
-            stringify!(tpidruro_ns)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tpidrro_el) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1__bindgen_ty_15),
-            "::",
-            stringify!(tpidrro_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1__bindgen_ty_15 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1__bindgen_ty_15 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "CPUArchState__bindgen_ty_1__bindgen_ty_15 {{ union }}")
-    }
-}
+pub struct CPUArchState__bindgen_ty_1 {}
 #[test]
 fn bindgen_test_layout_CPUArchState__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CPUArchState__bindgen_ty_1>(),
-        2344usize,
+        0usize,
         concat!("Size of: ", stringify!(CPUArchState__bindgen_ty_1))
     );
     assert_eq!(
         ::std::mem::align_of::<CPUArchState__bindgen_ty_1>(),
-        8usize,
+        1usize,
         concat!("Alignment of ", stringify!(CPUArchState__bindgen_ty_1))
     );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c0_cpuid) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c0_cpuid)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vsctlr) as usize - ptr as usize },
-        72usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(vsctlr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cpacr_el1) as usize - ptr as usize },
-        80usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(cpacr_el1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cptr_el) as usize - ptr as usize },
-        88usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(cptr_el)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c1_xscaleauxcr) as usize - ptr as usize },
-        120usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c1_xscaleauxcr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).sder) as usize - ptr as usize },
-        128usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(sder)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).nsacr) as usize - ptr as usize },
-        136usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(nsacr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vttbr_el2) as usize - ptr as usize },
-        208usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(vttbr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vsttbr_el2) as usize - ptr as usize },
-        216usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(vsttbr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tcr_el) as usize - ptr as usize },
-        224usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(tcr_el)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vtcr_el2) as usize - ptr as usize },
-        256usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(vtcr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vstcr_el2) as usize - ptr as usize },
-        264usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(vstcr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c2_data) as usize - ptr as usize },
-        272usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c2_data)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c2_insn) as usize - ptr as usize },
-        276usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c2_insn)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pmsav5_data_ap) as usize - ptr as usize },
-        296usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(pmsav5_data_ap)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pmsav5_insn_ap) as usize - ptr as usize },
-        300usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(pmsav5_insn_ap)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hcr_el2) as usize - ptr as usize },
-        304usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(hcr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hcrx_el2) as usize - ptr as usize },
-        312usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(hcrx_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).scr_el3) as usize - ptr as usize },
-        320usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(scr_el3)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c6_region) as usize - ptr as usize },
-        376usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c6_region)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hpfar_el2) as usize - ptr as usize },
-        440usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(hpfar_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hstr_el2) as usize - ptr as usize },
-        448usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(hstr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c9_insn) as usize - ptr as usize },
-        488usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c9_insn)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c9_data) as usize - ptr as usize },
-        492usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c9_data)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c9_pmcr) as usize - ptr as usize },
-        496usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c9_pmcr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c9_pmcnten) as usize - ptr as usize },
-        504usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c9_pmcnten)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c9_pmovsr) as usize - ptr as usize },
-        512usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c9_pmovsr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c9_pmuserenr) as usize - ptr as usize },
-        520usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c9_pmuserenr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c9_pmselr) as usize - ptr as usize },
-        528usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c9_pmselr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c9_pminten) as usize - ptr as usize },
-        536usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c9_pminten)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mvbar) as usize - ptr as usize },
-        608usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(mvbar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rvbar) as usize - ptr as usize },
-        616usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(rvbar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tpidr2_el0) as usize - ptr as usize },
-        696usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(tpidr2_el0)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tpidrurw_s) as usize - ptr as usize },
-        704usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(tpidrurw_s)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tpidrprw_s) as usize - ptr as usize },
-        712usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(tpidrprw_s)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tpidruro_s) as usize - ptr as usize },
-        720usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(tpidruro_s)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c14_cntfrq) as usize - ptr as usize },
-        736usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c14_cntfrq)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c14_cntkctl) as usize - ptr as usize },
-        744usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c14_cntkctl)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cnthctl_el2) as usize - ptr as usize },
-        752usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(cnthctl_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cntvoff_el2) as usize - ptr as usize },
-        760usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(cntvoff_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c14_timer) as usize - ptr as usize },
-        768usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c14_timer)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_cpar) as usize - ptr as usize },
-        848usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_cpar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_ticonfig) as usize - ptr as usize },
-        852usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_ticonfig)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_i_max) as usize - ptr as usize },
-        856usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_i_max)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_i_min) as usize - ptr as usize },
-        860usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_i_min)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_threadid) as usize - ptr as usize },
-        864usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_threadid)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_config_base_address) as usize - ptr as usize },
-        868usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_config_base_address)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_diagnostic) as usize - ptr as usize },
-        872usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_diagnostic)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_power_diagnostic) as usize - ptr as usize },
-        876usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_power_diagnostic)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_power_control) as usize - ptr as usize },
-        880usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_power_control)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dbgbvr) as usize - ptr as usize },
-        888usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(dbgbvr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dbgbcr) as usize - ptr as usize },
-        1016usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(dbgbcr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dbgwvr) as usize - ptr as usize },
-        1144usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(dbgwvr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dbgwcr) as usize - ptr as usize },
-        1272usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(dbgwcr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dbgclaim) as usize - ptr as usize },
-        1400usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(dbgclaim)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mdscr_el1) as usize - ptr as usize },
-        1408usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(mdscr_el1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).oslsr_el1) as usize - ptr as usize },
-        1416usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(oslsr_el1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).osdlr_el1) as usize - ptr as usize },
-        1424usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(osdlr_el1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mdcr_el2) as usize - ptr as usize },
-        1432usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(mdcr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mdcr_el3) as usize - ptr as usize },
-        1440usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(mdcr_el3)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_ccnt) as usize - ptr as usize },
-        1448usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_ccnt)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c15_ccnt_delta) as usize - ptr as usize },
-        1456usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c15_ccnt_delta)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c14_pmevcntr) as usize - ptr as usize },
-        1464usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c14_pmevcntr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c14_pmevcntr_delta) as usize - ptr as usize },
-        1712usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c14_pmevcntr_delta)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).c14_pmevtyper) as usize - ptr as usize },
-        1960usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(c14_pmevtyper)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pmccfiltr_el0) as usize - ptr as usize },
-        2208usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(pmccfiltr_el0)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vpidr_el2) as usize - ptr as usize },
-        2216usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(vpidr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vmpidr_el2) as usize - ptr as usize },
-        2224usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(vmpidr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tfsr_el) as usize - ptr as usize },
-        2232usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(tfsr_el)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).gcr_el1) as usize - ptr as usize },
-        2264usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(gcr_el1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rgsr_el1) as usize - ptr as usize },
-        2272usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(rgsr_el1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).disr_el1) as usize - ptr as usize },
-        2280usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(disr_el1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vdisr_el2) as usize - ptr as usize },
-        2288usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(vdisr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vsesr_el2) as usize - ptr as usize },
-        2296usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(vsesr_el2)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fgt_read) as usize - ptr as usize },
-        2304usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(fgt_read)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fgt_write) as usize - ptr as usize },
-        2320usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(fgt_write)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fgt_exec) as usize - ptr as usize },
-        2336usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_1),
-            "::",
-            stringify!(fgt_exec)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_1 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "CPUArchState__bindgen_ty_1 {{ __bindgen_anon_1: {:?}, __bindgen_anon_2: {:?}, cptr_el: {:?}, __bindgen_anon_3: {:?}, __bindgen_anon_4: {:?}, tcr_el: {:?}, __bindgen_anon_5: {:?}, __bindgen_anon_6: {:?}, __bindgen_anon_7: {:?}, c6_region: {:?}, __bindgen_anon_8: {:?}, __bindgen_anon_9: {:?}, __bindgen_anon_10: {:?}, __bindgen_anon_11: {:?}, __bindgen_anon_12: {:?}, __bindgen_anon_13: {:?}, __bindgen_anon_14: {:?}, __bindgen_anon_15: {:?}, c14_timer: {:?}, dbgbvr: {:?}, dbgbcr: {:?}, dbgwvr: {:?}, dbgwcr: {:?}, c14_pmevcntr: {:?}, c14_pmevcntr_delta: {:?}, c14_pmevtyper: {:?}, tfsr_el: {:?}, fgt_read: {:?}, fgt_write: {:?}, fgt_exec: {:?} }}" , self . __bindgen_anon_1 , self . __bindgen_anon_2 , self . cptr_el , self . __bindgen_anon_3 , self . __bindgen_anon_4 , self . tcr_el , self . __bindgen_anon_5 , self . __bindgen_anon_6 , self . __bindgen_anon_7 , self . c6_region , self . __bindgen_anon_8 , self . __bindgen_anon_9 , self . __bindgen_anon_10 , self . __bindgen_anon_11 , self . __bindgen_anon_12 , self . __bindgen_anon_13 , self . __bindgen_anon_14 , self . __bindgen_anon_15 , self . c14_timer , self . dbgbvr , self . dbgbcr , self . dbgwvr , self . dbgwcr , self . c14_pmevcntr , self . c14_pmevcntr_delta , self . c14_pmevtyper , self . tfsr_el , self . fgt_read , self . fgt_write , self . fgt_exec)
-    }
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_2 {
-    pub other_sp: u32,
-    pub other_ss_msp: u32,
-    pub other_ss_psp: u32,
-    pub vecbase: [u32; 2usize],
-    pub basepri: [u32; 2usize],
-    pub control: [u32; 2usize],
-    pub ccr: [u32; 2usize],
-    pub cfsr: [u32; 2usize],
-    pub hfsr: u32,
-    pub dfsr: u32,
-    pub sfsr: u32,
-    pub mmfar: [u32; 2usize],
-    pub bfar: u32,
-    pub sfar: u32,
-    pub mpu_ctrl: [::std::os::raw::c_uint; 2usize],
-    pub exception: ::std::os::raw::c_int,
-    pub primask: [u32; 2usize],
-    pub faultmask: [u32; 2usize],
-    pub aircr: u32,
-    pub secure: u32,
-    pub csselr: [u32; 2usize],
-    pub scr: [u32; 2usize],
-    pub msplim: [u32; 2usize],
-    pub psplim: [u32; 2usize],
-    pub fpcar: [u32; 2usize],
-    pub fpccr: [u32; 2usize],
-    pub fpdscr: [u32; 2usize],
-    pub cpacr: [u32; 2usize],
-    pub nsacr: u32,
-    pub ltpsize: u32,
-    pub vpr: u32,
-}
+pub struct CPUArchState__bindgen_ty_2 {}
 #[test]
 fn bindgen_test_layout_CPUArchState__bindgen_ty_2() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_2> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CPUArchState__bindgen_ty_2>(),
-        192usize,
+        0usize,
         concat!("Size of: ", stringify!(CPUArchState__bindgen_ty_2))
     );
     assert_eq!(
         ::std::mem::align_of::<CPUArchState__bindgen_ty_2>(),
-        4usize,
+        1usize,
         concat!("Alignment of ", stringify!(CPUArchState__bindgen_ty_2))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).other_sp) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(other_sp)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).other_ss_msp) as usize - ptr as usize },
-        4usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(other_ss_msp)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).other_ss_psp) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(other_ss_psp)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vecbase) as usize - ptr as usize },
-        12usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(vecbase)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).basepri) as usize - ptr as usize },
-        20usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(basepri)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).control) as usize - ptr as usize },
-        28usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(control)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ccr) as usize - ptr as usize },
-        36usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(ccr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cfsr) as usize - ptr as usize },
-        44usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(cfsr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hfsr) as usize - ptr as usize },
-        52usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(hfsr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dfsr) as usize - ptr as usize },
-        56usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(dfsr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).sfsr) as usize - ptr as usize },
-        60usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(sfsr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mmfar) as usize - ptr as usize },
-        64usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(mmfar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).bfar) as usize - ptr as usize },
-        72usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(bfar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).sfar) as usize - ptr as usize },
-        76usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(sfar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mpu_ctrl) as usize - ptr as usize },
-        80usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(mpu_ctrl)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).exception) as usize - ptr as usize },
-        88usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(exception)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).primask) as usize - ptr as usize },
-        92usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(primask)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).faultmask) as usize - ptr as usize },
-        100usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(faultmask)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).aircr) as usize - ptr as usize },
-        108usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(aircr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).secure) as usize - ptr as usize },
-        112usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(secure)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).csselr) as usize - ptr as usize },
-        116usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(csselr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).scr) as usize - ptr as usize },
-        124usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(scr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).msplim) as usize - ptr as usize },
-        132usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(msplim)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).psplim) as usize - ptr as usize },
-        140usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(psplim)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fpcar) as usize - ptr as usize },
-        148usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(fpcar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fpccr) as usize - ptr as usize },
-        156usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(fpccr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fpdscr) as usize - ptr as usize },
-        164usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(fpdscr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cpacr) as usize - ptr as usize },
-        172usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(cpacr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).nsacr) as usize - ptr as usize },
-        180usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(nsacr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ltpsize) as usize - ptr as usize },
-        184usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(ltpsize)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vpr) as usize - ptr as usize },
-        188usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_2),
-            "::",
-            stringify!(vpr)
-        )
     );
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_3 {
-    pub syndrome: u32,
-    pub fsr: u32,
-    pub vaddress: u64,
-    pub target_el: u32,
+#[derive(Copy, Clone)]
+pub union CPUArchState__bindgen_ty_3 {
+    pub cpu_breakpoint: [*mut CPUBreakpoint; 4usize],
+    pub cpu_watchpoint: [*mut CPUWatchpoint; 4usize],
 }
 #[test]
 fn bindgen_test_layout_CPUArchState__bindgen_ty_3() {
@@ -13499,7 +8083,7 @@ fn bindgen_test_layout_CPUArchState__bindgen_ty_3() {
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CPUArchState__bindgen_ty_3>(),
-        24usize,
+        32usize,
         concat!("Size of: ", stringify!(CPUArchState__bindgen_ty_3))
     );
     assert_eq!(
@@ -13508,581 +8092,55 @@ fn bindgen_test_layout_CPUArchState__bindgen_ty_3() {
         concat!("Alignment of ", stringify!(CPUArchState__bindgen_ty_3))
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).syndrome) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).cpu_breakpoint) as usize - ptr as usize },
         0usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState__bindgen_ty_3),
             "::",
-            stringify!(syndrome)
+            stringify!(cpu_breakpoint)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fsr) as usize - ptr as usize },
-        4usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).cpu_watchpoint) as usize - ptr as usize },
+        0usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState__bindgen_ty_3),
             "::",
-            stringify!(fsr)
+            stringify!(cpu_watchpoint)
         )
     );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vaddress) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_3),
-            "::",
-            stringify!(vaddress)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).target_el) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_3),
-            "::",
-            stringify!(target_el)
-        )
-    );
+}
+impl Default for CPUArchState__bindgen_ty_3 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ::std::fmt::Debug for CPUArchState__bindgen_ty_3 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "CPUArchState__bindgen_ty_3 {{ union }}")
+    }
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_4 {
-    pub pending: u8,
-    pub has_esr: u8,
-    pub esr: u64,
-}
+pub struct CPUArchState__bindgen_ty_4 {}
 #[test]
 fn bindgen_test_layout_CPUArchState__bindgen_ty_4() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_4> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CPUArchState__bindgen_ty_4>(),
-        16usize,
+        0usize,
         concat!("Size of: ", stringify!(CPUArchState__bindgen_ty_4))
     );
     assert_eq!(
         ::std::mem::align_of::<CPUArchState__bindgen_ty_4>(),
-        8usize,
+        1usize,
         concat!("Alignment of ", stringify!(CPUArchState__bindgen_ty_4))
     );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pending) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_4),
-            "::",
-            stringify!(pending)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).has_esr) as usize - ptr as usize },
-        1usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_4),
-            "::",
-            stringify!(has_esr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).esr) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_4),
-            "::",
-            stringify!(esr)
-        )
-    );
-}
-#[repr(C)]
-#[repr(align(16))]
-#[derive(Debug, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_5 {
-    pub zregs: [ARMVectorReg; 32usize],
-    pub qc: [u32; 4usize],
-    pub vec_len: ::std::os::raw::c_int,
-    pub vec_stride: ::std::os::raw::c_int,
-    pub xregs: [u32; 16usize],
-    pub scratch: [u32; 8usize],
-    pub fp_status: float_status,
-    pub fp_status_f16: float_status,
-    pub standard_fp_status: float_status,
-    pub standard_fp_status_f16: float_status,
-    pub zcr_el: [u64; 4usize],
-    pub smcr_el: [u64; 4usize],
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_5() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_5> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_5>(),
-        752usize,
-        concat!("Size of: ", stringify!(CPUArchState__bindgen_ty_5))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_5>(),
-        16usize,
-        concat!("Alignment of ", stringify!(CPUArchState__bindgen_ty_5))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).zregs) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(zregs)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).qc) as usize - ptr as usize },
-        512usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(qc)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vec_len) as usize - ptr as usize },
-        528usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(vec_len)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vec_stride) as usize - ptr as usize },
-        532usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(vec_stride)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).xregs) as usize - ptr as usize },
-        536usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(xregs)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).scratch) as usize - ptr as usize },
-        600usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(scratch)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fp_status) as usize - ptr as usize },
-        632usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(fp_status)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fp_status_f16) as usize - ptr as usize },
-        646usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(fp_status_f16)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).standard_fp_status) as usize - ptr as usize },
-        660usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(standard_fp_status)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).standard_fp_status_f16) as usize - ptr as usize },
-        674usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(standard_fp_status_f16)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).zcr_el) as usize - ptr as usize },
-        688usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(zcr_el)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).smcr_el) as usize - ptr as usize },
-        720usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_5),
-            "::",
-            stringify!(smcr_el)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_5 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_6 {
-    pub regs: [u64; 16usize],
-    pub val: u64,
-    pub cregs: [u32; 16usize],
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_6() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_6> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_6>(),
-        200usize,
-        concat!("Size of: ", stringify!(CPUArchState__bindgen_ty_6))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_6>(),
-        8usize,
-        concat!("Alignment of ", stringify!(CPUArchState__bindgen_ty_6))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).regs) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_6),
-            "::",
-            stringify!(regs)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).val) as usize - ptr as usize },
-        128usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_6),
-            "::",
-            stringify!(val)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cregs) as usize - ptr as usize },
-        136usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_6),
-            "::",
-            stringify!(cregs)
-        )
-    );
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_7 {}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_7() {
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_7>(),
-        0usize,
-        concat!("Size of: ", stringify!(CPUArchState__bindgen_ty_7))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_7>(),
-        1usize,
-        concat!("Alignment of ", stringify!(CPUArchState__bindgen_ty_7))
-    );
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_8 {
-    pub drbar: *mut u32,
-    pub drsr: *mut u32,
-    pub dracr: *mut u32,
-    pub rnr: [u32; 2usize],
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_8() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_8> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_8>(),
-        32usize,
-        concat!("Size of: ", stringify!(CPUArchState__bindgen_ty_8))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_8>(),
-        8usize,
-        concat!("Alignment of ", stringify!(CPUArchState__bindgen_ty_8))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).drbar) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_8),
-            "::",
-            stringify!(drbar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).drsr) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_8),
-            "::",
-            stringify!(drsr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dracr) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_8),
-            "::",
-            stringify!(dracr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rnr) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_8),
-            "::",
-            stringify!(rnr)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_8 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_9 {
-    pub rbar: [*mut u32; 2usize],
-    pub rlar: [*mut u32; 2usize],
-    pub hprbar: *mut u32,
-    pub hprlar: *mut u32,
-    pub mair0: [u32; 2usize],
-    pub mair1: [u32; 2usize],
-    pub hprselr: u32,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_9() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_9> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_9>(),
-        72usize,
-        concat!("Size of: ", stringify!(CPUArchState__bindgen_ty_9))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_9>(),
-        8usize,
-        concat!("Alignment of ", stringify!(CPUArchState__bindgen_ty_9))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rbar) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_9),
-            "::",
-            stringify!(rbar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rlar) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_9),
-            "::",
-            stringify!(rlar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hprbar) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_9),
-            "::",
-            stringify!(hprbar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hprlar) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_9),
-            "::",
-            stringify!(hprlar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mair0) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_9),
-            "::",
-            stringify!(mair0)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).mair1) as usize - ptr as usize },
-        56usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_9),
-            "::",
-            stringify!(mair1)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).hprselr) as usize - ptr as usize },
-        64usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_9),
-            "::",
-            stringify!(hprselr)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_9 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct CPUArchState__bindgen_ty_10 {
-    pub rbar: *mut u32,
-    pub rlar: *mut u32,
-    pub rnr: u32,
-    pub ctrl: u32,
-}
-#[test]
-fn bindgen_test_layout_CPUArchState__bindgen_ty_10() {
-    const UNINIT: ::std::mem::MaybeUninit<CPUArchState__bindgen_ty_10> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<CPUArchState__bindgen_ty_10>(),
-        24usize,
-        concat!("Size of: ", stringify!(CPUArchState__bindgen_ty_10))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<CPUArchState__bindgen_ty_10>(),
-        8usize,
-        concat!("Alignment of ", stringify!(CPUArchState__bindgen_ty_10))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rbar) as usize - ptr as usize },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_10),
-            "::",
-            stringify!(rbar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rlar) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_10),
-            "::",
-            stringify!(rlar)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rnr) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_10),
-            "::",
-            stringify!(rnr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ctrl) as usize - ptr as usize },
-        20usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState__bindgen_ty_10),
-            "::",
-            stringify!(ctrl)
-        )
-    );
-}
-impl Default for CPUArchState__bindgen_ty_10 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
 }
 #[test]
 fn bindgen_test_layout_CPUArchState() {
@@ -14090,7 +8148,7 @@ fn bindgen_test_layout_CPUArchState() {
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CPUArchState>(),
-        4640usize,
+        14880usize,
         concat!("Size of: ", stringify!(CPUArchState))
     );
     assert_eq!(
@@ -14109,58 +8167,78 @@ fn bindgen_test_layout_CPUArchState() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).xregs) as usize - ptr as usize },
-        64usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).eip) as usize - ptr as usize },
+        128usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(xregs)
+            stringify!(eip)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pc) as usize - ptr as usize },
-        320usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).eflags) as usize - ptr as usize },
+        136usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(pc)
+            stringify!(eflags)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pstate) as usize - ptr as usize },
-        328usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).cc_dst) as usize - ptr as usize },
+        144usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(pstate)
+            stringify!(cc_dst)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).aarch64) as usize - ptr as usize },
-        332usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).cc_src) as usize - ptr as usize },
+        152usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(aarch64)
+            stringify!(cc_src)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).thumb) as usize - ptr as usize },
-        333usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).cc_src2) as usize - ptr as usize },
+        160usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(thumb)
+            stringify!(cc_src2)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cc_op) as usize - ptr as usize },
+        168usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cc_op)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).df) as usize - ptr as usize },
+        172usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(df)
         )
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).hflags) as usize - ptr as usize },
-        336usize,
+        176usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
@@ -14169,358 +8247,1302 @@ fn bindgen_test_layout_CPUArchState() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).uncached_cpsr) as usize - ptr as usize },
-        344usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).hflags2) as usize - ptr as usize },
+        180usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(uncached_cpsr)
+            stringify!(hflags2)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).spsr) as usize - ptr as usize },
-        348usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).segs) as usize - ptr as usize },
+        184usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(spsr)
+            stringify!(segs)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).banked_spsr) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).ldt) as usize - ptr as usize },
+        328usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(ldt)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tr) as usize - ptr as usize },
         352usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(banked_spsr)
+            stringify!(tr)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).banked_r13) as usize - ptr as usize },
-        416usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).gdt) as usize - ptr as usize },
+        376usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(banked_r13)
+            stringify!(gdt)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).banked_r14) as usize - ptr as usize },
-        448usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).idt) as usize - ptr as usize },
+        400usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(banked_r14)
+            stringify!(idt)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).usr_regs) as usize - ptr as usize },
-        480usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).cr) as usize - ptr as usize },
+        424usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(usr_regs)
+            stringify!(cr)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fiq_regs) as usize - ptr as usize },
-        500usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).pdptrs_valid) as usize - ptr as usize },
+        464usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(fiq_regs)
+            stringify!(pdptrs_valid)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).CF) as usize - ptr as usize },
-        520usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).pdptrs) as usize - ptr as usize },
+        472usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(CF)
+            stringify!(pdptrs)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).VF) as usize - ptr as usize },
-        524usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).a20_mask) as usize - ptr as usize },
+        504usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(VF)
+            stringify!(a20_mask)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).NF) as usize - ptr as usize },
-        528usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).bnd_regs) as usize - ptr as usize },
+        512usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(NF)
+            stringify!(bnd_regs)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ZF) as usize - ptr as usize },
-        532usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).bndcs_regs) as usize - ptr as usize },
+        576usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(ZF)
+            stringify!(bndcs_regs)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).QF) as usize - ptr as usize },
-        536usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_bndcfgs) as usize - ptr as usize },
+        592usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(QF)
+            stringify!(msr_bndcfgs)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).GE) as usize - ptr as usize },
-        540usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState),
-            "::",
-            stringify!(GE)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).condexec_bits) as usize - ptr as usize },
-        544usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState),
-            "::",
-            stringify!(condexec_bits)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).btype) as usize - ptr as usize },
-        548usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState),
-            "::",
-            stringify!(btype)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).daif) as usize - ptr as usize },
-        552usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState),
-            "::",
-            stringify!(daif)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).svcr) as usize - ptr as usize },
-        560usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState),
-            "::",
-            stringify!(svcr)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).elr_el) as usize - ptr as usize },
-        568usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(CPUArchState),
-            "::",
-            stringify!(elr_el)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).sp_el) as usize - ptr as usize },
+        unsafe { ::std::ptr::addr_of!((*ptr).efer) as usize - ptr as usize },
         600usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(sp_el)
+            stringify!(efer)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cp15) as usize - ptr as usize },
-        632usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).start_init_save) as usize - ptr as usize },
+        608usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(cp15)
+            stringify!(start_init_save)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).v7m) as usize - ptr as usize },
-        2976usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fpstt) as usize - ptr as usize },
+        608usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(v7m)
+            stringify!(fpstt)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).exception) as usize - ptr as usize },
-        3168usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fpus) as usize - ptr as usize },
+        612usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(exception)
+            stringify!(fpus)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).serror) as usize - ptr as usize },
-        3192usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fpuc) as usize - ptr as usize },
+        614usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(serror)
+            stringify!(fpuc)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ext_dabt_raised) as usize - ptr as usize },
-        3208usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fptags) as usize - ptr as usize },
+        616usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(ext_dabt_raised)
+            stringify!(fptags)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).irq_line_state) as usize - ptr as usize },
-        3212usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fpregs) as usize - ptr as usize },
+        624usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(irq_line_state)
+            stringify!(fpregs)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).teecr) as usize - ptr as usize },
-        3216usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fpop) as usize - ptr as usize },
+        752usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(teecr)
+            stringify!(fpop)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).teehbr) as usize - ptr as usize },
-        3220usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fpcs) as usize - ptr as usize },
+        754usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(teehbr)
+            stringify!(fpcs)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).vfp) as usize - ptr as usize },
-        3232usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fpds) as usize - ptr as usize },
+        756usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(vfp)
+            stringify!(fpds)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).exclusive_addr) as usize - ptr as usize },
-        3984usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fpip) as usize - ptr as usize },
+        760usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(exclusive_addr)
+            stringify!(fpip)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).exclusive_val) as usize - ptr as usize },
-        3992usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fpdp) as usize - ptr as usize },
+        768usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(exclusive_val)
+            stringify!(fpdp)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).exclusive_high) as usize - ptr as usize },
-        4000usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).fp_status) as usize - ptr as usize },
+        776usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(exclusive_high)
+            stringify!(fp_status)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).iwmmxt) as usize - ptr as usize },
-        4008usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).ft0) as usize - ptr as usize },
+        792usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(iwmmxt)
+            stringify!(ft0)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cpu_breakpoint) as usize - ptr as usize },
-        4208usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).mmx_status) as usize - ptr as usize },
+        808usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(cpu_breakpoint)
+            stringify!(mmx_status)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).cpu_watchpoint) as usize - ptr as usize },
-        4336usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).sse_status) as usize - ptr as usize },
+        822usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(cpu_watchpoint)
+            stringify!(sse_status)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).tlb_fi) as usize - ptr as usize },
-        4464usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).mxcsr) as usize - ptr as usize },
+        836usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(tlb_fi)
+            stringify!(mxcsr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).xmm_regs) as usize - ptr as usize },
+        848usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(xmm_regs)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).xmm_t0) as usize - ptr as usize },
+        2896usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(xmm_t0)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mmx_t0) as usize - ptr as usize },
+        2960usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(mmx_t0)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).opmask_regs) as usize - ptr as usize },
+        2968usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(opmask_regs)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).xtilecfg) as usize - ptr as usize },
+        3032usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(xtilecfg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).xtiledata) as usize - ptr as usize },
+        3096usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(xtiledata)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).sysenter_cs) as usize - ptr as usize },
+        11288usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(sysenter_cs)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).sysenter_esp) as usize - ptr as usize },
+        11296usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(sysenter_esp)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).sysenter_eip) as usize - ptr as usize },
+        11304usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(sysenter_eip)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).star) as usize - ptr as usize },
+        11312usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(star)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).vm_hsave) as usize - ptr as usize },
+        11320usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(vm_hsave)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).lstar) as usize - ptr as usize },
+        11328usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(lstar)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cstar) as usize - ptr as usize },
+        11336usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cstar)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).fmask) as usize - ptr as usize },
+        11344usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(fmask)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).kernelgsbase) as usize - ptr as usize },
+        11352usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(kernelgsbase)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tsc_adjust) as usize - ptr as usize },
+        11360usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(tsc_adjust)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tsc_deadline) as usize - ptr as usize },
+        11368usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(tsc_deadline)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tsc_aux) as usize - ptr as usize },
+        11376usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(tsc_aux)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).xcr0) as usize - ptr as usize },
+        11384usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(xcr0)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mcg_status) as usize - ptr as usize },
+        11392usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(mcg_status)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_ia32_misc_enable) as usize - ptr as usize },
+        11400usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_ia32_misc_enable)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_ia32_feature_control) as usize - ptr as usize },
+        11408usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_ia32_feature_control)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_ia32_sgxlepubkeyhash) as usize - ptr as usize },
+        11416usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_ia32_sgxlepubkeyhash)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_fixed_ctr_ctrl) as usize - ptr as usize },
+        11448usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_fixed_ctr_ctrl)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_global_ctrl) as usize - ptr as usize },
+        11456usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_global_ctrl)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_global_status) as usize - ptr as usize },
+        11464usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_global_status)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_global_ovf_ctrl) as usize - ptr as usize },
+        11472usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_global_ovf_ctrl)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_fixed_counters) as usize - ptr as usize },
+        11480usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_fixed_counters)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_gp_counters) as usize - ptr as usize },
+        11504usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_gp_counters)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_gp_evtsel) as usize - ptr as usize },
+        11648usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_gp_evtsel)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).pat) as usize - ptr as usize },
+        11792usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(pat)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).smbase) as usize - ptr as usize },
+        11800usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(smbase)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_smi_count) as usize - ptr as usize },
+        11808usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_smi_count)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).pkru) as usize - ptr as usize },
+        11816usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(pkru)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).pkrs) as usize - ptr as usize },
+        11820usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(pkrs)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tsx_ctrl) as usize - ptr as usize },
+        11824usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(tsx_ctrl)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).spec_ctrl) as usize - ptr as usize },
+        11832usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(spec_ctrl)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).amd_tsc_scale_msr) as usize - ptr as usize },
+        11840usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(amd_tsc_scale_msr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).virt_ssbd) as usize - ptr as usize },
+        11848usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(virt_ssbd)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).end_init_save) as usize - ptr as usize },
+        11856usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(end_init_save)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).system_time_msr) as usize - ptr as usize },
+        11856usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(system_time_msr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).wall_clock_msr) as usize - ptr as usize },
+        11864usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(wall_clock_msr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).steal_time_msr) as usize - ptr as usize },
+        11872usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(steal_time_msr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).async_pf_en_msr) as usize - ptr as usize },
+        11880usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(async_pf_en_msr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).async_pf_int_msr) as usize - ptr as usize },
+        11888usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(async_pf_int_msr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).pv_eoi_en_msr) as usize - ptr as usize },
+        11896usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(pv_eoi_en_msr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).poll_control_msr) as usize - ptr as usize },
+        11904usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(poll_control_msr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_hypercall) as usize - ptr as usize },
+        11912usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_hypercall)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_guest_os_id) as usize - ptr as usize },
+        11920usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_guest_os_id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_tsc) as usize - ptr as usize },
+        11928usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_tsc)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_syndbg_control) as usize - ptr as usize },
+        11936usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_syndbg_control)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_syndbg_status) as usize - ptr as usize },
+        11944usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_syndbg_status)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_syndbg_send_page) as usize - ptr as usize },
+        11952usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_syndbg_send_page)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_syndbg_recv_page) as usize - ptr as usize },
+        11960usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_syndbg_recv_page)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_syndbg_pending_page) as usize - ptr as usize },
+        11968usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_syndbg_pending_page)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_syndbg_options) as usize - ptr as usize },
+        11976usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_syndbg_options)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_vapic) as usize - ptr as usize },
+        11984usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_vapic)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_crash_params) as usize - ptr as usize },
+        11992usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_crash_params)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_runtime) as usize - ptr as usize },
+        12032usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_runtime)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_synic_control) as usize - ptr as usize },
+        12040usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_synic_control)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_synic_evt_page) as usize - ptr as usize },
+        12048usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_synic_evt_page)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_synic_msg_page) as usize - ptr as usize },
+        12056usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_synic_msg_page)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_synic_sint) as usize - ptr as usize },
+        12064usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_synic_sint)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_stimer_config) as usize - ptr as usize },
+        12192usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_stimer_config)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_stimer_count) as usize - ptr as usize },
+        12224usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_stimer_count)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).msr_hv_reenlightenment_control) as usize - ptr as usize
+        },
+        12256usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_reenlightenment_control)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).msr_hv_tsc_emulation_control) as usize - ptr as usize
+        },
+        12264usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_tsc_emulation_control)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_hv_tsc_emulation_status) as usize - ptr as usize },
+        12272usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_hv_tsc_emulation_status)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_rtit_ctrl) as usize - ptr as usize },
+        12280usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_rtit_ctrl)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_rtit_status) as usize - ptr as usize },
+        12288usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_rtit_status)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_rtit_output_base) as usize - ptr as usize },
+        12296usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_rtit_output_base)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_rtit_output_mask) as usize - ptr as usize },
+        12304usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_rtit_output_mask)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_rtit_cr3_match) as usize - ptr as usize },
+        12312usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_rtit_cr3_match)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_rtit_addrs) as usize - ptr as usize },
+        12320usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_rtit_addrs)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_xfd) as usize - ptr as usize },
+        12384usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_xfd)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_xfd_err) as usize - ptr as usize },
+        12392usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_xfd_err)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_lbr_ctl) as usize - ptr as usize },
+        12400usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_lbr_ctl)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).msr_lbr_depth) as usize - ptr as usize },
+        12408usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(msr_lbr_depth)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).lbr_records) as usize - ptr as usize },
+        12416usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(lbr_records)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).error_code) as usize - ptr as usize },
+        13184usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(error_code)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).exception_is_int) as usize - ptr as usize },
+        13188usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(exception_is_int)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).exception_next_eip) as usize - ptr as usize },
+        13192usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(exception_next_eip)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).dr) as usize - ptr as usize },
+        13200usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(dr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).old_exception) as usize - ptr as usize },
+        13296usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(old_exception)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).vm_vmcb) as usize - ptr as usize },
+        13304usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(vm_vmcb)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tsc_offset) as usize - ptr as usize },
+        13312usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(tsc_offset)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).intercept) as usize - ptr as usize },
+        13320usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(intercept)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).intercept_cr_read) as usize - ptr as usize },
+        13328usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(intercept_cr_read)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).intercept_cr_write) as usize - ptr as usize },
+        13330usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(intercept_cr_write)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).intercept_dr_read) as usize - ptr as usize },
+        13332usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(intercept_dr_read)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).intercept_dr_write) as usize - ptr as usize },
+        13334usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(intercept_dr_write)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).intercept_exceptions) as usize - ptr as usize },
+        13336usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(intercept_exceptions)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).nested_cr3) as usize - ptr as usize },
+        13344usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(nested_cr3)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).nested_pg_mode) as usize - ptr as usize },
+        13352usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(nested_pg_mode)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).v_tpr) as usize - ptr as usize },
+        13356usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(v_tpr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).int_ctl) as usize - ptr as usize },
+        13360usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(int_ctl)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).nmi_injected) as usize - ptr as usize },
+        13364usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(nmi_injected)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).nmi_pending) as usize - ptr as usize },
+        13365usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(nmi_pending)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).retaddr) as usize - ptr as usize },
+        13368usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(retaddr)
         )
     );
     assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).end_reset_fields) as usize - ptr as usize },
-        4472usize,
+        13376usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
@@ -14529,8 +9551,158 @@ fn bindgen_test_layout_CPUArchState() {
         )
     );
     assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_level_func7) as usize - ptr as usize },
+        13376usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_level_func7)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_min_level_func7) as usize - ptr as usize },
+        13380usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_min_level_func7)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_min_level) as usize - ptr as usize },
+        13384usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_min_level)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_min_xlevel) as usize - ptr as usize },
+        13388usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_min_xlevel)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_min_xlevel2) as usize - ptr as usize },
+        13392usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_min_xlevel2)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_max_level) as usize - ptr as usize },
+        13396usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_max_level)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_max_xlevel) as usize - ptr as usize },
+        13400usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_max_xlevel)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_max_xlevel2) as usize - ptr as usize },
+        13404usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_max_xlevel2)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_level) as usize - ptr as usize },
+        13408usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_level)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_xlevel) as usize - ptr as usize },
+        13412usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_xlevel)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_xlevel2) as usize - ptr as usize },
+        13416usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_xlevel2)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_vendor1) as usize - ptr as usize },
+        13420usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_vendor1)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_vendor2) as usize - ptr as usize },
+        13424usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_vendor2)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_vendor3) as usize - ptr as usize },
+        13428usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_vendor3)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_version) as usize - ptr as usize },
+        13432usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(cpuid_version)
+        )
+    );
+    assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).features) as usize - ptr as usize },
-        4472usize,
+        13440usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
@@ -14539,63 +9711,373 @@ fn bindgen_test_layout_CPUArchState() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pmsav7) as usize - ptr as usize },
-        4480usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).user_features) as usize - ptr as usize },
+        13744usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(pmsav7)
+            stringify!(user_features)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pmsav8) as usize - ptr as usize },
-        4512usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).cpuid_model) as usize - ptr as usize },
+        14048usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(pmsav8)
+            stringify!(cpuid_model)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).sau) as usize - ptr as usize },
-        4584usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).cache_info_cpuid2) as usize - ptr as usize },
+        14096usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(sau)
+            stringify!(cache_info_cpuid2)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).nvic) as usize - ptr as usize },
-        4608usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).cache_info_cpuid4) as usize - ptr as usize },
+        14128usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(nvic)
+            stringify!(cache_info_cpuid4)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).boot_info) as usize - ptr as usize },
-        4616usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).cache_info_amd) as usize - ptr as usize },
+        14160usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(boot_info)
+            stringify!(cache_info_amd)
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).gicv3state) as usize - ptr as usize },
-        4624usize,
+        unsafe { ::std::ptr::addr_of!((*ptr).mtrr_fixed) as usize - ptr as usize },
+        14192usize,
         concat!(
             "Offset of field: ",
             stringify!(CPUArchState),
             "::",
-            stringify!(gicv3state)
+            stringify!(mtrr_fixed)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mtrr_deftype) as usize - ptr as usize },
+        14280usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(mtrr_deftype)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mtrr_var) as usize - ptr as usize },
+        14288usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(mtrr_var)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mp_state) as usize - ptr as usize },
+        14416usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(mp_state)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).exception_nr) as usize - ptr as usize },
+        14420usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(exception_nr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).interrupt_injected) as usize - ptr as usize },
+        14424usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(interrupt_injected)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).soft_interrupt) as usize - ptr as usize },
+        14428usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(soft_interrupt)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).exception_pending) as usize - ptr as usize },
+        14429usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(exception_pending)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).exception_injected) as usize - ptr as usize },
+        14430usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(exception_injected)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).has_error_code) as usize - ptr as usize },
+        14431usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(has_error_code)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).exception_has_payload) as usize - ptr as usize },
+        14432usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(exception_has_payload)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).exception_payload) as usize - ptr as usize },
+        14440usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(exception_payload)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).triple_fault_pending) as usize - ptr as usize },
+        14448usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(triple_fault_pending)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ins_len) as usize - ptr as usize },
+        14452usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(ins_len)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).sipi_vector) as usize - ptr as usize },
+        14456usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(sipi_vector)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tsc_valid) as usize - ptr as usize },
+        14460usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(tsc_valid)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tsc_khz) as usize - ptr as usize },
+        14464usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(tsc_khz)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).user_tsc_khz) as usize - ptr as usize },
+        14472usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(user_tsc_khz)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).apic_bus_freq) as usize - ptr as usize },
+        14480usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(apic_bus_freq)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tsc) as usize - ptr as usize },
+        14488usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(tsc)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mcg_cap) as usize - ptr as usize },
+        14496usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(mcg_cap)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mcg_ctl) as usize - ptr as usize },
+        14504usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(mcg_ctl)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mcg_ext_ctl) as usize - ptr as usize },
+        14512usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(mcg_ext_ctl)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mce_banks) as usize - ptr as usize },
+        14520usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(mce_banks)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).xstate_bv) as usize - ptr as usize },
+        14840usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(xstate_bv)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).fpus_vmstate) as usize - ptr as usize },
+        14848usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(fpus_vmstate)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).fptag_vmstate) as usize - ptr as usize },
+        14850usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(fptag_vmstate)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).fpregs_format_vmstate) as usize - ptr as usize },
+        14852usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(fpregs_format_vmstate)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).xss) as usize - ptr as usize },
+        14856usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(xss)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).umwait) as usize - ptr as usize },
+        14864usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(umwait)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tpr_access_type) as usize - ptr as usize },
+        14868usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(tpr_access_type)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).nr_dies) as usize - ptr as usize },
+        14872usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(CPUArchState),
+            "::",
+            stringify!(nr_dies)
         )
     );
 }
@@ -14610,10 +10092,911 @@ impl Default for CPUArchState {
 }
 impl ::std::fmt::Debug for CPUArchState {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write ! (f , "CPUArchState {{ regs: {:?}, xregs: {:?}, aarch64: {:?}, thumb: {:?}, hflags: {:?}, banked_spsr: {:?}, banked_r13: {:?}, banked_r14: {:?}, usr_regs: {:?}, fiq_regs: {:?}, elr_el: {:?}, sp_el: {:?}, cp15: {:?}, v7m: {:?}, exception: {:?}, serror: {:?}, vfp: {:?}, iwmmxt: {:?}, cpu_breakpoint: {:?}, cpu_watchpoint: {:?}, tlb_fi: {:?}, end_reset_fields: {:?}, pmsav7: {:?}, pmsav8: {:?}, sau: {:?}, nvic: {:?}, boot_info: {:?}, gicv3state: {:?} }}" , self . regs , self . xregs , self . aarch64 , self . thumb , self . hflags , self . banked_spsr , self . banked_r13 , self . banked_r14 , self . usr_regs , self . fiq_regs , self . elr_el , self . sp_el , self . cp15 , self . v7m , self . exception , self . serror , self . vfp , self . iwmmxt , self . cpu_breakpoint , self . cpu_watchpoint , self . tlb_fi , self . end_reset_fields , self . pmsav7 , self . pmsav8 , self . sau , self . nvic , self . boot_info , self . gicv3state)
+        write ! (f , "CPUArchState {{ regs: {:?}, segs: {:?}, ldt: {:?}, tr: {:?}, gdt: {:?}, idt: {:?}, cr: {:?}, pdptrs_valid: {:?}, pdptrs: {:?}, bnd_regs: {:?}, bndcs_regs: {:?}, start_init_save: {:?}, fpstt: {:?}, fptags: {:?}, fpregs: {:?}, fp_status: {:?}, ft0: {:?}, mmx_status: {:?}, sse_status: {:?}, xmm_regs: {:?}, xmm_t0: {:?}, mmx_t0: {:?}, opmask_regs: {:?}, xtilecfg: {:?}, xtiledata: {:?}, msr_ia32_sgxlepubkeyhash: {:?}, msr_fixed_counters: {:?}, msr_gp_counters: {:?}, msr_gp_evtsel: {:?}, end_init_save: {:?}, msr_hv_crash_params: {:?}, msr_hv_synic_sint: {:?}, msr_hv_stimer_config: {:?}, msr_hv_stimer_count: {:?}, msr_rtit_addrs: {:?}, lbr_records: {:?}, error_code: {:?}, exception_is_int: {:?}, dr: {:?}, __bindgen_anon_1: {:?}, old_exception: {:?}, end_reset_fields: {:?}, features: {:?}, user_features: {:?}, cpuid_model: {:?}, cache_info_cpuid2: {:?}, cache_info_cpuid4: {:?}, cache_info_amd: {:?}, mtrr_fixed: {:?}, mtrr_var: {:?}, tsc_valid: {:?}, mce_banks: {:?}, tpr_access_type: {:?}, nr_dies: {:?} }}" , self . regs , self . segs , self . ldt , self . tr , self . gdt , self . idt , self . cr , self . pdptrs_valid , self . pdptrs , self . bnd_regs , self . bndcs_regs , self . start_init_save , self . fpstt , self . fptags , self . fpregs , self . fp_status , self . ft0 , self . mmx_status , self . sse_status , self . xmm_regs , self . xmm_t0 , self . mmx_t0 , self . opmask_regs , self . xtilecfg , self . xtiledata , self . msr_ia32_sgxlepubkeyhash , self . msr_fixed_counters , self . msr_gp_counters , self . msr_gp_evtsel , self . end_init_save , self . msr_hv_crash_params , self . msr_hv_synic_sint , self . msr_hv_stimer_config , self . msr_hv_stimer_count , self . msr_rtit_addrs , self . lbr_records , self . error_code , self . exception_is_int , self . dr , self . __bindgen_anon_1 , self . old_exception , self . end_reset_fields , self . features , self . user_features , self . cpuid_model , self . cache_info_cpuid2 , self . cache_info_cpuid4 , self . cache_info_amd , self . mtrr_fixed , self . mtrr_var , self . tsc_valid , self . mce_banks , self . tpr_access_type , self . nr_dies)
     }
 }
+pub type CPUX86State = CPUArchState;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct kvm_msrs {
+    _unused: [u8; 0],
+}
+#[doc = " X86CPU:\n @env: #CPUX86State\n @migratable: If set, only migratable flags will be accepted when \"enforce\"\n mode is used, and only migratable flags will be included in the \"host\"\n CPU model.\n\n An x86 CPU."]
+#[repr(C)]
+#[repr(align(16))]
+#[derive(Copy, Clone)]
+pub struct ArchCPU {
+    pub parent_obj: CPUState,
+    pub neg: CPUNegativeOffsetState,
+    pub __bindgen_padding_0: u64,
+    pub env: CPUX86State,
+    pub vmsentry: *mut VMChangeStateEntry,
+    pub ucode_rev: u64,
+    pub hyperv_spinlock_attempts: u32,
+    pub hyperv_vendor: *mut ::std::os::raw::c_char,
+    pub hyperv_synic_kvm_only: bool,
+    pub hyperv_features: u64,
+    pub hyperv_passthrough: bool,
+    pub hyperv_no_nonarch_cs: OnOffAuto,
+    pub hyperv_vendor_id: [u32; 3usize],
+    pub hyperv_interface_id: [u32; 4usize],
+    pub hyperv_limits: [u32; 3usize],
+    pub hyperv_enforce_cpuid: bool,
+    pub hyperv_ver_id_build: u32,
+    pub hyperv_ver_id_major: u16,
+    pub hyperv_ver_id_minor: u16,
+    pub hyperv_ver_id_sp: u32,
+    pub hyperv_ver_id_sb: u8,
+    pub hyperv_ver_id_sn: u32,
+    pub check_cpuid: bool,
+    pub enforce_cpuid: bool,
+    pub force_features: bool,
+    pub expose_kvm: bool,
+    pub expose_tcg: bool,
+    pub migratable: bool,
+    pub migrate_smi_count: bool,
+    pub max_features: bool,
+    pub apic_id: u32,
+    pub vmware_cpuid_freq: bool,
+    pub cache_info_passthrough: bool,
+    pub mwait: ArchCPU__bindgen_ty_1,
+    pub filtered_features: FeatureWordArray,
+    pub enable_pmu: bool,
+    pub lbr_fmt: u64,
+    pub enable_lmce: bool,
+    pub enable_l3_cache: bool,
+    pub legacy_cache: bool,
+    pub enable_cpuid_0xb: bool,
+    pub full_cpuid_auto_level: bool,
+    pub vendor_cpuid_only: bool,
+    pub intel_pt_auto_level: bool,
+    pub fill_mtrr_mask: bool,
+    pub host_phys_bits: bool,
+    pub host_phys_bits_limit: u8,
+    pub kvm_no_smi_migration: bool,
+    pub kvm_pv_enforce_cpuid: bool,
+    pub phys_bits: u32,
+    pub apic_state: *mut DeviceState,
+    pub cpu_as_root: *mut MemoryRegion,
+    pub cpu_as_mem: *mut MemoryRegion,
+    pub smram: *mut MemoryRegion,
+    pub machine_done: Notifier,
+    pub kvm_msr_buf: *mut kvm_msrs,
+    pub node_id: i32,
+    pub socket_id: i32,
+    pub die_id: i32,
+    pub core_id: i32,
+    pub thread_id: i32,
+    pub hv_max_vps: i32,
+    pub xen_vapic: bool,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct ArchCPU__bindgen_ty_1 {
+    pub eax: u32,
+    pub ebx: u32,
+    pub ecx: u32,
+    pub edx: u32,
+}
+#[test]
+fn bindgen_test_layout_ArchCPU__bindgen_ty_1() {
+    const UNINIT: ::std::mem::MaybeUninit<ArchCPU__bindgen_ty_1> =
+        ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<ArchCPU__bindgen_ty_1>(),
+        16usize,
+        concat!("Size of: ", stringify!(ArchCPU__bindgen_ty_1))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<ArchCPU__bindgen_ty_1>(),
+        4usize,
+        concat!("Alignment of ", stringify!(ArchCPU__bindgen_ty_1))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).eax) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU__bindgen_ty_1),
+            "::",
+            stringify!(eax)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ebx) as usize - ptr as usize },
+        4usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU__bindgen_ty_1),
+            "::",
+            stringify!(ebx)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ecx) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU__bindgen_ty_1),
+            "::",
+            stringify!(ecx)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).edx) as usize - ptr as usize },
+        12usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU__bindgen_ty_1),
+            "::",
+            stringify!(edx)
+        )
+    );
+}
+#[test]
+fn bindgen_test_layout_ArchCPU() {
+    const UNINIT: ::std::mem::MaybeUninit<ArchCPU> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<ArchCPU>(),
+        16304usize,
+        concat!("Size of: ", stringify!(ArchCPU))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<ArchCPU>(),
+        16usize,
+        concat!("Alignment of ", stringify!(ArchCPU))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).parent_obj) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(parent_obj)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).neg) as usize - ptr as usize },
+        816usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(neg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).env) as usize - ptr as usize },
+        832usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(env)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).vmsentry) as usize - ptr as usize },
+        15712usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(vmsentry)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ucode_rev) as usize - ptr as usize },
+        15720usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(ucode_rev)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_spinlock_attempts) as usize - ptr as usize },
+        15728usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_spinlock_attempts)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_vendor) as usize - ptr as usize },
+        15736usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_vendor)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_synic_kvm_only) as usize - ptr as usize },
+        15744usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_synic_kvm_only)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_features) as usize - ptr as usize },
+        15752usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_features)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_passthrough) as usize - ptr as usize },
+        15760usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_passthrough)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_no_nonarch_cs) as usize - ptr as usize },
+        15764usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_no_nonarch_cs)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_vendor_id) as usize - ptr as usize },
+        15768usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_vendor_id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_interface_id) as usize - ptr as usize },
+        15780usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_interface_id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_limits) as usize - ptr as usize },
+        15796usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_limits)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_enforce_cpuid) as usize - ptr as usize },
+        15808usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_enforce_cpuid)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_ver_id_build) as usize - ptr as usize },
+        15812usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_ver_id_build)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_ver_id_major) as usize - ptr as usize },
+        15816usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_ver_id_major)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_ver_id_minor) as usize - ptr as usize },
+        15818usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_ver_id_minor)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_ver_id_sp) as usize - ptr as usize },
+        15820usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_ver_id_sp)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_ver_id_sb) as usize - ptr as usize },
+        15824usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_ver_id_sb)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hyperv_ver_id_sn) as usize - ptr as usize },
+        15828usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hyperv_ver_id_sn)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).check_cpuid) as usize - ptr as usize },
+        15832usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(check_cpuid)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).enforce_cpuid) as usize - ptr as usize },
+        15833usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(enforce_cpuid)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).force_features) as usize - ptr as usize },
+        15834usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(force_features)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).expose_kvm) as usize - ptr as usize },
+        15835usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(expose_kvm)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).expose_tcg) as usize - ptr as usize },
+        15836usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(expose_tcg)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).migratable) as usize - ptr as usize },
+        15837usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(migratable)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).migrate_smi_count) as usize - ptr as usize },
+        15838usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(migrate_smi_count)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).max_features) as usize - ptr as usize },
+        15839usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(max_features)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).apic_id) as usize - ptr as usize },
+        15840usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(apic_id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).vmware_cpuid_freq) as usize - ptr as usize },
+        15844usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(vmware_cpuid_freq)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cache_info_passthrough) as usize - ptr as usize },
+        15845usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(cache_info_passthrough)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mwait) as usize - ptr as usize },
+        15848usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(mwait)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).filtered_features) as usize - ptr as usize },
+        15864usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(filtered_features)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).enable_pmu) as usize - ptr as usize },
+        16168usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(enable_pmu)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).lbr_fmt) as usize - ptr as usize },
+        16176usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(lbr_fmt)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).enable_lmce) as usize - ptr as usize },
+        16184usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(enable_lmce)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).enable_l3_cache) as usize - ptr as usize },
+        16185usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(enable_l3_cache)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).legacy_cache) as usize - ptr as usize },
+        16186usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(legacy_cache)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).enable_cpuid_0xb) as usize - ptr as usize },
+        16187usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(enable_cpuid_0xb)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).full_cpuid_auto_level) as usize - ptr as usize },
+        16188usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(full_cpuid_auto_level)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).vendor_cpuid_only) as usize - ptr as usize },
+        16189usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(vendor_cpuid_only)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).intel_pt_auto_level) as usize - ptr as usize },
+        16190usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(intel_pt_auto_level)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).fill_mtrr_mask) as usize - ptr as usize },
+        16191usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(fill_mtrr_mask)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).host_phys_bits) as usize - ptr as usize },
+        16192usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(host_phys_bits)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).host_phys_bits_limit) as usize - ptr as usize },
+        16193usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(host_phys_bits_limit)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).kvm_no_smi_migration) as usize - ptr as usize },
+        16194usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(kvm_no_smi_migration)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).kvm_pv_enforce_cpuid) as usize - ptr as usize },
+        16195usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(kvm_pv_enforce_cpuid)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).phys_bits) as usize - ptr as usize },
+        16196usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(phys_bits)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).apic_state) as usize - ptr as usize },
+        16200usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(apic_state)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpu_as_root) as usize - ptr as usize },
+        16208usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(cpu_as_root)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpu_as_mem) as usize - ptr as usize },
+        16216usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(cpu_as_mem)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).smram) as usize - ptr as usize },
+        16224usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(smram)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).machine_done) as usize - ptr as usize },
+        16232usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(machine_done)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).kvm_msr_buf) as usize - ptr as usize },
+        16256usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(kvm_msr_buf)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).node_id) as usize - ptr as usize },
+        16264usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(node_id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).socket_id) as usize - ptr as usize },
+        16268usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(socket_id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).die_id) as usize - ptr as usize },
+        16272usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(die_id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).core_id) as usize - ptr as usize },
+        16276usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(core_id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).thread_id) as usize - ptr as usize },
+        16280usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(thread_id)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).hv_max_vps) as usize - ptr as usize },
+        16284usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(hv_max_vps)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).xen_vapic) as usize - ptr as usize },
+        16288usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(ArchCPU),
+            "::",
+            stringify!(xen_vapic)
+        )
+    );
+}
+impl Default for ArchCPU {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ::std::fmt::Debug for ArchCPU {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write ! (f , "ArchCPU {{ parent_obj: {:?}, neg: {:?}, env: {:?}, vmsentry: {:?}, hyperv_vendor: {:?}, hyperv_synic_kvm_only: {:?}, hyperv_passthrough: {:?}, hyperv_no_nonarch_cs: {:?}, hyperv_vendor_id: {:?}, hyperv_interface_id: {:?}, hyperv_limits: {:?}, hyperv_enforce_cpuid: {:?}, check_cpuid: {:?}, enforce_cpuid: {:?}, force_features: {:?}, expose_kvm: {:?}, expose_tcg: {:?}, migratable: {:?}, migrate_smi_count: {:?}, max_features: {:?}, vmware_cpuid_freq: {:?}, cache_info_passthrough: {:?}, mwait: {:?}, filtered_features: {:?}, enable_pmu: {:?}, enable_lmce: {:?}, enable_l3_cache: {:?}, legacy_cache: {:?}, enable_cpuid_0xb: {:?}, full_cpuid_auto_level: {:?}, vendor_cpuid_only: {:?}, intel_pt_auto_level: {:?}, fill_mtrr_mask: {:?}, host_phys_bits: {:?}, kvm_no_smi_migration: {:?}, kvm_pv_enforce_cpuid: {:?}, apic_state: {:?}, cpu_as_root: {:?}, cpu_as_mem: {:?}, smram: {:?}, machine_done: {:?}, kvm_msr_buf: {:?}, xen_vapic: {:?} }}" , self . parent_obj , self . neg , self . env , self . vmsentry , self . hyperv_vendor , self . hyperv_synic_kvm_only , self . hyperv_passthrough , self . hyperv_no_nonarch_cs , self . hyperv_vendor_id , self . hyperv_interface_id , self . hyperv_limits , self . hyperv_enforce_cpuid , self . check_cpuid , self . enforce_cpuid , self . force_features , self . expose_kvm , self . expose_tcg , self . migratable , self . migrate_smi_count , self . max_features , self . vmware_cpuid_freq , self . cache_info_passthrough , self . mwait , self . filtered_features , self . enable_pmu , self . enable_lmce , self . enable_l3_cache , self . legacy_cache , self . enable_cpuid_0xb , self . full_cpuid_auto_level , self . vendor_cpuid_only , self . intel_pt_auto_level , self . fill_mtrr_mask , self . host_phys_bits , self . kvm_no_smi_migration , self . kvm_pv_enforce_cpuid , self . apic_state , self . cpu_as_root , self . cpu_as_mem , self . smram , self . machine_done , self . kvm_msr_buf , self . xen_vapic)
+    }
+}
+pub type abi_ulong = target_ulong;
+pub type abi_long = target_long;
+pub const MemOp_MO_8: MemOp = MemOp(0);
+pub const MemOp_MO_16: MemOp = MemOp(1);
+pub const MemOp_MO_32: MemOp = MemOp(2);
+pub const MemOp_MO_64: MemOp = MemOp(3);
+pub const MemOp_MO_128: MemOp = MemOp(4);
+pub const MemOp_MO_256: MemOp = MemOp(5);
+pub const MemOp_MO_512: MemOp = MemOp(6);
+pub const MemOp_MO_1024: MemOp = MemOp(7);
+pub const MemOp_MO_SIZE: MemOp = MemOp(7);
+pub const MemOp_MO_SIGN: MemOp = MemOp(8);
+pub const MemOp_MO_BSWAP: MemOp = MemOp(16);
+pub const MemOp_MO_LE: MemOp = MemOp(0);
+pub const MemOp_MO_BE: MemOp = MemOp(16);
+pub const MemOp_MO_TE: MemOp = MemOp(0);
+pub const MemOp_MO_ASHIFT: MemOp = MemOp(5);
+pub const MemOp_MO_AMASK: MemOp = MemOp(224);
+pub const MemOp_MO_UNALN: MemOp = MemOp(0);
+pub const MemOp_MO_ALIGN_2: MemOp = MemOp(32);
+pub const MemOp_MO_ALIGN_4: MemOp = MemOp(64);
+pub const MemOp_MO_ALIGN_8: MemOp = MemOp(96);
+pub const MemOp_MO_ALIGN_16: MemOp = MemOp(128);
+pub const MemOp_MO_ALIGN_32: MemOp = MemOp(160);
+pub const MemOp_MO_ALIGN_64: MemOp = MemOp(192);
+pub const MemOp_MO_ALIGN: MemOp = MemOp(224);
+pub const MemOp_MO_ATOM_SHIFT: MemOp = MemOp(8);
+pub const MemOp_MO_ATOM_IFALIGN: MemOp = MemOp(0);
+pub const MemOp_MO_ATOM_IFALIGN_PAIR: MemOp = MemOp(256);
+pub const MemOp_MO_ATOM_WITHIN16: MemOp = MemOp(512);
+pub const MemOp_MO_ATOM_WITHIN16_PAIR: MemOp = MemOp(768);
+pub const MemOp_MO_ATOM_SUBALIGN: MemOp = MemOp(1024);
+pub const MemOp_MO_ATOM_NONE: MemOp = MemOp(1280);
+pub const MemOp_MO_ATOM_MASK: MemOp = MemOp(1792);
+pub const MemOp_MO_UB: MemOp = MemOp(0);
+pub const MemOp_MO_UW: MemOp = MemOp(1);
+pub const MemOp_MO_UL: MemOp = MemOp(2);
+pub const MemOp_MO_UQ: MemOp = MemOp(3);
+pub const MemOp_MO_UO: MemOp = MemOp(4);
+pub const MemOp_MO_SB: MemOp = MemOp(8);
+pub const MemOp_MO_SW: MemOp = MemOp(9);
+pub const MemOp_MO_SL: MemOp = MemOp(10);
+pub const MemOp_MO_SQ: MemOp = MemOp(11);
+pub const MemOp_MO_SO: MemOp = MemOp(12);
+pub const MemOp_MO_LEUW: MemOp = MemOp(1);
+pub const MemOp_MO_LEUL: MemOp = MemOp(2);
+pub const MemOp_MO_LEUQ: MemOp = MemOp(3);
+pub const MemOp_MO_LESW: MemOp = MemOp(9);
+pub const MemOp_MO_LESL: MemOp = MemOp(10);
+pub const MemOp_MO_LESQ: MemOp = MemOp(11);
+pub const MemOp_MO_BEUW: MemOp = MemOp(17);
+pub const MemOp_MO_BEUL: MemOp = MemOp(18);
+pub const MemOp_MO_BEUQ: MemOp = MemOp(19);
+pub const MemOp_MO_BESW: MemOp = MemOp(25);
+pub const MemOp_MO_BESL: MemOp = MemOp(26);
+pub const MemOp_MO_BESQ: MemOp = MemOp(27);
+pub const MemOp_MO_TEUW: MemOp = MemOp(1);
+pub const MemOp_MO_TEUL: MemOp = MemOp(2);
+pub const MemOp_MO_TEUQ: MemOp = MemOp(3);
+pub const MemOp_MO_TEUO: MemOp = MemOp(4);
+pub const MemOp_MO_TESW: MemOp = MemOp(9);
+pub const MemOp_MO_TESL: MemOp = MemOp(10);
+pub const MemOp_MO_TESQ: MemOp = MemOp(11);
+pub const MemOp_MO_SSIZE: MemOp = MemOp(15);
+impl ::std::ops::BitOr<MemOp> for MemOp {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        MemOp(self.0 | other.0)
+    }
+}
+impl ::std::ops::BitOrAssign for MemOp {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: MemOp) {
+        self.0 |= rhs.0;
+    }
+}
+impl ::std::ops::BitAnd<MemOp> for MemOp {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, other: Self) -> Self {
+        MemOp(self.0 & other.0)
+    }
+}
+impl ::std::ops::BitAndAssign for MemOp {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: MemOp) {
+        self.0 &= rhs.0;
+    }
+}
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct MemOp(pub ::std::os::raw::c_uint);
 pub type MemOpIdx = u32;
+extern "C" {
+    pub fn target_mprotect(
+        start: abi_ulong,
+        len: abi_ulong,
+        prot: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn target_mmap(
+        start: abi_ulong,
+        len: abi_ulong,
+        prot: ::std::os::raw::c_int,
+        flags: ::std::os::raw::c_int,
+        fd: ::std::os::raw::c_int,
+        offset: abi_ulong,
+    ) -> abi_long;
+}
+extern "C" {
+    pub fn target_munmap(start: abi_ulong, len: abi_ulong) -> ::std::os::raw::c_int;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct AccelCPUClass {
@@ -14976,7 +11359,6 @@ extern "C" {
         data: *mut qemu_plugin_hwaddr,
     ) -> bool;
 }
-pub type __int128_t = i128;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct GDBRegisterState {
