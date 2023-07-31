@@ -260,13 +260,13 @@ where
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct MultipleMutationalStage<E, EM, I, M, Z> {
+pub struct MultiMutationalStage<E, EM, I, M, Z> {
     mutator: M,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
 
-impl<E, EM, I, M, Z> UsesState for MultipleMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, Z> UsesState for MultiMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
@@ -277,7 +277,7 @@ where
     type State = Z::State;
 }
 
-impl<E, EM, I, M, Z> Stage<E, EM, Z> for MultipleMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, Z> Stage<E, EM, Z> for MultiMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
@@ -303,8 +303,7 @@ where
         };
         drop(testcase);
 
-        let mut generated = vec![];
-        let _ = self.mutator.mutate(state, &input, &mut generated, 0)?;
+        let generated = self.mutator.multi_mutate(state, &input, 0, None)?;
         // println!("Generated {}", generated.len());
         for (i, new_input) in generated.into_iter().enumerate() {
             // Time is measured directly the `evaluate_input` function
@@ -319,7 +318,7 @@ where
     }
 }
 
-impl<E, EM, M, Z> MultipleMutationalStage<E, EM, Z::Input, M, Z>
+impl<E, EM, M, Z> MultiMutationalStage<E, EM, Z::Input, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
@@ -333,7 +332,7 @@ where
     }
 }
 
-impl<E, EM, I, M, Z> MultipleMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, Z> MultiMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,

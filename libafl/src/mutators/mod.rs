@@ -102,25 +102,16 @@ pub trait Mutator<I, S>: Named {
 
 /// A mutator that takes input, and returns a vector of mutated inputs.
 /// Simple as that.
-pub trait MultiMutator<I, S>: Named {
-    /// Mutate a given input
-    fn mutate(
+pub trait MultiMutator<I, S>: Mutator<I, S> {
+    /// Mutate a given input up to [`max_count`] times,
+    /// or as many times as appropriate, if no [`max_count`] is given
+    fn multi_mutate(
         &mut self,
         state: &mut S,
         input: &I,
-        vec: &mut Vec<I>,
         stage_idx: i32,
-    ) -> Result<MutationResult, Error>;
-
-    /// Post-process given the outcome of the execution
-    fn post_exec(
-        &mut self,
-        _state: &mut S,
-        _stage_idx: i32,
-        _corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
+        max_count: Option<usize>,
+    ) -> Result<Vec<I>, Error>;
 }
 
 /// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
