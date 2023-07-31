@@ -30,6 +30,37 @@ pub type GuestHwAddrInfo = libafl_qemu_sys::qemu_plugin_hwaddr;
 #[cfg(emulation_mode = "systemmode")]
 pub type FastSnapshot = *mut libafl_qemu_sys::syx_snapshot_t;
 
+#[cfg(emulation_mode = "systemmode")]
+pub enum DeviceSnapshotFilter {
+    All,
+    AllowList(Vec<String>),
+    DenyList(Vec<String>),
+}
+
+#[cfg(emulation_mode = "systemmode")]
+impl DeviceSnapshotFilter {
+    fn enum_id(&self) -> libafl_qemu_sys::device_snapshot_kind_t {
+        match self {
+            All => libafl_qemu_sys::DEVICE_SNAPSHOT_ALL,
+            AllowList(_) => libafl_qemu_sys::DEVICE_SNAPSHOT_ALLOWLIST,
+            DenyList(_) => libafl_qemu_sys::DEVICE_SNAPSHOT_DENYLIST,
+        }
+    }
+
+    fn devices(&self, v: &mut Vec<*const u8>) -> *const *const u8 {
+        v.clear();
+        match self {
+            All => ptr::null(),
+            AllowList(l) | DenyList(l) => {
+                for name in l {
+                    v.push(name.as_bytes().as_ptr() as *const u8);
+                }
+                v.as_ptr()
+            }
+        }
+    }
+}
+
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct MemAccessInfo {
@@ -1142,7 +1173,29 @@ impl Emulator {
     #[cfg(emulation_mode = "systemmode")]
     #[must_use]
     pub fn create_fast_snapshot(&self, track: bool) -> FastSnapshot {
-        unsafe { libafl_qemu_sys::syx_snapshot_create(track) }
+        unsafe {
+            libafl_qemu_sys::syx_snapshot_create(
+                track,
+                libafl_qemu_sys::DEVICE_SNAPSHOT_ALL,
+                ptr::null(),
+            )
+        }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    #[must_use]
+    pub fn create_fast_snapshot_filter(
+        &self,
+        track: bool,
+        device_filter: &DeviceSnapshotFilter,
+    ) -> FastSnapshot {
+        unsafe {
+            libafl_qemu_sys::syx_snapshot_create(
+                track,
+                device_filter.enum_id(),
+                device_filter.devices(),
+            )
+        }
     }
 
     #[cfg(emulation_mode = "systemmode")]
