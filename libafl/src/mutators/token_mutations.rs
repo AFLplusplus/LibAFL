@@ -1670,7 +1670,7 @@ where
             }
         }
 
-        let ret_count = max_count.unwrap_or_else(|| ret.len());
+        let ret_count = max_count.unwrap_or(ret.len());
 
         Ok(ret
             .into_iter()
