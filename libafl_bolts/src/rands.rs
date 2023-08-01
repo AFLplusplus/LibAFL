@@ -515,12 +515,4 @@ pub mod pybind {
         m.add_class::<PythonRand>()?;
         Ok(())
     }
-
-    #[pymodule]
-    #[pyo3(name = "libafl_bolts")]
-    /// Register the classes to the python module
-    pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-        crate::rands::pybind::register(py, m)?;
-        Ok(())
-    }
 }

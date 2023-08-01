@@ -249,6 +249,7 @@ pub mod pybind {
     #[pyo3(name = "libafl")]
     /// Register the classes to the python module
     pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+        libafl_bolts::rands::pybind::register(py, m)?;
         observers::map::pybind::register(py, m)?;
         observers::pybind::register(py, m)?;
         feedbacks::map::pybind::register(py, m)?;
@@ -268,7 +269,6 @@ pub mod pybind {
         corpus::ondisk::pybind::register(py, m)?;
         corpus::inmemory::pybind::register(py, m)?;
         corpus::cached::pybind::register(py, m)?;
-        bolts::rands::pybind::register(py, m)?;
         stages::pybind::register(py, m)?;
         stages::mutational::pybind::register(py, m)?;
         Ok(())
