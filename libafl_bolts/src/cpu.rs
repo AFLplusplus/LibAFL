@@ -10,7 +10,7 @@ use core::arch::asm;
     target_arch = "riscv64",
     target_arsch = "riscv32"
 )))]
-use crate::bolts::current_nanos;
+use crate::current_nanos;
 
 // TODO: Add more architectures, using C code, see
 // https://github.com/google/benchmark/blob/master/src/cycleclock.h
