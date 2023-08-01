@@ -85,6 +85,14 @@ pub extern crate alloc;
 #[doc(hidden)]
 pub use ctor::ctor;
 
+#[deprecated(
+    since = "0.11.0",
+    note = "The launcher module has moved out of `libafl_bolts` into `libafl::events::launcher`."
+)]
+/// Dummy module informing potential users that the launcher module has moved
+/// out of `libafl_bolts` into `libafl::events::launcher`.
+pub mod launcher {}
+
 // Re-export derive(SerdeAny)
 #[cfg(feature = "libafl_derive")]
 #[allow(unused_imports)]
