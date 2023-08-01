@@ -358,7 +358,7 @@ impl Rand for XkcdRand {
 
 /// A test rng that will return the same value (chose by fair dice roll) for testing.
 impl XkcdRand {
-    /// Creates a new [`XkCDRand`] with the rand of 4, [chosen by fair dice roll, guaranteed to be random](https://xkcd.com/221/).
+    /// Creates a new [`XkcdRand`] with the rand of 4, [chosen by fair dice roll, guaranteed to be random](https://xkcd.com/221/).
     /// Will always return this seed.
     #[must_use]
     pub fn new() -> Self {
