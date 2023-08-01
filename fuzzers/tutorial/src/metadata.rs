@@ -9,7 +9,7 @@ use libafl::{
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error,
 };
-use libafl_bolts::{Named, serdeany::SerdeAny};
+use libafl_bolts::{serdeany::SerdeAny, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::input::PacketData;
