@@ -208,7 +208,7 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
             .unwrap()
     }
 
-    /// Convert to a slice of type &[T]
+    /// Convert to a slice of type &\[T\]
     ///
     /// # Safety
     /// This function is not safe as the object may be not initialized.
@@ -219,7 +219,7 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
         core::slice::from_raw_parts(ptr, len)
     }
 
-    /// Convert to a slice of type &mut [T]
+    /// Convert to a slice of type &mut \[T\]
     ///
     /// # Safety
     /// This function is not safe as the object may be not initialized.
@@ -882,6 +882,7 @@ pub mod unix_shmem {
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
                     if map as c_int == -1 || map.is_null() {
+                        perror(b"shmat\0".as_ptr() as *const _);
                         shmctl(os_id, libc::IPC_RMID, ptr::null_mut());
                         return Err(Error::unknown(
                             "Failed to map the shared mapping".to_string(),
@@ -903,6 +904,7 @@ pub mod unix_shmem {
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
                     if map.is_null() || map == ptr::null_mut::<c_uchar>().wrapping_sub(1) {
+                        perror(b"shmat\0".as_ptr() as *const _);
                         return Err(Error::unknown(
                             "Failed to map the shared mapping".to_string(),
                         ));
