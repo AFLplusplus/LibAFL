@@ -88,7 +88,8 @@ pub use ctor::ctor;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate libafl_derive;
-pub use libafl_bolts as bolts;
+//#[deprecated(since="0.5.0", note="please use `new_method` instead")]
+//pub use libafl_bolts as bolts;
 #[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use libafl_derive::*;

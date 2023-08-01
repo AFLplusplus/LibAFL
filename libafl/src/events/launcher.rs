@@ -24,6 +24,13 @@ use std::process::Stdio;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use std::{fs::File, os::unix::io::AsRawFd};
 
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use libafl_bolts::os::startable_self;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use libafl_bolts::{
+    core_affinity::get_core_ids,
+    os::{dup2, fork, ForkResult},
+};
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     shmem::ShMemProvider,
@@ -33,13 +40,6 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::bolts::{
-    core_affinity::get_core_ids,
-    os::{dup2, fork, ForkResult},
-};
 use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
@@ -256,7 +256,7 @@ where
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch(&mut self) -> Result<(), Error> {
-        use crate::bolts::core_affinity;
+        use libafl_bolts::core_affinity;
 
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
 

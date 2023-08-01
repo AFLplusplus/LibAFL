@@ -4,6 +4,8 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(feature = "adaptive_serialization")]
 use core::time::Duration;
 
+#[cfg(feature = "adaptive_serialization")]
+use libafl_bolts::current_time;
 use libafl_bolts::{
     llmp::{LlmpReceiver, LlmpSender, Tag},
     shmem::ShMemProvider,
@@ -12,8 +14,6 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
-#[cfg(feature = "adaptive_serialization")]
-use crate::bolts::current_time;
 use crate::{
     events::{
         llmp::EventStatsCollector, Event, EventConfig, EventFirer, EventManager, EventManagerId,

@@ -438,10 +438,11 @@ libafl_bolts::impl_serdeany!(SchedulerTestcaseMetadata);
 pub mod pybind {
     use alloc::{boxed::Box, vec::Vec};
 
+    use libafl_bolts::ownedref::OwnedMutPtr;
     use pyo3::{prelude::*, types::PyDict};
 
     use super::{HasMetadata, Testcase};
-    use crate::{bolts::ownedref::OwnedMutPtr, inputs::BytesInput, pybind::PythonMetadata};
+    use crate::{inputs::BytesInput, pybind::PythonMetadata};
 
     /// `PythonTestcase` with fixed generics
     pub type PythonTestcase = Testcase<BytesInput>;

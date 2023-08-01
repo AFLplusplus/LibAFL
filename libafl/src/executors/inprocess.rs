@@ -26,6 +26,14 @@ use core::{
 use std::intrinsics::transmute;
 
 use libafl_bolts::current_time;
+#[cfg(all(unix, not(miri)))]
+use libafl_bolts::os::unix_signals::setup_signal_handler;
+#[cfg(all(feature = "std", unix))]
+use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
+#[cfg(all(windows, feature = "std"))]
+use libafl_bolts::os::windows_exceptions::setup_exception_handler;
+#[cfg(all(feature = "std", unix))]
+use libafl_bolts::shmem::ShMemProvider;
 #[cfg(all(feature = "std", unix))]
 use libc::siginfo_t;
 #[cfg(all(feature = "std", unix))]
@@ -36,14 +44,6 @@ use nix::{
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
-#[cfg(all(unix, not(miri)))]
-use crate::bolts::os::unix_signals::setup_signal_handler;
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::os::unix_signals::{ucontext_t, Handler, Signal};
-#[cfg(all(windows, feature = "std"))]
-use crate::bolts::os::windows_exceptions::setup_exception_handler;
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::shmem::ShMemProvider;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
@@ -893,7 +893,7 @@ mod unix_signal_handler {
                 {
                     let mut writer = std::io::BufWriter::new(&mut bsod);
                     writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
-                    crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
+                    libafl_bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
                         .unwrap();
                     writer.flush().unwrap();
                 }
@@ -925,7 +925,7 @@ mod unix_signal_handler {
                     let mut bsod = Vec::new();
                     {
                         let mut writer = std::io::BufWriter::new(&mut bsod);
-                        crate::bolts::minibsod::generate_minibsod(
+                        libafl_bolts::minibsod::generate_minibsod(
                             &mut writer,
                             signal,
                             _info,

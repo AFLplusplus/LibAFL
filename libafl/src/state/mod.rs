@@ -13,14 +13,14 @@ use std::{
     vec::Vec,
 };
 
+#[cfg(test)]
+use libafl_bolts::rands::StdRand;
 use libafl_bolts::{
     rands::Rand,
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-#[cfg(test)]
-use crate::bolts::rands::StdRand;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},

@@ -21,9 +21,8 @@ use core::{fmt, fmt::Write, time::Duration};
 #[cfg(feature = "std")]
 pub use disk::{OnDiskJSONMonitor, OnDiskTOMLMonitor};
 use hashbrown::HashMap;
+use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use serde::{Deserialize, Serialize};
-
-use crate::bolts::{current_time, format_duration_hms, ClientId};
 
 #[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
@@ -670,7 +669,7 @@ impl ClientPerfMonitor {
     /// the current clock counter
     #[must_use]
     pub fn new() -> Self {
-        let start_time = crate::bolts::cpu::read_time_counter();
+        let start_time = libafl_bolts::cpu::read_time_counter();
 
         Self {
             start_time,
@@ -694,7 +693,7 @@ impl ClientPerfMonitor {
     /// Start a timer with the current time counter
     #[inline]
     pub fn start_timer(&mut self) {
-        self.timer_start = Some(crate::bolts::cpu::read_time_counter());
+        self.timer_start = Some(libafl_bolts::cpu::read_time_counter());
     }
 
     /// Update the current [`ClientPerfMonitor`] with the given [`ClientPerfMonitor`]
@@ -720,7 +719,7 @@ impl ClientPerfMonitor {
             }
             Some(timer_start) => {
                 // Calculate the elapsed time
-                let elapsed = crate::bolts::cpu::read_time_counter() - timer_start;
+                let elapsed = libafl_bolts::cpu::read_time_counter() - timer_start;
 
                 // Reset the timer
                 self.timer_start = None;

@@ -23,16 +23,16 @@ use core::{
 use ahash::RandomState;
 #[cfg(feature = "std")]
 pub use launcher::*;
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use libafl_bolts::{current_time, ClientId};
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
-#[cfg(all(unix, feature = "std"))]
-use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
-#[cfg(all(unix, feature = "std"))]
-use crate::bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 use crate::{
     executors::ExitKind,
     inputs::Input,
@@ -216,7 +216,7 @@ impl EventConfig {
     #[must_use]
     pub fn from_build_id() -> Self {
         EventConfig::BuildID {
-            id: crate::bolts::build_id::get(),
+            id: libafl_bolts::build_id::get(),
         }
     }
 
@@ -501,7 +501,7 @@ where
         {
             state
                 .introspection_monitor_mut()
-                .set_current_time(crate::bolts::cpu::read_time_counter());
+                .set_current_time(libafl_bolts::cpu::read_time_counter());
 
             // Send the current monitor over to the manager. This `.clone` shouldn't be
             // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s

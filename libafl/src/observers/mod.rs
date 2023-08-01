@@ -33,12 +33,12 @@ use core::{fmt::Debug, time::Duration};
 #[cfg(feature = "std")]
 use std::time::Instant;
 
+#[cfg(feature = "no_std")]
+use libafl_bolts::current_time;
 use libafl_bolts::{ownedref::OwnedMutPtr, tuples::MatchName, Named};
 use serde::{Deserialize, Serialize};
 pub use value::*;
 
-#[cfg(feature = "no_std")]
-use crate::bolts::current_time;
 use crate::{executors::ExitKind, inputs::UsesInput, state::UsesState, Error};
 
 /// Something that uses observer like mapfeedbacks
