@@ -15,7 +15,7 @@ use libafl::{
         core_affinity::{CoreId, Cores},
         current_nanos,
         launcher::Launcher,
-        llmp::{LlmpReceiver, LlmpSender},
+        llmp::{LlmpReceiver, LlmpSender, PersistentLlmpP2P},
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -130,32 +130,23 @@ pub extern "C" fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let mut senders = vec![];
-    let mut receivers = vec![];
-    let mut main_core_id = None;
+    let mut main_core_id = CoreId::from(0);
     let mut core_id_map = std::collections::HashMap::<CoreId, usize>::default();
-    for core_id in &cores.ids {
-        if main_core_id.is_none() {
-            main_core_id = Some(core_id.clone());
+    for idx in 0..cores.ids.len() {
+        let core_id = cores.ids[idx];
+        if idx == 0 {
+            main_core_id = core_id;
             continue;
         }
-        let sender =
-            LlmpSender::new(shmem_provider.clone(), ClientId(core_id.0 as u32), false).unwrap();
-        let receiver = LlmpReceiver::on_existing_shmem(
-            shmem_provider.clone(),
-            sender.out_shmems[0].shmem.clone(),
-            None,
-        )
-        .unwrap();
-
-        core_id_map.insert(core_id.clone(), senders.len());
-        senders.push(Some(sender));
-        receivers.push(receiver);
+        core_id_map.insert(core_id, idx - 1);
     }
 
-    eprintln!("Main is {main_core_id:?}");
+    let num_channels = cores.ids.len() - 1; // Number of clients minus the main
+    let mut p2p = Some(PersistentLlmpP2P::new(shmem_provider.clone(), num_channels).unwrap());
 
-    let mut receivers = Some(receivers);
+    let client_provider = shmem_provider.clone();
+
+    eprintln!("Main is {main_core_id:?}");
 
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
@@ -197,11 +188,20 @@ pub extern "C" fn libafl_main() {
             .unwrap()
         });
 
-        let mut mgr = if main_core_id.unwrap() == core_id {
-            CentralizedEventManager::new_main(restarting_mgr, receivers.take().unwrap())
+        let mut mgr = if main_core_id == core_id {
+            CentralizedEventManager::new_main(
+                restarting_mgr,
+                client_provider.clone(),
+                p2p.take().unwrap(),
+            )?
         } else {
             let idx = *core_id_map.get(&core_id).unwrap();
-            CentralizedEventManager::new_secondary(restarting_mgr, senders[idx].take().unwrap())
+            CentralizedEventManager::new_secondary(
+                restarting_mgr,
+                client_provider.clone(),
+                p2p.take().unwrap(),
+                idx,
+            )?
         };
 
         // let mut mgr = restarting_mgr;
