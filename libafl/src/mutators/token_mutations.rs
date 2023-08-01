@@ -25,7 +25,7 @@ use crate::{
     bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, UsesInput},
     mutators::{
-        buffer_self_copy, mutations::buffer_copy, MultipleMutator, MutationResult, Mutator, Named,
+        buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
@@ -1090,37 +1090,37 @@ impl AFLppRedQueen {
     }
 }
 
-impl<I, S> MultipleMutator<I, S> for AFLppRedQueen
+impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus,
     I: HasBytesVec + From<Vec<u8>>,
 {
     #[allow(clippy::needless_range_loop)]
     #[allow(clippy::too_many_lines)]
-    fn mutate(
+    fn multi_mutate(
         &mut self,
         state: &mut S,
         input: &I,
-        ret: &mut Vec<I>,
         stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
+        max_count: Option<usize>,
+    ) -> Result<Vec<I>, Error> {
         // TODO
         // handle 128-bits logs
         let size = input.bytes().len();
         if size == 0 {
-            return Ok(MutationResult::Skipped);
+            return Ok(vec![]);
         }
 
         let (cmp_len, cmp_meta, taint_meta) = {
             let cmp_meta = state.metadata_map().get::<AFLppCmpValuesMetadata>();
             let taint_meta = state.metadata_map().get::<TaintMetadata>();
             if cmp_meta.is_none() || taint_meta.is_none() {
-                return Ok(MutationResult::Skipped);
+                return Ok(vec![]);
             }
 
             let cmp_len = cmp_meta.unwrap().headers().len();
             if cmp_len == 0 {
-                return Ok(MutationResult::Skipped);
+                return Ok(vec![]);
             }
             (cmp_len, cmp_meta.unwrap(), taint_meta.unwrap())
         };
@@ -1135,7 +1135,7 @@ where
         let orig_bytes = input.bytes();
 
         let taint = taint_meta.ranges();
-        let mut vec = vec![];
+        let mut ret = max_count.map_or_else(Vec::new, Vec::with_capacity);
         let mut gathered_tokens = Tokens::new();
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
 
@@ -1172,6 +1172,13 @@ where
                 }
 
                 for cmp_buf_idx in 0..input_len {
+                    if let Some(max_count) = max_count {
+                        if ret.len() >= max_count {
+                            // TODO: does this bias towards earlier mutations?
+                            break;
+                        }
+                    }
+
                     let taint_len = match taint.get(taint_idx) {
                         Some(t) => {
                             if cmp_buf_idx < t.start {
@@ -1213,7 +1220,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
 
                                 // Swapped
@@ -1229,7 +1236,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
                             }
 
@@ -1247,7 +1254,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
 
                                 // Swapped
@@ -1263,7 +1270,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
                             }
                             */
@@ -1301,7 +1308,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
 
                                 // Swapped
@@ -1318,7 +1325,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
                             }
 
@@ -1336,7 +1343,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
 
                                 // Swapped
@@ -1352,7 +1359,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
                             }
 
@@ -1390,7 +1397,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
 
                                 // swapped
@@ -1407,7 +1414,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
                             }
 
@@ -1425,7 +1432,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
 
                                 // Swapped
@@ -1442,7 +1449,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
                             }
 
@@ -1483,7 +1490,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
 
                                 // Swapped
@@ -1500,7 +1507,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
                             }
 
@@ -1518,7 +1525,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
 
                                 // Swapped
@@ -1535,7 +1542,7 @@ where
                                     taint_len,
                                     input_len,
                                     hshape,
-                                    &mut vec,
+                                    &mut ret,
                                 );
                             }
 
@@ -1574,7 +1581,7 @@ where
                                 taint_len,
                                 input_len,
                                 hshape,
-                                &mut vec,
+                                &mut ret,
                             );
 
                             // Compare v1 against v0
@@ -1589,7 +1596,7 @@ where
                                 taint_len,
                                 input_len,
                                 hshape,
-                                &mut vec,
+                                &mut ret,
                             );
 
                             let is_ascii_or_utf8 = self.text_type.is_ascii_or_utf8();
@@ -1663,16 +1670,10 @@ where
             }
         }
 
-        let mut mutated = false;
-        for item in vec {
-            ret.push(I::from(item));
-            mutated = true;
-        }
-
-        if mutated {
-            Ok(MutationResult::Mutated)
+        if let Some(max_count) = max_count {
+            Ok(ret.into_iter().take(max_count).map(I::from).collect())
         } else {
-            Ok(MutationResult::Skipped)
+            Ok(ret.into_iter().map(I::from).collect())
         }
     }
 }

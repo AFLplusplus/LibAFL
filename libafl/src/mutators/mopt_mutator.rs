@@ -1,5 +1,8 @@
 //! The `MOpt` mutator scheduler, see <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
-use alloc::{string::ToString, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
@@ -9,7 +12,10 @@ use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 use crate::{
-    bolts::rands::{Rand, StdRand},
+    bolts::{
+        rands::{Rand, StdRand},
+        tuples::Named,
+    },
     corpus::{Corpus, CorpusId},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
@@ -365,6 +371,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
+    name: String,
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
@@ -539,6 +546,7 @@ where
             state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num, rand_seed)?);
         }
         Ok(Self {
+            name: format!("StdMOptMutator[{}]", mutations.names().join(",")),
             mode: MOptMode::Pilotfuzzing,
             finds_before: 0,
             mutations,
@@ -629,6 +637,16 @@ where
     #[inline]
     fn mutations_mut(&mut self) -> &mut MT {
         &mut self.mutations
+    }
+}
+
+impl<I, MT, S> Named for StdMOptMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata + HasCorpus + HasSolutions,
+{
+    fn name(&self) -> &str {
+        &self.name
     }
 }
 
