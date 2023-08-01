@@ -19,7 +19,8 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
     clippy::unreadable_literal,
-    clippy::ptr_cast_constness
+    clippy::ptr_cast_constness,
+    clippy::must_use_candidate
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
