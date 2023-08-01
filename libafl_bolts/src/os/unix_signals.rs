@@ -378,7 +378,7 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
 
 /// Setup signal handlers in a somewhat rusty way.
 /// This will allocate a signal stack and set the signal handlers accordingly.
-/// It is, for example, used in the [`type@crate::executors::InProcessExecutor`] to restart the fuzzer in case of a crash,
+/// It is, for example, used in LibAFL's `InProcessExecutor` to restart the fuzzer in case of a crash,
 /// or to handle `SIGINT` in the broker process.
 ///
 /// # Safety
