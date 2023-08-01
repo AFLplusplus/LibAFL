@@ -120,9 +120,8 @@ jobs:
       run: rustup toolchain install nightly --component clippy --allow-downgrade
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
-
     - name: Run clippy
-      run: ./scripts/clippy.sh
+      run: cargo build --all && ./scripts/clippy.sh
 
   ubuntu-check:
     runs-on: ubuntu-22.04
@@ -407,7 +406,7 @@ jobs:
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Run clippy
-      run: ./scripts/clippy.sh
+      run: cargo build --all && ./scripts/clippy.sh
 
   other_targets:
     runs-on: macOS-latest
