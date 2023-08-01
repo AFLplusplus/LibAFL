@@ -2929,7 +2929,7 @@ where
 
     /// Create a point-to-point channel instead of using a broker-client channel
     pub fn new_p2p(shmem_provider: SP, sender_id: ClientId) -> Result<Self, Error> {
-        let sender = LlmpSender::new(shmem_provider.clone(), sender_id, true)?;
+        let sender = LlmpSender::new(shmem_provider.clone(), sender_id, false)?;
         let receiver = LlmpReceiver::on_existing_shmem(
             shmem_provider,
             sender.out_shmems[0].shmem.clone(),
