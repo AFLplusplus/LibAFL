@@ -284,11 +284,11 @@ where
 pub mod pybind {
     use core::ffi::CStr;
 
+    use libafl_bolts::Named;
     use pyo3::{prelude::*, AsPyPointer};
 
     use super::{MutationResult, Mutator};
     use crate::{
-        bolts::tuples::Named,
         corpus::CorpusId,
         inputs::{BytesInput, HasBytesVec},
         mutators::scheduled::pybind::PythonStdHavocMutator,
