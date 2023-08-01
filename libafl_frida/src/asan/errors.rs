@@ -17,7 +17,7 @@ use libafl::{
     state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
-use libafl_bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, serdeany::SerdeAny, Named};
+use libafl_bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 

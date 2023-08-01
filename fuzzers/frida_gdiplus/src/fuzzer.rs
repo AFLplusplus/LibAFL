@@ -15,8 +15,8 @@ use std::path::PathBuf;
 use frida_gum::Gum;
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{llmp::LlmpRestartingEventManager, EventConfig},
-    executors::{inprocess::InProcessExecutor, launcher::Launcher, ExitKind, ShadowExecutor},
+    events::{launcher::Launcher, llmp::LlmpRestartingEventManager, EventConfig},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
