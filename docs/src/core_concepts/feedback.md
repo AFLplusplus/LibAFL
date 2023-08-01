@@ -10,8 +10,9 @@ The concept of "interestingness" is abstract, but typically it is related to a n
 
 As an example, given an Observer that reports all the sizes of memory allocations, a maximization Feedback can be used to maximize these sizes to sport pathological inputs in terms of memory consumption.
 
-In terms of code, the library offers the [`Feedback`](https://docs.rs/libafl/0/libafl/feedbacks/trait.Feedback.html) and the [`FeedbackState`](https://docs.rs/libafl/0/libafl/feedbacks/trait.FeedbackState.html) traits.
-The first is used to implement functors that, given the state of the observers from the last execution, tells if the execution was interesting. The second is tied with `Feedback` and is the state of the data that the feedback wants to persist in the fuzzers's state, for instance the cumulative map holding all the edges seen so far in the case of a feedback based on edge coverage.
+In terms of code, the library offers the [`Feedback`](https://docs.rs/libafl/0/libafl/feedbacks/trait.Feedback.html) trait.
+It is used to implement functors that, given the state of the observers from the last execution, tells if the execution was interesting. A `Feedback` can store anything it wants to persist in the fuzzers's state, for instance the cumulative map holding all the edges seen so far in the case of a feedback based on edge coverage by adding a `Metadata` in [`init_state`](https://docs.rs/libafl/0/libafl/feedbacks/trait.Feedback.html#method.init_state).
+It can also add custom metadata to a newly created [`Testcase`](https://docs.rs/libafl/0/libafl/corpus/testcase/struct.Testcase.html) using [`append_metadata`](https://docs.rs/libafl/0.10.1/libafl/feedbacks/trait.Feedback.html#method.append_metadata).
 
 Multiple Feedbacks can be combined into a boolean expression, considering for instance an execution as interesting if it triggers new code paths or execute in less time compared to the average execution time using [`feedback_or`](https://docs.rs/libafl/*/libafl/macro.feedback_or.html).
 
