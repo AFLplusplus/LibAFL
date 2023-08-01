@@ -225,6 +225,11 @@ mod tests {
 pub mod pybind {
     use pyo3::prelude::*;
 
+    use super::{
+        corpus, events, executors, feedbacks, fuzzer, generators, monitors, mutators, observers,
+        stages, state,
+    };
+
     #[derive(Debug, Clone)]
     pub struct PythonMetadata {
         pub map: PyObject,
@@ -244,7 +249,28 @@ pub mod pybind {
     #[pyo3(name = "libafl")]
     /// Register the classes to the python module
     pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-        libafl_bolts::rands::pybind::register(py, m)?;
+        observers::map::pybind::register(py, m)?;
+        observers::pybind::register(py, m)?;
+        feedbacks::map::pybind::register(py, m)?;
+        feedbacks::pybind::register(py, m)?;
+        state::pybind::register(py, m)?;
+        monitors::pybind::register(py, m)?;
+        events::pybind::register(py, m)?;
+        events::simple::pybind::register(py, m)?;
+        fuzzer::pybind::register(py, m)?;
+        executors::pybind::register(py, m)?;
+        executors::inprocess::pybind::register(py, m)?;
+        generators::pybind::register(py, m)?;
+        mutators::pybind::register(py, m)?;
+        mutators::scheduled::pybind::register(py, m)?;
+        corpus::pybind::register(py, m)?;
+        corpus::testcase::pybind::register(py, m)?;
+        corpus::ondisk::pybind::register(py, m)?;
+        corpus::inmemory::pybind::register(py, m)?;
+        corpus::cached::pybind::register(py, m)?;
+        bolts::rands::pybind::register(py, m)?;
+        stages::pybind::register(py, m)?;
+        stages::mutational::pybind::register(py, m)?;
         Ok(())
     }
 }
