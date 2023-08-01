@@ -1,4 +1,5 @@
 use libafl;
+use libafl_bolts;
 #[cfg(target_os = "linux")]
 use libafl_qemu;
 use libafl_sugar;
@@ -103,6 +104,9 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
 
     #[cfg(target_os = "linux")]
     modules.set_item("pylibafl.qemu", qemu_module)?;
+
+    let bolts_module = PyModule::new(py, "libafl_bolts")?;
+    libafl_bolts::pybind::python_module(py, bolts_module)?;
 
     let libafl_module = PyModule::new(py, "libafl")?;
     libafl::pybind::python_module(py, libafl_module)?;
