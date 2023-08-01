@@ -203,8 +203,8 @@ where
             self.p2p.get_description_mut(self.p2p_index).sender = sender.describe()?;
         } else if let Some(receivers) = self.receivers_from_secondary.as_ref() {
             debug_assert!(self.p2p.num_channels() == receivers.len());
-            for i in 0..receivers.len() {
-                self.p2p.get_description_mut(i).receiver = receivers[i].describe()?;
+            for (i, recv) in receivers.iter().enumerate() {
+                self.p2p.get_description_mut(i).receiver = recv.describe()?;
             }
         }
 
@@ -387,6 +387,7 @@ where
     SP: ShMemProvider,
 {
     /// Creates a new [`CentralizedEventManager`].
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new_main(
         inner: EM,
         shmem_provider: SP,
