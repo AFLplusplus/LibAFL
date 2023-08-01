@@ -88,8 +88,12 @@ pub use ctor::ctor;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate libafl_derive;
-//#[deprecated(since="0.5.0", note="please use `new_method` instead")]
-//pub use libafl_bolts as bolts;
+/// Dummy export that will warn with a deprecation note on usage.
+#[deprecated(
+    since = "0.11.0",
+    note = "All LibAFL bolts have moved to the libafl_bolts crate."
+)]
+pub mod bolts {}
 #[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use libafl_derive::*;
@@ -114,8 +118,6 @@ pub use libafl_bolts::Error;
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod prelude {
-    pub use libafl_bolts::{bolts_prelude::*, *};
-
     pub use super::{
         corpus::*, events::*, executors::*, feedbacks::*, fuzzer::*, generators::*, inputs::*,
         monitors::*, mutators::*, observers::*, schedulers::*, stages::*, state::*, *,
