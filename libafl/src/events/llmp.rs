@@ -954,7 +954,10 @@ where
         self.staterestorer.save(&(
             if self.save_state { Some(state) } else { None },
             &self.llmp_mgr.describe()?,
-        ))
+        ))?;
+
+        log::info!("Waiting for broker...");
+        self.await_restart_safe()
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {

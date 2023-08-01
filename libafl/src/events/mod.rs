@@ -523,6 +523,7 @@ pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
     fn on_restart(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        self.await_restart_safe();
         Ok(())
     }
 
@@ -532,7 +533,7 @@ pub trait EventRestarter: UsesState {
         Ok(())
     }
 
-    /// Block until we are safe to exit.
+    /// Block until we are safe to exit, usually called inside `on_restart`.
     #[inline]
     fn await_restart_safe(&mut self) {}
 }

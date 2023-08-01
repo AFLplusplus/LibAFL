@@ -208,7 +208,8 @@ where
             }
         }
 
-        self.inner.on_restart(state)
+        self.inner.on_restart(state)?;
+        self.await_restart_safe()
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
@@ -220,7 +221,6 @@ where
         if let Some(sender) = self.sender_to_main.as_ref() {
             sender.await_safe_to_unmap_blocking();
         }
-        self.inner.await_restart_safe();
     }
 }
 
