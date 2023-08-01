@@ -7,6 +7,7 @@
     allow(clippy::useless_conversion)
 )]
 #![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::needless_pass_by_ref_mut)]
 #![allow(clippy::transmute_ptr_to_ptr)]
 #![allow(clippy::ptr_cast_constness)]
 #![allow(clippy::too_many_arguments)]
