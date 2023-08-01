@@ -2,13 +2,13 @@
 //! Instead of a random mutator for a random amount of iterations, we can run
 //! a specific mutator for a specified amount of iterations
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
 };
 
-use libafl_bolts::{calculate_cumulative_sum_in_place, impl_serdeany, rands::Rand};
+use libafl_bolts::{calculate_cumulative_sum_in_place, impl_serdeany, rands::Rand, Named};
 use serde::{Deserialize, Serialize};
 
 pub use crate::mutators::{mutations::*, token_mutations::*};
@@ -79,6 +79,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
+    name: String,
     mutations: MT,
     max_stack_pow: u64,
     phantom: PhantomData<(I, S)>,
@@ -130,6 +131,16 @@ where
     #[inline]
     fn mutations_mut(&mut self) -> &mut MT {
         &mut self.mutations
+    }
+}
+
+impl<I, MT, S> Named for TuneableScheduledMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand,
+{
+    fn name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -214,6 +225,7 @@ where
             state.add_metadata(TuneableScheduledMutatorMetadata::default());
         }
         TuneableScheduledMutator {
+            name: format!("TuneableMutator[{}]", mutations.names().join(", ")),
             mutations,
             max_stack_pow: 7,
             phantom: PhantomData,

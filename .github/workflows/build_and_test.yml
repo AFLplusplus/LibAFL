@@ -16,6 +16,9 @@ jobs:
           os: [ubuntu-latest, windows-latest, macOS-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Install mimetype
+        if: runner.os == 'Linux'
+        run: sudo apt-get install libfile-mimeinfo-perl
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -31,9 +34,6 @@ jobs:
           crate: mdbook-linkcheck
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
-      - name: Install mimetype
-        if: runner.os == 'Linux'
-        run: sudo apt-get install libfile-mimeinfo-perl
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
