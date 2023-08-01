@@ -105,7 +105,7 @@ where
             if let Some(meta) = state.metadata_map_mut().get_mut::<TopRatedsMetadata>() {
                 let entries = meta
                     .map
-                    .drain_filter(|_, other_idx| *other_idx == idx)
+                    .extract_if(|_, other_idx| *other_idx == idx)
                     .map(|(entry, _)| entry)
                     .collect::<Vec<_>>();
                 entries

@@ -99,6 +99,9 @@ use core::{
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
 
+#[cfg(feature = "libafl_derive")]
+pub use libafl_derive::SerdeAny;
+
 /// We need fixed names for many parts of this lib.
 pub trait Named {
     /// Provide the name of this element.
