@@ -28,7 +28,7 @@ use libafl::{
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
-static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+static SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 /*
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {

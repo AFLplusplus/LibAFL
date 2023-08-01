@@ -117,7 +117,7 @@ jobs:
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component clippy --allow-downgrade
+      run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Run clippy
@@ -376,7 +376,7 @@ jobs:
         profile: minimal
         toolchain: stable
     - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --allow-downgrade
+      run: rustup toolchain install nightly --component rustfmt --allow-downgrade && rustup default nightly
     - name: Install deps
       run: brew install z3 gtk+3
     - name: Install cxxbridge
@@ -462,6 +462,7 @@ jobs:
           freebsd-version
           . "$HOME/.cargo/env"
           rustup toolchain install nightly
+          rustup default nightly
           export LLVM_CONFIG=/usr/local/bin/llvm-config16
           pwd
           ls -lah
