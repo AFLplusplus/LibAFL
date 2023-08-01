@@ -104,8 +104,8 @@ pub trait Mutator<I, S>: Named {
 /// A mutator that takes input, and returns a vector of mutated inputs.
 /// Simple as that.
 pub trait MultiMutator<I, S>: Named {
-    /// Mutate a given input up to [`max_count`] times,
-    /// or as many times as appropriate, if no [`max_count`] is given
+    /// Mutate a given input up to `max_count` times,
+    /// or as many times as appropriate, if no `max_count` is given
     fn multi_mutate(
         &mut self,
         state: &mut S,

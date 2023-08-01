@@ -1670,13 +1670,11 @@ where
             }
         }
 
-        let ret_count = max_count.unwrap_or(ret.len());
-
-        Ok(ret
-            .into_iter()
-            .take(ret_count)
-            .map(|item| I::from(item))
-            .collect())
+        if let Some(max_count) = max_count {
+            Ok(ret.into_iter().take(max_count).map(I::from).collect())
+        } else {
+            Ok(ret.into_iter().map(I::from).collect())
+        }
     }
 }
 
