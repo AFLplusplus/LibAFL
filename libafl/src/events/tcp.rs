@@ -734,7 +734,8 @@ where
         self.staterestorer.reset();
         self.staterestorer
             .save(&if self.save_state { Some(state) } else { None })?;
-        self.await_restart_safe()
+        self.await_restart_safe();
+        Ok(())
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {

@@ -209,7 +209,8 @@ where
         }
 
         self.inner.on_restart(state)?;
-        self.await_restart_safe()
+        self.await_restart_safe();
+        Ok(())
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
