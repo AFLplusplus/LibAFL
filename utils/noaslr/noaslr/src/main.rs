@@ -67,6 +67,34 @@ fn disable_aslr() -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "netbsd")]
+fn disable_aslr() -> Result<()> {
+    unsafe {
+        let mut aslr: i32 = 0;
+        let mut s = std::mem::size_of::<i32>();
+        let nm = CString::new("security.pax.aslr.enabled")
+            .map_err(|e| anyhow!("Failed to create sysctl oid: {e:}"))
+            .unwrap();
+        if libc::sysctlbyname(
+            nm.as_ptr(),
+            &mut aslr as *mut i32 as _,
+            &mut s,
+            std::ptr::null(),
+            0,
+        ) < 0
+        {
+            return Err(anyhow!("Failed to get aslr status"));
+        }
+
+        if aslr > 0 {
+            return Err(anyhow!(
+                "Please disable aslr with sysctl -w security.pax.aslr.enabled=0 as privileged user"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
 
