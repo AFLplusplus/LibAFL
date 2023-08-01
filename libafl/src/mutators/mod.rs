@@ -286,8 +286,8 @@ where
 #[allow(missing_docs)]
 pub mod pybind {
     use core::ffi::CStr;
-    use pyo3::prelude::*;
-    use pyo3::AsPyPointer;
+
+    use pyo3::{prelude::*, AsPyPointer};
 
     use super::{MutationResult, Mutator};
     use crate::{
