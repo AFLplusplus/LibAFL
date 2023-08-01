@@ -11,7 +11,7 @@ use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
 use crate::bolts::current_time;
 use crate::{
     bolts::{
-        llmp::{LlmpReceiver, LlmpSender, Tag},
+        llmp::{LlmpReceiver, LlmpSender, PersistentLlmpP2P, Tag},
         shmem::ShMemProvider,
         ClientId,
     },
@@ -37,6 +37,8 @@ where
     SP: ShMemProvider,
 {
     inner: EM,
+    p2p: PersistentLlmpP2P<SP>,
+    p2p_index: usize,
     sender_to_main: Option<LlmpSender<SP>>,
     receivers_from_secondary: Option<Vec<LlmpReceiver<SP>>>,
 }
@@ -197,6 +199,15 @@ where
 {
     #[inline]
     fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        if let Some(sender) = self.sender_to_main.as_ref() {
+            self.p2p.get_description_mut(self.p2p_index).sender = sender.describe()?;
+        } else if let Some(receivers) = self.receivers_from_secondary.as_ref() {
+            debug_assert!(self.p2p.num_channels() == receivers.len());
+            for i in 0..receivers.len() {
+                self.p2p.get_description_mut(i).receiver = receivers[i].describe()?;
+            }
+        }
+
         self.inner.on_restart(state)
     }
 
@@ -206,6 +217,9 @@ where
 
     #[inline]
     fn await_restart_safe(&mut self) {
+        if let Some(sender) = self.sender_to_main.as_ref() {
+            sender.await_safe_to_unmap_blocking();
+        }
         self.inner.await_restart_safe();
     }
 }
@@ -373,20 +387,43 @@ where
     SP: ShMemProvider,
 {
     /// Creates a new [`CentralizedEventManager`].
-    pub fn new_main(inner: EM, receivers_from_secondary: Vec<LlmpReceiver<SP>>) -> Self {
-        Self {
+    pub fn new_main(
+        inner: EM,
+        shmem_provider: SP,
+        p2p: PersistentLlmpP2P<SP>,
+    ) -> Result<Self, Error> {
+        let mut receivers_from_secondary = vec![];
+        for i in 0..p2p.num_channels() {
+            receivers_from_secondary.push(p2p.get_receiver(shmem_provider.clone(), i)?);
+        }
+        Ok(Self {
             inner,
+            p2p,
+            p2p_index: 0,
             sender_to_main: None,
             receivers_from_secondary: Some(receivers_from_secondary),
-        }
+        })
     }
 
     /// Creates a new [`CentralizedEventManager`].
-    pub fn new_secondary(inner: EM, sender_to_main: LlmpSender<SP>) -> Self {
-        Self {
+    pub fn new_secondary(
+        inner: EM,
+        shmem_provider: SP,
+        p2p: PersistentLlmpP2P<SP>,
+        p2p_index: usize,
+    ) -> Result<Self, Error> {
+        let sender_to_main = p2p.get_sender(shmem_provider, p2p_index)?;
+        Ok(Self {
             inner,
+            p2p,
+            p2p_index,
             sender_to_main: Some(sender_to_main),
             receivers_from_secondary: None,
-        }
+        })
+    }
+
+    /// Know if this instance is main or secondary
+    pub fn is_main(&self) -> bool {
+        self.receivers_from_secondary.is_some()
     }
 }

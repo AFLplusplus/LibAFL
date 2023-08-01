@@ -2777,9 +2777,9 @@ where
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct LlmpClientDescription {
     /// Description of the sender
-    sender: LlmpDescription,
+    pub sender: LlmpDescription,
     /// Description of the receiver
-    receiver: LlmpDescription,
+    pub receiver: LlmpDescription,
 }
 
 /// Client side of LLMP
@@ -2925,6 +2925,17 @@ where
                 last_msg_time: current_time(),
             },
         })
+    }
+
+    /// Create a point-to-point channel instead of using a broker-client channel
+    pub fn new_p2p(shmem_provider: SP, sender_id: ClientId) -> Result<Self, Error> {
+        let sender = LlmpSender::new(shmem_provider.clone(), sender_id, false)?;
+        let receiver = LlmpReceiver::on_existing_shmem(
+            shmem_provider,
+            sender.out_shmems[0].shmem.clone(),
+            None,
+        )?;
+        Ok(Self { sender, receiver })
     }
 
     /// Commits a msg to the client's out map
@@ -3082,6 +3093,65 @@ where
         }
 
         Ok(ret)
+    }
+}
+
+/// Persistent shared memory storage for point-to-point channels descriptions
+#[derive(Debug, Clone)]
+pub struct PersistentLlmpP2P<SP>
+where
+    SP: ShMemProvider,
+{
+    shmem: SP::ShMem,
+    num_channels: usize,
+}
+
+impl<SP> PersistentLlmpP2P<SP>
+where
+    SP: ShMemProvider,
+{
+    /// Create a new `PersistentLlmpP2P` given a number of channels
+    pub fn new(mut shmem_provider: SP, num_channels: usize) -> Result<Self, Error> {
+        let mut shmem =
+            shmem_provider.new_shmem_objects_array::<LlmpClientDescription>(num_channels)?;
+        for i in 0..num_channels {
+            let client = LlmpClient::new_p2p(shmem_provider.clone(), ClientId(i as u32))?;
+            unsafe {
+                shmem.as_objects_slice_mut(num_channels)[i] = client.describe()?;
+            }
+        }
+        Ok(Self {
+            shmem,
+            num_channels,
+        })
+    }
+
+    /// Get the description for the channel at a specific index
+    pub fn get_description(&self, idx: usize) -> &LlmpClientDescription {
+        unsafe { &self.shmem.as_objects_slice(self.num_channels)[idx] }
+    }
+
+    /// Get the description for the channel at a specific index (mut)
+    pub fn get_description_mut(&mut self, idx: usize) -> &mut LlmpClientDescription {
+        unsafe { &mut self.shmem.as_objects_slice_mut(self.num_channels)[idx] }
+    }
+
+    /// Get the number of channels
+    pub fn num_channels(&self) -> usize {
+        self.num_channels
+    }
+
+    /// Get a `LlmpReceiver` from the description for the channel at a specific index
+    pub fn get_receiver(&self, shmem_provider: SP, idx: usize) -> Result<LlmpReceiver<SP>, Error> {
+        LlmpReceiver::on_existing_from_description(
+            shmem_provider,
+            &self.get_description(idx).receiver,
+        )
+    }
+
+    /// Get a `LlmpSender` from the description for the channel at a specific index
+    pub fn get_sender(&self, shmem_provider: SP, idx: usize) -> Result<LlmpSender<SP>, Error> {
+        LlmpSender::on_existing_from_description(shmem_provider, &self.get_description(idx).sender)
     }
 }
 

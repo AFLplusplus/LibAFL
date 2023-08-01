@@ -208,6 +208,28 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
             .unwrap()
     }
 
+    /// Convert to a slice of type &[T]
+    ///
+    /// # Safety
+    /// This function is not safe as the object may be not initialized.
+    /// The user is responsible to initialize the objects in the slice
+    unsafe fn as_objects_slice<T: Sized + 'static>(&self, len: usize) -> &[T] {
+        assert!(self.len() >= core::mem::size_of::<T>() * len);
+        let ptr = self.as_slice().as_ptr() as *const () as *const T;
+        core::slice::from_raw_parts(ptr, len)
+    }
+
+    /// Convert to a slice of type &mut [T]
+    ///
+    /// # Safety
+    /// This function is not safe as the object may be not initialized.
+    /// The user is responsible to initialize the objects in the slice
+    unsafe fn as_objects_slice_mut<T: Sized + 'static>(&mut self, len: usize) -> &mut [T] {
+        assert!(self.len() >= core::mem::size_of::<T>() * len);
+        let ptr = self.as_mut_slice().as_mut_ptr() as *mut () as *mut T;
+        core::slice::from_raw_parts_mut(ptr, len)
+    }
+
     /// Get the description of the shared memory mapping
     fn description(&self) -> ShMemDescription {
         ShMemDescription {
@@ -246,6 +268,14 @@ pub trait ShMemProvider: Clone + Default + Debug {
     /// Create a new shared memory mapping to hold an object of the given type
     fn new_shmem_object<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
         self.new_shmem(core::mem::size_of::<T>())
+    }
+
+    /// Create a new shared memory mapping to hold an array of objects of the given type
+    fn new_shmem_objects_array<T: Sized + 'static>(
+        &mut self,
+        len: usize,
+    ) -> Result<Self::ShMem, Error> {
+        self.new_shmem(core::mem::size_of::<T>() * len)
     }
 
     /// Get a mapping given its id to hold an object of the given type
