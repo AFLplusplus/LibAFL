@@ -121,7 +121,7 @@ jobs:
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Run clippy
-      run: cargo build --all && ./scripts/clippy.sh
+      run: ./scripts/clippy.sh
 
   ubuntu-check:
     runs-on: ubuntu-22.04
@@ -398,7 +398,7 @@ jobs:
         profile: minimal
         toolchain: stable
     - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component clippy --allow-downgrade
+      run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
     - name: Install deps
       run: brew install z3 gtk+3
     - name: Install cxxbridge
@@ -406,7 +406,7 @@ jobs:
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Run clippy
-      run: cargo build --all && ./scripts/clippy.sh
+      run: ./scripts/clippy.sh
 
   other_targets:
     runs-on: macOS-latest
@@ -462,7 +462,6 @@ jobs:
           freebsd-version
           . "$HOME/.cargo/env"
           rustup toolchain install nightly
-          rustup default nightly
           export LLVM_CONFIG=/usr/local/bin/llvm-config16
           pwd
           ls -lah
