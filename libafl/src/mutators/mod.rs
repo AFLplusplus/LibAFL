@@ -90,6 +90,7 @@ pub trait Mutator<I, S>: Named {
     ) -> Result<MutationResult, Error>;
 
     /// Post-process given the outcome of the execution
+    #[inline]
     fn post_exec(
         &mut self,
         _state: &mut S,
@@ -102,7 +103,7 @@ pub trait Mutator<I, S>: Named {
 
 /// A mutator that takes input, and returns a vector of mutated inputs.
 /// Simple as that.
-pub trait MultiMutator<I, S>: Mutator<I, S> {
+pub trait MultiMutator<I, S>: Named {
     /// Mutate a given input up to [`max_count`] times,
     /// or as many times as appropriate, if no [`max_count`] is given
     fn multi_mutate(
@@ -112,6 +113,17 @@ pub trait MultiMutator<I, S>: Mutator<I, S> {
         stage_idx: i32,
         max_count: Option<usize>,
     ) -> Result<Vec<I>, Error>;
+
+    /// Post-process given the outcome of the execution
+    #[inline]
+    fn multi_post_exec(
+        &mut self,
+        _state: &mut S,
+        _stage_idx: i32,
+        _corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 /// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
@@ -155,6 +167,7 @@ pub trait MutatorsTuple<I, S>: HasConstLen {
 }
 
 impl<I, S> MutatorsTuple<I, S> for () {
+    #[inline]
     fn mutate_all(
         &mut self,
         _state: &mut S,
@@ -164,6 +177,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
         Ok(MutationResult::Skipped)
     }
 
+    #[inline]
     fn post_exec_all(
         &mut self,
         _state: &mut S,
@@ -173,6 +187,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
         Ok(())
     }
 
+    #[inline]
     fn get_and_mutate(
         &mut self,
         _index: MutationId,
@@ -183,6 +198,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
         Ok(MutationResult::Skipped)
     }
 
+    #[inline]
     fn get_and_post_exec(
         &mut self,
         _index: usize,
@@ -193,6 +209,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
         Ok(())
     }
 
+    #[inline]
     fn names(&self) -> Vec<&str> {
         Vec::new()
     }
@@ -268,10 +285,13 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use core::ffi::CStr;
     use pyo3::prelude::*;
+    use pyo3::AsPyPointer;
 
     use super::{MutationResult, Mutator};
     use crate::{
+        bolts::tuples::Named,
         corpus::CorpusId,
         inputs::{BytesInput, HasBytesVec},
         mutators::scheduled::pybind::PythonStdHavocMutator,
@@ -288,6 +308,14 @@ pub mod pybind {
         #[must_use]
         pub fn new(obj: PyObject) -> Self {
             PyObjectMutator { inner: obj }
+        }
+    }
+
+    impl Named for PyObjectMutator {
+        fn name(&self) -> &str {
+            unsafe { CStr::from_ptr((*(*self.inner.as_ptr()).ob_type).tp_name) }
+                .to_str()
+                .unwrap()
         }
     }
 
@@ -386,6 +414,15 @@ pub mod pybind {
             match &self.wrapper {
                 PythonMutatorWrapper::Python(pyo) => Some(pyo.inner.clone()),
                 PythonMutatorWrapper::StdHavoc(_) => None,
+            }
+        }
+    }
+
+    impl Named for PythonMutator {
+        fn name(&self) -> &str {
+            match &self.wrapper {
+                PythonMutatorWrapper::Python(pyo) => pyo.name(),
+                PythonMutatorWrapper::StdHavoc(_) => "StdHavocPythonMutator",
             }
         }
     }

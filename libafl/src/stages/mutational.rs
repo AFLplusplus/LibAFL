@@ -309,7 +309,7 @@ where
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = new_input.try_transform_into(state)?;
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-            self.mutator.post_exec(state, i as i32, corpus_idx)?;
+            self.mutator.multi_post_exec(state, i as i32, corpus_idx)?;
             post.post_exec(state, i as i32, corpus_idx)?;
         }
         // println!("Found {}", found);

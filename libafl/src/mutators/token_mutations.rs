@@ -1090,27 +1090,6 @@ impl AFLppRedQueen {
     }
 }
 
-impl<I, S> Mutator<I, S> for AFLppRedQueen
-where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus,
-    I: HasBytesVec + From<Vec<u8>>,
-{
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut I,
-        stage_idx: i32,
-    ) -> Result<MutationResult, Error> {
-        let mut result = self.multi_mutate(state, input, stage_idx, Some(1))?;
-        if let Some(first_input) = result.pop() {
-            *input = first_input;
-            Ok(MutationResult::Mutated)
-        } else {
-            Ok(MutationResult::Skipped)
-        }
-    }
-}
-
 impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
     S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus,
