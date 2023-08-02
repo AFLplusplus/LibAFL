@@ -1,5 +1,7 @@
 //! Compiletime lists/tuples used throughout the `LibAFL` universe
 
+#[rustversion::not(nightly)]
+use core::any::type_name;
 use core::{
     any::TypeId,
     ptr::{addr_of, addr_of_mut},
@@ -13,6 +15,7 @@ use crate::Named;
 /// Returns if the type `T` is equal to `U`
 /// From <https://stackoverflow.com/a/60138532/7658998>
 #[rustversion::nightly]
+#[inline]
 #[must_use]
 pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // Helper trait. `VALUE` is false, except for the specialization of the
@@ -35,11 +38,14 @@ pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
 }
 
 /// Returns if the type `T` is equal to `U`
+/// As this relies on [`type_name`](https://doc.rust-lang.org/std/any/fn.type_name.html#note) internally,
+/// there is a chance for collisions.
+/// Use `nightly` if you need a perfect match at all times.
 #[rustversion::not(nightly)]
+#[inline]
 #[must_use]
-pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
-    // BEWARE! This is not unsafe, it is SUPER UNSAFE
-    true
+pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+    type_name::<T>() == type_name::<U>()
 }
 
 /// Gets the length of the element
@@ -238,7 +244,8 @@ where
 /// Match for a name and return the value
 ///
 /// # Note
-/// This operation is unsafe with Rust stable, wait for [specialization](https://stackoverflow.com/a/60138532/7658998).
+/// This operation may not be 100% accurate with Rust stable, see the notes for [`type_eq`]
+/// (in `nightly`, it uses [specialization](https://stackoverflow.com/a/60138532/7658998)).
 pub trait MatchName {
     /// Match for a name and return the borrowed value
     fn match_name<T>(&self, name: &str) -> Option<&T>;
@@ -516,3 +523,43 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 }
 
 */
+
+#[cfg(test)]
+mod test {
+    use crate::bolts::{ownedref::OwnedMutSlice, tuples::type_eq};
+
+    #[test]
+    #[allow(unused_qualifications)] // for type name tests
+    fn test_type_eq() {
+        #[allow(extra_unused_lifetimes)]
+        fn test_lifetimes<'a, 'b>() {
+            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
+            assert!(type_eq::<OwnedMutSlice<'static, u8>, OwnedMutSlice<'a, u8>>());
+            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
+            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'static, u8>>());
+            assert!(!type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, i8>>());
+        }
+        type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
+        assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSliceAlias>());
+
+        test_lifetimes();
+        // test eq
+        assert!(type_eq::<u64, u64>());
+
+        // test neq
+        assert!(!type_eq::<u64, usize>());
+
+        // test weirder lifetime things
+        assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSlice<u8>>());
+        assert!(!type_eq::<OwnedMutSlice<u8>, OwnedMutSlice<u32>>());
+
+        assert!(type_eq::<
+            OwnedMutSlice<u8>,
+            crate::bolts::ownedref::OwnedMutSlice<u8>,
+        >());
+        assert!(!type_eq::<
+            OwnedMutSlice<u8>,
+            crate::bolts::ownedref::OwnedMutSlice<u32>,
+        >());
+    }
+}
