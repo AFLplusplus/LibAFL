@@ -906,8 +906,7 @@ pub mod unix_shmem {
                     if map.is_null() || map == ptr::null_mut::<c_uchar>().wrapping_sub(1) {
                         perror(b"shmat\0".as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "Failed to map the shared mapping with id {}",
-                            id_int
+                            "Failed to map the shared mapping with id {id_int}"
                         )));
                     }
 
