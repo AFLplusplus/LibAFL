@@ -471,6 +471,7 @@ macro_rules! fuzz_with {
                 grimoire,
             );
 
+            #[allow(clippy::unnecessary_mut_passed)] // the functions may not require these many `mut`s
             $operation(&$options, &mut fuzzer, &mut stages, &mut executor, &mut state, &mut mgr)
         };
 

@@ -21,7 +21,7 @@ fn do_report<F, ST, E, S, EM>(
     _fuzzer: &mut F,
     _stages: &mut ST,
     _executor: &mut E,
-    state: &mut S,
+    state: &S,
     _mgr: &mut EM,
 ) -> Result<(), Error>
 where

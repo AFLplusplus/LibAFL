@@ -2,7 +2,7 @@ use alloc::rc::{Rc, Weak};
 use std::{
     cell::RefCell,
     marker::PhantomData,
-    ops::{Deref, DerefMut},
+    ops::Deref,
     prelude::rust_2015::{Box, Vec},
 };
 
@@ -192,7 +192,7 @@ where
                 .replace(Err(Error::illegal_state(
                     "Couldn't borrow mutator while mutating!",
                 )))
-                .ok()
+                .ok();
         });
         new_size
     }
