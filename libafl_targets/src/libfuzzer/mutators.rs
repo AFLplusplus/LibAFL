@@ -7,7 +7,11 @@ use std::{
 };
 
 use libafl::{
-    bolts::{rands::Rand, AsSlice},
+    bolts::{
+        rands::Rand,
+        AsSlice,
+        tuples::Named
+    },
     corpus::Corpus,
     inputs::{BytesInput, HasBytesVec, UsesInput},
     mutators::{
@@ -267,6 +271,12 @@ where
     }
 }
 
+impl<MT, SM> Named for LLVMCustomMutator<MT, SM, false> {
+    fn name(&self) -> &str {
+        "LLVMCustomMutator"
+    }
+}
+
 impl<MT, S, SM> Mutator<BytesInput, S> for LLVMCustomMutator<MT, SM, false>
 where
     MT: MutatorsTuple<BytesInput, S> + 'static,
@@ -338,6 +348,12 @@ where
         bytes.truncate(new_size);
         core::mem::swap(input.bytes_mut(), &mut bytes);
         Ok(MutationResult::Mutated)
+    }
+}
+
+impl<MT, SM> Named for LLVMCustomMutator<MT, SM, true> {
+    fn name(&self) -> &str {
+        "LLVMCustomCrossover"
     }
 }
 
