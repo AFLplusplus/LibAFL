@@ -3097,12 +3097,15 @@ where
 }
 
 /// Persistent shared memory storage for point-to-point channels descriptions
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PersistentLlmpP2P<SP>
 where
     SP: ShMemProvider,
 {
     shmem: SP::ShMem,
+    // Keep the clients here to prevent drop from removing the shmem segments
+    #[allow(dead_code)]
+    clients: Vec<LlmpClient<SP>>,
     num_channels: usize,
 }
 
@@ -3114,14 +3117,17 @@ where
     pub fn new(mut shmem_provider: SP, num_channels: usize) -> Result<Self, Error> {
         let mut shmem =
             shmem_provider.new_shmem_objects_array::<LlmpClientDescription>(num_channels)?;
+        let mut clients = vec![];
         for i in 0..num_channels {
             let client = LlmpClient::new_p2p(shmem_provider.clone(), ClientId(i as u32))?;
             unsafe {
                 shmem.as_objects_slice_mut(num_channels)[i] = client.describe()?;
             }
+            clients.push(client);
         }
         Ok(Self {
             shmem,
+            clients,
             num_channels,
         })
     }
