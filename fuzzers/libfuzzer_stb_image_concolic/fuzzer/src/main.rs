@@ -46,8 +46,8 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Named},
-    AsMutSlice, AsSlice,
+    tuples::tuple_list,
+    AsMutSlice, AsSlice, Named,
 };
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
