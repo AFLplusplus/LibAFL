@@ -348,7 +348,8 @@ mod test {
 
     #[test]
     fn test_tuning() {
-        #[cfg(any(not(feature = "std"), miri))] {
+        #[cfg(any(not(feature = "std"), miri))]
+        {
             libafl_bolts::serdeany::RegistryBuilder::register::<TuneableScheduledMutatorMetadata>();
         }
 

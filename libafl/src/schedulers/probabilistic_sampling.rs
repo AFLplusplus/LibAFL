@@ -187,7 +187,8 @@ mod tests {
 
     #[test]
     fn test_prob_sampling() {
-        #[cfg(any(not(feature = "std"), miri))] {
+        #[cfg(any(not(feature = "std"), miri))]
+        {
             libafl_bolts::serdeany::RegistryBuilder::register::<super::ProbabilityMetadata>();
         }
 
