@@ -13,6 +13,7 @@ use xxhash_rust::xxh3::xxh3_64;
 /// Returns if the type `T` is equal to `U`
 /// From <https://stackoverflow.com/a/60138532/7658998>
 #[rustversion::nightly]
+#[inline]
 #[must_use]
 pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // Helper trait. `VALUE` is false, except for the specialization of the
@@ -35,9 +36,11 @@ pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
 }
 
 /// Returns if the type `T` is equal to `U`
-/// As this uses `type_name` internally, there is a slight chance for collisions.
+/// As this relies on [`type_name`](https://doc.rust-lang.org/std/any/fn.type_name.html#note) internally,
+/// there is a chance for collisions.
 /// Use `nightly` if you need a perfect match at all times.
 #[rustversion::not(nightly)]
+#[inline]
 #[must_use]
 pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     type_name::<T>() == type_name::<U>()
@@ -516,3 +519,21 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 }
 
 */
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        bolts::tuples::type_eq,
+        inputs::{BytesInput, NopInput},
+        state::NopState,
+    };
+
+    #[test]
+    fn test_type_eq() {
+        assert!(type_eq::<u64, u64>());
+        assert!(!type_eq::<u64, usize>());
+        assert!(type_eq::<NopState<BytesInput>, NopState<BytesInput>>());
+        assert!(!type_eq::<NopState<BytesInput>, NopState<NopInput>>());
+        assert!(!type_eq::<NopState<BytesInput>, i64>());
+    }
+}
