@@ -1,3 +1,5 @@
+//! The `LibAFL` `LibFuzzer` runtime, exposing the same functions as the original [`LibFuzzer`](https://llvm.org/docs/LibFuzzer.html).
+
 #![allow(incomplete_features)]
 // For `type_eq`
 #![cfg_attr(unstable_feature, feature(specialization))]
@@ -505,6 +507,7 @@ macro_rules! fuzz_with {
 
 pub(crate) use fuzz_with;
 
+/// Starts to fuzz on a single node
 pub fn start_fuzzing_single<F, S, EM>(
     mut fuzz_single: F,
     initial_state: Option<S>,
@@ -521,6 +524,14 @@ extern "C" {
     fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
 }
 
+/// A method to start the fuzzer at a later point in time from a library.
+/// To quote the `libfuzzer` docs:
+/// > when it’s ready to start fuzzing, it can call `LLVMFuzzerRunDriver`, passing in the program arguments and a callback. This callback is invoked just like `LLVMFuzzerTestOneInput`, and has the same signature.
+///
+/// # Safety
+/// Will dereference all parameters.
+/// This will then call the (potentially unsafe) harness.
+/// The fuzzer itself should catch any side effects and, hence be reasonably safe, if the `harness_fn` parameter is correct.
 #[allow(non_snake_case, clippy::similar_names, clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn LLVMFuzzerRunDriver(
