@@ -1,0 +1,24 @@
+informative_questions = [
+    "observers",
+    "feedback",
+    "state",
+    "monitors",
+    "events",
+    "schedulers",
+    "fuzzer",
+    "executors",
+    "generators",
+    "mutators",
+    "stages",
+]
+
+in_process_skip_questions = [
+    "restart fuzzer",
+    "corrupt memory",
+    "in process timeout",
+]
+
+forkserver_skip_questions = [
+    "restart fuzzer llmp",
+    "forkserver timeout",
+]
