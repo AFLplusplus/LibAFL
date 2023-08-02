@@ -95,17 +95,14 @@ use nix::sys::socket::{self, sockopt::ReusePort};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-use crate::bolts::current_time;
+use crate::current_time;
 #[cfg(all(unix, not(miri)))]
-use crate::bolts::os::unix_signals::setup_signal_handler;
+use crate::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
-use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+use crate::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use crate::{
-    bolts::{
-        shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-        ClientId,
-    },
-    Error,
+    shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+    ClientId, Error,
 };
 
 /// The timeout after which a client will be considered stale, and removed.
@@ -1752,7 +1749,7 @@ where
 
 // TODO: May be obsolete
 /// The page struct, placed on a shared mem instance.
-/// A thin wrapper around a [`ShMem`] implementation, with special [`crate::bolts::llmp`] funcs
+/// A thin wrapper around a [`ShMem`] implementation, with special [`crate::llmp`] funcs
 impl<SHM> LlmpSharedMap<SHM>
 where
     SHM: ShMem,
@@ -3098,7 +3095,7 @@ mod tests {
         LlmpMsgHookResult::ForwardToClients,
         Tag,
     };
-    use crate::bolts::shmem::{ShMemProvider, StdShMemProvider};
+    use crate::shmem::{ShMemProvider, StdShMemProvider};
 
     #[test]
     #[serial]

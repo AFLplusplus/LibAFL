@@ -5,9 +5,10 @@
 use alloc::string::String;
 use std::vec::Vec;
 
+use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::tuples::Named, inputs::UsesInput, observers::Observer};
+use crate::{inputs::UsesInput, observers::Observer};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.

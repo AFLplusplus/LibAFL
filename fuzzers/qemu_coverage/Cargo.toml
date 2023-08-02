@@ -27,5 +27,6 @@ vergen = { version = "8.2.1", features = ["build", "cargo", "git", "gitcl", "rus
 [dependencies]
 clap = { version = "4.3.0", features = ["derive", "string"]}
 libafl = { path = "../../libafl/" }
+libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode"] }
 rangemap = { version = "1.0.3" }

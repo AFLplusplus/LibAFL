@@ -3,13 +3,6 @@ use std::path::PathBuf;
 
 use clap::{self, Parser};
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-        tuples::{tuple_list, MatchName, Merge},
-        AsMutSlice, Truncate,
-    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
@@ -26,6 +19,13 @@ use libafl::{
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
+};
+use libafl_bolts::{
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    tuples::{tuple_list, MatchName, Merge},
+    AsMutSlice, Truncate,
 };
 use nix::sys::signal::Signal;
 

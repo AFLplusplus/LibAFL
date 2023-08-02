@@ -1,7 +1,6 @@
 mod utils;
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{Corpus, InMemoryCorpus},
     events::SimpleEventManager,
     executors::{ExitKind, InProcessExecutor},
@@ -16,6 +15,7 @@ use libafl::{
     state::{HasSolutions, StdState},
     Fuzzer, StdFuzzer,
 };
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 use wasm_bindgen::prelude::*;
 use web_sys::{Performance, Window};
 

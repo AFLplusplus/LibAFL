@@ -2,11 +2,11 @@
 
 use alloc::vec::Vec;
 
+use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{CorpusId, Testcase},
-    impl_serdeany,
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
     state::{HasCorpus, HasMetadata},

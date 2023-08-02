@@ -31,6 +31,7 @@ use std::{
 
 // using thread in order to start the HTTP server in a separate thread
 use futures::executor::block_on;
+use libafl_bolts::{current_time, format_duration_hms, ClientId};
 // using the official rust client library for Prometheus: https://github.com/prometheus/client_rust
 use prometheus_client::{
     encoding::{text::encode, EncodeLabelSet},
@@ -40,10 +41,7 @@ use prometheus_client::{
 // using tide for the HTTP server library (fast, async, simple)
 use tide::Request;
 
-use crate::{
-    bolts::{current_time, format_duration_hms, ClientId},
-    monitors::{ClientStats, Monitor, UserStats},
-};
+use crate::monitors::{ClientStats, Monitor, UserStats};
 
 /// Tracking monitor during fuzzing.
 #[derive(Clone)]

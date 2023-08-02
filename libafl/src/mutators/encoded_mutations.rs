@@ -3,11 +3,12 @@
 use alloc::vec::Vec;
 use core::cmp::{max, min};
 
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{tuple_list, tuple_list_type},
+};
+
 use crate::{
-    bolts::{
-        rands::Rand,
-        tuples::{tuple_list, tuple_list_type},
-    },
     corpus::Corpus,
     inputs::{EncodedInput, UsesInput},
     mutators::{

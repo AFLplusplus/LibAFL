@@ -3,10 +3,11 @@
 
 use core::marker::PhantomData;
 
+use libafl_bolts::rands::Rand;
+
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, CorpusId, Testcase},
     fuzzer::Evaluator,
     inputs::Input,

@@ -17,6 +17,8 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 
+#[cfg(target_os = "linux")]
+use libafl_bolts::current_time;
 #[cfg(all(unix, not(target_os = "linux")))]
 use libc::c_int;
 #[cfg(all(windows, feature = "std"))]
@@ -29,8 +31,6 @@ use windows::Win32::{
     },
 };
 
-#[cfg(target_os = "linux")]
-use crate::bolts::current_time;
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::inprocess::HasInProcessHandlers;
 #[cfg(any(windows, target_os = "linux"))]

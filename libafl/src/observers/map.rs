@@ -14,15 +14,14 @@ use core::{
 
 use ahash::RandomState;
 use intervaltree::IntervalTree;
+use libafl_bolts::{
+    ownedref::{OwnedMutPtr, OwnedMutSlice},
+    AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named, Truncate,
+};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{
-        ownedref::{OwnedMutPtr, OwnedMutSlice},
-        tuples::Named,
-        AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Truncate,
-    },
     executors::ExitKind,
     inputs::UsesInput,
     observers::{DifferentialObserver, Observer, ObserversTuple},

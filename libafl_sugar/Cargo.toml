@@ -28,6 +28,7 @@ pyo3-build-config = { version = "0.15", optional = true }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.10.1" }
+libafl_bolts = { path = "../libafl_bolts", version = "0.10.1" }
 libafl_targets = { path = "../libafl_targets", version = "0.10.1" }
 libafl_qemu = { path = "../libafl_qemu", version = "0.10.1" }
 
