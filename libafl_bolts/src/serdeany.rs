@@ -170,6 +170,7 @@ macro_rules! create_serde_registry_for_trait {
 
             /// A (de)serializable anymap containing (de)serializable trait objects registered
             /// in the registry
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[derive(Debug, Serialize, Deserialize)]
             pub struct SerdeAnyMap {
                 map: HashMap<u128, Box<dyn $trait_name>>,
@@ -308,6 +309,7 @@ macro_rules! create_serde_registry_for_trait {
             }
 
             /// A serializable [`HashMap`] wrapper for [`SerdeAny`] types, addressable by name.
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[allow(unused_qualifications)]
             #[derive(Debug, Serialize, Deserialize)]
             pub struct NamedSerdeAnyMap {

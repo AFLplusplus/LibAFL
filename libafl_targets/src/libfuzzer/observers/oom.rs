@@ -26,8 +26,8 @@ static MALLOC_MAX: AtomicUsize = AtomicUsize::new(2 << 30);
 
 static MALLOC_SIZE: AtomicUsize = AtomicUsize::new(0);
 
-/// malloc hook which will be invoked if ASan is present. Used to detect if the target makes a malloc call that will
-/// exceed the permissible size
+/// malloc hook which will be invoked if address sanitizer is present. Used to detect if the target makes a malloc call
+/// that will exceed the permissible size
 ///
 /// # Safety
 /// Is only safe to call with valid freshly allocated pointers backed by allocations of `size`.
