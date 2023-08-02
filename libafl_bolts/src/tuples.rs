@@ -526,12 +526,12 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 #[cfg(test)]
 mod test {
-    use crate::bolts::{ownedref::OwnedMutSlice, tuples::type_eq};
+    use crate::{ownedref::OwnedMutSlice, tuples::type_eq};
 
     #[test]
     #[allow(unused_qualifications)] // for type name tests
     fn test_type_eq() {
-        #[allow(extra_unused_lifetimes)]
+        #[allow(unused_lifetimes)]
         fn test_lifetimes<'a, 'b>() {
             assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
             assert!(type_eq::<OwnedMutSlice<'static, u8>, OwnedMutSlice<'a, u8>>());
@@ -555,11 +555,11 @@ mod test {
 
         assert!(type_eq::<
             OwnedMutSlice<u8>,
-            crate::bolts::ownedref::OwnedMutSlice<u8>,
+            crate::ownedref::OwnedMutSlice<u8>,
         >());
         assert!(!type_eq::<
             OwnedMutSlice<u8>,
-            crate::bolts::ownedref::OwnedMutSlice<u32>,
+            crate::ownedref::OwnedMutSlice<u32>,
         >());
     }
 }
