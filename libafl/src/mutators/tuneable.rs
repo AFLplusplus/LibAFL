@@ -348,8 +348,9 @@ mod test {
 
     #[test]
     fn test_tuning() {
-        #[cfg(not(feature = "std"))]
-        libafl_bolts::serdeany::RegistryBuilder::register::<TuneableScheduledMutatorMetadata>();
+        #[cfg(any(not(feature = "std"), miri))] {
+            libafl_bolts::serdeany::RegistryBuilder::register::<TuneableScheduledMutatorMetadata>();
+        }
 
         let mut state: NopState<BytesInput> = NopState::new();
         let mutators = tuple_list!(

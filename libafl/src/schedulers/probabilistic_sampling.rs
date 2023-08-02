@@ -187,6 +187,10 @@ mod tests {
 
     #[test]
     fn test_prob_sampling() {
+        #[cfg(any(not(feature = "std"), miri))] {
+            libafl_bolts::serdeany::RegistryBuilder::register::<super::ProbabilityMetadata>();
+        }
+
         // the first 3 probabilities will be .69, .86, .44
         let rand = StdRand::with_seed(12);
 
