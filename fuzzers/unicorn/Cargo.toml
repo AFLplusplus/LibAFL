@@ -1,0 +1,12 @@
+[package]
+name = "unicorn"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libafl = { path = "../../libafl/" }
+libafl_unicorn = { path = "../../libafl_unicorn/" }
+libafl_targets = { path = "../../libafl_targets" }
+
+unicorn-engine = "2.0.1"
+iced-x86 = "1.18.0"
