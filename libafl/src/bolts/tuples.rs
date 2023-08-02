@@ -523,61 +523,40 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        bolts::{ownedref::OwnedMutSlice, tuples::type_eq},
-        inputs::{BytesInput, NopInput},
-        observers::StdMapObserver,
-        state::NopState,
-    };
+    use crate::bolts::{ownedref::OwnedMutSlice, tuples::type_eq};
 
     #[test]
     #[allow(unused_qualifications)] // for type name tests
     fn test_type_eq() {
         // test eq
         assert!(type_eq::<u64, u64>());
-        assert!(type_eq::<BytesInput, BytesInput>());
-        assert!(type_eq::<NopState<BytesInput>, NopState<BytesInput>>());
 
         // test neq
         assert!(!type_eq::<u64, usize>());
-        assert!(!type_eq::<NopInput, BytesInput>());
-        assert!(!type_eq::<BytesInput, NopInput>());
-        assert!(!type_eq::<NopState<BytesInput>, NopState<NopInput>>());
-        assert!(!type_eq::<NopState<BytesInput>, BytesInput>());
-        assert!(!type_eq::<NopState<BytesInput>, u64>());
 
         // test weirder lifetime things
-        assert!(type_eq::<StdMapObserver<u8, true>, StdMapObserver<u8, true>>());
-        assert!(!type_eq::<
-            StdMapObserver<u8, true>,
-            StdMapObserver<u8, false>,
-        >());
+        assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSlice<u8>>());
+        assert!(!type_eq::<OwnedMutSlice<u8>, OwnedMutSlice<u32>>());
 
         assert!(type_eq::<
-            StdMapObserver<u8, true>,
-            crate::observers::StdMapObserver<u8, true>,
+            OwnedMutSlice<u8>,
+            crate::bolts::ownedref::OwnedMutSlice<u8>,
         >());
         assert!(!type_eq::<
-            StdMapObserver<u8, true>,
-            crate::observers::StdMapObserver<i8, true>,
+            OwnedMutSlice<u8>,
+            crate::bolts::ownedref::OwnedMutSlice<u32>,
         >());
 
-        type MapObserverAlias<'a, T> = StdMapObserver<'a, T, true>;
-        assert!(type_eq::<StdMapObserver<u8, true>, MapObserverAlias<u8>>());
+        type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
+        assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSliceAlias>());
 
-        fn lifetimes<'a, 'b>() {
-            assert!(type_eq::<
-                StdMapObserver<'a, u8, true>,
-                StdMapObserver<'b, u8, true>,
-            >());
-            assert!(type_eq::<
-                StdMapObserver<'static, u8, true>,
-                StdMapObserver<'a, u8, true>,
-            >());
+        fn test_lifetimes<'a, 'b>() {
+            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
+            assert!(type_eq::<OwnedMutSlice<'static, u8>, OwnedMutSlice<'a, u8>>());
             assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
             assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'static, u8>>());
             assert!(!type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, i8>>());
         }
-        lifetimes();
+        test_lifetimes();
     }
 }
