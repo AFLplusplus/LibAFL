@@ -25,13 +25,13 @@ use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
 mod input;
-use input::*;
+use input::PacketData;
 
 mod mutator;
-use mutator::*;
+use mutator::LainMutator;
 
 mod metadata;
-use metadata::*;
+use metadata::{PacketLenFeedback, PacketLenMinimizerScheduler};
 
 /// The main fn, `no_mangle` as it is a C main
 #[cfg(not(test))]
