@@ -528,6 +528,18 @@ mod test {
     #[test]
     #[allow(unused_qualifications)] // for type name tests
     fn test_type_eq() {
+        #[allow(extra_unused_lifetimes)]
+        fn test_lifetimes<'a, 'b>() {
+            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
+            assert!(type_eq::<OwnedMutSlice<'static, u8>, OwnedMutSlice<'a, u8>>());
+            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
+            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'static, u8>>());
+            assert!(!type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, i8>>());
+        }
+        type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
+        assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSliceAlias>());
+
+        test_lifetimes();
         // test eq
         assert!(type_eq::<u64, u64>());
 
@@ -546,17 +558,5 @@ mod test {
             OwnedMutSlice<u8>,
             crate::bolts::ownedref::OwnedMutSlice<u32>,
         >());
-
-        type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
-        assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSliceAlias>());
-
-        fn test_lifetimes<'a, 'b>() {
-            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
-            assert!(type_eq::<OwnedMutSlice<'static, u8>, OwnedMutSlice<'a, u8>>());
-            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
-            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'static, u8>>());
-            assert!(!type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, i8>>());
-        }
-        test_lifetimes();
     }
 }
