@@ -241,7 +241,8 @@ where
 /// Match for a name and return the value
 ///
 /// # Note
-/// This operation is unsafe with Rust stable, wait for [specialization](https://stackoverflow.com/a/60138532/7658998).
+/// This operation may not be 100% accurate with Rust stable, see the notes for [`type_eq`]
+/// (in `nightly`, it uses [specialization](https://stackoverflow.com/a/60138532/7658998)).
 pub trait MatchName {
     /// Match for a name and return the borrowed value
     fn match_name<T>(&self, name: &str) -> Option<&T>;
@@ -523,8 +524,9 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 #[cfg(test)]
 mod test {
     use crate::{
-        bolts::tuples::type_eq,
+        bolts::{ownedref::OwnedMutSlice, tuples::type_eq},
         inputs::{BytesInput, NopInput},
+        observers::StdMapObserver,
         state::NopState,
     };
 
@@ -542,5 +544,27 @@ mod test {
         assert!(!type_eq::<NopState<BytesInput>, NopState<NopInput>>());
         assert!(!type_eq::<NopState<BytesInput>, BytesInput>());
         assert!(!type_eq::<NopState<BytesInput>, u64>());
+
+        assert!(type_eq::<StdMapObserver<u8, true>, StdMapObserver<u8, true>>());
+        assert!(!type_eq::<
+            StdMapObserver<u8, true>,
+            StdMapObserver<u8, false>,
+        >());
+        assert!(!type_eq::<StdMapObserver<u8, true>, StdMapObserver<i8, true>>());
+
+        fn lifetimes<'a, 'b>() {
+            assert!(type_eq::<
+                StdMapObserver<'a, u8, true>,
+                StdMapObserver<'b, u8, true>,
+            >());
+            assert!(type_eq::<
+                StdMapObserver<'static, u8, true>,
+                StdMapObserver<'a, u8, true>,
+            >());
+            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
+            assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'static, u8>>());
+            assert!(!type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, i8>>());
+        }
+        lifetimes();
     }
 }
