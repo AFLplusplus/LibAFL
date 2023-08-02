@@ -11,11 +11,11 @@ use core::{
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
+use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;
 use crate::{
-    bolts::{serdeany::SerdeAnyMap, HasLen},
     corpus::CorpusId,
     inputs::{Input, UsesInput},
     state::HasMetadata,
@@ -467,7 +467,7 @@ impl SchedulerTestcaseMetadata {
     }
 }
 
-crate::impl_serdeany!(SchedulerTestcaseMetadata);
+libafl_bolts::impl_serdeany!(SchedulerTestcaseMetadata);
 
 #[cfg(feature = "std")]
 impl<I> Drop for Testcase<I>
@@ -490,10 +490,11 @@ where
 pub mod pybind {
     use alloc::{boxed::Box, vec::Vec};
 
+    use libafl_bolts::ownedref::OwnedMutPtr;
     use pyo3::{prelude::*, types::PyDict};
 
     use super::{HasMetadata, Testcase};
-    use crate::{bolts::ownedref::OwnedMutPtr, inputs::BytesInput, pybind::PythonMetadata};
+    use crate::{inputs::BytesInput, pybind::PythonMetadata};
 
     /// `PythonTestcase` with fixed generics
     pub type PythonTestcase = Testcase<BytesInput>;

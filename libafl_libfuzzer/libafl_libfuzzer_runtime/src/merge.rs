@@ -8,12 +8,6 @@ use std::{
 };
 
 use libafl::{
-    bolts::{
-        rands::{Rand, RandomSeed, StdRand},
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
-        AsSlice,
-    },
     corpus::{Corpus, OnDiskCorpus},
     events::{EventRestarter, SimpleRestartingEventManager},
     executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
@@ -25,6 +19,12 @@ use libafl::{
     schedulers::RemovableScheduler,
     state::{HasCorpus, HasRand, StdState},
     Error, HasScheduler, StdFuzzer,
+};
+use libafl_bolts::{
+    rands::{Rand, RandomSeed, StdRand},
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsSlice,
 };
 use libafl_targets::{OomFeedback, OomObserver, COUNTERS_MAPS};
 

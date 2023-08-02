@@ -8,15 +8,15 @@ use alloc::{
 use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
+use libafl_bolts::{
+    current_time,
+    tuples::{MatchName, Named},
+    AsIter, Named,
+};
 use num_traits::ToPrimitive;
 use z3::{ast::Bool, Config, Context, Optimize};
 
 use crate::{
-    bolts::{
-        current_time,
-        tuples::{MatchName, Named},
-        AsIter,
-    },
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},

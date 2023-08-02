@@ -18,6 +18,7 @@ use std::{
 };
 
 use backtrace::Backtrace;
+use libafl_bolts::{ownedref::OwnedRefMut, Named};
 #[cfg(feature = "casr")]
 use libcasr::{
     asan::AsanStacktrace,
@@ -39,13 +40,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use super::ObserverWithHashField;
-use crate::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named},
-    executors::ExitKind,
-    inputs::UsesInput,
-    observers::Observer,
-    Error,
-};
+use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error};
 
 #[cfg(not(feature = "casr"))]
 /// Collects the backtrace via [`Backtrace`] and [`Debug`]

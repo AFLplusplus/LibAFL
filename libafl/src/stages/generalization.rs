@@ -6,10 +6,11 @@ use alloc::{
 };
 use core::{fmt::Debug, marker::PhantomData};
 
+use libafl_bolts::AsSlice;
+
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    bolts::AsSlice,
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,

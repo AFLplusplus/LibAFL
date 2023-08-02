@@ -2,8 +2,9 @@
 
 use alloc::{boxed::Box, vec::Vec};
 
+use libafl_bolts::anymap::AsAny;
+
 use crate::{
-    bolts::anymap::AsAny,
     corpus::CorpusId,
     stages::{Stage, StagesTuple},
     state::UsesState,

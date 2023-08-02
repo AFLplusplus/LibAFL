@@ -2,8 +2,9 @@
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
+use libafl_bolts::{HasLen, HasRefCnt};
+
 use crate::{
-    bolts::{HasLen, HasRefCnt},
     corpus::{Corpus, SchedulerTestcaseMetadata, Testcase},
     feedbacks::MapIndexesMetadata,
     schedulers::{

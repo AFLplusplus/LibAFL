@@ -3,12 +3,13 @@
 use core::{any::Any, fmt::Debug};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-use crate::{
-    bolts::{
+use libafl_bolts::{
         anymap::{pack_type_id, AsAny},
         tuples::MatchName,
-    },
+    };
+
+use crate::{
+
     executors::ExitKind,
     observers::{Observer, ObserversTuple},
     Error,

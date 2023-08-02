@@ -1,17 +1,6 @@
 use std::path::PathBuf;
 
-#[cfg(not(target_vendor = "apple"))]
-use libafl::bolts::shmem::StdShMemProvider;
-#[cfg(target_vendor = "apple")]
-use libafl::bolts::shmem::UnixShMemProvider;
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        shmem::{ShMem, ShMemProvider},
-        tuples::tuple_list,
-        AsMutSlice,
-    },
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::ForkserverExecutor,
@@ -26,6 +15,17 @@ use libafl::{
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
+};
+#[cfg(not(target_vendor = "apple"))]
+use libafl_bolts::shmem::StdShMemProvider;
+#[cfg(target_vendor = "apple")]
+use libafl_bolts::shmem::UnixShMemProvider;
+use libafl_bolts::{
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMem, ShMemProvider},
+    tuples::tuple_list,
+    AsMutSlice,
 };
 
 #[allow(clippy::similar_names)]

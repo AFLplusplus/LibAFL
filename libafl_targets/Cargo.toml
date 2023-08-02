@@ -37,6 +37,7 @@ cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.10.1", default-features = false, features = [] }
+libafl_bolts = { path = "../libafl_bolts", version = "0.10.1", default-features = false, features = [] }
 log = "0.4.17"
 libc = "0.2"
 

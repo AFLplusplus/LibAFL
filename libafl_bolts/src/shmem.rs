@@ -23,13 +23,10 @@ pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 
 #[cfg(all(unix, feature = "std"))]
-use crate::bolts::os::pipes::Pipe;
+use crate::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix))]
-pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
-use crate::{
-    bolts::{AsMutSlice, AsSlice},
-    Error,
-};
+pub use crate::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
+use crate::{AsMutSlice, AsSlice, Error};
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -168,7 +165,7 @@ impl Display for ShMemId {
 }
 
 /// A [`ShMem`] is an interface to shared maps.
-/// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
+/// They are the backbone of [`crate::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
 pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry = u8> {
     /// Get the id of this shared memory mapping
@@ -228,7 +225,7 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
 }
 
 /// A [`ShMemProvider`] provides access to shared maps.
-/// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
+/// They are the backbone of [`crate::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
 pub trait ShMemProvider: Clone + Default + Debug {
     /// The actual shared map handed out by this [`ShMemProvider`].
@@ -528,7 +525,7 @@ where
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem {
     #[cfg(doc)]
-    use crate::bolts::shmem::{ShMem, ShMemProvider};
+    use crate::shmem::{ShMem, ShMemProvider};
 
     /// Shared memory provider for Android, allocating and forwarding maps over unix domain sockets.
     #[cfg(target_os = "android")]
@@ -563,12 +560,9 @@ pub mod unix_shmem {
         };
 
         use crate::{
-            bolts::{
-                rands::{Rand, RandomSeed, StdRand},
-                shmem::{ShMem, ShMemId, ShMemProvider},
-                AsMutSlice, AsSlice,
-            },
-            Error,
+            rands::{Rand, RandomSeed, StdRand},
+            shmem::{ShMem, ShMemId, ShMemProvider},
+            AsMutSlice, AsSlice, Error,
         };
         #[cfg(unix)]
         #[derive(Copy, Clone)]
@@ -968,11 +962,8 @@ pub mod unix_shmem {
         };
 
         use crate::{
-            bolts::{
-                shmem::{ShMem, ShMemId, ShMemProvider},
-                AsMutSlice, AsSlice,
-            },
-            Error,
+            shmem::{ShMem, ShMemId, ShMemProvider},
+            AsMutSlice, AsSlice, Error,
         };
 
         /// An ashmem based impl for linux/android
@@ -1059,7 +1050,7 @@ pub mod unix_shmem {
                 }
             }
 
-            /// Get a [`crate::bolts::shmem::unix_shmem::UnixShMem`] of the existing [`ShMem`] mapping identified by id.
+            /// Get a [`crate::shmem::unix_shmem::UnixShMem`] of the existing [`ShMem`] mapping identified by id.
             pub fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
@@ -1196,11 +1187,8 @@ pub mod win32_shmem {
     use uuid::Uuid;
 
     use crate::{
-        bolts::{
-            shmem::{ShMem, ShMemId, ShMemProvider},
-            AsMutSlice, AsSlice,
-        },
-        Error,
+        shmem::{ShMem, ShMemId, ShMemProvider},
+        AsMutSlice, AsSlice, Error,
     };
 
     const INVALID_HANDLE_VALUE: isize = -1;
@@ -1442,7 +1430,6 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
             std::io::SeekFrom::Start(s) => s,
             std::io::SeekFrom::End(offset) => {
                 let map_len = self.inner.as_slice().len();
-                i64::try_from(map_len).unwrap();
                 let signed_pos = i64::try_from(map_len).unwrap();
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
@@ -1468,7 +1455,7 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 mod tests {
     use serial_test::serial;
 
-    use crate::bolts::{
+    use crate::{
         shmem::{ShMemProvider, StdShMemProvider},
         AsMutSlice, AsSlice,
     };

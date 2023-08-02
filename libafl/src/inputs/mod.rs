@@ -23,13 +23,12 @@ use core::{clone::Clone, fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
 
+#[cfg(feature = "std")]
+use libafl_bolts::fs::write_file_atomic;
+use libafl_bolts::{ownedref::OwnedSlice, Error};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "std")]
-use crate::bolts::fs::write_file_atomic;
-use crate::{bolts::ownedref::OwnedSlice, Error};
 
 /// An input for the target
 #[cfg(not(feature = "std"))]

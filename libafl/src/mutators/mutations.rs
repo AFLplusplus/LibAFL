@@ -3,8 +3,9 @@
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{cmp::min, mem::size_of, ops::Range};
 
+use libafl_bolts::{rands::Rand, Named};
+
 use crate::{
-    bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
     inputs::HasBytesVec,
     mutators::{MutationResult, Mutator},
@@ -1246,9 +1247,9 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
         #[allow(clippy::cast_possible_wrap)]
         if this_el != other_el {
             if first_diff < 0 {
-                first_diff = i as i64;
+                first_diff = i64::try_from(i).unwrap();
             }
-            last_diff = i as i64;
+            last_diff = i64::try_from(i).unwrap();
         }
     }
 
@@ -1369,12 +1370,13 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
 
 #[cfg(test)]
 mod tests {
+    use libafl_bolts::{
+        rands::StdRand,
+        tuples::{tuple_list, HasConstLen},
+    };
+
     use super::*;
     use crate::{
-        bolts::{
-            rands::StdRand,
-            tuples::{tuple_list, HasConstLen},
-        },
         corpus::{Corpus, InMemoryCorpus},
         feedbacks::ConstFeedback,
         inputs::BytesInput,

@@ -3,7 +3,8 @@ use std::{
     path::PathBuf,
 };
 
-use libafl::{impl_serdeany, state::HasMetadata, Error};
+use libafl::{state::HasMetadata, Error};
+use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 use utf8_chars::BufReadCharsExt;
 

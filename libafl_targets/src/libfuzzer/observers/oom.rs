@@ -2,7 +2,6 @@ use core::{ffi::c_void, fmt::Debug};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use libafl::{
-    bolts::tuples::Named,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
@@ -11,6 +10,7 @@ use libafl::{
     state::HasClientPerfMonitor,
     Error,
 };
+use libafl_bolts::Named;
 use libc::SIGABRT;
 use serde::{Deserialize, Serialize};
 

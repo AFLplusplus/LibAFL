@@ -74,10 +74,10 @@ unused_must_use,
 use core::ffi::{c_char, c_int, CStr};
 
 use libafl::{
-    bolts::AsSlice,
     inputs::{BytesInput, HasTargetBytes, Input},
     Error,
 };
+use libafl_bolts::AsSlice;
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
@@ -144,13 +144,13 @@ impl CustomMutationStatus {
 
 macro_rules! fuzz_with {
     ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
-        use libafl::{
-            bolts::{
+        use libafl_bolts::{
                 current_nanos,
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
                 AsSlice,
-            },
+        };
+        use libafl::{
             corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
             executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
             feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,

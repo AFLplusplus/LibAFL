@@ -5,13 +5,13 @@ use std::{
 
 use ahash::AHasher;
 use libafl::{
-    bolts::{tuples::Named, AsIter, HasLen},
     executors::ExitKind,
     inputs::UsesInput,
     observers::{MapObserver, Observer, TimeObserver},
     state::UsesState,
     Error,
 };
+use libafl_bolts::{AsIter, HasLen, Named};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 

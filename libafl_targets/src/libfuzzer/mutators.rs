@@ -7,7 +7,6 @@ use std::{
 };
 
 use libafl::{
-    bolts::{rands::Rand, tuples::Named, AsSlice},
     corpus::Corpus,
     inputs::{BytesInput, HasBytesVec, UsesInput},
     mutators::{
@@ -17,6 +16,7 @@ use libafl::{
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
+use libafl_bolts::{rands::Rand, AsSlice, Named};
 
 extern "C" {
     fn libafl_targets_has_libfuzzer_custom_mutator() -> bool;

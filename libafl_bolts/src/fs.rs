@@ -157,7 +157,7 @@ impl Drop for InputFile {
 mod test {
     use std::fs;
 
-    use crate::bolts::fs::{write_file_atomic, InputFile};
+    use crate::fs::{write_file_atomic, InputFile};
 
     #[test]
     fn test_atomic_file_write() {

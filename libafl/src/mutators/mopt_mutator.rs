@@ -8,14 +8,14 @@ use core::{
     marker::PhantomData,
 };
 
+use libafl_bolts::{
+    rands::{Rand, StdRand},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 use crate::{
-    bolts::{
-        rands::{Rand, StdRand},
-        tuples::Named,
-    },
     corpus::{Corpus, CorpusId},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
@@ -97,7 +97,7 @@ pub struct MOpt {
     pub core_operator_cycles_v3: Vec<u64>,
 }
 
-crate::impl_serdeany!(MOpt);
+libafl_bolts::impl_serdeany!(MOpt);
 
 impl Debug for MOpt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -12,13 +12,11 @@ use std::{
 };
 
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        launcher::Launcher,
-        shmem::{ShMemProvider, StdShMemProvider},
-    },
     corpus::Corpus,
-    events::{EventConfig, ProgressReporter, SimpleEventManager, SimpleRestartingEventManager},
+    events::{
+        launcher::Launcher, EventConfig, ProgressReporter, SimpleEventManager,
+        SimpleRestartingEventManager,
+    },
     executors::ExitKind,
     inputs::UsesInput,
     monitors::{
@@ -31,6 +29,10 @@ use libafl::{
         UsesState,
     },
     Error, Fuzzer,
+};
+use libafl_bolts::{
+    core_affinity::Cores,
+    shmem::{ShMemProvider, StdShMemProvider},
 };
 
 use crate::{feedbacks::LibfuzzerCrashCauseMetadata, fuzz_with, options::LibfuzzerOptions};

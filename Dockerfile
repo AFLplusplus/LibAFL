@@ -29,8 +29,11 @@ COPY libafl_derive/Cargo.toml libafl_derive/Cargo.toml
 COPY scripts/dummy.rs libafl_derive/src/lib.rs
 
 COPY libafl/Cargo.toml libafl/build.rs libafl/
-COPY libafl/examples libafl/examples
 COPY scripts/dummy.rs libafl/src/lib.rs
+
+COPY libafl_bolts/Cargo.toml libafl_bolts/build.rs libafl_bolts/
+COPY libafl_bolts/examples libafl_bolts/examples
+COPY scripts/dummy.rs libafl_bolts/src/lib.rs
 
 COPY libafl_frida/Cargo.toml libafl_frida/build.rs libafl_frida/
 COPY scripts/dummy.rs libafl_frida/src/lib.rs
@@ -99,6 +102,8 @@ COPY libafl_cc/src libafl_cc/src
 RUN touch libafl_cc/src/lib.rs
 COPY libafl_derive/src libafl_derive/src
 RUN touch libafl_derive/src/lib.rs
+COPY libafl_bolts/src libafl_bolts/src
+RUN touch libafl_bolts/src/lib.rs
 COPY libafl/src libafl/src
 RUN touch libafl/src/lib.rs
 COPY libafl_targets/src libafl_targets/src

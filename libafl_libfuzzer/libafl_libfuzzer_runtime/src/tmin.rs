@@ -5,12 +5,6 @@ use std::{
 };
 
 use libafl::{
-    bolts::{
-        rands::{RandomSeed, RomuDuoJrRand, StdRand},
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
-        AsSlice, HasLen,
-    },
     corpus::{Corpus, HasTestcase, InMemoryCorpus, Testcase},
     events::SimpleEventManager,
     executors::{inprocess::TimeoutInProcessForkExecutor, ExitKind},
@@ -21,6 +15,12 @@ use libafl::{
     stages::StdTMinMutationalStage,
     state::{HasCorpus, StdState},
     Error, Fuzzer, StdFuzzer,
+};
+use libafl_bolts::{
+    rands::{RandomSeed, RomuDuoJrRand, StdRand},
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsSlice, HasLen,
 };
 use libafl_targets::LLVMCustomMutator;
 

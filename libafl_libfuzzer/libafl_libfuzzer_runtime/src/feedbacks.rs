@@ -4,17 +4,16 @@ use std::path::PathBuf;
 
 use libafl::{
     alloc,
-    bolts::tuples::Named,
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, MinMapFeedback},
-    impl_serdeany,
     inputs::{BytesInput, Input, UsesInput},
     observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
+use libafl_bolts::{impl_serdeany, Named};
 use libafl_targets::OomFeedback;
 use serde::{Deserialize, Serialize};
 
