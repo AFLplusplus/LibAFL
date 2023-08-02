@@ -69,7 +69,7 @@ thread_local! {
 pub extern "C" fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     MUTATOR.with(|mutator| {
         if let Ok(mut mutator) = mutator.try_borrow_mut() {
-            if let Some(mutator) = mutator.deref_mut() {
+            if let Some(mutator) = &mut *mutator {
                 return mutator.mutate(data, size, max_size);
             }
         }
@@ -123,7 +123,7 @@ impl<'a, M, MT, S> MutatorProxy<'a, M, MT, S> {
                         return true;
                     }
                 }
-                return false;
+                false
             },
             mutator: self.mutator.clone(),
             stage_idx: self.stage_idx,
@@ -192,10 +192,9 @@ where
                 .replace(Err(Error::illegal_state(
                     "Couldn't borrow mutator while mutating!",
                 )))
-                .ok();
-            return;
+                .ok()
         });
-        return new_size;
+        new_size
     }
 }
 
@@ -211,6 +210,10 @@ pub struct LLVMCustomMutator<MT, SM, const CROSSOVER: bool> {
 
 impl<MT, SM> LLVMCustomMutator<MT, SM, false> {
     /// Create the mutator which will invoke the custom mutator, emitting an error if the custom mutator is not present
+    ///
+    /// # Safety
+    /// Will create the specified libfuzzer custom mutator `mutate` fn.
+    /// Only safe if the custom mutator implementation is correct.
     pub unsafe fn mutate(mutator: SM) -> Result<Self, Error> {
         if libafl_targets_has_libfuzzer_custom_mutator() {
             Ok(Self::mutate_unchecked(mutator))
@@ -222,6 +225,10 @@ impl<MT, SM> LLVMCustomMutator<MT, SM, false> {
     }
 
     /// Create the mutator which will invoke the custom mutator without checking if it exists first
+    ///
+    /// # Safety
+    /// Will create the specified libfuzzer custom mutator and not check if it exists.
+    /// Only safe if the custom mutator implementation is correct and exists.
     pub unsafe fn mutate_unchecked(mutator: SM) -> Self {
         LLVMCustomMutator {
             mutator: Rc::new(RefCell::new(mutator)),
@@ -232,6 +239,10 @@ impl<MT, SM> LLVMCustomMutator<MT, SM, false> {
 
 impl<MT, SM> LLVMCustomMutator<MT, SM, true> {
     /// Create the mutator which will invoke the custom crossover, emitting an error if the custom crossover is not present
+    ///
+    /// # Safety
+    /// Will create the specified libfuzzer custom crossover mutator.
+    /// Only safe if the custom mutator crossover implementation is correct.
     pub unsafe fn crossover(mutator: SM) -> Result<Self, Error> {
         if libafl_targets_has_libfuzzer_custom_crossover() {
             Ok(Self::crossover_unchecked(mutator))
@@ -243,6 +254,10 @@ impl<MT, SM> LLVMCustomMutator<MT, SM, true> {
     }
 
     /// Create the mutator which will invoke the custom crossover without checking if it exists first
+    ///
+    /// # Safety
+    /// Will create the specified libfuzzer custom mutator crossover and not check if it exists.
+    /// Only safe if the custom mutator crossover implementation is correct and exists.
     pub unsafe fn crossover_unchecked(mutator: SM) -> Self {
         LLVMCustomMutator {
             mutator: Rc::new(RefCell::new(mutator)),

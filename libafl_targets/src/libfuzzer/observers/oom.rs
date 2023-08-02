@@ -26,10 +26,13 @@ static MALLOC_MAX: AtomicUsize = AtomicUsize::new(2 << 30);
 
 static MALLOC_SIZE: AtomicUsize = AtomicUsize::new(0);
 
-/// malloc hook which will be invoked if ASAN is present. Used to detect if the target makes a malloc call that will
+/// malloc hook which will be invoked if ASan is present. Used to detect if the target makes a malloc call that will
 /// exceed the permissible size
+///
+/// # Safety
+/// Is only safe to call with valid freshly allocated pointers backed by allocations of `size`.
 #[no_mangle]
-pub extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize) {
+pub unsafe extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = match unsafe { libafl_check_malloc_size(ptr) } {
             0 => size, // either the malloc size function didn't work or it's really zero-sized
@@ -50,8 +53,11 @@ pub extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize) {
 
 /// free hook which will be invoked if ASAN is present. Used to detect if the target makes a malloc call that will
 /// exceed the permissible size
+///
+/// # Safety
+/// Is only safe to call with valid allocated pointers, about to be freed.
 #[no_mangle]
-pub extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
+pub unsafe extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = unsafe { libafl_check_malloc_size(ptr) };
         if MALLOC_SIZE
@@ -68,12 +74,12 @@ const OOM_OBS_NAME: &str = "libfuzzer-like-oom";
 
 /// Observer which detects if the target would run out of memory or otherwise violate the permissible usage of malloc
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OOMObserver {
+pub struct OomObserver {
     oomed: bool,
 }
 
-impl OOMObserver {
-    /// Create a OOM observer with the provided rss_max (total heap size) and malloc_max (largest permissible malloc
+impl OomObserver {
+    /// Create a [`OomObserver`] with the provided `rss_max` (total heap size) and `malloc_max` (largest permissible malloc
     /// allocation size)
     pub fn new(rss_max: usize, malloc_max: usize) -> Self {
         RSS_MAX.store(rss_max, Ordering::Relaxed);
@@ -82,14 +88,14 @@ impl OOMObserver {
     }
 }
 
-impl Named for OOMObserver {
+impl Named for OomObserver {
     // strictly one name to prevent two from being registered
     fn name(&self) -> &str {
         OOM_OBS_NAME
     }
 }
 
-impl<S> Observer<S> for OOMObserver
+impl<S> Observer<S> for OomObserver
 where
     S: UsesInput,
 {
@@ -126,24 +132,24 @@ where
     }
 }
 
-/// Feedback for the similarly named [OOMObserver] to detect if the target crashed due to an observed OOM
+/// Feedback for the similarly named [`OomObserver`] to detect if the target crashed due to an observed OOM
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, Default)]
-pub struct OOMFeedback;
+pub struct OomFeedback;
 
-impl OOMFeedback {
+impl OomFeedback {
     /// Whether the target OOM'd in the last execution
     pub fn oomed() -> bool {
         OOMED.load(Ordering::Relaxed)
     }
 }
 
-impl Named for OOMFeedback {
+impl Named for OomFeedback {
     fn name(&self) -> &str {
         "oom"
     }
 }
 
-impl<S> Feedback<S> for OOMFeedback
+impl<S> Feedback<S> for OomFeedback
 where
     S: UsesInput + HasClientPerfMonitor,
 {

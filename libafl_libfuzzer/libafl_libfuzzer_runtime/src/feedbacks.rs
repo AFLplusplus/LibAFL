@@ -15,7 +15,7 @@ use libafl::{
     state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
-use libafl_targets::OOMFeedback;
+use libafl_targets::OomFeedback;
 use serde::{Deserialize, Serialize};
 
 use crate::{observers::MappedEdgeMapObserver, options::ArtifactPrefix};
@@ -150,7 +150,7 @@ where
         OT: ObserversTuple<S>,
     {
         match self.exit_kind {
-            ExitKind::Crash | ExitKind::Oom if OOMFeedback::oomed() => {
+            ExitKind::Crash | ExitKind::Oom if OomFeedback::oomed() => {
                 self.set_filename("oom", testcase);
                 testcase.add_metadata(LibfuzzerCrashCauseMetadata {
                     kind: ExitKind::Oom,

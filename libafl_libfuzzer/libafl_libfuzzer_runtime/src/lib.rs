@@ -171,7 +171,7 @@ macro_rules! fuzz_with {
             state::{HasCorpus, StdState},
             StdFuzzer,
         };
-        use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OOMFeedback, OOMObserver};
+        use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OomFeedback, OomObserver};
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
 
@@ -197,7 +197,7 @@ macro_rules! fuzz_with {
             let time_observer = TimeObserver::new("time");
 
             // Create an OOM observer to monitor if an OOM has occurred
-            let oom_observer = OOMObserver::new($options.rss_limit(), $options.malloc_limit());
+            let oom_observer = OomObserver::new($options.rss_limit(), $options.malloc_limit());
 
             // Create the Cmp observer
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
@@ -237,7 +237,7 @@ macro_rules! fuzz_with {
             // A feedback to choose if an input is a solution or not
             let mut objective = feedback_or_fast!(
                 LibfuzzerCrashCauseFeedback::new($options.artifact_prefix().cloned()),
-                OOMFeedback,
+                OomFeedback,
                 feedback_and_fast!(
                     CrashFeedback::new(),
                     feedback_or_fast!(ConstFeedback::new(!$options.dedup()), NewHashFeedback::new(&backtrace_observer))

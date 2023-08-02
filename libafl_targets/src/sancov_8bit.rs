@@ -7,14 +7,17 @@ use libafl::bolts::{ownedref::OwnedMutSlice, AsSlice};
 /// They are initialized by calling [`__sanitizer_cov_8bit_counters_init`](
 pub static mut COUNTERS_MAPS: Vec<OwnedMutSlice<'static, u8>> = Vec::new();
 
-/// Create more copies of the counters maps -- you are responsible for ensuring there is no
-/// multi-mutability!
+/// Create more copies of the counters maps
+///
+/// # Safety
+/// You are responsible for ensuring there is no multi-mutability!
+#[must_use]
 pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
     COUNTERS_MAPS
         .iter()
         .map(|counters| {
             OwnedMutSlice::from_raw_parts_mut(
-                counters.as_slice().as_ptr() as *mut u8,
+                counters.as_slice().as_ptr().cast_mut(),
                 counters.as_slice().len(),
             )
         })

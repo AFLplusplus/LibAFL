@@ -26,7 +26,7 @@ use libafl::{
     state::{HasCorpus, HasRand, StdState},
     Error, HasScheduler, StdFuzzer,
 };
-use libafl_targets::{OOMFeedback, OOMObserver, COUNTERS_MAPS};
+use libafl_targets::{OomFeedback, OomObserver, COUNTERS_MAPS};
 
 use crate::{
     feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback},
@@ -139,7 +139,7 @@ pub fn merge(
     let map_feedback = MinMapFeedback::tracking(&edges_observer, false, true);
 
     // Create an OOM observer to monitor if an OOM has occurred
-    let oom_observer = OOMObserver::new(options.rss_limit(), options.malloc_limit());
+    let oom_observer = OomObserver::new(options.rss_limit(), options.malloc_limit());
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -148,7 +148,7 @@ pub fn merge(
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_or_fast!(
         LibfuzzerCrashCauseFeedback::new(options.artifact_prefix().cloned()),
-        OOMFeedback,
+        OomFeedback,
         CrashFeedback::new(),
         TimeoutFeedback::new()
     );
