@@ -1,5 +1,7 @@
 //! Compiletime lists/tuples used throughout the `LibAFL` universe
 
+#[rustversion::not(nightly)]
+use core::any::type_name;
 use core::{
     any::TypeId,
     ptr::{addr_of, addr_of_mut},
@@ -33,11 +35,12 @@ pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
 }
 
 /// Returns if the type `T` is equal to `U`
+/// As this uses `type_name` internally, there is a slight chance for collisions.
+/// Use `nightly` if you need a perfect match at all times.
 #[rustversion::not(nightly)]
 #[must_use]
-pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
-    // BEWARE! This is not unsafe, it is SUPER UNSAFE
-    true
+pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+    type_name::<T>() == type_name::<U>()
 }
 
 /// Gets the length of the element
