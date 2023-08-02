@@ -13,7 +13,7 @@ pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
     bolts::{
         rands::Rand,
-        tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
+        tuples::{tuple_list, tuple_list_type, Merge, Named, NamedTuple},
         AsMutSlice, AsSlice,
     },
     corpus::{Corpus, CorpusId},
@@ -106,6 +106,7 @@ where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
+    name: String,
     mutations: MT,
     max_stack_pow: u64,
     phantom: PhantomData<(I, S)>,
@@ -123,6 +124,16 @@ where
             self.mutations.len(),
             core::any::type_name::<I>()
         )
+    }
+}
+
+impl<I, MT, S> Named for StdScheduledMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand,
+{
+    fn name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -185,6 +196,7 @@ where
     /// Create a new [`StdScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {
+            name: format!("StdScheduledMutator[{}]", mutations.names().join(", ")),
             mutations,
             max_stack_pow: 7,
             phantom: PhantomData,
@@ -194,6 +206,7 @@ where
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
     pub fn with_max_stack_pow(mutations: MT, max_stack_pow: u64) -> Self {
         StdScheduledMutator {
+            name: format!("StdScheduledMutator[{}]", mutations.names().join(", ")),
             mutations,
             max_stack_pow,
             phantom: PhantomData,
@@ -324,6 +337,7 @@ where
     S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
+    name: String,
     scheduled: SM,
     mutation_log: Vec<MutationId>,
     phantom: PhantomData<(I, MT, S)>,
@@ -342,6 +356,17 @@ where
             self.scheduled.mutations().len(),
             core::any::type_name::<I>()
         )
+    }
+}
+
+impl<I, MT, S, SM> Named for LoggerScheduledMutator<I, MT, S, SM>
+where
+    MT: MutatorsTuple<I, S> + NamedTuple,
+    S: HasRand + HasCorpus,
+    SM: ScheduledMutator<I, MT, S>,
+{
+    fn name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -448,9 +473,11 @@ where
     S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
-    /// Create a new [`StdScheduledMutator`] instance without mutations and corpus
+    /// Create a new [`LoggerScheduledMutator`] instance without mutations and corpus
+    /// This mutator logs all mutators.
     pub fn new(scheduled: SM) -> Self {
         Self {
+            name: format!("LoggerScheduledMutator[{}]", scheduled.name()),
             scheduled,
             mutation_log: vec![],
             phantom: PhantomData,

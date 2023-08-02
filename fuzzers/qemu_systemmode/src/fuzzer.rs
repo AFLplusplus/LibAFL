@@ -90,6 +90,9 @@ pub fn fuzz() {
 
         emu.set_breakpoint(breakpoint); // BREAKPOINT
 
+        let devices = emu.list_devices();
+        println!("Devices = {:?}", devices);
+
         // let saved_cpu_states: Vec<_> = (0..emu.num_cpus())
         //     .map(|i| emu.cpu_from_index(i).save_state())
         //     .collect();
