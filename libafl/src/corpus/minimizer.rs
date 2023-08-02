@@ -156,7 +156,7 @@ where
                 Event::UpdateUserStats {
                     name: "minimisation exec pass".to_string(),
                     value: UserStats::Ratio(curr, total),
-                    phantom: Default::default(),
+                    phantom: PhantomData,
                 },
             )?;
 
@@ -164,7 +164,7 @@ where
                 state,
                 Event::UpdateExecStats {
                     time: current_time(),
-                    phantom: Default::default(),
+                    phantom: PhantomData,
                     executions,
                 },
             )?;
