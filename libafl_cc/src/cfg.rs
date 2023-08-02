@@ -1,6 +1,5 @@
 //! LLVM style control flow graph with information of AFL-style index of the each
 //! edges, use together with ``AFLCoverage`` pass having --dump-afl-cfg flag enabled.
-use core::borrow::Borrow;
 use std::{
     collections::{BinaryHeap, HashMap, HashSet},
     marker::PhantomData,
@@ -313,10 +312,8 @@ where
             }
             if let Some(edge_info) = self.get_edge(edge) {
                 for successor in &edge_info.successor_edges {
-                    let successor_info = self
-                        .get_edge(*successor)
-                        .expect("unknown successor added")
-                        .borrow();
+                    let successor_info =
+                        self.get_edge(*successor).expect("unknown successor added");
                     let new_distance = distance + successor_info.get_weight();
                     let is_shorter = distances
                         .get(successor)
