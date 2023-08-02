@@ -496,8 +496,7 @@ fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
     let mut size_bytes = [0_u8; 4];
     stream.read_exact(&mut size_bytes)?;
     let size = u32::from_be_bytes(size_bytes);
-    let mut bytes = vec![];
-    bytes.resize(size as usize, 0_u8);
+    let mut bytes = vec![0; size.try_into().unwrap()];
 
     #[cfg(feature = "llmp_debug")]
     log::trace!("LLMP TCP: Receiving payload of size {size}");
