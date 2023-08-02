@@ -1,0 +1,29 @@
+name;content;answer1;answer2;next1;next2;previous
+Introduction;Description;Yes;Sure;1;1;0
+Do you have the target's source code?;Description;Yes;No;2;3;0
+Can you provide a harness function?;Description;Yes;No;3;3;0
+Do you want to use a map to track coverage?;Description;Yes;No;4;7;0
+Do you need multiple maps?;Description;Yes;No;5;5;0
+Do you know the size of the map at compile time?;Description;Yes;No;6;6;0
+Do you want to improve input selection by adding a hit counts map?;Description;Yes;No;7;7;0
+Do you want to consider the logged values of CMP instructions?;Description;Yes;No;8;8;0
+Do you want to consider the backtrace after the harness crashes?;Description;Yes;No;9;9;0
+Do you want to keep track of the testcases' runtime?;Description;Yes;No;10;11;0
+Do you want to consider a timeout as a solution?;Description;Yes;No;11;11;0
+Do you want to consider a crash as a solution?;Description;Yes;No;12;12;0
+Do you want to manage the testcases in memory or on disk?;Description;In memory; On disk;13;14;0
+Do you want to manage only in memory or in memory and on disk?;Description;In memory;Both;16;16;0
+Do you want to manage only on disk or on disk and in memory?;Description;On disk;Both;15;16;0
+Do you want to load testcases from disk to memory using a cache?;Description;Yes;No;16;16;0
+Do you want to see stats about the fuzzing campaign?;Description;Yes;No;17;20;0
+Do you want to see the stats in a UI style?;Description;Yes;No;18;18;0
+Do you want to store the stats to a file?;Description;Yes;No;19;20;0
+Do you want to store them to a TOML or JSON file?;Description;TOML;JSON;20;20;0
+Do you want to restart your fuzzer every time a solution is achieved?;Description;Yes;No;21;21;0
+Do you want to load testcases from the corpus using a queue policy?;Description;Yes;No;22;22;0
+Do you want to prioritize smaller and faster testcases?;Description;Yes;No;23;23;0
+Can your target corrupt memory used by the fuzzer?;Description;Yes;No;24;24;0
+Do you want to set a timeout before each run?;Description;Yes;No;25;25;0
+Do you want to generate an initial set of inputs?;Description;Yes;No;26;26;0
+Do you want to schedule mutations?;Description;Yes;No;27;27;0
+Do you want to use the StdMutationalStage?;Description;Yes;No;28;28;0

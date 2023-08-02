@@ -1,0 +1,210 @@
+[[question]]
+name = "Introduction"
+content = """\
+Description\n
+New line\
+"""
+answers = [ "Yes", "Quit" ]
+next = [ 1, 1 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you have the target's source code?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 2, 3 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Can you provide a harness function?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 3, 3 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to use a map to track coverage?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 4, 7 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you need multiple maps?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 5, 5 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you know the size of the map at compile time?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 6, 6 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to improve input selection by adding a hit counts map?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 7, 7 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to consider the logged values of CMP instructions?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 8, 8 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to consider the backtrace after the harness crashes?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 9, 9 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to keep track of the testcases' runtime?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 10, 11 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to consider a timeout as a solution?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 11, 11 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to consider a crash as a solution?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 12, 12 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to manage the testcases in memory, on disk or both?"
+content = "Description"
+answers = [ "In memory", "On disk", "Both" ]
+next = [ 14, 13, 14 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to load testcases from disk to memory using a cache?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 14, 14 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to see stats about the fuzzing campaign?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 15, 18 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to see the stats in a UI style?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 16, 16 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to store the stats to a file?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 17, 18 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to store them to a TOML or JSON file?"
+content = "Description"
+answers = [ "TOML", "JSON" ]
+next = [ 18, 18 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to restart your fuzzer every time a solution is achieved?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 19, 19 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to load testcases from the corpus using a queue policy?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 20, 20 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to prioritize smaller and faster testcases?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 21, 21 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Can your target corrupt memory used by the fuzzer?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 22, 22 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to set a timeout before each run?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 23, 23 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to generate an initial set of inputs?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 24, 24 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to schedule mutations?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 25, 25 ]
+previous = 0
+code = ""
+
+[[question]]
+name = "Do you want to use the StdMutationalStage?"
+content = "Description"
+answers = [ "Yes", "No" ]
+next = [ 26, 26 ]
+previous = 0
+code = ""
