@@ -7,11 +7,7 @@ use std::{
 };
 
 use libafl::{
-    bolts::{
-        rands::Rand,
-        AsSlice,
-        tuples::Named
-    },
+    bolts::{rands::Rand, tuples::Named, AsSlice},
     corpus::Corpus,
     inputs::{BytesInput, HasBytesVec, UsesInput},
     mutators::{
