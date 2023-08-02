@@ -530,10 +530,17 @@ mod test {
 
     #[test]
     fn test_type_eq() {
+        // test eq
         assert!(type_eq::<u64, u64>());
-        assert!(!type_eq::<u64, usize>());
+        assert!(type_eq::<BytesInput, BytesInput>());
         assert!(type_eq::<NopState<BytesInput>, NopState<BytesInput>>());
+
+        // test neq
+        assert!(!type_eq::<u64, usize>());
+        assert!(!type_eq::<NopInput, BytesInput>());
+        assert!(!type_eq::<BytesInput, NopInput>());
         assert!(!type_eq::<NopState<BytesInput>, NopState<NopInput>>());
-        assert!(!type_eq::<NopState<BytesInput>, i64>());
+        assert!(!type_eq::<NopState<BytesInput>, BytesInput>());
+        assert!(!type_eq::<NopState<BytesInput>, u64>());
     }
 }
