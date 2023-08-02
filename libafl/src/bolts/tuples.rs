@@ -531,6 +531,7 @@ mod test {
     };
 
     #[test]
+    #[allow(unused_qualifications)] // for type name tests
     fn test_type_eq() {
         // test eq
         assert!(type_eq::<u64, u64>());
@@ -545,12 +546,18 @@ mod test {
         assert!(!type_eq::<NopState<BytesInput>, BytesInput>());
         assert!(!type_eq::<NopState<BytesInput>, u64>());
 
+        // test weirder lifetime things
         assert!(type_eq::<StdMapObserver<u8, true>, StdMapObserver<u8, true>>());
         assert!(!type_eq::<
             StdMapObserver<u8, true>,
             StdMapObserver<u8, false>,
         >());
-        assert!(!type_eq::<StdMapObserver<u8, true>, StdMapObserver<i8, true>>());
+
+        assert!(type_eq::<StdMapObserver<u8, true>, crate::observers::StdMapObserver<u8, true>>());
+        assert!(!type_eq::<StdMapObserver<u8, true>, crate::observers::StdMapObserver<i8, true>>());
+
+        type MapObserverAlias<'a, T> = StdMapObserver<'a, T, true>;
+        assert!(type_eq::<StdMapObserver<u8, true>, MapObserverAlias<u8>>());
 
         fn lifetimes<'a, 'b>() {
             assert!(type_eq::<
