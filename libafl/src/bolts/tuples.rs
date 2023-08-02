@@ -553,8 +553,14 @@ mod test {
             StdMapObserver<u8, false>,
         >());
 
-        assert!(type_eq::<StdMapObserver<u8, true>, crate::observers::StdMapObserver<u8, true>>());
-        assert!(!type_eq::<StdMapObserver<u8, true>, crate::observers::StdMapObserver<i8, true>>());
+        assert!(type_eq::<
+            StdMapObserver<u8, true>,
+            crate::observers::StdMapObserver<u8, true>,
+        >());
+        assert!(!type_eq::<
+            StdMapObserver<u8, true>,
+            crate::observers::StdMapObserver<i8, true>,
+        >());
 
         type MapObserverAlias<'a, T> = StdMapObserver<'a, T, true>;
         assert!(type_eq::<StdMapObserver<u8, true>, MapObserverAlias<u8>>());
