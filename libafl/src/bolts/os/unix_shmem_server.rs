@@ -607,8 +607,7 @@ where
         let mut size_bytes = [0_u8; 4];
         client.stream.read_exact(&mut size_bytes)?;
         let size = u32::from_be_bytes(size_bytes);
-        let mut bytes = vec![];
-        bytes.resize(size as usize, 0_u8);
+        let mut bytes = vec![0; size.try_into().unwrap()];
         client
             .stream
             .read_exact(&mut bytes)
