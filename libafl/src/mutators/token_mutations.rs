@@ -17,12 +17,12 @@ use std::{
 };
 
 use hashbrown::HashSet;
+use libafl_bolts::{rands::Rand, AsSlice};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
 use crate::{
-    bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, UsesInput},
     mutators::{
         buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
@@ -42,7 +42,7 @@ pub struct Tokens {
     tokens_set: HashSet<Vec<u8>>,
 }
 
-crate::impl_serdeany!(Tokens);
+libafl_bolts::impl_serdeany!(Tokens);
 
 /// The metadata used for token mutators
 impl Tokens {

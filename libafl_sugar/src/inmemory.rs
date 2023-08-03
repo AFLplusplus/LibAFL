@@ -5,17 +5,8 @@ use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsSlice,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -32,6 +23,14 @@ use libafl::{
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
+};
+use libafl_bolts::{
+    core_affinity::Cores,
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsSlice,
 };
 use libafl_targets::{std_edges_map_observer, CmpLogObserver};
 use typed_builder::TypedBuilder;
@@ -357,7 +356,7 @@ where
 pub mod pybind {
     use std::path::PathBuf;
 
-    use libafl::bolts::core_affinity::Cores;
+    use libafl_bolts::core_affinity::Cores;
     use pyo3::{prelude::*, types::PyBytes};
 
     use crate::inmemory;

@@ -7,10 +7,10 @@ use std::{
     time::SystemTime,
 };
 
+use libafl_bolts::{current_time, shmem::ShMemProvider};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{current_time, shmem::ShMemProvider},
     corpus::{Corpus, CorpusId, HasTestcase},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
@@ -28,7 +28,7 @@ pub struct SyncFromDiskMetadata {
     pub last_time: SystemTime,
 }
 
-crate::impl_serdeany!(SyncFromDiskMetadata);
+libafl_bolts::impl_serdeany!(SyncFromDiskMetadata);
 
 impl SyncFromDiskMetadata {
     /// Create a new [`struct@SyncFromDiskMetadata`]
@@ -197,7 +197,7 @@ pub struct SyncFromBrokerMetadata {
     pub last_id: Option<CorpusId>,
 }
 
-crate::impl_serdeany!(SyncFromBrokerMetadata);
+libafl_bolts::impl_serdeany!(SyncFromBrokerMetadata);
 
 impl SyncFromBrokerMetadata {
     /// Create a new [`struct@SyncFromBrokerMetadata`]

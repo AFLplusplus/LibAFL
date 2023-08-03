@@ -10,6 +10,8 @@ use core::{
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 use xxhash_rust::xxh3::xxh3_64;
 
+use crate::Named;
+
 /// Returns if the type `T` is equal to `U`
 /// From <https://stackoverflow.com/a/60138532/7658998>
 #[rustversion::nightly]
@@ -206,12 +208,6 @@ where
     }
 }
 
-/// We need fixed names for many parts of this lib.
-pub trait Named {
-    /// Provide the name of this element.
-    fn name(&self) -> &str;
-}
-
 /// A named tuple
 pub trait NamedTuple: HasConstLen {
     /// Gets the name of this tuple
@@ -221,6 +217,13 @@ pub trait NamedTuple: HasConstLen {
 impl NamedTuple for () {
     fn name(&self, _index: usize) -> Option<&str> {
         None
+    }
+}
+
+impl Named for () {
+    #[inline]
+    fn name(&self) -> &str {
+        "Empty"
     }
 }
 
@@ -523,12 +526,15 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 #[cfg(test)]
 mod test {
-    use crate::bolts::{ownedref::OwnedMutSlice, tuples::type_eq};
+    use crate::{ownedref::OwnedMutSlice, tuples::type_eq};
+
+    /// An alias for equality testing
+    type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
 
     #[test]
     #[allow(unused_qualifications)] // for type name tests
     fn test_type_eq() {
-        #[allow(extra_unused_lifetimes)]
+        #[allow(clippy::extra_unused_lifetimes)]
         fn test_lifetimes<'a, 'b>() {
             assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
             assert!(type_eq::<OwnedMutSlice<'static, u8>, OwnedMutSlice<'a, u8>>());
@@ -536,7 +542,6 @@ mod test {
             assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'static, u8>>());
             assert!(!type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, i8>>());
         }
-        type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
         assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSliceAlias>());
 
         test_lifetimes();
@@ -552,11 +557,11 @@ mod test {
 
         assert!(type_eq::<
             OwnedMutSlice<u8>,
-            crate::bolts::ownedref::OwnedMutSlice<u8>,
+            crate::ownedref::OwnedMutSlice<u8>,
         >());
         assert!(!type_eq::<
             OwnedMutSlice<u8>,
-            crate::bolts::ownedref::OwnedMutSlice<u32>,
+            crate::ownedref::OwnedMutSlice<u32>,
         >());
     }
 }

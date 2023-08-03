@@ -30,10 +30,10 @@ pub mod ecofuzz;
 pub use ecofuzz::{EcoMetadata, EcoScheduler, EcoState, EcoTestcaseMetadata, EcoTestcaseScore};
 
 pub mod tuneable;
+use libafl_bolts::rands::Rand;
 pub use tuneable::*;
 
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::ObserversTuple,

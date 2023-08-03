@@ -9,7 +9,7 @@ use std::{collections::BTreeMap, ffi::c_void, num::NonZeroUsize};
 use backtrace::Backtrace;
 use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
-use libafl::bolts::cli::FuzzerOptions;
+use libafl_bolts::cli::FuzzerOptions;
 #[cfg(any(
     target_os = "linux",
     target_vendor = "apple",

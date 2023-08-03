@@ -28,7 +28,7 @@ impl QemuCmpsMapMetadata {
     }
 }
 
-libafl::impl_serdeany!(QemuCmpsMapMetadata);
+libafl_bolts::impl_serdeany!(QemuCmpsMapMetadata);
 
 #[derive(Debug)]
 pub struct QemuCmpLogHelper {

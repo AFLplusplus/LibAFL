@@ -8,7 +8,6 @@ use core::cell::{Cell, RefCell};
 use std::{path::PathBuf, rc::Rc};
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     executors::ExitKind,
@@ -22,6 +21,7 @@ use libafl::{
     stages::push::{PushStageSharedState, StdMutationalPushStage},
     state::{HasCorpus, StdState},
 };
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];

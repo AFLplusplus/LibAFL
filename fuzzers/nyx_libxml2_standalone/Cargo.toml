@@ -6,6 +6,7 @@ default-run = "nyx_libxml2_standalone"
 
 [dependencies]
 libafl = { path = "../../libafl" }
+libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_cc = { path = "../../libafl_cc" }
 libafl_nyx = { path = "../../libafl_nyx" }
 

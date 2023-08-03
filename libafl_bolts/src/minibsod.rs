@@ -1,13 +1,13 @@
 //! Implements a mini-bsod generator.
 //! It dumps all important registers and prints a stacktrace.
-//! You may use the [`crate::bolts::os::unix_signals::ucontext`]
+//! You may use the [`crate::os::unix_signals::ucontext`]
 //! function to get a [`ucontext_t`].
 
 use std::io::{BufWriter, Write};
 
 use libc::siginfo_t;
 
-use crate::bolts::os::unix_signals::{ucontext_t, Signal};
+use crate::os::unix_signals::{ucontext_t, Signal};
 
 /// Write the content of all important registers
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
@@ -700,7 +700,7 @@ mod tests {
 
     use std::io::{stdout, BufWriter};
 
-    use crate::bolts::{minibsod::dump_registers, os::unix_signals::ucontext};
+    use crate::{minibsod::dump_registers, os::unix_signals::ucontext};
 
     #[test]
     #[cfg_attr(miri, ignore)]

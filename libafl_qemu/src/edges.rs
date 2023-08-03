@@ -30,7 +30,7 @@ impl QemuEdgesMapMetadata {
     }
 }
 
-libafl::impl_serdeany!(QemuEdgesMapMetadata);
+libafl_bolts::impl_serdeany!(QemuEdgesMapMetadata);
 
 #[derive(Debug)]
 pub struct QemuEdgeCoverageHelper {

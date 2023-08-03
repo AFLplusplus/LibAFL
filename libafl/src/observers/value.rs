@@ -12,15 +12,11 @@ use core::{
 };
 
 use ahash::RandomState;
+use libafl_bolts::{ownedref::OwnedRef, Named};
 use serde::{Deserialize, Serialize};
 
 use super::Observer;
-use crate::{
-    bolts::{ownedref::OwnedRef, tuples::Named},
-    inputs::UsesInput,
-    observers::ObserverWithHashField,
-    Error,
-};
+use crate::{inputs::UsesInput, observers::ObserverWithHashField, Error};
 
 /// A simple observer with a single value.
 ///
