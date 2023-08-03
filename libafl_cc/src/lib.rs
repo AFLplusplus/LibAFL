@@ -104,6 +104,16 @@ impl Configuration {
     pub fn to_flags(&self) -> Result<Vec<String>, Error> {
         Ok(match self {
             Configuration::Default => vec![],
+            // hardware asan is more memory efficient than asan on arm64
+            #[cfg(all(
+                any(target_os = "linux", target_os = "android"),
+                target_arch = "aarch64"
+            ))]
+            Configuration::AddressSanitizer => vec!["-fsanitize=hwaddress".to_string()],
+            #[cfg(not(all(
+                any(target_os = "linux", target_os = "android"),
+                target_arch = "aarch64"
+            )))]
             Configuration::AddressSanitizer => vec!["-fsanitize=address".to_string()],
             Configuration::UndefinedBehaviorSanitizer => vec!["-fsanitize=undefined".to_string()],
             Configuration::GenerateCoverageMap => {
