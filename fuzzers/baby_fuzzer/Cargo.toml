@@ -20,5 +20,5 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../libafl/", default_features = false, features = ["std", "derive"] }
-libafl_bolts = { path = "../../libafl_bolts/", default_features = false, features = ["std", "derive"] }
+libafl = { path = "../../libafl/" }
+libafl_bolts = { path = "../../libafl_bolts/" }
