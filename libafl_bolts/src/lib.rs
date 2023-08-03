@@ -1,4 +1,4 @@
-//! Bolts are no conceptual fuzzing elements, but they keep libafl-based fuzzers together.
+#![doc = include_str!("../README.md")]
 
 /*!
 Welcome to `LibAFL`
