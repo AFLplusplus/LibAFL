@@ -614,7 +614,6 @@ pub use serdeany_registry::*;
 ///
 /// Do nothing for without the `serdeany_autoreg` feature, you'll have to register it manually
 /// in `main()` with [`RegistryBuilder::register`] or using <T>::register().
-#[cfg(feature = "std")]
 #[macro_export]
 macro_rules! register_at_startup {
     ($struct_type:ty) => {
