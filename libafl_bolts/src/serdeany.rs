@@ -615,7 +615,7 @@ pub use serdeany_registry::*;
 /// Do nothing for without the `serdeany_autoreg` feature, you'll have to register it manually
 /// in `main()` with [`RegistryBuilder::register`] or using `<T>::register()`.
 #[macro_export]
-macro_rules! register_at_startup {
+macro_rules! create_register {
     ($struct_type:ty) => {
         const _: () = {
             /// Manually register this type at a later point in time
@@ -666,7 +666,7 @@ macro_rules! impl_serdeany {
         }
 
         $(
-            $crate::register_at_startup!($struct_name < $( $opt ),+ >);
+            $crate::create_register!($struct_name < $( $opt ),+ >);
         )*
     };
     ($struct_name:ident) =>
@@ -690,6 +690,6 @@ macro_rules! impl_serdeany {
             }
         }
 
-        $crate::register_at_startup!($struct_name);
+        $crate::create_register!($struct_name);
     };
 }
