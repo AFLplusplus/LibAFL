@@ -633,9 +633,9 @@ macro_rules! register_at_startup {
             #[$crate::ctor]
             fn register() {
                 // # Safety
-                // This `register_unsafe` call will always run at startup and never in parallel.
+                // This `register` call will always run at startup and never in parallel.
                 unsafe {
-                    $crate::serdeany::RegistryBuilder::register_unsafe::<$struct_type>();
+                    $crate::serdeany::RegistryBuilder::register::<$struct_type>();
                 }
             }
         };
