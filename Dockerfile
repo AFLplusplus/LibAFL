@@ -31,7 +31,7 @@ COPY scripts/dummy.rs libafl_derive/src/lib.rs
 COPY libafl/Cargo.toml libafl/build.rs libafl/
 COPY scripts/dummy.rs libafl/src/lib.rs
 
-COPY libafl_bolts/Cargo.toml libafl_bolts/build.rs libafl_bolts/
+COPY libafl_bolts/Cargo.toml libafl_bolts/build.rs libafl_bolts/README.md libafl_bolts/
 COPY libafl_bolts/examples libafl_bolts/examples
 COPY scripts/dummy.rs libafl_bolts/src/lib.rs
 
