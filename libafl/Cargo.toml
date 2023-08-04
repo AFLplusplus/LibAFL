@@ -12,8 +12,8 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg"]
-std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-timeout", "uuid", "tui_monitor", "backtrace", "serial_test", "libafl_bolts/std", "typed-builder"] # print, env, launcher ... support
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor"]
+std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-timeout", "uuid", "backtrace", "serial_test", "libafl_bolts/std", "typed-builder"] # print, env, launcher ... support
 derive = ["libafl_derive", "libafl_bolts/derive"] # provide derive(SerdeAny) macro.
 fork = ["libafl_bolts/derive"] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
 rand_trait = ["libafl_bolts/rand_trait"] # If set, libafl's rand implementations will implement `rand::Rng`
