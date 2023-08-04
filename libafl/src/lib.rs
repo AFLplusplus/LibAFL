@@ -5,11 +5,11 @@ Welcome to `LibAFL`
 #![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`
-#![cfg_attr(unstable_feature, feature(specialization))]
+#![cfg_attr(nightly, feature(specialization))]
 // For `type_id` and owned things
-#![cfg_attr(unstable_feature, feature(intrinsics))]
+#![cfg_attr(nightly, feature(intrinsics))]
 // For `std::simd`
-#![cfg_attr(unstable_feature, feature(portable_simd))]
+#![cfg_attr(nightly, feature(portable_simd))]
 #![warn(clippy::cargo)]
 #![allow(ambiguous_glob_reexports)]
 #![deny(clippy::cargo_common_metadata)]

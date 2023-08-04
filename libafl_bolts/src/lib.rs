@@ -7,13 +7,13 @@ Welcome to `LibAFL`
 #![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`
-#![cfg_attr(unstable_feature, feature(specialization))]
+#![cfg_attr(nightly, feature(specialization))]
 // For `type_id` and owned things
-#![cfg_attr(unstable_feature, feature(intrinsics))]
+#![cfg_attr(nightly, feature(intrinsics))]
 // For `std::simd`
-#![cfg_attr(unstable_feature, feature(portable_simd))]
+#![cfg_attr(nightly, feature(portable_simd))]
 // For `core::error`
-#![cfg_attr(unstable_feature, feature(error_in_core))]
+#![cfg_attr(nightly, feature(error_in_core))]
 #![warn(clippy::cargo)]
 #![allow(ambiguous_glob_reexports)]
 #![deny(clippy::cargo_common_metadata)]
@@ -449,10 +449,10 @@ impl From<pyo3::PyErr> for Error {
     }
 }
 
-#[cfg(all(not(unstable_feature), feature = "std"))]
+#[cfg(all(not(nightly), feature = "std"))]
 impl std::error::Error for Error {}
 
-#[cfg(unstable_feature)]
+#[cfg(nightly)]
 impl core::error::Error for Error {}
 
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
