@@ -12,6 +12,8 @@ Welcome to `LibAFL`
 #![cfg_attr(unstable_feature, feature(intrinsics))]
 // For `std::simd`
 #![cfg_attr(unstable_feature, feature(portable_simd))]
+// For `core::error`
+#![cfg_attr(unstable_feature, feature(error_in_core))]
 #![warn(clippy::cargo)]
 #![allow(ambiguous_glob_reexports)]
 #![deny(clippy::cargo_common_metadata)]
@@ -425,6 +427,7 @@ impl From<TryFromSliceError> for Error {
 
 #[cfg(windows)]
 impl From<windows::core::Error> for Error {
+    #[allow(unused_variables)]
     fn from(err: windows::core::Error) -> Self {
         Self::unknown(format!("Windows API error: {err:?}"))
     }
@@ -446,8 +449,11 @@ impl From<pyo3::PyErr> for Error {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(not(unstable_feature), feature = "std"))]
 impl std::error::Error for Error {}
+
+#[cfg(unstable_feature)]
+impl core::error::Error for Error {}
 
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
