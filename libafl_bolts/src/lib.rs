@@ -7,11 +7,13 @@ Welcome to `LibAFL`
 #![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`
-#![cfg_attr(unstable_feature, feature(specialization))]
+#![cfg_attr(nightly, feature(specialization))]
 // For `type_id` and owned things
-#![cfg_attr(unstable_feature, feature(intrinsics))]
+#![cfg_attr(nightly, feature(intrinsics))]
 // For `std::simd`
-#![cfg_attr(unstable_feature, feature(portable_simd))]
+#![cfg_attr(nightly, feature(portable_simd))]
+// For `core::error`
+#![cfg_attr(nightly, feature(error_in_core))]
 #![warn(clippy::cargo)]
 #![allow(ambiguous_glob_reexports)]
 #![deny(clippy::cargo_common_metadata)]
@@ -78,6 +80,7 @@ Welcome to `LibAFL`
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate std;
+#[cfg(feature = "alloc")]
 #[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
@@ -98,10 +101,11 @@ pub mod launcher {}
 #[allow(unused_imports)]
 #[macro_use]
 extern crate libafl_derive;
+#[cfg(feature = "alloc")]
 use alloc::string::{FromUtf8Error, String};
 use core::{
     array::TryFromSliceError,
-    fmt,
+    fmt::{self, Display},
     num::{ParseIntError, TryFromIntError},
 };
 #[cfg(feature = "std")]
@@ -109,6 +113,21 @@ use std::{env::VarError, io};
 
 #[cfg(feature = "libafl_derive")]
 pub use libafl_derive::SerdeAny;
+
+/// We need some sort of "[`String`]" for errors in `no_alloc`...
+/// We can only support `'static` without allocator, so let's do that.
+#[cfg(not(feature = "alloc"))]
+type String = &'static str;
+
+/// We also need a non-allocating format...
+/// This one simply returns the `fmt` string.
+/// Good enough for simple errors, for anything else, use the `alloc` feature.
+#[cfg(not(feature = "alloc"))]
+macro_rules! format {
+    ($fmt:literal) => {{
+        $fmt
+    }};
+}
 
 /// We need fixed names for many parts of this lib.
 pub trait Named {
@@ -276,7 +295,7 @@ impl Error {
     }
 }
 
-impl fmt::Display for Error {
+impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Serialize(s, b) => {
@@ -339,6 +358,7 @@ impl fmt::Display for Error {
 }
 
 /// Stringify the postcard serializer error
+#[cfg(feature = "alloc")]
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
         Self::serialize(format!("{err:?}"))
@@ -368,7 +388,9 @@ impl From<io::Error> for Error {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl From<FromUtf8Error> for Error {
+    #[allow(unused_variables)]
     fn from(err: FromUtf8Error) -> Self {
         Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
     }
@@ -376,24 +398,28 @@ impl From<FromUtf8Error> for Error {
 
 #[cfg(feature = "std")]
 impl From<VarError> for Error {
+    #[allow(unused_variables)]
     fn from(err: VarError) -> Self {
         Self::empty(format!("Could not get env var: {err:?}"))
     }
 }
 
 impl From<ParseIntError> for Error {
+    #[allow(unused_variables)]
     fn from(err: ParseIntError) -> Self {
         Self::unknown(format!("Failed to parse Int: {err:?}"))
     }
 }
 
 impl From<TryFromIntError> for Error {
+    #[allow(unused_variables)]
     fn from(err: TryFromIntError) -> Self {
         Self::illegal_state(format!("Expected conversion failed: {err:?}"))
     }
 }
 
 impl From<TryFromSliceError> for Error {
+    #[allow(unused_variables)]
     fn from(err: TryFromSliceError) -> Self {
         Self::illegal_argument(format!("Could not convert slice: {err:?}"))
     }
@@ -401,6 +427,7 @@ impl From<TryFromSliceError> for Error {
 
 #[cfg(windows)]
 impl From<windows::core::Error> for Error {
+    #[allow(unused_variables)]
     fn from(err: windows::core::Error) -> Self {
         Self::unknown(format!("Windows API error: {err:?}"))
     }
@@ -422,8 +449,11 @@ impl From<pyo3::PyErr> for Error {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(not(nightly), feature = "std"))]
 impl std::error::Error for Error {}
+
+#[cfg(nightly)]
+impl core::error::Error for Error {}
 
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
@@ -439,6 +469,7 @@ pub unsafe extern "C" fn external_current_millis() -> u64 {
     1000
 }
 
+#[cfg(feature = "alloc")]
 pub mod anymap;
 #[cfg(feature = "std")]
 pub mod build_id;
@@ -454,18 +485,22 @@ pub mod core_affinity;
 pub mod cpu;
 #[cfg(feature = "std")]
 pub mod fs;
+#[cfg(feature = "alloc")]
 pub mod llmp;
 #[cfg(all(feature = "std", unix))]
 pub mod minibsod;
 pub mod os;
+#[cfg(feature = "alloc")]
 pub mod ownedref;
 pub mod rands;
+#[cfg(feature = "alloc")]
 pub mod serdeany;
 pub mod shmem;
 #[cfg(feature = "std")]
 pub mod staterestore;
 pub mod tuples;
 
+#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 use core::{iter::Iterator, ops::AddAssign, time};
 #[cfg(feature = "std")]
@@ -499,6 +534,7 @@ pub trait AsMutSlice {
     fn as_mut_slice(&mut self) -> &mut [Self::Entry];
 }
 
+#[cfg(feature = "alloc")]
 impl<T> AsSlice for Vec<T> {
     type Entry = T;
 
@@ -507,6 +543,7 @@ impl<T> AsSlice for Vec<T> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T> AsMutSlice for Vec<T> {
     type Entry = T;
 
@@ -653,6 +690,7 @@ pub fn current_milliseconds() -> u64 {
 }
 
 /// Format a `Duration` into a HMS string
+#[cfg(feature = "alloc")]
 #[must_use]
 pub fn format_duration_hms(duration: &time::Duration) -> String {
     let secs = duration.as_secs();
@@ -802,9 +840,9 @@ pub mod bolts_prelude {
     pub use super::minibsod::*;
     #[cfg(feature = "std")]
     pub use super::staterestore::*;
-    pub use super::{
-        anymap::*, cpu::*, llmp::*, os::*, ownedref::*, rands::*, serdeany::*, shmem::*, tuples::*,
-    };
+    #[cfg(feature = "alloc")]
+    pub use super::{anymap::*, llmp::*, ownedref::*, rands::*, serdeany::*, shmem::*, tuples::*};
+    pub use super::{cpu::*, os::*, rands::*};
 }
 
 #[cfg(feature = "python")]
