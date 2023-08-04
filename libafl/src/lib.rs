@@ -79,9 +79,6 @@ extern crate std;
 #[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
-#[cfg(feature = "ctor")]
-#[doc(hidden)]
-pub use ctor::ctor;
 
 // Re-export derive(SerdeAny)
 #[cfg(feature = "derive")]
