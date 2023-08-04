@@ -12,8 +12,8 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip"]
-std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "once_cell", "uuid", "ctor", "byteorder", "backtrace", "uds", "serial_test"] # print, env, launcher ... support
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip", "serdeany_autoreg"]
+std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "once_cell", "uuid", "byteorder", "backtrace", "uds", "serial_test"] # print, env, launcher ... support
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
 python = ["pyo3"]
@@ -23,6 +23,9 @@ qemu_cli = ["cli"] # Commandline flags for qemu-based fuzzers
 frida_cli = ["cli"] # Commandline flags for frida-based fuzzers
 errors_backtrace = ["backtrace"]
 gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
+
+# SerdeAny features
+serdeany_autoreg = ["ctor"] # Automatically register all `#[derive(SerdeAny)]` types at startup.
 
 # LLMP features
 llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
