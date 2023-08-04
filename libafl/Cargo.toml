@@ -58,7 +58,7 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 bytecount = "0.6.3"
 
 [dependencies]
-libafl_bolts = { version = "0.10.1", path = "../libafl_bolts", default-features = false }
+libafl_bolts = { version = "0.10.1", path = "../libafl_bolts", default-features = false, features = ["alloc"] }
 libafl_derive = { version = "0.10.1", path = "../libafl_derive", optional = true }
 
 rustversion = "1.0"

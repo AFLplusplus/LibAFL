@@ -526,14 +526,28 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 #[cfg(test)]
 mod test {
-    use crate::{ownedref::OwnedMutSlice, tuples::type_eq};
-
-    /// An alias for equality testing
-    type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
+    #[cfg(feature = "alloc")]
+    use crate::ownedref::OwnedMutSlice;
+    use crate::tuples::type_eq;
 
     #[test]
     #[allow(unused_qualifications)] // for type name tests
+    fn test_type_eq_simple() {
+        // test eq
+        assert!(type_eq::<u64, u64>());
+
+        // test neq
+        assert!(!type_eq::<u64, usize>());
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    #[allow(unused_qualifications)] // for type name tests
     fn test_type_eq() {
+        // An alias for equality testing
+        type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
+
+        // A function for lifetime testing
         #[allow(clippy::extra_unused_lifetimes)]
         fn test_lifetimes<'a, 'b>() {
             assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
@@ -545,12 +559,6 @@ mod test {
         assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSliceAlias>());
 
         test_lifetimes();
-        // test eq
-        assert!(type_eq::<u64, u64>());
-
-        // test neq
-        assert!(!type_eq::<u64, usize>());
-
         // test weirder lifetime things
         assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSlice<u8>>());
         assert!(!type_eq::<OwnedMutSlice<u8>, OwnedMutSlice<u32>>());
