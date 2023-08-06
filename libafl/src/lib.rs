@@ -6,9 +6,6 @@ Welcome to `LibAFL`
 #![no_std]
 // For `type_eq`
 #![cfg_attr(nightly, feature(specialization))]
-// For `type_id` and owned things
-#![allow(internal_features)]
-#![cfg_attr(nightly, feature(intrinsics))]
 // For `std::simd`
 #![cfg_attr(nightly, feature(portable_simd))]
 #![warn(clippy::cargo)]
