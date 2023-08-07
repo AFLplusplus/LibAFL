@@ -481,16 +481,13 @@ where
 
         log::info!("spawning on cores: {:?}", self.cores);
 
-        #[cfg(feature = "std")]
         let stdout_file = self
             .stdout_file
             .map(|filename| File::create(filename).unwrap());
-        #[cfg(feature = "std")]
         let stderr_file = self
             .stderr_file
             .map(|filename| File::create(filename).unwrap());
 
-        #[cfg(feature = "std")]
         let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
 
         let mut served_provider = StdServedShMemProvider::new()?;
@@ -520,10 +517,8 @@ where
                         self.shmem_provider.post_fork(true)?;
                         served_provider.post_fork(true)?;
 
-                        #[cfg(feature = "std")]
                         std::thread::sleep(std::time::Duration::from_millis(index * 10));
 
-                        #[cfg(feature = "std")]
                         if !debug_output {
                             if let Some(file) = stdout_file {
                                 dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
@@ -547,14 +542,14 @@ where
                             .build()
                             .launch()?;
 
-                        let c_mgr = if index == 1 {
+                        let c_mgr = if id == 0 {
                             // main node
                             CentralizedEventManager::new_main(mgr, p2p.take().unwrap())?
                         } else {
                             CentralizedEventManager::new_secondary(
                                 mgr,
                                 p2p.take().unwrap(),
-                                index as usize - 1,
+                                id - 1,
                             )?
                         };
 
@@ -565,7 +560,6 @@ where
         }
 
         if self.spawn_broker {
-            #[cfg(feature = "std")]
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
