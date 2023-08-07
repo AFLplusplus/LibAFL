@@ -20,11 +20,6 @@ pub mod concolic;
 
 pub mod value;
 
-// Rust is breaking this with 'error: intrinsic safety mismatch between list of intrinsics within the compiler and core library intrinsics for intrinsic `type_id`' and so we disable this component for the moment
-//#[cfg(nightly)]
-//pub mod owned;
-//#[cfg(nightly)]
-//pub use owned::*;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
