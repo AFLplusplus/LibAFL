@@ -3127,22 +3127,25 @@ impl PersistentLlmpP2P {
         Ok(Self {
             shmem,
             num_channels,
-            served_provider,
             clients,
+            served_provider,
         })
     }
 
     /// Get the description for the channel at a specific index
+    #[must_use]
     pub fn get_description(&self, idx: usize) -> &LlmpClientDescription {
         unsafe { &self.shmem.as_objects_slice(self.num_channels)[idx] }
     }
 
     /// Get the description for the channel at a specific index (mut)
+    #[must_use]
     pub fn get_description_mut(&mut self, idx: usize) -> &mut LlmpClientDescription {
         unsafe { &mut self.shmem.as_objects_slice_mut(self.num_channels)[idx] }
     }
 
     /// Get the number of channels
+    #[must_use]
     pub fn num_channels(&self) -> usize {
         self.num_channels
     }
@@ -3165,7 +3168,7 @@ impl PersistentLlmpP2P {
 
     /// Call it before restarting a process using p2p
     pub fn on_restart(&mut self) {
-        self.served_provider.on_restart()
+        self.served_provider.on_restart();
     }
 }
 

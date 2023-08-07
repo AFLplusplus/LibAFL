@@ -580,7 +580,7 @@ where
 {
     /// Forward to `ServedShMemProvider::on_restart`
     pub fn on_restart(&mut self) {
-        self.internal.borrow_mut().on_restart()
+        self.internal.borrow_mut().on_restart();
     }
 }
 
