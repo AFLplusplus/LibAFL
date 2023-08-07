@@ -2,35 +2,37 @@
 resolver = "2"
 members = [
     "libafl",
-    "libafl_derive",
+    "libafl_bolts",
     "libafl_cc",
-    "libafl_targets",
-    "libafl_frida",
-    "libafl_qemu",
-    "libafl_tinyinst",
-    "libafl_sugar",
-    "libafl_nyx",
     "libafl_concolic/symcc_runtime",
     "libafl_concolic/symcc_libafl",
     "libafl_concolic/test/dump_constraints",
     "libafl_concolic/test/runtime_test",
-    "utils/deexit",
-    "utils/gramatron/construct_automata",
-    "utils/libafl_benches",
+    "libafl_derive",
+    "libafl_frida",
+    "libafl_nyx",
+    "libafl_qemu",
+    "libafl_sugar",
+    "libafl_targets",
+    "libafl_tinyinst",
     "utils/build_and_test_fuzzers",
+    "utils/deexit",
+    "utils/libafl_benches",
+    "utils/gramatron/construct_automata",
 ]
 default-members = [
     "libafl",
-    "libafl_derive",
+    "libafl_bolts",
     "libafl_cc",
+    "libafl_derive",
     "libafl_targets",
 ]
 exclude = [
-    "fuzzers",
     "bindings",
-    "scripts",
+    "fuzzers",
     "libafl_qemu/libafl_qemu_build",
-    "libafl_qemu/libafl_qemu_sys"
+    "libafl_qemu/libafl_qemu_sys",
+    "scripts",
 ]
 
 [workspace.package]

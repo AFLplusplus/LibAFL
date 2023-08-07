@@ -12,16 +12,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(feature = "gzip")]
+use libafl_bolts::compress::GzipCompressor;
+use libafl_bolts::serdeany::SerdeAnyMap;
 use serde::{Deserialize, Serialize};
 
 use super::{
     ondisk::{OnDiskMetadata, OnDiskMetadataFormat},
     HasTestcase,
 };
-#[cfg(feature = "gzip")]
-use crate::bolts::compress::GzipCompressor;
 use crate::{
-    bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::{Input, UsesInput},
     state::HasMetadata,

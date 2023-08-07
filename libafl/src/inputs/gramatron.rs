@@ -7,9 +7,10 @@ use core::{
 };
 
 use ahash::RandomState;
+use libafl_bolts::{Error, HasLen};
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::HasLen, inputs::Input, Error};
+use crate::inputs::Input;
 
 /// A terminal for gramatron grammar fuzzing
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]

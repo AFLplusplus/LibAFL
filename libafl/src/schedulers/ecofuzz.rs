@@ -49,7 +49,7 @@ pub struct EcoTestcaseMetadata {
     computed_score: f64,
 }
 
-crate::impl_serdeany!(EcoTestcaseMetadata);
+libafl_bolts::impl_serdeany!(EcoTestcaseMetadata);
 
 /// The state Metadata for `EcoScheduler`
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -64,7 +64,7 @@ pub struct EcoMetadata {
     regret: f64,
 }
 
-crate::impl_serdeany!(EcoMetadata);
+libafl_bolts::impl_serdeany!(EcoMetadata);
 
 /// A corpus scheduler implementing `EcoFuzz` (`https://www.usenix.org/conference/usenixsecurity20/presentation/yue`)
 #[derive(Clone, Debug)]

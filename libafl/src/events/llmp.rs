@@ -12,37 +12,37 @@ use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 use std::net::{SocketAddr, ToSocketAddrs};
 
 #[cfg(feature = "std")]
+use libafl_bolts::core_affinity::CoreId;
+#[cfg(feature = "adaptive_serialization")]
+use libafl_bolts::current_time;
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use libafl_bolts::os::startable_self;
+#[cfg(all(unix, feature = "std", not(miri)))]
+use libafl_bolts::os::unix_signals::setup_signal_handler;
+#[cfg(all(feature = "std", feature = "fork", unix))]
+use libafl_bolts::os::{fork, ForkResult};
+#[cfg(feature = "llmp_compression")]
+use libafl_bolts::{
+    compress::GzipCompressor,
+    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
+};
+#[cfg(feature = "std")]
+use libafl_bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
+use libafl_bolts::{
+    llmp::{self, LlmpClient, LlmpClientDescription, Tag},
+    shmem::ShMemProvider,
+    ClientId,
+};
+#[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
 use super::{CustomBufEventResult, CustomBufHandlerFn};
-#[cfg(feature = "std")]
-use crate::bolts::core_affinity::CoreId;
-#[cfg(feature = "adaptive_serialization")]
-use crate::bolts::current_time;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", not(miri)))]
-use crate::bolts::os::unix_signals::setup_signal_handler;
-#[cfg(all(feature = "std", feature = "fork", unix))]
-use crate::bolts::os::{fork, ForkResult};
-#[cfg(feature = "llmp_compression")]
-use crate::bolts::{
-    compress::GzipCompressor,
-    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
-};
-#[cfg(feature = "std")]
-use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
 #[cfg(all(unix, feature = "std"))]
 use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
 use crate::{
-    bolts::{
-        llmp::{self, LlmpClient, LlmpClientDescription, Tag},
-        shmem::ShMemProvider,
-        ClientId,
-    },
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
@@ -338,7 +338,7 @@ pub trait EventStatsCollector {
 pub trait EventStatsCollector {}
 
 /// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
-/// using low-level message passing, [`crate::bolts::llmp`].
+/// using low-level message passing, [`libafl_bolts::llmp`].
 pub struct LlmpEventManager<S, SP>
 where
     S: UsesInput,
@@ -1719,17 +1719,17 @@ where
 mod tests {
     use core::sync::atomic::{compiler_fence, Ordering};
 
+    use libafl_bolts::{
+        llmp::{LlmpClient, LlmpSharedMap},
+        rands::StdRand,
+        shmem::{ShMemProvider, StdShMemProvider},
+        staterestore::StateRestorer,
+        tuples::tuple_list,
+        ClientId,
+    };
     use serial_test::serial;
 
     use crate::{
-        bolts::{
-            llmp::{LlmpClient, LlmpSharedMap},
-            rands::StdRand,
-            shmem::{ShMemProvider, StdShMemProvider},
-            staterestore::StateRestorer,
-            tuples::tuple_list,
-            ClientId,
-        },
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
         executors::{ExitKind, InProcessExecutor},

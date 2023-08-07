@@ -29,12 +29,12 @@ use core::{
     marker::PhantomData,
 };
 
+use libafl_bolts::Named;
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::Named,
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -89,13 +89,13 @@ where
         OT: ObserversTuple<S>,
     {
         // Start a timer for this feedback
-        let start_time = crate::bolts::cpu::read_time_counter();
+        let start_time = libafl_bolts::cpu::read_time_counter();
 
         // Execute this feedback
         let ret = self.is_interesting(state, manager, input, observers, exit_kind);
 
         // Get the elapsed time for checking this feedback
-        let elapsed = crate::bolts::cpu::read_time_counter() - start_time;
+        let elapsed = libafl_bolts::cpu::read_time_counter() - start_time;
 
         // Add this stat to the feedback metrics
         state
@@ -777,13 +777,6 @@ where
     }
 }
 
-impl Named for () {
-    #[inline]
-    fn name(&self) -> &str {
-        "Empty"
-    }
-}
-
 /// A [`CrashFeedback`] reports as interesting if the target crashed.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CrashFeedback {}
@@ -1106,6 +1099,7 @@ impl From<bool> for ConstFeedback {
 pub mod pybind {
     use std::cell::UnsafeCell;
 
+    use libafl_bolts::Named;
     use pyo3::prelude::*;
 
     use super::{
@@ -1113,7 +1107,6 @@ pub mod pybind {
         FastOrFeedback, Feedback, NotFeedback, String, ToString,
     };
     use crate::{
-        bolts::tuples::Named,
         corpus::{testcase::pybind::PythonTestcaseWrapper, Testcase},
         events::{pybind::PythonEventManager, EventFirer},
         executors::{pybind::PythonExitKind, ExitKind},
@@ -1402,7 +1395,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_body!($wrapper, $name, $body, PythonFeedbackWrapper,
+            libafl_bolts::unwrap_me_body!($wrapper, $name, $body, PythonFeedbackWrapper,
                 {
                     MaxMapI8,
                     MaxMapI16,
@@ -1432,7 +1425,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me_mut {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonFeedbackWrapper,
+            libafl_bolts::unwrap_me_mut_body!($wrapper, $name, $body, PythonFeedbackWrapper,
                 {
                     MaxMapI8,
                     MaxMapI16,

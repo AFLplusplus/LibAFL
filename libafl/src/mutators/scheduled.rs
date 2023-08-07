@@ -6,16 +6,16 @@ use core::{
     marker::PhantomData,
 };
 
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{tuple_list, tuple_list_type, NamedTuple},
+    AsMutSlice, AsSlice, Named,
+};
 use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
-    bolts::{
-        rands::Rand,
-        tuples::{tuple_list, tuple_list_type, Named, NamedTuple},
-        AsMutSlice, AsSlice,
-    },
     corpus::{Corpus, CorpusId},
     mutators::{MutationResult, Mutator, MutatorsTuple},
     state::{HasCorpus, HasMetadata, HasRand},
@@ -29,7 +29,7 @@ pub struct LogMutationMetadata {
     pub list: Vec<String>,
 }
 
-crate::impl_serdeany!(LogMutationMetadata);
+libafl_bolts::impl_serdeany!(LogMutationMetadata);
 
 impl AsSlice for LogMutationMetadata {
     type Entry = String;
@@ -442,8 +442,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use libafl_bolts::rands::{Rand, StdRand, XkcdRand};
+
     use crate::{
-        bolts::rands::{Rand, StdRand, XkcdRand},
         corpus::{Corpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasBytesVec},

@@ -441,7 +441,7 @@ mod serialization_tests {
     }
 }
 
-use crate::bolts::shmem::{ShMem, ShMemCursor, ShMemProvider, StdShMemProvider};
+use libafl_bolts::shmem::{ShMem, ShMemCursor, ShMemProvider, StdShMemProvider};
 
 /// The default environment variable name to use for the shared memory used by the concolic tracing
 pub const DEFAULT_ENV_NAME: &str = "SHARED_MEMORY_MESSAGES";

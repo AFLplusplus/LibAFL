@@ -4,10 +4,10 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use hashbrown::HashMap;
+use libafl_bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
     corpus::{Corpus, CorpusId},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
@@ -29,7 +29,7 @@ pub struct AccountingIndexesMetadata {
     pub tcref: isize,
 }
 
-crate::impl_serdeany!(AccountingIndexesMetadata);
+libafl_bolts::impl_serdeany!(AccountingIndexesMetadata);
 
 impl AsSlice for AccountingIndexesMetadata {
     type Entry = usize;
@@ -82,7 +82,7 @@ pub struct TopAccountingMetadata {
     pub max_accounting: Vec<u32>,
 }
 
-crate::impl_serdeany!(TopAccountingMetadata);
+libafl_bolts::impl_serdeany!(TopAccountingMetadata);
 
 impl TopAccountingMetadata {
     /// Creates a new [`struct@TopAccountingMetadata`]

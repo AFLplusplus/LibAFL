@@ -37,7 +37,7 @@ use frida_gum::{
     Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails,
 };
 use hashbrown::HashMap;
-use libafl::bolts::{cli::FuzzerOptions, AsSlice};
+use libafl_bolts::{cli::FuzzerOptions, AsSlice};
 #[cfg(unix)]
 use libc::RLIMIT_STACK;
 use libc::{c_char, wchar_t};

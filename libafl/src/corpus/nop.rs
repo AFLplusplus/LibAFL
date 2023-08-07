@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     inputs::{Input, UsesInput},
-    Error, ErrorBacktrace,
+    Error,
 };
 
 /// A corpus which does not store any [`Testcase`]s.
@@ -37,37 +37,25 @@ where
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, _testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        Err(Error::Unsupported(
-            "Unsupported".into(),
-            ErrorBacktrace::new(),
-        ))
+        Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, _idx: CorpusId, _testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        Err(Error::Unsupported(
-            "Unsupported".into(),
-            ErrorBacktrace::new(),
-        ))
+        Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
     fn remove(&mut self, _idx: CorpusId) -> Result<Testcase<I>, Error> {
-        Err(Error::Unsupported(
-            "Unsupported".into(),
-            ErrorBacktrace::new(),
-        ))
+        Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     /// Get by id
     #[inline]
     fn get(&self, _idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        Err(Error::Unsupported(
-            "Unsupported".into(),
-            ErrorBacktrace::new(),
-        ))
+        Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     /// Current testcase scheduled
@@ -109,18 +97,12 @@ where
 
     #[inline]
     fn load_input_into(&self, _testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
-        Err(Error::Unsupported(
-            "Unsupported".into(),
-            ErrorBacktrace::new(),
-        ))
+        Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     #[inline]
     fn store_input_from(&self, _testcase: &Testcase<Self::Input>) -> Result<(), Error> {
-        Err(Error::Unsupported(
-            "Unsupported".into(),
-            ErrorBacktrace::new(),
-        ))
+        Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 }
 

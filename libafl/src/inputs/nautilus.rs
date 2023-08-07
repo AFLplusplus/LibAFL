@@ -13,10 +13,10 @@ use grammartec::{
     rule::RuleIDOrCustom,
     tree::{Tree, TreeLike},
 };
+use libafl_bolts::HasLen;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::HasLen,
     generators::nautilus::NautilusContext,
     inputs::{BytesInput, Input, InputConverter},
     Error,

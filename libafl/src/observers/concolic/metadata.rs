@@ -23,4 +23,4 @@ impl ConcolicMetadata {
     }
 }
 
-crate::impl_serdeany!(ConcolicMetadata);
+libafl_bolts::impl_serdeany!(ConcolicMetadata);

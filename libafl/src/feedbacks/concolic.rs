@@ -6,8 +6,9 @@
 use alloc::{borrow::ToOwned, string::String};
 use core::{fmt::Debug, marker::PhantomData};
 
+use libafl_bolts::Named;
+
 use crate::{
-    bolts::tuples::Named,
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,

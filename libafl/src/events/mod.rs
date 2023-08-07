@@ -7,6 +7,8 @@ pub use simple::*;
 pub mod centralized;
 #[cfg(all(unix, feature = "std"))]
 pub use centralized::*;
+#[cfg(feature = "std")]
+pub mod launcher;
 pub mod llmp;
 #[cfg(feature = "tcp_manager")]
 pub mod tcp;
@@ -21,17 +23,19 @@ use core::{
 };
 
 use ahash::RandomState;
+#[cfg(feature = "std")]
+pub use launcher::*;
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+use libafl_bolts::{current_time, ClientId};
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
-#[cfg(all(unix, feature = "std"))]
-use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
-#[cfg(all(unix, feature = "std"))]
-use crate::bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 use crate::{
-    bolts::{current_time, ClientId},
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
@@ -214,7 +218,7 @@ impl EventConfig {
     #[must_use]
     pub fn from_build_id() -> Self {
         EventConfig::BuildID {
-            id: crate::bolts::build_id::get(),
+            id: libafl_bolts::build_id::get(),
         }
     }
 
@@ -499,7 +503,7 @@ where
         {
             state
                 .introspection_monitor_mut()
-                .set_current_time(crate::bolts::cpu::read_time_counter());
+                .set_current_time(libafl_bolts::cpu::read_time_counter());
 
             // Send the current monitor over to the manager. This `.clone` shouldn't be
             // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s
@@ -663,13 +667,10 @@ impl<S> HasEventManagerId for NopEventManager<S> {
 #[cfg(test)]
 mod tests {
 
+    use libafl_bolts::{current_time, tuples::tuple_list, Named};
     use tuple_list::tuple_list_type;
 
     use crate::{
-        bolts::{
-            current_time,
-            tuples::{tuple_list, Named},
-        },
         events::{Event, EventConfig},
         executors::ExitKind,
         inputs::bytes::BytesInput,
@@ -751,7 +752,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_body!($wrapper, $name, $body, PythonEventManagerWrapper, {
+            libafl_bolts::unwrap_me_body!($wrapper, $name, $body, PythonEventManagerWrapper, {
                 Simple
             })
         };
@@ -759,7 +760,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me_mut {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonEventManagerWrapper, {
+            libafl_bolts::unwrap_me_mut_body!($wrapper, $name, $body, PythonEventManagerWrapper, {
                 Simple
             })
         };

@@ -2,16 +2,16 @@ use core::marker::PhantomData;
 use std::time::Duration;
 
 use libafl::{
-    bolts::{
-        fs::{InputFile, INPUTFILE_STD},
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        AsMutSlice, AsSlice,
-    },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::{State, UsesState},
     Error,
+};
+use libafl_bolts::{
+    fs::{InputFile, INPUTFILE_STD},
+    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    AsMutSlice, AsSlice,
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
 

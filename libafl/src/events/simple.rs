@@ -13,20 +13,28 @@ use core::ptr::write_volatile;
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{fmt::Debug, marker::PhantomData};
 
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use libafl_bolts::os::startable_self;
+#[cfg(all(unix, feature = "std", not(miri)))]
+use libafl_bolts::os::unix_signals::setup_signal_handler;
+#[cfg(all(feature = "std", feature = "fork", unix))]
+use libafl_bolts::os::{fork, ForkResult};
+use libafl_bolts::ClientId;
+#[cfg(feature = "std")]
+use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", not(miri)))]
-use crate::bolts::os::unix_signals::setup_signal_handler;
-#[cfg(all(feature = "std", feature = "fork", unix))]
-use crate::bolts::os::{fork, ForkResult};
 #[cfg(all(unix, feature = "std"))]
 use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
+#[cfg(feature = "std")]
 use crate::{
-    bolts::ClientId,
+    corpus::Corpus,
+    monitors::SimplePrintingMonitor,
+    state::{HasCorpus, HasSolutions},
+};
+use crate::{
     events::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
@@ -35,13 +43,6 @@ use crate::{
     monitors::Monitor,
     state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
-};
-#[cfg(feature = "std")]
-use crate::{
-    bolts::{shmem::ShMemProvider, staterestore::StateRestorer},
-    corpus::Corpus,
-    monitors::SimplePrintingMonitor,
-    state::{HasCorpus, HasSolutions},
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it

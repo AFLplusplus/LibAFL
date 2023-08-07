@@ -24,14 +24,11 @@ pub use tuneable::*;
 pub mod nautilus;
 use alloc::vec::Vec;
 
+use libafl_bolts::{tuples::HasConstLen, Named};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 
-use crate::{
-    bolts::tuples::{HasConstLen, Named},
-    corpus::CorpusId,
-    Error,
-};
+use crate::{corpus::CorpusId, Error};
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event
 // We can use it to report which mutations generated the testcase in the broker logs
@@ -287,11 +284,11 @@ where
 pub mod pybind {
     use core::ffi::CStr;
 
+    use libafl_bolts::Named;
     use pyo3::{prelude::*, AsPyPointer};
 
     use super::{MutationResult, Mutator};
     use crate::{
-        bolts::tuples::Named,
         corpus::CorpusId,
         inputs::{BytesInput, HasBytesVec},
         mutators::scheduled::pybind::PythonStdHavocMutator,
@@ -379,7 +376,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me_mut {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonMutatorWrapper, {
+            libafl_bolts::unwrap_me_mut_body!($wrapper, $name, $body, PythonMutatorWrapper, {
                 StdHavoc
             },
             {

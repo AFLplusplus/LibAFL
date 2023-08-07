@@ -7,11 +7,11 @@
 use core::{cell::RefCell, time::Duration};
 use std::path::{Path, PathBuf};
 
+use libafl_bolts::serdeany::SerdeAnyMap;
 use serde::{Deserialize, Serialize};
 
 use super::{CachedOnDiskCorpus, HasTestcase};
 use crate::{
-    bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, CorpusId, Testcase},
     inputs::{Input, UsesInput},
     Error,

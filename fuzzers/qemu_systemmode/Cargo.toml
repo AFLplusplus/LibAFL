@@ -16,4 +16,5 @@ codegen-units = 1
 
 [dependencies]
 libafl = { path = "../../libafl/" }
+libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_qemu = { path = "../../libafl_qemu/", features = ["arm", "systemmode"] }
