@@ -174,6 +174,8 @@ where
             if self.cores.ids.iter().any(|&x| x == id.into()) {
                 index += 1;
                 self.shmem_provider.pre_fork()?;
+                // # Safety
+                // Fork is safe in general, apart from potential side effects to the OS and other threads
                 match unsafe { fork() }? {
                     ForkResult::Parent(child) => {
                         self.shmem_provider.post_fork(false)?;
@@ -182,6 +184,8 @@ where
                         log::info!("child spawned and bound to core {id}");
                     }
                     ForkResult::Child => {
+                        // # Safety
+                        // A call to `getpid` is safe.
                         log::info!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
@@ -237,6 +241,8 @@ where
 
             // Broker exited. kill all clients.
             for handle in &handles {
+                // # Safety
+                // Normal libc call, no dereferences whatsoever
                 unsafe {
                     libc::kill(*handle, libc::SIGINT);
                 }

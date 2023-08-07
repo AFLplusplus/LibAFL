@@ -5,30 +5,34 @@ authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenuk
 description = "Low-level bolts to create fuzzers and so much more"
 documentation = "https://docs.rs/libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"
-readme = "../README.md"
+readme = "./README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip"]
-std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "once_cell", "uuid", "ctor", "byteorder", "backtrace", "uds", "serial_test"] # print, env, launcher ... support
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip", "serdeany_autoreg", "alloc"]
+std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "once_cell", "uuid", "byteorder", "backtrace", "uds", "serial_test", "alloc"] # print, env, ... support
+alloc = ["serde/alloc",  "hashbrown", "postcard", "erased-serde/alloc", "ahash"] # Enables all features that allocate in no_std
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
-python = ["pyo3"]
+python = ["pyo3", "std"]
 prelude = [] # Expose libafl::prelude for access without additional using directives
 cli = ["clap"]  # expose libafl_bolts::cli for easy commandline parsing
-qemu_cli = ["cli"] # Commandline flags for qemu-based fuzzers
+qemu_cli = ["cli"] # Commandline flagr for qemu-based fuzzers
 frida_cli = ["cli"] # Commandline flags for frida-based fuzzers
 errors_backtrace = ["backtrace"]
 gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
 
+# SerdeAny features
+serdeany_autoreg = ["ctor"] # Automatically register all `#[derive(SerdeAny)]` types at startup.
+
 # LLMP features
-llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
-llmp_compression = ["gzip"] # llmp compression using GZip
-llmp_debug = [] # Enables debug output for LLMP
-llmp_small_maps = [] # reduces initial map size for llmp
+llmp_bind_public = ["alloc"] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
+llmp_compression = ["alloc", "gzip"] # llmp compression using GZip
+llmp_debug = ["alloc"] # Enables debug output for LLMP
+llmp_small_maps = ["alloc"] # reduces initial map size for llmp
 
 [build-dependencies]
 rustversion = "1.0"
@@ -42,13 +46,13 @@ libafl_derive = { version = "0.10.1", optional = true, path = "../libafl_derive"
 
 rustversion = "1.0"
 tuple_list = { version = "0.1.3" }
-hashbrown =  { version = "0.14", features = ["serde", "ahash"], default-features=false } # A faster hashmap, nostd compatible
+hashbrown =  { version = "0.14", features = ["serde", "ahash"], default-features=false, optional = true } # A faster hashmap, nostd compatible
 xxhash-rust = { version = "0.8.5", features = ["xxh3"] } # xxh3 hashing for rust
-serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] } # serialization lib
-erased-serde = { version = "0.3.21", default-features = false, features = ["alloc"] } # erased serde
-postcard = { version = "1.0", features = ["alloc"] } # no_std compatible serde serialization format
+serde = { version = "1.0", default-features = false, features = ["derive"] } # serialization lib
+erased-serde = { version = "0.3.21", default-features = false, optional = true } # erased serde
+postcard = { version = "1.0", features = ["alloc"], optional = true } # no_std compatible serde serialization format
 num_enum = { version = "0.5.7", default-features = false }
-ahash = { version = "0.8", default-features=false } # The hash function already used in hashbrown
+ahash = { version = "0.8", default-features=false, optional = true } # The hash function already used in hashbrown
 backtrace = {version = "0.3", optional = true} # Used to get the stacktrace in StacktraceObserver
 
 ctor = { optional = true, version = "0.2" }

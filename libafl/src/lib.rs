@@ -5,11 +5,9 @@ Welcome to `LibAFL`
 #![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`
-#![cfg_attr(unstable_feature, feature(specialization))]
-// For `type_id` and owned things
-#![cfg_attr(unstable_feature, feature(intrinsics))]
+#![cfg_attr(nightly, feature(specialization))]
 // For `std::simd`
-#![cfg_attr(unstable_feature, feature(portable_simd))]
+#![cfg_attr(nightly, feature(portable_simd))]
 #![warn(clippy::cargo)]
 #![allow(ambiguous_glob_reexports)]
 #![deny(clippy::cargo_common_metadata)]
@@ -79,9 +77,6 @@ extern crate std;
 #[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
-#[cfg(feature = "ctor")]
-#[doc(hidden)]
-pub use ctor::ctor;
 
 // Re-export derive(SerdeAny)
 #[cfg(feature = "derive")]
