@@ -23,7 +23,7 @@ cli = ["clap"]  # expose libafl_bolts::cli for easy commandline parsing
 qemu_cli = ["cli"] # Commandline flagr for qemu-based fuzzers
 frida_cli = ["cli"] # Commandline flags for frida-based fuzzers
 errors_backtrace = ["backtrace"]
-gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
+gzip = ["miniz_oxide", "alloc"] # Enables gzip compression in certain parts of the lib
 
 # SerdeAny features
 serdeany_autoreg = ["ctor"] # Automatically register all `#[derive(SerdeAny)]` types at startup.
