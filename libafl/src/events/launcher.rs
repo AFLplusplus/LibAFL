@@ -461,6 +461,7 @@ where
 {
     /// Launch the broker and the clients and fuzz
     #[allow(clippy::similar_names)]
+    #[allow(clippy::too_many_lines)]
     pub fn launch(&mut self) -> Result<(), Error> {
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
