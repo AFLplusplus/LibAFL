@@ -12,7 +12,7 @@ use std::{env, net::SocketAddr, path::PathBuf};
 use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, CentralizedEventManager, EventConfig},
+    events::{launcher::CentralizedLauncher, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -32,7 +32,6 @@ use libafl::{
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     current_nanos,
-    llmp::PersistentLlmpP2P,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -129,27 +128,9 @@ pub extern "C" fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let mut main_core_id = CoreId::from(0);
-    let mut core_id_map = std::collections::HashMap::<CoreId, usize>::default();
-    for idx in 0..cores.ids.len() {
-        let core_id = cores.ids[idx];
-        if idx == 0 {
-            main_core_id = core_id;
-            continue;
-        }
-        core_id_map.insert(core_id, idx - 1);
-    }
-
-    let num_channels = cores.ids.len() - 1; // Number of clients minus the main
-    let mut p2p = Some(PersistentLlmpP2P::new(shmem_provider.clone(), num_channels).unwrap());
-
-    let client_provider = shmem_provider.clone();
-
-    eprintln!("Main is {main_core_id:?}");
-
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    let mut run_client = |state: Option<_>, restarting_mgr, core_id: CoreId| {
+    let mut run_client = |state: Option<_>, mut mgr, _core_id: CoreId| {
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
@@ -186,24 +167,6 @@ pub extern "C" fn libafl_main() {
             )
             .unwrap()
         });
-
-        let mut mgr = if main_core_id == core_id {
-            CentralizedEventManager::new_main(
-                restarting_mgr,
-                client_provider.clone(),
-                p2p.take().unwrap(),
-            )?
-        } else {
-            let idx = *core_id_map.get(&core_id).unwrap();
-            CentralizedEventManager::new_secondary(
-                restarting_mgr,
-                client_provider.clone(),
-                p2p.take().unwrap(),
-                idx,
-            )?
-        };
-
-        // let mut mgr = restarting_mgr;
 
         println!("We're a client, let's fuzz :)");
 
@@ -272,7 +235,7 @@ pub extern "C" fn libafl_main() {
         Ok(())
     };
 
-    match Launcher::builder()
+    match CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
