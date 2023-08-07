@@ -3,7 +3,9 @@
 
 pub mod simple;
 pub use simple::*;
+#[cfg(all(unix, feature = "std"))]
 pub mod centralized;
+#[cfg(all(unix, feature = "std"))]
 pub use centralized::*;
 pub mod llmp;
 #[cfg(feature = "tcp_manager")]

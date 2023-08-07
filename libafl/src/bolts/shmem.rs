@@ -61,6 +61,22 @@ pub type StdShMemProvider = UnixShMemProvider;
 ))]
 pub type StdShMemService = DummyShMemService;
 
+// for unix only
+/// The standard served shmem provider
+#[cfg(all(target_os = "android", feature = "std"))]
+pub type StdServedShMemProvider =
+    RcShMemProvider<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
+/// The standard served shmem provider
+#[cfg(all(feature = "std", target_vendor = "apple"))]
+pub type StdServedShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
+/// The standard served shmem provider
+#[cfg(all(
+    feature = "std",
+    unix,
+    not(any(target_os = "android", target_vendor = "apple"))
+))]
+pub type StdServedShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
+
 /// Description of a shared map.
 /// May be used to restore the map by id.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -547,6 +563,17 @@ where
 {
     fn default() -> Self {
         Self::new().unwrap()
+    }
+}
+
+#[cfg(all(unix, feature = "std"))]
+impl<SP> RcShMemProvider<ServedShMemProvider<SP>>
+where
+    SP: ShMemProvider + Debug,
+{
+    /// Forward to `ServedShMemProvider::on_restart`
+    pub fn on_restart(&mut self) {
+        self.internal.borrow_mut().on_restart()
     }
 }
 

@@ -12,7 +12,7 @@ use crate::bolts::current_time;
 use crate::{
     bolts::{
         llmp::{LlmpReceiver, LlmpSender, PersistentLlmpP2P, Tag},
-        shmem::ShMemProvider,
+        shmem::{ShMemProvider, StdServedShMemProvider},
         ClientId,
     },
     events::{
@@ -31,31 +31,28 @@ const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
 
 /// A wrapper manager to implement a main-secondary architecture with point-to-point channels
 #[derive(Debug)]
-pub struct CentralizedEventManager<EM, SP>
+pub struct CentralizedEventManager<EM>
 where
     EM: UsesState,
-    SP: ShMemProvider,
 {
     inner: EM,
-    p2p: PersistentLlmpP2P<SP>,
+    p2p: PersistentLlmpP2P,
     p2p_index: usize,
-    sender_to_main: Option<LlmpSender<SP>>,
-    receivers_from_secondary: Option<Vec<LlmpReceiver<SP>>>,
+    sender_to_main: Option<LlmpSender<StdServedShMemProvider>>,
+    receivers_from_secondary: Option<Vec<LlmpReceiver<StdServedShMemProvider>>>,
 }
 
-impl<EM, SP> UsesState for CentralizedEventManager<EM, SP>
+impl<EM> UsesState for CentralizedEventManager<EM>
 where
     EM: UsesState,
-    SP: ShMemProvider,
 {
     type State = EM::State;
 }
 
 #[cfg(feature = "adaptive_serialization")]
-impl<EM, SP> EventStatsCollector for CentralizedEventManager<EM, SP>
+impl<EM> EventStatsCollector for CentralizedEventManager<EM>
 where
     EM: EventStatsCollector + UsesState,
-    SP: ShMemProvider,
 {
     fn serialization_time(&self) -> Duration {
         self.inner.serialization_time()
@@ -85,17 +82,14 @@ where
 }
 
 #[cfg(not(feature = "adaptive_serialization"))]
-impl<EM, SP> EventStatsCollector for CentralizedEventManager<EM, SP>
-where
-    EM: EventStatsCollector + UsesState,
-    SP: ShMemProvider,
+impl<EM> EventStatsCollector for CentralizedEventManager<EM> where
+    EM: EventStatsCollector + UsesState
 {
 }
 
-impl<EM, SP> EventFirer for CentralizedEventManager<EM, SP>
+impl<EM> EventFirer for CentralizedEventManager<EM>
 where
     EM: EventStatsCollector + EventFirer + HasEventManagerId,
-    SP: ShMemProvider,
 {
     fn fire(
         &mut self,
@@ -192,10 +186,9 @@ where
     }
 }
 
-impl<EM, SP> EventRestarter for CentralizedEventManager<EM, SP>
+impl<EM> EventRestarter for CentralizedEventManager<EM>
 where
     EM: EventRestarter,
-    SP: ShMemProvider,
 {
     #[inline]
     fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -225,10 +218,9 @@ where
     }
 }
 
-impl<E, EM, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, SP>
+impl<E, EM, Z> EventProcessor<E, Z> for CentralizedEventManager<EM>
 where
     EM: EventStatsCollector + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
-    SP: ShMemProvider,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
@@ -246,7 +238,10 @@ where
             let mut receivers = self.receivers_from_secondary.take().unwrap();
             // TODO in case of error, this is discarded, that is a bug ATM
 
+            // TODO We need to handle the unampping of pages in case main and secondary are restarted concurrently
+
             for (idx, receiver) in receivers.iter_mut().enumerate() {
+                // TODO We need to act like broker and set safe to unmap
                 while let Some((_client_id, tag, _flags, msg)) = receiver.recv_buf_with_flags()? {
                     assert!(
                         tag == _LLMP_TAG_TO_MAIN,
@@ -336,11 +331,10 @@ where
     }
 }
 
-impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
+impl<E, EM, Z> EventManager<E, Z> for CentralizedEventManager<EM>
 where
     EM: EventStatsCollector + EventManager<E, Z>,
     EM::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasLastReportTime,
-    SP: ShMemProvider,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
@@ -348,10 +342,9 @@ where
 {
 }
 
-impl<EM, SP> HasCustomBufHandlers for CentralizedEventManager<EM, SP>
+impl<EM> HasCustomBufHandlers for CentralizedEventManager<EM>
 where
     EM: HasCustomBufHandlers,
-    SP: ShMemProvider,
 {
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
     fn add_custom_buf_handler(
@@ -364,39 +357,32 @@ where
     }
 }
 
-impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
+impl<EM> ProgressReporter for CentralizedEventManager<EM>
 where
     EM: EventStatsCollector + ProgressReporter + HasEventManagerId,
     EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
-    SP: ShMemProvider,
 {
 }
 
-impl<EM, SP> HasEventManagerId for CentralizedEventManager<EM, SP>
+impl<EM> HasEventManagerId for CentralizedEventManager<EM>
 where
     EM: HasEventManagerId + UsesState,
-    SP: ShMemProvider,
 {
     fn mgr_id(&self) -> EventManagerId {
         self.inner.mgr_id()
     }
 }
 
-impl<EM, SP> CentralizedEventManager<EM, SP>
+impl<EM> CentralizedEventManager<EM>
 where
     EM: UsesState,
-    SP: ShMemProvider,
 {
     /// Creates a new [`CentralizedEventManager`].
     #[allow(clippy::needless_pass_by_value)]
-    pub fn new_main(
-        inner: EM,
-        shmem_provider: SP,
-        p2p: PersistentLlmpP2P<SP>,
-    ) -> Result<Self, Error> {
+    pub fn new_main(inner: EM, p2p: PersistentLlmpP2P) -> Result<Self, Error> {
         let mut receivers_from_secondary = vec![];
         for i in 0..p2p.num_channels() {
-            receivers_from_secondary.push(p2p.get_receiver(shmem_provider.clone(), i)?);
+            receivers_from_secondary.push(p2p.get_receiver(i)?);
         }
         Ok(Self {
             inner,
@@ -410,11 +396,10 @@ where
     /// Creates a new [`CentralizedEventManager`].
     pub fn new_secondary(
         inner: EM,
-        shmem_provider: SP,
-        p2p: PersistentLlmpP2P<SP>,
+        p2p: PersistentLlmpP2P,
         p2p_index: usize,
     ) -> Result<Self, Error> {
-        let sender_to_main = p2p.get_sender(shmem_provider, p2p_index)?;
+        let sender_to_main = p2p.get_sender(p2p_index)?;
         Ok(Self {
             inner,
             p2p,

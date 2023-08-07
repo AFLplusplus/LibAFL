@@ -100,6 +100,8 @@ use crate::bolts::current_time;
 use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::shmem::StdServedShMemProvider;
 use crate::{
     bolts::{
         shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
@@ -3096,29 +3098,27 @@ where
 }
 
 /// Persistent shared memory storage for point-to-point channels descriptions
+#[cfg(all(unix, feature = "std"))]
 #[derive(Debug)]
-pub struct PersistentLlmpP2P<SP>
-where
-    SP: ShMemProvider,
-{
-    shmem: SP::ShMem,
-    // Keep the clients here to prevent drop from removing the shmem segments
-    #[allow(dead_code)]
-    clients: Vec<LlmpClient<SP>>,
+pub struct PersistentLlmpP2P {
+    shmem: <StdServedShMemProvider as ShMemProvider>::ShMem,
     num_channels: usize,
+    pub served_provider: StdServedShMemProvider,
+    clients: Vec<LlmpClient<StdServedShMemProvider>>,
 }
 
-impl<SP> PersistentLlmpP2P<SP>
-where
-    SP: ShMemProvider,
-{
+#[cfg(all(unix, feature = "std"))]
+impl PersistentLlmpP2P {
     /// Create a new `PersistentLlmpP2P` given a number of channels
-    pub fn new(mut shmem_provider: SP, num_channels: usize) -> Result<Self, Error> {
+    pub fn new(
+        mut served_provider: StdServedShMemProvider,
+        num_channels: usize,
+    ) -> Result<Self, Error> {
         let mut shmem =
-            shmem_provider.new_shmem_objects_array::<LlmpClientDescription>(num_channels)?;
+            served_provider.new_shmem_objects_array::<LlmpClientDescription>(num_channels)?;
         let mut clients = vec![];
         for i in 0..num_channels {
-            let client = LlmpClient::new_p2p(shmem_provider.clone(), ClientId(i as u32))?;
+            let client = LlmpClient::new_p2p(served_provider.clone(), ClientId(i as u32))?;
             unsafe {
                 shmem.as_objects_slice_mut(num_channels)[i] = client.describe()?;
             }
@@ -3126,8 +3126,9 @@ where
         }
         Ok(Self {
             shmem,
-            clients,
             num_channels,
+            served_provider,
+            clients,
         })
     }
 
@@ -3147,16 +3148,24 @@ where
     }
 
     /// Get a `LlmpReceiver` from the description for the channel at a specific index
-    pub fn get_receiver(&self, shmem_provider: SP, idx: usize) -> Result<LlmpReceiver<SP>, Error> {
+    pub fn get_receiver(&self, idx: usize) -> Result<LlmpReceiver<StdServedShMemProvider>, Error> {
         LlmpReceiver::on_existing_from_description(
-            shmem_provider,
+            self.served_provider.clone(),
             &self.get_description(idx).receiver,
         )
     }
 
     /// Get a `LlmpSender` from the description for the channel at a specific index
-    pub fn get_sender(&self, shmem_provider: SP, idx: usize) -> Result<LlmpSender<SP>, Error> {
-        LlmpSender::on_existing_from_description(shmem_provider, &self.get_description(idx).sender)
+    pub fn get_sender(&self, idx: usize) -> Result<LlmpSender<StdServedShMemProvider>, Error> {
+        LlmpSender::on_existing_from_description(
+            self.served_provider.clone(),
+            &self.get_description(idx).sender,
+        )
+    }
+
+    /// Call it before restarting a process using p2p
+    pub fn on_restart(&mut self) {
+        self.served_provider.on_restart()
     }
 }
 
