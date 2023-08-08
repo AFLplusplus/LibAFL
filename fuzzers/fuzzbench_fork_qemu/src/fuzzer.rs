@@ -13,14 +13,6 @@ use std::{
 
 use clap::{Arg, Command};
 use libafl::{
-    bolts::{
-        current_nanos, current_time,
-        os::dup2,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsMutSlice, AsSlice,
-    },
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor},
@@ -43,6 +35,14 @@ use libafl::{
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
+};
+use libafl_bolts::{
+    current_nanos, current_time,
+    os::dup2,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsMutSlice, AsSlice,
 };
 use libafl_qemu::{
     cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},

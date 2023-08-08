@@ -7,17 +7,8 @@ use core::{
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsSlice,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -34,6 +25,14 @@ use libafl::{
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
+};
+use libafl_bolts::{
+    core_affinity::Cores,
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsSlice,
 };
 pub use libafl_qemu::emu::Emulator;
 use libafl_qemu::{edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
@@ -438,7 +437,7 @@ where
 pub mod pybind {
     use std::path::PathBuf;
 
-    use libafl::bolts::core_affinity::Cores;
+    use libafl_bolts::core_affinity::Cores;
     use libafl_qemu::emu::pybind::Emulator;
     use pyo3::{prelude::*, types::PyBytes};
 

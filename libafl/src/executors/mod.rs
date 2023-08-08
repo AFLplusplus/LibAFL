@@ -35,10 +35,10 @@ use core::{fmt::Debug, marker::PhantomData};
 
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub use command::CommandExecutor;
+use libafl_bolts::AsSlice;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::AsSlice,
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,
@@ -84,7 +84,7 @@ pub enum DiffExitKind {
     // Custom(Box<dyn SerdeAny>),
 }
 
-crate::impl_serdeany!(ExitKind);
+libafl_bolts::impl_serdeany!(ExitKind);
 
 impl From<ExitKind> for DiffExitKind {
     fn from(exitkind: ExitKind) -> Self {
@@ -98,7 +98,7 @@ impl From<ExitKind> for DiffExitKind {
     }
 }
 
-crate::impl_serdeany!(DiffExitKind);
+libafl_bolts::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers: UsesObservers {
@@ -389,7 +389,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_body!($wrapper, $name, $body, PythonExecutorWrapper,
+            libafl_bolts::unwrap_me_body!($wrapper, $name, $body, PythonExecutorWrapper,
                 { InProcess },
                 {
                     Python(py_wrapper) => {
@@ -403,7 +403,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me_mut {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonExecutorWrapper,
+            libafl_bolts::unwrap_me_mut_body!($wrapper, $name, $body, PythonExecutorWrapper,
                 { InProcess },
                 {
                     Python(py_wrapper) => {

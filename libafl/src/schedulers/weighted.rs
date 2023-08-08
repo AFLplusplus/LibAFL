@@ -5,10 +5,10 @@ use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
+use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
@@ -85,7 +85,7 @@ impl WeightedScheduleMetadata {
     }
 }
 
-crate::impl_serdeany!(WeightedScheduleMetadata);
+libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]

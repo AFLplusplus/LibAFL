@@ -1,9 +1,9 @@
 use alloc::string::String;
 
+use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::Named,
     inputs::UsesInput,
     observers::{
         concolic::{serialization_format::MessageFileReader, ConcolicMetadata},

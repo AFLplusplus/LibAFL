@@ -1,9 +1,10 @@
 extern crate libafl;
+extern crate libafl_bolts;
 use libafl::{
-    bolts::AsSlice,
     executors::ExitKind,
     inputs::{BytesInput, HasTargetBytes},
 };
+use libafl_bolts::AsSlice;
 
 fn main() {
     let mut harness = |input: &BytesInput| {

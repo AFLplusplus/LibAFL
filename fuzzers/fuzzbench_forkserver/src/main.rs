@@ -9,13 +9,6 @@ use std::{
 
 use clap::{Arg, ArgAction, Command};
 use libafl::{
-    bolts::{
-        current_nanos, current_time,
-        rands::StdRand,
-        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsMutSlice,
-    },
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
@@ -40,6 +33,13 @@ use libafl::{
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
+};
+use libafl_bolts::{
+    current_nanos, current_time,
+    rands::StdRand,
+    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsMutSlice,
 };
 use nix::sys::signal::Signal;
 

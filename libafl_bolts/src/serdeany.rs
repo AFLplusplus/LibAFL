@@ -65,7 +65,7 @@ where
 #[macro_export]
 macro_rules! create_serde_registry_for_trait {
     ($mod_name:ident, $trait_name:path) => {
-        /// A [`crate::bolts::serdeany`] module.
+        /// A [`crate::serdeany`] module.
         pub mod $mod_name {
 
             use alloc::boxed::Box;
@@ -78,10 +78,8 @@ macro_rules! create_serde_registry_for_trait {
             use postcard;
             use serde::{Deserialize, Serialize};
             use $crate::{
-                bolts::{
-                    anymap::{pack_type_id, unpack_type_id},
-                    serdeany::{DeserializeCallback, DeserializeCallbackSeed},
-                },
+                anymap::{pack_type_id, unpack_type_id},
+                serdeany::{DeserializeCallback, DeserializeCallbackSeed},
                 Error,
             };
 
@@ -145,7 +143,7 @@ macro_rules! create_serde_registry_for_trait {
                 finalized: false,
             };
 
-            /// This shugar must be used to register all the structs which
+            /// This sugar must be used to register all the structs which
             /// have trait objects that can be serialized and deserialized in the program
             #[derive(Debug)]
             pub struct RegistryBuilder {}
@@ -153,7 +151,11 @@ macro_rules! create_serde_registry_for_trait {
             #[allow(unused_qualifications)]
             impl RegistryBuilder {
                 /// Register a given struct type for trait object (de)serialization
-                pub fn register<T>()
+                ///
+                /// # Safety
+                /// This may never be called concurrently or at the same time as `finalize`.
+                /// It dereferences the `REGISTRY` hashmap and adds the given type to it.
+                pub unsafe fn register<T>()
                 where
                     T: $trait_name + Serialize + serde::de::DeserializeOwned,
                 {
@@ -163,6 +165,10 @@ macro_rules! create_serde_registry_for_trait {
                 }
 
                 /// Finalize the registry, no more registrations are allowed after this call
+                ///
+                /// # Safety
+                /// This may never be called concurrently or at the same time as `register`.
+                /// It dereferences the `REGISTRY` hashmap and adds the given type to it.
                 pub fn finalize() {
                     unsafe {
                         REGISTRY.finalize();
@@ -581,10 +587,10 @@ macro_rules! create_serde_registry_for_trait {
             {
                 use serde::ser::SerializeSeq;
 
-                let id = $crate::bolts::anymap::unpack_type_id(self.type_id());
+                let id = $crate::anymap::unpack_type_id(self.type_id());
                 let mut seq = se.serialize_seq(Some(2))?;
                 seq.serialize_element(&id)?;
-                seq.serialize_element(&$crate::bolts::serdeany::Wrap(self))?;
+                seq.serialize_element(&$crate::serdeany::Wrap(self))?;
                 seq.end()
             }
         }
@@ -601,28 +607,38 @@ macro_rules! create_serde_registry_for_trait {
     };
 }
 
-create_serde_registry_for_trait!(serdeany_registry, crate::bolts::serdeany::SerdeAny);
+create_serde_registry_for_trait!(serdeany_registry, crate::serdeany::SerdeAny);
 pub use serdeany_registry::*;
 
 /// Register a `SerdeAny` type in the [`RegistryBuilder`]
-#[cfg(feature = "std")]
+///
+/// Do nothing for without the `serdeany_autoreg` feature, you'll have to register it manually
+/// in `main()` with [`RegistryBuilder::register`] or using `<T>::register()`.
 #[macro_export]
-macro_rules! register_at_startup {
+macro_rules! create_register {
     ($struct_type:ty) => {
         const _: () = {
+            /// Manually register this type at a later point in time
+            ///
+            /// # Safety
+            /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
+            #[cfg(not(feature = "serdeany_autoreg"))]
+            pub unsafe fn register() {
+                $crate::serdeany::RegistryBuilder::register::<$struct_type>();
+            }
+
+            /// Automatically register this type
+            #[cfg(feature = "serdeany_autoreg")]
             #[$crate::ctor]
-            fn constructor() {
-                $crate::bolts::serdeany::RegistryBuilder::register::<$struct_type>();
+            fn register() {
+                // # Safety
+                // This `register` call will always run at startup and never in parallel.
+                unsafe {
+                    $crate::serdeany::RegistryBuilder::register::<$struct_type>();
+                }
             }
         };
     };
-}
-
-/// Do nothing for `no_std`, you have to register it manually in `main()` with [`RegistryBuilder::register`]
-#[cfg(not(feature = "std"))]
-#[macro_export]
-macro_rules! register_at_startup {
-    ($struct_type:ty) => {};
 }
 
 /// Implement a [`SerdeAny`], registering it in the [`RegistryBuilder`] when on std
@@ -631,7 +647,7 @@ macro_rules! impl_serdeany {
     ($struct_name:ident < $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ > $(, < $( $opt:tt ),+ >)*) =>
     {
         impl < $( $lt $( : $clt $(+ $dlt )* )? ),+ >
-            $crate::bolts::serdeany::SerdeAny
+            $crate::serdeany::SerdeAny
             for $struct_name < $( $lt ),+ >
         {
             fn as_any(&self) -> &dyn ::core::any::Any {
@@ -650,13 +666,13 @@ macro_rules! impl_serdeany {
         }
 
         $(
-            $crate::register_at_startup!($struct_name < $( $opt ),+ >);
+            $crate::create_register!($struct_name < $( $opt ),+ >);
         )*
     };
     ($struct_name:ident) =>
     {
         impl
-            $crate::bolts::serdeany::SerdeAny
+            $crate::serdeany::SerdeAny
             for $struct_name
         {
             fn as_any(&self) -> &dyn ::core::any::Any {
@@ -674,6 +690,6 @@ macro_rules! impl_serdeany {
             }
         }
 
-        $crate::register_at_startup!($struct_name);
+        $crate::create_register!($struct_name);
     };
 }

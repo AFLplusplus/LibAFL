@@ -8,7 +8,6 @@ use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 use frida_gum::interceptor::Interceptor;
 use frida_gum::ModuleDetails;
 use libafl::{
-    bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -16,8 +15,9 @@ use libafl::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{Observer, ObserversTuple},
     state::{HasClientPerfMonitor, HasMetadata},
-    Error, SerdeAny,
+    Error,
 };
+use libafl_bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 

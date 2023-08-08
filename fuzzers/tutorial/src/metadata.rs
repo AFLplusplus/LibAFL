@@ -1,5 +1,4 @@
 use libafl::{
-    bolts::tuples::Named,
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -8,8 +7,9 @@ use libafl::{
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
-    Error, SerdeAny,
+    Error,
 };
+use libafl_bolts::{Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 
 use crate::input::PacketData;

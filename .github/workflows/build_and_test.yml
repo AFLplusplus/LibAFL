@@ -16,6 +16,9 @@ jobs:
           os: [ubuntu-latest, windows-latest, macOS-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Install mimetype
+        if: runner.os == 'Linux'
+        run: sudo apt-get install libfile-mimeinfo-perl
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -49,6 +52,8 @@ jobs:
         run: cargo test
       - name: Test libafl no_std
         run: cd libafl && cargo test --no-default-features
+      - name: Test libafl_bolts no_std no_alloc
+        run: cd libafl_bolts && cargo test --no-default-features
       - name: Test libafl_targets no_std
         run: cd libafl_targets && cargo test --no-default-features
      
@@ -183,7 +188,7 @@ jobs:
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Run a maturin build
-      run: cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install . && ./test.sh
+      run: cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
     - name: Run python test
       run: . ./bindings/pylibafl/.env/bin/activate && cd ./fuzzers/baby_fuzzer && python3 baby_fuzzer.py 2>&1 | grep "Bye"
 
@@ -319,6 +324,8 @@ jobs:
       run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
     - name: libafl armv6m-none-eabi (32 bit no_std) clippy
       run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
+    - name: Build no_std no_alloc bolts
+      run: cd ./libafl_bolts && cargo +nightly build -Zbuild-std=core --target aarch64-unknown-none --no-default-features -v --release && cd ../
 
   build-docker:
     runs-on: ubuntu-latest

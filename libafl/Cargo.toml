@@ -12,25 +12,25 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex"]
-std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "bincode", "wait-timeout", "byteorder", "once_cell", "uuid", "tui_monitor", "ctor", "backtrace", "uds", "serial_test"] # print, env, launcher ... support
-derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
-fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
-rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor"]
+std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-timeout", "uuid", "backtrace", "serial_test", "libafl_bolts/std", "typed-builder"] # print, env, launcher ... support
+derive = ["libafl_derive", "libafl_bolts/derive"] # provide derive(SerdeAny) macro.
+fork = ["libafl_bolts/derive"] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
+rand_trait = ["libafl_bolts/rand_trait"] # If set, libafl's rand implementations will implement `rand::Rng`
 introspection = [] # Include performance statistics of the fuzzing pipeline
 concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
-python = ["pyo3", "concat-idents"]
-prelude = [] # Expose libafl::prelude for access without additional using directives
+python = ["pyo3", "concat-idents", "libafl_bolts/python"]
+prelude = ["libafl_bolts/prelude"] # Expose libafl::prelude for access without additional using directives
 tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
 prometheus_monitor = ["std", "async-std", "prometheus-client", "tide", "futures"]
-cli = ["clap"]  # expose bolts::cli for easy commandline parsing
-qemu_cli = ["cli"] # Commandline flags for qemu-based fuzzers
-frida_cli = ["cli"] # Commandline flags for frida-based fuzzers
+cli = ["libafl_bolts/cli"]  # expose libafl_bolts::cli for easy commandline parsing
+qemu_cli = ["cli", "libafl_bolts/qemu_cli"] # Commandline flags for qemu-based fuzzers
+frida_cli = ["cli", "libafl_bolts/frida_cli"] # Commandline flags for frida-based fuzzers
 afl_exec_sec = [] # calculate exec/sec like AFL
-errors_backtrace = ["backtrace"]
+errors_backtrace = ["libafl_bolts/errors_backtrace"]
 cmin = ["z3"] # corpus minimisation
 corpus_btreemap = [] # Switches from HashMap to BTreeMap for CorpusId
-gzip = ["miniz_oxide"] # Enables gzip compression in certain parts of the lib
+gzip = ["libafl_bolts/gzip"] # Enables gzip compression in certain parts of the lib
 regex = ["std", "dep:regex"] # enables the NaiveTokenizer and StacktraceObserver
 casr = ["libcasr", "std", "regex"] # enables deduplication based on libcasr for StacktraceObserver
 tcp_manager = ["tokio", "std"] # A simple EventManager proxying everything via TCP
@@ -42,11 +42,14 @@ gpl = []
 agpl = ["gpl", "nautilus"]
 nautilus = ["grammartec", "std", "serde_json/std"]
 
+# SerdeAny features
+serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"] # Automatically register all `#[derive(SerdeAny)]` types at startup.
+
 # LLMP features
-llmp_bind_public = [] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
-llmp_compression = ["gzip"] # llmp compression using GZip
-llmp_debug = [] # Enables debug output for LLMP
-llmp_small_maps = [] # reduces initial map size for llmp
+llmp_bind_public = ["libafl_bolts/llmp_bind_public"] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
+llmp_compression = ["libafl_bolts/llmp_compression"] # llmp compression using GZip
+llmp_debug = ["libafl_bolts/llmp_debug"] # Enables debug output for LLMP
+llmp_small_maps = ["libafl_bolts/llmp_small_maps"] # reduces initial map size for llmp
 llmp_broker_timeouts = ["std"] # The broker loop will yield occasionally, even without status messages from client nodes
 
 [build-dependencies]
@@ -58,38 +61,29 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 bytecount = "0.6.3"
 
 [dependencies]
-libafl_derive = { version = "0.10.1", optional = true, path = "../libafl_derive" }
+libafl_bolts = { version = "0.10.1", path = "../libafl_bolts", default-features = false, features = ["alloc"] }
+libafl_derive = { version = "0.10.1", path = "../libafl_derive", optional = true }
 
 rustversion = "1.0"
 tuple_list = { version = "0.1.3" }
-hashbrown =  { version = "0.13", features = ["serde", "ahash"], default-features=false } # A faster hashmap, nostd compatible
+hashbrown =  { version = "0.14", features = ["serde", "ahash"], default-features=false } # A faster hashmap, nostd compatible
 num-traits = { version = "0.2", default-features = false }
-xxhash-rust = { version = "0.8.5", features = ["xxh3"] } # xxh3 hashing for rust
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] } # serialization lib
-erased-serde = { version = "0.3.21", default-features = false, features = ["alloc"] } # erased serde
-postcard = { version = "1.0", features = ["alloc"] } # no_std compatible serde serialization fromat
+postcard = { version = "1.0", features = ["alloc"] } # no_std compatible serde serialization format
 bincode = {version = "1.3", optional = true }
 c2rust-bitfields = { version = "0.17", features = ["no_std"] }
-num_enum = { version = "0.6", default-features = false }
-typed-builder = "0.15.1" # Implement the builder pattern at compiletime
 ahash = { version = "0.8", default-features=false } # The hash function already used in hashbrown
 intervaltree = { version = "0.2.7", default-features = false, features = ["serde"] }
 backtrace = {version = "0.3", optional = true} # Used to get the stacktrace in StacktraceObserver
+typed-builder = { version = "0.15.1", optional = true } # Implement the builder pattern at compiletime
 
-ctor = { optional = true, version = "0.2" }
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] }
-miniz_oxide = { version = "0.7.1", optional = true}
-hostname = { version = "^0.3", optional = true } # Is there really no gethostname in the stdlib?
-rand_core = { version = "0.6", optional = true }
 nix = { version = "0.26", optional = true }
 regex = { version = "1", optional = true }
 uuid = { version = "1.1.2", optional = true, features = ["serde", "v4"] }
-byteorder = { version = "1.4", optional = true }
-once_cell = { version =  "1.13", optional = true }
 libm = "0.2.2"
 tui = { version = "0.19", default-features = false, features = ['crossterm'], optional = true } # Commandline rendering, for TUI Monitor
-crossterm = { version = "0.26", optional = true }
-clap = {version = "4.0", features = ["derive", "wrap_help"], optional = true} # CLI parsing, for bolts::cli / the `cli` feature
+crossterm = { version = "0.25", optional = true }
 
 prometheus-client = { version= "0.19", optional = true} # For the prometheus monitor
 tide = { version = "0.16.0", optional = true }
@@ -116,8 +110,6 @@ grammartec = { version = "0.3", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc
-uds = { version = "0.2.6", optional = true }
-lock_api = "0.4.7"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.44", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Diagnostics_Debug", "Win32_System_Kernel", "Win32_System_Memory", "Win32_Security", "Win32_System_SystemInformation"] }
@@ -129,8 +121,3 @@ windows = "0.44"
 #lto = true
 #opt-level = 3
 #debug = true
-
-[[example]]
-name = "llmp_test"
-path = "./examples/llmp_test/main.rs"
-required-features = ["std"]

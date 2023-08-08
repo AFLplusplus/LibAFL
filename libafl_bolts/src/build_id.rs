@@ -31,8 +31,8 @@ static BUILD_ID: Lazy<Uuid> = Lazy::new(calculate);
 /// # Examples
 ///
 /// ```
-/// # let remote_build_id = libafl::bolts::build_id::get();
-/// let local_build_id = libafl::bolts::build_id::get();
+/// # let remote_build_id = libafl_bolts::build_id::get();
+/// let local_build_id = libafl_bolts::build_id::get();
 /// if local_build_id == remote_build_id {
 ///     println!("We're running the same binary as remote!");
 /// } else {

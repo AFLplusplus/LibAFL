@@ -4,6 +4,7 @@ use alloc::{string::String, vec::Vec};
 use core::{clone::Clone, marker::PhantomData};
 use std::{fs, fs::File, io::Write, path::PathBuf};
 
+use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -21,7 +22,7 @@ pub struct DumpToDiskMetadata {
     last_solution: Option<CorpusId>,
 }
 
-crate::impl_serdeany!(DumpToDiskMetadata);
+impl_serdeany!(DumpToDiskMetadata);
 
 /// The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk
 #[derive(Debug)]

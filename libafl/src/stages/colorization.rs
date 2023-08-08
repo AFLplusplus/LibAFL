@@ -6,10 +6,10 @@ use alloc::{
 };
 use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
+use libafl_bolts::{rands::Rand, tuples::MatchName};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{rands::Rand, tuples::MatchName},
     corpus::{Corpus, CorpusId},
     events::EventFirer,
     executors::{Executor, HasObservers},
@@ -134,7 +134,7 @@ impl TaintMetadata {
     }
 }
 
-crate::impl_serdeany!(TaintMetadata);
+libafl_bolts::impl_serdeany!(TaintMetadata);
 
 impl<EM, O, E, Z> ColorizationStage<EM, O, E, Z>
 where

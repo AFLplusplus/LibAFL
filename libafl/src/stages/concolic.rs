@@ -78,9 +78,11 @@ impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z> {
     }
 }
 
+use libafl_bolts::tuples::MatchName;
+
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
-use crate::{bolts::tuples::MatchName, state::UsesState};
+use crate::state::UsesState;
 #[cfg(feature = "concolic_mutation")]
 use crate::{
     inputs::HasBytesVec,
