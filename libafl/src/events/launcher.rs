@@ -43,7 +43,7 @@ use serde::de::DeserializeOwned;
 use typed_builder::TypedBuilder;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::events::CentralizedEventManager;
+use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
 use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
@@ -376,7 +376,7 @@ pub struct CentralizedLauncher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<S, SP>>,
+        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
     S::Input: 'a,
@@ -427,7 +427,7 @@ impl<CF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<S, SP>>,
+        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
@@ -452,7 +452,7 @@ impl<'a, CF, MT, S, SP> CentralizedLauncher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(
         Option<S>,
-        CentralizedEventManager<LlmpRestartingEventManager<S, SP>>,
+        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
@@ -490,12 +490,26 @@ where
 
         let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
 
-        let mut served_provider = StdServedShMemProvider::new()?;
-        let num_channels = num_cores - 1; // Number of clients minus the main
-        let mut p2p = Some(PersistentLlmpP2P::new(
-            served_provider.clone(),
-            num_channels,
-        )?);
+        // Spawn centralized broker
+        self.shmem_provider.pre_fork()?;
+        match unsafe { fork() }? {
+            ForkResult::Parent(child) => {
+                self.shmem_provider.post_fork(false)?;
+                handles.push(child.pid);
+                #[cfg(feature = "std")]
+                log::info!("centralized broker spawned");
+            }
+            ForkResult::Child => {
+                log::info!("{:?} PostFork", unsafe { libc::getpid() });
+                self.shmem_provider.post_fork(true)?;
+
+                let mut broker: CentralizedLlmpEventBroker<S::Input, SP> =
+                    CentralizedLlmpEventBroker::on_port(self.shmem_provider.clone(), 1338)?;
+                broker.broker_loop()?;
+            }
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
 
         // Spawn clients
         let mut index = 0_u64;
@@ -503,11 +517,9 @@ where
             if self.cores.ids.iter().any(|&x| x == id.into()) {
                 index += 1;
                 self.shmem_provider.pre_fork()?;
-                served_provider.pre_fork()?;
                 match unsafe { fork() }? {
                     ForkResult::Parent(child) => {
                         self.shmem_provider.post_fork(false)?;
-                        served_provider.post_fork(false)?;
                         handles.push(child.pid);
                         #[cfg(feature = "std")]
                         log::info!("child spawned and bound to core {id}");
@@ -515,7 +527,6 @@ where
                     ForkResult::Child => {
                         log::info!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
-                        served_provider.post_fork(true)?;
 
                         std::thread::sleep(std::time::Duration::from_millis(index * 10));
 
@@ -542,16 +553,12 @@ where
                             .build()
                             .launch()?;
 
-                        let c_mgr = if id == 0 {
-                            // main node
-                            CentralizedEventManager::new_main(mgr, p2p.take().unwrap())?
-                        } else {
-                            CentralizedEventManager::new_secondary(
-                                mgr,
-                                p2p.take().unwrap(),
-                                id - 1,
-                            )?
-                        };
+                        let c_mgr = CentralizedEventManager::on_port(
+                            mgr,
+                            self.shmem_provider.clone(),
+                            1338,
+                            id == 0,
+                        )?;
 
                         return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
                     }
