@@ -294,7 +294,7 @@ where
                 _ => false,
             };
             if is_nt {
-                return self.forward_to_main(event);
+                return self.forward_to_main(&event);
             }
         }
         self.inner.fire(state, event)
@@ -548,11 +548,11 @@ where
     SP: ShMemProvider + 'static,
 {
     #[cfg(feature = "llmp_compression")]
-    fn forward_to_main<I>(&mut self, event: Event<I>) -> Result<(), Error>
+    fn forward_to_main<I>(&mut self, event: &Event<I>) -> Result<(), Error>
     where
         I: Input,
     {
-        let serialized = postcard::to_allocvec(&event)?;
+        let serialized = postcard::to_allocvec(event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
         match self.compressor.compress(&serialized)? {
@@ -571,11 +571,11 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn forward_to_main<I>(&mut self, event: Event<I>) -> Result<(), Error>
+    fn forward_to_main<I>(&mut self, event: &Event<I>) -> Result<(), Error>
     where
         I: Input,
     {
-        let serialized = postcard::to_allocvec(&event)?;
+        let serialized = postcard::to_allocvec(event)?;
         self.client.send_buf(_LLMP_TAG_TO_MAIN, &serialized)?;
         Ok(())
     }
