@@ -101,7 +101,6 @@ where
     /// Run forever in the broker
     #[cfg(not(feature = "llmp_broker_timeouts"))]
     pub fn broker_loop(&mut self) -> Result<(), Error> {
-        let monitor = &mut self.monitor;
         #[cfg(feature = "llmp_compression")]
         let compressor = &self.compressor;
         self.llmp.loop_forever(
@@ -119,7 +118,7 @@ where
                         msg
                     };
                     let event: Event<I> = postcard::from_bytes(event_bytes)?;
-                    match Self::handle_in_broker(monitor, client_id, &event)? {
+                    match Self::handle_in_broker(client_id, &event)? {
                         BrokerEventResult::Forward => Ok(llmp::LlmpMsgHookResult::ForwardToClients),
                         BrokerEventResult::Handled => Ok(llmp::LlmpMsgHookResult::Handled),
                     }
