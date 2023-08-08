@@ -272,6 +272,7 @@ where
 }
 */
 
+// TODO remove forward_id as not anymore needed for centralized
 /// Events sent around in the library
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]

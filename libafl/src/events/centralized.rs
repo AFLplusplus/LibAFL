@@ -12,7 +12,7 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     llmp::{self, LlmpBroker, LlmpClient, LlmpClientDescription, Tag},
-    shmem::{ShMemProvider, StdServedShMemProvider},
+    shmem::ShMemProvider,
     ClientId,
 };
 use serde::{Deserialize, Serialize};
@@ -182,23 +182,27 @@ where
 
     /// Handle arriving events in the broker
     #[allow(clippy::unnecessary_wraps)]
-    fn handle_in_broker(client_id: ClientId, event: &Event<I>) -> Result<BrokerEventResult, Error> {
+    fn handle_in_broker(
+        _client_id: ClientId,
+        event: &Event<I>,
+    ) -> Result<BrokerEventResult, Error> {
         match &event {
             Event::NewTestcase {
                 input: _,
                 client_config: _,
                 exit_kind: _,
-                corpus_size,
+                corpus_size: _,
                 observers_buf: _,
-                time,
-                executions,
-                forward_id,
+                time: _,
+                executions: _,
+                forward_id: _,
             } => Ok(BrokerEventResult::Forward),
             _ => Ok(BrokerEventResult::Handled),
         }
     }
 }
 
+/// A wrapper manager to implement a main-secondary architecture witgh another broker
 #[derive(Debug)]
 pub struct CentralizedEventManager<EM, SP>
 where
@@ -527,7 +531,7 @@ where
     }
 
     /// Write the config for a client [`EventManager`] to env vars, a new
-    /// client can reattach using [`LlmpEventManager::existing_client_from_env()`].
+    /// client can reattach using [`CentralizedEventManager::existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.client.to_env(env_name).unwrap();

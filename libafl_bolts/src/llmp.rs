@@ -100,8 +100,6 @@ use crate::current_time;
 use crate::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
 use crate::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
-#[cfg(all(unix, feature = "std"))]
-use crate::shmem::StdServedShMemProvider;
 use crate::{
     shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     ClientId, Error,
@@ -3091,84 +3089,6 @@ where
         }
 
         Ok(ret)
-    }
-}
-
-/// Persistent shared memory storage for point-to-point channels descriptions
-#[cfg(all(unix, feature = "std"))]
-#[derive(Debug)]
-pub struct PersistentLlmpP2P {
-    shmem: <StdServedShMemProvider as ShMemProvider>::ShMem,
-    num_channels: usize,
-    /// Keep a reference to the clients here so that the first pages don't get unmapped when starting the clients
-    #[allow(dead_code)]
-    clients: Vec<LlmpClient<StdServedShMemProvider>>,
-    /// The served shmem propvider used to keep the shared pages
-    pub served_provider: StdServedShMemProvider,
-}
-
-#[cfg(all(unix, feature = "std"))]
-impl PersistentLlmpP2P {
-    /// Create a new `PersistentLlmpP2P` given a number of channels
-    pub fn new(
-        mut served_provider: StdServedShMemProvider,
-        num_channels: usize,
-    ) -> Result<Self, Error> {
-        let mut shmem =
-            served_provider.new_shmem_objects_array::<LlmpClientDescription>(num_channels)?;
-        let mut clients = vec![];
-        for i in 0..num_channels {
-            let client = LlmpClient::new_p2p(served_provider.clone(), ClientId(i as u32))?;
-            unsafe {
-                shmem.as_objects_slice_mut(num_channels)[i] = client.describe()?;
-            }
-            clients.push(client);
-        }
-        Ok(Self {
-            shmem,
-            num_channels,
-            clients,
-            served_provider,
-        })
-    }
-
-    /// Get the description for the channel at a specific index
-    #[must_use]
-    pub fn get_description(&self, idx: usize) -> &LlmpClientDescription {
-        unsafe { &self.shmem.as_objects_slice(self.num_channels)[idx] }
-    }
-
-    /// Get the description for the channel at a specific index (mut)
-    #[must_use]
-    pub fn get_description_mut(&mut self, idx: usize) -> &mut LlmpClientDescription {
-        unsafe { &mut self.shmem.as_objects_slice_mut(self.num_channels)[idx] }
-    }
-
-    /// Get the number of channels
-    #[must_use]
-    pub fn num_channels(&self) -> usize {
-        self.num_channels
-    }
-
-    /// Get a `LlmpReceiver` from the description for the channel at a specific index
-    pub fn get_receiver(&self, idx: usize) -> Result<LlmpReceiver<StdServedShMemProvider>, Error> {
-        LlmpReceiver::on_existing_from_description(
-            self.served_provider.clone(),
-            &self.get_description(idx).receiver,
-        )
-    }
-
-    /// Get a `LlmpSender` from the description for the channel at a specific index
-    pub fn get_sender(&self, idx: usize) -> Result<LlmpSender<StdServedShMemProvider>, Error> {
-        LlmpSender::on_existing_from_description(
-            self.served_provider.clone(),
-            &self.get_description(idx).sender,
-        )
-    }
-
-    /// Call it before restarting a process using p2p
-    pub fn on_restart(&mut self) {
-        self.served_provider.on_restart();
     }
 }
 
