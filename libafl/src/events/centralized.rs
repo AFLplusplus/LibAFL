@@ -86,7 +86,7 @@ where
     #[cfg(feature = "std")]
     pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
         Ok(Self {
-            llmp: LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
+            llmp: LlmpBroker::with_keep_pages_attach_to_tcp(shmem_provider, port, false)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             phantom: PhantomData,
