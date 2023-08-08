@@ -394,6 +394,9 @@ where
     /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
     #[builder(default = 1337_u16)]
     broker_port: u16,
+    /// The centralized broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
+    #[builder(default = 1338_u16)]
+    centralized_broker_port: u16,
     /// The list of cores to run on
     cores: &'a Cores,
     /// A file name to write all client output to
@@ -502,7 +505,10 @@ where
                 self.shmem_provider.post_fork(true)?;
 
                 let mut broker: CentralizedLlmpEventBroker<S::Input, SP> =
-                    CentralizedLlmpEventBroker::on_port(self.shmem_provider.clone(), 1338)?;
+                    CentralizedLlmpEventBroker::on_port(
+                        self.shmem_provider.clone(),
+                        self.centralized_broker_port,
+                    )?;
                 broker.broker_loop()?;
             }
         }
@@ -554,7 +560,7 @@ where
                         let c_mgr = CentralizedEventManager::on_port(
                             mgr,
                             self.shmem_provider.clone(),
-                            1338,
+                            self.centralized_broker_port,
                             id == 0,
                         )?;
 
