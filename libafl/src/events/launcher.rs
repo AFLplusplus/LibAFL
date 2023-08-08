@@ -35,8 +35,6 @@ use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     shmem::ShMemProvider,
 };
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::{llmp::PersistentLlmpP2P, shmem::StdServedShMemProvider};
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]

@@ -11,10 +11,7 @@ use libafl_bolts::{
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 use libafl_bolts::{
-    llmp::{
-        self, LlmpBroker, LlmpClient, LlmpClientDescription, LlmpReceiver, LlmpSender,
-        PersistentLlmpP2P, Tag,
-    },
+    llmp::{self, LlmpBroker, LlmpClient, LlmpClientDescription, Tag},
     shmem::{ShMemProvider, StdServedShMemProvider},
     ClientId,
 };
