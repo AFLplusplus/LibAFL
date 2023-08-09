@@ -198,9 +198,15 @@ pub fn merge(
 
     // In case the corpus is empty (on first run) or crashed while loading, reset
     if state.must_load_initial_inputs() && !options.dirs().is_empty() {
+        let loaded_dirs = options
+            .dirs()
+            .iter()
+            .cloned()
+            .filter(|dir| state.corpus().dir_path() != dir)
+            .collect::<Vec<_>>();
         // Load from disk
         state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, options.dirs())
+            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &loaded_dirs)
             .unwrap_or_else(|e| {
                 panic!(
                     "Failed to load initial corpus at {:?}: {}",
