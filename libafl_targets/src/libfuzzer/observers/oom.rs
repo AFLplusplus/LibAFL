@@ -60,13 +60,11 @@ pub unsafe extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize
 pub unsafe extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = unsafe { libafl_check_malloc_size(ptr) };
-        if MALLOC_SIZE
-            .fetch_sub(size, Ordering::Relaxed)
-            .checked_sub(size)
-            .is_none()
-        {
-            panic!("We somehow freed more memory than was available!");
-        }
+        MALLOC_SIZE
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |existing| {
+                Some(existing.saturating_sub(size))
+            })
+            .expect("must complete successfully");
     }
 }
 
