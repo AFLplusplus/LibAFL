@@ -30,10 +30,18 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
-        COUNTERS_MAPS.push(OwnedMutSlice::from_raw_parts_mut(
-            start,
-            stop.offset_from(start) as usize,
-        ));
+        let computed_len = stop.offset_from(start) as usize;
+        for existing in COUNTERS_MAPS.iter_mut() {
+            if existing.as_slice().as_ptr() == start {
+                // we have a duplicated range
+                if existing.as_slice().len() < computed_len {
+                    // keep the longer
+                    *existing = OwnedMutSlice::from_raw_parts_mut(start, computed_len)
+                }
+                return;
+            }
+        }
+        COUNTERS_MAPS.push(OwnedMutSlice::from_raw_parts_mut(start, computed_len));
     }
 }
 
