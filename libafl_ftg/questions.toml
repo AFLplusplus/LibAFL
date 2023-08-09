@@ -416,21 +416,20 @@ id = "StdMutationalStage"
 title = "Do you want to use the StdMutationalStage?"
 content = "Description"
 answers = [ "Yes", "No" ]
-next = [ "end", "end" ]
+next = [ "fuzz loop", "fuzz loop" ]
 code = [ "let mut stages = tuple_list!(StdMutationalStage::new())", "" ]
 previous = 0
 skip = false
 
 [[question]]
-id = "StdMutationalStage"
+id = "fuzz loop"
 title = ""
 content = ""
 answers = [ "" ]
 next = [ "end" ]
 code = [ """fuzzer
 \t.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
-\t.expect("Error in the fuzzing loop")
-""" ]
+\t.expect("Error in the fuzzing loop")""" ]
 previous = 0
 skip = false
 
