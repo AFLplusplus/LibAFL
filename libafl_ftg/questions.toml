@@ -1,9 +1,9 @@
 [[question]]
 id = "intro"
 title = "Introduction"
-content = """\
-Description\n
-New line\
+content = """
+Description
+New line
 """
 answers = [ "Next" ]
 next = [ "source code" ]
@@ -17,7 +17,11 @@ title = "Do you have the target's source code?"
 content = "Description"
 answers = [ "Yes", "No" ]
 next = [ "harness", "observers" ]
-code = []
+code = [ "",
+"""let mut shmem_provider = UnixShMemProvider::new().unwrap();\n
+let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
+shmem.write_to_env("__AFL_SHM_ID").unwrap();
+let shmem_buf = shmem.as_mut_slice();""" ]
 previous = 0
 skip = false
 
@@ -27,7 +31,11 @@ title = "Can you provide a harness function?"
 content = "Description"
 answers = [ "Yes", "No" ]
 next = [ "observers", "observers" ]
-code = []
+code = [ "",
+"""let mut shmem_provider = UnixShMemProvider::new().unwrap();\n
+let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
+shmem.write_to_env("__AFL_SHM_ID").unwrap();
+let shmem_buf = shmem.as_mut_slice();""" ]
 previous = 0
 skip = false
 
@@ -77,7 +85,11 @@ title = "Do you want to keep track of the testcase's runtime?"
 content = "Description"
 answers = [ "Yes", "No" ]
 next = [ "crash", "crash" ]
-code = [ "let mut feedback =  feedback_or!(MaxMapFeedback::new(&observer), TimeObserver::new())", "let mut feedback =  MaxMapFeedback::new(&observer)" ]
+code = [ """let mut feedback =  feedback_or!(
+\tMaxMapFeedback::new(&observer),
+\tTimeObserver::new()
+)""",
+"let mut feedback =  MaxMapFeedback::new(&observer)" ]
 previous = 0
 skip = false
 
@@ -137,7 +149,14 @@ title = ""
 content = ""
 answers = [ "" ]
 next = [ "monitors" ]
-code = [ "let mut state = StdState::new(StdRand::with_seed(current_nanos()), $, OnDiskCorpus::new(PathBuf::from()).unwrap(), &mut feedback, &mut objective,).unwrap()" ]
+code = [ """let mut state = StdState::new(
+\tStdRand::with_seed(current_nanos()),
+\t$,
+\tOnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
+\t&mut feedback,
+\t&mut objective,
+)
+.unwrap()""" ]
 previous = 0
 skip = false
 
@@ -167,7 +186,7 @@ title = "Do you want to see the stats in a UI style?"
 content = "Description"
 answers = [ "Yes", "No" ]
 next = [ "stats to file", "stats to file" ]
-code = [ "let mon = (WIP)", "let mon = SimpleMonitor::new()" ]
+code = [ "let mon = (WIP)", """let mon = SimpleMonitor::new(|s| println!("{s}")""" ]
 previous = 0
 skip = false
 
@@ -288,7 +307,25 @@ title = "Can your target corrupt memory used by the fuzzer?"
 content = "Description"
 answers = [ "Yes", "No" ]
 next = [ "in process timeout", "in process timeout" ]
-code = [ "let mut executor = InProcessForkExecutor::new()", "let mut executor = InProcessExecutor::new()" ]
+code = [ """let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();\n
+let mut executor = InProcessForkExecutor::new(
+\t&mut harness,
+\ttuple_list!(observer),
+\t&mut fuzzer,
+\t&mut state,
+\t&mut mgr,
+\tshmem_provider
+)
+.expect("Failed to create the Executor")""",
+"""let mut executor = InProcessExecutor::new(
+\t&mut harness,
+\ttuple_list!(observer),
+\t&mut fuzzer,
+\t&mut state,
+\t&mut mgr,
+)\
+.expect("Failed to create the Executor")""" 
+]
 previous = 0
 skip = false
 
@@ -298,7 +335,11 @@ title = "Do you want to set a timeout before each run?"
 content = "Description"
 answers = [ "Yes", "No" ]
 next = [ "forkserver timeout", "forkserver timeout" ]
-code = [ "let mut executor = TimeoutExecutor::new($, Duration::from_secs())", "" ]
+code = [ """let mut executor = TimeoutExecutor::new(
+$,
+Duration::from_secs()
+)""",
+"" ]
 previous = 0
 skip = false
 
@@ -308,7 +349,11 @@ title = "Do you want to set a timeout before each run (forkserver)?"
 content = "Description"
 answers = [ "Yes", "No" ]
 next = [ "generators", "generators" ]
-code = [ "let mut executor = TimeoutForkserverExecutor::new($, Duration::from_secs())", "let mut executor = ForkserverExecutor::new()" ]
+code = [ """let mut executor = TimeoutForkserverExecutor::new(
+\t$,
+\tDuration::from_secs()
+)""",
+"let mut executor = ForkserverExecutor::new()" ]
 previous = 0
 skip = false
 
@@ -328,7 +373,11 @@ title = "Do you want to generate an initial set of inputs?"
 content = "Description"
 answers = [ "Yes", "No" ]
 next = [ "mutators", "mutators" ]
-code = [ "let mut = RandBytesGenerator::new()", "" ]
+code = [ """let mut generator = RandBytesGenerator::new(32);\n
+state
+\t.generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
+\t.expect("Failed to generate the initial corpus")"""
+, "" ]
 previous = 0
 skip = false
 
@@ -348,7 +397,7 @@ title = "Do you want to schedule mutations?"
 content = "Description"
 answers = [ "Yes", "No" ]
 next = [ "stages", "stages" ]
-code = [ "let mutator = StdScheduledMutator::new()", "" ]
+code = [ "let mutator = StdScheduledMutator::new(havoc_mutations())", "" ]
 previous = 0
 skip = false
 
@@ -368,7 +417,20 @@ title = "Do you want to use the StdMutationalStage?"
 content = "Description"
 answers = [ "Yes", "No" ]
 next = [ "end", "end" ]
-code = [ "let mut stages = StdMutationalStage::new()", "" ]
+code = [ "let mut stages = tuple_list!(StdMutationalStage::new())", "" ]
+previous = 0
+skip = false
+
+[[question]]
+id = "StdMutationalStage"
+title = ""
+content = ""
+answers = [ "" ]
+next = [ "end" ]
+code = [ """fuzzer
+\t.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+\t.expect("Error in the fuzzing loop")
+""" ]
 previous = 0
 skip = false
 

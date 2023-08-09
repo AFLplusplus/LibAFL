@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::{error::Error, fs, fs::OpenOptions, io::Write};
+use std::{error::Error, fs, fs::OpenOptions, io::Write, path::Path};
 use toml;
 
 #[derive(Deserialize)]
@@ -231,11 +231,20 @@ pub fn replace_code(code_content: &mut Vec<String>) -> () {
 }
 
 // Write Rust code in the file of the generated fuzzer.
-pub fn write_code(code_content: Vec<String>) -> Result<(), Box<dyn Error>> {
+pub fn write_code(code_content: Vec<String>) -> Result<String, Box<dyn Error>> {
+    let mut counter = 0;
+    let mut file_name = format!("fuzzer.rs");
+
+    // Creates "fuzzer.rs", "fuzzer_1.rs" files if the previous one already exists...
+    while Path::new(&file_name).exists() {
+        counter += 1;
+        file_name = format!("fuzzer_{}.rs", counter);
+    }
+
     let mut out_file = OpenOptions::new()
         .append(true)
         .create(true)
-        .open("fuzzer.rs")?;
+        .open(&file_name)?;
 
     // While imports are not resolved, use this.
     out_file.write_all("use libafl::prelude::*;\n\n".as_bytes())?;
@@ -248,7 +257,7 @@ pub fn write_code(code_content: Vec<String>) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    Ok(())
+    Ok(file_name)
 }
 
 pub fn validate_answer(input: &String, ans: &String) -> bool {

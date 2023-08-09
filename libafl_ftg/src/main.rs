@@ -49,9 +49,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         println!("Please type a valid answer: ");
     }
 
-    // Basically, a question is asked, answered by the user and then the generator moves on to the next question, until the last one is asked.
+    // Basically, a question is asked, answered by the user and then the generator moves on to the next question.
     // Note that not all the questions are going to be asked, for example, if the user chose not to use a monitor, the generator shouldn't
-    // ask if he wants a monitor with a UI style or a Simple monitor.
+    // ask if he wants a monitor with a UI style or a SimpleMonitor.
     while !questions[curr_q].end() {
         // If the question has a title, it means it contains information to show to the user and expects some input.
         if questions[curr_q].has_title() {
@@ -109,10 +109,11 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     replace_code(&mut code_content);
 
-    write_code(code_content)?;
+    let file_name = write_code(code_content)?;
 
     print!("{esc}c", esc = 27 as char);
-    println!("\nAll questions answered!!!\n\nShutting down...");
+    println!("File {} successfully created!", file_name);
+    println!("\nAll questions answered.");
 
     Ok(())
 }
