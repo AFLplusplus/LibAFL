@@ -16,7 +16,7 @@ use backtrace::Backtrace;
 #[cfg(target_arch = "x86_64")]
 use capstone::{
     arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
-    Capstone, Insn, RegAccessType, RegId,
+    Capstone, RegAccessType, RegId,
 };
 #[cfg(target_arch = "aarch64")]
 use capstone::{
@@ -36,6 +36,8 @@ use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
     Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails,
 };
+#[cfg(target_arch = "x86_64")]
+use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
 #[cfg(unix)]
@@ -2250,15 +2252,20 @@ impl AsanRuntime {
         _address: u64,
         instr: &Insn,
     ) -> Option<(RegId, u8, RegId, RegId, i32, i64)> {
+        // We need to re-decode frida-internal capstone values to upstream capstone
+        let cs_instr = capstone
+            .disasm_count(instr.bytes(), instr.address(), 1)
+            .unwrap();
+        let cs_instr = cs_instr.first().unwrap();
         let operands = capstone
-            .insn_detail(instr)
+            .insn_detail(cs_instr)
             .unwrap()
             .arch_detail()
             .operands();
         // Ignore lea instruction
         // put nop into the white-list so that instructions like
         // like `nop dword [rax + rax]` does not get caught.
-        match instr.mnemonic().unwrap() {
+        match cs_instr.mnemonic().unwrap() {
             "lea" | "nop" => return None,
 
             _ => (),
@@ -2266,7 +2273,7 @@ impl AsanRuntime {
 
         // This is a TODO! In this case, both the src and the dst are mem operand
         // so we would need to return two operadns?
-        if instr.mnemonic().unwrap().starts_with("rep") {
+        if cs_instr.mnemonic().unwrap().starts_with("rep") {
             return None;
         }
 
@@ -2317,9 +2324,9 @@ impl AsanRuntime {
         basereg: RegId,
         indexreg: RegId,
         scale: i32,
-        disp: i64,
+        disp: isize,
     ) {
-        let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
+        let redzone_size = isize::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).unwrap();
         let writer = output.writer();
         let true_rip = address;
 

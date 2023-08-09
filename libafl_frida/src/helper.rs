@@ -298,8 +298,14 @@ where
                         if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
                             if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                                 rt.emit_shadow_check(
-                                    address, &output, segment, width, basereg, indexreg, scale,
-                                    disp,
+                                    address,
+                                    &output,
+                                    segment,
+                                    width,
+                                    basereg,
+                                    indexreg,
+                                    scale,
+                                    disp.try_into().unwrap(),
                                 );
                             }
                         }
