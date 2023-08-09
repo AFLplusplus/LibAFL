@@ -25,7 +25,7 @@ use capstone::{
         ArchOperand::Arm64Operand,
         BuildsCapstone,
     },
-    Capstone, Insn,
+    Capstone,
 };
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
@@ -36,7 +36,7 @@ use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
     Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails,
 };
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
@@ -112,6 +112,15 @@ const ASAN_EH_FRAME_DWORD_COUNT: usize = 14;
 const ASAN_EH_FRAME_FDE_OFFSET: u32 = 20;
 #[cfg(target_arch = "aarch64")]
 const ASAN_EH_FRAME_FDE_ADDRESS_OFFSET: u32 = 28;
+
+/// Translates a frida instruction to a capstone instruction.
+/// Returns a [`capstone::Instructions`] with a single [`capstone::Insn`] inside.
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+fn frida_to_cs<'a>(capstone: &'a Capstone, frida_insn: &Insn) -> capstone::Instructions<'a> {
+    capstone
+        .disasm_count(frida_insn.bytes(), frida_insn.address(), 1)
+        .unwrap()
+}
 
 /// The frida address sanitizer runtime, providing address sanitization.
 /// When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
@@ -1096,7 +1105,7 @@ impl AsanRuntime {
                 3,
             )
             .unwrap();
-        let instructions = instructions.iter().collect::<Vec<&Insn>>();
+        let instructions = instructions.iter().collect::<Vec<&capstone::Insn>>();
         let mut insn = instructions.first().unwrap();
         if insn.mnemonic().unwrap() == "msr" && insn.op_str().unwrap() == "nzcv, x0" {
             insn = instructions.get(2).unwrap();
@@ -2208,9 +2217,13 @@ impl AsanRuntime {
         Arm64Shift,
         Arm64Extender,
     )> {
+        // We need to re-decode frida-internal capstone values to upstream capstone
+        let cs_instr = frida_to_cs(capstone, instr);
+        let cs_instr = cs_instr.first().unwrap();
+
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
-        match instr.mnemonic().unwrap() {
+        match cs_instr.mnemonic().unwrap() {
             "ldaxr" | "stlxr" | "ldxr" | "stxr" | "ldar" | "stlr" | "ldarb" | "ldarh" | "ldaxp"
             | "ldaxrb" | "ldaxrh" | "stlrb" | "stlrh" | "stlxp" | "stlxrb" | "stlxrh" | "ldxrb"
             | "ldxrh" | "stxrb" | "stxrh" => return None,
@@ -2218,7 +2231,7 @@ impl AsanRuntime {
         }
 
         let operands = capstone
-            .insn_detail(instr)
+            .insn_detail(cs_instr)
             .unwrap()
             .arch_detail()
             .operands();
@@ -2232,7 +2245,7 @@ impl AsanRuntime {
                     opmem.base(),
                     opmem.index(),
                     opmem.disp(),
-                    instruction_width(instr, &operands),
+                    instruction_width(cs_instr, &operands),
                     arm64operand.shift,
                     arm64operand.ext,
                 ));
@@ -2253,9 +2266,7 @@ impl AsanRuntime {
         instr: &Insn,
     ) -> Option<(RegId, u8, RegId, RegId, i32, i64)> {
         // We need to re-decode frida-internal capstone values to upstream capstone
-        let cs_instr = capstone
-            .disasm_count(instr.bytes(), instr.address(), 1)
-            .unwrap();
+        let cs_instr = frida_to_cs(capstone, instr);
         let cs_instr = cs_instr.first().unwrap();
         let operands = capstone
             .insn_detail(cs_instr)
