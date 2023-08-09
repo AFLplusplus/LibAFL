@@ -44,23 +44,6 @@ pub fn merge(
         return Err(Error::illegal_argument("Missing corpora to minimize; you should provide one directory to minimize into and one-to-many from which the inputs are loaded."));
     }
 
-    let mut rand = StdRand::new();
-
-    let corpus_dir = if options.dirs().first().unwrap().exists()
-        && options
-            .dirs()
-            .first()
-            .unwrap()
-            .read_dir()?
-            .any(|entry| entry.map_or(true, |e| !(e.file_name() == "." || e.file_name() == "..")))
-    {
-        let temp = temp_dir().join(format!("libafl-merge-{}{}", rand.next(), rand.next()));
-        eprintln!("Warning: creating an intermediary directory for minimisation at {}. We will move your existing corpus dir to.", temp.to_str().unwrap());
-        temp
-    } else {
-        options.dirs().first().cloned().unwrap()
-    };
-
     let crash_corpus = if let Some(prefix) = options.artifact_prefix() {
         OnDiskCorpus::with_meta_format_and_prefix(
             prefix.dir(),
@@ -158,7 +141,24 @@ pub fn merge(
     // scheduler doesn't really matter here
     let scheduler = MergeScheduler::new();
 
-    let mut state = state.unwrap_or_else(|| {
+    let mut state = state.map(|s| Ok(s)).unwrap_or_else(|| {
+        let mut rand = StdRand::new();
+
+        let corpus_dir = if options.dirs().first().unwrap().exists()
+            && options
+            .dirs()
+            .first()
+            .unwrap()
+            .read_dir()?
+            .any(|entry| entry.map_or(true, |e| !(e.file_name() == "." || e.file_name() == "..")))
+        {
+            let temp = temp_dir().join(format!("libafl-merge-{}{}", rand.next(), rand.next()));
+            eprintln!("Warning: creating an intermediary directory for minimisation at {}. We will move your existing corpus dir to.", temp.to_str().unwrap());
+            temp
+        } else {
+            options.dirs().first().cloned().unwrap()
+        };
+
         StdState::new(
             // RNG
             StdRand::new(),
@@ -172,8 +172,7 @@ pub fn merge(
             // A reference to the objectives, to create their objective state
             &mut objective,
         )
-        .expect("Failed to create state")
-    });
+    })?;
 
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective); // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
@@ -252,6 +251,7 @@ pub fn merge(
         state.corpus().count()
     );
 
+    let corpus_dir = state.corpus().dir_path().clone();
     if corpus_dir != options.dirs()[0] {
         let temp = temp_dir().join(format!(
             "libafl-merge-orig-{}{}",

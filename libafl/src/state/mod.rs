@@ -10,7 +10,6 @@ use core::{
 use std::{
     fs,
     path::{Path, PathBuf},
-    str::FromStr,
     vec::Vec,
 };
 

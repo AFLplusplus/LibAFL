@@ -254,6 +254,11 @@ where
             )?,
         })
     }
+
+    /// Path to the corpus directory associated with this corpus
+    pub fn dir_path(&self) -> &PathBuf {
+        &self.dir_path
+    }
 }
 
 #[cfg(feature = "python")]

@@ -242,6 +242,11 @@ where
             cache_max_len,
         })
     }
+
+    /// Fetch the inner corpus
+    pub fn inner(&self) -> &InMemoryOnDiskCorpus<I> {
+        &self.inner
+    }
 }
 
 /// ``CachedOnDiskCorpus`` Python bindings
