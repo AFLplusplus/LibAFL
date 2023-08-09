@@ -467,9 +467,9 @@ where
             if let Some(path) = self.remaining_initial_files.as_mut().and_then(Vec::pop) {
                 let filename = path.file_name().unwrap().to_string_lossy();
                 if filename.starts_with('.')
-                    || filename
-                        .rsplit_once('-')
-                        .map_or(false, |(_, s)| u64::from_str(s).is_ok())
+                // || filename
+                //     .rsplit_once('-')
+                //     .map_or(false, |(_, s)| u64::from_str(s).is_ok())
                 {
                     continue;
                 }
