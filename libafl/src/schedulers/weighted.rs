@@ -8,6 +8,8 @@ use hashbrown::HashMap;
 use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
+#[cfg(doc)]
+use crate::corpus::Testcase;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata},
     inputs::UsesInput,
