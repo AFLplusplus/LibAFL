@@ -252,7 +252,7 @@ where
     S: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
 {
-    /// Add an entry to the corpus and return its index
+    /// Add an entry to the corpus
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
 
