@@ -74,7 +74,7 @@ pub trait Scheduler: UsesState
 where
     Self::State: HasCorpus,
 {
-    /// Added an entry to the corpus at the given index
+    /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, _state: &mut Self::State, _idx: CorpusId) -> Result<(), Error>;
     // Add parent_id here if it has no inner
 
