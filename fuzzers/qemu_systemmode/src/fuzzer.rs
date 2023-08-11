@@ -4,17 +4,8 @@ use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
-        AsSlice,
-    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::EventConfig,
+    events::{launcher::Launcher, EventConfig},
     executors::{ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -27,6 +18,14 @@ use libafl::{
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
     Error,
+};
+use libafl_bolts::{
+    core_affinity::Cores,
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsSlice,
 };
 use libafl_qemu::{
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
@@ -89,6 +88,9 @@ pub fn fuzz() {
         emu.remove_breakpoint(main_addr);
 
         emu.set_breakpoint(breakpoint); // BREAKPOINT
+
+        let devices = emu.list_devices();
+        println!("Devices = {:?}", devices);
 
         // let saved_cpu_states: Vec<_> = (0..emu.num_cpus())
         //     .map(|i| emu.cpu_from_index(i).save_state())

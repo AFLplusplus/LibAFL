@@ -5,10 +5,12 @@ use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
+use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
+#[cfg(doc)]
+use crate::corpus::Testcase;
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
@@ -85,7 +87,7 @@ impl WeightedScheduleMetadata {
     }
 }
 
-crate::impl_serdeany!(WeightedScheduleMetadata);
+libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
@@ -302,7 +304,7 @@ where
     O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
-    /// Add an entry to the corpus and return its index
+    /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
 

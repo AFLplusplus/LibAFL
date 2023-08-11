@@ -55,7 +55,8 @@ pub fn autotokens() -> Result<Tokens, Error> {
 #[no_mangle]
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE;
 pub use __afl_map_size as EDGES_MAP_PTR_NUM;
-use libafl::{bolts::ownedref::OwnedMutSlice, observers::StdMapObserver};
+use libafl::observers::StdMapObserver;
+use libafl_bolts::ownedref::OwnedMutSlice;
 
 /// Gets the edges map from the `EDGES_MAP_PTR` raw pointer.
 /// Assumes a `len` of `EDGES_MAP_PTR_NUM`.
@@ -146,11 +147,11 @@ mod swap {
     use core::fmt::Debug;
 
     use libafl::{
-        bolts::{ownedref::OwnedMutSlice, tuples::Named, AsMutSlice},
         inputs::UsesInput,
         observers::{DifferentialObserver, Observer, ObserversTuple, StdMapObserver},
         Error,
     };
+    use libafl_bolts::{ownedref::OwnedMutSlice, AsMutSlice, Named};
     use serde::{Deserialize, Serialize};
 
     use super::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};

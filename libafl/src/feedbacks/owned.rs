@@ -1,9 +1,9 @@
 //! A dynamic collection of owned FeedbackStates
 
 use alloc::{boxed::Box, vec::Vec};
+use libafl_bolts::anymap::AsAny;
 
 use crate::{
-    bolts::anymap::AsAny,
     feedbacks::{FeedbackState, FeedbackStateTuple},
     Error,
 };

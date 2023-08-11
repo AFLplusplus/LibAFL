@@ -3,10 +3,11 @@
 use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
 
+use libafl_bolts::tuples::MatchName;
+
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    bolts::tuples::MatchName,
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers, ShadowExecutor},
     inputs::{BytesInput, UsesInput},

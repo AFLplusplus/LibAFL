@@ -7,7 +7,6 @@ use {
         io::{Read, Write},
         net::{SocketAddr, TcpStream},
         os::fd::RawFd,
-        str::from_utf8,
         thread::spawn,
         time::{Duration, SystemTime},
     },
@@ -61,8 +60,7 @@ impl Parent {
     }
 
     fn log_packets(direction: &Direction, buffer: &[u8]) -> Result<()> {
-        for pkt in from_utf8(buffer)
-            .map_err(|e| anyhow!("Failed to read buffer: {e:}"))?
+        for pkt in String::from_utf8_lossy(buffer)
             .split('$')
             .filter(|x| !x.is_empty())
             .filter(|x| x != &"+")
@@ -73,8 +71,7 @@ impl Parent {
     }
 
     fn log_io(channel: &Channel, buffer: &[u8]) -> Result<()> {
-        for line in from_utf8(buffer)
-            .map_err(|e| anyhow!("Failed to read buffer: {e:}"))?
+        for line in String::from_utf8_lossy(buffer)
             .lines()
             .filter(|x| !x.is_empty())
         {

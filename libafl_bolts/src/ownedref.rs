@@ -10,7 +10,7 @@ use core::{clone::Clone, fmt::Debug, slice};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::bolts::{AsMutSlice, AsSlice, Truncate};
+use crate::{AsMutSlice, AsSlice, Truncate};
 
 /// Trait to convert into an Owned type
 pub trait IntoOwned {

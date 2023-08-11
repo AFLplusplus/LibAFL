@@ -13,15 +13,15 @@ use std::{
     vec::Vec,
 };
 
+#[cfg(test)]
+use libafl_bolts::rands::StdRand;
+use libafl_bolts::{
+    rands::Rand,
+    serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-#[cfg(test)]
-use crate::bolts::rands::StdRand;
 use crate::{
-    bolts::{
-        rands::Rand,
-        serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
-    },
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
@@ -951,10 +951,10 @@ pub mod pybind {
     use alloc::{boxed::Box, vec::Vec};
     use std::path::PathBuf;
 
+    use libafl_bolts::{ownedref::OwnedMutPtr, rands::pybind::PythonRand};
     use pyo3::{prelude::*, types::PyDict};
 
     use crate::{
-        bolts::{ownedref::OwnedMutPtr, rands::pybind::PythonRand},
         corpus::pybind::PythonCorpus,
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,

@@ -6,7 +6,7 @@
 //!
 //! ```rust
 //! # use std::thread;
-//! use libafl::bolts::core_affinity;
+//! use libafl_bolts::core_affinity;
 //!
 //! // Retrieve the IDs of all active CPU cores.
 //! # #[cfg(not(miri))]
@@ -369,7 +369,7 @@ mod windows {
         Threading::{GetCurrentThread, SetThreadGroupAffinity},
     };
 
-    use crate::bolts::core_affinity::{CoreId, Error};
+    use crate::core_affinity::{CoreId, Error};
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         let mut core_ids: Vec<CoreId> = Vec::new();

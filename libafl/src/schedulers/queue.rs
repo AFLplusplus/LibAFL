@@ -81,8 +81,9 @@ mod tests {
 
     use std::{fs, path::PathBuf};
 
+    use libafl_bolts::rands::StdRand;
+
     use crate::{
-        bolts::rands::StdRand,
         corpus::{Corpus, OnDiskCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,

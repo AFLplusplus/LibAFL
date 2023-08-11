@@ -1,13 +1,13 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
-    bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::{State, UsesState},
     Error,
 };
+use libafl_bolts::AsSlice;
 use libnyx::NyxReturnValue;
 
 use crate::helper::NyxHelper;

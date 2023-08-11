@@ -24,23 +24,25 @@ use std::process::Stdio;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use std::{fs::File, os::unix::io::AsRawFd};
 
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use libafl_bolts::os::startable_self;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use libafl_bolts::{
+    core_affinity::get_core_ids,
+    os::{dup2, fork, ForkResult},
+};
+use libafl_bolts::{
+    core_affinity::{CoreId, Cores},
+    shmem::ShMemProvider,
+};
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-use super::core_affinity::CoreId;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::bolts::{
-    core_affinity::get_core_ids,
-    os::{dup2, fork, ForkResult},
-};
 use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
-    bolts::{core_affinity::Cores, shmem::ShMemProvider},
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     monitors::Monitor,
     state::{HasClientPerfMonitor, HasExecutions},
@@ -167,6 +169,8 @@ where
             if self.cores.ids.iter().any(|&x| x == id.into()) {
                 index += 1;
                 self.shmem_provider.pre_fork()?;
+                // # Safety
+                // Fork is safe in general, apart from potential side effects to the OS and other threads
                 match unsafe { fork() }? {
                     ForkResult::Parent(child) => {
                         self.shmem_provider.post_fork(false)?;
@@ -175,6 +179,8 @@ where
                         log::info!("child spawned and bound to core {id}");
                     }
                     ForkResult::Child => {
+                        // # Safety
+                        // A call to `getpid` is safe.
                         log::info!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
@@ -230,6 +236,8 @@ where
 
             // Broker exited. kill all clients.
             for handle in &handles {
+                // # Safety
+                // Normal libc call, no dereferences whatsoever
                 unsafe {
                     libc::kill(*handle, libc::SIGINT);
                 }
@@ -254,7 +262,7 @@ where
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch(&mut self) -> Result<(), Error> {
-        use crate::bolts::core_affinity;
+        use libafl_bolts::core_affinity;
 
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
 

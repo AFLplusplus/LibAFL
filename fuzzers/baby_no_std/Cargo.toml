@@ -16,6 +16,7 @@ debug = true
 
 [dependencies]
 libafl = { default-features = false, path = "../../libafl/" }
+libafl_bolts = { default-features = false, path = "../../libafl_bolts/" }
 static-alloc = "0.2.3"
 
 [target.'cfg(unix)'.dependencies]

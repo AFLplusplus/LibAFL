@@ -1,15 +1,6 @@
 use std::path::PathBuf;
 
-#[cfg(target_vendor = "apple")]
-use libafl::bolts::shmem::UnixShMemProvider;
-#[cfg(windows)]
-use libafl::bolts::shmem::Win32ShMemProvider;
 use libafl::{
-    bolts::{
-        rands::{RandomSeed, StdRand},
-        shmem::ShMemProvider,
-        tuples::tuple_list,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     feedbacks::{CrashFeedback, ListFeedback},
@@ -21,6 +12,15 @@ use libafl::{
     stages::StdMutationalStage,
     state::StdState,
     Fuzzer, StdFuzzer,
+};
+#[cfg(target_vendor = "apple")]
+use libafl_bolts::shmem::UnixShMemProvider;
+#[cfg(windows)]
+use libafl_bolts::shmem::Win32ShMemProvider;
+use libafl_bolts::{
+    rands::{RandomSeed, StdRand},
+    shmem::ShMemProvider,
+    tuples::tuple_list,
 };
 use libafl_tinyinst::executor::TinyInstExecutorBuilder;
 static mut COVERAGE: Vec<u64> = vec![];

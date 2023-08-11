@@ -39,11 +39,8 @@ use serde::{Deserialize, Serialize};
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 use crate::{
-    bolts::{
-        shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-        AsMutSlice, AsSlice,
-    },
-    Error,
+    shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+    AsMutSlice, AsSlice, Error,
 };
 
 /// The default server name for our abstract shmem server
@@ -607,8 +604,7 @@ where
         let mut size_bytes = [0_u8; 4];
         client.stream.read_exact(&mut size_bytes)?;
         let size = u32::from_be_bytes(size_bytes);
-        let mut bytes = vec![];
-        bytes.resize(size as usize, 0_u8);
+        let mut bytes = vec![0; size.try_into().unwrap()];
         client
             .stream
             .read_exact(&mut bytes)
@@ -741,7 +737,7 @@ TODO: Fix test
 mod tests {
     use serial_test::serial;
 
-    use crate::bolts::{
+    use crate::{
         os::unix_shmem_server::ServedShMemProvider,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     };

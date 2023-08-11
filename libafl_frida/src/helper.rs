@@ -15,10 +15,10 @@ use frida_gum::instruction_writer::InstructionWriter;
 use frida_gum::CpuContext;
 use frida_gum::{stalker::Transformer, Gum, Module, ModuleDetails, ModuleMap, PageProtection};
 use libafl::{
-    bolts::{cli::FuzzerOptions, tuples::MatchFirstType},
     inputs::{HasTargetBytes, Input},
     Error,
 };
+use libafl_bolts::{cli::FuzzerOptions, tuples::MatchFirstType};
 #[cfg(unix)]
 use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]

@@ -56,7 +56,7 @@ impl GzipCompressor {
 
 #[cfg(test)]
 mod tests {
-    use crate::bolts::compress::GzipCompressor;
+    use crate::compress::GzipCompressor;
 
     #[test]
     fn test_compression() {

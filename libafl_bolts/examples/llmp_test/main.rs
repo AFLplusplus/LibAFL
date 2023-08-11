@@ -9,13 +9,10 @@ use core::time::Duration;
 use std::{num::NonZeroUsize, thread, time};
 
 #[cfg(feature = "std")]
-use libafl::{
-    bolts::{
-        llmp::{self, Tag},
-        shmem::{ShMemProvider, StdShMemProvider},
-        ClientId, SimpleStderrLogger,
-    },
-    Error,
+use libafl_bolts::{
+    llmp::{self, Tag},
+    shmem::{ShMemProvider, StdShMemProvider},
+    ClientId, Error, SimpleStderrLogger,
 };
 
 #[cfg(feature = "std")]
