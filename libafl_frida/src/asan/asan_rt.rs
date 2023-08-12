@@ -50,6 +50,8 @@ use libc::{getrlimit64, rlimit64};
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+use crate::utils::frida_to_cs;
 #[cfg(target_arch = "aarch64")]
 use crate::utils::instruction_width;
 use crate::{
@@ -112,15 +114,6 @@ const ASAN_EH_FRAME_DWORD_COUNT: usize = 14;
 const ASAN_EH_FRAME_FDE_OFFSET: u32 = 20;
 #[cfg(target_arch = "aarch64")]
 const ASAN_EH_FRAME_FDE_ADDRESS_OFFSET: u32 = 28;
-
-/// Translates a frida instruction to a capstone instruction.
-/// Returns a [`capstone::Instructions`] with a single [`capstone::Insn`] inside.
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-fn frida_to_cs<'a>(capstone: &'a Capstone, frida_insn: &Insn) -> capstone::Instructions<'a> {
-    capstone
-        .disasm_count(frida_insn.bytes(), frida_insn.address(), 1)
-        .unwrap()
-}
 
 /// The frida address sanitizer runtime, providing address sanitization.
 /// When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.

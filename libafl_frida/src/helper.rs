@@ -331,9 +331,7 @@ where
                         if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>() {
                             if let Some((op1, op2, special_case)) =
                                 CmpLogRuntime::cmplog_is_interesting_instruction(
-                                    &helper.capstone,
-                                    address,
-                                    instr,
+                                    &capstone, address, instr,
                                 )
                             {
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
