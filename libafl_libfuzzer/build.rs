@@ -69,9 +69,21 @@ fn main() {
 
     // // TODO this is definitely not compat with macOS/Windows...
     if cfg!(feature = "whole-archive") {
-        let mut command = Command::new("ld");
+        use std::path::Path;
+        let target_libdir = Command::new("rustc")
+            .args(["--print", "target-libdir"])
+            .output()
+            .expect("Couldn't find rustc's target-libdir");
+        let target_libdir = String::from_utf8(target_libdir.stdout).unwrap();
+        let target_libdir = Path::new(target_libdir.trim());
+
+        let rust_lld = target_libdir.join("../bin/rust-lld");
+        let rust_ar = target_libdir.join("../bin/llvm-ar"); // NOTE: depends on llvm-tools
+
+        let mut command = Command::new(rust_lld);
         command
-            .arg("-Ur")
+            .args(["-flavor", "gnu"])
+            .arg("-r")
             .arg("--whole-archive")
             .arg(lib_path)
             .args(["-o", custom_lib_dir.join("libFuzzer.o").to_str().expect("Invalid path characters present in your current directory prevent us from linking to the runtime")]);
@@ -81,7 +93,7 @@ fn main() {
             "Couldn't link runtime crate!"
         );
 
-        let mut command = Command::new("ar");
+        let mut command = Command::new(rust_ar);
         command
             .arg("cr")
             .arg(custom_lib_dir.join("libFuzzer.a"))
