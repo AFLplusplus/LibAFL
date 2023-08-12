@@ -53,9 +53,12 @@ use crate::{
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
-#[allow(clippy::ignored_unit_patterns)]
+#[allow(
+    clippy::type_complexity,
+    missing_debug_implementations,
+    clippy::ignored_unit_patterns
+)]
 #[derive(TypedBuilder)]
-#[allow(clippy::type_complexity, missing_debug_implementations)]
 pub struct Launcher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
