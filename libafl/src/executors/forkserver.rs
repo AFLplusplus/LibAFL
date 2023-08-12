@@ -105,14 +105,14 @@ impl ConfigTarget for Command {
     ) -> &mut Self {
         let func = move || {
             match dup2(ctl_read, FORKSRV_FD) {
-                Ok(_) => (),
+                Ok(()) => (),
                 Err(_) => {
                     return Err(io::Error::last_os_error());
                 }
             }
 
             match dup2(st_write, FORKSRV_FD + 1) {
-                Ok(_) => (),
+                Ok(()) => (),
                 Err(_) => {
                     return Err(io::Error::last_os_error());
                 }
@@ -132,7 +132,7 @@ impl ConfigTarget for Command {
         if use_stdin {
             let func = move || {
                 match dup2(fd, libc::STDIN_FILENO) {
-                    Ok(_) => (),
+                    Ok(()) => (),
                     Err(_) => {
                         return Err(io::Error::last_os_error());
                     }
