@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["fork", "build_libqasan"]
+default = ["fork", "build_libqasan", "serdeany_autoreg"]
 python = ["pyo3", "pyo3-build-config"]
 fork = ["libafl/fork"]
 build_libqasan = []
