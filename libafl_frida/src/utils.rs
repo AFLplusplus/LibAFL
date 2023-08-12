@@ -1,7 +1,9 @@
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+use capstone::Capstone;
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand},
-    Capstone, Insn,
+    Insn,
 };
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::Aarch64Register;
