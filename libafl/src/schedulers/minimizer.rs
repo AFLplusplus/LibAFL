@@ -189,7 +189,7 @@ where
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
-    /// Add an entry to the corpus and return its index
+    /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
         self.base.on_add(state, idx)?;
         self.update_score(state, idx)

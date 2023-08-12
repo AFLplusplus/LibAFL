@@ -214,7 +214,7 @@ where
                             continue;
                         }
 
-                        if top_acc.max_accounting[idx] >= self.accounting_map[idx] {
+                        if top_acc.max_accounting[idx] == self.accounting_map[idx] {
                             equal_score = true;
                         }
 

@@ -216,7 +216,7 @@ where
     S: HasCorpus + HasMetadata + HasRand + HasExecutions + HasTestcase,
     O: MapObserver,
 {
-    /// Add an entry to the corpus and return its index
+    /// Called when a [`Testcase`] is added to the corpus
     #[allow(clippy::cast_precision_loss)]
     fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
