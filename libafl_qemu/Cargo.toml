@@ -31,6 +31,9 @@ be = ["libafl_qemu_sys/be"]
 usermode = ["libafl_qemu_sys/usermode"]
 systemmode = ["libafl_qemu_sys/systemmode"]
 
+# SerdeAny features
+serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"] # Automatically register all `#[derive(SerdeAny)]` types at startup.
+
 slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
 
 clippy = [] # special feature for clippy, don't use in normal projects§
