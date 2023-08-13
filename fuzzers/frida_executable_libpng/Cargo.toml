@@ -30,7 +30,7 @@ libafl = { path = "../../libafl/", features = [ "std", "llmp_compression", "llmp
 libafl_bolts = { path = "../../libafl_bolts/" }
 capstone = "0.11.0"
 frida-gum = { version = "0.8.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
-libafl_fra = { path = "../../libafl_frida", features = ["cmplog"] }
+libafl_frida = { path = "../../libafl_frida", features = ["cmplog"] }
 libafl_targets = { path = "../../libafl_targets", features = ["sancov_cmplog"] }
 libc = "0.2"
 libloading = "0.7"
