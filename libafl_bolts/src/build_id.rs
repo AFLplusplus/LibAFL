@@ -6,13 +6,12 @@ use std::{
     env,
     fs::File,
     hash::{Hash, Hasher},
-    io,
+    io, sync::OnceLock,
 };
 
-use once_cell::sync::Lazy;
 use uuid::Uuid;
 
-static BUILD_ID: Lazy<Uuid> = Lazy::new(calculate);
+static BUILD_ID: OnceLock<Uuid> = OnceLock::new();
 
 /// Returns a [Uuid] uniquely representing the build of the current binary.
 ///
@@ -48,7 +47,7 @@ static BUILD_ID: Lazy<Uuid> = Lazy::new(calculate);
 #[inline]
 #[must_use]
 pub fn get() -> Uuid {
-    *BUILD_ID
+    *BUILD_ID.get_or_init(calculate)
 }
 
 fn from_exe<H: Hasher>(mut hasher: H) -> Result<H, ()> {

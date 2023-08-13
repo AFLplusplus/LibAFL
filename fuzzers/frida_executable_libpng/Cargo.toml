@@ -19,7 +19,7 @@ debug = true
 
 [build-dependencies]
 cc = { version = "1.0.42", features = ["parallel"] }
-which = "4.1"
+which = "4.4"
 xz2 = "0.1.6"
 flate2 = "1.0.22"
 tar = "0.4.37"
