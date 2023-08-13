@@ -26,7 +26,6 @@ mips = ["libafl_qemu/mips"] # build qemu for mips (el, use with the 'be' feature
 ppc = ["libafl_qemu/ppc"] # build qemu for powerpc
 hexagon = ["libafl_qemu/hexagon"] # build qemu for hexagon
 
-
 [build-dependencies]
 pyo3-build-config = { version = "0.15", optional = true }
 
