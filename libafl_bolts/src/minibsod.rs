@@ -622,7 +622,7 @@ fn write_crash<W: Write>(
 
 /// Generates a mini-BSOD given a signal and context.
 #[cfg(unix)]
-#[allow(clippy::non_ascii_literal)]
+#[allow(clippy::non_ascii_literal, clippy::too_many_lines)]
 pub fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
