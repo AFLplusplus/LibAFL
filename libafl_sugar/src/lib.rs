@@ -63,6 +63,7 @@ pub mod inmemory;
 pub use inmemory::InMemoryBytesCoverageSugar;
 
 #[cfg(target_os = "linux")]
+#[allow(clippy::ignored_unit_patterns)]
 pub mod qemu;
 #[cfg(target_os = "linux")]
 pub use qemu::QemuBytesCoverageSugar;
