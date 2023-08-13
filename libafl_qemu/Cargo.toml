@@ -57,7 +57,7 @@ meminterval = "0.3"
 thread_local = "1.1.4"
 capstone = "0.11.0"
 pyo3 = { version = "0.18.3", optional = true }
-rangemap = "1.0"
+rangemap = "1.3"
 log = "0.4.17"
 
 [build-dependencies]
