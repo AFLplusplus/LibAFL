@@ -688,7 +688,58 @@ pub fn generate_minibsod<W: Write>(
                         start = start + sz as usize;
                     }
                 }
+            } else {
+                return Err(std::io::Error::last_os_error());
             }
+        } else {
+            return Err(std::io::Error::last_os_error());
+        }
+    }
+
+    #[cfg(target_os = "openbsd")]
+    {
+        let mut pentry = std::mem::MaybeUninit::<libc::kinfo_vmentry>::uninit();
+        let mut s = std::mem::size_of::<libc::kinfo_vmentry>();
+        let arr = &[libc::CTL_KERN, libc::KERN_PROC_VMMAP, unsafe {
+            libc::getpid()
+        }];
+        let mib = arr.as_ptr();
+        let miblen = arr.len() as u32;
+        unsafe { (*pentry.as_mut_ptr()).kve_start = 0 };
+        if unsafe {
+            libc::sysctl(
+                mib,
+                miblen,
+                pentry.as_mut_ptr() as *mut libc::c_void,
+                &mut s,
+                std::ptr::null_mut(),
+                0,
+            )
+        } == 0
+        {
+            let end: u64 = s as u64;
+            unsafe {
+                let mut entry = pentry.assume_init();
+                while libc::sysctl(
+                    mib,
+                    miblen,
+                    &mut entry as *mut libc::kinfo_vmentry as *mut libc::c_void,
+                    &mut s,
+                    std::ptr::null_mut(),
+                    0,
+                ) == 0
+                {
+                    if entry.kve_end == end {
+                        break;
+                    }
+                    // OpenBSD's vm mappings have no knowledge of their paths on disk
+                    let i = format!("{}-{}\n", entry.kve_start, entry.kve_end);
+                    writer.write(&i.into_bytes())?;
+                    entry.kve_start = entry.kve_start + 1;
+                }
+            }
+        } else {
+            return Err(std::io::Error::last_os_error());
         }
     }
 
