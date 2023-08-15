@@ -6,7 +6,8 @@ use std::{
     env,
     fs::File,
     hash::{Hash, Hasher},
-    io, sync::OnceLock,
+    io,
+    sync::OnceLock,
 };
 
 use uuid::Uuid;
