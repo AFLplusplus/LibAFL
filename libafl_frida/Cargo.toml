@@ -12,8 +12,9 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = []
+default = ["serdeany_autoreg"]
 cmplog = []
+serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }

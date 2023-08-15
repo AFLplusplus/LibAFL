@@ -6,9 +6,12 @@ pub use simple::*;
 pub mod centralized;
 pub use centralized::*;
 #[cfg(feature = "std")]
+#[allow(clippy::ignored_unit_patterns)]
 pub mod launcher;
+#[allow(clippy::ignored_unit_patterns)]
 pub mod llmp;
 #[cfg(feature = "tcp_manager")]
+#[allow(clippy::ignored_unit_patterns)]
 pub mod tcp;
 use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(all(unix, feature = "std"))]
