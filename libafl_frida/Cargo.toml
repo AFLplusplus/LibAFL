@@ -26,9 +26,9 @@ libafl_targets = { path = "../libafl_targets", version = "0.10.1", features = ["
 nix = "0.26"
 libc = "0.2"
 hashbrown = "0.14"
-rangemap = "1.0"
-frida-gum-sys = { version = "0.8.0", features = [ "auto-download", "event-sink", "invocation-listener"] }
-frida-gum = { version = "0.13.1", features = [ "auto-download", "event-sink", "invocation-listener", "module-names"] }
+rangemap = "1.3"
+frida-gum-sys = { git = "https://github.com/frida/frida-rust.git", version = "0.8.0", features = [ "auto-download", "event-sink", "invocation-listener"] }
+frida-gum = { git = "https://github.com/frida/frida-rust.git", version = "0.13.1", features = [ "auto-download", "event-sink", "invocation-listener", "module-names"] }
 dynasmrt = "2"
 capstone = "0.11.0"
 color-backtrace ={ version = "0.5", features = [ "resolve-modules" ] }
