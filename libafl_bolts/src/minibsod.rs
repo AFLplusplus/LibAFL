@@ -732,14 +732,58 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     Ok(())
 }
 
+#[cfg(target_env = "apple")]
+fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
+    let ptask = std::mem::MaybeUninit::<libc::mach_task_t>::uninit();
+    // We start by the lowest virtual address from the userland' standpoint
+    let mut addr = libc::mach_vm_address_t = libc::MACH_VM_MIN_ADDRESS;
+    let mut cnt: libc::mach_msg_type_number_t = 0;
+    let mut sz: libc::mach_vm_size_t = 0;
+    let mut reg: libc::natural_t = 1;
+
+    let mut r =
+        unsafe { libc::task_for_pid(libc::mach_task_self(), libc::getpid(), ptask.as_mut_ptr()) };
+    if r != libc::KERN_SUCCESS {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let task = ptask.assume_init();
+
+    loop {
+        let pvminfo = std::mem::MaybeUninit::<libc::vm_regions_submap_info_64>::uninit();
+        cnt = libc::VM_REGION_SUBMAP_INFO_COUNT_64;
+        r = libc::mach_vm_region_recurse(
+            task,
+            &mut addr,
+            &mut sz,
+            &mut reg,
+            pvminfo.as_mut_ptr() as *mut libc::vm_region_recurse_info_t,
+            &cnt,
+        );
+        if r != libc::KERN_SUCCESS {
+            break;
+        }
+
+        let vminfo = pvminfo.assume_init();
+        // We are only interested by the first level of the maps
+        if !vminfo.is_submap {
+            let i = format!("{}-{}\n", addr, addr + sz);
+            writer.write(&i.into_bytes())?;
+        }
+        addr = addr + sz;
+    }
+
+    Ok(())
+}
+
 #[cfg(not(any(
     target_os = "freebsd",
     target_os = "openbsd",
+    target_env = "apple",
     any(target_os = "linux", target_os = "android"),
 )))]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     // TODO for other platforms
-    // Note that for apple, types might not be entirely mapped in libc due to mach crate.
     writeln!(writer, "{:━^100}", " / ")?;
     Ok(())
 }
