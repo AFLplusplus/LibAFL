@@ -1,0 +1,166 @@
+[[question]]
+id = "intro"
+title = "libafl_wizard: a tool to generate Libafl-based fuzzers."
+content = """
+Before starting, make sure that you know your target very well. Choosing the right components to build a fuzzer depends on the details of the implementation of your target.
+Knowing what you want before building a fuzzer can be extremely helpful when selecting the components that best fit your options and the restrictions of the environment.
+
+Details such as:
+\t*Having the source code of the target.
+\t*Implementing a harness function to fuzz your target.
+\t*Knowing the expected input by the target.
+\t*Providing an initial set of inputs.
+\t*The size of the target and the availability of memory.
+\t*The possibility of memory corruption.
+
+Can be helpful during this process.
+"""
+answers = [ "Next" ]
+next = [ "source code" ]
+code = []
+previous = 0
+skip = false
+
+[[question]]
+id = "source code"
+title = "Do you have the target's source code?"
+content = """
+Having the target's source code is interesting for performance. With the source code in hands, we can instrument the target, that is,
+place coverage information to help our fuzzer identify new points of execution.
+
+Without instrumentation on the source, we have to rely on third-party applications to provide this infromation for our fuzzer,
+such as QEMU, FRIDA or Tiny Inst. Note that QEMU only supports Linux.
+"""
+answers = [ "Yes", "No" ]
+next = [ "harness", "" ]
+code = [ 
+"""
+""",
+"""
+""" ]
+previous = 0
+skip = false
+
+[[question]]
+id = "harness"
+title = "Can you provide a harness function?"
+content = """
+Providing a harness also has an impact on performance, for it allows in-process fuzzing.
+"""
+answers = [ "Yes", "No" ]
+next = [ "special algorithm" ]
+code = [ 
+"""
+""",
+"""
+""" ]
+previous = 0
+skip = false
+
+[[question]]
+id = "special algorithm"
+title = "Do you want to use some special algorithm to select and update testcases from the corpus?"
+content = """
+Usually, a testcase that reaches a new execution point or achieves the desired objective, e.g. a crash on the target, are deemed interesting,
+stored for later use and then selected using a queue policy. However, we can determine which testcases to use based on other aspects: for
+instance, we can prioritize testacases that are smaller in size and take less time to execute (following a minimization policy).
+
+There are many algorithms supported by Libafl to choose, for more information about each, please read the libafl documentation on Schedulers
+and Stages.
+"""
+answers = [ "Yes", "No" ]
+next = [ "algorithm options", "special input" ]
+code = [ 
+"""
+""",
+"""
+""" ]
+previous = 0
+skip = false
+
+[[question]]
+id = "algorithm options"
+title = "Which of the following options would you like to use?"
+content = """
+(maybe give a quick explanation about each?)
+"""
+answers = [ "Accounting", "Ecofuzz", "Minimizer", "Power Scheduling", "Probabilistic Sampling", "Weighted" ]
+next = [ "special input" ]
+code = [ 
+"""
+""",
+"""
+""" ]
+previous = 0
+skip = false
+
+[[question]]
+id = "special input"
+title = "Does your target require some special type of input?"
+content = """
+Usually, libafl uses a map of bytes (BytesInput) to represent the input sent to the target for execution. (maybe cite some examples of data that can be represented as a map of bytes?)
+
+More abstract or complex inputs, such as Grammar-Based have their own type in libafl. There are many input representations supported by Libafl
+to choose, for more information about each, please read the libafl documentation on Inputs.
+"""
+answers = [ "Yes", "No" ]
+next = [ "input options", "crash/timeout" ]
+code = [ 
+"""
+""",
+"""
+""" ]
+previous = 0
+skip = false
+
+[[question]]
+id = "input options"
+title = "How can your input be represented?"
+content = """
+(again, maybe give a quick explanation about each?)
+"""
+answers = [ "Encoded", "Generalized", "Gramatron", "Nautilus" ]
+next = [ "crash/timeout" ]
+code = [ 
+"""
+""",
+"""
+""" ]
+previous = 0
+skip = false
+
+[[question]]
+id = "crash/timeout"
+title = "Do you expect to cause a crash and/or a timeout on the target?"
+content = """
+Determining the objective of the fuzzing campaign is essential to identify input that triggered critical errors on the target.
+
+(I think that by crash, the fuzzer can catch the signal that finished the program and by timeout we are able to catch infinite recursion?)
+"""
+answers = [ "Crash and Timeout", "Crash", "Timeout" ]
+next = [ "" ]
+code = [ 
+"""
+""",
+"""
+""" ]
+previous = 0
+skip = false
+
+[[question]]
+id = "corrupt"
+title = "Can your target corrupt memory used by the fuzzer?"
+content = """
+Well, under some circumstances, you may find your harness pretty unstable or your harness wreaks havoc on the global states.
+In this case, you want to fork it before executing the harness runs in the child process so that it doesn't break things.
+(from the book for now, don't know if I can explain it any better hahahaha)
+"""
+answers = [ "Yes", "No" ]
+next = [ "", "" ]
+code = [ 
+"""
+""",
+"""
+""" ]
+previous = 0
+skip = false

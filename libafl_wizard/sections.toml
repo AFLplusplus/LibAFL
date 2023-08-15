@@ -1,0 +1,10 @@
+in_process_skip_questions = [
+    "restart fuzzer",
+    "corrupt memory",
+    "in process timeout",
+]
+
+forkserver_skip_questions = [
+    "restart fuzzer llmp",
+    "forkserver timeout",
+]
