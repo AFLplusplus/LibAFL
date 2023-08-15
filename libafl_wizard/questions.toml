@@ -2,16 +2,19 @@
 id = "intro"
 title = "libafl_wizard: a tool to generate Libafl-based fuzzers."
 content = """
-Before starting, make sure that you know your target very well. Choosing the right components to build a fuzzer depends on the details of the implementation of your target.
-Knowing what you want before building a fuzzer can be extremely helpful when selecting the components that best fit your options and the restrictions of the environment.
+Before starting, make sure that you know your target very well. Choosing the right components to build a fuzzer depends on the details of the
+implementation of your target.
+
+Knowing what you want before building a fuzzer can be extremely helpful when selecting the components that best fit your options and the
+restrictions of the environment.
 
 Details such as:
-\t*Having the source code of the target.
-\t*Implementing a harness function to fuzz your target.
-\t*Knowing the expected input by the target.
-\t*Providing an initial set of inputs.
-\t*The size of the target and the availability of memory.
-\t*The possibility of memory corruption.
+    *Having the source code of the target.
+    *Implementing a harness function to fuzz your target.
+    *Knowing the expected input by the target.
+    *Providing an initial set of inputs.
+    *The size of the target and the availability of memory.
+    *The possibility of memory corruption.
 
 Can be helpful during this process.
 """
@@ -33,11 +36,7 @@ such as QEMU, FRIDA or Tiny Inst. Note that QEMU only supports Linux.
 """
 answers = [ "Yes", "No" ]
 next = [ "harness", "" ]
-code = [ 
-"""
-""",
-"""
-""" ]
+code = []
 previous = 0
 skip = false
 
@@ -53,6 +52,11 @@ code = [
 """
 """,
 """
+const MAP_SIZE: usize = 65536;
+
+let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
+shmem.write_to_env("__AFL_SHM_ID").unwrap();
+let shmem_buf = shmem.as_mut_slice();
 """ ]
 previous = 0
 skip = false
@@ -62,11 +66,10 @@ id = "special algorithm"
 title = "Do you want to use some special algorithm to select and update testcases from the corpus?"
 content = """
 Usually, a testcase that reaches a new execution point or achieves the desired objective, e.g. a crash on the target, are deemed interesting,
-stored for later use and then selected using a queue policy. However, we can determine which testcases to use based on other aspects: for
+stored for later use and then selected using a determined policy. However, we can select which testcases to use based on variable aspects: for
 instance, we can prioritize testacases that are smaller in size and take less time to execute (following a minimization policy).
 
-There are many algorithms supported by Libafl to choose, for more information about each, please read the libafl documentation on Schedulers
-and Stages.
+There are many algorithms supported by Libafl to choose, for more information, please read the libafl documentation on Schedulers and Stages.
 """
 answers = [ "Yes", "No" ]
 next = [ "algorithm options", "special input" ]
@@ -74,6 +77,9 @@ code = [
 """
 """,
 """
+let scheduler = QueueScheduler::new();
+
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 """ ]
 previous = 0
 skip = false
@@ -88,8 +94,50 @@ answers = [ "Accounting", "Ecofuzz", "Minimizer", "Power Scheduling", "Probabili
 next = [ "special input" ]
 code = [ 
 """
+let scheduler = CoverageAccountingScheduler::new(&mut state, QueueScheduler::new(), unsafe {
+    &ACCOUNTING_MEMOP_MAP
+    });
+
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 """,
 """
+let scheduler = EcoScheduler:new(&mut state, &observer);
+
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+""",
+"""
+let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+""",
+"""
+let scheduler = PowerQueueScheduler::new(
+    &mut state,
+    &observer,
+    PowerSchedule::FAST,
+);
+
+let mut stages = tuple_list!(PowerMutationalStage::new(mutator));
+""",
+"""
+let scheduler = ProbabilitySamplingScheduler::new();
+
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+""",
+"""
+let time_observer = TimeObserver::new("time");
+
+let scheduler = StdWeightedScheduler::with_schedule(
+    &mut state,
+    &observer,
+    Some(PowerSchedule::FAST),
+);
+
+let calibration = CalibrationStage::new(&map_feedback);
+
+let power = StdPowerMutationalStage::new(mutator);
+
+let mut stages = tuple_list!(calibration, power);
 """ ]
 previous = 0
 skip = false
@@ -109,6 +157,7 @@ code = [
 """
 """,
 """
+let mutator = StdScheduledMutator::new(havoc_mutations());
 """ ]
 previous = 0
 skip = false
@@ -119,12 +168,59 @@ title = "How can your input be represented?"
 content = """
 (again, maybe give a quick explanation about each?)
 """
-answers = [ "Encoded", "Generalized", "Gramatron", "Nautilus" ]
+answers = [ "Encoded", "Grimoire", "Gramatron", "Nautilus" ]
 next = [ "crash/timeout" ]
 code = [ 
 """
+let mutator = StdScheduledMutator::with_max_stack_pow(encoded_mutations(), 2);
 """,
 """
+let generalization = GeneralizationStage::new(&observer);
+
+let mutator = StdScheduledMutator::with_max_stack_pow(havoc_mutations(), 2);
+
+let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
+    tuple_list!(
+      GrimoireExtensionMutator::new(),
+      GrimoireRecursiveReplacementMutator::new(),
+      GrimoireStringReplacementMutator::new(),
+      GrimoireRandomDeleteMutator::new(),
+      GrimoireRandomDeleteMutator::new(),
+    ),
+    3,
+);
+
+let mut stages = tuple_list!(
+    generalization,
+    StdMutationalStage::new(mutator),
+    StdMutationalStage::transforming(grimoire_mutator)
+);
+""",
+"""
+let mutator = StdScheduledMutator::with_max_stack_pow(
+    tuple_list!(
+      GramatronRandomMutator::new(&generator),
+      GramatronRandomMutator::new(&generator),
+      GramatronRandomMutator::new(&generator),
+      GramatronSpliceMutator::new(),
+      GramatronSpliceMutator::new(),
+      GramatronRecursionMutator::new()
+    ),
+    2,
+);
+""",
+"""
+let mutator = StdScheduledMutator::with_max_stack_pow(
+        tuple_list!(
+            GramatronRandomMutator::new(&generator),
+            GramatronRandomMutator::new(&generator),
+            GramatronRandomMutator::new(&generator),
+            GramatronSpliceMutator::new(),
+            GramatronSpliceMutator::new(),
+            GramatronRecursionMutator::new()
+        ),
+        2,
+    );
 """ ]
 previous = 0
 skip = false
@@ -135,14 +231,29 @@ title = "Do you expect to cause a crash and/or a timeout on the target?"
 content = """
 Determining the objective of the fuzzing campaign is essential to identify input that triggered critical errors on the target.
 
+Telling the fuzzer that we are looking for a crash mens that a testcase, which causes a crash on the target, fullfills the objective and, differently from the ones
+that e.g. reach a new execution point, this testcase is saved in a separate folder for you to check the input that trigerred the crash.
+
+A timeout follows the same idea: a testcase that takes longer to execute than the defined timeout.
+
+It's even possible to join these two ideas to instruct the fuzzzer that any testcase, which causes a crash or takes long enough to execute, is stored.
+
 (I think that by crash, the fuzzer can catch the signal that finished the program and by timeout we are able to catch infinite recursion?)
 """
-answers = [ "Crash and Timeout", "Crash", "Timeout" ]
-next = [ "" ]
+answers = [ "Crash or Timeout", "Crash", "Timeout" ]
+next = [ "corrupt" ]
 code = [ 
 """
+let mut objective = feedback_or_fast!(
+    CrashFeedback::new(),
+    TimeoutFeedback::new()
+);
 """,
 """
+let mut objective = CrashFeedback::new();
+""",
+"""
+let mut objective = TimeoutFeedback::new();
 """ ]
 previous = 0
 skip = false
@@ -151,16 +262,33 @@ skip = false
 id = "corrupt"
 title = "Can your target corrupt memory used by the fuzzer?"
 content = """
-Well, under some circumstances, you may find your harness pretty unstable or your harness wreaks havoc on the global states.
+Under some circumstances, you may find your harness pretty unstable or your harness wreaks havoc on the global states.
 In this case, you want to fork it before executing the harness runs in the child process so that it doesn't break things.
-(from the book for now, don't know if I can explain it any better hahahaha)
+(from the book for now hahahaha)
 """
 answers = [ "Yes", "No" ]
 next = [ "", "" ]
 code = [ 
 """
+let mut executor = InProcessForkExecutor::new(
+        &mut harness,
+        tuple_list!(observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+        shmem_provider,
+    )
+    .expect("Failed to create the Executor");
 """,
 """
+let mut executor = InProcessExecutor::new(
+        &mut harness,
+        tuple_list!(observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+    )
+    .expect("Failed to create the Executor");
 """ ]
 previous = 0
 skip = false
