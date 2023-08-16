@@ -620,6 +620,174 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
+    match std::fs::read_to_string("/proc/self/maps") {
+        Ok(maps) => writer.write_all(maps.as_bytes())?,
+        Err(e) => writeln!(writer, "Couldn't load mappings: {e:?}")?,
+    };
+
+    Ok(())
+}
+
+#[cfg(target_os = "freebsd")]
+fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
+    let mut s: usize = 0;
+    let arr = &[libc::CTL_KERN, libc::KERN_PROC, libc::KERN_PROC_VMMAP, -1];
+    let mib = arr.as_ptr();
+    let miblen = arr.len() as u32;
+    if unsafe {
+        libc::sysctl(
+            mib,
+            miblen,
+            std::ptr::null_mut(),
+            &mut s,
+            std::ptr::null_mut(),
+            0,
+        )
+    } == 0
+    {
+        s = s * 4 / 3;
+        let mut buf: std::boxed::Box<[u8]> = vec![0; s].into_boxed_slice();
+        let bufptr = buf.as_mut_ptr() as *mut libc::c_void;
+        if unsafe { libc::sysctl(mib, miblen, bufptr, &mut s, std::ptr::null_mut(), 0) } == 0 {
+            let mut start = bufptr as usize;
+            let end = start + s;
+
+            unsafe {
+                while start < end {
+                    let entry = start as *mut u8 as *mut libc::kinfo_vmentry;
+                    let sz = (*entry).kve_structsize;
+                    if sz == 0 {
+                        break;
+                    }
+
+                    let i = format!(
+                        "{}-{} {:?}\n",
+                        (*entry).kve_start,
+                        (*entry).kve_end,
+                        (*entry).kve_path
+                    );
+                    writer.write(&i.into_bytes())?;
+
+                    start = start + sz as usize;
+                }
+            }
+        } else {
+            return Err(std::io::Error::last_os_error());
+        }
+    } else {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "openbsd")]
+fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
+    let mut pentry = std::mem::MaybeUninit::<libc::kinfo_vmentry>::uninit();
+    let mut s = std::mem::size_of::<libc::kinfo_vmentry>();
+    let arr = &[libc::CTL_KERN, libc::KERN_PROC_VMMAP, unsafe {
+        libc::getpid()
+    }];
+    let mib = arr.as_ptr();
+    let miblen = arr.len() as u32;
+    unsafe { (*pentry.as_mut_ptr()).kve_start = 0 };
+    if unsafe {
+        libc::sysctl(
+            mib,
+            miblen,
+            pentry.as_mut_ptr() as *mut libc::c_void,
+            &mut s,
+            std::ptr::null_mut(),
+            0,
+        )
+    } == 0
+    {
+        let end: u64 = s as u64;
+        unsafe {
+            let mut entry = pentry.assume_init();
+            while libc::sysctl(
+                mib,
+                miblen,
+                &mut entry as *mut libc::kinfo_vmentry as *mut libc::c_void,
+                &mut s,
+                std::ptr::null_mut(),
+                0,
+            ) == 0
+            {
+                if entry.kve_end == end {
+                    break;
+                }
+                // OpenBSD's vm mappings have no knowledge of their paths on disk
+                let i = format!("{}-{}\n", entry.kve_start, entry.kve_end);
+                writer.write(&i.into_bytes())?;
+                entry.kve_start = entry.kve_start + 1;
+            }
+        }
+    } else {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    Ok(())
+}
+
+#[cfg(target_env = "apple")]
+fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
+    let ptask = std::mem::MaybeUninit::<libc::mach_task_t>::uninit();
+    // We start by the lowest virtual address from the userland' standpoint
+    let mut addr = libc::mach_vm_address_t = libc::MACH_VM_MIN_ADDRESS;
+    let mut cnt: libc::mach_msg_type_number_t = 0;
+    let mut sz: libc::mach_vm_size_t = 0;
+    let mut reg: libc::natural_t = 1;
+
+    let mut r =
+        unsafe { libc::task_for_pid(libc::mach_task_self(), libc::getpid(), ptask.as_mut_ptr()) };
+    if r != libc::KERN_SUCCESS {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    let task = ptask.assume_init();
+
+    loop {
+        let pvminfo = std::mem::MaybeUninit::<libc::vm_regions_submap_info_64>::uninit();
+        cnt = libc::VM_REGION_SUBMAP_INFO_COUNT_64;
+        r = libc::mach_vm_region_recurse(
+            task,
+            &mut addr,
+            &mut sz,
+            &mut reg,
+            pvminfo.as_mut_ptr() as *mut libc::vm_region_recurse_info_t,
+            &cnt,
+        );
+        if r != libc::KERN_SUCCESS {
+            break;
+        }
+
+        let vminfo = pvminfo.assume_init();
+        // We are only interested by the first level of the maps
+        if !vminfo.is_submap {
+            let i = format!("{}-{}\n", addr, addr + sz);
+            writer.write(&i.into_bytes())?;
+        }
+        addr = addr + sz;
+    }
+
+    Ok(())
+}
+
+#[cfg(not(any(
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_env = "apple",
+    any(target_os = "linux", target_os = "android"),
+)))]
+fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
+    // TODO for other platforms
+    writeln!(writer, "{:━^100}", " / ")?;
+    Ok(())
+}
+
 /// Generates a mini-BSOD given a signal and context.
 #[cfg(unix)]
 #[allow(clippy::non_ascii_literal, clippy::too_many_lines)]
@@ -635,115 +803,8 @@ pub fn generate_minibsod<W: Write>(
     dump_registers(writer, ucontext)?;
     writeln!(writer, "{:━^100}", " BACKTRACE ")?;
     writeln!(writer, "{:?}", backtrace::Backtrace::new())?;
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        writeln!(writer, "{:━^100}", " MAPS ")?;
-
-        match std::fs::read_to_string("/proc/self/maps") {
-            Ok(maps) => writer.write_all(maps.as_bytes())?,
-            Err(e) => writeln!(writer, "Couldn't load mappings: {e:?}")?,
-        };
-    }
-
-    #[cfg(target_os = "freebsd")]
-    {
-        let mut s: usize = 0;
-        let arr = &[libc::CTL_KERN, libc::KERN_PROC, libc::KERN_PROC_VMMAP, -1];
-        let mib = arr.as_ptr();
-        let miblen = arr.len() as u32;
-        if unsafe {
-            libc::sysctl(
-                mib,
-                miblen,
-                std::ptr::null_mut(),
-                &mut s,
-                std::ptr::null_mut(),
-                0,
-            )
-        } == 0
-        {
-            s = s * 4 / 3;
-            let mut buf: std::boxed::Box<[u8]> = vec![0; s].into_boxed_slice();
-            let bufptr = buf.as_mut_ptr() as *mut libc::c_void;
-            if unsafe { libc::sysctl(mib, miblen, bufptr, &mut s, std::ptr::null_mut(), 0) } == 0 {
-                let mut start = bufptr as usize;
-                let end = start + s;
-
-                unsafe {
-                    while start < end {
-                        let entry = start as *mut u8 as *mut libc::kinfo_vmentry;
-                        let sz = (*entry).kve_structsize;
-                        if sz == 0 {
-                            break;
-                        }
-
-                        let i = format!(
-                            "{}-{} {:?}\n",
-                            (*entry).kve_start,
-                            (*entry).kve_end,
-                            (*entry).kve_path
-                        );
-                        writer.write(&i.into_bytes())?;
-
-                        start = start + sz as usize;
-                    }
-                }
-            } else {
-                return Err(std::io::Error::last_os_error());
-            }
-        } else {
-            return Err(std::io::Error::last_os_error());
-        }
-    }
-
-    #[cfg(target_os = "openbsd")]
-    {
-        let mut pentry = std::mem::MaybeUninit::<libc::kinfo_vmentry>::uninit();
-        let mut s = std::mem::size_of::<libc::kinfo_vmentry>();
-        let arr = &[libc::CTL_KERN, libc::KERN_PROC_VMMAP, unsafe {
-            libc::getpid()
-        }];
-        let mib = arr.as_ptr();
-        let miblen = arr.len() as u32;
-        unsafe { (*pentry.as_mut_ptr()).kve_start = 0 };
-        if unsafe {
-            libc::sysctl(
-                mib,
-                miblen,
-                pentry.as_mut_ptr() as *mut libc::c_void,
-                &mut s,
-                std::ptr::null_mut(),
-                0,
-            )
-        } == 0
-        {
-            let end: u64 = s as u64;
-            unsafe {
-                let mut entry = pentry.assume_init();
-                while libc::sysctl(
-                    mib,
-                    miblen,
-                    &mut entry as *mut libc::kinfo_vmentry as *mut libc::c_void,
-                    &mut s,
-                    std::ptr::null_mut(),
-                    0,
-                ) == 0
-                {
-                    if entry.kve_end == end {
-                        break;
-                    }
-                    // OpenBSD's vm mappings have no knowledge of their paths on disk
-                    let i = format!("{}-{}\n", entry.kve_start, entry.kve_end);
-                    writer.write(&i.into_bytes())?;
-                    entry.kve_start = entry.kve_start + 1;
-                }
-            }
-        } else {
-            return Err(std::io::Error::last_os_error());
-        }
-    }
-
-    Ok(())
+    writeln!(writer, "{:━^100}", " MAPS ")?;
+    write_minibsod(writer)
 }
 
 #[cfg(test)]
