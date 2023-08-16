@@ -1050,7 +1050,7 @@ impl Emulator {
         perms: MmapPerms,
     ) -> Result<GuestAddr, String> {
         self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
-            .map_err(|_| format!("Failed to map {addr}"))
+            .map_err(|()| format!("Failed to map {addr}"))
             .map(|addr| addr as GuestAddr)
     }
 
@@ -1067,7 +1067,7 @@ impl Emulator {
             perms,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
         )
-        .map_err(|_| format!("Failed to map {addr}"))
+        .map_err(|()| format!("Failed to map {addr}"))
         .map(|addr| addr as GuestAddr)
     }
 
