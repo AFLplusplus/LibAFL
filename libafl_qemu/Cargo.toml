@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["fork", "build_libqasan"]
+default = ["fork", "build_libqasan", "serdeany_autoreg"]
 python = ["pyo3", "pyo3-build-config"]
 fork = ["libafl/fork"]
 build_libqasan = []
@@ -30,6 +30,9 @@ be = ["libafl_qemu_sys/be"]
 
 usermode = ["libafl_qemu_sys/usermode"]
 systemmode = ["libafl_qemu_sys/systemmode"]
+
+# SerdeAny features
+serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"] # Automatically register all `#[derive(SerdeAny)]` types at startup.
 
 slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
 
