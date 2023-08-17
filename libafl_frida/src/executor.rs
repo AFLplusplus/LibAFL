@@ -34,6 +34,8 @@ where
     'a: 'b,
 {
     base: InProcessExecutor<'a, H, OT, S>,
+    // thread_id for the Stalker
+    thread_id: usize,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -85,7 +87,8 @@ where
             } else {
                 self.followed = true;
                 let transformer = self.helper.transformer();
-                self.stalker.follow_me::<NoneEventSink>(transformer, None);
+                self.stalker
+                    .follow::<NoneEventSink>(self.thread_id, transformer, None);
             }
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);
@@ -154,6 +157,7 @@ where
     pub fn new(
         gum: &'a Gum,
         base: InProcessExecutor<'a, H, OT, S>,
+        thread_id: usize,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     ) -> Self {
         let mut stalker = Stalker::new(gum);
@@ -187,6 +191,7 @@ where
 
         Self {
             base,
+            thread_id,
             stalker,
             helper,
             followed: false,
