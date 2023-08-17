@@ -14,7 +14,7 @@ categories = [
     "emulators",
     "embedded",
     "os",
-    "no-std",
+    "no-std"
 ]
 
 [features]
@@ -44,7 +44,7 @@ frida-gum-sys = { version = "0.4.1", features = [
     "event-sink",
     "invocation-listener",
 ] }
-frida-gum = { git = "https://github.com/frida/frida-rust", features = [
+frida-gum = { version = "0.8.1", features = [
     "auto-download",
     "event-sink",
     "invocation-listener",
