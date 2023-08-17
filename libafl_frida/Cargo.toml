@@ -28,8 +28,8 @@ nix = "0.26"
 libc = "0.2"
 hashbrown = "0.14"
 rangemap = "1.3"
-frida-gum-sys = { version = "0.4.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
-frida-gum = { version = "0.8.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
+frida-gum-sys = { version = "0.8.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
+frida-gum = { version = "0.13.2", features = [ "auto-download", "event-sink", "invocation-listener", "module-names"] }
 dynasmrt = "2"
 capstone = "0.11.0"
 color-backtrace ={ version = "0.5", features = [ "resolve-modules" ] }
