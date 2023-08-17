@@ -35,7 +35,7 @@ use libafl_bolts::{
     AsSlice,
 };
 pub use libafl_qemu::emu::Emulator;
-#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
+#[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::QemuCmpLogHelper;
 use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
 use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
