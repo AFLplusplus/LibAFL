@@ -8,7 +8,10 @@ use core::{
     ptr::{addr_of, copy_nonoverlapping, null},
 };
 #[cfg(emulation_mode = "systemmode")]
-use std::ffi::CString;
+use std::{
+    ffi::{CStr, CString},
+    ptr::null_mut,
+};
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
@@ -16,6 +19,8 @@ use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
 use strum_macros::EnumIter;
+
+use crate::GuestReg;
 
 pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
@@ -27,6 +32,43 @@ pub type GuestHwAddrInfo = libafl_qemu_sys::qemu_plugin_hwaddr;
 
 #[cfg(emulation_mode = "systemmode")]
 pub type FastSnapshot = *mut libafl_qemu_sys::syx_snapshot_t;
+
+#[cfg(emulation_mode = "systemmode")]
+pub enum DeviceSnapshotFilter {
+    All,
+    AllowList(Vec<String>),
+    DenyList(Vec<String>),
+}
+
+#[cfg(emulation_mode = "systemmode")]
+impl DeviceSnapshotFilter {
+    fn enum_id(&self) -> libafl_qemu_sys::device_snapshot_kind_t {
+        match self {
+            DeviceSnapshotFilter::All => {
+                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_ALL
+            }
+            DeviceSnapshotFilter::AllowList(_) => {
+                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_ALLOWLIST
+            }
+            DeviceSnapshotFilter::DenyList(_) => {
+                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_DENYLIST
+            }
+        }
+    }
+
+    fn devices(&self, v: &mut Vec<*mut i8>) -> *mut *mut i8 {
+        v.clear();
+        match self {
+            DeviceSnapshotFilter::All => null_mut(),
+            DeviceSnapshotFilter::AllowList(l) | DeviceSnapshotFilter::DenyList(l) => {
+                for name in l {
+                    v.push(name.as_bytes().as_ptr() as *mut i8);
+                }
+                v.as_mut_ptr()
+            }
+        }
+    }
+}
 
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -485,6 +527,28 @@ pub struct CPU {
     ptr: CPUStatePtr,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum CallingConvention {
+    Cdecl,
+}
+
+pub trait ArchExtras {
+    fn read_return_address<T>(&self) -> Result<T, String>
+    where
+        T: From<GuestReg>;
+    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>;
+    fn write_function_argument<T>(
+        &self,
+        conv: CallingConvention,
+        idx: i32,
+        val: T,
+    ) -> Result<(), String>
+    where
+        T: Into<GuestReg>;
+}
+
 #[allow(clippy::unused_self)]
 impl CPU {
     #[must_use]
@@ -617,8 +681,15 @@ impl CPU {
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
     where
         R: Into<i32>,
+        T: Into<GuestReg>,
     {
         let reg = reg.into();
+        #[cfg(feature = "be")]
+        let val = GuestReg::to_be(val.into());
+
+        #[cfg(not(feature = "be"))]
+        let val = GuestReg::to_le(val.into());
+
         let success = unsafe { libafl_qemu_write_reg(self.ptr, reg, addr_of!(val) as *const u8) };
         if success == 0 {
             Err(format!("Failed to write to register {reg}"))
@@ -630,6 +701,7 @@ impl CPU {
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
         R: Into<i32>,
+        T: From<GuestReg>,
     {
         unsafe {
             let reg = reg.into();
@@ -638,7 +710,11 @@ impl CPU {
             if success == 0 {
                 Err(format!("Failed to read register {reg}"))
             } else {
-                Ok(val.assume_init())
+                #[cfg(feature = "be")]
+                return Ok(GuestReg::from_be(val.assume_init()).into());
+
+                #[cfg(not(feature = "be"))]
+                return Ok(GuestReg::from_le(val.assume_init()).into());
             }
         }
     }
@@ -739,11 +815,7 @@ impl Emulator {
         envp.push(null());
         unsafe {
             #[cfg(emulation_mode = "usermode")]
-            qemu_user_init(
-                argc,
-                argv.as_ptr() as *const *const u8,
-                envp.as_ptr() as *const *const u8,
-            );
+            qemu_user_init(argc, argv.as_ptr(), envp.as_ptr());
             #[cfg(emulation_mode = "systemmode")]
             {
                 qemu_init(
@@ -861,7 +933,7 @@ impl Emulator {
 
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
     where
-        T: Num + PartialOrd + Copy,
+        T: Num + PartialOrd + Copy + Into<GuestReg>,
         R: Into<i32>,
     {
         self.current_cpu().unwrap().write_reg(reg, val)
@@ -869,7 +941,7 @@ impl Emulator {
 
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
-        T: Num + PartialOrd + Copy,
+        T: Num + PartialOrd + Copy + From<GuestReg>,
         R: Into<i32>,
     {
         self.current_cpu().unwrap().read_reg(reg)
@@ -978,7 +1050,7 @@ impl Emulator {
         perms: MmapPerms,
     ) -> Result<GuestAddr, String> {
         self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
-            .map_err(|_| format!("Failed to map {addr}"))
+            .map_err(|()| format!("Failed to map {addr}"))
             .map(|addr| addr as GuestAddr)
     }
 
@@ -995,7 +1067,7 @@ impl Emulator {
             perms,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
         )
-        .map_err(|_| format!("Failed to map {addr}"))
+        .map_err(|()| format!("Failed to map {addr}"))
         .map(|addr| addr as GuestAddr)
     }
 
@@ -1110,12 +1182,58 @@ impl Emulator {
     #[cfg(emulation_mode = "systemmode")]
     #[must_use]
     pub fn create_fast_snapshot(&self, track: bool) -> FastSnapshot {
-        unsafe { libafl_qemu_sys::syx_snapshot_create(track) }
+        unsafe {
+            libafl_qemu_sys::syx_snapshot_create(
+                track,
+                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_ALL,
+                null_mut(),
+            )
+        }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    #[must_use]
+    pub fn create_fast_snapshot_filter(
+        &self,
+        track: bool,
+        device_filter: &DeviceSnapshotFilter,
+    ) -> FastSnapshot {
+        let mut v = vec![];
+        unsafe {
+            libafl_qemu_sys::syx_snapshot_create(
+                track,
+                device_filter.enum_id(),
+                device_filter.devices(&mut v),
+            )
+        }
     }
 
     #[cfg(emulation_mode = "systemmode")]
     pub fn restore_fast_snapshot(&self, snapshot: FastSnapshot) {
         unsafe { libafl_qemu_sys::syx_snapshot_root_restore(snapshot) }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    pub fn list_devices(&self) -> Vec<String> {
+        let mut r = vec![];
+        unsafe {
+            let devices = libafl_qemu_sys::device_list_all();
+            if devices.is_null() {
+                return r;
+            }
+
+            let mut ptr = devices;
+            while !(*ptr).is_null() {
+                let c_str: &CStr = CStr::from_ptr(*ptr);
+                let name = c_str.to_str().unwrap().to_string();
+                r.push(name);
+
+                ptr = ptr.add(1);
+            }
+
+            libc::free(devices as *mut c_void);
+            r
+        }
     }
 
     #[cfg(emulation_mode = "usermode")]
@@ -1151,6 +1269,40 @@ impl Emulator {
 
     pub fn gdb_reply(&self, output: &str) {
         unsafe { libafl_qemu_gdb_reply(output.as_bytes().as_ptr(), output.len()) };
+    }
+}
+
+impl ArchExtras for Emulator {
+    fn read_return_address<T>(&self) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        self.current_cpu()
+            .ok_or("Failed to get current CPU")?
+            .read_return_address::<T>()
+    }
+
+    fn write_return_address<T>(&self, val: T) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        self.current_cpu()
+            .ok_or("Failed to get current CPU")?
+            .write_return_address::<T>(val)
+    }
+
+    fn write_function_argument<T>(
+        &self,
+        conv: CallingConvention,
+        idx: i32,
+        val: T,
+    ) -> Result<(), String>
+    where
+        T: Into<GuestReg>,
+    {
+        self.current_cpu()
+            .ok_or("Failed to get current CPU")?
+            .write_function_argument::<T>(conv, idx, val)
     }
 }
 

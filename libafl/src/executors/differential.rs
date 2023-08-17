@@ -4,10 +4,10 @@
 //!
 use core::{cell::UnsafeCell, fmt::Debug};
 
+use libafl_bolts::{ownedref::OwnedMutPtr, tuples::MatchName};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{ownedref::OwnedMutPtr, tuples::MatchName},
     executors::{Executor, ExitKind, HasObservers},
     inputs::UsesInput,
     observers::{DifferentialObserversTuple, ObserversTuple, UsesObservers},

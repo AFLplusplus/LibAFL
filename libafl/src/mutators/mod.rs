@@ -22,14 +22,13 @@ pub use tuneable::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+use alloc::vec::Vec;
+
+use libafl_bolts::{tuples::HasConstLen, Named};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 
-use crate::{
-    bolts::tuples::{HasConstLen, Named},
-    corpus::CorpusId,
-    Error,
-};
+use crate::{corpus::CorpusId, Error};
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event
 // We can use it to report which mutations generated the testcase in the broker logs
@@ -78,7 +77,7 @@ pub enum MutationResult {
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<I, S> {
+pub trait Mutator<I, S>: Named {
     /// Mutate a given input
     fn mutate(
         &mut self,
@@ -88,7 +87,33 @@ pub trait Mutator<I, S> {
     ) -> Result<MutationResult, Error>;
 
     /// Post-process given the outcome of the execution
+    #[inline]
     fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _stage_idx: i32,
+        _corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// A mutator that takes input, and returns a vector of mutated inputs.
+/// Simple as that.
+pub trait MultiMutator<I, S>: Named {
+    /// Mutate a given input up to `max_count` times,
+    /// or as many times as appropriate, if no `max_count` is given
+    fn multi_mutate(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        stage_idx: i32,
+        max_count: Option<usize>,
+    ) -> Result<Vec<I>, Error>;
+
+    /// Post-process given the outcome of the execution
+    #[inline]
+    fn multi_post_exec(
         &mut self,
         _state: &mut S,
         _stage_idx: i32,
@@ -133,9 +158,13 @@ pub trait MutatorsTuple<I, S>: HasConstLen {
         stage_idx: i32,
         corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error>;
+
+    /// Gets all names of the wrapped [`Mutator`]`s`.
+    fn names(&self) -> Vec<&str>;
 }
 
 impl<I, S> MutatorsTuple<I, S> for () {
+    #[inline]
     fn mutate_all(
         &mut self,
         _state: &mut S,
@@ -145,6 +174,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
         Ok(MutationResult::Skipped)
     }
 
+    #[inline]
     fn post_exec_all(
         &mut self,
         _state: &mut S,
@@ -154,6 +184,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
         Ok(())
     }
 
+    #[inline]
     fn get_and_mutate(
         &mut self,
         _index: MutationId,
@@ -164,6 +195,7 @@ impl<I, S> MutatorsTuple<I, S> for () {
         Ok(MutationResult::Skipped)
     }
 
+    #[inline]
     fn get_and_post_exec(
         &mut self,
         _index: usize,
@@ -173,11 +205,16 @@ impl<I, S> MutatorsTuple<I, S> for () {
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    #[inline]
+    fn names(&self) -> Vec<&str> {
+        Vec::new()
+    }
 }
 
 impl<Head, Tail, I, S> MutatorsTuple<I, S> for (Head, Tail)
 where
-    Head: Mutator<I, S> + Named,
+    Head: Mutator<I, S>,
     Tail: MutatorsTuple<I, S>,
 {
     fn mutate_all(
@@ -233,13 +270,22 @@ where
                 .get_and_post_exec(index - 1, state, stage_idx, corpus_idx)
         }
     }
+
+    fn names(&self) -> Vec<&str> {
+        let mut ret = self.1.names();
+        ret.insert(0, self.0.name());
+        ret
+    }
 }
 
 /// `Mutator` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use pyo3::prelude::*;
+    use core::ffi::CStr;
+
+    use libafl_bolts::Named;
+    use pyo3::{prelude::*, AsPyPointer};
 
     use super::{MutationResult, Mutator};
     use crate::{
@@ -259,6 +305,14 @@ pub mod pybind {
         #[must_use]
         pub fn new(obj: PyObject) -> Self {
             PyObjectMutator { inner: obj }
+        }
+    }
+
+    impl Named for PyObjectMutator {
+        fn name(&self) -> &str {
+            unsafe { CStr::from_ptr((*(*self.inner.as_ptr()).ob_type).tp_name) }
+                .to_str()
+                .unwrap()
         }
     }
 
@@ -322,7 +376,7 @@ pub mod pybind {
 
     macro_rules! unwrap_me_mut {
         ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonMutatorWrapper, {
+            libafl_bolts::unwrap_me_mut_body!($wrapper, $name, $body, PythonMutatorWrapper, {
                 StdHavoc
             },
             {
@@ -357,6 +411,15 @@ pub mod pybind {
             match &self.wrapper {
                 PythonMutatorWrapper::Python(pyo) => Some(pyo.inner.clone()),
                 PythonMutatorWrapper::StdHavoc(_) => None,
+            }
+        }
+    }
+
+    impl Named for PythonMutator {
+        fn name(&self) -> &str {
+            match &self.wrapper {
+                PythonMutatorWrapper::Python(pyo) => pyo.name(),
+                PythonMutatorWrapper::StdHavoc(_) => "StdHavocPythonMutator",
             }
         }
     }

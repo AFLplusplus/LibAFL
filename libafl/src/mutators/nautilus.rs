@@ -7,9 +7,9 @@ use grammartec::{
     mutator::Mutator as BackingMutator,
     tree::{Tree, TreeMutation},
 };
+use libafl_bolts::Named;
 
 use crate::{
-    bolts::tuples::Named,
     feedbacks::NautilusChunksMetadata,
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,

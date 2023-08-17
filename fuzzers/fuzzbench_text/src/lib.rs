@@ -17,14 +17,6 @@ use std::{
 use clap::{Arg, Command};
 use content_inspector::inspect;
 use libafl::{
-    bolts::{
-        current_nanos, current_time,
-        os::dup2,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsSlice,
-    },
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
@@ -53,6 +45,14 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
+use libafl_bolts::{
+    current_nanos, current_time,
+    os::dup2,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsSlice,
+};
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
@@ -64,7 +64,7 @@ use nix::{self, unistd::dup};
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
 #[allow(clippy::too_many_lines)]
-pub fn libafl_main() {
+pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();

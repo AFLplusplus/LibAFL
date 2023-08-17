@@ -5,10 +5,10 @@ use alloc::string::String;
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
+use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, CorpusId, HasTestcase},
     inputs::UsesInput,
     schedulers::{Scheduler, TestcaseScore},
@@ -34,7 +34,7 @@ pub struct ProbabilityMetadata {
     pub total_probability: f64,
 }
 
-crate::impl_serdeany!(ProbabilityMetadata);
+libafl_bolts::impl_serdeany!(ProbabilityMetadata);
 
 impl ProbabilityMetadata {
     /// Creates a new [`struct@ProbabilityMetadata`]
@@ -124,7 +124,7 @@ where
             let threshold = meta.total_probability * rand_prob;
             let mut k: f64 = 0.0;
             let mut ret = *meta.map.keys().last().unwrap();
-            for (idx, prob) in meta.map.iter() {
+            for (idx, prob) in &meta.map {
                 k += prob;
                 if k >= threshold {
                     ret = *idx;
@@ -152,8 +152,9 @@ where
 mod tests {
     use core::{borrow::BorrowMut, marker::PhantomData};
 
+    use libafl_bolts::rands::StdRand;
+
     use crate::{
-        bolts::rands::StdRand,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::{bytes::BytesInput, Input, UsesInput},

@@ -16,22 +16,23 @@ use std::{
     time::Duration,
 };
 
+use libafl_bolts::{
+    fs::{get_unique_std_input_file, InputFile},
+    tuples::MatchName,
+    AsSlice,
+};
+
 use super::HasObservers;
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
+#[cfg(feature = "std")]
+use crate::{inputs::Input, Error};
 use crate::{
-    bolts::{
-        fs::{get_unique_std_input_file, InputFile},
-        tuples::MatchName,
-        AsSlice,
-    },
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,
     std::borrow::ToOwned,
 };
-#[cfg(feature = "std")]
-use crate::{inputs::Input, Error};
 
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin
@@ -566,9 +567,9 @@ impl CommandExecutorBuilder {
         S: UsesInput,
     {
         let Some(program) = &self.program else {
-             return Err(Error::illegal_argument(
+            return Err(Error::illegal_argument(
                 "CommandExecutor::builder: no program set!",
-           ));
+            ));
         };
 
         let mut command = Command::new(program);
@@ -618,7 +619,8 @@ impl CommandExecutorBuilder {
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
-/// use libafl::{Error, bolts::AsSlice, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::UsesState};
+/// use libafl::{Error, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::UsesState};
+/// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///

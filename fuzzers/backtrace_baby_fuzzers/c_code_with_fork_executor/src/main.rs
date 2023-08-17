@@ -1,13 +1,6 @@
 use std::path::PathBuf;
 
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
-        AsSlice,
-    },
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::InProcessForkExecutor,
@@ -22,6 +15,13 @@ use libafl::{
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
+};
+use libafl_bolts::{
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsSlice,
 };
 use libc::{c_int, c_uchar};
 extern crate libc;

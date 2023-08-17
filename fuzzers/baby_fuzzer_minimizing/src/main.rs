@@ -3,6 +3,7 @@ use std::ptr::write_volatile;
 use std::{path::PathBuf, ptr::write};
 
 use libafl::prelude::*;
+use libafl_bolts::prelude::*;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];

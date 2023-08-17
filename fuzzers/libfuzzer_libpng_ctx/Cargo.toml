@@ -16,10 +16,11 @@ debug = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
-which = { version = "4.0.2" }
+which = "4.4"
 
 [dependencies]
 libafl = { path = "../../libafl/", features = ["std", "derive", "llmp_compression", "introspection"] }
+libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }

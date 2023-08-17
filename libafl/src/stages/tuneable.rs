@@ -2,14 +2,14 @@
 
 use core::{marker::PhantomData, time::Duration};
 
+use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    bolts::{current_time, rands::Rand},
     corpus::{Corpus, CorpusId},
-    impl_serdeany, mark_feature_time,
+    mark_feature_time,
     mutators::{MutationResult, Mutator},
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
@@ -60,7 +60,7 @@ pub fn set_seed_fuzz_time<S: HasMetadata>(state: &mut S, fuzz_time: Duration) ->
 }
 
 /// Get the time for a single seed to be used by this mutational stage
-pub fn get_seed_fuzz_time<S: HasMetadata>(state: &mut S) -> Result<Option<Duration>, Error> {
+pub fn get_seed_fuzz_time<S: HasMetadata>(state: &S) -> Result<Option<Duration>, Error> {
     state
         .metadata_map()
         .get::<TuneableMutationalStageMetadata>()
@@ -120,7 +120,9 @@ where
 
         start_timer!(state);
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else { return Ok(()); };
+        let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
+            return Ok(());
+        };
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
@@ -260,7 +262,7 @@ impl TuneableMutationalStage<(), (), (), (), ()> {
     }
 
     /// Set the time to mutate a single input in this mutational stage
-    pub fn seed_fuzz_time<S: HasMetadata>(state: &mut S) -> Result<Option<Duration>, Error> {
+    pub fn seed_fuzz_time<S: HasMetadata>(state: &S) -> Result<Option<Duration>, Error> {
         get_seed_fuzz_time(state)
     }
 }

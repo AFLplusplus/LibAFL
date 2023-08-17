@@ -1,3 +1,5 @@
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+use capstone::Capstone;
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand},
@@ -7,6 +9,8 @@ use capstone::{
 use frida_gum::instruction_writer::Aarch64Register;
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+use frida_gum_sys;
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 
@@ -131,4 +135,16 @@ pub fn writer_register(reg: capstone::RegId) -> X86Register {
         41 => X86Register::Rip,
         _ => X86Register::None, // Ignore Xax..Xip
     }
+}
+
+/// Translates a frida instruction to a capstone instruction.
+/// Returns a [`capstone::Instructions`] with a single [`capstone::Insn`] inside.
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+pub(crate) fn frida_to_cs<'a>(
+    capstone: &'a Capstone,
+    frida_insn: &frida_gum_sys::Insn,
+) -> capstone::Instructions<'a> {
+    capstone
+        .disasm_count(frida_insn.bytes(), frida_insn.address(), 1)
+        .unwrap()
 }

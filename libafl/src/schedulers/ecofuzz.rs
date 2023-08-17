@@ -49,7 +49,7 @@ pub struct EcoTestcaseMetadata {
     computed_score: f64,
 }
 
-crate::impl_serdeany!(EcoTestcaseMetadata);
+libafl_bolts::impl_serdeany!(EcoTestcaseMetadata);
 
 /// The state Metadata for `EcoScheduler`
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -64,7 +64,7 @@ pub struct EcoMetadata {
     regret: f64,
 }
 
-crate::impl_serdeany!(EcoMetadata);
+libafl_bolts::impl_serdeany!(EcoMetadata);
 
 /// A corpus scheduler implementing `EcoFuzz` (`https://www.usenix.org/conference/usenixsecurity20/presentation/yue`)
 #[derive(Clone, Debug)]
@@ -150,6 +150,7 @@ where
             if !was_fuzzed {
                 let selection = Some(id);
                 state.metadata_mut::<EcoMetadata>()?.state = EcoState::Exploration;
+                #[allow(clippy::unnecessary_literal_unwrap)] // false positive
                 return Ok(selection.expect("Error in the algorithm, this cannot be None"));
             }
         }
@@ -215,7 +216,7 @@ where
     S: HasCorpus + HasMetadata + HasRand + HasExecutions + HasTestcase,
     O: MapObserver,
 {
-    /// Add an entry to the corpus and return its index
+    /// Called when a [`Testcase`] is added to the corpus
     #[allow(clippy::cast_precision_loss)]
     fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();

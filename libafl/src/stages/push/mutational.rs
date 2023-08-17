@@ -7,11 +7,12 @@ use core::{
     fmt::Debug,
 };
 
+use libafl_bolts::rands::Rand;
+
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, CorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
@@ -21,7 +22,9 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand,
+    },
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -88,8 +91,14 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State:
-        HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
+    CS::State: HasClientPerfMonitor
+        + HasCorpus
+        + HasRand
+        + HasExecutions
+        + HasLastReportTime
+        + HasMetadata
+        + Clone
+        + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -202,8 +211,14 @@ where
     EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter<State = CS::State>,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State:
-        HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
+    CS::State: HasClientPerfMonitor
+        + HasCorpus
+        + HasRand
+        + HasExecutions
+        + HasMetadata
+        + HasLastReportTime
+        + Clone
+        + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,

@@ -18,8 +18,9 @@ categories = [
 ]
 
 [features]
-default = []
+default = ["serdeany_autoreg"]
 cmplog = []
+serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
@@ -27,7 +28,7 @@ cc = { version = "1.0", features = ["parallel"] }
 [dependencies]
 libafl = { path = "../libafl", default-features = false, version = "0.10.1", features = [
     "std",
-    "libafl_derive",
+    "derive",
     "frida_cli",
 ] }
 libafl_targets = { path = "../libafl_targets", version = "0.10.1", features = [
@@ -37,14 +38,14 @@ libafl_targets = { path = "../libafl_targets", version = "0.10.1", features = [
 
 nix = "0.26"
 libc = "0.2"
-hashbrown = "0.13"
-rangemap = "1.0"
-frida-gum-sys = { version = "0.4.1", features = [
+hashbrown = "0.14"
+rangemap = "1.3"
+frida-gum-sys = { version = "0.8.1", features = [
     "auto-download",
     "event-sink",
     "invocation-listener",
 ] }
-frida-gum = { version = "0.8.1", features = [
+frida-gum = { version = "0.13.2", features = [
     "auto-download",
     "event-sink",
     "invocation-listener",
@@ -62,7 +63,7 @@ backtrace = { version = "0.3", default-features = false, features = [
 num-traits = "0.2"
 ahash = "0.8"
 paste = "1.0"
-log = "0.4.17"
+log = "0.4.20"
 
 [dev-dependencies]
 serial_test = "1"

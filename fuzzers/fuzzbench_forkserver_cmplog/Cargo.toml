@@ -1,0 +1,21 @@
+[package]
+name = "fuzzbench_forkserver_cmplog"
+version = "0.10.1"
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+edition = "2021"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+which = "4.4"
+
+[dependencies]
+libafl = { path = "../../libafl/" }
+libafl_bolts = { path = "../../libafl_bolts/" }
+clap = { version = "4.0", features = ["default"] }
+nix = "0.26"

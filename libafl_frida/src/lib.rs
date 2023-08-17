@@ -19,7 +19,8 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
     clippy::unreadable_literal,
-    clippy::ptr_cast_constness
+    clippy::ptr_cast_constness,
+    clippy::must_use_candidate
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -98,7 +99,7 @@ pub mod executor;
 pub mod utils;
 
 // for parsing asan and cmplog cores
-use libafl::bolts::core_affinity::{get_core_ids, CoreId, Cores};
+use libafl_bolts::core_affinity::{get_core_ids, CoreId, Cores};
 
 /// A representation of the various Frida options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

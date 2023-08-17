@@ -8,13 +8,6 @@ use std::{
 };
 
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
-        tuples::tuple_list,
-        AsMutSlice, AsSlice,
-    },
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::command::CommandConfigurator,
@@ -30,6 +23,13 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
     Error,
+};
+use libafl_bolts::{
+    current_nanos,
+    rands::StdRand,
+    shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
+    tuples::tuple_list,
+    AsMutSlice, AsSlice,
 };
 
 #[allow(clippy::similar_names)]

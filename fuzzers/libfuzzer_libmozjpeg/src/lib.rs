@@ -7,12 +7,6 @@ static GLOBAL: MiMalloc = MiMalloc;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        tuples::{tuple_list, Merge},
-        AsSlice,
-    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -31,6 +25,12 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
+use libafl_bolts::{
+    current_nanos,
+    rands::StdRand,
+    tuples::{tuple_list, Merge},
+    AsSlice,
+};
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CMP_MAP,
 };
@@ -42,7 +42,7 @@ extern "C" {
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 #[no_mangle]
-pub fn libafl_main() {
+pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();

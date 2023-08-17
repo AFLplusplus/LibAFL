@@ -2,10 +2,10 @@
 use alloc::{string::String, vec::Vec};
 use core::marker::PhantomData;
 
+use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::rands::Rand,
     generators::Generator,
     inputs::{GramatronInput, Terminal},
     state::HasRand,

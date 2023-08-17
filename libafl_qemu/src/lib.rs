@@ -7,6 +7,7 @@
     allow(clippy::useless_conversion)
 )]
 #![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::needless_pass_by_ref_mut)]
 #![allow(clippy::transmute_ptr_to_ptr)]
 #![allow(clippy::ptr_cast_constness)]
 #![allow(clippy::too_many_arguments)]
@@ -55,6 +56,11 @@ pub mod ppc;
 #[cfg(cpu_target = "ppc")]
 pub use ppc::*;
 
+#[cfg(cpu_target = "hexagon")]
+pub mod hexagon;
+#[cfg(cpu_target = "hexagon")]
+pub use hexagon::*;
+
 pub mod elf;
 
 pub mod helper;
@@ -65,22 +71,24 @@ pub use hooks::*;
 pub mod edges;
 pub use edges::QemuEdgeCoverageHelper;
 
-#[cfg(not(cpu_target = "mips"))]
+#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub mod cmplog;
-#[cfg(not(cpu_target = "mips"))]
+#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::QemuCmpLogHelper;
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod snapshot;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub use snapshot::QemuSnapshotHelper;
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod asan;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub use asan::{init_with_asan, QemuAsanHelper};
 
+#[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
+#[cfg(not(cpu_target = "hexagon"))]
 pub mod drcov;
 
 pub mod executor;

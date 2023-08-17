@@ -20,7 +20,7 @@ use crate::{
 /// The n fuzz size
 pub const N_FUZZ_SIZE: usize = 1 << 21;
 
-crate::impl_serdeany!(SchedulerMetadata);
+libafl_bolts::impl_serdeany!(SchedulerMetadata);
 
 /// The metadata used for power schedules
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -252,7 +252,7 @@ where
     S: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
 {
-    /// Add an entry to the corpus and return its index
+    /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
 

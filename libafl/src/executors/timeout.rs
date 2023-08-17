@@ -17,6 +17,8 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 
+#[cfg(target_os = "linux")]
+use libafl_bolts::current_time;
 #[cfg(all(unix, not(target_os = "linux")))]
 use libc::c_int;
 #[cfg(all(windows, feature = "std"))]
@@ -29,8 +31,6 @@ use windows::Win32::{
     },
 };
 
-#[cfg(target_os = "linux")]
-use crate::bolts::current_time;
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::inprocess::HasInProcessHandlers;
 #[cfg(any(windows, target_os = "linux"))]
@@ -218,11 +218,11 @@ impl<E> TimeoutExecutor<E> {
         self.exec_tmout = exec_tmout;
     }
 
-    pub(crate) fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool {
+    pub(crate) fn handle_timeout(&mut self, data: &InProcessExecutorHandlerData) -> bool {
         if !self.batch_mode {
             return false;
         }
-        // eprintln!("handle_timeout {:?} {}", self.avg_exec_time, self.avg_mul_k);
+        //eprintln!("handle_timeout {:?} {}", self.avg_exec_time, self.avg_mul_k);
         let cur_time = current_time();
         if !data.is_valid() {
             // outside the target
@@ -490,7 +490,7 @@ where
         if self.batch_mode {
             unsafe {
                 let elapsed = current_time() - self.tmout_start_time;
-                // elapsed may be > than tmout in case of reveived but ingored signal
+                // elapsed may be > than tmout in case of received but ingored signal
                 if elapsed > self.exec_tmout
                     || self.exec_tmout - elapsed < self.avg_exec_time * self.avg_mul_k
                 {

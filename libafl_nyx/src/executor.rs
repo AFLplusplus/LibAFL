@@ -1,13 +1,13 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
-    bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::{State, UsesState},
     Error,
 };
+use libafl_bolts::AsSlice;
 use libnyx::NyxReturnValue;
 
 use crate::helper::NyxHelper;
@@ -61,7 +61,13 @@ where
     ) -> Result<ExitKind, Error> {
         let input_owned = input.target_bytes();
         let input = input_owned.as_slice();
-        self.helper.nyx_process.set_input(input, input.len() as u32);
+        self.helper.nyx_process.set_input(
+            input,
+            input
+                .len()
+                .try_into()
+                .expect("Inputs larger than 4GB not supported"),
+        );
 
         // exec will take care of trace_bits, so no need to reset
         let ret_val = self.helper.nyx_process.exec();

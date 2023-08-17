@@ -31,6 +31,21 @@ You can choose the features by using `features = ["feature1", "feature2", ...]` 
 Out of this list, by default, `std`, `derive`, and `rand_trait` are already set.
 You can choose to disable them by setting `default-features = false` in your `Cargo.toml`.
 
+## [`libafl_bolts](https://github.com/AFLplusplus/LibAFL/tree/main/libafl)
+
+The `libafl_bolts` create is a minimal tool shed filled with useful low-level rust features, not necessarily related to fuzzers.
+In it, you'll find highlights like:
+
+- `core_affinity` to bind the current process to cores
+- `SerdeAnyMap` a map that can store typed values in a serializable fashion
+- `minibsod` to dump the current process state
+- `LLMP`, "low level message passing", a lock-free IPC mechanism
+- `Rand`, different fast (non-cryptographically secure) RNG implementations like RomuRand
+- `ShMem`, a platform independent shard memory implementation
+- `Tuples`, a compiletime tuple implementation
+
+... and much more.
+
 ### libafl_sugar
 
 The sugar crate abstracts away most of the complexity of LibAFL's API.
