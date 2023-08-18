@@ -217,7 +217,7 @@ where
                     emulator,
                     tuple_list!(
                         QemuEdgeCoverageHelper::default(),
-                        #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
+                        #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                         QemuCmpLogHelper::default(),
                     ),
                 );

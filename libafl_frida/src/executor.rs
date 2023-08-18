@@ -1,5 +1,5 @@
 use core::fmt::{self, Debug, Formatter};
-use std::{ffi::c_void, marker::PhantomData};
+use std::{ffi::c_void, marker::PhantomData, process};
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
@@ -153,12 +153,21 @@ where
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,
 {
-    /// Creates a new [`FridaInProcessExecutor`]
+    /// Creates a new [`FridaInProcessExecutor`].
     pub fn new(
         gum: &'a Gum,
         base: InProcessExecutor<'a, H, OT, S>,
-        thread_id: usize,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+    ) -> Self {
+        Self::new(gum, base, helper, process::id())
+    }
+
+    /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`.
+    pub fn on_thread(
+        gum: &'a Gum,
+        base: InProcessExecutor<'a, H, OT, S>,
+        helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+        thread_id: usize,
     ) -> Self {
         let mut stalker = Stalker::new(gum);
         // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
