@@ -35,7 +35,7 @@ where
 {
     base: InProcessExecutor<'a, H, OT, S>,
     // thread_id for the Stalker
-    thread_id: usize,
+    thread_id: u32,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -87,8 +87,11 @@ where
             } else {
                 self.followed = true;
                 let transformer = self.helper.transformer();
-                self.stalker
-                    .follow::<NoneEventSink>(self.thread_id, transformer, None);
+                self.stalker.follow::<NoneEventSink>(
+                    self.thread_id.try_into().unwrap(),
+                    transformer,
+                    None,
+                );
             }
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);
@@ -159,7 +162,7 @@ where
         base: InProcessExecutor<'a, H, OT, S>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     ) -> Self {
-        Self::new(gum, base, helper, process::id())
+        Self::on_thread(gum, base, helper, process::id())
     }
 
     /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`.
@@ -167,7 +170,7 @@ where
         gum: &'a Gum,
         base: InProcessExecutor<'a, H, OT, S>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
-        thread_id: usize,
+        thread_id: u32,
     ) -> Self {
         let mut stalker = Stalker::new(gum);
         // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
