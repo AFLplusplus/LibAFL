@@ -35,7 +35,9 @@ use libafl_bolts::{
     AsSlice,
 };
 pub use libafl_qemu::emu::Emulator;
-use libafl_qemu::{edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
+#[cfg(not(any(feature = "mips", feature = "hexagon")))]
+use libafl_qemu::QemuCmpLogHelper;
+use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
 use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
@@ -215,6 +217,7 @@ where
                     emulator,
                     tuple_list!(
                         QemuEdgeCoverageHelper::default(),
+                        #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
                         QemuCmpLogHelper::default(),
                     ),
                 );
