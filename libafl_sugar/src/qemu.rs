@@ -215,11 +215,13 @@ where
             if self.use_cmplog.unwrap_or(false) {
                 let mut hooks = QemuHooks::new(
                     emulator,
+                    #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     tuple_list!(
                         QemuEdgeCoverageHelper::default(),
-                        #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                         QemuCmpLogHelper::default(),
                     ),
+                    #[cfg(any(feature = "mips", feature = "hexagon"))]
+                    tupe_list!(QemuEdgeCoverageHelper::default()),
                 );
 
                 let executor = QemuExecutor::new(
