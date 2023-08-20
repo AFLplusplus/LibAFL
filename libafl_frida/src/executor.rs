@@ -166,7 +166,7 @@ where
         base: InProcessExecutor<'a, H, OT, S>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     ) -> Self {
-        Self::on_thread(gum, base, helper, None)
+        Self::_on_thread(gum, base, helper, None)
     }
 
     /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`.
