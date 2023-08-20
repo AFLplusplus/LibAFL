@@ -742,6 +742,17 @@ impl CPU {
     pub fn raw_ptr(&self) -> CPUStatePtr {
         self.ptr
     }
+
+    pub fn get_page_size(&self) -> usize {
+        #[cfg(emulation_mode = "usermode")]
+        {
+            4096usize
+        }
+        #[cfg(emulation_mode = "systemmode")]
+        {
+            libafl_qemu_sys::qemu_target_page_size()
+        }
+    }
 }
 
 static mut EMULATOR_IS_INITIALIZED: bool = false;
