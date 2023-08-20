@@ -1,5 +1,5 @@
 use core::fmt::{self, Debug, Formatter};
-use std::{ffi::c_void, marker::PhantomData, process};
+use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
