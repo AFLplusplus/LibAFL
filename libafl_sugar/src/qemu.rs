@@ -221,7 +221,7 @@ where
                         QemuCmpLogHelper::default(),
                     ),
                     #[cfg(any(feature = "mips", feature = "hexagon"))]
-                    tupe_list!(QemuEdgeCoverageHelper::default()),
+                    tuple_list!(QemuEdgeCoverageHelper::default()),
                 );
 
                 let executor = QemuExecutor::new(
