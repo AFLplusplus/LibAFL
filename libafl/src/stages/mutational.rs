@@ -158,6 +158,7 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 #[derive(Clone, Debug)]
 pub struct StdMutationalStage<E, EM, I, M, Z> {
     mutator: M,
+    max_iterations: u64,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
@@ -185,7 +186,7 @@ where
 
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
-        Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
+        Ok(1 + state.rand_mut().below(self.max_iterations))
     }
 }
 
@@ -238,7 +239,12 @@ where
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
-        Self::transforming(mutator)
+        Self::transforming(mutator, DEFAULT_MUTATIONAL_MAX_ITERATIONS)
+    }
+
+    /// Creates a new mutational stage with the given max iterations
+    pub fn with_iterations(mutator: M, max_iterations: u64) -> Self {
+        Self::transforming(mutator, max_iterations)
     }
 }
 
@@ -251,9 +257,10 @@ where
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
     /// Creates a new transforming mutational stage
-    pub fn transforming(mutator: M) -> Self {
+    pub fn transforming(mutator: M, max_iterations: u64) -> Self {
         Self {
             mutator,
+            max_iterations,
             phantom: PhantomData,
         }
     }
