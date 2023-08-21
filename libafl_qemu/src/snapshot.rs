@@ -698,10 +698,9 @@ where
 
             if sys_const == SYS_mremap {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                if let Ok(prot) = MmapPerms::try_from(a3 as i32) {
-                    h.add_mapped(result as GuestAddr, a2 as usize, Some(prot));
-                    h.remove_mapped(a0 as GuestAddr, a1 as usize);
-                }
+                // TODO get the old permissions from the removed mapping
+                h.remove_mapped(a0 as GuestAddr, a1 as usize);
+                h.add_mapped(result as GuestAddr, a2 as usize, None);
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
