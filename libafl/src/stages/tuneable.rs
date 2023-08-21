@@ -12,13 +12,12 @@ use crate::{
     corpus::{Corpus, CorpusId},
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    prelude::HasNamedMetadata,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
         MutationalStage, Stage,
     },
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, HasRand, UsesState},
     Error, Evaluator,
 };
 
