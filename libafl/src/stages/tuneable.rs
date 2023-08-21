@@ -1,8 +1,8 @@
 //! A [`crate::stages::MutationalStage`] where the mutator iteration can be tuned at runtime
 
+use alloc::string::{String, ToString};
 use core::{marker::PhantomData, time::Duration};
 
-use alloc::string::{String, ToString};
 use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
