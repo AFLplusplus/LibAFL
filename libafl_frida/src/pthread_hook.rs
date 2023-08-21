@@ -133,9 +133,11 @@ impl From<EventType> for libc::c_uint {
 ///# use libafl_frida::pthread_hook;
 ///# use std::time::Duration;
 ///# use std::thread;
-/// pthread_hook::install(|event, pthread, addr, size| {
+/// unsafe {
+///   pthread_hook::install(|event, pthread, addr, size| {
 ///     log::trace!("thread id=0x{:x} event={:?} addr={:?} size={:x}", pthread, event, addr, size);
-/// });
+///   });
+/// };
 ///# thread::spawn(|| {
 ///#     thread::sleep(Duration::from_millis(1));
 ///# });
@@ -174,7 +176,7 @@ where
 ///# use libafl_frida::pthread_hook;
 ///# use std::time::Duration;
 ///# use std::thread;
-/// pthread_hook::reset();
+/// unsafe { pthread_hook::reset() };
 /// ```
 ///
 /// # Safety
