@@ -243,7 +243,7 @@ where
     }
 
     /// Creates a new mutational stage with the given max iterations
-    pub fn with_iterations(mutator: M, max_iterations: u64) -> Self {
+    pub fn with_max_iterations(mutator: M, max_iterations: u64) -> Self {
         Self::transforming(mutator, max_iterations)
     }
 }
