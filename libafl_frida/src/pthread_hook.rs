@@ -20,7 +20,9 @@ type pthread_introspection_hook_t = extern "C" fn(
 );
 
 extern "C" {
-    fn pthread_introspection_hook_install(hook: *const libc::c_void) -> *const libc::c_void;
+    fn pthread_introspection_hook_install(
+        hook: *const pthread_introspection_hook_t,
+    ) -> *const pthread_introspection_hook_t;
 }
 
 struct PreviousHook(*const pthread_introspection_hook_t);
@@ -57,7 +59,7 @@ impl PreviousHook {
         }
         unsafe {
             self.0 = std::ptr::null();
-            pthread_introspection_hook_install(inner as *const libc::c_void);
+            pthread_introspection_hook_install(inner);
         }
     }
 }
@@ -66,7 +68,7 @@ impl PreviousHook {
 // Mark it as sync.
 unsafe impl Sync for PreviousHook {}
 
-#[allow(non_upper_case_globals)]
+// TODO: This could use a RwLock as well
 static mut PREVIOUS_HOOK: PreviousHook = PreviousHook(std::ptr::null());
 
 static CURRENT_HOOK: RwLock<Option<PthreadIntrospectionHook>> = RwLock::new(None);
@@ -156,12 +158,10 @@ where
     let mut new_hook = CURRENT_HOOK.write().unwrap();
     *new_hook = Some(Box::new(hook));
 
-    let prev = unsafe {
-        pthread_introspection_hook_install(pthread_introspection_hook as *const libc::c_void)
-    };
+    let prev = unsafe { pthread_introspection_hook_install(pthread_introspection_hook as _) };
 
     // Allow because we're sure this isn't from a different code generation unit.
-    if !(prev).is_null() && prev != pthread_introspection_hook as *const libc::c_void {
+    if !(prev).is_null() && prev != pthread_introspection_hook as _ {
         unsafe {
             PREVIOUS_HOOK.set(prev as *const pthread_introspection_hook_t);
         }
@@ -220,7 +220,7 @@ mod test {
                     let mut triggered = inner_triggered.lock().unwrap();
                     *triggered = true;
                 }
-            })
+            });
         };
 
         thread::spawn(|| {
@@ -244,7 +244,7 @@ mod test {
                     let mut triggered = inner_triggered.lock().unwrap();
                     *triggered = true;
                 }
-            })
+            });
         };
 
         thread::spawn(|| {
@@ -268,7 +268,7 @@ mod test {
                     let mut triggered = inner_triggered.lock().unwrap();
                     *triggered = true;
                 }
-            })
+            });
         };
 
         unsafe { super::reset() };
