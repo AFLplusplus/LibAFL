@@ -2,6 +2,7 @@
 
 use core::{marker::PhantomData, time::Duration};
 
+use alloc::string::{String, ToString};
 use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
@@ -11,6 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId},
     mark_feature_time,
     mutators::{MutationResult, Mutator},
+    prelude::HasNamedMetadata,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
         MutationalStage, Stage,
@@ -28,11 +30,14 @@ struct TuneableMutationalStageMetadata {
 
 impl_serdeany!(TuneableMutationalStageMetadata);
 
+/// The default name of the tunenable mutational stage.
+pub const DEFAULT_TUNEABLE_MUTATIONAL_STAGE_NAME: &str = "TuneableMutationalStage";
+
 /// Set the number of iterations to be used by this mutational stage
-pub fn set_iters<S: HasMetadata>(state: &mut S, iters: u64) -> Result<(), Error> {
+pub fn set_iters<S: HasNamedMetadata>(state: &mut S, iters: u64, name: &str) -> Result<(), Error> {
     let metadata = state
-        .metadata_map_mut()
-        .get_mut::<TuneableMutationalStageMetadata>()
+        .named_metadata_map_mut()
+        .get_mut::<TuneableMutationalStageMetadata>(name)
         .ok_or_else(|| Error::illegal_state("TuneableMutationalStage not in use"));
     metadata.map(|metadata| {
         metadata.iters = Some(iters);
@@ -40,19 +45,23 @@ pub fn set_iters<S: HasMetadata>(state: &mut S, iters: u64) -> Result<(), Error>
 }
 
 /// Get the set iterations
-pub fn get_iters<S: HasMetadata>(state: &S) -> Result<Option<u64>, Error> {
+pub fn get_iters<S: HasNamedMetadata>(state: &S, name: &str) -> Result<Option<u64>, Error> {
     state
-        .metadata_map()
-        .get::<TuneableMutationalStageMetadata>()
+        .named_metadata_map()
+        .get::<TuneableMutationalStageMetadata>(name)
         .ok_or_else(|| Error::illegal_state("TuneableMutationalStage not in use"))
         .map(|metadata| metadata.iters)
 }
 
 /// Set the time for a single seed to be used by this mutational stage
-pub fn set_seed_fuzz_time<S: HasMetadata>(state: &mut S, fuzz_time: Duration) -> Result<(), Error> {
+pub fn set_seed_fuzz_time<S: HasNamedMetadata>(
+    state: &mut S,
+    fuzz_time: Duration,
+    name: &str,
+) -> Result<(), Error> {
     let metadata = state
-        .metadata_map_mut()
-        .get_mut::<TuneableMutationalStageMetadata>()
+        .named_metadata_map_mut()
+        .get_mut::<TuneableMutationalStageMetadata>(name)
         .ok_or_else(|| Error::illegal_state("TuneableMutationalStage not in use"));
     metadata.map(|metadata| {
         metadata.fuzz_time = Some(fuzz_time);
@@ -60,19 +69,22 @@ pub fn set_seed_fuzz_time<S: HasMetadata>(state: &mut S, fuzz_time: Duration) ->
 }
 
 /// Get the time for a single seed to be used by this mutational stage
-pub fn get_seed_fuzz_time<S: HasMetadata>(state: &S) -> Result<Option<Duration>, Error> {
+pub fn get_seed_fuzz_time<S: HasNamedMetadata>(
+    state: &S,
+    name: &str,
+) -> Result<Option<Duration>, Error> {
     state
-        .metadata_map()
-        .get::<TuneableMutationalStageMetadata>()
+        .named_metadata_map()
+        .get::<TuneableMutationalStageMetadata>(name)
         .ok_or_else(|| Error::illegal_state("TuneableMutationalStage not in use"))
         .map(|metadata| metadata.fuzz_time)
 }
 
 /// Reset this to a normal, randomized, stage
-pub fn reset<S: HasMetadata>(state: &mut S) -> Result<(), Error> {
+pub fn reset<S: HasNamedMetadata>(state: &mut S, name: &str) -> Result<(), Error> {
     state
-        .metadata_map_mut()
-        .get_mut::<TuneableMutationalStageMetadata>()
+        .named_metadata_map_mut()
+        .get_mut::<TuneableMutationalStageMetadata>(name)
         .ok_or_else(|| Error::illegal_state("TuneableMutationalStage not in use"))
         .map(|metadata| {
             metadata.iters = None;
@@ -84,6 +96,7 @@ pub fn reset<S: HasMetadata>(state: &mut S) -> Result<(), Error> {
 #[derive(Clone, Debug)]
 pub struct TuneableMutationalStage<E, EM, I, M, Z> {
     mutator: M,
+    name: String,
     phantom: PhantomData<(E, EM, I, Z)>,
 }
 
@@ -93,7 +106,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// Runs this (mutational) stage for the given `testcase`
@@ -178,7 +191,7 @@ where
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_possible_truncation)]
     fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
-        Ok(if let Some(iters) = get_iters(state)? {
+        Ok(if let Some(iters) = self.iters(state)? {
             iters
         } else {
             // fall back to random
@@ -205,7 +218,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     #[inline]
@@ -227,43 +240,50 @@ where
     }
 }
 
-impl<E, EM, M, Z> TuneableMutationalStage<E, EM, Z::Input, M, Z>
+impl<E, EM, I, M, Z> TuneableMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: Mutator<Z::Input, Z::State>,
+    M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
 {
-    /// Creates a new default mutational stage
+    /// Creates a new default tuneable mutational stage
     #[must_use]
     pub fn new(state: &mut Z::State, mutator: M) -> Self {
-        Self::transforming(state, mutator)
+        Self::transforming(state, mutator, "TuneableMutationalStage")
     }
-}
 
-impl TuneableMutationalStage<(), (), (), (), ()> {
+    /// Crates a new tuneable mutational stage with the given name
+    pub fn with_name(state: &mut Z::State, mutator: M, name: &str) -> Self {
+        Self::transforming(state, mutator, name)
+    }
+
     /// Set the number of iterations to be used by this mutational stage
-    pub fn set_iters<S: HasMetadata>(state: &mut S, iters: u64) -> Result<(), Error> {
-        set_iters(state, iters)
+    pub fn set_iters<S: HasNamedMetadata>(&self, state: &mut S, iters: u64) -> Result<(), Error> {
+        set_iters(state, iters, &self.name)
     }
 
     /// Get the set iterations
-    pub fn iters<S: HasMetadata>(state: &S) -> Result<Option<u64>, Error> {
-        get_iters(state)
+    pub fn iters<S: HasNamedMetadata>(&self, state: &S) -> Result<Option<u64>, Error> {
+        get_iters(state, &self.name)
     }
 
     /// Set the time to mutate a single input in this mutational stage
-    pub fn set_seed_fuzz_time<S: HasMetadata>(
+    pub fn set_seed_fuzz_time<S: HasNamedMetadata>(
+        &self,
         state: &mut S,
         fuzz_time: Duration,
     ) -> Result<(), Error> {
-        set_seed_fuzz_time(state, fuzz_time)
+        set_seed_fuzz_time(state, fuzz_time, &self.name)
     }
 
     /// Set the time to mutate a single input in this mutational stage
-    pub fn seed_fuzz_time<S: HasMetadata>(state: &S) -> Result<Option<Duration>, Error> {
-        get_seed_fuzz_time(state)
+    pub fn seed_fuzz_time<S: HasNamedMetadata>(
+        &self,
+        state: &S,
+    ) -> Result<Option<Duration>, Error> {
+        get_seed_fuzz_time(state, &self.name)
     }
 }
 
@@ -273,16 +293,17 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata,
 {
     /// Creates a new tranforming mutational stage
     #[must_use]
-    pub fn transforming(state: &mut Z::State, mutator: M) -> Self {
-        if !state.has_metadata::<TuneableMutationalStageMetadata>() {
-            state.add_metadata(TuneableMutationalStageMetadata::default());
+    pub fn transforming(state: &mut Z::State, mutator: M, name: &str) -> Self {
+        if !state.has_named_metadata::<TuneableMutationalStageMetadata>(name) {
+            state.add_named_metadata(TuneableMutationalStageMetadata::default(), name);
         }
         Self {
             mutator,
+            name: name.to_string(),
             phantom: PhantomData,
         }
     }
