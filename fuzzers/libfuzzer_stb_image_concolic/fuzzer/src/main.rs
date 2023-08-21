@@ -13,13 +13,6 @@ use std::{
 
 use clap::{self, Parser};
 use libafl::{
-    bolts::{
-        current_nanos,
-        rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Named},
-        AsMutSlice, AsSlice,
-    },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{
@@ -48,6 +41,13 @@ use libafl::{
     },
     state::{HasCorpus, StdState},
     Error,
+};
+use libafl_bolts::{
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
+    AsMutSlice, AsSlice, Named,
 };
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
@@ -216,7 +216,7 @@ fn fuzz(
             // Create a concolic trace
             ConcolicTracingStage::new(
                 TracingStage::new(
-                    MyCommandConfigurator::default().into_executor(tuple_list!(concolic_observer))
+                    MyCommandConfigurator.into_executor(tuple_list!(concolic_observer))
                 ),
                 concolic_observer_name,
             ),

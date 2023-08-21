@@ -12,9 +12,10 @@ debug = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
-which = { version = "4.0.2" }
+which = "4.4"
 
 [dependencies]
 libafl = { path = "../../libafl/" }
+libafl_bolts = { path = "../../libafl_bolts/" }
 clap = { version = "4.0", features = ["default"] }
 nix = "0.26"

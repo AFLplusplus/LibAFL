@@ -18,14 +18,15 @@ debug = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
-which = { version = "4.0.2" }
+which = { version = "4.4" }
 
 [dependencies]
-libafl = { path = "../../libafl/", features = ["default"] }
 clap = { version = "4.0", features = ["derive"] }
 nix = "0.26"
-libafl_targets = { path = "../../libafl_targets/" }
+libafl = { path = "../../libafl/" }
+libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_cc = { path = "../../libafl_cc/" }
+libafl_targets = { path = "../../libafl_targets/" }
 
 [lib]
 name = "libforkserver_libafl_cc"

@@ -31,7 +31,7 @@ impl QemuDrCovMetadata {
     }
 }
 
-libafl::impl_serdeany!(QemuDrCovMetadata);
+libafl_bolts::impl_serdeany!(QemuDrCovMetadata);
 
 #[derive(Debug)]
 pub struct QemuDrCovHelper {

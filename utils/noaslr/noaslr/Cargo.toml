@@ -9,7 +9,7 @@ vergen = { version = "8.1.1", features = ["build", "cargo", "git", "gitcl", "rus
 [dependencies]
 anyhow = { version = "1.0.71", default-features = false }
 clap = { version = "4.2.0", default-features = false, features = ["derive", "string", "std", "help", "derive", "error-context", "usage"] }
-log = { version = "0.4.19", default-features = false }
+log = { version = "0.4.20", default-features = false }
 nix = { version = "0.26.2", default-features = false, features = ["process", "personality"] }
 readonly = { version = "0.2.8", default-features = false }
 simplelog = { version = "0.12.1", default-features = false }

@@ -7,17 +7,8 @@ use core::{
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
-    bolts::{
-        core_affinity::Cores,
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsSlice,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -35,8 +26,18 @@ use libafl::{
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
 };
+use libafl_bolts::{
+    core_affinity::Cores,
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsSlice,
+};
 pub use libafl_qemu::emu::Emulator;
-use libafl_qemu::{edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
+#[cfg(not(any(feature = "mips", feature = "hexagon")))]
+use libafl_qemu::QemuCmpLogHelper;
+use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
 use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
@@ -214,10 +215,13 @@ where
             if self.use_cmplog.unwrap_or(false) {
                 let mut hooks = QemuHooks::new(
                     emulator,
+                    #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     tuple_list!(
                         QemuEdgeCoverageHelper::default(),
                         QemuCmpLogHelper::default(),
                     ),
+                    #[cfg(any(feature = "mips", feature = "hexagon"))]
+                    tuple_list!(QemuEdgeCoverageHelper::default()),
                 );
 
                 let executor = QemuExecutor::new(
@@ -438,7 +442,7 @@ where
 pub mod pybind {
     use std::path::PathBuf;
 
-    use libafl::bolts::core_affinity::Cores;
+    use libafl_bolts::core_affinity::Cores;
     use libafl_qemu::emu::pybind::Emulator;
     use pyo3::{prelude::*, types::PyBytes};
 

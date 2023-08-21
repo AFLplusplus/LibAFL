@@ -15,11 +15,12 @@ use core::{
 
 use ahash::RandomState;
 use hashbrown::HashMap;
+use libafl_bolts::{Error, HasLen};
 #[cfg(feature = "regex")]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::HasLen, inputs::Input, Error};
+use crate::inputs::Input;
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
 pub trait InputEncoder<T>

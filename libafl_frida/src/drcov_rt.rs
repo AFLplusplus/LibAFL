@@ -6,10 +6,10 @@ use std::{
 
 use ahash::RandomState;
 use libafl::{
-    bolts::AsSlice,
     inputs::{HasTargetBytes, Input},
     Error,
 };
+use libafl_bolts::AsSlice;
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 

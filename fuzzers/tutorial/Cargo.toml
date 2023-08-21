@@ -16,10 +16,11 @@ debug = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
-which = { version = "4.0.2" }
+which = "4.4"
 
 [dependencies]
 libafl = { path = "../../libafl/", features = ["default", "rand_trait"] }
+libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer", "sancov_cmplog"] }
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 lain = { version = "0.5", features = ["serde_support"], git = "https://github.com/Mrmaxmeier/lain.git", rev = "6c8a786" } # We're using a lain fork with updated rand crate

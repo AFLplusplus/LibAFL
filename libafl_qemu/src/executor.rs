@@ -3,8 +3,9 @@ use core::fmt::{self, Debug, Formatter};
 
 #[cfg(feature = "fork")]
 use libafl::{
-    bolts::shmem::ShMemProvider, events::EventManager, executors::InProcessForkExecutor,
-    state::HasMetadata,
+    events::EventManager,
+    executors::InProcessForkExecutor,
+    state::{HasLastReportTime, HasMetadata},
 };
 use libafl::{
     events::{EventFirer, EventRestarter},
@@ -13,12 +14,11 @@ use libafl::{
     fuzzer::{HasFeedback, HasObjective, HasScheduler},
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasSolutions, State,
-        UsesState,
-    },
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
+#[cfg(feature = "fork")]
+use libafl_bolts::shmem::ShMemProvider;
 
 use crate::{emu::Emulator, helper::QemuHelperTuple, hooks::QemuHooks};
 

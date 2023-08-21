@@ -8,11 +8,11 @@ use core::{
 };
 
 use ahash::RandomState;
+use libafl_bolts::{HasLen, Named};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    bolts::{tuples::Named, HasLen},
     corpus::{Corpus, CorpusId, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},

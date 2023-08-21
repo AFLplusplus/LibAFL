@@ -17,6 +17,7 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../../libafl/", features = ["concolic_mutation"] }
+libafl_bolts = { path = "../../../libafl_bolts/" }
 libafl_targets = { path = "../../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer"] }
 clap = { version = "4.0", features = ["derive"]}
 mimalloc = { version = "*", default-features = false }
@@ -24,5 +25,5 @@ mimalloc = { version = "*", default-features = false }
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 cmake = "0.1"
-which = "4.1"
+which = "4.4"
 symcc_libafl = {path = "../../../libafl_concolic/symcc_libafl"}

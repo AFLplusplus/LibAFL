@@ -8,17 +8,8 @@ use std::{path::PathBuf, ptr::null};
 
 use frida_gum::Gum;
 use libafl::{
-    bolts::{
-        cli::{parse_args, FuzzerOptions},
-        current_nanos,
-        launcher::Launcher,
-        rands::StdRand,
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, Merge},
-        AsSlice,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{llmp::LlmpRestartingEventManager, EventConfig},
+    events::{launcher::Launcher, llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -37,6 +28,14 @@ use libafl::{
 };
 #[cfg(unix)]
 use libafl::{feedback_and_fast, feedbacks::ConstFeedback};
+use libafl_bolts::{
+    cli::{parse_args, FuzzerOptions},
+    current_nanos,
+    rands::StdRand,
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::{tuple_list, Merge},
+    AsSlice,
+};
 #[cfg(unix)]
 use libafl_frida::asan::{
     asan_rt::AsanRuntime,
@@ -55,15 +54,15 @@ pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -
 
     let options = parse_args();
 
-    let mut frida_harness = |input: &BytesInput| {
+    let frida_harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         let len = buf.len().to_string();
 
         let argv: [*const u8; 3] = [
             null(), // dummy value
-            len.as_ptr() as _,
-            buf.as_ptr() as _,
+            len.as_ptr().cast(),
+            buf.as_ptr().cast(),
         ];
 
         let env: [*const u8; 2] = [
@@ -76,7 +75,7 @@ pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -
     };
 
     unsafe {
-        match fuzz(&options, &mut frida_harness) {
+        match fuzz(&options, &frida_harness) {
             Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
             Err(e) => panic!("Error during fuzzing: {e:?}"),
         }

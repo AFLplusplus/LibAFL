@@ -15,6 +15,13 @@ use std::{
     process::{Command, Stdio},
 };
 
+use libafl_bolts::{
+    fs::{get_unique_std_input_file, InputFile},
+    os::{dup2, pipes::Pipe},
+    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    tuples::{MatchName, Prepend},
+    AsMutSlice, AsSlice, Truncate,
+};
 use nix::{
     sys::{
         select::{pselect, FdSet},
@@ -27,13 +34,6 @@ use nix::{
 #[cfg(feature = "regex")]
 use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
 use crate::{
-    bolts::{
-        fs::{get_unique_std_input_file, InputFile},
-        os::{dup2, pipes::Pipe},
-        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-        tuples::{MatchName, Prepend},
-        AsMutSlice, AsSlice, Truncate,
-    },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
@@ -105,14 +105,14 @@ impl ConfigTarget for Command {
     ) -> &mut Self {
         let func = move || {
             match dup2(ctl_read, FORKSRV_FD) {
-                Ok(_) => (),
+                Ok(()) => (),
                 Err(_) => {
                     return Err(io::Error::last_os_error());
                 }
             }
 
             match dup2(st_write, FORKSRV_FD + 1) {
-                Ok(_) => (),
+                Ok(()) => (),
                 Err(_) => {
                     return Err(io::Error::last_os_error());
                 }
@@ -132,7 +132,7 @@ impl ConfigTarget for Command {
         if use_stdin {
             let func = move || {
                 match dup2(fd, libc::STDIN_FILENO) {
-                    Ok(_) => (),
+                    Ok(()) => (),
                     Err(_) => {
                         return Err(io::Error::last_os_error());
                     }
@@ -1291,14 +1291,14 @@ where
 mod tests {
     use std::ffi::OsString;
 
+    use libafl_bolts::{
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+        tuples::tuple_list,
+        AsMutSlice,
+    };
     use serial_test::serial;
 
     use crate::{
-        bolts::{
-            shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-            tuples::tuple_list,
-            AsMutSlice,
-        },
         executors::forkserver::ForkserverExecutorBuilder,
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,

@@ -1,11 +1,15 @@
 //! Signal handling for unix
+#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+#[cfg(feature = "alloc")]
 use core::{
     cell::UnsafeCell,
-    fmt::{self, Display, Formatter},
-    mem, ptr,
-    ptr::{addr_of_mut, write_volatile},
+    ptr::{self, addr_of_mut, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
+};
+use core::{
+    fmt::{self, Display, Formatter},
+    mem,
 };
 #[cfg(feature = "std")]
 use std::ffi::CString;
@@ -241,11 +245,15 @@ use libc::ssize_t;
 )))]
 pub use libc::ucontext_t;
 use libc::{
-    c_int, malloc, sigaction, sigaddset, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
-    SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
-    SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
+    c_int, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE, SIGQUIT,
+    SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
 };
 pub use libc::{c_void, siginfo_t};
+#[cfg(feature = "alloc")]
+use libc::{
+    malloc, sigaction, sigaddset, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
+    SA_SIGINFO,
+};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::Error;
@@ -335,6 +343,7 @@ impl Display for Signal {
 }
 
 /// A trait for `LibAFL` signal handling
+#[cfg(feature = "alloc")]
 pub trait Handler {
     /// Handle a signal
     fn handle(&mut self, signal: Signal, info: siginfo_t, _context: &mut ucontext_t);
@@ -342,18 +351,24 @@ pub trait Handler {
     fn signals(&self) -> Vec<Signal>;
 }
 
+#[cfg(feature = "alloc")]
 struct HandlerHolder {
     handler: UnsafeCell<*mut dyn Handler>,
 }
 
+#[cfg(feature = "alloc")]
 unsafe impl Send for HandlerHolder {}
 
 /// Let's get 8 mb for now.
+#[cfg(feature = "alloc")]
 const SIGNAL_STACK_SIZE: usize = 2 << 22;
+
 /// To be able to handle SIGSEGV when the stack is exhausted, we need our own little stack space.
+#[cfg(feature = "alloc")]
 static mut SIGNAL_STACK_PTR: *mut c_void = ptr::null_mut();
 
 /// Keep track of which handler is registered for which signal
+#[cfg(feature = "alloc")]
 static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
     // We cannot use [None; 32] because it requires Copy. Ugly, but I don't think there's an
     // alternative.
@@ -362,9 +377,11 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 ];
 
 /// Internal function that is being called whenever a signal we are registered for arrives.
+///
 /// # Safety
 /// This should be somewhat safe to call for signals previously registered,
 /// unless the signal handlers registered using [`setup_signal_handler()`] are broken.
+#[cfg(feature = "alloc")]
 unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
     let signal = &Signal::try_from(sig).unwrap();
     let handler = {
@@ -378,13 +395,14 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
 
 /// Setup signal handlers in a somewhat rusty way.
 /// This will allocate a signal stack and set the signal handlers accordingly.
-/// It is, for example, used in the [`type@crate::executors::InProcessExecutor`] to restart the fuzzer in case of a crash,
+/// It is, for example, used in `LibAFL's` `InProcessExecutor` to restart the fuzzer in case of a crash,
 /// or to handle `SIGINT` in the broker process.
 ///
 /// # Safety
 ///
 /// The signal handlers will be called on any signal. They should (tm) be async safe.
 /// A lot can go south in signal handling. Be sure you know what you are doing.
+#[cfg(feature = "alloc")]
 pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {
     // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
     if SIGNAL_STACK_PTR.is_null() {

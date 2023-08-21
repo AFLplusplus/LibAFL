@@ -7,10 +7,10 @@ use core::{
     marker::PhantomData,
 };
 
+use libafl_bolts::{tuples::MatchName, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{MatchName, Named},
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
@@ -155,8 +155,9 @@ mod tests {
     use alloc::string::{String, ToString};
     use core::marker::PhantomData;
 
+    use libafl_bolts::{tuples::tuple_list, Named};
+
     use crate::{
-        bolts::tuples::{tuple_list, Named},
         events::EventFirer,
         executors::ExitKind,
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},

@@ -56,3 +56,5 @@ __pycache__
 
 libafl_nyx/QEMU-Nyx
 libafl_nyx/packer
+
+.z3-trace

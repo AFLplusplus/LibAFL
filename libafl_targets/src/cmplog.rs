@@ -6,13 +6,13 @@ use alloc::string::{String, ToString};
 use core::fmt::{self, Debug, Formatter};
 
 use libafl::{
-    bolts::{ownedref::OwnedMutPtr, tuples::Named},
     executors::ExitKind,
     inputs::UsesInput,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
     state::HasMetadata,
     Error,
 };
+use libafl_bolts::{ownedref::OwnedMutPtr, Named};
 
 use crate::{CMPLOG_MAP_H, CMPLOG_MAP_W};
 

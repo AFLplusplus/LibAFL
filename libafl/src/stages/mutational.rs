@@ -3,15 +3,16 @@
 
 use core::marker::PhantomData;
 
+use libafl_bolts::rands::Rand;
+
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, CorpusId, Testcase},
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
-    mutators::{MultipleMutator, MutationResult, Mutator},
+    mutators::{MultiMutator, MutationResult, Mutator},
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
@@ -260,28 +261,28 @@ where
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct MultipleMutationalStage<E, EM, I, M, Z> {
+pub struct MultiMutationalStage<E, EM, I, M, Z> {
     mutator: M,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
 
-impl<E, EM, I, M, Z> UsesState for MultipleMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, Z> UsesState for MultiMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: MultipleMutator<I, Z::State>,
+    M: MultiMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
     type State = Z::State;
 }
 
-impl<E, EM, I, M, Z> Stage<E, EM, Z> for MultipleMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, Z> Stage<E, EM, Z> for MultiMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: MultipleMutator<I, Z::State>,
+    M: MultiMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
@@ -303,14 +304,13 @@ where
         };
         drop(testcase);
 
-        let mut generated = vec![];
-        let _ = self.mutator.mutate(state, &input, &mut generated, 0)?;
+        let generated = self.mutator.multi_mutate(state, &input, 0, None)?;
         // println!("Generated {}", generated.len());
         for (i, new_input) in generated.into_iter().enumerate() {
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = new_input.try_transform_into(state)?;
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-            self.mutator.post_exec(state, i as i32, corpus_idx)?;
+            self.mutator.multi_post_exec(state, i as i32, corpus_idx)?;
             post.post_exec(state, i as i32, corpus_idx)?;
         }
         // println!("Found {}", found);
@@ -319,11 +319,11 @@ where
     }
 }
 
-impl<E, EM, M, Z> MultipleMutationalStage<E, EM, Z::Input, M, Z>
+impl<E, EM, M, Z> MultiMutationalStage<E, EM, Z::Input, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: MultipleMutator<Z::Input, Z::State>,
+    M: MultiMutator<Z::Input, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
@@ -333,11 +333,11 @@ where
     }
 }
 
-impl<E, EM, I, M, Z> MultipleMutationalStage<E, EM, I, M, Z>
+impl<E, EM, I, M, Z> MultiMutationalStage<E, EM, I, M, Z>
 where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
-    M: MultipleMutator<I, Z::State>,
+    M: MultiMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {

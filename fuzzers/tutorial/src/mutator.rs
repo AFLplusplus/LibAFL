@@ -1,12 +1,12 @@
 use lain::traits::Mutatable;
 use libafl::{
-    bolts::{
-        rands::{Rand, StdRand},
-        tuples::Named,
-    },
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
+};
+use libafl_bolts::{
+    rands::{Rand, StdRand},
+    Named,
 };
 
 use crate::input::PacketData;

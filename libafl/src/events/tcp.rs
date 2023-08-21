@@ -15,6 +15,17 @@ use std::{
     net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
 };
 
+#[cfg(feature = "std")]
+use libafl_bolts::core_affinity::CoreId;
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use libafl_bolts::os::startable_self;
+#[cfg(all(unix, feature = "std", not(miri)))]
+use libafl_bolts::os::unix_signals::setup_signal_handler;
+#[cfg(all(feature = "std", feature = "fork", unix))]
+use libafl_bolts::os::{fork, ForkResult};
+use libafl_bolts::{shmem::ShMemProvider, ClientId};
+#[cfg(feature = "std")]
+use libafl_bolts::{shmem::StdShMemProvider, staterestore::StateRestorer};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -25,20 +36,9 @@ use tokio::{
 use typed_builder::TypedBuilder;
 
 use super::{CustomBufEventResult, CustomBufHandlerFn};
-#[cfg(feature = "std")]
-use crate::bolts::core_affinity::CoreId;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", not(miri)))]
-use crate::bolts::os::unix_signals::setup_signal_handler;
-#[cfg(all(feature = "std", feature = "fork", unix))]
-use crate::bolts::os::{fork, ForkResult};
-#[cfg(feature = "std")]
-use crate::bolts::{shmem::StdShMemProvider, staterestore::StateRestorer};
 #[cfg(all(unix, feature = "std"))]
 use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
 use crate::{
-    bolts::{shmem::ShMemProvider, ClientId},
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
         EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
@@ -336,7 +336,7 @@ where
 }
 
 /// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
-/// using low-level message passing, [`crate::bolts::tcp`].
+/// using low-level message passing, [`libafl_bolts::tcp`].
 pub struct TcpEventManager<S>
 where
     S: UsesInput,
@@ -873,7 +873,7 @@ where
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
-#[allow(clippy::default_trait_access)]
+#[allow(clippy::default_trait_access, clippy::ignored_unit_patterns)]
 #[derive(TypedBuilder, Debug)]
 pub struct RestartingMgr<MT, S, SP>
 where

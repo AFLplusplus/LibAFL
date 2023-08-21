@@ -1,15 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use libafl::{
-    bolts::{
-        core_affinity::{CoreId, Cores},
-        launcher::Launcher,
-        rands::{RandomSeed, StdRand},
-        shmem::{ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
-    },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
-    events::EventConfig,
+    events::{launcher::Launcher, EventConfig},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::BytesInput,
     monitors::MultiMonitor,
@@ -19,6 +12,12 @@ use libafl::{
     stages::StdMutationalStage,
     state::StdState,
     Error, Fuzzer, StdFuzzer,
+};
+use libafl_bolts::{
+    core_affinity::{CoreId, Cores},
+    rands::{RandomSeed, StdRand},
+    shmem::{ShMemProvider, StdShMemProvider},
+    tuples::tuple_list,
 };
 use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper};
 

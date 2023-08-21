@@ -12,11 +12,11 @@ use core::{
     ops::{BitAnd, BitOr},
 };
 
+use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    bolts::{tuples::Named, AsIter, AsMutSlice, AsSlice, HasRefCnt},
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
@@ -207,7 +207,7 @@ where
     }
 }
 
-/// A filter that only saves values which are at least the next pow2 class
+/// Only consider `T::one()` or `T::max_value()`, if they are bigger than the old value, as novel
 #[derive(Clone, Debug)]
 pub struct OneOrFilledIsNovel {}
 impl<T> IsNovel<T> for OneOrFilledIsNovel
@@ -229,7 +229,7 @@ pub struct MapIndexesMetadata {
     pub tcref: isize,
 }
 
-crate::impl_serdeany!(MapIndexesMetadata);
+libafl_bolts::impl_serdeany!(MapIndexesMetadata);
 
 impl AsSlice for MapIndexesMetadata {
     type Entry = usize;
@@ -271,7 +271,7 @@ pub struct MapNoveltiesMetadata {
     pub list: Vec<usize>,
 }
 
-crate::impl_serdeany!(MapNoveltiesMetadata);
+libafl_bolts::impl_serdeany!(MapNoveltiesMetadata);
 
 impl AsSlice for MapNoveltiesMetadata {
     type Entry = usize;
@@ -308,7 +308,7 @@ where
     pub history_map: Vec<T>,
 }
 
-crate::impl_serdeany!(
+libafl_bolts::impl_serdeany!(
     MapFeedbackMetadata<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned>,
     <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<f32>,<f64>,<bool>,<char>
 );
