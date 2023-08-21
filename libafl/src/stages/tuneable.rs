@@ -251,7 +251,7 @@ where
     /// Creates a new default tuneable mutational stage
     #[must_use]
     pub fn new(state: &mut Z::State, mutator: M) -> Self {
-        Self::transforming(state, mutator, "TuneableMutationalStage")
+        Self::transforming(state, mutator, DEFAULT_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
     /// Crates a new tuneable mutational stage with the given name
