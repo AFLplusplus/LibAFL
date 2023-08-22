@@ -81,6 +81,9 @@ use libafl_bolts::AsSlice;
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
+#[cfg(not(feature = "serdeany_autoreg"))]
+compile_error!("serdeany_autoreg feature must be enabled.");
+
 mod feedbacks;
 mod fuzz;
 mod merge;
