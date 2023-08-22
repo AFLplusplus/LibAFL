@@ -34,6 +34,8 @@ where
     'a: 'b,
 {
     base: InProcessExecutor<'a, H, OT, S>,
+    // thread_id for the Stalker
+    thread_id: Option<u32>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -85,7 +87,15 @@ where
             } else {
                 self.followed = true;
                 let transformer = self.helper.transformer();
-                self.stalker.follow_me::<NoneEventSink>(transformer, None);
+                if let Some(thread_id) = self.thread_id {
+                    self.stalker.follow::<NoneEventSink>(
+                        thread_id.try_into().unwrap(),
+                        transformer,
+                        None,
+                    );
+                } else {
+                    self.stalker.follow_me::<NoneEventSink>(transformer, None);
+                }
             }
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);
@@ -150,11 +160,31 @@ where
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,
 {
-    /// Creates a new [`FridaInProcessExecutor`]
+    /// Creates a new [`FridaInProcessExecutor`].
     pub fn new(
         gum: &'a Gum,
         base: InProcessExecutor<'a, H, OT, S>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+    ) -> Self {
+        Self::_on_thread(gum, base, helper, None)
+    }
+
+    /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`.
+    pub fn on_thread(
+        gum: &'a Gum,
+        base: InProcessExecutor<'a, H, OT, S>,
+        helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+        thread_id: u32,
+    ) -> Self {
+        Self::_on_thread(gum, base, helper, Some(thread_id))
+    }
+
+    /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`, of `thread_id` is provided.
+    fn _on_thread(
+        gum: &'a Gum,
+        base: InProcessExecutor<'a, H, OT, S>,
+        helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+        thread_id: Option<u32>,
     ) -> Self {
         let mut stalker = Stalker::new(gum);
         // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
@@ -187,6 +217,7 @@ where
 
         Self {
             base,
+            thread_id,
             stalker,
             helper,
             followed: false,

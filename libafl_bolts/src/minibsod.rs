@@ -630,10 +630,19 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     Ok(())
 }
 
-#[cfg(target_os = "freebsd")]
+#[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     let mut s: usize = 0;
+    #[cfg(target_os = "freebsd")]
     let arr = &[libc::CTL_KERN, libc::KERN_PROC, libc::KERN_PROC_VMMAP, -1];
+    #[cfg(target_os = "netbsd")]
+    let arr = &[
+        libc::CTL_VM,
+        libc::VM_PROC,
+        libc::VM_PROC_MAP,
+        -1,
+        std::mem::size_of::<libc::kinfo_vmentry>() as i32,
+    ];
     let mib = arr.as_ptr();
     let miblen = arr.len() as u32;
     if unsafe {
@@ -657,7 +666,10 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
             unsafe {
                 while start < end {
                     let entry = start as *mut u8 as *mut libc::kinfo_vmentry;
-                    let sz = (*entry).kve_structsize;
+                    #[cfg(target_os = "freebsd")]
+                    let sz = (*entry).kve_structsize as usize;
+                    #[cfg(target_os = "netbsd")]
+                    let sz = std::mem::size_of::<libc::kinfo_vmentry>();
                     if sz == 0 {
                         break;
                     }
@@ -670,7 +682,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
                     );
                     writer.write(&i.into_bytes())?;
 
-                    start = start + sz as usize;
+                    start = start + sz;
                 }
             }
         } else {
@@ -779,6 +791,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 #[cfg(not(any(
     target_os = "freebsd",
     target_os = "openbsd",
+    target_os = "netbsd",
     target_env = "apple",
     any(target_os = "linux", target_os = "android"),
 )))]
@@ -790,7 +803,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 
 /// Generates a mini-BSOD given a signal and context.
 #[cfg(unix)]
-#[allow(clippy::non_ascii_literal)]
+#[allow(clippy::non_ascii_literal, clippy::too_many_lines)]
 pub fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,

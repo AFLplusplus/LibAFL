@@ -54,15 +54,15 @@ pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -
 
     let options = parse_args();
 
-    let mut frida_harness = |input: &BytesInput| {
+    let frida_harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
         let len = buf.len().to_string();
 
         let argv: [*const u8; 3] = [
             null(), // dummy value
-            len.as_ptr() as _,
-            buf.as_ptr() as _,
+            len.as_ptr().cast(),
+            buf.as_ptr().cast(),
         ];
 
         let env: [*const u8; 2] = [
@@ -75,7 +75,7 @@ pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -
     };
 
     unsafe {
-        match fuzz(&options, &mut frida_harness) {
+        match fuzz(&options, &frida_harness) {
             Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
             Err(e) => panic!("Error during fuzzing: {e:?}"),
         }
