@@ -166,7 +166,7 @@ pub enum Error {
     /// Serialization error
     Serialize(String, ErrorBacktrace),
     /// Compression error
-    #[cfg(feature = "llmp_compression")]
+    #[cfg(feature = "gzip")]
     Compression(ErrorBacktrace),
     /// File related error
     #[cfg(feature = "std")]
@@ -202,7 +202,7 @@ impl Error {
     {
         Error::Serialize(arg.into(), ErrorBacktrace::new())
     }
-    #[cfg(feature = "llmp_compression")]
+    #[cfg(feature = "gzip")]
     /// Compression error
     #[must_use]
     pub fn compression() -> Self {
@@ -300,7 +300,7 @@ impl Display for Error {
                 write!(f, "Error in Serialization: `{0}`", &s)?;
                 display_error_backtrace(f, b)
             }
-            #[cfg(feature = "llmp_compression")]
+            #[cfg(feature = "gzip")]
             Self::Compression(b) => {
                 write!(f, "Error in decompression")?;
                 display_error_backtrace(f, b)
@@ -476,7 +476,7 @@ pub mod build_id;
     feature = "std"
 ))]
 pub mod cli;
-#[cfg(feature = "llmp_compression")]
+#[cfg(feature = "gzip")]
 pub mod compress;
 #[cfg(feature = "std")]
 pub mod core_affinity;
@@ -828,7 +828,7 @@ pub mod bolts_prelude {
         feature = "std"
     ))]
     pub use super::cli::*;
-    #[cfg(feature = "llmp_compression")]
+    #[cfg(feature = "gzip")]
     pub use super::compress::*;
     #[cfg(feature = "std")]
     pub use super::core_affinity::*;

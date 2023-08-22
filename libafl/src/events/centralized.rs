@@ -1,27 +1,33 @@
 //! A wrapper manager to implement a main-secondary architecture with point-to-point channels
 
 use alloc::{boxed::Box, string::String, vec::Vec};
-#[cfg(feature = "adaptive_serialization")]
-use core::time::Duration;
+use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 
 #[cfg(feature = "adaptive_serialization")]
 use libafl_bolts::current_time;
+#[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
-    llmp::{LlmpReceiver, LlmpSender, Tag},
+    compress::GzipCompressor,
+    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
+};
+use libafl_bolts::{
+    llmp::{self, LlmpBroker, LlmpClient, LlmpClientDescription, Tag},
     shmem::ShMemProvider,
     ClientId,
 };
 use serde::{Deserialize, Serialize};
 
 use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
+#[cfg(feature = "llmp_compression")]
+use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
     events::{
-        llmp::EventStatsCollector, Event, EventConfig, EventFirer, EventManager, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, LogSeverity,
+        llmp::EventStatsCollector, BrokerEventResult, Event, EventConfig, EventFirer, EventManager,
+        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LogSeverity,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::UsesInput,
+    inputs::{Input, UsesInput},
     observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
@@ -29,22 +35,192 @@ use crate::{
 
 const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
 
-/// A wrapper manager to implement a main-secondary architecture with point-to-point channels
+/// An LLMP-backed event manager for scalable multi-processed fuzzing
+pub struct CentralizedLlmpEventBroker<I, SP>
+where
+    I: Input,
+    SP: ShMemProvider + 'static,
+    //CE: CustomEvent<I>,
+{
+    llmp: LlmpBroker<SP>,
+    #[cfg(feature = "llmp_compression")]
+    compressor: GzipCompressor,
+    phantom: PhantomData<I>,
+}
+
+impl<I, SP> core::fmt::Debug for CentralizedLlmpEventBroker<I, SP>
+where
+    SP: ShMemProvider + 'static,
+    I: Input,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut debug_struct = f.debug_struct("CentralizedLlmpEventBroker");
+        let debug = debug_struct.field("llmp", &self.llmp);
+        //.field("custom_buf_handlers", &self.custom_buf_handlers)
+        #[cfg(feature = "llmp_compression")]
+        let debug = debug.field("compressor", &self.compressor);
+        debug
+            .field("phantom", &self.phantom)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<I, SP> CentralizedLlmpEventBroker<I, SP>
+where
+    I: Input,
+    SP: ShMemProvider + 'static,
+{
+    /// Create an event broker from a raw broker.
+    pub fn new(llmp: LlmpBroker<SP>) -> Result<Self, Error> {
+        Ok(Self {
+            llmp,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            phantom: PhantomData,
+        })
+    }
+
+    /// Create an LLMP broker on a port.
+    ///
+    /// The port must not be bound yet to have a broker.
+    #[cfg(feature = "std")]
+    pub fn on_port(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        Ok(Self {
+            // TODO switch to false after solving the bug
+            llmp: LlmpBroker::with_keep_pages_attach_to_tcp(shmem_provider, port, true)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            phantom: PhantomData,
+        })
+    }
+
+    /// Exit the broker process cleanly after at least `n` clients attached and all of them disconnected again
+    pub fn set_exit_cleanly_after(&mut self, n_clients: NonZeroUsize) {
+        self.llmp.set_exit_cleanly_after(n_clients);
+    }
+
+    /// Run forever in the broker
+    #[cfg(not(feature = "llmp_broker_timeouts"))]
+    pub fn broker_loop(&mut self) -> Result<(), Error> {
+        #[cfg(feature = "llmp_compression")]
+        let compressor = &self.compressor;
+        self.llmp.loop_forever(
+            &mut |client_id, tag, _flags, msg| {
+                if tag == _LLMP_TAG_TO_MAIN {
+                    #[cfg(not(feature = "llmp_compression"))]
+                    let event_bytes = msg;
+                    #[cfg(feature = "llmp_compression")]
+                    let compressed;
+                    #[cfg(feature = "llmp_compression")]
+                    let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                        compressed = compressor.decompress(msg)?;
+                        &compressed
+                    } else {
+                        msg
+                    };
+                    let event: Event<I> = postcard::from_bytes(event_bytes)?;
+                    match Self::handle_in_broker(client_id, &event)? {
+                        BrokerEventResult::Forward => Ok(llmp::LlmpMsgHookResult::ForwardToClients),
+                        BrokerEventResult::Handled => Ok(llmp::LlmpMsgHookResult::Handled),
+                    }
+                } else {
+                    Ok(llmp::LlmpMsgHookResult::ForwardToClients)
+                }
+            },
+            Some(Duration::from_millis(5)),
+        );
+
+        #[cfg(all(feature = "std", feature = "llmp_debug"))]
+        println!("The last client quit. Exiting.");
+
+        Err(Error::shutting_down())
+    }
+
+    /// Run in the broker until all clients exit
+    #[cfg(feature = "llmp_broker_timeouts")]
+    pub fn broker_loop(&mut self) -> Result<(), Error> {
+        #[cfg(feature = "llmp_compression")]
+        let compressor = &self.compressor;
+        self.llmp.loop_with_timeouts(
+            &mut |msg_or_timeout| {
+                if let Some((client_id, tag, _flags, msg)) = msg_or_timeout {
+                    if tag == _LLMP_TAG_TO_MAIN {
+                        #[cfg(not(feature = "llmp_compression"))]
+                        let event_bytes = msg;
+                        #[cfg(feature = "llmp_compression")]
+                        let compressed;
+                        #[cfg(feature = "llmp_compression")]
+                        let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                            compressed = compressor.decompress(msg)?;
+                            &compressed
+                        } else {
+                            msg
+                        };
+                        let event: Event<I> = postcard::from_bytes(event_bytes)?;
+                        match Self::handle_in_broker(client_id, &event)? {
+                            BrokerEventResult::Forward => {
+                                Ok(llmp::LlmpMsgHookResult::ForwardToClients)
+                            }
+                            BrokerEventResult::Handled => Ok(llmp::LlmpMsgHookResult::Handled),
+                        }
+                    } else {
+                        Ok(llmp::LlmpMsgHookResult::ForwardToClients)
+                    }
+                } else {
+                    Ok(llmp::LlmpMsgHookResult::Handled)
+                }
+            },
+            Duration::from_secs(30),
+            Some(Duration::from_millis(5)),
+        );
+
+        #[cfg(feature = "llmp_debug")]
+        println!("The last client quit. Exiting.");
+
+        Err(Error::shutting_down())
+    }
+
+    /// Handle arriving events in the broker
+    #[allow(clippy::unnecessary_wraps)]
+    fn handle_in_broker(
+        _client_id: ClientId,
+        event: &Event<I>,
+    ) -> Result<BrokerEventResult, Error> {
+        match &event {
+            Event::NewTestcase {
+                input: _,
+                client_config: _,
+                exit_kind: _,
+                corpus_size: _,
+                observers_buf: _,
+                time: _,
+                executions: _,
+                forward_id: _,
+            } => Ok(BrokerEventResult::Forward),
+            _ => Ok(BrokerEventResult::Handled),
+        }
+    }
+}
+
+/// A wrapper manager to implement a main-secondary architecture witgh another broker
 #[derive(Debug)]
 pub struct CentralizedEventManager<EM, SP>
 where
     EM: UsesState,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     inner: EM,
-    sender_to_main: Option<LlmpSender<SP>>,
-    receivers_from_secondary: Option<Vec<LlmpReceiver<SP>>>,
+    /// The LLMP client for inter process communication
+    client: LlmpClient<SP>,
+    #[cfg(feature = "llmp_compression")]
+    compressor: GzipCompressor,
+    is_main: bool,
 }
 
 impl<EM, SP> UsesState for CentralizedEventManager<EM, SP>
 where
     EM: UsesState,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     type State = EM::State;
 }
@@ -53,7 +229,7 @@ where
 impl<EM, SP> EventStatsCollector for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + UsesState,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     fn serialization_time(&self) -> Duration {
         self.inner.serialization_time()
@@ -86,21 +262,21 @@ where
 impl<EM, SP> EventStatsCollector for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + UsesState,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
 }
 
 impl<EM, SP> EventFirer for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventFirer + HasEventManagerId,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     fn fire(
         &mut self,
         state: &mut Self::State,
         mut event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
-        if let Some(sender) = self.sender_to_main.as_mut() {
+        if !self.is_main {
             // secondary node
             let is_nt = match &mut event {
                 Event::NewTestcase {
@@ -119,9 +295,7 @@ where
                 _ => false,
             };
             if is_nt {
-                // TODO use copression when llmp_compression is enabled
-                let serialized = postcard::to_allocvec(&event)?;
-                return sender.send_buf(_LLMP_TAG_TO_MAIN, &serialized);
+                return self.forward_to_main(&event);
             }
         }
         self.inner.fire(state, event)
@@ -193,19 +367,23 @@ where
 impl<EM, SP> EventRestarter for CentralizedEventManager<EM, SP>
 where
     EM: EventRestarter,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     #[inline]
     fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.inner.on_restart(state)
+        self.client.await_safe_to_unmap_blocking();
+        self.inner.on_restart(state)?;
+        Ok(())
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
+        self.client.sender.send_exiting()?;
         self.inner.send_exiting()
     }
 
     #[inline]
     fn await_restart_safe(&mut self) {
+        self.client.await_safe_to_unmap_blocking();
         self.inner.await_restart_safe();
     }
 }
@@ -213,12 +391,12 @@ where
 impl<E, EM, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
-    SP: ShMemProvider,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
         + ExecutionProcessor<E::Observers, State = Self::State>,
     Self::State: HasExecutions + HasMetadata,
+    SP: ShMemProvider + 'static,
 {
     fn process(
         &mut self,
@@ -226,94 +404,9 @@ where
         state: &mut Self::State,
         executor: &mut E,
     ) -> Result<usize, Error> {
-        if self.receivers_from_secondary.is_some() {
+        if self.is_main {
             // main node
-            let mut receivers = self.receivers_from_secondary.take().unwrap();
-            // TODO in case of error, this is discarded, that is a bug ATM
-
-            for (idx, receiver) in receivers.iter_mut().enumerate() {
-                while let Some((_client_id, tag, _flags, msg)) = receiver.recv_buf_with_flags()? {
-                    assert!(
-                        tag == _LLMP_TAG_TO_MAIN,
-                        "Only the TO_MAIN parcel should have arrived in the main node!"
-                    );
-
-                    // TODO handle compression
-                    let event: Event<<Self::State as UsesInput>::Input> =
-                        postcard::from_bytes(msg)?;
-                    match event {
-                        Event::NewTestcase {
-                            input,
-                            client_config,
-                            exit_kind,
-                            corpus_size,
-                            observers_buf,
-                            time,
-                            executions,
-                            forward_id,
-                        } => {
-                            log::info!(
-                                "Received new Testcase to evaluate from secondary node {idx:?}"
-                            );
-
-                            let res = if client_config.match_with(&self.configuration())
-                                && observers_buf.is_some()
-                            {
-                                #[cfg(feature = "adaptive_serialization")]
-                                let start = current_time();
-                                let observers: E::Observers =
-                                    postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-
-                                #[cfg(feature = "adaptive_serialization")]
-                                {
-                                    *self.inner.deserialization_time_mut() = current_time() - start;
-                                }
-
-                                fuzzer.process_execution(
-                                    state,
-                                    self,
-                                    input.clone(),
-                                    &observers,
-                                    &exit_kind,
-                                    false,
-                                )?
-                            } else {
-                                fuzzer.evaluate_input_with_observers::<E, Self>(
-                                    state,
-                                    executor,
-                                    self,
-                                    input.clone(),
-                                    false,
-                                )?
-                            };
-                            if let Some(item) = res.1 {
-                                log::info!("Added received Testcase as item #{item}");
-
-                                self.inner.fire(
-                                    state,
-                                    Event::NewTestcase {
-                                        input,
-                                        observers_buf,
-                                        exit_kind,
-                                        corpus_size,
-                                        client_config,
-                                        time,
-                                        executions,
-                                        forward_id,
-                                    },
-                                )?;
-                            }
-                        }
-                        _ => panic!(
-                            "Only the NewTestcase event should have arrived to the main node!"
-                        ),
-                    };
-                }
-            }
-
-            self.receivers_from_secondary = Some(receivers);
-
-            Ok(0) // TODO is 0 ok?
+            self.receive_from_secondary(fuzzer, state, executor)
         } else {
             // The main node does not process incoming events from the broker ATM
             self.inner.process(fuzzer, state, executor)
@@ -325,18 +418,18 @@ impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventManager<E, Z>,
     EM::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasLastReportTime,
-    SP: ShMemProvider,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
         + ExecutionProcessor<E::Observers, State = Self::State>,
+    SP: ShMemProvider + 'static,
 {
 }
 
 impl<EM, SP> HasCustomBufHandlers for CentralizedEventManager<EM, SP>
 where
     EM: HasCustomBufHandlers,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
     fn add_custom_buf_handler(
@@ -353,14 +446,14 @@ impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + ProgressReporter + HasEventManagerId,
     EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
 }
 
 impl<EM, SP> HasEventManagerId for CentralizedEventManager<EM, SP>
 where
     EM: HasEventManagerId + UsesState,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     fn mgr_id(&self) -> EventManagerId {
         self.inner.mgr_id()
@@ -370,23 +463,226 @@ where
 impl<EM, SP> CentralizedEventManager<EM, SP>
 where
     EM: UsesState,
-    SP: ShMemProvider,
+    SP: ShMemProvider + 'static,
 {
     /// Creates a new [`CentralizedEventManager`].
-    pub fn new_main(inner: EM, receivers_from_secondary: Vec<LlmpReceiver<SP>>) -> Self {
-        Self {
+    pub fn new(inner: EM, client: LlmpClient<SP>, is_main: bool) -> Result<Self, Error> {
+        Ok(Self {
             inner,
-            sender_to_main: None,
-            receivers_from_secondary: Some(receivers_from_secondary),
-        }
+            client,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            is_main,
+        })
     }
 
-    /// Creates a new [`CentralizedEventManager`].
-    pub fn new_secondary(inner: EM, sender_to_main: LlmpSender<SP>) -> Self {
-        Self {
+    /// Create a centralized event manager on a port
+    ///
+    /// If the port is not yet bound, it will act as a broker; otherwise, it
+    /// will act as a client.
+    #[cfg(feature = "std")]
+    pub fn on_port(inner: EM, shmem_provider: SP, port: u16, is_main: bool) -> Result<Self, Error> {
+        Ok(Self {
             inner,
-            sender_to_main: Some(sender_to_main),
-            receivers_from_secondary: None,
+            client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            is_main,
+        })
+    }
+
+    /// If a client respawns, it may reuse the existing connection, previously
+    /// stored by [`LlmpClient::to_env()`].
+    #[cfg(feature = "std")]
+    pub fn existing_client_from_env(
+        inner: EM,
+        shmem_provider: SP,
+        env_name: &str,
+        is_main: bool,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            inner,
+            client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            is_main,
+        })
+    }
+
+    /// Describe the client event manager's LLMP parts in a restorable fashion
+    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
+        self.client.describe()
+    }
+
+    /// Create an existing client from description
+    pub fn existing_client_from_description(
+        inner: EM,
+        shmem_provider: SP,
+        description: &LlmpClientDescription,
+        is_main: bool,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            inner,
+            client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
+            is_main,
+        })
+    }
+
+    /// Write the config for a client [`EventManager`] to env vars, a new
+    /// client can reattach using [`CentralizedEventManager::existing_client_from_env()`].
+    #[cfg(feature = "std")]
+    pub fn to_env(&self, env_name: &str) {
+        self.client.to_env(env_name).unwrap();
+    }
+
+    /// Know if this instance is main or secondary
+    pub fn is_main(&self) -> bool {
+        self.is_main
+    }
+}
+
+impl<EM, SP> CentralizedEventManager<EM, SP>
+where
+    EM: UsesState + EventFirer + EventStatsCollector + HasEventManagerId,
+    SP: ShMemProvider + 'static,
+{
+    #[cfg(feature = "llmp_compression")]
+    fn forward_to_main<I>(&mut self, event: &Event<I>) -> Result<(), Error>
+    where
+        I: Input,
+    {
+        let serialized = postcard::to_allocvec(event)?;
+        let flags = LLMP_FLAG_INITIALIZED;
+
+        match self.compressor.compress(&serialized)? {
+            Some(comp_buf) => {
+                self.client.send_buf_with_flags(
+                    _LLMP_TAG_TO_MAIN,
+                    flags | LLMP_FLAG_COMPRESSED,
+                    &comp_buf,
+                )?;
+            }
+            None => {
+                self.client.send_buf(_LLMP_TAG_TO_MAIN, &serialized)?;
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "llmp_compression"))]
+    fn forward_to_main<I>(&mut self, event: &Event<I>) -> Result<(), Error>
+    where
+        I: Input,
+    {
+        let serialized = postcard::to_allocvec(event)?;
+        self.client.send_buf(_LLMP_TAG_TO_MAIN, &serialized)?;
+        Ok(())
+    }
+
+    fn receive_from_secondary<E, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut EM::State,
+        executor: &mut E,
+    ) -> Result<usize, Error>
+    where
+        E: Executor<Self, Z> + HasObservers<State = EM::State>,
+        EM::State: UsesInput + HasExecutions + HasMetadata,
+        for<'a> E::Observers: Deserialize<'a>,
+        Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
+    {
+        // TODO: Get around local event copy by moving handle_in_client
+        let self_id = self.client.sender.id;
+        let mut count = 0;
+        while let Some((client_id, tag, _flags, msg)) = self.client.recv_buf_with_flags()? {
+            assert!(
+                tag == _LLMP_TAG_TO_MAIN,
+                "Only _LLMP_TAG_TO_MAIN parcel should have arrived in the main node!"
+            );
+
+            if client_id == self_id {
+                continue;
+            }
+            #[cfg(not(feature = "llmp_compression"))]
+            let event_bytes = msg;
+            #[cfg(feature = "llmp_compression")]
+            let compressed;
+            #[cfg(feature = "llmp_compression")]
+            let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                compressed = self.compressor.decompress(msg)?;
+                &compressed
+            } else {
+                msg
+            };
+            let event: Event<<<EM as UsesState>::State as UsesInput>::Input> =
+                postcard::from_bytes(event_bytes)?;
+            self.handle_in_main(fuzzer, executor, state, client_id, event)?;
+            count += 1;
+        }
+        Ok(count)
+    }
+
+    // Handle arriving events in the main node
+    fn handle_in_main<E, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut EM::State,
+        client_id: ClientId,
+        event: Event<<EM::State as UsesInput>::Input>,
+    ) -> Result<(), Error>
+    where
+        E: Executor<Self, Z> + HasObservers<State = EM::State>,
+        EM::State: UsesInput + HasExecutions + HasMetadata,
+        for<'a> E::Observers: Deserialize<'a>,
+        Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
+    {
+        match event {
+            Event::NewTestcase {
+                input,
+                client_config,
+                exit_kind,
+                corpus_size: _,
+                observers_buf,
+                time: _,
+                executions: _,
+                forward_id,
+            } => {
+                log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
+
+                let res = if client_config.match_with(&self.configuration())
+                    && observers_buf.is_some()
+                {
+                    let observers: E::Observers =
+                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                    fuzzer.process_execution(state, self, input, &observers, &exit_kind, true)?
+                } else {
+                    fuzzer.evaluate_input_with_observers::<E, Self>(
+                        state, executor, self, input, true,
+                    )?
+                };
+                if let Some(item) = res.1 {
+                    log::info!("Added received Testcase as item #{item}");
+                }
+                Ok(())
+            }
+            _ => Err(Error::unknown(format!(
+                "Received illegal message that message should not have arrived: {:?}.",
+                event.name()
+            ))),
         }
     }
 }
+
+/*
+impl<EM, SP> Drop for CentralizedEventManager<EM, SP>
+where
+    EM: UsesState,    SP: ShMemProvider + 'static,
+{
+    /// LLMP clients will have to wait until their pages are mapped by somebody.
+    fn drop(&mut self) {
+        self.await_restart_safe();
+    }
+}*/
