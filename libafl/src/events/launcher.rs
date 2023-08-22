@@ -53,8 +53,12 @@ use crate::{
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
+#[allow(
+    clippy::type_complexity,
+    missing_debug_implementations,
+    clippy::ignored_unit_patterns
+)]
 #[derive(TypedBuilder)]
-#[allow(clippy::type_complexity, missing_debug_implementations)]
 pub struct Launcher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
@@ -169,6 +173,8 @@ where
             if self.cores.ids.iter().any(|&x| x == id.into()) {
                 index += 1;
                 self.shmem_provider.pre_fork()?;
+                // # Safety
+                // Fork is safe in general, apart from potential side effects to the OS and other threads
                 match unsafe { fork() }? {
                     ForkResult::Parent(child) => {
                         self.shmem_provider.post_fork(false)?;
@@ -177,6 +183,8 @@ where
                         log::info!("child spawned and bound to core {id}");
                     }
                     ForkResult::Child => {
+                        // # Safety
+                        // A call to `getpid` is safe.
                         log::info!("{:?} PostFork", unsafe { libc::getpid() });
                         self.shmem_provider.post_fork(true)?;
 
@@ -232,6 +240,8 @@ where
 
             // Broker exited. kill all clients.
             for handle in &handles {
+                // # Safety
+                // Normal libc call, no dereferences whatsoever
                 unsafe {
                     libc::kill(*handle, libc::SIGINT);
                 }

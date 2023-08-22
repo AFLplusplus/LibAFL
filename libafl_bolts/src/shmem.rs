@@ -1,12 +1,13 @@
 //! A generic shared memory region to be used by any functions (queues or feedbacks
 //! too.)
 
+#[cfg(feature = "alloc")]
 use alloc::{rc::Rc, string::ToString};
-use core::{
-    cell::RefCell,
-    fmt::{self, Debug, Display},
-    mem::ManuallyDrop,
-};
+use core::fmt::Debug;
+#[cfg(feature = "alloc")]
+use core::fmt::Display;
+#[cfg(feature = "alloc")]
+use core::{cell::RefCell, fmt, mem::ManuallyDrop};
 #[cfg(feature = "std")]
 use std::env;
 #[cfg(all(unix, feature = "std"))]
@@ -105,6 +106,7 @@ impl ShMemId {
     }
 
     /// Create a new id from an int
+    #[cfg(feature = "alloc")]
     #[must_use]
     pub fn from_int(val: i32) -> Self {
         Self::from_string(&val.to_string())
@@ -140,6 +142,7 @@ impl ShMemId {
     }
 
     /// Returns a `str` representation of this [`ShMemId`]
+    #[cfg(feature = "alloc")]
     #[must_use]
     pub fn as_str(&self) -> &str {
         alloc::str::from_utf8(&self.id[..self.null_pos()]).unwrap()
@@ -152,12 +155,14 @@ impl AsSlice for ShMemId {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl From<ShMemId> for i32 {
     fn from(id: ShMemId) -> i32 {
         id.as_str().parse().unwrap()
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Display for ShMemId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_str())
@@ -302,12 +307,14 @@ pub trait ShMemProvider: Clone + Default + Debug {
 /// A Reference Counted shared map,
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub struct RcShMem<T: ShMemProvider> {
     internal: ManuallyDrop<T::ShMem>,
     provider: Rc<RefCell<T>>,
 }
 
+#[cfg(feature = "alloc")]
 impl<T> ShMem for RcShMem<T>
 where
     T: ShMemProvider + Debug,
@@ -321,6 +328,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T> AsSlice for RcShMem<T>
 where
     T: ShMemProvider + Debug,
@@ -331,6 +339,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T> AsMutSlice for RcShMem<T>
 where
     T: ShMemProvider + Debug,
@@ -341,6 +350,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T: ShMemProvider> Drop for RcShMem<T> {
     fn drop(&mut self) {
         self.provider.borrow_mut().release_shmem(&mut self.internal);

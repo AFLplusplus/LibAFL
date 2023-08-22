@@ -109,7 +109,7 @@ pub fn main() -> Result<(), Error> {
 
     let mut state = StdState::new(
         StdRand::with_seed(current_nanos()),
-        InMemoryOnDiskCorpus::new(&minimized_dir).unwrap(),
+        InMemoryOnDiskCorpus::new(minimized_dir).unwrap(),
         InMemoryCorpus::new(),
         &mut (),
         &mut (),

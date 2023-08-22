@@ -1,5 +1,6 @@
 //! Exception handling for Windows
 
+#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
@@ -282,6 +283,7 @@ pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 47] = [
     ExceptionCode::Other,
 ];
 
+#[cfg(feature = "alloc")]
 pub trait Handler {
     /// Handle an exception
     fn handle(
@@ -366,6 +368,7 @@ unsafe extern "C" fn handle_signal(_signum: i32) {
 /// Setup Win32 exception handlers in a somewhat rusty way.
 /// # Safety
 /// Exception handlers are usually ugly, handle with care!
+#[cfg(feature = "alloc")]
 pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {
     let exceptions = handler.exceptions();
     let mut catch_assertions = false;

@@ -2,7 +2,11 @@
 use core::fmt::{self, Debug, Formatter};
 
 #[cfg(feature = "fork")]
-use libafl::{events::EventManager, executors::InProcessForkExecutor, state::HasMetadata};
+use libafl::{
+    events::EventManager,
+    executors::InProcessForkExecutor,
+    state::{HasLastReportTime, HasMetadata},
+};
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
@@ -10,10 +14,7 @@ use libafl::{
     fuzzer::{HasFeedback, HasObjective, HasScheduler},
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasSolutions, State,
-        UsesState,
-    },
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
 #[cfg(feature = "fork")]
