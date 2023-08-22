@@ -266,7 +266,7 @@ where
         locking: bool,
     ) -> Result<Self, Error> {
         match fs::create_dir_all(dir_path) {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
             Err(e) => return Err(e.into()),
         }
@@ -432,6 +432,7 @@ where
     }
 
     /// Path to the corpus directory associated with this corpus
+    #[must_use]
     pub fn dir_path(&self) -> &PathBuf {
         &self.dir_path
     }
