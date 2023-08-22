@@ -30,12 +30,12 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
-        for existing in COUNTERS_MAPS.iter_mut() {
+        for existing in &mut COUNTERS_MAPS {
             let range = existing.as_mut_slice().as_mut_ptr()
                 ..=existing
                     .as_mut_slice()
                     .as_mut_ptr()
-                    .offset(existing.as_slice().len() as isize);
+                    .add(existing.as_slice().len());
             if range.contains(&start) || range.contains(&stop) {
                 // we have overlapping or touching ranges; merge them
                 let &start = range.start().min(&start);
