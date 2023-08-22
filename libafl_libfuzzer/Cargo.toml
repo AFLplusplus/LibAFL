@@ -21,4 +21,4 @@ introspection = []
 whole-archive = []
 
 [dependencies]
-libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
+libfuzzer-sys = { version = "0.4.7", default-features = false }
