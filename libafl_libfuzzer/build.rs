@@ -90,7 +90,7 @@ fn main() {
 
         assert!(
             !command.status().map(|s| !s.success()).unwrap_or(true),
-            "Couldn't link runtime crate!"
+            "Couldn't link runtime crate! Do you have the llvm-tools component installed?"
         );
 
         let mut command = Command::new(rust_ar);
