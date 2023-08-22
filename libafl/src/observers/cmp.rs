@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Compare values collected during a run
-#[derive(Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Clone)]
 pub enum CmpValues {
     /// Two u8 values
     U8((u8, u8)),
