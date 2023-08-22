@@ -349,7 +349,7 @@ mod test {
     #[test]
     fn test_tuning() {
         #[cfg(any(not(feature = "std"), miri))]
-        {
+        unsafe {
             libafl_bolts::serdeany::RegistryBuilder::register::<TuneableScheduledMutatorMetadata>();
         }
 
