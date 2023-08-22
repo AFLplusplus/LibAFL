@@ -87,12 +87,16 @@ pub struct ClientStats {
     // monitor (maybe we need a separated struct?)
     /// The corpus size for this client
     pub corpus_size: u64,
+    /// The time for the last update of the corpus size
+    pub last_corpus_time: Duration,
     /// The total executions for this client
     pub executions: u64,
     /// The number of executions of the previous state in case a client decrease the number of execution (e.g when restarting without saving the state)
     pub prev_state_executions: u64,
     /// The size of the objectives corpus for this client
     pub objective_size: u64,
+    /// The time for the last update of the objective size
+    pub last_objective_time: Duration,
     /// The last reported executions for this client
     #[cfg(feature = "afl_exec_sec")]
     pub last_window_executions: u64,
@@ -101,6 +105,8 @@ pub struct ClientStats {
     pub last_execs_per_sec: f64,
     /// The last time we got this information
     pub last_window_time: Duration,
+    /// the start time of the client
+    pub start_time: Duration,
     /// User-defined monitor
     pub user_monitor: HashMap<String, UserStats>,
     /// Client performance statistics
@@ -140,6 +146,7 @@ impl ClientStats {
     /// We got a new information about corpus size for this client, insert them.
     pub fn update_corpus_size(&mut self, corpus_size: u64) {
         self.corpus_size = corpus_size;
+        self.last_corpus_time = current_time();
     }
 
     /// We got a new information about objective corpus size for this client, insert them.
@@ -206,8 +213,9 @@ impl ClientStats {
         self.user_monitor.insert(name, value);
     }
 
+    #[must_use]
     /// Get a user-defined stat using the name
-    pub fn get_user_stats(&mut self, name: &str) -> Option<&UserStats> {
+    pub fn get_user_stats(&self, name: &str) -> Option<&UserStats> {
         self.user_monitor.get(name)
     }
 
@@ -275,6 +283,7 @@ pub trait Monitor {
         for _ in client_stat_count..(client_id.0 + 1) as usize {
             self.client_stats_mut().push(ClientStats {
                 last_window_time: current_time(),
+                start_time: current_time(),
                 ..ClientStats::default()
             });
         }
