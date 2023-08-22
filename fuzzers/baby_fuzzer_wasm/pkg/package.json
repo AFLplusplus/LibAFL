@@ -11,5 +11,7 @@
   ],
   "module": "baby_fuzzer_wasm.js",
   "types": "baby_fuzzer_wasm.d.ts",
-  "sideEffects": false
+  "sideEffects": [
+    "./snippets/*"
+  ]
 }

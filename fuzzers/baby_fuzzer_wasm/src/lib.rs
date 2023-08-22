@@ -38,7 +38,10 @@ pub extern "C" fn external_current_millis() -> u64 {
 #[wasm_bindgen]
 pub fn fuzz() {
     set_panic_hook();
-    RegistryBuilder::register::<MapFeedbackMetadata<u8>>();
+
+    unsafe {
+        RegistryBuilder::register::<MapFeedbackMetadata<u8>>();
+    }
 
     let mut signals = [0u8; 64];
     let signals_ptr = signals.as_mut_ptr();
