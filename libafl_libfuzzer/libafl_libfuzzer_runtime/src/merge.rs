@@ -141,7 +141,7 @@ pub fn merge(
     // scheduler doesn't really matter here
     let scheduler = MergeScheduler::new();
 
-    let mut state = state.map(|s| Ok(s)).unwrap_or_else(|| {
+    let mut state = state.map_or_else(|| {
         let mut rand = StdRand::new();
 
         let corpus_dir = if options.dirs().first().unwrap().exists()
@@ -172,7 +172,7 @@ pub fn merge(
             // A reference to the objectives, to create their objective state
             &mut objective,
         )
-    })?;
+    }, Ok)?;
 
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective); // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
