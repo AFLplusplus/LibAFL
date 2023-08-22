@@ -40,6 +40,8 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
 use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
@@ -51,6 +53,7 @@ use crate::{
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
+
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
 #[allow(
@@ -359,6 +362,249 @@ where
                 let ecode = handle.wait()?;
                 if !ecode.success() {
                     log::info!("Client with handle {handle:?} exited with {ecode:?}");
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores with a single main and multiple secondary nodes
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[derive(TypedBuilder)]
+#[allow(clippy::type_complexity, missing_debug_implementations)]
+pub struct CentralizedLauncher<'a, CF, MT, S, SP>
+where
+    CF: FnOnce(
+        Option<S>,
+        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
+        CoreId,
+    ) -> Result<(), Error>,
+    S::Input: 'a,
+    MT: Monitor,
+    SP: ShMemProvider + 'static,
+    S: DeserializeOwned + UsesInput + 'a,
+{
+    /// The ShmemProvider to use
+    shmem_provider: SP,
+    /// The monitor instance to use
+    monitor: MT,
+    /// The configuration
+    configuration: EventConfig,
+    /// The 'main' function to run for each client forked. This probably shouldn't return
+    #[builder(default, setter(strip_option))]
+    run_client: Option<CF>,
+    /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
+    #[builder(default = 1337_u16)]
+    broker_port: u16,
+    /// The centralized broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
+    #[builder(default = 1338_u16)]
+    centralized_broker_port: u16,
+    /// The list of cores to run on
+    cores: &'a Cores,
+    /// A file name to write all client output to
+    #[builder(default = None)]
+    stdout_file: Option<&'a str>,
+    /// A file name to write all client stderr output to. If not specified, output is sent to
+    /// `stdout_file`.
+    #[builder(default = None)]
+    stderr_file: Option<&'a str>,
+    /// The `ip:port` address of another broker to connect our new broker to for multi-machine
+    /// clusters.
+    #[builder(default = None)]
+    remote_broker_addr: Option<SocketAddr>,
+    /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
+    /// The reason you may not want this is, if you already have a [`Launcher`]
+    /// with a different configuration (for the same target) running on this machine.
+    /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
+    #[builder(default = true)]
+    spawn_broker: bool,
+    /// Tell the manager to serialize or not the state on restart
+    #[builder(default = true)]
+    serialize_state: bool,
+    #[builder(setter(skip), default = PhantomData)]
+    phantom_data: PhantomData<(&'a S, &'a SP)>,
+}
+
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+impl<CF, MT, S, SP> Debug for CentralizedLauncher<'_, CF, MT, S, SP>
+where
+    CF: FnOnce(
+        Option<S>,
+        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
+        CoreId,
+    ) -> Result<(), Error>,
+    MT: Monitor + Clone,
+    SP: ShMemProvider + 'static,
+    S: DeserializeOwned + UsesInput,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Launcher")
+            .field("configuration", &self.configuration)
+            .field("broker_port", &self.broker_port)
+            .field("core", &self.cores)
+            .field("spawn_broker", &self.spawn_broker)
+            .field("remote_broker_addr", &self.remote_broker_addr)
+            .field("stdout_file", &self.stdout_file)
+            .field("stderr_file", &self.stderr_file)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+impl<'a, CF, MT, S, SP> CentralizedLauncher<'a, CF, MT, S, SP>
+where
+    CF: FnOnce(
+        Option<S>,
+        CentralizedEventManager<LlmpRestartingEventManager<S, SP>, SP>,
+        CoreId,
+    ) -> Result<(), Error>,
+    MT: Monitor + Clone,
+    S: DeserializeOwned + UsesInput + HasExecutions + HasClientPerfMonitor,
+    SP: ShMemProvider + 'static,
+{
+    /// Launch the broker and the clients and fuzz
+    #[allow(clippy::similar_names)]
+    #[allow(clippy::too_many_lines)]
+    pub fn launch(&mut self) -> Result<(), Error> {
+        if self.cores.ids.is_empty() {
+            return Err(Error::illegal_argument(
+                "No cores to spawn on given, cannot launch anything.",
+            ));
+        }
+
+        if self.run_client.is_none() {
+            return Err(Error::illegal_argument(
+                "No client callback provided".to_string(),
+            ));
+        }
+
+        let core_ids = get_core_ids().unwrap();
+        let num_cores = core_ids.len();
+        let mut handles = vec![];
+
+        log::info!("spawning on cores: {:?}", self.cores);
+
+        let stdout_file = self
+            .stdout_file
+            .map(|filename| File::create(filename).unwrap());
+        let stderr_file = self
+            .stderr_file
+            .map(|filename| File::create(filename).unwrap());
+
+        let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
+
+        // Spawn centralized broker
+        self.shmem_provider.pre_fork()?;
+        match unsafe { fork() }? {
+            ForkResult::Parent(child) => {
+                self.shmem_provider.post_fork(false)?;
+                handles.push(child.pid);
+                #[cfg(feature = "std")]
+                log::info!("centralized broker spawned");
+            }
+            ForkResult::Child => {
+                log::info!("{:?} PostFork", unsafe { libc::getpid() });
+                self.shmem_provider.post_fork(true)?;
+
+                let mut broker: CentralizedLlmpEventBroker<S::Input, SP> =
+                    CentralizedLlmpEventBroker::on_port(
+                        self.shmem_provider.clone(),
+                        self.centralized_broker_port,
+                    )?;
+                broker.broker_loop()?;
+            }
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        // Spawn clients
+        let mut index = 0_u64;
+        for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
+            if self.cores.ids.iter().any(|&x| x == id.into()) {
+                index += 1;
+                self.shmem_provider.pre_fork()?;
+                match unsafe { fork() }? {
+                    ForkResult::Parent(child) => {
+                        self.shmem_provider.post_fork(false)?;
+                        handles.push(child.pid);
+                        #[cfg(feature = "std")]
+                        log::info!("child spawned and bound to core {id}");
+                    }
+                    ForkResult::Child => {
+                        log::info!("{:?} PostFork", unsafe { libc::getpid() });
+                        self.shmem_provider.post_fork(true)?;
+
+                        std::thread::sleep(std::time::Duration::from_millis(index * 10));
+
+                        if !debug_output {
+                            if let Some(file) = stdout_file {
+                                dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                if let Some(stderr) = stderr_file {
+                                    dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                } else {
+                                    dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                }
+                            }
+                        }
+
+                        // Fuzzer client. keeps retrying the connection to broker till the broker starts
+                        let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
+                            .shmem_provider(self.shmem_provider.clone())
+                            .broker_port(self.broker_port)
+                            .kind(ManagerKind::Client {
+                                cpu_core: Some(*bind_to),
+                            })
+                            .configuration(self.configuration)
+                            .serialize_state(self.serialize_state)
+                            .build()
+                            .launch()?;
+
+                        let c_mgr = CentralizedEventManager::on_port(
+                            mgr,
+                            self.shmem_provider.clone(),
+                            self.centralized_broker_port,
+                            id == 0,
+                        )?;
+
+                        return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
+                    }
+                };
+            }
+        }
+
+        if self.spawn_broker {
+            log::info!("I am broker!!.");
+
+            // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
+            RestartingMgr::<MT, S, SP>::builder()
+                .shmem_provider(self.shmem_provider.clone())
+                .monitor(Some(self.monitor.clone()))
+                .broker_port(self.broker_port)
+                .kind(ManagerKind::Broker)
+                .remote_broker_addr(self.remote_broker_addr)
+                .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
+                .configuration(self.configuration)
+                .serialize_state(self.serialize_state)
+                .build()
+                .launch()?;
+
+            // Broker exited. kill all clients.
+            for handle in &handles {
+                unsafe {
+                    libc::kill(*handle, libc::SIGINT);
+                }
+            }
+        } else {
+            for handle in &handles {
+                let mut status = 0;
+                log::info!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
+                unsafe {
+                    libc::waitpid(*handle, &mut status, 0);
+                    if status != 0 {
+                        log::info!("Client with pid {handle} exited with status {status}");
+                    }
                 }
             }
         }

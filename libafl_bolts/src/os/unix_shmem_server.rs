@@ -65,6 +65,7 @@ where
     /// A referencde to the [`ShMemService`] backing this provider.
     /// It will be started only once for all processes and providers.
     service: ShMemService<SP>,
+    about_to_restart: bool,
 }
 
 /// [`ShMem`] that got served from a [`ShMemService`] via domain sockets and can now be used in this program.
@@ -142,6 +143,11 @@ where
         let server_fd: i32 = server_id.into();
         Ok((server_fd, fd_buf[0]))
     }
+
+    /// Tell the provider that we are about to restart and the worker should not kill the shared memory
+    pub fn on_restart(&mut self) {
+        self.about_to_restart = true;
+    }
 }
 
 impl<SP> Default for ServedShMemProvider<SP>
@@ -185,6 +191,7 @@ where
             inner: SP::new()?,
             id: -1,
             service,
+            about_to_restart: false
         };
         let (id, _) = res.send_receive(ServedShMemRequest::Hello())?;
         res.id = id;
@@ -244,6 +251,10 @@ where
     }
 
     fn release_shmem(&mut self, map: &mut Self::ShMem) {
+        if self.about_to_restart {
+            return;
+        }
+
         let (refcount, _) = self
             .send_receive(ServedShMemRequest::Deregister(map.server_fd))
             .expect("Could not communicate with ServedShMem server!");

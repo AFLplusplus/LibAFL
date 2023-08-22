@@ -733,7 +733,9 @@ where
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer
-            .save(&if self.save_state { Some(state) } else { None })
+            .save(&if self.save_state { Some(state) } else { None })?;
+        self.await_restart_safe();
+        Ok(())
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
