@@ -228,7 +228,11 @@ macro_rules! fuzz_with {
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_and_fast!(
                 feedback_not!(
-                    CrashFeedback::new()
+                    feedback_or_fast!(
+                        OomFeedback,
+                        CrashFeedback::new(),
+                        TimeoutFeedback::new()
+                    )
                 ),
                 keep_observer,
                 feedback_or!(
