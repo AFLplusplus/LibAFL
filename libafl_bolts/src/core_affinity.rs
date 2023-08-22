@@ -662,8 +662,7 @@ mod freebsd {
     #[allow(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
-            .into_iter()
-            .map(|n| CoreId(n))
+            .map(CoreId)
             .collect::<Vec<_>>())
     }
 
