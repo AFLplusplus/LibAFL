@@ -1,3 +1,4 @@
+#![allow(clippy::missing_safety_doc)]
 use std::mem::transmute;
 
 use libc::{c_void, dlsym, RTLD_NEXT};
@@ -33,6 +34,7 @@ pub unsafe extern "C" fn main_hook(
 }
 
 #[no_mangle]
+#[allow(clippy::similar_names)]
 pub unsafe extern "C" fn __libc_start_main(
     main: extern "C" fn(i32, *const *const u8, *const *const u8) -> i32,
     argc: i32,
@@ -46,13 +48,10 @@ pub unsafe extern "C" fn __libc_start_main(
         ORIG_MAIN = main;
 
         let orig_libc_start_main_addr: *mut c_void =
-            dlsym(RTLD_NEXT, "__libc_start_main\0".as_ptr() as *const i8);
+            dlsym(RTLD_NEXT, "__libc_start_main\0".as_ptr().cast::<i8>());
 
         let orig_libc_start_main: LibcStartMainFunc = transmute(orig_libc_start_main_addr);
 
-        let exit_code =
-            orig_libc_start_main(main_hook, argc, argv, init, fini, rtld_fini, stack_end);
-
-        return exit_code;
+        orig_libc_start_main(main_hook, argc, argv, init, fini, rtld_fini, stack_end)
     }
 }

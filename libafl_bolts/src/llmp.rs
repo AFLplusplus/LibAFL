@@ -1940,7 +1940,17 @@ where
     SP: ShMemProvider + 'static,
 {
     /// Create and initialize a new [`LlmpBroker`]
-    pub fn new(mut shmem_provider: SP) -> Result<Self, Error> {
+    pub fn new(shmem_provider: SP) -> Result<Self, Error> {
+        // Broker never cleans up the pages so that new
+        // clients may join at any time
+        Self::with_keep_pages(shmem_provider, true)
+    }
+
+    /// Create and initialize a new [`LlmpBroker`] telling if it has to keep pages forever
+    pub fn with_keep_pages(
+        mut shmem_provider: SP,
+        keep_pages_forever: bool,
+    ) -> Result<Self, Error> {
         Ok(LlmpBroker {
             llmp_out: LlmpSender {
                 id: ClientId(0),
@@ -1949,9 +1959,7 @@ where
                     ClientId(0),
                     shmem_provider.new_shmem(next_shmem_size(0))?,
                 )],
-                // Broker never cleans up the pages so that new
-                // clients may join at any time
-                keep_pages_forever: true,
+                keep_pages_forever,
                 has_unsent_message: false,
                 shmem_provider: shmem_provider.clone(),
                 unused_shmem_cache: vec![],
@@ -1965,12 +1973,22 @@ where
         })
     }
 
-    /// Create a new [`LlmpBroker`] sttaching to a TCP port
+    /// Create a new [`LlmpBroker`] attaching to a TCP port
     #[cfg(feature = "std")]
     pub fn create_attach_to_tcp(shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        Self::with_keep_pages_attach_to_tcp(shmem_provider, port, true)
+    }
+
+    /// Create a new [`LlmpBroker`] attaching to a TCP port and telling if it has to keep pages forever
+    #[cfg(feature = "std")]
+    pub fn with_keep_pages_attach_to_tcp(
+        shmem_provider: SP,
+        port: u16,
+        keep_pages_forever: bool,
+    ) -> Result<Self, Error> {
         match tcp_bind(port) {
             Ok(listener) => {
-                let mut broker = LlmpBroker::new(shmem_provider)?;
+                let mut broker = LlmpBroker::with_keep_pages(shmem_provider, keep_pages_forever)?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
                 Ok(broker)
             }
@@ -2773,9 +2791,9 @@ where
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct LlmpClientDescription {
     /// Description of the sender
-    sender: LlmpDescription,
+    pub sender: LlmpDescription,
     /// Description of the receiver
-    receiver: LlmpDescription,
+    pub receiver: LlmpDescription,
 }
 
 /// Client side of LLMP
@@ -2921,6 +2939,17 @@ where
                 last_msg_time: current_time(),
             },
         })
+    }
+
+    /// Create a point-to-point channel instead of using a broker-client channel
+    pub fn new_p2p(shmem_provider: SP, sender_id: ClientId) -> Result<Self, Error> {
+        let sender = LlmpSender::new(shmem_provider.clone(), sender_id, false)?;
+        let receiver = LlmpReceiver::on_existing_shmem(
+            shmem_provider,
+            sender.out_shmems[0].shmem.clone(),
+            None,
+        )?;
+        Ok(Self { sender, receiver })
     }
 
     /// Commits a msg to the client's out map
