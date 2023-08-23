@@ -274,7 +274,7 @@ where
         let tcmeta = tc.metadata_mut::<EcoTestcaseMetadata>()?;
 
         tcmeta.exec_num = exec_num;
-        tcmeta.serial = state.corpus().count() as u64 + 1;
+        tcmeta.serial = (state.corpus().count() as u64).saturating_add(1);
         Ok(())
     }
 
