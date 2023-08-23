@@ -657,6 +657,7 @@ macro_rules! impl_serdeany {
         }
 
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        #[allow(unsafe_derive_deserialize)]
         impl< $( $lt $( : $clt $(+ $dlt )* )? ),+ > $struct_name < $( $lt ),+ > {
 
             /// Manually register this type at a later point in time
@@ -694,6 +695,7 @@ macro_rules! impl_serdeany {
         }
 
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        #[allow(unsafe_derive_deserialize)]
         impl $struct_name {
             /// Manually register this type at a later point in time
             ///
