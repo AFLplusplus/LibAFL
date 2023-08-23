@@ -326,7 +326,10 @@ where
 
 /// The Metadata for each testcase used in power schedules.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct SchedulerTestcaseMetadata {
     /// Number of bits set in bitmap, updated in calibrate_case
     bitmap_size: u64,

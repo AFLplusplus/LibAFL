@@ -24,7 +24,10 @@ use crate::{
 
 /// Metadata in the state, that controls the behavior of the [`TuneableScheduledMutator`] at runtime
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
-#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct TuneableScheduledMutatorMetadata {
     /// The offsets of mutators to run, in order. Clear to fall back to random,
     /// or use `mutation_probabilities`

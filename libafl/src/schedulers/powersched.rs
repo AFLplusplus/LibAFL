@@ -24,7 +24,10 @@ libafl_bolts::impl_serdeany!(SchedulerMetadata);
 
 /// The metadata used for power schedules
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct SchedulerMetadata {
     /// Powerschedule strategy
     strat: Option<PowerSchedule>,
