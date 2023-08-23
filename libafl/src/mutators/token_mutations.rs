@@ -1774,7 +1774,7 @@ const fn isprint(c: u8) -> bool {
 }
 
 #[inline]
-fn strlen(buf: &[u8]) -> usize {
+const fn strlen(buf: &[u8]) -> usize {
     let mut count = 0;
     while count < buf.len() {
         if buf[count] == 0x0 {
