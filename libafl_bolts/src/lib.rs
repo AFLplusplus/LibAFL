@@ -128,26 +128,28 @@ macro_rules! format {
 }
 
 /// Calculates the integer square root using binary search
+/// Algorithm from
+/// <https://en.wikipedia.org/wiki/Integer_square_root#Algorithm_using_binary_search>.
 #[must_use]
 pub const fn integer_sqrt(val: u64) -> u64 {
-    // TODO: We can probably do this with u64 if we are careful
-
-    let val: u128 = val as u128;
+    if val == u64::MAX {
+        return 2_u64.pow(32) - 1;
+    }
     let mut ret = 0;
-    let mut r = val + 1;
+    let mut i = val + 1;
     let mut m;
 
-    while ret != r - 1 {
-        m = (ret + r) / 2;
+    while ret != i - 1 {
+        m = (ret + i) / 2;
 
-        if m * m <= val {
+        if m.saturating_mul(m) <= val {
             ret = m;
         } else {
-            r = m;
+            i = m;
         }
     }
 
-    ret as u64
+    ret
 }
 
 /// We need fixed names for many parts of this lib.
@@ -1022,5 +1024,6 @@ mod test {
         assert_eq!(11, integer_sqrt(128));
         assert_eq!(2_u64.pow(16) - 1, integer_sqrt(u64::from(u32::MAX)));
         assert_eq!(2_u64.pow(32) - 1, integer_sqrt(u64::MAX));
+        assert_eq!(2_u64.pow(32) - 1, integer_sqrt(u64::MAX - 1));
     }
 }
