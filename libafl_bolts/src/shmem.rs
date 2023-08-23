@@ -1387,12 +1387,12 @@ pub mod win32_shmem {
                 });
                 if let Err(err) = res {
                     // ignore result: nothing we can do if this goes wrong..
-                    log::warn!("Failed to unmap memory at {:?}: {err}", self.map)
+                    log::warn!("Failed to unmap memory at {:?}: {err}", self.map);
                 }
                 let res = CloseHandle(self.handle);
                 if let Err(err) = res {
                     // ignore result: nothing we can do if this goes wrong..
-                    log::warn!("Failed to close mem handle {:?}: {err}", self.handle)
+                    log::warn!("Failed to close mem handle {:?}: {err}", self.handle);
                 }
             }
         }

@@ -332,7 +332,8 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
                 Some(addr_of_mut!(GLOBAL_STATE) as *mut c_void),
                 Some(&TP_CALLBACK_ENVIRON_V3::default()),
             )
-        }.expect("CreateThreadpoolTimer failed!");
+        }
+        .expect("CreateThreadpoolTimer failed!");
         let mut critical = CRITICAL_SECTION::default();
 
         unsafe {
