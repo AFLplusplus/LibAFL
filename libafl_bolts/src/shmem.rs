@@ -1268,8 +1268,7 @@ pub mod win32_shmem {
             Foundation::{CloseHandle, BOOL, HANDLE},
             System::Memory::{
                 CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
-                FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
-                MEMORY_MAPPED_VIEW_ADDRESS,
+                FILE_MAP_ALL_ACCESS, MEMORY_MAPPED_VIEW_ADDRESS, PAGE_READWRITE,
             },
         },
     };
@@ -1310,7 +1309,8 @@ pub mod win32_shmem {
                     PCSTR(map_str_bytes.as_mut_ptr()),
                 )?;
 
-                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size).Value as *mut u8;
+                let map =
+                    MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size).Value as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(
                         "Cannot map shared memory {}",
@@ -1337,7 +1337,8 @@ pub mod win32_shmem {
                     PCSTR(map_str_bytes.as_ptr() as *mut _),
                 )?;
 
-                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size).Value as *mut u8;
+                let map =
+                    MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size).Value as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(
                         "Cannot map shared memory {}",
@@ -1381,7 +1382,9 @@ pub mod win32_shmem {
     impl Drop for Win32ShMem {
         fn drop(&mut self) {
             unsafe {
-                let res = UnmapViewOfFile(MEMORY_MAPPED_VIEW_ADDRESS { Value: self.map as *mut c_void });
+                let res = UnmapViewOfFile(MEMORY_MAPPED_VIEW_ADDRESS {
+                    Value: self.map as *mut c_void,
+                });
                 if let Err(err) = res {
                     // ignore result: nothing we can do if this goes wrong..
                     log::warn!("Failed to unmap memory at {:?}: {err}", self.map)
