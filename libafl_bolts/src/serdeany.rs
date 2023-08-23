@@ -272,7 +272,8 @@ macro_rules! create_serde_registry_for_trait {
                                 .get(&id)
                                 .is_some()
                         },
-                        "type {} was inserted without registration!",
+                        "Type {} was inserted without registration! Call {}::register or use serde_autoreg.",
+                        core::any::type_name::<T>(),
                         core::any::type_name::<T>()
                     );
                     self.map.insert(id, t);
@@ -541,7 +542,8 @@ macro_rules! create_serde_registry_for_trait {
                                 .get(&id)
                                 .is_some()
                         },
-                        "type {} was inserted without registration!",
+                        "Type {} was inserted without registration! Call {}::register or use serde_autoreg.",
+                        core::any::type_name::<T>(),
                         core::any::type_name::<T>()
                     );
                     if !self.map.contains_key(&id) {
