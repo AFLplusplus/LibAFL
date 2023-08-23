@@ -3,6 +3,7 @@
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
+use libafl_bolts::integer_sqrt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -13,17 +14,6 @@ use crate::{
     state::{HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
 };
-
-#[inline]
-const fn integer_sqrt(val: u64) -> u64 {
-    let mut i = 0;
-    let mut r = 0;
-    while r <= val {
-        r = i * i;
-        i = i.wrapping_add(1);
-    }
-    i.wrapping_sub(1)
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Copy, Default)]
 /// The state of the `EcoFuzz` scheduling algorithm

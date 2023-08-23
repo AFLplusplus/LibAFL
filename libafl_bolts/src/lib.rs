@@ -127,6 +127,29 @@ macro_rules! format {
     }};
 }
 
+/// Calculates the integer square root using binary search
+#[must_use]
+pub const fn integer_sqrt(val: u64) -> u64 {
+    // TODO: We can probably do this with u64 if we are careful
+
+    let val: u128 = val as u128;
+    let mut ret = 0;
+    let mut r = val + 1;
+    let mut m;
+
+    while ret != r - 1 {
+        m = (ret + r) / 2;
+
+        if m * m <= val {
+            ret = m;
+        } else {
+            r = m;
+        }
+    }
+
+    ret as u64
+}
+
 /// We need fixed names for many parts of this lib.
 pub trait Named {
     /// Provide the name of this element.
@@ -982,5 +1005,22 @@ pub mod pybind {
     pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
         crate::rands::pybind::register(py, m)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::integer_sqrt;
+
+    #[test]
+    fn test_integer_sqrt() {
+        assert_eq!(0, integer_sqrt(0));
+        assert_eq!(1, integer_sqrt(1));
+        assert_eq!(2, integer_sqrt(4));
+        assert_eq!(10, integer_sqrt(120));
+        assert_eq!(11, integer_sqrt(121));
+        assert_eq!(11, integer_sqrt(128));
+        assert_eq!(2_u64.pow(16) - 1, integer_sqrt(u32::MAX as _));
+        assert_eq!(2_u64.pow(32) - 1, integer_sqrt(u64::MAX));
     }
 }
