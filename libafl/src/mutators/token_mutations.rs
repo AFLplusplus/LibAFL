@@ -1759,14 +1759,18 @@ impl TextType {
     }
 }
 
+/// Returns `true` if the given `u8` char is
+/// in the valid ascii range (`<= 0x7F`)
 #[inline]
 const fn isascii(c: u8) -> bool {
     c <= 0x7F
 }
 
+/// Returns `true` if the given `u8` char is
+/// a valid printable character (between `0x20` and `0x7E`)
 #[inline]
 const fn isprint(c: u8) -> bool {
-    c >= 0x20 && isascii(c)
+    c >= 0x20 && c <= 0x7E
 }
 
 #[inline]
