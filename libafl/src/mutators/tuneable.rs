@@ -42,6 +42,8 @@ pub struct TuneableScheduledMutatorMetadata {
     pub iter_probabilities_pow_cumulative: Vec<f32>,
 }
 
+impl_serdeany!(TuneableScheduledMutatorMetadata);
+
 impl Default for TuneableScheduledMutatorMetadata {
     fn default() -> Self {
         Self {
@@ -71,8 +73,6 @@ impl TuneableScheduledMutatorMetadata {
             .ok_or_else(|| Error::illegal_state("TuneableScheduledMutator not in use"))
     }
 }
-
-impl_serdeany!(TuneableScheduledMutatorMetadata);
 
 /// A [`Mutator`] that schedules one of the embedded mutations on each call.
 /// The index of the next mutation can be set.
