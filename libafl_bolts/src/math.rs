@@ -24,8 +24,7 @@ pub fn calculate_cumulative_distribution_in_place(probabilities: &mut [f32]) -> 
     let offset_to_1 = *last - 1.0_f32;
     if offset_to_1.is_nan() || offset_to_1 > 1.0e-4 || -offset_to_1 > 1.0e-4 {
         return Err(Error::illegal_argument(format!(
-            "sum of probabilities ({}) is not 1",
-            *last
+            "sum of probabilities ({last}) is not 1"
         )));
     }
 

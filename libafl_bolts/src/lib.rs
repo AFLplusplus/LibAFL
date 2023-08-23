@@ -75,6 +75,21 @@ Welcome to `LibAFL`
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
 
+/// We need some sort of "[`String`]" for errors in `no_alloc`...
+/// We can only support `'static` without allocator, so let's do that.
+#[cfg(not(feature = "alloc"))]
+type String = &'static str;
+
+/// We also need a non-allocating format...
+/// This one simply returns the `fmt` string.
+/// Good enough for simple errors, for anything else, use the `alloc` feature.
+#[cfg(not(feature = "alloc"))]
+macro_rules! format {
+    ($fmt:literal) => {{
+        $fmt
+    }};
+}
+
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate std;
@@ -160,21 +175,6 @@ use std::{env::VarError, io};
 
 #[cfg(feature = "libafl_derive")]
 pub use libafl_derive::SerdeAny;
-
-/// We need some sort of "[`String`]" for errors in `no_alloc`...
-/// We can only support `'static` without allocator, so let's do that.
-#[cfg(not(feature = "alloc"))]
-type String = &'static str;
-
-/// We also need a non-allocating format...
-/// This one simply returns the `fmt` string.
-/// Good enough for simple errors, for anything else, use the `alloc` feature.
-#[cfg(not(feature = "alloc"))]
-macro_rules! format {
-    ($fmt:literal) => {{
-        $fmt
-    }};
-}
 
 /// We need fixed names for many parts of this lib.
 pub trait Named {
