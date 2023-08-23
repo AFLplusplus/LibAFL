@@ -164,8 +164,8 @@ pub fn calculate_cumulative_distribution_in_place(probabilities: &mut [f32]) -> 
         )));
     }
 
-    let mut cumulative = probabilities;
-    calculate_cumulative_sum_in_place(&mut cumulative);
+    let cumulative = probabilities;
+    calculate_cumulative_sum_in_place(cumulative);
 
     // The cumulative sum should be roughly equal to 1.
     let last = cumulative.last_mut().unwrap();
