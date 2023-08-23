@@ -152,6 +152,36 @@ pub const fn integer_sqrt(val: u64) -> u64 {
     ret
 }
 
+/// Returns the cumulative distribution function for a discrete distribution.
+pub fn calculate_cumulative_distribution_in_place(probabilities: &mut [f32]) -> Result<(), Error> {
+    if probabilities.is_empty() {
+        return Err(Error::illegal_argument("empty list of probabilities"));
+    }
+
+    if !probabilities.iter().all(|&p| (0.0..=1.0).contains(&p)) {
+        return Err(Error::illegal_argument(format!(
+            "invalid probability distribution: {probabilities:?}"
+        )));
+    }
+
+    let mut cumulative = probabilities;
+    calculate_cumulative_sum_in_place(&mut cumulative);
+
+    // The cumulative sum should be roughly equal to 1.
+    let last = cumulative.last_mut().unwrap();
+    if (*last - 1.0_f32).abs() > 1.0e-4 {
+        return Err(Error::illegal_argument(format!(
+            "sum of probabilities ({}) is not 1",
+            *last
+        )));
+    }
+
+    // Clamp the end of the vector to account for floating point errors.
+    *last = 1.0_f32;
+
+    Ok(())
+}
+
 /// We need fixed names for many parts of this lib.
 pub trait Named {
     /// Provide the name of this element.
@@ -1030,5 +1060,26 @@ mod test {
         assert_eq!(128, integer_sqrt((128 * 128) + 127));
         assert_eq!(128, integer_sqrt((128 * 128) + 127));
         assert_eq!(999999, integer_sqrt((999999 * 999999) + 9));
+    }
+
+    #[test]
+    fn get_cdf_fails_with_invalid_probs() {
+        // Distribution has to sum up to 1.
+        assert!(calculate_cumulative_distribution_in_place(&mut []).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.0]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.9]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.9, 0.9]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [f32::NAN]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [f32::INFINITY]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [f32::NEG_INFINITY]).is_err());
+
+        // Elements have to be between 0 and 1
+        assert!(calculate_cumulative_distribution_in_place(&mut [-0.5, 0.5, 0.5]).is_err());
+
+        assert!(calculate_cumulative_distribution_in_place(&mut [1.0]).is_ok());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.0, 1.0]).is_ok());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.0, 1.0, 0.0]).is_ok());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.5, 0.5]).is_ok());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.2; 5]).is_ok());
     }
 }

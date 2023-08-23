@@ -8,7 +8,7 @@ use core::{
     marker::PhantomData,
 };
 
-use libafl_bolts::{calculate_cumulative_sum_in_place, impl_serdeany, rands::Rand, Named};
+use libafl_bolts::{calculate_cumulative_distribution_in_place, impl_serdeany, rands::Rand, Named};
 use serde::{Deserialize, Serialize};
 
 pub use crate::mutators::{mutations::*, token_mutations::*};
@@ -247,36 +247,6 @@ where
     }
 }
 
-// Returns the cumulative distribution function for a discrete distribution.
-fn calculate_cumulative_distribution_in_place(probabilities: &mut [f32]) -> Result<(), Error> {
-    if probabilities.is_empty() {
-        return Err(Error::illegal_argument("empty list of probabilities"));
-    }
-
-    if !probabilities.iter().all(|&p| (0.0..=1.0).contains(&p)) {
-        return Err(Error::illegal_argument(format!(
-            "invalid probability distribution: {probabilities:?}"
-        )));
-    }
-
-    let mut cumulative = probabilities;
-    calculate_cumulative_sum_in_place(&mut cumulative);
-
-    // The cumulative sum should be roughly equal to 1.
-    let last = cumulative.last_mut().unwrap();
-    if num_traits::abs(*last - 1.0_f32) > 1.0e-4 {
-        return Err(Error::illegal_argument(format!(
-            "sum of probabilities ({}) is not 1",
-            *last
-        )));
-    }
-
-    // Clamp the end of the vector to account for floating point errors.
-    *last = 1.0_f32;
-
-    Ok(())
-}
-
 impl<S> TuneableScheduledMutator<(), (), S>
 where
     S: HasRand + HasMetadata,
@@ -395,8 +365,7 @@ mod test {
     use libafl_bolts::tuples::tuple_list;
 
     use super::{
-        calculate_cumulative_distribution_in_place, BitFlipMutator, ByteDecMutator,
-        TuneableScheduledMutator, TuneableScheduledMutatorMetadata,
+        BitFlipMutator, ByteDecMutator, TuneableScheduledMutator, TuneableScheduledMutatorMetadata,
     };
     use crate::{
         inputs::BytesInput,
@@ -425,27 +394,6 @@ mod test {
         assert_eq!(tuneable.schedule(&mut state, &input), 1.into());
         assert_eq!(tuneable.schedule(&mut state, &input), 2.into());
         assert_eq!(tuneable.schedule(&mut state, &input), 1.into());
-    }
-
-    #[test]
-    fn get_cdf_fails_with_invalid_probs() {
-        // Distribution has to sum up to 1.
-        assert!(calculate_cumulative_distribution_in_place(&mut []).is_err());
-        assert!(calculate_cumulative_distribution_in_place(&mut [0.0]).is_err());
-        assert!(calculate_cumulative_distribution_in_place(&mut [0.9]).is_err());
-        assert!(calculate_cumulative_distribution_in_place(&mut [0.9, 0.9]).is_err());
-        assert!(calculate_cumulative_distribution_in_place(&mut [f32::NAN]).is_err());
-        assert!(calculate_cumulative_distribution_in_place(&mut [f32::INFINITY]).is_err());
-        assert!(calculate_cumulative_distribution_in_place(&mut [f32::NEG_INFINITY]).is_err());
-
-        // Elements have to be between 0 and 1
-        assert!(calculate_cumulative_distribution_in_place(&mut [-0.5, 0.5, 0.5]).is_err());
-
-        assert!(calculate_cumulative_distribution_in_place(&mut [1.0]).is_ok());
-        assert!(calculate_cumulative_distribution_in_place(&mut [0.0, 1.0]).is_ok());
-        assert!(calculate_cumulative_distribution_in_place(&mut [0.0, 1.0, 0.0]).is_ok());
-        assert!(calculate_cumulative_distribution_in_place(&mut [0.5, 0.5]).is_ok());
-        assert!(calculate_cumulative_distribution_in_place(&mut [0.2; 5]).is_ok());
     }
 
     #[test]
