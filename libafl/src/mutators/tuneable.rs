@@ -248,7 +248,7 @@ where
 }
 
 // Returns the cumulative distribution function for a discrete distribution.
-fn calculate_cumulative_distribution(probabilities: Vec<f32>) -> Result<Vec<f32>, Error> {
+fn calculate_cumulative_distribution_in_place(probabilities: &mut [f32]) -> Result<(), Error> {
     if probabilities.is_empty() {
         return Err(Error::illegal_argument("empty list of probabilities"));
     }
@@ -274,7 +274,7 @@ fn calculate_cumulative_distribution(probabilities: Vec<f32>) -> Result<Vec<f32>
     // Clamp the end of the vector to account for floating point errors.
     *last = 1.0_f32;
 
-    Ok(cumulative)
+    Ok(())
 }
 
 impl<S> TuneableScheduledMutator<(), (), S>
@@ -317,7 +317,7 @@ where
     /// Setting this function will unset everything previously set in `set_iters`.
     pub fn set_iter_probabilities_pow(
         state: &mut S,
-        iter_probabilities_pow: Vec<f32>,
+        mut iter_probabilities_pow: Vec<f32>,
     ) -> Result<(), Error> {
         if iter_probabilities_pow.len() >= 32 {
             return Err(Error::illegal_argument(
@@ -328,8 +328,8 @@ where
         metadata.iters = None;
 
         // we precalculate the cumulative probability to be faster when sampling later.
-        metadata.iter_probabilities_pow_cumulative =
-            calculate_cumulative_distribution(iter_probabilities_pow)?;
+        calculate_cumulative_distribution_in_place(&mut iter_probabilities_pow)?;
+        metadata.iter_probabilities_pow_cumulative = iter_probabilities_pow;
 
         Ok(())
     }
@@ -353,15 +353,15 @@ where
     /// Setting the probabilities will remove the value set through `set_mutation_ids`.
     pub fn set_mutation_probabilities(
         state: &mut S,
-        mutation_probabilities: Vec<f32>,
+        mut mutation_probabilities: Vec<f32>,
     ) -> Result<(), Error> {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids.clear();
         metadata.next_id = 0.into();
 
         // we precalculate the cumulative probability to be faster when sampling later.
-        metadata.mutation_probabilities_cumulative =
-            calculate_cumulative_distribution(mutation_probabilities)?;
+        calculate_cumulative_distribution_in_place(&mut mutation_probabilities)?;
+        metadata.mutation_probabilities_cumulative = mutation_probabilities;
         Ok(())
     }
 
@@ -395,7 +395,7 @@ mod test {
     use libafl_bolts::tuples::tuple_list;
 
     use super::{
-        calculate_cumulative_distribution, BitFlipMutator, ByteDecMutator,
+        calculate_cumulative_distribution_in_place, BitFlipMutator, ByteDecMutator,
         TuneableScheduledMutator, TuneableScheduledMutatorMetadata,
     };
     use crate::{
@@ -406,6 +406,11 @@ mod test {
 
     #[test]
     fn test_tuning() {
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            TuneableScheduledMutatorMetadata::register();
+        }
+
         let mut state: NopState<BytesInput> = NopState::new();
         let mutators = tuple_list!(
             BitFlipMutator::new(),
@@ -425,26 +430,31 @@ mod test {
     #[test]
     fn get_cdf_fails_with_invalid_probs() {
         // Distribution has to sum up to 1.
-        assert!(calculate_cumulative_distribution(vec![]).is_err());
-        assert!(calculate_cumulative_distribution(vec![0.0]).is_err());
-        assert!(calculate_cumulative_distribution(vec![0.9]).is_err());
-        assert!(calculate_cumulative_distribution(vec![0.9, 0.9]).is_err());
-        assert!(calculate_cumulative_distribution(vec![f32::NAN]).is_err());
-        assert!(calculate_cumulative_distribution(vec![f32::INFINITY]).is_err());
-        assert!(calculate_cumulative_distribution(vec![f32::NEG_INFINITY]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut []).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.0]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.9]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.9, 0.9]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [f32::NAN]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [f32::INFINITY]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [f32::NEG_INFINITY]).is_err());
 
         // Elements have to be between 0 and 1
-        assert!(calculate_cumulative_distribution(vec![-0.5, 0.5, 0.5]).is_err());
+        assert!(calculate_cumulative_distribution_in_place(&mut [-0.5, 0.5, 0.5]).is_err());
 
-        assert!(calculate_cumulative_distribution(vec![1.0]).is_ok());
-        assert!(calculate_cumulative_distribution(vec![0.0, 1.0]).is_ok());
-        assert!(calculate_cumulative_distribution(vec![0.0, 1.0, 0.0]).is_ok());
-        assert!(calculate_cumulative_distribution(vec![0.5, 0.5]).is_ok());
-        assert!(calculate_cumulative_distribution(vec![0.2; 5]).is_ok());
+        assert!(calculate_cumulative_distribution_in_place(&mut [1.0]).is_ok());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.0, 1.0]).is_ok());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.0, 1.0, 0.0]).is_ok());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.5, 0.5]).is_ok());
+        assert!(calculate_cumulative_distribution_in_place(&mut [0.2; 5]).is_ok());
     }
 
     #[test]
     fn test_mutation_distribution() {
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            TuneableScheduledMutatorMetadata::register();
+        }
+
         let mut state: NopState<BytesInput> = NopState::new();
         let mutators = tuple_list!(
             BitFlipMutator::new(),
