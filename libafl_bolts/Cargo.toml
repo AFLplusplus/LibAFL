@@ -50,7 +50,7 @@ hashbrown =  { version = "0.14", features = ["serde", "ahash"], default-features
 xxhash-rust = { version = "0.8.5", features = ["xxh3"] } # xxh3 hashing for rust
 serde = { version = "1.0", default-features = false, features = ["derive"] } # serialization lib
 erased-serde = { version = "0.3.21", default-features = false, optional = true } # erased serde
-postcard = { version = "1.0", features = ["alloc"], optional = true } # no_std compatible serde serialization format
+postcard = { version = "1.0", features = ["alloc"], default-features = false, optional = true } # no_std compatible serde serialization format
 num_enum = { version = "0.6", default-features = false }
 ahash = { version = "0.8", default-features=false, optional = true } # The hash function already used in hashbrown
 backtrace = {version = "0.3", optional = true} # Used to get the stacktrace in StacktraceObserver
