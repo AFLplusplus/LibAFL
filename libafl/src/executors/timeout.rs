@@ -322,7 +322,7 @@ impl<E> TimeoutExecutor<E> {
 #[cfg(windows)]
 impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
-    pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
+    pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
         let timeout_handler: PTP_TIMER_CALLBACK =
             unsafe { std::mem::transmute(executor.inprocess_handlers().timeout_handler) };
@@ -332,14 +332,14 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
                 Some(addr_of_mut!(GLOBAL_STATE) as *mut c_void),
                 Some(&TP_CALLBACK_ENVIRON_V3::default()),
             )
-        }?;
+        }.expect("CreateThreadpoolTimer failed!");
         let mut critical = CRITICAL_SECTION::default();
 
         unsafe {
             InitializeCriticalSection(&mut critical);
         }
 
-        Ok(Self {
+        Self {
             executor,
             milli_sec,
             ptp_timer,
@@ -352,7 +352,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
             avg_exec_time: Duration::ZERO,
             start_time: Duration::ZERO,
             tmout_start_time: Duration::ZERO,
-        })
+        }
     }
 
     /// Set the timeout for this executor
