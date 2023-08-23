@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_prob_sampling() {
-        #[cfg(not(feature = "serdeany_autoreg"))]
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
             super::ProbabilityMetadata::register();
         }

@@ -650,14 +650,14 @@ macro_rules! create_register {
             ///
             /// # Safety
             /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
-            #[cfg(not(feature = "serdeany_autoreg"))]
+            #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
             pub unsafe fn register() {
                 $crate::serdeany::RegistryBuilder::register::<$struct_type>();
             }
         }
         const _: () = {
             /// Automatically register this type
-            #[cfg(feature = "serdeany_autoreg")]
+            #[cfg(all(feature = "serdeany_autoreg", not(miri)))]
             #[$crate::ctor]
             fn register() {
                 // # Safety
