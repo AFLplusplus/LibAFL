@@ -3,7 +3,7 @@
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
-use libafl_bolts::integer_sqrt;
+use libafl_bolts::math::integer_sqrt;
 use serde::{Deserialize, Serialize};
 
 use crate::{

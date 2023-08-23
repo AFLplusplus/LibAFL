@@ -8,7 +8,9 @@ use core::{
     marker::PhantomData,
 };
 
-use libafl_bolts::{calculate_cumulative_distribution_in_place, impl_serdeany, rands::Rand, Named};
+use libafl_bolts::{
+    impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand, Named,
+};
 use serde::{Deserialize, Serialize};
 
 pub use crate::mutators::{mutations::*, token_mutations::*};
