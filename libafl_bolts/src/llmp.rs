@@ -521,6 +521,9 @@ fn next_shmem_size(max_alloc: usize) -> usize {
 
 /// Initialize a new `llmp_page`. The size should be relative to
 /// `llmp_page->messages`
+///
+/// # Safety
+/// Will write to the raw SHM page header, should be safe for correct [`ShMem`] implementations
 unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow_reinit: bool) {
     #[cfg(feature = "llmp_debug")]
     log::trace!("llmp_page_init: shmem {:?}", &shmem);
@@ -551,6 +554,9 @@ unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow
 }
 
 /// Get the next pointer and make sure it's in the current page, and has enough space.
+///
+/// # Safety
+/// Will dereference `last_msg`
 #[inline]
 unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     map: &mut LlmpSharedMap<SHM>,
@@ -576,6 +582,9 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
 
 /// Pointer to the message behind the last message
 /// The messages are padded, so accesses will be aligned properly.
+///
+/// # Safety
+/// Will dereference the `last_msg` ptr
 #[inline]
 #[allow(clippy::cast_ptr_alignment)]
 unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {

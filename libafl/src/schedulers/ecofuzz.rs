@@ -3,6 +3,7 @@
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
+use libafl_bolts::math::integer_sqrt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -13,16 +14,6 @@ use crate::{
     state::{HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
     Error,
 };
-
-fn integer_sqrt(val: u64) -> u64 {
-    let mut i = 0;
-    let mut r = 0;
-    while r <= val {
-        r = i * i;
-        i += 1;
-    }
-    i - 1
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Copy, Default)]
 /// The state of the `EcoFuzz` scheduling algorithm
@@ -38,6 +29,10 @@ pub enum EcoState {
 
 /// The testcase Metadata for `EcoScheduler`
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct EcoTestcaseMetadata {
     mutation_num: u64,
     exec_num: u64,
@@ -53,6 +48,10 @@ libafl_bolts::impl_serdeany!(EcoTestcaseMetadata);
 
 /// The state Metadata for `EcoScheduler`
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct EcoMetadata {
     state: EcoState,
     initial_corpus_count: Option<usize>,
@@ -283,7 +282,7 @@ where
         let tcmeta = tc.metadata_mut::<EcoTestcaseMetadata>()?;
 
         tcmeta.exec_num = exec_num;
-        tcmeta.serial = state.corpus().count() as u64 + 1;
+        tcmeta.serial = (state.corpus().count() as u64).saturating_add(1);
         Ok(())
     }
 
