@@ -661,7 +661,7 @@ pub fn current_time() -> time::Duration {
 /// Mixing function: <http://mostlymangling.blogspot.com/2018/07/on-mixing-functions-in-fast-splittable.html>
 #[inline]
 #[must_use]
-pub fn xxh3_rrmxmx_mixer(v: u64) -> u64 {
+pub const fn xxh3_rrmxmx_mixer(v: u64) -> u64 {
     let tmp = (v >> 32) + ((v & 0xffffffff) << 32);
     let bitflip = 0x1cad21f72c81017c ^ 0xdb979082e96dd4de;
     let mut h64 = tmp ^ bitflip;

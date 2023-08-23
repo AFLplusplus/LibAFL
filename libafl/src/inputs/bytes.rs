@@ -109,7 +109,7 @@ impl From<BytesInput> for Vec<u8> {
 impl BytesInput {
     /// Creates a new bytes input using the given bytes
     #[must_use]
-    pub fn new(bytes: Vec<u8>) -> Self {
+    pub const fn new(bytes: Vec<u8>) -> Self {
         Self { bytes }
     }
 }

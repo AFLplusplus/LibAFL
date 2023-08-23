@@ -14,14 +14,15 @@ use crate::{
     Error,
 };
 
-fn integer_sqrt(val: u64) -> u64 {
+#[inline]
+const fn integer_sqrt(val: u64) -> u64 {
     let mut i = 0;
     let mut r = 0;
     while r <= val {
         r = i * i;
-        i += 1;
+        i = i.wrapping_add(1);
     }
-    i - 1
+    i.wrapping_sub(1)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Copy, Default)]

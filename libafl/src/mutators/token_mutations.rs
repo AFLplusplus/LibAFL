@@ -1760,13 +1760,13 @@ impl TextType {
 }
 
 #[inline]
-fn isascii(c: u8) -> bool {
+const fn isascii(c: u8) -> bool {
     c <= 0x7F
 }
 
 #[inline]
-fn isprint(c: u8) -> bool {
-    (0x20..=0x7e).contains(&c)
+const fn isprint(c: u8) -> bool {
+    c >= 0x20 && isascii(c)
 }
 
 #[inline]
