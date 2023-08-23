@@ -67,7 +67,7 @@ use nix::{self, unistd::dup};
 pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
+    // unsafe { RegistryBuilder::register::<Tokens>(); }
 
     let res = match Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))

@@ -110,7 +110,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
 ) {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
+    // unsafe { RegistryBuilder::register::<Tokens>(); }
 
     assert!(harness_fn.is_some(), "No harness callback provided");
     let harness_fn = harness_fn.unwrap();
