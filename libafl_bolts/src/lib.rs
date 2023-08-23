@@ -1020,7 +1020,7 @@ mod test {
         assert_eq!(10, integer_sqrt(120));
         assert_eq!(11, integer_sqrt(121));
         assert_eq!(11, integer_sqrt(128));
-        assert_eq!(2_u64.pow(16) - 1, integer_sqrt(u32::MAX as _));
+        assert_eq!(2_u64.pow(16) - 1, integer_sqrt(u64::from(u32::MAX)));
         assert_eq!(2_u64.pow(32) - 1, integer_sqrt(u64::MAX));
     }
 }
