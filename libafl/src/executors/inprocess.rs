@@ -675,11 +675,9 @@ pub fn run_observers_and_save_state<CF, E, EM, OF, Z>(
             .expect("Could not save state in run_observers_and_save_state");
     }
 
-    // We will start mutators from scratch after restart.
+    // Serialize the state and wait safely for the broker to read pending messages
     event_mgr.on_restart(state).unwrap();
 
-    log::info!("Waiting for broker...");
-    event_mgr.await_restart_safe();
     log::info!("Bye!");
 }
 

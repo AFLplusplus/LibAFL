@@ -68,7 +68,7 @@ const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
 
 /// The minimum buffer size at which to compress LLMP IPC messages.
 #[cfg(feature = "llmp_compression")]
-const COMPRESS_THRESHOLD: usize = 1024;
+pub const COMPRESS_THRESHOLD: usize = 1024;
 
 /// An LLMP-backed event manager for scalable multi-processed fuzzing
 #[derive(Debug)]
@@ -954,7 +954,11 @@ where
         self.staterestorer.save(&(
             if self.save_state { Some(state) } else { None },
             &self.llmp_mgr.describe()?,
-        ))
+        ))?;
+
+        log::info!("Waiting for broker...");
+        self.await_restart_safe();
+        Ok(())
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {

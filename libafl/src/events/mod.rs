@@ -3,7 +3,9 @@
 
 pub mod simple;
 pub use simple::*;
+#[cfg(all(unix, feature = "std"))]
 pub mod centralized;
+#[cfg(all(unix, feature = "std"))]
 pub use centralized::*;
 #[cfg(feature = "std")]
 #[allow(clippy::ignored_unit_patterns)]
@@ -273,6 +275,7 @@ where
 }
 */
 
+// TODO remove forward_id as not anymore needed for centralized
 /// Events sent around in the library
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -530,6 +533,7 @@ pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
     fn on_restart(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        self.await_restart_safe();
         Ok(())
     }
 
@@ -539,7 +543,7 @@ pub trait EventRestarter: UsesState {
         Ok(())
     }
 
-    /// Block until we are safe to exit.
+    /// Block until we are safe to exit, usually called inside `on_restart`.
     #[inline]
     fn await_restart_safe(&mut self) {}
 }

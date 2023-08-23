@@ -631,7 +631,6 @@ pub struct AFLppCmpHeader {
     #[bitfield(name = "reserved", ty = "u32", bits = "60..=63")]
     data: [u8; 8],
 }
-
 /// The AFL++ `cmp_operands` struct
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C, packed)]
@@ -814,8 +813,8 @@ impl CmpMap for AFLppCmpMap {
 
     fn reset(&mut self) -> Result<(), Error> {
         // For performance, we reset just the headers
-        self.headers = unsafe { core::mem::zeroed() };
-        // self.vals.operands = unsafe { core::mem::zeroed() };
+        self.headers.fill(AFLppCmpHeader { data: [0; 8] });
+
         Ok(())
     }
 }
