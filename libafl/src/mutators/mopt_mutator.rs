@@ -28,6 +28,7 @@ use crate::{
 /// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the operation operator.
 /// With the current implementation we are always in the pacemaker fuzzing mode.
 #[derive(Serialize, Deserialize, Clone)]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 pub struct MOpt {
     /// Random number generator
     pub rand: StdRand,

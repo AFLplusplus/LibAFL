@@ -14,6 +14,7 @@ use crate::{
     hooks::QemuHooks,
 };
 
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct QemuEdgesMapMetadata {
     pub map: HashMap<(GuestAddr, GuestAddr), u64>,

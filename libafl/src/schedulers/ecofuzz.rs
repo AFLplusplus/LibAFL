@@ -29,6 +29,7 @@ pub enum EcoState {
 
 /// The testcase Metadata for `EcoScheduler`
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 pub struct EcoTestcaseMetadata {
     mutation_num: u64,
     exec_num: u64,
@@ -44,6 +45,7 @@ libafl_bolts::impl_serdeany!(EcoTestcaseMetadata);
 
 /// The state Metadata for `EcoScheduler`
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 pub struct EcoMetadata {
     state: EcoState,
     initial_corpus_count: Option<usize>,

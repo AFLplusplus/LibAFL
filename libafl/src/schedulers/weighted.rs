@@ -24,9 +24,9 @@ use crate::{
     Error,
 };
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-
 /// The Metadata for `WeightedScheduler`
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WeightedScheduleMetadata {
     /// The fuzzer execution spent in the current cycles
     runs_in_current_cycle: usize,

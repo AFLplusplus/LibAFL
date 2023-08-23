@@ -24,6 +24,7 @@ pub enum GeneralizedItem {
 
 /// Metadata regarding the generalised content of an input
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 pub struct GeneralizedInputMetadata {
     generalized: Vec<GeneralizedItem>,
 }

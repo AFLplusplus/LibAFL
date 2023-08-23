@@ -24,6 +24,7 @@ use crate::{
 
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 pub struct LogMutationMetadata {
     /// A list of logs
     pub list: Vec<String>,

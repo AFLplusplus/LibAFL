@@ -18,6 +18,7 @@ use crate::{
 };
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 struct TuneableSchedulerMetadata {
     next: Option<CorpusId>,
 }

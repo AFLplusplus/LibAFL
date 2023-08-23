@@ -222,6 +222,7 @@ where
 
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 pub struct MapIndexesMetadata {
     /// The list of indexes.
     pub list: Vec<usize>,
@@ -266,6 +267,7 @@ impl MapIndexesMetadata {
 
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 pub struct MapNoveltiesMetadata {
     /// A `list` of novelties.
     pub list: Vec<usize>,
@@ -300,6 +302,7 @@ impl MapNoveltiesMetadata {
 /// The state of [`MapFeedback`]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: DeserializeOwned")]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 pub struct MapFeedbackMetadata<T>
 where
     T: Default + Copy + 'static + Serialize,

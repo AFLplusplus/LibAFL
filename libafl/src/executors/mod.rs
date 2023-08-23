@@ -47,6 +47,7 @@ use crate::{
 
 /// How an execution finished.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 pub enum ExitKind {
     /// The run exited normally.
     Ok,
@@ -69,6 +70,7 @@ pub enum ExitKind {
 
 /// How one of the diffing executions finished.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
 pub enum DiffExitKind {
     /// The run exited normally.
     Ok,
