@@ -29,10 +29,6 @@ use crate::{
     SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
 
-// TODO use the functions provided by Emulator
-pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
-pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
-
 pub type StopExecutionCallback = Box<dyn FnMut(&mut QemuSnapshotHelper, &Emulator)>;
 
 #[derive(Debug)]
@@ -40,7 +36,7 @@ pub struct SnapshotPageInfo {
     pub addr: GuestAddr,
     pub perms: MmapPerms,
     pub private: bool,
-    pub data: Option<Box<[u8; SNAPSHOT_PAGE_SIZE]>>,
+    pub data: Option<Box<Vec<u8>>>,
 }
 
 #[derive(Default, Debug)]
@@ -78,6 +74,8 @@ pub struct QemuSnapshotHelper {
     pub brk: GuestAddr,
     pub mmap_start: GuestAddr,
     pub mmap_limit: usize,
+    pub page_size: usize,
+    pub page_mask: GuestAddr,
     pub stop_execution: Option<StopExecutionCallback>,
     pub empty: bool,
     pub accurate_unmap: bool,
@@ -108,6 +106,8 @@ impl QemuSnapshotHelper {
             brk: 0,
             mmap_start: 0,
             mmap_limit: 0,
+            page_size: 0,
+            page_mask: 0,
             stop_execution: None,
             empty: true,
             accurate_unmap: false,
@@ -124,6 +124,8 @@ impl QemuSnapshotHelper {
             brk: 0,
             mmap_start: 0,
             mmap_limit,
+            page_size: 0,
+            page_mask: 0,
             stop_execution: Some(stop_execution),
             empty: true,
             accurate_unmap: false,
@@ -138,6 +140,8 @@ impl QemuSnapshotHelper {
     pub fn snapshot(&mut self, emulator: &Emulator) {
         self.brk = emulator.get_brk();
         self.mmap_start = emulator.get_mmap_start();
+        self.page_size = emulator.current_cpu().expect("Invalid CPU").page_size();
+        self.page_mask = !(self.page_size as GuestAddr - 1);
         self.pages.clear();
         for map in emulator.mappings() {
             let mut addr = map.start();
@@ -151,12 +155,12 @@ impl QemuSnapshotHelper {
                 if map.flags().is_r() {
                     // TODO not just for R pages
                     unsafe {
-                        info.data = Some(Box::new(core::mem::zeroed()));
+                        info.data = Some(Box::new(vec![0; self.page_size]));
                         emulator.read_mem(addr, &mut info.data.as_mut().unwrap()[..]);
                     }
                 }
                 self.pages.insert(addr, info);
-                addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
+                addr += self.page_size as GuestAddr;
             }
 
             self.maps.tree.insert(
@@ -199,9 +203,9 @@ impl QemuSnapshotHelper {
     pub fn access(&mut self, addr: GuestAddr, size: usize) {
         // ASSUMPTION: the access can only cross 2 pages
         debug_assert!(size > 0);
-        let page = addr & SNAPSHOT_PAGE_MASK;
+        let page = addr & self.page_mask;
         self.page_access(page);
-        let second_page = (addr + size as GuestAddr - 1) & SNAPSHOT_PAGE_MASK;
+        let second_page = (addr + size as GuestAddr - 1) & self.page_mask;
         if page != second_page {
             self.page_access(second_page);
         }
@@ -220,7 +224,7 @@ impl QemuSnapshotHelper {
                             let mut found = false;
                             for entry in new_maps
                                 .tree
-                                .query_mut(*page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
+                                .query_mut(*page..(page + self.page_size as GuestAddr))
                             {
                                 if !entry.value.perms.unwrap_or(MmapPerms::None).is_w() {
                                     drop(emulator.mprotect(
@@ -256,7 +260,7 @@ impl QemuSnapshotHelper {
                 for entry in self
                     .maps
                     .tree
-                    .query_mut(*page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
+                    .query_mut(*page..(page + self.page_size as GuestAddr))
                 {
                     if !entry.value.perms.unwrap_or(MmapPerms::None).is_w() && !entry.value.changed
                     {
@@ -297,8 +301,8 @@ impl QemuSnapshotHelper {
     }
 
     pub fn is_unmap_allowed(&mut self, start: GuestAddr, mut size: usize) -> bool {
-        if size % SNAPSHOT_PAGE_SIZE != 0 {
-            size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
+        if size % self.page_size != 0 {
+            size = size + (self.page_size - size % self.page_size);
         }
         self.maps
             .tree
@@ -313,8 +317,8 @@ impl QemuSnapshotHelper {
         }
 
         let total_size = {
-            if size % SNAPSHOT_PAGE_SIZE != 0 {
-                size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
+            if size % self.page_size != 0 {
+                size = size + (self.page_size - size % self.page_size);
             }
             let mut mapping = self.new_maps.lock().unwrap();
             mapping.tree.insert(
@@ -337,8 +341,8 @@ impl QemuSnapshotHelper {
     }
 
     pub fn change_mapped(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
-        if size % SNAPSHOT_PAGE_SIZE != 0 {
-            size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
+        if size % self.page_size != 0 {
+            size = size + (self.page_size - size % self.page_size);
         }
         let mut mapping = self.new_maps.lock().unwrap();
 
@@ -383,8 +387,8 @@ impl QemuSnapshotHelper {
     }
 
     pub fn remove_mapped(&mut self, start: GuestAddr, mut size: usize) {
-        if size % SNAPSHOT_PAGE_SIZE != 0 {
-            size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
+        if size % self.page_size != 0 {
+            size = size + (self.page_size - size % self.page_size);
         }
 
         let mut mapping = self.new_maps.lock().unwrap();
@@ -399,7 +403,7 @@ impl QemuSnapshotHelper {
             let overlap = i.intersect(&interval).unwrap();
 
             mapping.tree.delete(i);
-            for page in (i.start..i.end).step_by(SNAPSHOT_PAGE_SIZE) {
+            for page in (i.start..i.end).step_by(self.page_size) {
                 self.page_access_no_cache(page);
             }
 
