@@ -12,7 +12,10 @@ use crate::{
     GuestAddr,
 };
 
-#[allow(clippy::unsafe_derive_deserialize)] // for the no_std SerdeAny `register` fn
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct QemuCmpsMapMetadata {
     pub map: HashMap<u64, u64>,
