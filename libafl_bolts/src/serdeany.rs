@@ -643,7 +643,7 @@ pub use serdeany_registry::*;
 #[macro_export]
 macro_rules! create_register {
     ($struct_type:ty) => {
-        const _: () = {
+        impl $struct_type {
             /// Manually register this type at a later point in time
             ///
             /// # Safety
@@ -652,7 +652,8 @@ macro_rules! create_register {
             pub unsafe fn register() {
                 $crate::serdeany::RegistryBuilder::register::<$struct_type>();
             }
-
+        }
+        const _: () = {
             /// Automatically register this type
             #[cfg(feature = "serdeany_autoreg")]
             #[$crate::ctor]

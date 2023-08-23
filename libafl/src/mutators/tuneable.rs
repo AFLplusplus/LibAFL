@@ -406,9 +406,9 @@ mod test {
 
     #[test]
     fn test_tuning() {
-        #[cfg(any(not(feature = "std"), miri))]
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
-            libafl_bolts::serdeany::RegistryBuilder::register::<TuneableScheduledMutatorMetadata>();
+            TuneableScheduledMutatorMetadata::register();
         }
 
         let mut state: NopState<BytesInput> = NopState::new();
@@ -450,6 +450,11 @@ mod test {
 
     #[test]
     fn test_mutation_distribution() {
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            TuneableScheduledMutatorMetadata::register();
+        }
+
         let mut state: NopState<BytesInput> = NopState::new();
         let mutators = tuple_list!(
             BitFlipMutator::new(),
