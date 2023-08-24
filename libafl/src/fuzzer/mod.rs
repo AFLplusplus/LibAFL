@@ -338,9 +338,9 @@ where
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
         &mut self,
-        state: &mut CS::State,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: <CS::State as UsesInput>::Input,
+        input: <Self::State as UsesInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
@@ -489,10 +489,10 @@ where
     #[inline]
     fn evaluate_input_events(
         &mut self,
-        state: &mut CS::State,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <CS::State as UsesInput>::Input,
+        input: <Self::State as UsesInput>::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
@@ -501,47 +501,57 @@ where
     /// Adds an input, even if it's not considered `interesting` by any of the executors
     fn add_input(
         &mut self,
-        state: &mut CS::State,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <CS::State as UsesInput>::Input,
+        input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
+        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
 
-        // However, we still want to trigger the side effects of objectives and feedbacks.
+        // Maybe a solution
         #[cfg(not(feature = "introspection"))]
-        let _is_solution = self
+        let is_solution = self
             .objective_mut()
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
 
         #[cfg(feature = "introspection")]
-        let _is_solution = self
+        let is_solution = self
             .objective_mut()
             .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
 
-        #[cfg(not(feature = "introspection"))]
-        let _is_corpus = self
-            .feedback_mut()
-            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+        if is_solution {
+            self.objective_mut()
+                .append_metadata(state, observers, &mut testcase)?;
+            let idx = state.solutions_mut().add(testcase)?;
 
-        #[cfg(feature = "introspection")]
-        let _is_corpus = self
-            .feedback_mut()
-            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+            manager.fire(
+                state,
+                Event::Objective {
+                    objective_size: state.solutions().count(),
+                },
+            )?;
+            return Ok(idx);
+        }
 
         // Not a solution
         self.objective_mut().discard_metadata(state, &input)?;
 
         // several is_interesting implementations collect some data about the run, later used in
         // append_metadata; we *must* invoke is_interesting here to collect it
-        let _: bool = self
+        #[cfg(not(feature = "introspection"))]
+        let _is_corpus = self
             .feedback_mut()
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
 
+        #[cfg(feature = "introspection")]
+        let _is_corpus = self
+            .feedback_mut()
+            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+
         // Add the input to the main corpus
-        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
         self.feedback_mut()
             .append_metadata(state, observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
