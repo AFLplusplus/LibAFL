@@ -75,7 +75,11 @@ where
 }
 
 /// Set the time for a single seed to be used by this mutational stage
-pub fn set_seed_fuzz_time_with_name<S>(state: &mut S, fuzz_time: Duration, name: &str) -> Result<(), Error>
+pub fn set_seed_fuzz_time_with_name<S>(
+    state: &mut S,
+    fuzz_time: Duration,
+    name: &str,
+) -> Result<(), Error>
 where
     S: HasNamedMetadata,
 {
@@ -323,11 +327,7 @@ where
     }
 
     /// Set the time to mutate a single input in this mutational stage
-    pub fn set_seed_fuzz_time<S>(
-        &self,
-        state: &mut S,
-        fuzz_time: Duration,
-    ) -> Result<(), Error>
+    pub fn set_seed_fuzz_time<S>(&self, state: &mut S, fuzz_time: Duration) -> Result<(), Error>
     where
         S: HasNamedMetadata,
     {
