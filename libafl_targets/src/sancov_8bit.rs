@@ -52,11 +52,11 @@ mod observers {
 
     #[must_use]
     #[export_name = "counters_maps_observer"]
-    /// Create a new [`CountersMultiMapObserver`] of the [`COUNTERS_MAP`].
+    /// Create a new [`CountersMultiMapObserver`] of the [`COUNTERS_MAPS`].
     ///
-    /// This is a special [`MultiMapObserver`] for the [`COUNTERS_MAP`] and may be used when
+    /// This is a special [`libafl::observers::MultiMapObserver`] for the [`COUNTERS_MAPS`] and may be used when
     /// 8-bit counters are used for `SanitizerCoverage`. You can utilize this observer in a
-    /// [`HitcountsIterableMapObserver`] like so:
+    /// [`libafl::observers::HitcountsIterableMapObserver`] like so:
     ///
     /// ```rust,ignore
     /// use libafl::{
