@@ -11100,12 +11100,6 @@ impl ::std::ops::BitAndAssign for qemu_plugin_mem_rw {
         self.0 &= rhs.0;
     }
 }
-
-extern "C" {
-    #[doc = " qemu_target_page_size - return the target's page size"]
-    pub fn qemu_target_page_size() -> usize;
-}
-
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct qemu_plugin_mem_rw(pub ::std::os::raw::c_uint);
