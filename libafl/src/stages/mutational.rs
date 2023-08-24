@@ -239,12 +239,12 @@ where
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
-        Self::transforming(mutator, DEFAULT_MUTATIONAL_MAX_ITERATIONS)
+        Self::transforming_with_max_iterations(mutator, DEFAULT_MUTATIONAL_MAX_ITERATIONS)
     }
 
     /// Creates a new mutational stage with the given max iterations
     pub fn with_max_iterations(mutator: M, max_iterations: u64) -> Self {
-        Self::transforming(mutator, max_iterations)
+        Self::transforming_with_max_iterations(mutator, max_iterations)
     }
 }
 
@@ -256,8 +256,13 @@ where
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
-    /// Creates a new transforming mutational stage
-    pub fn transforming(mutator: M, max_iterations: u64) -> Self {
+    /// Creates a new transforming mutational stage with the default max iterations
+    pub fn transforming(mutator: M) -> Self {
+        Self::transforming_with_max_iterations(mutator, DEFAULT_MUTATIONAL_MAX_ITERATIONS)
+    }
+
+    /// Creates a new transforming mutational stage with the given max iterations
+    pub fn transforming_with_max_iterations(mutator: M, max_iterations: u64) -> Self {
         Self {
             mutator,
             max_iterations,
