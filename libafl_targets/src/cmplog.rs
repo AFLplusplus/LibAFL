@@ -149,8 +149,12 @@ impl CmpMap for CmpLogMap {
 
     fn reset(&mut self) -> Result<(), Error> {
         // For performance, we reset just the headers
-        self.headers = unsafe { core::mem::zeroed() };
-        // self.vals.operands = unsafe { core::mem::zeroed() };
+        self.headers.fill(CmpLogHeader {
+            hits: 0,
+            shape: 0,
+            kind: 0,
+        });
+
         Ok(())
     }
 }
