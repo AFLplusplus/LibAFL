@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Compare values collected during a run
-#[derive(Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Clone)]
 pub enum CmpValues {
     /// Two u8 values
     U8((u8, u8)),
@@ -55,6 +55,10 @@ impl CmpValues {
 
 /// A state metadata holding a list of values logged from comparisons
 #[derive(Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct CmpValuesMetadata {
     /// A `list` of values.
     #[serde(skip)]
@@ -562,6 +566,10 @@ where
 
 /// A state metadata holding a list of values logged from comparisons. AFL++ RQ version.
 #[derive(Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct AFLppCmpValuesMetadata {
     /// The first map of AFLppCmpVals retrieved by running the un-mutated input
     #[serde(skip)]
@@ -631,7 +639,6 @@ pub struct AFLppCmpHeader {
     #[bitfield(name = "reserved", ty = "u32", bits = "60..=63")]
     data: [u8; 8],
 }
-
 /// The AFL++ `cmp_operands` struct
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C, packed)]
@@ -814,8 +821,8 @@ impl CmpMap for AFLppCmpMap {
 
     fn reset(&mut self) -> Result<(), Error> {
         // For performance, we reset just the headers
-        self.headers = unsafe { core::mem::zeroed() };
-        // self.vals.operands = unsafe { core::mem::zeroed() };
+        self.headers.fill(AFLppCmpHeader { data: [0; 8] });
+
         Ok(())
     }
 }

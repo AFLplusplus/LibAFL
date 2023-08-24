@@ -29,4 +29,4 @@ clap = { version = "4.3.0", features = ["derive", "string"]}
 libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
 libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode"] }
-rangemap = { version = "1.0.3" }
+rangemap = { version = "1.3" }

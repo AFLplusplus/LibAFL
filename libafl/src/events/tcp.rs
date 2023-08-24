@@ -733,7 +733,9 @@ where
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer
-            .save(&if self.save_state { Some(state) } else { None })
+            .save(&if self.save_state { Some(state) } else { None })?;
+        self.await_restart_safe();
+        Ok(())
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
@@ -873,7 +875,7 @@ where
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
-#[allow(clippy::default_trait_access)]
+#[allow(clippy::default_trait_access, clippy::ignored_unit_patterns)]
 #[derive(TypedBuilder, Debug)]
 pub struct RestartingMgr<MT, S, SP>
 where

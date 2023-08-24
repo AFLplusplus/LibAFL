@@ -207,7 +207,7 @@ where
     }
 }
 
-/// A filter that only saves values which are at least the next pow2 class
+/// Only consider `T::one()` or `T::max_value()`, if they are bigger than the old value, as novel
 #[derive(Clone, Debug)]
 pub struct OneOrFilledIsNovel {}
 impl<T> IsNovel<T> for OneOrFilledIsNovel
@@ -222,6 +222,10 @@ where
 
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct MapIndexesMetadata {
     /// The list of indexes.
     pub list: Vec<usize>,
@@ -266,6 +270,10 @@ impl MapIndexesMetadata {
 
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct MapNoveltiesMetadata {
     /// A `list` of novelties.
     pub list: Vec<usize>,
@@ -300,6 +308,10 @@ impl MapNoveltiesMetadata {
 /// The state of [`MapFeedback`]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: DeserializeOwned")]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct MapFeedbackMetadata<T>
 where
     T: Default + Copy + 'static + Serialize,

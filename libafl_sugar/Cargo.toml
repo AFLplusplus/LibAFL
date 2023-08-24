@@ -22,6 +22,9 @@ x86_64 = ["libafl_qemu/x86_64"] # build qemu for x86_64 (default)
 i386 = ["libafl_qemu/i386"] # build qemu for i386
 arm = ["libafl_qemu/arm"] # build qemu for arm
 aarch64 = ["libafl_qemu/aarch64"] # build qemu for aarch64
+mips = ["libafl_qemu/mips"] # build qemu for mips (el, use with the 'be' feature of mips be)
+ppc = ["libafl_qemu/ppc"] # build qemu for powerpc
+hexagon = ["libafl_qemu/hexagon"] # build qemu for hexagon
 
 [build-dependencies]
 pyo3-build-config = { version = "0.15", optional = true }
@@ -32,9 +35,9 @@ libafl_bolts = { path = "../libafl_bolts", version = "0.10.1" }
 libafl_targets = { path = "../libafl_targets", version = "0.10.1" }
 libafl_qemu = { path = "../libafl_qemu", version = "0.10.1" }
 
-typed-builder = "0.15.1" # Implement the builder pattern at compiletime
+typed-builder = "0.15.2" # Implement the builder pattern at compiletime
 pyo3 = { version = "0.18.3", optional = true }
-log = "0.4.17"
+log = "0.4.20"
 
 [lib]
 name = "libafl_sugar"

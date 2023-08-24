@@ -63,7 +63,7 @@ impl CoreId {
     ///
     pub fn set_affinity(&self) -> Result<(), Error> {
         match set_for_current_helper(*self) {
-            Ok(_) | Err(Error::Unsupported(_, _)) => Ok(()),
+            Ok(()) | Err(Error::Unsupported(_, _)) => Ok(()),
             Err(e) => Err(e),
         }
     }
@@ -662,8 +662,7 @@ mod freebsd {
     #[allow(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
-            .into_iter()
-            .map(|n| CoreId(n))
+            .map(CoreId)
             .collect::<Vec<_>>())
     }
 

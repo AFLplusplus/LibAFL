@@ -101,8 +101,12 @@ where
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
 /// Store the taint and the input
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct TaintMetadata {
     input_vec: Vec<u8>,
     ranges: Vec<Range<usize>>,
