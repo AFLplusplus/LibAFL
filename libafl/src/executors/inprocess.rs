@@ -43,6 +43,8 @@ use nix::{
 };
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
+#[cfg(all(windows, feature = "std"))]
+use windows::Win32::System::Threading::PTP_TIMER;
 
 use crate::{
     events::{EventFirer, EventRestarter},
@@ -208,7 +210,7 @@ where
                 This number 0x20000 could vary depending on the compilers optimization for future compression library changes.
             */
             let mut stack_reserved = 0x20000;
-            SetThreadStackGuarantee(&mut stack_reserved);
+            SetThreadStackGuarantee(&mut stack_reserved)?;
         }
         Ok(Self {
             harness_fn,
@@ -443,7 +445,7 @@ pub(crate) struct InProcessExecutorHandlerData {
     timeout_handler: *const c_void,
 
     #[cfg(all(windows, feature = "std"))]
-    pub(crate) tp_timer: *mut c_void,
+    pub(crate) ptp_timer: Option<PTP_TIMER>,
     #[cfg(all(windows, feature = "std"))]
     pub(crate) in_target: u64,
     #[cfg(all(windows, feature = "std"))]
@@ -530,7 +532,7 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     #[cfg(any(unix, feature = "std"))]
     timeout_handler: ptr::null(),
     #[cfg(all(windows, feature = "std"))]
-    tp_timer: null_mut(),
+    ptp_timer: None,
     #[cfg(all(windows, feature = "std"))]
     in_target: 0,
     #[cfg(all(windows, feature = "std"))]
@@ -954,13 +956,10 @@ mod unix_signal_handler {
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_asan_handler {
     use alloc::string::String;
-    use core::{
-        ptr,
-        sync::atomic::{compiler_fence, Ordering},
-    };
+    use core::sync::atomic::{compiler_fence, Ordering};
 
     use windows::Win32::System::Threading::{
-        EnterCriticalSection, LeaveCriticalSection, RTL_CRITICAL_SECTION,
+        EnterCriticalSection, LeaveCriticalSection, CRITICAL_SECTION,
     };
 
     use crate::{
@@ -991,18 +990,18 @@ pub mod windows_asan_handler {
         let data = &mut GLOBAL_STATE;
         data.set_in_handler(true);
         // Have we set a timer_before?
-        if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
+        if data.ptp_timer.is_some() {
             /*
                 We want to prevent the timeout handler being run while the main thread is executing the crash handler
                 Timeout handler runs if it has access to the critical section or data.in_target == 0
                 Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
             */
             compiler_fence(Ordering::SeqCst);
-            EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+            EnterCriticalSection(data.critical as *mut CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
             data.in_target = 0;
             compiler_fence(Ordering::SeqCst);
-            LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+            LeaveCriticalSection(data.critical as *mut CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
         }
 
@@ -1027,9 +1026,9 @@ pub mod windows_asan_handler {
         } else {
             let executor = data.executor_mut::<E>();
             // reset timer
-            if !data.tp_timer.is_null() {
+            if data.ptp_timer.is_some() {
                 executor.post_run_reset();
-                data.tp_timer = ptr::null_mut();
+                data.ptp_timer = None;
             }
 
             let state = data.state_mut::<E::State>();
@@ -1073,7 +1072,7 @@ mod windows_exception_handler {
         ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS,
     };
     use windows::Win32::System::Threading::{
-        EnterCriticalSection, ExitProcess, LeaveCriticalSection, RTL_CRITICAL_SECTION,
+        EnterCriticalSection, ExitProcess, LeaveCriticalSection, CRITICAL_SECTION,
     };
 
     use crate::{
@@ -1141,18 +1140,18 @@ mod windows_exception_handler {
             let in_handler = data.set_in_handler(true);
             // Have we set a timer_before?
             unsafe {
-                if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
+                if data.ptp_timer.is_some() {
                     /*
                         We want to prevent the timeout handler being run while the main thread is executing the crash handler
                         Timeout handler runs if it has access to the critical section or data.in_target == 0
                         Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
                     */
                     compiler_fence(Ordering::SeqCst);
-                    EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+                    EnterCriticalSection(data.critical as *mut CRITICAL_SECTION);
                     compiler_fence(Ordering::SeqCst);
                     data.in_target = 0;
                     compiler_fence(Ordering::SeqCst);
-                    LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+                    LeaveCriticalSection(data.critical as *mut CRITICAL_SECTION);
                     compiler_fence(Ordering::SeqCst);
                 }
             }
@@ -1202,22 +1201,14 @@ mod windows_exception_handler {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
         compiler_fence(Ordering::SeqCst);
-        EnterCriticalSection(
-            (data.critical as *mut RTL_CRITICAL_SECTION)
-                .as_mut()
-                .unwrap(),
-        );
+        EnterCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
         compiler_fence(Ordering::SeqCst);
 
         if !data.timeout_executor_ptr.is_null()
             && data.timeout_executor_mut::<E>().handle_timeout(data)
         {
             compiler_fence(Ordering::SeqCst);
-            LeaveCriticalSection(
-                (data.critical as *mut RTL_CRITICAL_SECTION)
-                    .as_mut()
-                    .unwrap(),
-            );
+            LeaveCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
             compiler_fence(Ordering::SeqCst);
 
             return;
@@ -1254,11 +1245,7 @@ mod windows_exception_handler {
             }
         }
         compiler_fence(Ordering::SeqCst);
-        LeaveCriticalSection(
-            (data.critical as *mut RTL_CRITICAL_SECTION)
-                .as_mut()
-                .unwrap(),
-        );
+        LeaveCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
         compiler_fence(Ordering::SeqCst);
         // log::info!("TIMER INVOKED!");
     }
@@ -1278,18 +1265,18 @@ mod windows_exception_handler {
             + HasScheduler,
     {
         // Have we set a timer_before?
-        if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
+        if data.ptp_timer.is_some() {
             /*
                 We want to prevent the timeout handler being run while the main thread is executing the crash handler
                 Timeout handler runs if it has access to the critical section or data.in_target == 0
                 Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
             */
             compiler_fence(Ordering::SeqCst);
-            EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+            EnterCriticalSection(data.critical as *mut CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
             data.in_target = 0;
             compiler_fence(Ordering::SeqCst);
-            LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+            LeaveCriticalSection(data.critical as *mut CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
         }
 
@@ -1346,9 +1333,9 @@ mod windows_exception_handler {
         } else {
             let executor = data.executor_mut::<E>();
             // reset timer
-            if !data.tp_timer.is_null() {
+            if data.ptp_timer.is_some() {
                 executor.post_run_reset();
-                data.tp_timer = ptr::null_mut();
+                data.ptp_timer = None;
             }
 
             let state = data.state_mut::<E::State>();

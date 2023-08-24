@@ -141,13 +141,13 @@ impl ShMemId {
     /// Returns `true` if this `ShMemId` has an empty backing slice.
     /// If this is the case something went wrong, and this `ShMemId` may not be read from.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.id[0] == 0
     }
 
     /// Get the id as a fixed-length slice
     #[must_use]
-    pub fn as_array(&self) -> &[u8; 20] {
+    pub const fn as_array(&self) -> &[u8; 20] {
         &self.id
     }
 
@@ -1268,7 +1268,7 @@ pub mod win32_shmem {
             Foundation::{CloseHandle, BOOL, HANDLE},
             System::Memory::{
                 CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
-                FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
+                FILE_MAP_ALL_ACCESS, MEMORY_MAPPED_VIEW_ADDRESS, PAGE_READWRITE,
             },
         },
     };
@@ -1309,7 +1309,8 @@ pub mod win32_shmem {
                     PCSTR(map_str_bytes.as_mut_ptr()),
                 )?;
 
-                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                let map =
+                    MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size).Value as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(
                         "Cannot map shared memory {}",
@@ -1336,7 +1337,8 @@ pub mod win32_shmem {
                     PCSTR(map_str_bytes.as_ptr() as *mut _),
                 )?;
 
-                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                let map =
+                    MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size).Value as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(
                         "Cannot map shared memory {}",
@@ -1380,8 +1382,18 @@ pub mod win32_shmem {
     impl Drop for Win32ShMem {
         fn drop(&mut self) {
             unsafe {
-                UnmapViewOfFile(self.map as *mut c_void);
-                CloseHandle(self.handle);
+                let res = UnmapViewOfFile(MEMORY_MAPPED_VIEW_ADDRESS {
+                    Value: self.map as *mut c_void,
+                });
+                if let Err(err) = res {
+                    // ignore result: nothing we can do if this goes wrong..
+                    log::warn!("Failed to unmap memory at {:?}: {err}", self.map);
+                }
+                let res = CloseHandle(self.handle);
+                if let Err(err) = res {
+                    // ignore result: nothing we can do if this goes wrong..
+                    log::warn!("Failed to close mem handle {:?}: {err}", self.handle);
+                }
             }
         }
     }

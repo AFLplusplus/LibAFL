@@ -27,6 +27,10 @@ where
 
 /// A state metadata holding a map of probability of corpus elements.
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct ProbabilityMetadata {
     /// corpus index -> probability
     pub map: HashMap<CorpusId, f64>,

@@ -25,7 +25,7 @@ use crate::{
 
 const MAX_GENERALIZED_LEN: usize = 8192;
 
-fn increment_by_offset(_list: &[Option<u8>], idx: usize, off: u8) -> usize {
+const fn increment_by_offset(_list: &[Option<u8>], idx: usize, off: u8) -> usize {
     idx + 1 + off as usize
 }
 

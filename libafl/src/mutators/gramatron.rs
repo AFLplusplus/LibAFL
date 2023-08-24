@@ -72,6 +72,10 @@ where
 
 /// The metadata used for `gramatron`
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct GramatronIdxMapMetadata {
     /// The map containing a vec for each terminal
     pub map: HashMap<usize, Vec<usize>>,
