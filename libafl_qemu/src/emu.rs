@@ -7,12 +7,12 @@ use core::{
     mem::MaybeUninit,
     ptr::{addr_of, copy_nonoverlapping, null},
 };
+use std::{cell::OnceCell, slice::from_raw_parts, str::from_utf8_unchecked};
 #[cfg(emulation_mode = "systemmode")]
 use std::{
     ffi::{CStr, CString},
     ptr::null_mut,
 };
-use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
@@ -741,6 +741,28 @@ impl CPU {
     #[must_use]
     pub fn raw_ptr(&self) -> CPUStatePtr {
         self.ptr
+    }
+
+    #[must_use]
+    pub fn page_size(&self) -> usize {
+        #[cfg(emulation_mode = "usermode")]
+        {
+            thread_local! {
+                static PAGE_SIZE: OnceCell<usize> = OnceCell::new();
+            }
+
+            PAGE_SIZE.with(|s| {
+                *s.get_or_init(|| {
+                    unsafe { libc::sysconf(libc::_SC_PAGE_SIZE) }
+                        .try_into()
+                        .expect("Invalid page size")
+                })
+            })
+        }
+        #[cfg(emulation_mode = "systemmode")]
+        {
+            unsafe { libafl_qemu_sys::qemu_target_page_size() }
+        }
     }
 }
 
