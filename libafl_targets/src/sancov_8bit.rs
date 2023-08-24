@@ -131,16 +131,16 @@ mod observers {
         fn get(&self, idx: usize) -> &u8 {
             let elem = self.intervals.query(idx..=idx).next().unwrap();
             let i = elem.value;
-            let j = idx - elem.range.start;
-            unsafe { &COUNTERS_MAPS[i].as_slice()[j] }
+            let j = idx - elem.interval.start;
+            unsafe { &COUNTERS_MAPS[*i].as_slice()[j] }
         }
 
         #[inline]
         fn get_mut(&mut self, idx: usize) -> &mut u8 {
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
-            let j = idx - elem.range.start;
-            unsafe { &mut COUNTERS_MAPS[i].as_mut_slice()[j] }
+            let j = idx - elem.interval.start;
+            unsafe { &mut COUNTERS_MAPS[*i].as_mut_slice()[j] }
         }
 
         #[inline]
@@ -252,11 +252,10 @@ mod observers {
         pub fn owned(name: &'static str) -> Self {
             let mut idx = 0;
             let mut v = 0;
-            let mut builder = vec![];
             let mut intervals = IntervalTree::new();
             unsafe { &mut COUNTERS_MAPS }.iter_mut().for_each(|m| {
                 let l = m.as_mut_slice().len();
-                intervals.push(idx..(idx + l), v);
+                intervals.insert(idx..(idx + l), v);
                 idx += l;
                 v += 1;
             });
