@@ -67,6 +67,12 @@ fn main() {
         #[cfg(feature = "sancov_cmplog")]
         {
             sancov_cmp.define("SANCOV_CMPLOG", "1");
+
+            println!("cargo:rustc-link-arg=--undefined=__sanitizer_weak_hook_memcmp");
+            println!("cargo:rustc-link-arg=--undefined=__sanitizer_weak_hook_strncmp");
+            println!("cargo:rustc-link-arg=--undefined=__sanitizer_weak_hook_strncasecmp");
+            println!("cargo:rustc-link-arg=--undefined=__sanitizer_weak_hook_strcmp");
+            println!("cargo:rustc-link-arg=--undefined=__sanitizer_weak_hook_strcasecmp");
         }
 
         sancov_cmp
@@ -75,6 +81,18 @@ fn main() {
             .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
             .file(src_dir.join("sancov_cmp.c"))
             .compile("sancov_cmp");
+
+        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_cmp1");
+        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_cmp2");
+        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_cmp4");
+        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_cmp8");
+
+        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_const_cmp1");
+        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_const_cmp2");
+        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_const_cmp4");
+        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_const_cmp8");
+
+        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_switch");
     }
 
     #[cfg(feature = "libfuzzer")]
