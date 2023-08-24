@@ -22,3 +22,8 @@ whole-archive = []
 
 [dependencies]
 libfuzzer-sys = { version = "0.4.7", default-features = false }
+
+[package.metadata.docs.rs]
+rustdoc-args = [
+    "--cfg", "docsrs",
+]

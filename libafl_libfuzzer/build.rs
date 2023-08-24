@@ -1,8 +1,8 @@
 use std::{path::PathBuf, process::Command};
 
 fn main() {
-    if cfg!(feature = "cargo-clippy") {
-        return; // skip when clippy is running
+    if cfg!(any(feature = "cargo-clippy", docsrs)) {
+        return; // skip when clippy or docs is running
     }
     if cfg!(not(target_os = "linux")) {
         println!(
