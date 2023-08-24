@@ -11,9 +11,12 @@ keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip", "serdeany_autoreg", "alloc"]
-std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "uuid", "byteorder", "backtrace", "uds", "serial_test", "alloc"] # print, env, ... support
+std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "uuid", "backtrace", "uds", "serial_test", "alloc"] # print, env, ... support
 alloc = ["serde/alloc",  "hashbrown", "postcard", "erased-serde/alloc", "ahash"] # Enables all features that allocate in no_std
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
@@ -62,18 +65,17 @@ hostname = { version = "^0.3", optional = true } # Is there really no gethostnam
 rand_core = { version = "0.6", optional = true }
 nix = { version = "0.26", optional = true }
 uuid = { version = "1.4", optional = true, features = ["serde", "v4"] }
-byteorder = { version = "1.4", optional = true }
 clap = {version = "4.0", features = ["derive", "wrap_help"], optional = true} # CLI parsing, for libafl_bolts::cli / the `cli` feature
 log = "0.4.20"
 
 pyo3 = { version = "0.18.3", optional = true, features = ["serde", "macros"] }
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
-serial_test = { version = "2", optional = true }
+serial_test = { version = "2", optional = true, default-features = false, features = ["logging"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc
-uds = { version = "0.4", optional = true, default_features = false }
+uds = { version = "0.4", optional = true, default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.51.1", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Diagnostics_Debug", "Win32_System_Kernel", "Win32_System_Memory", "Win32_Security", "Win32_System_SystemInformation"] }

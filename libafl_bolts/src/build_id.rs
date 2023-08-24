@@ -87,9 +87,10 @@ fn calculate() -> Uuid {
     let mut hasher = from_type_id(hasher);
 
     let mut bytes = [0; 16];
-    <byteorder::NativeEndian as byteorder::ByteOrder>::write_u64(&mut bytes[..8], hasher.finish());
+    bytes[..8].copy_from_slice(&hasher.finish().to_ne_bytes());
+
     hasher.write_u8(0);
-    <byteorder::NativeEndian as byteorder::ByteOrder>::write_u64(&mut bytes[8..], hasher.finish());
+    bytes[8..].copy_from_slice(&hasher.finish().to_ne_bytes());
 
     *uuid::Builder::from_bytes(bytes)
         .set_variant(uuid::Variant::RFC4122)
