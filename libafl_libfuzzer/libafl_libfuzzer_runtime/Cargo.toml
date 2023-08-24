@@ -18,6 +18,12 @@ codegen-units = 1
 opt-level = 3
 debug = true
 
+# debug-free release profile for fuzzbench due to space restrictions
+[profile.release-fuzzbench]
+inherits = "release"
+debug = false
+strip = true
+
 
 [lib]
 name = "afl_libfuzzer_runtime" # TODO fix name once cargo-fuzz stops stripping double-prefixes
