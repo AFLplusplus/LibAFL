@@ -12,30 +12,67 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [package.metadata.docs.rs]
+features = ["document-features"]
 all-features = true
 
 [features]
 default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip", "serdeany_autoreg", "alloc"]
-std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "uuid", "backtrace", "uds", "serial_test", "alloc"] # print, env, ... support
-alloc = ["serde/alloc",  "hashbrown", "postcard", "erased-serde/alloc", "ahash"] # Enables all features that allocate in no_std
-derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
-rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
+
+#! # Feature Flags
+#! ### General Features
+
+## Enables features that need rust's `std` lib to work, like print, env, ... support
+std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "uuid", "backtrace", "uds", "serial_test", "alloc"]
+
+## Enables all features that allocate in `no_std`
+alloc = ["serde/alloc",  "hashbrown", "postcard", "erased-serde/alloc", "ahash"]
+
+## Provide the `#[derive(SerdeAny)]` macro.
+derive = ["libafl_derive"]
+
+## If set, libafl_bolt's `rand` implementations will implement `rand::Rng`
+rand_trait = ["rand_core"]
+
+## Will build the `pyo3` bindings
 python = ["pyo3", "std"]
-prelude = [] # Expose libafl::prelude for access without additional using directives
-cli = ["clap"]  # expose libafl_bolts::cli for easy commandline parsing
-qemu_cli = ["cli"] # Commandline flagr for qemu-based fuzzers
-frida_cli = ["cli"] # Commandline flags for frida-based fuzzers
+
+## Expose `libafl::prelude` for direct access to all types without additional `use` directives
+prelude = []
+
+## Expose `libafl_bolts::cli` for easy commandline parsing of common fuzzer settings
+cli = ["clap"]
+
+## Enables extra commandline flags for qemu-based fuzzers in `cli`
+qemu_cli = ["cli"]
+
+## Enables extra commandline flags for frida-based fuzzers in `cli`
+frida_cli = ["cli"]
+
+## Stores the backtraces of all generated `Error`s. Good for debugging, but may come with a slight performance hit.
 errors_backtrace = ["backtrace"]
-gzip = ["miniz_oxide", "alloc"] # Enables gzip compression in certain parts of the lib
 
-# SerdeAny features
-serdeany_autoreg = ["ctor"] # Automatically register all `#[derive(SerdeAny)]` types at startup.
+## Enables gzip compression in certain parts of the lib
+gzip = ["miniz_oxide", "alloc"]
 
-# LLMP features
-llmp_bind_public = ["alloc"] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
-llmp_compression = ["alloc", "gzip"] # llmp compression using GZip
-llmp_debug = ["alloc"] # Enables debug output for LLMP
-llmp_small_maps = ["alloc"] # reduces initial map size for llmp
+#! ### SerdeAny features
+
+## Automatically register all `#[derive(SerdeAny)]` types at startup.
+serdeany_autoreg = ["ctor"]
+
+
+#! ### LLMP features
+
+## If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
+llmp_bind_public = ["alloc"]
+
+## Enables llmp compression using GZip
+llmp_compression = ["alloc", "gzip"]
+
+## Enables debug output for LLMP (also needs a `logger` installed)
+llmp_debug = ["alloc"]
+
+## Reduces the initial map size for llmp
+llmp_small_maps = ["alloc"]
 
 [build-dependencies]
 rustversion = "1.0"
@@ -72,6 +109,9 @@ pyo3 = { version = "0.18.3", optional = true, features = ["serde", "macros"] }
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
 serial_test = { version = "2", optional = true, default-features = false, features = ["logging"] }
+
+# Document all features of this crate (for `cargo doc`)
+document-features = { version = "0.2" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc

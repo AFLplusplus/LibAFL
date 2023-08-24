@@ -1,7 +1,9 @@
 /*!
 Welcome to `LibAFL`
 */
-
+#![doc = include_str!("../../README.md")]
+/*! */
+#![doc = document_features::document_features!()]
 #![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`

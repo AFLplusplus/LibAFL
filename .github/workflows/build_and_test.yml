@@ -91,7 +91,7 @@ jobs:
       
     # ---- doc check ----
     - name: Build Docs
-      run: cargo doc
+      run: cargo +nightly doc --all-features
     - name: Test Docs
       run: cargo +nightly test --doc --all-features
 
