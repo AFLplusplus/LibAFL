@@ -10,6 +10,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+rust-version = "1.70.0"
 
 [package.metadata.docs.rs]
 features = ["document-features"]
