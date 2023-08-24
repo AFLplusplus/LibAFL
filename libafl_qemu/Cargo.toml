@@ -56,7 +56,7 @@ libc = "0.2"
 strum = "0.25"
 strum_macros = "0.25"
 syscall-numbers = "3.0"
-meminterval = "0.3"
+meminterval = "0.4"
 thread_local = "1.1.4"
 capstone = "0.11.0"
 pyo3 = { version = "0.18.3", optional = true }

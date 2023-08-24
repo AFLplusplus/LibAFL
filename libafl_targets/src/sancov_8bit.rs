@@ -37,7 +37,6 @@ mod observers {
     };
 
     use ahash::RandomState;
-    use intervaltree::IntervalTree;
     use libafl::{
         inputs::UsesInput,
         observers::{DifferentialObserver, MapObserver, Observer, ObserversTuple},
@@ -46,6 +45,7 @@ mod observers {
     use libafl_bolts::{
         ownedref::OwnedMutSlice, AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named,
     };
+    use meminterval::IntervalTree;
     use serde::{Deserialize, Serialize};
 
     use super::COUNTERS_MAPS;
@@ -129,7 +129,7 @@ mod observers {
 
         #[inline]
         fn get(&self, idx: usize) -> &u8 {
-            let elem = self.intervals.query_point(idx).next().unwrap();
+            let elem = self.intervals.query(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.range.start;
             unsafe { &COUNTERS_MAPS[i].as_slice()[j] }
@@ -137,7 +137,7 @@ mod observers {
 
         #[inline]
         fn get_mut(&mut self, idx: usize) -> &mut u8 {
-            let elem = self.intervals.query_point(idx).next().unwrap();
+            let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.range.start;
             unsafe { &mut COUNTERS_MAPS[i].as_mut_slice()[j] }
@@ -216,15 +216,14 @@ mod observers {
         #[must_use]
         fn maybe_differential(name: &'static str) -> Self {
             let mut idx = 0;
-            let mut builder = vec![];
+            let mut intervals = IntervalTree::new();
             for (v, x) in unsafe { &COUNTERS_MAPS }.iter().enumerate() {
                 let l = x.as_slice().len();
-                let r = (idx..(idx + l), v);
+                intervals.insert(idx..(idx + l), v);
                 idx += l;
-                builder.push(r);
             }
             Self {
-                intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
+                intervals,
                 len: idx,
                 name: name.to_string(),
                 initial: u8::default(),
@@ -254,15 +253,15 @@ mod observers {
             let mut idx = 0;
             let mut v = 0;
             let mut builder = vec![];
+            let mut intervals = IntervalTree::new();
             unsafe { &mut COUNTERS_MAPS }.iter_mut().for_each(|m| {
                 let l = m.as_mut_slice().len();
-                let r = (idx..(idx + l), v);
+                intervals.push(idx..(idx + l), v);
                 idx += l;
-                builder.push(r);
                 v += 1;
             });
             Self {
-                intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
+                intervals,
                 len: idx,
                 name: name.to_string(),
                 initial: u8::default(),
