@@ -11,6 +11,9 @@ keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor"]
 std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-timeout", "uuid", "backtrace", "serial_test", "libafl_bolts/std", "typed-builder"] # print, env, launcher ... support

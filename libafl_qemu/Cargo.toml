@@ -11,6 +11,9 @@ keywords = ["fuzzing", "qemu", "instrumentation"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["fork", "build_libqasan", "serdeany_autoreg"]
 python = ["pyo3", "pyo3-build-config"]

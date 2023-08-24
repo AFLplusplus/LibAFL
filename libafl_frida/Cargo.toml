@@ -17,6 +17,9 @@ categories = [
     "no-std"
 ]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["serdeany_autoreg"]
 cmplog = []

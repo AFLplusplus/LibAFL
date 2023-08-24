@@ -12,6 +12,9 @@ edition = "2021"
 build = "build.rs"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 python = ["pyo3", "libafl_qemu/python", "pyo3-build-config"]
 default = []
