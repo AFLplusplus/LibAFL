@@ -11,6 +11,9 @@ keywords = ["fuzzing", "qemu", "instrumentation"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 # The following architecture features are mutually exclusive.
 x86_64 = [] # build qemu for x86_64 (default)

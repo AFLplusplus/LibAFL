@@ -30,6 +30,7 @@ pub trait HashSetState<T> {
 
 /// The state of [`NewHashFeedback`]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct NewHashFeedbackMetadata {
     /// Contains information about untouched entries
     pub hash_set: HashSet<u64>,
