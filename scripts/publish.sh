@@ -70,3 +70,7 @@ fi
 cd libafl_concolic/symcc_runtime
 cargo publish "$@"
 cd ../.. || exit 1
+
+cd libafl_libfuzzer
+cargo publish "$@"
+cd ../.. || exit 1

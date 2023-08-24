@@ -642,7 +642,9 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
         libc::VM_PROC,
         libc::VM_PROC_MAP,
         -1,
-        std::mem::size_of::<libc::kinfo_vmentry>() as i32,
+        std::mem::size_of::<libc::kinfo_vmentry>()
+            .try_into()
+            .expect("Invalid libc::kinfo_vmentry size"),
     ];
     let mib = arr.as_ptr();
     let miblen = arr.len() as u32;
@@ -737,7 +739,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
                 }
                 // OpenBSD's vm mappings have no knowledge of their paths on disk
                 let i = format!("{}-{}\n", entry.kve_start, entry.kve_end);
-                writer.write(&i.into_bytes())?;
+                writer.write_all(&i.into_bytes())?;
                 entry.kve_start = entry.kve_start + 1;
             }
         }
