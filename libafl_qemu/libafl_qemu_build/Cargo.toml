@@ -17,6 +17,9 @@ categories = [
     "no-std",
 ]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 slirp = [] # build qemu with host libslirp (for user networking)
 

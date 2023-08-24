@@ -17,6 +17,9 @@ categories = [
     "no-std"
 ]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["serdeany_autoreg"]
 cmplog = []
@@ -71,4 +74,4 @@ paste = "1.0"
 log = "0.4.20"
 
 [dev-dependencies]
-serial_test = "1"
+serial_test = { version = "2", default-features = false, features = ["logging"] }

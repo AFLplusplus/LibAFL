@@ -11,6 +11,9 @@ keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor"]
 std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-timeout", "uuid", "backtrace", "serial_test", "libafl_bolts/std", "typed-builder"] # print, env, launcher ... support
@@ -102,7 +105,7 @@ concat-idents = { version = "1.1.3", optional = true }
 libcasr = { version = "2.7", optional = true}
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
-serial_test = { version = "2", optional = true }
+serial_test = { version = "2", optional = true, default-features = false, features = ["logging"] }
 
 # AGPL
 # !!! this create requires nightly
