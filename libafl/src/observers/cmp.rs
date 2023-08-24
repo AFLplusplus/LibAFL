@@ -1,19 +1,42 @@
 //! The `CmpObserver` provides access to the logged values of CMP instructions
 
 use alloc::{
+    alloc::alloc_zeroed,
+    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt::Debug, marker::PhantomData};
+use core::{alloc::Layout, fmt::Debug, marker::PhantomData};
 
 use c2rust_bitfields::BitfieldStruct;
 use hashbrown::HashMap;
-use libafl_bolts::{ownedref::OwnedRefMut, AsMutSlice, AsSlice, Named};
+use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsMutSlice, AsSlice, Named};
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     executors::ExitKind, inputs::UsesInput, observers::Observer, state::HasMetadata, Error,
 };
+
+/// Generic metadata trait for use in a `CmpObserver`, which adds comparisons from a `CmpObserver`
+/// primarily intended for use with `AFLppCmpValuesMetadata` or `CmpValuesMetadata`
+pub trait CmpObserverMetadata<'a, CM>: SerdeAny + Debug
+where
+    CM: CmpMap + Debug,
+{
+    /// Extra data used by the metadata when adding information from a `CmpObserver`, for example
+    /// the `original` field in `AFLppCmpObserver`
+    type Data: 'a + Debug + Default + Serialize + DeserializeOwned;
+
+    /// Instantiate a new metadata instance. This is used by `CmpObserver` to create a new
+    /// metadata if one is missing and `add_meta` is specified. This will typically juse call
+    /// `new()`
+    fn new_metadata() -> Self;
+
+    /// Add comparisons to a metadata from a `CmpObserver`. `cmp_map` is mutable in case
+    /// it is needed for a custom map, but this is not utilized for `CmpObserver` or
+    /// `AFLppCmpObserver`.
+    fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM, cmp_observer_data: Self::Data);
+}
 
 /// Compare values collected during a run
 #[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Clone)]
@@ -75,6 +98,7 @@ impl AsSlice for CmpValuesMetadata {
         self.list.as_slice()
     }
 }
+
 impl AsMutSlice for CmpValuesMetadata {
     type Entry = CmpValues;
     /// Convert to a slice
@@ -92,65 +116,22 @@ impl CmpValuesMetadata {
     }
 }
 
-/// A [`CmpMap`] traces comparisons during the current execution
-pub trait CmpMap: Debug {
-    /// Get the number of cmps
-    fn len(&self) -> usize;
-
-    /// Get if it is empty
-    #[must_use]
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Get the number of executions for a cmp
-    fn executions_for(&self, idx: usize) -> usize;
-
-    /// Get the number of logged executions for a cmp
-    fn usable_executions_for(&self, idx: usize) -> usize;
-
-    /// Get the logged values for a cmp
-    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues>;
-
-    /// Reset the state
-    fn reset(&mut self) -> Result<(), Error>;
-}
-
-/// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
-pub trait CmpObserver<CM, S>: Observer<S>
+impl<'a, CM> CmpObserverMetadata<'a, CM> for CmpValuesMetadata
 where
     CM: CmpMap,
-    S: UsesInput,
 {
-    /// Get the number of usable cmps (all by default)
-    fn usable_count(&self) -> usize;
+    type Data = bool;
 
-    /// Get the `CmpMap`
-    fn cmp_map(&self) -> &CM;
+    #[must_use]
+    fn new_metadata() -> Self {
+        Self::new()
+    }
 
-    /// Get the `CmpMap` (mutable)
-    fn cmp_map_mut(&mut self) -> &mut CM;
-
-    /// Add [`struct@CmpValuesMetadata`] to the State including the logged values.
-    /// This routine does a basic loop filtering because loop index cmps are not interesting.
-    fn add_cmpvalues_meta(&mut self, state: &mut S)
-    where
-        S: HasMetadata,
-    {
-        #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-        let meta = if let Some(meta) = state.metadata_map_mut().get_mut::<CmpValuesMetadata>() {
-            meta
-        } else {
-            state.add_metadata(CmpValuesMetadata::new());
-            state
-                .metadata_map_mut()
-                .get_mut::<CmpValuesMetadata>()
-                .unwrap()
-        };
-        meta.list.clear();
-        let count = self.usable_count();
+    fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM, _: Self::Data) {
+        self.list.clear();
+        let count = usable_count;
         for i in 0..count {
-            let execs = self.cmp_map().usable_executions_for(i);
+            let execs = cmp_map.usable_executions_for(i);
             if execs > 0 {
                 // Recongize loops and discard if needed
                 if execs > 4 {
@@ -161,7 +142,7 @@ where
 
                     let mut last: Option<CmpValues> = None;
                     for j in 0..execs {
-                        if let Some(val) = self.cmp_map().values_of(i, j) {
+                        if let Some(val) = cmp_map.values_of(i, j) {
                             if let Some(l) = last.and_then(|x| x.to_u64_tuple()) {
                                 if let Some(v) = val.to_u64_tuple() {
                                     if l.0.wrapping_add(1) == v.0 {
@@ -192,8 +173,8 @@ where
                     }
                 }
                 for j in 0..execs {
-                    if let Some(val) = self.cmp_map().values_of(i, j) {
-                        meta.list.push(val);
+                    if let Some(val) = cmp_map.values_of(i, j) {
+                        self.list.push(val);
                     }
                 }
             }
@@ -201,25 +182,94 @@ where
     }
 }
 
+/// A [`CmpMap`] traces comparisons during the current execution
+pub trait CmpMap: Debug {
+    /// Get the number of cmps
+    fn len(&self) -> usize;
+
+    /// Get if it is empty
+    #[must_use]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Get the number of executions for a cmp
+    fn executions_for(&self, idx: usize) -> usize;
+
+    /// Get the number of logged executions for a cmp
+    fn usable_executions_for(&self, idx: usize) -> usize;
+
+    /// Get the logged values for a cmp
+    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues>;
+
+    /// Reset the state
+    fn reset(&mut self) -> Result<(), Error>;
+}
+
+/// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
+pub trait CmpObserver<'a, CM, S, M>: Observer<S>
+where
+    CM: CmpMap,
+    S: UsesInput,
+    M: CmpObserverMetadata<'a, CM>,
+{
+    /// Get the number of usable cmps (all by default)
+    fn usable_count(&self) -> usize;
+
+    /// Get the `CmpMap`
+    fn cmp_map(&self) -> &CM;
+
+    /// Get the `CmpMap` (mutable)
+    fn cmp_map_mut(&mut self) -> &mut CM;
+
+    /// Get the observer data. By default, this is the default metadata aux data, which is `()`.
+    fn cmp_observer_data(&self) -> M::Data {
+        M::Data::default()
+    }
+
+    /// Add [`struct@CmpValuesMetadata`] to the State including the logged values.
+    /// This routine does a basic loop filtering because loop index cmps are not interesting.
+    fn add_cmpvalues_meta(&mut self, state: &mut S)
+    where
+        S: HasMetadata,
+    {
+        #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
+        let meta = if let Some(meta) = state.metadata_map_mut().get_mut::<M>() {
+            meta
+        } else {
+            state.add_metadata(M::new_metadata());
+            state.metadata_map_mut().get_mut::<M>().unwrap()
+        };
+
+        let usable_count = self.usable_count();
+        let cmp_observer_data = self.cmp_observer_data();
+
+        meta.add_from(usable_count, self.cmp_map_mut(), cmp_observer_data);
+    }
+}
+
 /// A standard [`CmpObserver`] observer
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "CM: serde::de::DeserializeOwned")]
-pub struct ForkserverCmpObserver<'a, CM, S>
+pub struct StdCmpObserver<'a, CM, S, M>
 where
     CM: CmpMap + Serialize,
     S: UsesInput + HasMetadata,
+    M: CmpObserverMetadata<'a, CM>,
 {
     cmp_map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: String,
     add_meta: bool,
+    data: M::Data,
     phantom: PhantomData<S>,
 }
 
-impl<'a, CM, S> CmpObserver<CM, S> for ForkserverCmpObserver<'a, CM, S>
+impl<'a, CM, S, M> CmpObserver<'a, CM, S, M> for StdCmpObserver<'a, CM, S, M>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
     S: UsesInput + Debug + HasMetadata,
+    M: CmpObserverMetadata<'a, CM>,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -236,12 +286,17 @@ where
     fn cmp_map_mut(&mut self) -> &mut CM {
         self.cmp_map.as_mut()
     }
+
+    fn cmp_observer_data(&self) -> <M as CmpObserverMetadata<'a, CM>>::Data {
+        <M as CmpObserverMetadata<CM>>::Data::default()
+    }
 }
 
-impl<'a, CM, S> Observer<S> for ForkserverCmpObserver<'a, CM, S>
+impl<'a, CM, S, M> Observer<S> for StdCmpObserver<'a, CM, S, M>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
     S: UsesInput + Debug + HasMetadata,
+    M: CmpObserverMetadata<'a, CM>,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;
@@ -261,22 +316,24 @@ where
     }
 }
 
-impl<'a, CM, S> Named for ForkserverCmpObserver<'a, CM, S>
+impl<'a, CM, S, M> Named for StdCmpObserver<'a, CM, S, M>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
     S: UsesInput + HasMetadata,
+    M: CmpObserverMetadata<'a, CM>,
 {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<'a, CM, S> ForkserverCmpObserver<'a, CM, S>
+impl<'a, CM, S, M> StdCmpObserver<'a, CM, S, M>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
     S: UsesInput + HasMetadata,
+    M: CmpObserverMetadata<'a, CM>,
 {
-    /// Creates a new [`ForkserverCmpObserver`] with the given name and map.
+    /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]
     pub fn new(name: &'static str, map: &'a mut CM, add_meta: bool) -> Self {
         Self {
@@ -284,11 +341,26 @@ where
             size: None,
             cmp_map: OwnedRefMut::Ref(map),
             add_meta,
+            data: M::Data::default(),
             phantom: PhantomData,
         }
     }
 
-    /// Creates a new [`ForkserverCmpObserver`] with the given name, map and reference to variable size.
+    /// Creates a new [`StdCmpObserver`] with the given name, map, and auxiliary data used to
+    /// populate metadata
+    #[must_use]
+    pub fn with_data(name: &'static str, map: &'a mut CM, add_meta: bool, data: M::Data) -> Self {
+        Self {
+            name: name.to_string(),
+            size: None,
+            cmp_map: OwnedRefMut::Ref(map),
+            add_meta,
+            data,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Creates a new [`StdCmpObserver`] with the given name, map and reference to variable size.
     #[must_use]
     pub fn with_size(
         name: &'static str,
@@ -301,6 +373,27 @@ where
             size: Some(OwnedRefMut::Ref(size)),
             cmp_map: OwnedRefMut::Ref(map),
             add_meta,
+            data: M::Data::default(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Creates a new [`StdCmpObserver`] with the given name, map, auxiliary data, and
+    /// reference to variable size.
+    #[must_use]
+    pub fn with_size_data(
+        name: &'static str,
+        map: &'a mut CM,
+        add_meta: bool,
+        data: M::Data,
+        size: &'a mut usize,
+    ) -> Self {
+        Self {
+            name: name.to_string(),
+            size: Some(OwnedRefMut::Ref(size)),
+            cmp_map: OwnedRefMut::Ref(map),
+            add_meta,
+            data,
             phantom: PhantomData,
         }
     }
@@ -354,7 +447,7 @@ struct cmp_map {
 
 /// A [`CmpObserver`] observer for AFL++ redqueen
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AFLppForkserverCmpObserver<'a, S>
+pub struct AFLppCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
@@ -362,11 +455,11 @@ where
     size: Option<OwnedRefMut<'a, usize>>,
     name: String,
     add_meta: bool,
-    original: bool,
+    original: <AFLppCmpValuesMetadata as CmpObserverMetadata<'a, AFLppCmpMap>>::Data,
     phantom: PhantomData<S>,
 }
 
-impl<'a, S> CmpObserver<AFLppCmpMap, S> for AFLppForkserverCmpObserver<'a, S>
+impl<'a, S> CmpObserver<'a, AFLppCmpMap, S, AFLppCmpValuesMetadata> for AFLppCmpObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -384,6 +477,12 @@ where
 
     fn cmp_map_mut(&mut self) -> &mut AFLppCmpMap {
         self.cmp_map.as_mut()
+    }
+
+    fn cmp_observer_data(
+        &self,
+    ) -> <AFLppCmpValuesMetadata as CmpObserverMetadata<'a, AFLppCmpMap>>::Data {
+        self.original
     }
 
     /// Add [`struct@CmpValuesMetadata`] to the State including the logged values.
@@ -415,84 +514,14 @@ where
             meta.new_cmpvals.clear();
         }
 
-        let count = self.usable_count();
-        for i in 0..count {
-            let execs = self.cmp_map().usable_executions_for(i);
-            if execs > 0 {
-                if self.original {
-                    // Update header
-                    meta.headers.push((i, self.cmp_map().headers[i]));
-                }
+        let usable_count = self.usable_count();
+        let cmp_observer_data = self.cmp_observer_data();
 
-                // Recongize loops and discard if needed
-                if execs > 4 {
-                    let mut increasing_v0 = 0;
-                    let mut increasing_v1 = 0;
-                    let mut decreasing_v0 = 0;
-                    let mut decreasing_v1 = 0;
-
-                    let mut last: Option<CmpValues> = None;
-                    for j in 0..execs {
-                        if let Some(val) = self.cmp_map().values_of(i, j) {
-                            if let Some(l) = last.and_then(|x| x.to_u64_tuple()) {
-                                if let Some(v) = val.to_u64_tuple() {
-                                    if l.0.wrapping_add(1) == v.0 {
-                                        increasing_v0 += 1;
-                                    }
-                                    if l.1.wrapping_add(1) == v.1 {
-                                        increasing_v1 += 1;
-                                    }
-                                    if l.0.wrapping_sub(1) == v.0 {
-                                        decreasing_v0 += 1;
-                                    }
-                                    if l.1.wrapping_sub(1) == v.1 {
-                                        decreasing_v1 += 1;
-                                    }
-                                }
-                            }
-                            last = Some(val);
-                        }
-                    }
-                    // We check for execs-2 because the logged execs may wrap and have something like
-                    // 8 9 10 3 4 5 6 7
-                    if increasing_v0 >= execs - 2
-                        || increasing_v1 >= execs - 2
-                        || decreasing_v0 >= execs - 2
-                        || decreasing_v1 >= execs - 2
-                    {
-                        continue;
-                    }
-                }
-
-                let cmpmap_idx = i;
-                let mut cmp_values = Vec::new();
-                if self.original {
-                    // push into orig_cmpvals
-                    // println!("Adding to orig_cmpvals");
-                    for j in 0..execs {
-                        if let Some(val) = self.cmp_map().values_of(i, j) {
-                            cmp_values.push(val);
-                        }
-                    }
-                    // println!("idx: {cmpmap_idx} cmp_values: {:#?}", cmp_values);
-                    meta.orig_cmpvals.insert(cmpmap_idx, cmp_values);
-                } else {
-                    // push into new_cmpvals
-                    // println!("Adding to new_cmpvals");
-                    for j in 0..execs {
-                        if let Some(val) = self.cmp_map().values_of(i, j) {
-                            cmp_values.push(val);
-                        }
-                    }
-                    // println!("idx: {cmpmap_idx} cmp_values: {:#?}", cmp_values);
-                    meta.new_cmpvals.insert(cmpmap_idx, cmp_values);
-                }
-            }
-        }
+        meta.add_from(usable_count, self.cmp_map_mut(), cmp_observer_data);
     }
 }
 
-impl<'a, S> Observer<S> for AFLppForkserverCmpObserver<'a, S>
+impl<'a, S> Observer<S> for AFLppCmpObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -514,7 +543,7 @@ where
     }
 }
 
-impl<'a, S> Named for AFLppForkserverCmpObserver<'a, S>
+impl<'a, S> Named for AFLppCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
@@ -523,11 +552,11 @@ where
     }
 }
 
-impl<'a, S> AFLppForkserverCmpObserver<'a, S>
+impl<'a, S> AFLppCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
-    /// Creates a new [`ForkserverCmpObserver`] with the given name and map.
+    /// Creates a new [`AFLppCmpObserver`] with the given name and map.
     #[must_use]
     pub fn new(name: &'static str, map: &'a mut AFLppCmpMap, add_meta: bool) -> Self {
         Self {
@@ -544,7 +573,7 @@ where
         self.original = v;
     }
 
-    /// Creates a new [`ForkserverCmpObserver`] with the given name, map and reference to variable size.
+    /// Creates a new [`AFLppCmpObserver`] with the given name, map and reference to variable size.
     #[must_use]
     pub fn with_size(
         name: &'static str,
@@ -614,6 +643,96 @@ impl AFLppCmpValuesMetadata {
     }
 }
 
+impl<'a> CmpObserverMetadata<'a, AFLppCmpMap> for AFLppCmpValuesMetadata {
+    type Data = bool;
+
+    fn new_metadata() -> Self {
+        Self::new()
+    }
+
+    fn add_from(
+        &mut self,
+        usable_count: usize,
+        cmp_map: &mut AFLppCmpMap,
+        cmp_observer_data: Self::Data,
+    ) {
+        let count = usable_count;
+        for i in 0..count {
+            let execs = cmp_map.usable_executions_for(i);
+            if execs > 0 {
+                if cmp_observer_data {
+                    // Update header
+                    self.headers.push((i, cmp_map.headers[i]));
+                }
+
+                // Recongize loops and discard if needed
+                if execs > 4 {
+                    let mut increasing_v0 = 0;
+                    let mut increasing_v1 = 0;
+                    let mut decreasing_v0 = 0;
+                    let mut decreasing_v1 = 0;
+
+                    let mut last: Option<CmpValues> = None;
+                    for j in 0..execs {
+                        if let Some(val) = cmp_map.values_of(i, j) {
+                            if let Some(l) = last.and_then(|x| x.to_u64_tuple()) {
+                                if let Some(v) = val.to_u64_tuple() {
+                                    if l.0.wrapping_add(1) == v.0 {
+                                        increasing_v0 += 1;
+                                    }
+                                    if l.1.wrapping_add(1) == v.1 {
+                                        increasing_v1 += 1;
+                                    }
+                                    if l.0.wrapping_sub(1) == v.0 {
+                                        decreasing_v0 += 1;
+                                    }
+                                    if l.1.wrapping_sub(1) == v.1 {
+                                        decreasing_v1 += 1;
+                                    }
+                                }
+                            }
+                            last = Some(val);
+                        }
+                    }
+                    // We check for execs-2 because the logged execs may wrap and have something like
+                    // 8 9 10 3 4 5 6 7
+                    if increasing_v0 >= execs - 2
+                        || increasing_v1 >= execs - 2
+                        || decreasing_v0 >= execs - 2
+                        || decreasing_v1 >= execs - 2
+                    {
+                        continue;
+                    }
+                }
+
+                let cmpmap_idx = i;
+                let mut cmp_values = Vec::new();
+                if cmp_observer_data {
+                    // push into orig_cmpvals
+                    // println!("Adding to orig_cmpvals");
+                    for j in 0..execs {
+                        if let Some(val) = cmp_map.values_of(i, j) {
+                            cmp_values.push(val);
+                        }
+                    }
+                    // println!("idx: {cmpmap_idx} cmp_values: {:#?}", cmp_values);
+                    self.orig_cmpvals.insert(cmpmap_idx, cmp_values);
+                } else {
+                    // push into new_cmpvals
+                    // println!("Adding to new_cmpvals");
+                    for j in 0..execs {
+                        if let Some(val) = cmp_map.values_of(i, j) {
+                            cmp_values.push(val);
+                        }
+                    }
+                    // println!("idx: {cmpmap_idx} cmp_values: {:#?}", cmp_values);
+                    self.new_cmpvals.insert(cmpmap_idx, cmp_values);
+                }
+            }
+        }
+    }
+}
+
 /// The AFL++ `CMP_MAP_W`
 pub const AFL_CMP_MAP_W: usize = 65536;
 /// The AFL++ `CMP_MAP_H`
@@ -629,6 +748,18 @@ pub const AFL_CMP_TYPE_RTN: u32 = 2;
 /// The AFL++ `cmp_header` struct
 #[derive(Debug, Copy, Clone, BitfieldStruct)]
 #[repr(C, packed)]
+/// Comparison header, used to describe a set of comparison values efficiently.
+///
+/// # Bitfields
+///
+/// - hits:      The number of hits of a particular comparison
+/// - id:        Unused by ``LibAFL``, a unique ID for a particular comparison
+/// - shape:     Whether a comparison is u8/u8, u16/u16, etc.
+/// - _type:     Whether the comparison value represents an instruction (like a `cmp`) or function
+///              call arguments
+/// - attribute: OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
+/// - overflow:  Whether the comparison overflows
+/// - reserved:  Reserved for future use
 pub struct AFLppCmpHeader {
     #[bitfield(name = "hits", ty = "u32", bits = "0..=23")]
     #[bitfield(name = "id", ty = "u32", bits = "24..=47")]
@@ -642,6 +773,10 @@ pub struct AFLppCmpHeader {
 /// The AFL++ `cmp_operands` struct
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C, packed)]
+/// Comparison operands, represented as either two (left and right of comparison) u64 values or
+/// two (left and right of comparison) u128 values, split into two u64 values. If the left and
+/// right values are smaller than u64, they can be sign or zero extended to 64 bits, as the actual
+/// comparison size is determined by the `hits` field of the associated `AFLppCmpHeader`.
 pub struct AFLppCmpOperands {
     v0: u64,
     v1: u64,
@@ -650,6 +785,33 @@ pub struct AFLppCmpOperands {
 }
 
 impl AFLppCmpOperands {
+    #[must_use]
+    /// Create new `AFLppCmpOperands`
+    pub fn new(v0: u64, v1: u64) -> Self {
+        Self {
+            v0,
+            v1,
+            v0_128: 0,
+            v1_128: 0,
+        }
+    }
+
+    #[must_use]
+    /// Create new `AFLppCmpOperands` with 128-bit comparison values
+    pub fn new_128bit(v0: u128, v1: u128) -> Self {
+        let v0_128 = (v0 >> 64) as u64;
+        let v0 = v0 as u64;
+        let v1_128 = (v1 >> 64) as u64;
+        let v1 = v1 as u64;
+
+        Self {
+            v0,
+            v1,
+            v0_128,
+            v1_128,
+        }
+    }
+
     #[must_use]
     /// 64bit first cmp operand
     pub fn v0(&self) -> u64 {
@@ -673,11 +835,36 @@ impl AFLppCmpOperands {
     pub fn v1_128(&self) -> u64 {
         self.v1_128
     }
+
+    /// Set the v0 (left) side of the comparison
+    pub fn set_v0(&mut self, v0: u64) {
+        self.v0 = v0;
+        self.v0_128 = 0;
+    }
+
+    /// Set the v1 (right) side of the comparison
+    pub fn set_v1(&mut self, v1: u64) {
+        self.v1 = v1;
+        self.v1_128 = 0;
+    }
+
+    /// Set the v0 (left) side of the comparison from a 128-bit comparison value
+    pub fn set_v0_128(&mut self, v0: u128) {
+        self.v0_128 = (v0 >> 64) as u64;
+        self.v0 = v0 as u64;
+    }
+
+    /// Set the v1 (right) side of the comparison from a 128-bit comparison value
+    pub fn set_v1_128(&mut self, v1: u128) {
+        self.v1_128 = (v1 >> 64) as u64;
+        self.v1 = v1 as u64;
+    }
 }
 
 /// The AFL++ `cmpfn_operands` struct
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C, packed)]
+/// Comparison function operands, like for strcmp/memcmp, represented as two byte arrays.
 pub struct AFLppCmpFnOperands {
     v0: [u8; 31],
     v0_len: u8,
@@ -686,6 +873,26 @@ pub struct AFLppCmpFnOperands {
 }
 
 impl AFLppCmpFnOperands {
+    #[must_use]
+    /// Create a new AFL++ function operands comparison values from two byte slices
+    pub fn new(v0: &[u8], v1: &[u8]) -> Self {
+        let v0_len = v0.len() as u8;
+        let v1_len = v1.len() as u8;
+
+        let mut v0_arr = [0; 31];
+        let mut v1_arr = [0; 31];
+
+        v0_arr.copy_from_slice(v0);
+        v1_arr.copy_from_slice(v1);
+
+        Self {
+            v0: v0_arr,
+            v0_len,
+            v1: v1_arr,
+            v1_len,
+        }
+    }
+
     #[must_use]
     /// first rtn operand
     pub fn v0(&self) -> &[u8; 31] {
@@ -709,11 +916,23 @@ impl AFLppCmpFnOperands {
     pub fn v1_len(&self) -> u8 {
         self.v1_len
     }
+
+    /// Set the v0 (left) side of the comparison
+    pub fn set_v0(&mut self, v0: &[u8]) {
+        self.v0_len = v0.len() as u8;
+        self.v0.copy_from_slice(v0);
+    }
+
+    /// Set the v1 (right) side of the comparison
+    pub fn set_v1(&mut self, v1: &[u8]) {
+        self.v1_len = v1.len() as u8;
+        self.v1.copy_from_slice(v1);
+    }
 }
 
-/// A proxy union to avoid casting operands as in AFL++
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
+/// Comparison values
 pub union AFLppCmpVals {
     operands: [[AFLppCmpOperands; AFL_CMP_MAP_H]; AFL_CMP_MAP_W],
     fn_operands: [[AFLppCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFL_CMP_MAP_W],
@@ -725,12 +944,72 @@ impl Debug for AFLppCmpVals {
     }
 }
 
-/// The AFL++ `cmp_map` struct, use with `ForkserverCmpObserver`
+impl AFLppCmpVals {
+    #[must_use]
+    /// Reference comparison values as comparison operands
+    pub fn operands(&self) -> &[[AFLppCmpOperands; AFL_CMP_MAP_H]; AFL_CMP_MAP_W] {
+        unsafe { &self.operands }
+    }
+
+    #[must_use]
+    /// Mutably reference comparison values as comparison operands
+    pub fn operands_mut(&mut self) -> &[[AFLppCmpOperands; AFL_CMP_MAP_H]; AFL_CMP_MAP_W] {
+        unsafe { &mut self.operands }
+    }
+
+    #[must_use]
+    /// Reference comparison values as comparison function operands
+    pub fn fn_operands(&self) -> &[[AFLppCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFL_CMP_MAP_W] {
+        unsafe { &self.fn_operands }
+    }
+
+    #[must_use]
+    /// Mutably reference comparison values as comparison function operands
+    pub fn fn_operands_mut(&mut self) -> &[[AFLppCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFL_CMP_MAP_W] {
+        unsafe { &mut self.fn_operands }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
+/// Comparison map compatible with AFL++ cmplog instrumentation
 pub struct AFLppCmpMap {
     headers: [AFLppCmpHeader; AFL_CMP_MAP_W],
     vals: AFLppCmpVals,
+}
+
+impl AFLppCmpMap {
+    #[must_use]
+    /// Instantiate a new boxed zeroed `AFLppCmpMap`. This should be used to create a new
+    /// map, because it is so large it cannot be allocated on the stack with default
+    /// runtime configuration.
+    pub fn boxed() -> Box<Self> {
+        unsafe { Box::from_raw(alloc_zeroed(Layout::new::<AFLppCmpMap>()) as *mut AFLppCmpMap) }
+    }
+
+    #[must_use]
+    /// Reference the headers for the map
+    pub fn headers(&self) -> &[AFLppCmpHeader] {
+        &self.headers
+    }
+
+    #[must_use]
+    /// Mutably reference the headers for the map
+    pub fn headers_mut(&mut self) -> &mut [AFLppCmpHeader] {
+        &mut self.headers
+    }
+
+    #[must_use]
+    /// Reference the values for the map
+    pub fn values(&self) -> &AFLppCmpVals {
+        &self.vals
+    }
+
+    #[must_use]
+    /// Mutably reference the headers for the map
+    pub fn values_mut(&mut self) -> &mut AFLppCmpVals {
+        &mut self.vals
+    }
 }
 
 impl Serialize for AFLppCmpMap {

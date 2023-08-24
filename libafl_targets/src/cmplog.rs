@@ -9,6 +9,7 @@ use libafl::{
     executors::ExitKind,
     inputs::UsesInput,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
+    prelude::CmpValuesMetadata,
     state::HasMetadata,
     Error,
 };
@@ -185,7 +186,7 @@ pub struct CmpLogObserver {
     name: String,
 }
 
-impl<S> CmpObserver<CmpLogMap, S> for CmpLogObserver
+impl<'a, S> CmpObserver<'a, CmpLogMap, S, CmpValuesMetadata> for CmpLogObserver
 where
     S: UsesInput + HasMetadata,
 {
@@ -206,10 +207,10 @@ where
     }
 }
 
-impl<S> Observer<S> for CmpLogObserver
+impl<'a, S> Observer<S> for CmpLogObserver
 where
     S: UsesInput + HasMetadata,
-    Self: CmpObserver<CmpLogMap, S>,
+    Self: CmpObserver<'a, CmpLogMap, S, CmpValuesMetadata>,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.map.as_mut().reset()?;
@@ -228,9 +229,11 @@ where
         unsafe {
             CMPLOG_ENABLED = 0;
         }
+
         if self.add_meta {
             self.add_cmpvalues_meta(state);
         }
+
         Ok(())
     }
 }
