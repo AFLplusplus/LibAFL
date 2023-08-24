@@ -618,15 +618,6 @@ pub use serdeany_registry::*;
 macro_rules! create_register {
     ($struct_type:ty) => {
         const _: () = {
-            /// Manually register this type at a later point in time
-            ///
-            /// # Safety
-            /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
-            #[cfg(not(feature = "serdeany_autoreg"))]
-            pub unsafe fn register() {
-                $crate::serdeany::RegistryBuilder::register::<$struct_type>();
-            }
-
             /// Automatically register this type
             #[cfg(feature = "serdeany_autoreg")]
             #[$crate::ctor]
@@ -665,6 +656,18 @@ macro_rules! impl_serdeany {
             }
         }
 
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        impl< $( $lt $( : $clt $(+ $dlt )* )? ),+ > $struct_name < $( $lt ),+ > {
+
+            /// Manually register this type at a later point in time
+            ///
+            /// # Safety
+            /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
+            pub unsafe fn register() {
+                $crate::serdeany::RegistryBuilder::register::<$struct_name < $( $lt ),+ >>();
+            }
+        }
+
         $(
             $crate::create_register!($struct_name < $( $opt ),+ >);
         )*
@@ -687,6 +690,17 @@ macro_rules! impl_serdeany {
                 self: $crate::alloc::boxed::Box<$struct_name>,
             ) -> $crate::alloc::boxed::Box<dyn ::core::any::Any> {
                 self
+            }
+        }
+
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        impl $struct_name {
+            /// Manually register this type at a later point in time
+            ///
+            /// # Safety
+            /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
+            pub unsafe fn register() {
+                $crate::serdeany::RegistryBuilder::register::<$struct_name>();
             }
         }
 

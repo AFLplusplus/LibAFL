@@ -22,6 +22,10 @@ use crate::{
 
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct AccountingIndexesMetadata {
     /// The list of indexes.
     pub list: Vec<usize>,
@@ -73,6 +77,10 @@ impl AccountingIndexesMetadata {
 
 /// A state metadata holding a map of favoreds testcases for each map entry
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct TopAccountingMetadata {
     /// map index -> corpus index
     pub map: HashMap<usize, CorpusId>,
