@@ -50,31 +50,31 @@ The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 but
 - Cargo-make  
 We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with
 
-```
+```sh
 cargo install cargo-make
 ```
 
 2. Clone the LibAFL repository with
 
-```
+```sh
 git clone https://github.com/AFLplusplus/LibAFL
 ```
 
 3. Build the library using
 
-```
+```sh
 cargo build --release
 ```
 
 4. Build the API documentation with
 
-```
+```sh
 cargo doc
 ```
 
 5. Browse the LibAFL book (WIP!) with (requires [mdbook](https://rust-lang.github.io/mdBook/index.html))
 
-```
+```sh
 cd docs && mdbook serve
 ```
 
@@ -82,9 +82,11 @@ We collect all example fuzzers in [`./fuzzers`](./fuzzers/).
 Be sure to read their documentation (and source), this is *the natural way to get started!*
 
 You can run each example fuzzer with
-```
+
+```sh
 cargo make run
 ```
+
 as long as the fuzzer directory has `Makefile.toml` file.
 
 The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
