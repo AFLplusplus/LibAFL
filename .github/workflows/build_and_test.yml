@@ -114,7 +114,6 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
-        components: llvm-tools
     - name: Install and cache deps
       uses: awalsh128/cache-apt-pkgs-action@v1.1.0
       with:
