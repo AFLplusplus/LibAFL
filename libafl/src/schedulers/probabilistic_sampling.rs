@@ -191,6 +191,11 @@ mod tests {
 
     #[test]
     fn test_prob_sampling() {
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            super::ProbabilityMetadata::register();
+        }
+
         // the first 3 probabilities will be .69, .86, .44
         let rand = StdRand::with_seed(12);
 

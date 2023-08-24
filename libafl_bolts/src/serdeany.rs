@@ -178,6 +178,7 @@ macro_rules! create_serde_registry_for_trait {
 
             /// A (de)serializable anymap containing (de)serializable trait objects registered
             /// in the registry
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[derive(Debug, Serialize, Deserialize)]
             pub struct SerdeAnyMap {
                 map: HashMap<u128, Box<dyn $trait_name>>,
@@ -252,8 +253,7 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     T: $trait_name,
                 {
-                    self.map
-                        .insert(unpack_type_id(TypeId::of::<T>()), Box::new(t));
+                    self.insert_boxed(Box::new(t));
                 }
 
                 /// Insert a boxed element into the map.
@@ -262,7 +262,21 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     T: $trait_name,
                 {
-                    self.map.insert(unpack_type_id(TypeId::of::<T>()), t);
+                    let id = unpack_type_id(TypeId::of::<T>());
+                    assert!(
+                        unsafe {
+                            REGISTRY
+                                .deserializers
+                                .as_ref()
+                                .expect("Empty types registry")
+                                .get(&id)
+                                .is_some()
+                        },
+                        "Type {} was inserted without registration! Call {}::register or use serde_autoreg.",
+                        core::any::type_name::<T>(),
+                        core::any::type_name::<T>()
+                    );
+                    self.map.insert(id, t);
                 }
 
                 /// Returns the count of elements in this map.
@@ -304,6 +318,7 @@ macro_rules! create_serde_registry_for_trait {
             }
 
             /// A serializable [`HashMap`] wrapper for [`SerdeAny`] types, addressable by name.
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[allow(unused_qualifications)]
             #[derive(Debug, Serialize, Deserialize)]
             pub struct NamedSerdeAnyMap {
@@ -518,6 +533,19 @@ macro_rules! create_serde_registry_for_trait {
                     T: $trait_name,
                 {
                     let id = unpack_type_id(TypeId::of::<T>());
+                    assert!(
+                        unsafe {
+                            REGISTRY
+                                .deserializers
+                                .as_ref()
+                                .expect("Empty types registry")
+                                .get(&id)
+                                .is_some()
+                        },
+                        "Type {} was inserted without registration! Call {}::register or use serde_autoreg.",
+                        core::any::type_name::<T>(),
+                        core::any::type_name::<T>()
+                    );
                     if !self.map.contains_key(&id) {
                         self.map.insert(id, HashMap::default());
                     }
@@ -619,7 +647,7 @@ macro_rules! create_register {
     ($struct_type:ty) => {
         const _: () = {
             /// Automatically register this type
-            #[cfg(feature = "serdeany_autoreg")]
+            #[cfg(all(feature = "serdeany_autoreg", not(miri)))]
             #[$crate::ctor]
             fn register() {
                 // # Safety

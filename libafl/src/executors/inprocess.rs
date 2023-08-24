@@ -847,8 +847,6 @@ mod unix_signal_handler {
             ExitKind::Timeout,
         );
 
-        event_mgr.await_restart_safe();
-
         libc::_exit(55);
     }
 

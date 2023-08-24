@@ -52,9 +52,6 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
 
-    //std::env::set_var("CC", "clang");
-    //std::env::set_var("CXX", "clang++");
-
     #[cfg(any(feature = "sancov_value_profile", feature = "sancov_cmplog"))]
     {
         println!("cargo:rerun-if-changed=src/sancov_cmp.c");
@@ -89,12 +86,31 @@ fn main() {
 
         #[cfg(feature = "libfuzzer_no_link_main")]
         libfuzzer.define("FUZZER_NO_LINK_MAIN", "1");
+        #[cfg(feature = "libfuzzer_define_run_driver")]
+        libfuzzer.define("FUZZER_DEFINE_RUN_DRIVER", "1");
 
         libfuzzer.compile("libfuzzer");
     }
 
     println!("cargo:rerun-if-changed=src/common.h");
     println!("cargo:rerun-if-changed=src/common.c");
+
+    #[cfg(feature = "sanitizer_interfaces")]
+    {
+        println!("cargo:rerun-if-changed=src/sanitizer_interfaces.h");
+
+        let build = bindgen::builder()
+            .header("src/sanitizer_interfaces.h")
+            .use_core()
+            .generate_comments(true)
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+            .generate()
+            .expect("Couldn't generate the sanitizer headers!");
+
+        build
+            .write_to_file(Path::new(&out_dir).join("sanitizer_interfaces.rs"))
+            .expect("Couldn't write the sanitizer headers!");
+    }
 
     let mut common = cc::Build::new();
 

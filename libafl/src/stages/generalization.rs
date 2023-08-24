@@ -100,6 +100,9 @@ where
                         "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_idx} (check the arguments of MapFeedback::new(...))"
                     ))
                 })?;
+            if meta.as_slice().is_empty() {
+                return Ok(()); // don't generalise inputs which don't have novelties
+            }
             (payload, original, meta.as_slice().to_vec())
         };
 
