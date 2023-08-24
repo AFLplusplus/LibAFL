@@ -61,14 +61,6 @@
 //! - `-runs`
 //! - `-close_fd_mask`
 //!
-//! ## Cargo features
-//!
-//! Features exported by `libafl_libfuzzer` modify the build configuration of the linked runtime.
-//!
-//! - `arbitrary-derive` enables the derive macros for the arbitrary dependency, transparently
-//! forwarded from libfuzzer-sys.
-//! - `introspection` enables fuzzer introspection with LibAFL's `introspection` feature.
-//!
 //! ## Important notes
 //!
 //! This crate only offers sufficient functionality to replace libfuzzer for cargo-fuzz in its
@@ -77,6 +69,8 @@
 //! This crate links to a (separately built) internal crate which affords the actual functionality.
 //! The internal crate must be built separately to ensure flags from dependent crates are not leaked
 //! to the runtime (e.g., to prevent coverage being collected on the runtime).
+
+#![doc = document_features::document_features!()]
 
 use std::ffi::{c_char, c_int};
 
