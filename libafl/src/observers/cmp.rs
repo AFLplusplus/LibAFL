@@ -953,7 +953,7 @@ impl AFLppCmpVals {
 
     #[must_use]
     /// Mutably reference comparison values as comparison operands
-    pub fn operands_mut(&mut self) -> &[[AFLppCmpOperands; AFL_CMP_MAP_H]; AFL_CMP_MAP_W] {
+    pub fn operands_mut(&mut self) -> &mut [[AFLppCmpOperands; AFL_CMP_MAP_H]; AFL_CMP_MAP_W] {
         unsafe { &mut self.operands }
     }
 
@@ -965,7 +965,9 @@ impl AFLppCmpVals {
 
     #[must_use]
     /// Mutably reference comparison values as comparison function operands
-    pub fn fn_operands_mut(&mut self) -> &[[AFLppCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFL_CMP_MAP_W] {
+    pub fn fn_operands_mut(
+        &mut self,
+    ) -> &mut [[AFLppCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFL_CMP_MAP_W] {
         unsafe { &mut self.fn_operands }
     }
 }
