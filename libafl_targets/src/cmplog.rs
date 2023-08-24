@@ -8,8 +8,7 @@ use core::fmt::{self, Debug, Formatter};
 use libafl::{
     executors::ExitKind,
     inputs::UsesInput,
-    observers::{CmpMap, CmpObserver, CmpValues, Observer},
-    prelude::CmpValuesMetadata,
+    observers::{cmp::CmpValuesMetadata, CmpMap, CmpObserver, CmpValues, Observer},
     state::HasMetadata,
     Error,
 };
