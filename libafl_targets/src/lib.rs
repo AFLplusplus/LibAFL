@@ -98,6 +98,9 @@ pub use value_profile::*;
 pub mod cmplog;
 pub use cmplog::*;
 
+pub mod tables;
+pub use tables::*;
+
 #[cfg(feature = "std")]
 pub mod drcov;
 

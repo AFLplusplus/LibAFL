@@ -27,6 +27,9 @@ fn main() {
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
         .map_or(Ok(65536), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
+    let tables_map_size: usize = option_env!("LIBAFL_TABLES_MAP_SIZE")
+        .map_or(Ok(16384), str::parse)
+        .expect("Could not parse LIBAFL_TABLES_MAP_SIZE");
 
     write!(
         constants_file,
@@ -42,6 +45,8 @@ fn main() {
         pub const CMPLOG_MAP_H: usize = {cmplog_map_h};
         /// The size of the accounting maps
         pub const ACCOUNTING_MAP_SIZE: usize = {acc_map_size};
+        /// The size of the tables map
+        pub const TABLES_MAP_SIZE: usize = {tables_map_size};
 "
     )
     .expect("Could not write file");
@@ -51,6 +56,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_TABLES_MAP_SIZE");
 
     //std::env::set_var("CC", "clang");
     //std::env::set_var("CXX", "clang++");
