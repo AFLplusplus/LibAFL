@@ -17,7 +17,6 @@ all-features = true
 
 [features]
 default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip", "serdeany_autoreg", "alloc"]
-<<<<<<< HEAD
 
 #! # Feature Flags
 #! ### General Features
