@@ -13,11 +13,11 @@ use core::{
 };
 
 use ahash::RandomState;
-use intervaltree::IntervalTree;
 use libafl_bolts::{
     ownedref::{OwnedMutPtr, OwnedMutSlice},
     AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named, Truncate,
 };
+use meminterval::IntervalTree;
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
@@ -1739,17 +1739,17 @@ where
 
     #[inline]
     fn get(&self, idx: usize) -> &T {
-        let elem = self.intervals.query_point(idx).next().unwrap();
-        let i = elem.value;
-        let j = idx - elem.range.start;
+        let elem = self.intervals.query(idx..=idx).next().unwrap();
+        let i = *elem.value;
+        let j = idx - elem.interval.start;
         &self.maps[i].as_slice()[j]
     }
 
     #[inline]
     fn get_mut(&mut self, idx: usize) -> &mut T {
-        let elem = self.intervals.query_point(idx).next().unwrap();
-        let i = elem.value;
-        let j = idx - elem.range.start;
+        let elem = self.intervals.query(idx..=idx).next().unwrap();
+        let i = *elem.value;
+        let j = idx - elem.interval.start;
         &mut self.maps[i].as_mut_slice()[j]
     }
 
@@ -1829,16 +1829,15 @@ where
     #[must_use]
     fn maybe_differential(name: &'static str, maps: Vec<OwnedMutSlice<'a, T>>) -> Self {
         let mut idx = 0;
-        let mut builder = vec![];
+        let mut intervals = IntervalTree::new();
         for (v, x) in maps.iter().enumerate() {
             let l = x.as_slice().len();
-            let r = (idx..(idx + l), v);
+            intervals.insert(idx..(idx + l), v);
             idx += l;
-            builder.push(r);
         }
         Self {
             maps,
-            intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
+            intervals,
             len: idx,
             name: name.to_string(),
             initial: T::default(),
@@ -1873,21 +1872,20 @@ where
     pub fn owned(name: &'static str, maps: Vec<Vec<T>>) -> Self {
         let mut idx = 0;
         let mut v = 0;
-        let mut builder = vec![];
+        let mut intervals = IntervalTree::new();
         let maps: Vec<_> = maps
             .into_iter()
             .map(|x| {
                 let l = x.len();
-                let r = (idx..(idx + l), v);
+                intervals.insert(idx..(idx + l), v);
                 idx += l;
-                builder.push(r);
                 v += 1;
                 OwnedMutSlice::from(x)
             })
             .collect();
         Self {
             maps,
-            intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
+            intervals,
             len: idx,
             name: name.to_string(),
             initial: T::default(),
