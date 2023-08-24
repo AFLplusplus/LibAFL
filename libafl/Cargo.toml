@@ -54,7 +54,7 @@ adaptive_serialization = []
 
 #! ## Additional Components
 
-## Enables [TcpEventManager], a simple EventManager proxying everything via TCP. This uses `tokio`.
+## Enables `TcpEventManager`, a simple EventManager proxying everything via TCP. This uses `tokio`.
 tcp_manager = ["tokio", "std"]
 
 ## Enables the `NaiveTokenizer` and `StacktraceObserver`
