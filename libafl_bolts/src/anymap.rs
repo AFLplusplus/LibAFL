@@ -52,7 +52,11 @@ pub const fn pack_type_id(id: u128) -> TypeId {
     match size_of::<TypeId>() {
         8 => {
             let id_64 = id as u64;
-            unsafe { *(addr_of!(id_64) as *const TypeId) }
+            // false positive: this branch only executes on 64 bit `TypeId`s
+            #[allow(clippy::cast_ptr_alignment)]
+            unsafe {
+                *(addr_of!(id_64) as *const TypeId)
+            }
         }
         16 => unsafe { *(addr_of!(id) as *const TypeId) },
         _ => {

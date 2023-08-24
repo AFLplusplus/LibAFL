@@ -11,46 +11,117 @@ keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
+[package.metadata.docs.rs]
+features = ["document-features"]
+all-features = true
+
 [features]
 default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor"]
-std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-timeout", "uuid", "backtrace", "serial_test", "libafl_bolts/std", "typed-builder"] # print, env, launcher ... support
-derive = ["libafl_derive", "libafl_bolts/derive"] # provide derive(SerdeAny) macro.
-fork = ["libafl_bolts/derive"] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
-rand_trait = ["libafl_bolts/rand_trait"] # If set, libafl's rand implementations will implement `rand::Rng`
-introspection = [] # Include performance statistics of the fuzzing pipeline
-concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
+
+#! # Feature Flags
+#! ### General Features
+
+## Enables features that need rust's `std` lib to work, like print, env, ... support
+std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-timeout", "uuid", "backtrace", "serial_test", "libafl_bolts/std", "typed-builder"]
+
+## Collects performance statistics of the fuzzing pipeline and displays it on `Monitor` components
+introspection = []
+
+## Will build the `pyo3` bindings
 python = ["pyo3", "concat-idents", "libafl_bolts/python"]
-prelude = ["libafl_bolts/prelude"] # Expose libafl::prelude for access without additional using directives
-tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
-prometheus_monitor = ["std", "async-std", "prometheus-client", "tide", "futures"]
-cli = ["libafl_bolts/cli"]  # expose libafl_bolts::cli for easy commandline parsing
-qemu_cli = ["cli", "libafl_bolts/qemu_cli"] # Commandline flags for qemu-based fuzzers
-frida_cli = ["cli", "libafl_bolts/frida_cli"] # Commandline flags for frida-based fuzzers
-afl_exec_sec = [] # calculate exec/sec like AFL
+
+## Expose `libafl::prelude` for access without additional using directives
+prelude = ["libafl_bolts/prelude"]
+
+## Calculate exec/sec like AFL, using 5 second time windows
+afl_exec_sec = []
+
+## Stores the backtraces of all generated `Error`s. Good for debugging, but may come with a slight performance hit.
 errors_backtrace = ["libafl_bolts/errors_backtrace"]
-cmin = ["z3"] # corpus minimisation
-corpus_btreemap = [] # Switches from HashMap to BTreeMap for CorpusId
-gzip = ["libafl_bolts/gzip"] # Enables gzip compression in certain parts of the lib
-regex = ["std", "dep:regex"] # enables the NaiveTokenizer and StacktraceObserver
-casr = ["libcasr", "std", "regex"] # enables deduplication based on libcasr for StacktraceObserver
-tcp_manager = ["tokio", "std"] # A simple EventManager proxying everything via TCP
+
+## Switches from `HashMap` to `BTreeMap` for `CorpusId`
+corpus_btreemap = []
+
+## Enables gzip compression in certain parts of the lib
+gzip = ["libafl_bolts/gzip"] 
+
+## If set, will use the `fork()` syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on `Windows`).
+fork = ["libafl_bolts/derive"]
+
+## Collected stats to decide if observers must be serialized or not (which should reduce mem use and increase speed)
 adaptive_serialization = []
 
-# features hiding dependencies licensed under GPL
-gpl = []
-# features hiding dependencies licensed under AGPL
-agpl = ["gpl", "nautilus"]
-nautilus = ["grammartec", "std", "serde_json/std"]
 
-# SerdeAny features
-serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"] # Automatically register all `#[derive(SerdeAny)]` types at startup.
+#! ## Additional Components
 
-# LLMP features
-llmp_bind_public = ["libafl_bolts/llmp_bind_public"] # If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
-llmp_compression = ["libafl_bolts/llmp_compression"] # llmp compression using GZip
-llmp_debug = ["libafl_bolts/llmp_debug"] # Enables debug output for LLMP
+## Enables `TcpEventManager`, a simple EventManager proxying everything via TCP. This uses `tokio`.
+tcp_manager = ["tokio", "std"]
+
+## Enables the `NaiveTokenizer` and `StacktraceObserver`
+regex = ["std", "dep:regex"]
+
+## Enables deduplication based on `libcasr` for `StacktraceObserver`
+casr = ["libcasr", "std", "regex"]
+
+## Enables features for corpus minimization
+cmin = ["z3"]
+
+## Enables the `PrometheusMonitor` which will monitor stats via UDP, for `Grafana` and others.
+prometheus_monitor = ["std", "async-std", "prometheus-client", "tide", "futures"]
+
+## Include a simple concolic mutator based on z3
+concolic_mutation = ["z3"]
+
+## Enable the fancy TuiMonitor for a termanal UI using crossterm
+tui_monitor = ["tui", "crossterm"]
+
+
+#! ## LibAFL-Bolts Features
+
+## Provide the `#[derive(SerdeAny)]` macro.
+derive = ["libafl_derive", "libafl_bolts/derive"] # provide `derive(SerdeAny) macro.
+
+## Expose `libafl_bolts::cli` for easy commandline parsing of common fuzzer settings
+cli = ["libafl_bolts/cli"]
+
+## Enables extra commandline flags for qemu-based fuzzers in `cli`
+qemu_cli = ["cli", "libafl_bolts/qemu_cli"]
+
+## Enables extra commandline flags for frida-based fuzzers in `cli`
+frida_cli = ["cli", "libafl_bolts/frida_cli"]
+
+## If set, libafl_bolt's `rand` implementations will implement `rand::Rng`
+rand_trait = ["libafl_bolts/rand_trait"]
+
+#! ### SerdeAny features
+
+## Automatically register all `#[derive(SerdeAny)]` types at startup.
+serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
+
+#! ### LLMP features
+
+## The broker loop will yield occasionally, even without status messages from client nodes
+llmp_broker_timeouts = ["std"]
+
+## If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
+llmp_bind_public = ["libafl_bolts/llmp_bind_public"]
+
+## Enables llmp compression using GZip
+llmp_compression = ["libafl_bolts/llmp_compression"]
+
+## Enables debug output for LLMP (also needs a `logger` installed)
+llmp_debug = ["libafl_bolts/llmp_debug"]
+
+## Reduces the initial map size for llmp
 llmp_small_maps = ["libafl_bolts/llmp_small_maps"] # reduces initial map size for llmp
-llmp_broker_timeouts = ["std"] # The broker loop will yield occasionally, even without status messages from client nodes
+
+#! ## License-Changing Dependencies(!)
+
+## Enables features hiding dependencies licensed under `AGPL`
+agpl = ["nautilus"]
+
+## Enables the [`Nautilus`](https://wcventure.github.io/FuzzingPaper/Paper/NDSS19_Nautilus.pdf) Grammar Mutator (AGPL-licensed)
+nautilus = ["grammartec", "std", "serde_json/std"]
 
 [build-dependencies]
 rustversion = "1.0"
@@ -102,7 +173,10 @@ concat-idents = { version = "1.1.3", optional = true }
 libcasr = { version = "2.7", optional = true}
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
-serial_test = { version = "2", optional = true }
+serial_test = { version = "2", optional = true, default-features = false, features = ["logging"] }
+
+# Document all features of this crate (for `cargo doc`)
+document-features = { version = "0.2" }
 
 # AGPL
 # !!! this create requires nightly

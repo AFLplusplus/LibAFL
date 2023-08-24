@@ -1,0 +1,24 @@
+[package]
+name = "libafl_libfuzzer"
+version.workspace = true
+description = "libFuzzer shim which uses LibAFL with common defaults"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "testing", "security"]
+edition = "2021"
+categories = ["development-tools::testing", "fuzzing"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+cc = "1.0"
+rustversion = "1.0"
+
+[features]
+arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
+introspection = []
+whole-archive = []
+
+[dependencies]
+libfuzzer-sys = { version = "0.4.7", default-features = false }

@@ -115,7 +115,7 @@ struct Opt {
 pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
+    // unsafe { RegistryBuilder::register::<Tokens>(); }
     let opt = Opt::parse();
 
     let broker_port = opt.broker_port;

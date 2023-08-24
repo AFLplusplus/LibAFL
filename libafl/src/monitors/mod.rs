@@ -371,8 +371,14 @@ impl Monitor for SimplePrintingMonitor {
     }
 
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
+        let mut userstats = self.client_stats()[sender_id.0 as usize]
+            .user_monitor
+            .iter()
+            .map(|(key, value)| format!("{key}: {value}"))
+            .collect::<Vec<_>>();
+        userstats.sort();
         println!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}, {}",
             event_msg,
             sender_id.0,
             format_duration_hms(&(current_time() - self.start_time)),
@@ -380,7 +386,8 @@ impl Monitor for SimplePrintingMonitor {
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec_pretty()
+            self.execs_per_sec_pretty(),
+            userstats.join(", ")
         );
 
         // Only print perf monitor if the feature is enabled
