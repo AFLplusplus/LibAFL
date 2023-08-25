@@ -397,7 +397,20 @@ where
             phantom: PhantomData,
         }
     }
+
+    /// Reference the stored auxiliary data associated with the [`CmpObserverMetadata`]
+    pub fn data(&self) -> &M::Data {
+        &self.data
+    }
+
+    /// Mutably reference the stored auxiliary data associated with the [`CmpObserverMetadata`]
+    pub fn data_mut(&mut self) -> &mut M::Data {
+        &mut self.data
+    }
 }
+
+/// A [`StdCmpObserver`] that optionally adds comparisons into a [`CmpValuesMetadata`]
+pub type StdCmpValuesObserver<'a, CM, S> = StdCmpObserver<'a, CM, S, CmpValuesMetadata>;
 
 /* From AFL++ cmplog.h
 
