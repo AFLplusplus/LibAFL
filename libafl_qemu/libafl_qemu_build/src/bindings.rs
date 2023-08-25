@@ -115,12 +115,12 @@ pub fn generate(
         .allowlist_function("tlb_plugin_lookup")
         .allowlist_function("qemu_plugin_hwaddr_phys_addr")
         .allowlist_function("qemu_plugin_get_hwaddr")
+        .allowlist_function("qemu_target_page_size")
         .allowlist_function("syx_snapshot_init")
         .allowlist_function("syx_snapshot_create")
         .allowlist_function("syx_snapshot_root_restore")
         .allowlist_function("syx_snapshot_dirty_list_add")
         .allowlist_function("device_list_all")
-        .allowlist_function("qemu_target_page_size")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
         .parse_callbacks(Box::new(bindgen::CargoCallbacks));
 

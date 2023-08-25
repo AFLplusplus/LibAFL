@@ -14,10 +14,6 @@ use std::{
     ptr::null_mut,
 };
 
-thread_local! {
-    static SNAPSHOT_PAGE_SIZE: OnceCell<usize> = OnceCell::new();
-}
-
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -751,7 +747,11 @@ impl CPU {
     pub fn page_size(&self) -> usize {
         #[cfg(emulation_mode = "usermode")]
         {
-            SNAPSHOT_PAGE_SIZE.with(|s| {
+            thread_local! {
+                static PAGE_SIZE: OnceCell<usize> = OnceCell::new();
+            }
+
+            PAGE_SIZE.with(|s| {
                 *s.get_or_init(|| {
                     unsafe { libc::sysconf(libc::_SC_PAGE_SIZE) }
                         .try_into()
@@ -761,8 +761,7 @@ impl CPU {
         }
         #[cfg(emulation_mode = "systemmode")]
         {
-            SNAPSHOT_PAGE_SIZE
-                .with(|s| *s.get_or_init(|| unsafe { libafl_qemu_sys::qemu_target_page_size() }))
+            unsafe { libafl_qemu_sys::qemu_target_page_size() }
         }
     }
 }

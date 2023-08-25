@@ -644,10 +644,10 @@ where
                 input,
                 client_config,
                 exit_kind,
-                corpus_size: _,
+                corpus_size,
                 observers_buf,
-                time: _,
-                executions: _,
+                time,
+                executions,
                 forward_id,
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
@@ -659,9 +659,29 @@ where
                         postcard::from_bytes(observers_buf.as_ref().unwrap())?;
                     fuzzer.process_execution(state, self, input, &observers, &exit_kind, true)?
                 } else {
-                    fuzzer.evaluate_input_with_observers::<E, Self>(
-                        state, executor, self, input, true,
-                    )?
+                    let res = fuzzer.evaluate_input_with_observers::<E, Self>(
+                        state,
+                        executor,
+                        self,
+                        input.clone(),
+                        false,
+                    )?;
+                    if res.1.is_some() {
+                        self.inner.fire(
+                            state,
+                            Event::NewTestcase {
+                                input,
+                                client_config,
+                                exit_kind,
+                                corpus_size,
+                                observers_buf,
+                                time,
+                                executions,
+                                forward_id,
+                            },
+                        )?;
+                    }
+                    res
                 };
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
