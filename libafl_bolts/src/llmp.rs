@@ -1922,6 +1922,35 @@ where
     shmem_provider: SP,
 }
 
+#[inline]
+fn binary_search<SP: ShMemProvider>(
+    llmp_clients: &Vec<LlmpReceiver<SP>>,
+    client_id: ClientId,
+) -> Option<usize> {
+    if llmp_clients.is_empty() {
+        return None;
+    }
+
+    let mut left = 0;
+    let mut right = llmp_clients.len().checked_sub(1)?;
+
+    loop {
+        if left > right {
+            break;
+        }
+
+        let mid = left + (right - left) / 2;
+
+        match client_id {
+            id if id == llmp_clients[mid].id => return Some(llmp_clients[mid].id.0 as _),
+            id if id > llmp_clients[mid].id => left = mid + 1,
+            _ => right = mid.checked_sub(1).expect("invalid right edge"),
+        }
+    }
+
+    None
+}
+
 /// A signal handler for the [`LlmpBroker`].
 #[cfg(unix)]
 #[derive(Debug, Clone)]
@@ -2686,10 +2715,7 @@ where
                     // Fast path when no client was removed
                     client_id.0 as usize
                 } else {
-                    // TODO binary search
-                    self.llmp_clients
-                        .iter()
-                        .position(|x| x.id == client_id)
+                    binary_search(&self.llmp_clients, client_id)
                         .expect("Fatal error, client ID not found")
                 };
                 let client = &mut self.llmp_clients[pos];
@@ -2773,10 +2799,7 @@ where
                         // Fast path when no client was removed
                         client_id.0 as usize
                     } else {
-                        // TODO binary search
-                        self.llmp_clients
-                            .iter()
-                            .position(|x| x.id == client_id)
+                        binary_search(&self.llmp_clients, client_id)
                             .expect("Fatal error, client ID not found")
                     };
 
