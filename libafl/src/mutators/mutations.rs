@@ -50,9 +50,7 @@ pub(crate) unsafe fn buffer_copy<T>(dst: &mut [T], src: &[T], from: usize, to: u
 #[inline]
 pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
     debug_assert!(from + len <= data.len());
-    for p in &mut data[from..(from + len)] {
-        *p = val.clone();
-    }
+    data[from..(from + len)].fill(val);
 }
 
 /// Generate a range of values where (upon repeated calls) each index is likely to appear in the
