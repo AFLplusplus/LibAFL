@@ -351,7 +351,7 @@ impl ByteRandMutator {
 // within the input are treated as u8, u16, u32, or u64, then mutated in place.
 macro_rules! add_mutator_impl {
     ($name: ident, $size: ty) => {
-        /// Adds or subtracts a random value up to `ARITH_MAX` to a [`<$size>`] at a random place in the [`Vec`], in random byte order.
+        #[doc = concat!("Adds or subtracts a random value up to `ARITH_MAX` to a [`", stringify!($size), "`] at a random place in the [`Vec`], in random byte order.")]
         #[derive(Default, Debug)]
         pub struct $name;
 
@@ -400,7 +400,7 @@ macro_rules! add_mutator_impl {
         }
 
         impl $name {
-            /// Creates a new [`$name`].
+            #[doc = concat!("Creates a new [`", stringify!($name), "`].")]
             #[must_use]
             pub fn new() -> Self {
                 Self
@@ -458,7 +458,7 @@ macro_rules! interesting_mutator_impl {
         }
 
         impl $name {
-            /// Creates a new [`$name`].
+            #[doc = concat!("Creates a new [`", stringify!($name), "`].")]
             #[must_use]
             pub fn new() -> Self {
                 Self
