@@ -1,0 +1,61 @@
+struct SlintData {
+    title: string,
+    content: string,
+    answers: [string],
+}
+
+component AnswerButton inherits Rectangle {
+    in-out property text <=> answer.text;
+
+    callback clicked <=> touch.clicked;
+
+    border-radius: 10px;
+    border-width: 2px;
+    border-color: #ffffff;
+    background: touch.pressed ? #3b3b3b : touch.has-hover ? #1c1c1c : transparent;
+    height: answer.preferred-height * 2;
+    min-width: answer.preferred-width + 20px;
+
+    answer := Text {
+        x: ((parent.width - self.width) / 2) + (touch.pressed ? 2px : 0);
+        y: ((parent.height - self.height) / 2) + (touch.pressed ? 1px : 0);
+        color: touch.pressed ? #fff : #eee;
+    }
+
+    touch := TouchArea { }
+}
+
+export component MainWindow inherits Window {
+    in-out property <SlintData> question;
+
+    background: #0f0f0f;
+    title: "libafl_wizard";
+    icon: @image-url("../icons/libafl_wizard.png");
+    default-font-size: 20px;
+
+    VerticalLayout {
+        Text {
+            text: root.question.title;
+            color: white;
+            font-family: "Terminal";
+        }
+
+        Text {
+            text: root.question.content;
+            color: white;
+            font-family: "Terminal";
+        }
+
+        HorizontalLayout {
+            spacing: 10px;
+
+            for ans[i] in question.answers: AnswerButton {
+                text: ans;
+            }
+
+            undo := AnswerButton{
+                text: "Undo";
+            }
+        }
+    }
+}
