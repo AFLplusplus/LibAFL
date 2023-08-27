@@ -397,7 +397,7 @@ jobs:
         sync: rsync
         copyback: false
         mem: 2048
-        release: 13.1
+        release: 13.2
         prepare: |
           pkg install -y curl bash sudo llvm16
           curl https://sh.rustup.rs -sSf | sh -s -- -y
