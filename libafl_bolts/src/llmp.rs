@@ -1987,10 +1987,10 @@ where
     /// Gets the [`ClientId`] the next client attaching to this broker will get.
     /// In its current implememtation, the inner value of the next [`ClientId`]
     /// is equal to `self.num_clients_total`.
-    /// Calling `next_client_id` mutliple times (without adding a client) will yield the same value.
+    /// Calling `peek_next_client_id` mutliple times (without adding a client) will yield the same value.
     #[must_use]
     #[inline]
-    pub fn next_client_id(&self) -> ClientId {
+    pub fn peek_next_client_id(&self) -> ClientId {
         ClientId(
             self.num_clients_total
                 .try_into()
@@ -2042,7 +2042,7 @@ where
         // Since we now have a handle to it, it won't be umapped too early (only after we also unmap it)
         client_page.mark_safe_to_unmap();
 
-        let id = self.next_client_id();
+        let id = self.peek_next_client_id();
         self.llmp_clients.push(LlmpReceiver {
             id,
             current_recv_shmem: client_page,
@@ -2106,7 +2106,7 @@ where
         // TODO: handle broker_ids properly/at all.
         let map_description = Self::b2b_thread_on(
             stream,
-            self.next_client_id(),
+            self.peek_next_client_id(),
             &self
                 .llmp_out
                 .out_shmems
@@ -2593,7 +2593,7 @@ where
             hostname,
         };
 
-        let llmp_tcp_id = self.next_client_id();
+        let llmp_tcp_id = self.peek_next_client_id();
 
         // Tcp out map sends messages from background thread tcp server to foreground client
         let tcp_out_shmem = LlmpSharedMap::new(
@@ -2751,7 +2751,7 @@ where
                             let mut new_page = LlmpSharedMap::existing(new_shmem);
                             new_page.mark_safe_to_unmap();
 
-                            let id = self.next_client_id();
+                            let id = self.peek_next_client_id();
                             self.llmp_clients.push(LlmpReceiver {
                                 id,
                                 current_recv_shmem: new_page,
