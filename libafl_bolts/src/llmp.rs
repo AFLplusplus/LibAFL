@@ -2695,8 +2695,10 @@ where
         // TODO: We could memcpy a range of pending messages, instead of one by one.
         loop {
             let msg = {
-                let pos = if self.num_clients_total == self.llmp_clients.len() {
-                    // Fast path when no client was removed
+                let pos = if (client_id.0 as usize) < self.llmp_clients.len()
+                    && self.llmp_clients[client_id.0 as usize].id == client_id
+                {
+                    // Fast path when no client before this one was removed
                     client_id.0 as usize
                 } else {
                     self.llmp_clients
@@ -2778,8 +2780,10 @@ where
                     // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
                     let mut should_forward_msg = true;
 
-                    let pos = if self.num_clients_total == self.llmp_clients.len() {
-                        // Fast path when no client was removed
+                    let pos = if (client_id.0 as usize) < self.llmp_clients.len()
+                        && self.llmp_clients[client_id.0 as usize].id == client_id
+                    {
+                        // Fast path when no client before this one was removed
                         client_id.0 as usize
                     } else {
                         self.llmp_clients
