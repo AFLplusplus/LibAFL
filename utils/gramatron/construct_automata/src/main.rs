@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashSet, VecDeque},
     fs,
     io::{BufReader, Write},
     path::{Path, PathBuf},
@@ -65,8 +65,8 @@ struct Transition<'src> {
 
 #[derive(Default)]
 struct Stacks<'src> {
-    pub q: HashMap<usize, VecDeque<&'src str>>,
-    pub s: HashMap<usize, Vec<&'src str>>,
+    pub q: Vec<VecDeque<&'src str>>,
+    pub s: Vec<Vec<&'src str>>,
 }
 
 fn tokenize(rule: &str) -> (&str, Vec<&str>) {
@@ -74,8 +74,8 @@ fn tokenize(rule: &str) -> (&str, Vec<&str>) {
     let re = RE.get_or_init(|| Regex::new(r"'([\s\S]+)'([\s\S]*)").unwrap());
     let cap = re.captures(rule).unwrap();
     // let is_regex = cap.get(1).is_some();
-    let terminal = cap.get(2).unwrap().as_str();
-    let ss = cap.get(3).map_or(vec![], |m| {
+    let terminal = cap.get(1).unwrap().as_str();
+    let ss = cap.get(2).map_or(vec![], |m| {
         m.as_str()
             .split_whitespace()
             // .map(ToOwned::to_owned)
@@ -115,7 +115,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
         // Creating a state stack for the new state
         let mut state_stack = state_stacks
             .q
-            .get(&state)
+            .get(state.wrapping_sub(1))
             .map_or(VecDeque::new(), Clone::clone);
 
         state_stack.pop_front();
@@ -137,9 +137,9 @@ fn prepare_transitions<'pda, 'src: 'pda>(
 
         // Check if a recursive transition state being created, if so make a backward
         // edge and don't add anything to the worklist
-        for (key, val) in &state_stacks.s {
+        for (key, val) in state_stacks.s.iter().enumerate() {
             if state_stack_sorted == *val {
-                transition.dest = *key;
+                transition.dest = key;
                 // i += 1;
                 pda.push(transition);
 
@@ -161,8 +161,11 @@ fn prepare_transitions<'pda, 'src: 'pda>(
             state: dest,
             items: state_stack.clone(),
         });
-        state_stacks.q.insert(dest, state_stack);
-        state_stacks.s.insert(dest, state_stack_sorted);
+
+        // since `state_stacks` get 1 element pushed each time `state_count` gets incremented
+        // and `state_count` starts with 1, we should index the state stacks with state - 1
+        state_stacks.q.push(state_stack);
+        state_stacks.s.push(state_stack_sorted);
         pda.push(transition);
 
         println!("worklist size: {}", worklist.len());
@@ -223,7 +226,9 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
         let culled_finals: HashSet<usize> = finals.difference(&blocklist).copied().collect();
         assert!(culled_finals.len() == 1);
 
-        for transition in &culled_pda {
+        let culled_pda_len = culled_pda.len();
+
+        for transition in culled_pda {
             if blocklist.contains(&transition.dest) {
                 continue;
             }
@@ -240,8 +245,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
             if num_transition % 4096 == 0 {
                 println!(
                     "processed {} transitions over {}",
-                    num_transition,
-                    culled_pda.len()
+                    num_transition, culled_pda_len
                 );
             }
         }
@@ -261,8 +265,8 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
         */
 
         Automaton {
-            init_state: initial.iter().next().copied().unwrap(),
-            final_state: culled_finals.iter().next().copied().unwrap(),
+            init_state: initial.into_iter().next().unwrap(),
+            final_state: culled_finals.into_iter().next().unwrap(),
             pda: memoized,
         }
     } else {
@@ -288,8 +292,8 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
         }
 
         Automaton {
-            init_state: initial.iter().next().copied().unwrap(),
-            final_state: finals.iter().next().copied().unwrap(),
+            init_state: initial.into_iter().next().unwrap(),
+            final_state: finals.into_iter().next().unwrap(),
             pda: memoized,
         }
     }
@@ -328,8 +332,7 @@ fn main() {
         );
     }
 
-    state_stacks.q.clear();
-    state_stacks.s.clear();
+    drop(state_stacks);
 
     let transformed = postprocess(&pda, stack_limit);
     let serialized = postcard::to_allocvec(&transformed).unwrap();
