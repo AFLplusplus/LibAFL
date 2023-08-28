@@ -3,7 +3,6 @@ use std::{
     fs,
     io::{BufReader, Write},
     path::{Path, PathBuf},
-    rc::Rc,
     sync::OnceLock,
 };
 
@@ -51,7 +50,7 @@ fn read_grammar_from_file<P: AsRef<Path>>(path: P) -> Value {
 #[derive(Debug)]
 struct Element<'src> {
     pub state: usize,
-    pub items: Rc<VecDeque<&'src str>>,
+    pub items: VecDeque<&'src str>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
@@ -160,7 +159,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
         // Create transitions for the non-recursive relations and add to the worklist
         worklist.push_back(Element {
             state: dest,
-            items: state_stack.clone().into(),
+            items: state_stack.clone(),
         });
         state_stacks.q.insert(dest, state_stack);
         state_stacks.s.insert(dest, state_stack_sorted);
@@ -314,7 +313,7 @@ fn main() {
     start_vec.push_back(start_symbol);
     worklist.push_back(Element {
         state: 0,
-        items: Rc::new(start_vec),
+        items: start_vec,
     });
 
     while let Some(element) = worklist.pop_front() {
