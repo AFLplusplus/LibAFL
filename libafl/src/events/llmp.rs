@@ -624,7 +624,7 @@ impl<S: UsesInput, SP: ShMemProvider> LlmpEventManager<S, SP> {
     /// The other side may free up all allocated memory.
     /// We are no longer allowed to send anything afterwards.
     pub fn send_exiting(&mut self) -> Result<(), Error> {
-        self.llmp.sender.send_exiting()
+        self.llmp.sender_mut().send_exiting()
     }
 }
 
@@ -758,7 +758,7 @@ where
         executor: &mut E,
     ) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
-        let self_id = self.llmp.sender.id;
+        let self_id = self.llmp.sender().id();
         let mut count = 0;
         while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
             assert!(
@@ -825,7 +825,7 @@ where
 {
     /// Gets the id assigned to this staterestorer.
     fn mgr_id(&self) -> EventManagerId {
-        EventManagerId(self.llmp.sender.id.0 as usize)
+        EventManagerId(self.llmp.sender().id().0 as usize)
     }
 }
 
@@ -1572,7 +1572,7 @@ where
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
-        let self_id = self.llmp.sender.id;
+        let self_id = self.llmp.sender().id();
         let mut count = 0;
         while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
             assert!(

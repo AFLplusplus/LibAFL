@@ -377,7 +377,7 @@ where
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
-        self.client.sender.send_exiting()?;
+        self.client.sender_mut().send_exiting()?;
         self.inner.send_exiting()
     }
 
@@ -594,7 +594,7 @@ where
         Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
-        let self_id = self.client.sender.id;
+        let self_id = self.client.sender().id();
         let mut count = 0;
         while let Some((client_id, tag, _flags, msg)) = self.client.recv_buf_with_flags()? {
             assert!(
