@@ -71,7 +71,8 @@ struct Stacks<'src> {
 }
 
 fn tokenize(rule: &str) -> (&str, Vec<&str>) {
-    let re = RE.get_or_init(|| Regex::new(r"([r])*'([\s\S]+)'([\s\S]*)").unwrap());
+    // let re = RE.get_or_init(|| Regex::new(r"([r])*'([\s\S]+)'([\s\S]*)").unwrap());
+    let re = RE.get_or_init(|| Regex::new(r"'([\s\S]+)'([\s\S]*)").unwrap());
     let cap = re.captures(rule).unwrap();
     // let is_regex = cap.get(1).is_some();
     let terminal = cap.get(2).unwrap().as_str();
