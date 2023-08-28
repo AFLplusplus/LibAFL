@@ -82,7 +82,7 @@ fn tokenize(rule: &str) -> (&str, Vec<&str>) {
             .collect()
     });
     if terminal == "\\n" {
-        ("\n".into(), ss /*is_regex*/)
+        ("\n", ss /*is_regex*/)
     } else {
         (terminal, ss /*is_regex*/)
     }
@@ -142,7 +142,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
             if state_stack_sorted == *val {
                 transition.dest = *key;
                 // i += 1;
-                pda.push(transition.clone());
+                pda.push(transition);
 
                 // If a recursive transition exercised don't add the same transition as a new
                 // edge, continue onto the next transitions
