@@ -245,14 +245,15 @@ impl ClientTuiContext {
             "own_finds": 0,
         });
         let afl_stats = client
-            .get_user_stats("AflStas")
+            .get_user_stats("AflStats")
             .map_or(default_json.to_string(), ToString::to_string);
 
-        let afl_stats_json: Value = serde_json::from_str(afl_stats.as_str()).unwrap();
-        self.item_geometry.pending = afl_stats_json["pending"].as_u64().unwrap();
-        self.item_geometry.pend_fav = afl_stats_json["pend_fav"].as_u64().unwrap();
-        self.item_geometry.imported = afl_stats_json["imported"].as_u64().unwrap();
-        self.item_geometry.own_finds = afl_stats_json["own_finds"].as_u64().unwrap();
+        let afl_stats_json: Value =
+            serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
+        self.item_geometry.pending = afl_stats_json["pending"].as_u64().unwrap_or_default();
+        self.item_geometry.pend_fav = afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
+        self.item_geometry.imported = afl_stats_json["imported"].as_u64().unwrap_or_default();
+        self.item_geometry.own_finds = afl_stats_json["own_finds"].as_u64().unwrap_or_default();
 
         let stability = client
             .get_user_stats("stability")
@@ -479,11 +480,22 @@ impl TuiMonitor {
                 .map_or(&UserStats::Ratio(0, 100), |x| x);
 
             if afl_stats != "None" {
-                let afl_stats_json: Value = serde_json::from_str(afl_stats.as_str()).unwrap();
-                total_item_geometry.pending += afl_stats_json["pending"].as_u64().unwrap();
-                total_item_geometry.pend_fav += afl_stats_json["pend_fav"].as_u64().unwrap();
-                total_item_geometry.own_finds += afl_stats_json["own_finds"].as_u64().unwrap();
-                total_item_geometry.imported += afl_stats_json["imported"].as_u64().unwrap();
+                let default_json = serde_json::json!({
+                    "pending": 0,
+                    "pend_fav": 0,
+                    "imported": 0,
+                    "own_finds": 0,
+                });
+                let afl_stats_json: Value =
+                    serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
+                total_item_geometry.pending +=
+                    afl_stats_json["pending"].as_u64().unwrap_or_default();
+                total_item_geometry.pend_fav +=
+                    afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
+                total_item_geometry.own_finds +=
+                    afl_stats_json["own_finds"].as_u64().unwrap_or_default();
+                total_item_geometry.imported +=
+                    afl_stats_json["imported"].as_u64().unwrap_or_default();
             }
 
             if let UserStats::Ratio(a, b) = stability {
