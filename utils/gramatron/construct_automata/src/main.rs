@@ -58,10 +58,10 @@ struct Element {
 struct Transition {
     pub source: usize,
     pub dest: usize,
-    pub ss: Vec<String>,
+    // pub ss: Vec<String>,
     pub terminal: String,
-    pub is_regex: bool,
-    pub stack: Rc<VecDeque<String>>,
+    // pub is_regex: bool,
+    pub stack_len: usize,
 }
 
 #[derive(Default)]
@@ -70,10 +70,10 @@ struct Stacks {
     pub s: HashMap<usize, Vec<String>>,
 }
 
-fn tokenize(rule: &str) -> (String, Vec<String>, bool) {
+fn tokenize(rule: &str) -> (String, Vec<String>) {
     let re = RE.get_or_init(|| Regex::new(r"([r])*'([\s\S]+)'([\s\S]*)").unwrap());
     let cap = re.captures(rule).unwrap();
-    let is_regex = cap.get(1).is_some();
+    // let is_regex = cap.get(1).is_some();
     let terminal = cap.get(2).unwrap().as_str().to_owned();
     let ss = cap.get(3).map_or(vec![], |m| {
         m.as_str()
@@ -82,9 +82,9 @@ fn tokenize(rule: &str) -> (String, Vec<String>, bool) {
             .collect()
     });
     if terminal == "\\n" {
-        ("\n".into(), ss, is_regex)
+        ("\n".into(), ss /*is_regex*/)
     } else {
-        (terminal, ss, is_regex)
+        (terminal, ss /*is_regex*/)
     }
 }
 
@@ -107,7 +107,7 @@ fn prepare_transitions(
     // let mut i = 0;
     'rules_loop: for rule in rules {
         let rule = rule.as_str().unwrap();
-        let (terminal, ss, is_regex) = tokenize(rule);
+        let (terminal, ss /*_is_regex*/) = tokenize(rule);
         let dest = *state_count;
 
         // log::trace!("Rule \"{}\", {} over {}", &rule, i, rules.len());
@@ -129,10 +129,11 @@ fn prepare_transitions(
         let mut transition = Transition {
             source: state,
             dest,
-            ss,
+            // ss,
             terminal,
-            is_regex,
-            stack: Rc::new(state_stack.clone()),
+            // is_regex,
+            // stack: Rc::new(state_stack.clone()),
+            stack_len: state_stack.len(),
         };
 
         // Check if a recursive transition state being created, if so make a backward
@@ -151,7 +152,7 @@ fn prepare_transitions(
 
         // If the generated state has a stack size > stack_limit then that state is abandoned
         // and not added to the FSA or the worklist for further expansion
-        if stack_limit > 0 && transition.stack.len() > stack_limit {
+        if stack_limit > 0 && transition.stack_len > stack_limit {
             // TODO add to unexpanded_rules
             continue;
         }
@@ -159,7 +160,7 @@ fn prepare_transitions(
         // Create transitions for the non-recursive relations and add to the worklist
         worklist.push_back(Element {
             state: dest,
-            items: transition.stack.clone(),
+            items: state_stack.clone().into(),
         });
         state_stacks.q.insert(dest, state_stack);
         state_stacks.s.insert(dest, state_stack_sorted);
@@ -209,7 +210,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
 
         for final_state in &finals {
             for transition in pda {
-                if transition.dest == *final_state && transition.stack.len() > 0 {
+                if transition.dest == *final_state && transition.stack_len > 0 {
                     blocklist.insert(transition.dest);
                 } else {
                     culled_pda.push(transition);
