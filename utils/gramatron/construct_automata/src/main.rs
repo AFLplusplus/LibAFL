@@ -49,9 +49,9 @@ fn read_grammar_from_file<P: AsRef<Path>>(path: P) -> Value {
 }
 
 #[derive(Debug)]
-struct Element {
+struct Element<'src> {
     pub state: usize,
-    pub items: Rc<VecDeque<String>>,
+    pub items: Rc<VecDeque<&'src str>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
@@ -93,7 +93,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
     pda: &'pda mut Vec<Transition<'src>>,
     state_stacks: &mut Stacks<'src>,
     state_count: &mut usize,
-    worklist: &mut VecDeque<Element>,
+    worklist: &mut VecDeque<Element<'src>>,
     element: &Element,
     stack_limit: usize,
 ) {
@@ -160,12 +160,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
         // Create transitions for the non-recursive relations and add to the worklist
         worklist.push_back(Element {
             state: dest,
-            items: state_stack
-                .clone()
-                .into_iter()
-                .map(ToOwned::to_owned)
-                .collect::<VecDeque<_>>()
-                .into(),
+            items: state_stack.clone().into(),
         });
         state_stacks.q.insert(dest, state_stack);
         state_stacks.s.insert(dest, state_stack_sorted);
@@ -314,7 +309,7 @@ fn main() {
     let mut pda = vec![];
 
     let grammar = read_grammar_from_file(grammar_file);
-    let start_symbol = grammar["Start"][0].as_str().unwrap().to_owned();
+    let start_symbol = grammar["Start"][0].as_str().unwrap();
     let mut start_vec = VecDeque::new();
     start_vec.push_back(start_symbol);
     worklist.push_back(Element {
