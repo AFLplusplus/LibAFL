@@ -55,11 +55,11 @@ struct Element {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
-struct Transition {
+struct Transition<'a> {
     pub source: usize,
     pub dest: usize,
     // pub ss: Vec<String>,
-    pub terminal: String,
+    pub terminal: &'a str,
     // pub is_regex: bool,
     pub stack_len: usize,
 }
@@ -70,15 +70,15 @@ struct Stacks {
     pub s: HashMap<usize, Vec<String>>,
 }
 
-fn tokenize(rule: &str) -> (String, Vec<String>) {
+fn tokenize(rule: &str) -> (&str, Vec<&str>) {
     let re = RE.get_or_init(|| Regex::new(r"([r])*'([\s\S]+)'([\s\S]*)").unwrap());
     let cap = re.captures(rule).unwrap();
     // let is_regex = cap.get(1).is_some();
-    let terminal = cap.get(2).unwrap().as_str().to_owned();
+    let terminal = cap.get(2).unwrap().as_str();
     let ss = cap.get(3).map_or(vec![], |m| {
         m.as_str()
             .split_whitespace()
-            .map(ToOwned::to_owned)
+            // .map(ToOwned::to_owned)
             .collect()
     });
     if terminal == "\\n" {
@@ -88,9 +88,9 @@ fn tokenize(rule: &str) -> (String, Vec<String>) {
     }
 }
 
-fn prepare_transitions(
-    grammar: &Value,
-    pda: &mut Vec<Transition>,
+fn prepare_transitions<'pda, 'src: 'pda>(
+    grammar: &'src Value,
+    pda: &'pda mut Vec<Transition<'src>>,
     state_stacks: &mut Stacks,
     state_count: &mut usize,
     worklist: &mut VecDeque<Element>,
@@ -121,7 +121,7 @@ fn prepare_transitions(
             state_stack.pop_front();
         }
         for symbol in ss.iter().rev() {
-            state_stack.push_front(symbol.clone());
+            state_stack.push_front(symbol.to_string());
         }
         let mut state_stack_sorted: Vec<_> = state_stack.iter().cloned().collect();
         state_stack_sorted.sort();
@@ -235,7 +235,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
             }
             memoized[state].push(Trigger {
                 dest: transition.dest,
-                term: transition.terminal.clone(),
+                term: transition.terminal.to_string(),
             });
 
             if num_transition % 4096 == 0 {
@@ -276,7 +276,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
             }
             memoized[state].push(Trigger {
                 dest: transition.dest,
-                term: transition.terminal.clone(),
+                term: transition.terminal.to_string(),
             });
 
             if num_transition % 4096 == 0 {
