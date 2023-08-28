@@ -202,7 +202,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 thread::sleep(Duration::from_millis(10));
             }
             log::info!("Exiting Client exits");
-            client.sender.send_exiting()?;
+            client.sender_mut().send_exiting()?;
         }
         _ => {
             println!("No valid mode supplied");
