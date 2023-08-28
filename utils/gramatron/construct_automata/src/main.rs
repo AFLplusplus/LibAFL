@@ -55,19 +55,19 @@ struct Element {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
-struct Transition<'a> {
+struct Transition<'src> {
     pub source: usize,
     pub dest: usize,
     // pub ss: Vec<String>,
-    pub terminal: &'a str,
+    pub terminal: &'src str,
     // pub is_regex: bool,
     pub stack_len: usize,
 }
 
 #[derive(Default)]
-struct Stacks {
-    pub q: HashMap<usize, VecDeque<String>>,
-    pub s: HashMap<usize, Vec<String>>,
+struct Stacks<'src> {
+    pub q: HashMap<usize, VecDeque<&'src str>>,
+    pub s: HashMap<usize, Vec<&'src str>>,
 }
 
 fn tokenize(rule: &str) -> (&str, Vec<&str>) {
@@ -91,7 +91,7 @@ fn tokenize(rule: &str) -> (&str, Vec<&str>) {
 fn prepare_transitions<'pda, 'src: 'pda>(
     grammar: &'src Value,
     pda: &'pda mut Vec<Transition<'src>>,
-    state_stacks: &mut Stacks,
+    state_stacks: &mut Stacks<'src>,
     state_count: &mut usize,
     worklist: &mut VecDeque<Element>,
     element: &Element,
@@ -121,7 +121,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
             state_stack.pop_front();
         }
         for symbol in ss.iter().rev() {
-            state_stack.push_front(symbol.to_string());
+            state_stack.push_front(symbol);
         }
         let mut state_stack_sorted: Vec<_> = state_stack.iter().cloned().collect();
         state_stack_sorted.sort();
@@ -160,7 +160,12 @@ fn prepare_transitions<'pda, 'src: 'pda>(
         // Create transitions for the non-recursive relations and add to the worklist
         worklist.push_back(Element {
             state: dest,
-            items: state_stack.clone().into(),
+            items: state_stack
+                .clone()
+                .into_iter()
+                .map(ToOwned::to_owned)
+                .collect::<VecDeque<_>>()
+                .into(),
         });
         state_stacks.q.insert(dest, state_stack);
         state_stacks.s.insert(dest, state_stack_sorted);
