@@ -123,8 +123,8 @@ fn prepare_transitions<'pda, 'src: 'pda>(
         for symbol in ss.iter().rev() {
             state_stack.push_front(symbol);
         }
-        let mut state_stack_sorted: Vec<_> = state_stack.iter().cloned().collect();
-        state_stack_sorted.sort();
+        let mut state_stack_sorted: Vec<_> = state_stack.iter().copied().collect();
+        state_stack_sorted.sort_unstable();
 
         let mut transition = Transition {
             source: state,
