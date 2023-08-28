@@ -25,12 +25,12 @@ no-cpp-runtime = []
 unchecked_unwrap = "4"
 ctor = "0.2"
 libc = "0.2"
-libafl = { path = "../../libafl", version = "0.10.1", default-features=false, features=["std", "serdeany_autoreg"] }
-libafl_bolts = { path = "../../libafl_bolts", version = "0.10.1", default-features=false, features=["std", "serdeany_autoreg"] }
+libafl = { path = "../../libafl", version = "0.11.0", default-features=false, features=["std", "serdeany_autoreg"] }
+libafl_bolts = { path = "../../libafl_bolts", version = "0.11.0", default-features=false, features=["std", "serdeany_autoreg"] }
 
 [build-dependencies]
 cmake = "0.1"
 bindgen = "0.63"
 regex = "1"
 which = "4.4"
-symcc_libafl = { path = "../symcc_libafl", version = "0.10.1" }
+symcc_libafl = { path = "../symcc_libafl", version = "0.11.0" }
