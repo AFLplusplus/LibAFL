@@ -2926,7 +2926,7 @@ where
         &self.sender
     }
 
-    /// Outgoing channel to the broker
+    /// Outgoing channel to the broker (mut)
     #[must_use]
     pub fn sender_mut(&mut self) -> &mut LlmpSender<SP> {
         &mut self.sender
@@ -2938,7 +2938,7 @@ where
         &self.receiver
     }
 
-    /// Incoming (broker) broadcast map
+    /// Incoming (broker) broadcast map (mut)
     #[must_use]
     pub fn receiver_mut(&mut self) -> &mut LlmpReceiver<SP> {
         &mut self.receiver
