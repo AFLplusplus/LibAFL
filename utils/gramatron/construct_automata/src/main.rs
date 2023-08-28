@@ -118,9 +118,8 @@ fn prepare_transitions<'pda, 'src: 'pda>(
             .q
             .get(&state)
             .map_or(VecDeque::new(), Clone::clone);
-        if !state_stack.is_empty() {
-            state_stack.pop_front();
-        }
+
+        state_stack.pop_front();
         for symbol in ss.iter().rev() {
             state_stack.push_front(symbol);
         }
