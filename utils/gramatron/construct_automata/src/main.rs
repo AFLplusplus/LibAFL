@@ -70,12 +70,12 @@ struct Stacks<'src> {
 }
 
 fn tokenize(rule: &str) -> (&str, Vec<&str>) {
-    // let re = RE.get_or_init(|| Regex::new(r"([r])*'([\s\S]+)'([\s\S]*)").unwrap());
-    let re = RE.get_or_init(|| Regex::new(r"'([\s\S]+)'([\s\S]*)").unwrap());
+    let re = RE.get_or_init(|| Regex::new(r"([r])*'([\s\S]+)'([\s\S]*)").unwrap());
+    // let re = RE.get_or_init(|| Regex::new(r"'([\s\S]+)'([\s\S]*)").unwrap());
     let cap = re.captures(rule).unwrap();
     // let is_regex = cap.get(1).is_some();
-    let terminal = cap.get(1).unwrap().as_str();
-    let ss = cap.get(2).map_or(vec![], |m| {
+    let terminal = cap.get(2).unwrap().as_str();
+    let ss = cap.get(3).map_or(vec![], |m| {
         m.as_str()
             .split_whitespace()
             // .map(ToOwned::to_owned)
@@ -115,7 +115,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
         // Creating a state stack for the new state
         let mut state_stack = state_stacks
             .q
-            .get(state.wrapping_sub(1))
+            .get(state)
             .map_or(VecDeque::new(), Clone::clone);
 
         state_stack.pop_front();
@@ -162,8 +162,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
             items: state_stack.clone(),
         });
 
-        // since `state_stacks` get 1 element pushed each time `state_count` gets incremented
-        // and `state_count` starts with 1, we should index the state stacks with state - 1
+        // we should just be able to use indexes as before
         state_stacks.q.push(state_stack);
         state_stacks.s.push(state_stack_sorted);
         pda.push(transition);
