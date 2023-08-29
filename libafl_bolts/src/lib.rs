@@ -137,7 +137,9 @@ pub mod tuples;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
-use core::hash::{BuildHasher, Hasher};
+use core::hash::BuildHasher;
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+use core::hash::Hasher;
 use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
