@@ -17,7 +17,7 @@ features = ["document-features"]
 all-features = true
 
 [features]
-default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip", "serdeany_autoreg", "alloc"]
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "rand_trait", "prelude", "gzip", "serdeany_autoreg", "alloc", "xxh3"]
 document-features = ["dep:document-features"]
 
 #! # Feature Flags
