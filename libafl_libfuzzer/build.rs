@@ -51,9 +51,7 @@ fn main() {
     }
 
     if features.is_empty() {
-        command
-            .arg("--features")
-            .arg(features.join(","));
+        command.arg("--features").arg(features.join(","));
     }
 
     command
