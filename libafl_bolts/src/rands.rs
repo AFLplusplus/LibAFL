@@ -145,6 +145,7 @@ macro_rules! impl_random {
     };
 }
 
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
 impl_random!(Xoshiro256StarRand);
 impl_random!(XorShift64Rand);
 impl_random!(Lehmer64Rand);
