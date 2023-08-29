@@ -103,7 +103,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
     }
 
     let state = element.state;
-    let nonterminal = &element.items[0];
+    let nonterminal = element.items[0];
     let rules = grammar[nonterminal].as_array().unwrap();
     // let mut i = 0;
     'rules_loop: for rule in rules {
@@ -165,7 +165,8 @@ fn prepare_transitions<'pda, 'src: 'pda>(
             items: Rc::clone(&state_stack),
         });
 
-        // we should just be able to use indexes as before
+        // since each index corresponds to `state_count - 1`
+        // index with `dest - 1`
         state_stacks.q.push(state_stack);
         state_stacks.s.push(state_stack_sorted);
         pda.push(transition);
@@ -208,26 +209,17 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
 
     // if stack_limit ...
     if stack_limit > 0 {
-        // let mut culled_pda = Vec::with_capacity(pda.len());
+        let mut culled_pda = Vec::with_capacity(pda.len());
         let mut blocklist = HashSet::new();
-        //let mut culled_pda_unique = HashSet::new();
+        // let mut culled_pda_unique = HashSet::new();
 
         for final_state in &finals {
             for transition in pda {
                 if transition.dest == *final_state && transition.stack_len > 0 {
                     blocklist.insert(transition.dest);
                 } else {
-                    // culled_pda.push(transition);
+                    culled_pda.push(transition);
                     //culled_pda_unique.insert(transition);
-                    num_transition += 1;
-                    let state = transition.source;
-                    if state >= memoized.len() {
-                        memoized.resize(state + 1, vec![]);
-                    }
-                    memoized[state].push(Trigger {
-                        dest: transition.dest,
-                        term: transition.terminal.to_string(),
-                    });
                 }
             }
         }
@@ -237,29 +229,29 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
         let culled_finals: HashSet<usize> = finals.difference(&blocklist).copied().collect();
         assert!(culled_finals.len() == 1);
 
-        // let culled_pda_len = culled_pda.len();
+        let culled_pda_len = culled_pda.len();
 
-        // for transition in culled_pda {
-        //     if blocklist.contains(&transition.dest) {
-        //         continue;
-        //     }
-        //     num_transition += 1;
-        //     let state = transition.source;
-        //     if state >= memoized.len() {
-        //         memoized.resize(state + 1, vec![]);
-        //     }
-        //     memoized[state].push(Trigger {
-        //         dest: transition.dest,
-        //         term: transition.terminal.to_string(),
-        //     });
+        for transition in culled_pda {
+            if blocklist.contains(&transition.dest) {
+                continue;
+            }
+            num_transition += 1;
+            let state = transition.source;
+            if state >= memoized.len() {
+                memoized.resize(state + 1, vec![]);
+            }
+            memoized[state].push(Trigger {
+                dest: transition.dest,
+                term: transition.terminal.to_string(),
+            });
 
-        //     if num_transition % 4096 == 0 {
-        //         println!(
-        //             "processed {} transitions over {}",
-        //             num_transition, culled_pda_len
-        //         );
-        //     }
-        // }
+            if num_transition % 4096 == 0 {
+                println!(
+                    "processed {} transitions over {}",
+                    num_transition, culled_pda_len
+                );
+            }
+        }
 
         /*
         culled_pda_unique.iter().for_each(|transition| {
