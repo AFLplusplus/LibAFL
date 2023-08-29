@@ -8,7 +8,8 @@ publish = false
 
 [features]
 default = ["fork", "serdeany_autoreg"]
-fork = ["libafl/fork"] # Enables forking mode for the LibAFL launcher (instead of starting new processes)
+## Enables forking mode for the LibAFL launcher (instead of starting new processes)
+fork = ["libafl/fork"]
 
 serdeany_autoreg = [] # TODO: drop this when fixed in libafl proper
 
@@ -31,9 +32,9 @@ path = "src/lib.rs"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-libafl = { path = "../../libafl", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "errors_backtrace", "regex", "serdeany_autoreg", "tui_monitor"] }
-libafl_bolts = { path = "../../libafl_bolts", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "errors_backtrace"] }
-libafl_targets = { path = "../../libafl_targets", features = ["sancov_8bit", "sancov_cmplog", "libfuzzer", "libfuzzer_oom", "libfuzzer_define_run_driver", "sanitizers_flags"] }
+libafl = { version = "0.11", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "errors_backtrace", "regex", "serdeany_autoreg", "tui_monitor"] }
+libafl_bolts = { version = "0.11", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "errors_backtrace"] }
+libafl_targets = { version = "0.11", features = ["sancov_8bit", "sancov_cmplog", "libfuzzer", "libfuzzer_oom", "libfuzzer_define_run_driver", "sanitizers_flags"] }
 
 ahash = { version = "0.8.3", default-features = false }
 libc = "0.2.139"
