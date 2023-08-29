@@ -4,12 +4,9 @@ use core::{debug_assert, fmt::Debug};
 #[cfg(feature = "rand_trait")]
 use rand_core::{self, impls::fill_bytes_via_next, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
 use crate::current_nanos;
-
-const HASH_CONST: u64 = 0xa5b35705;
 
 /// The standard rand implementation for `LibAFL`.
 /// It is usually the right choice, with very good speed and a reasonable randomness.
@@ -160,7 +157,7 @@ pub struct Xoshiro256StarRand {
 impl Rand for Xoshiro256StarRand {
     #[allow(clippy::unreadable_literal)]
     fn set_seed(&mut self, seed: u64) {
-        self.rand_seed[0] = xxh3_64_with_seed(&HASH_CONST.to_le_bytes(), seed);
+        self.rand_seed[0] = crate::hash_std(&seed.to_be_bytes());
         self.rand_seed[1] = self.rand_seed[0] ^ 0x1234567890abcdef;
         self.rand_seed[2] = self.rand_seed[0] & 0x0123456789abcdef;
         self.rand_seed[3] = self.rand_seed[0] | 0x01abcde43f567908;

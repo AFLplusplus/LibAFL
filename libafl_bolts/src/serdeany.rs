@@ -79,6 +79,7 @@ macro_rules! create_serde_registry_for_trait {
             use serde::{Deserialize, Serialize};
             use $crate::{
                 anymap::{pack_type_id, unpack_type_id},
+                hash_std,
                 serdeany::{DeserializeCallback, DeserializeCallbackSeed},
                 Error,
             };
@@ -346,7 +347,7 @@ macro_rules! create_serde_registry_for_trait {
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
                         Some(h) => h
-                            .get(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
+                            .get(&hash_std(name.as_bytes()))
                             .map(|x| x.as_any().downcast_ref::<T>().unwrap()),
                     }
                 }
@@ -359,7 +360,7 @@ macro_rules! create_serde_registry_for_trait {
                     match self.map.get(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => h
-                            .get(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
+                            .get(&hash_std(name.as_bytes()))
                             .map(AsRef::as_ref),
                     }
                 }
@@ -374,7 +375,7 @@ macro_rules! create_serde_registry_for_trait {
                     match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
                         Some(h) => h
-                            .get_mut(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
+                            .get_mut(&hash_std(name.as_bytes()))
                             .map(|x| x.as_any_mut().downcast_mut::<T>().unwrap()),
                     }
                 }
@@ -390,7 +391,7 @@ macro_rules! create_serde_registry_for_trait {
                     match self.map.get_mut(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => h
-                            .get_mut(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
+                            .get_mut(&hash_std(name.as_bytes()))
                             .map(AsMut::as_mut),
                     }
                 }
@@ -552,7 +553,7 @@ macro_rules! create_serde_registry_for_trait {
                     self.map
                         .get_mut(&id)
                         .unwrap()
-                        .insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), Box::new(val));
+                        .insert(hash_std(name.as_bytes()), Box::new(val));
                 }
 
                 /// Returns the `len` of this map.
@@ -587,7 +588,7 @@ macro_rules! create_serde_registry_for_trait {
                 {
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
                         None => false,
-                        Some(h) => h.contains_key(&xxhash_rust::xxh3::xxh3_64(name.as_bytes())),
+                        Some(h) => h.contains_key(&hash_std(name.as_bytes())),
                     }
                 }
 

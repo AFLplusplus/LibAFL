@@ -132,11 +132,18 @@ pub mod shmem;
 pub mod staterestore;
 pub mod tuples;
 
+#[cfg(not(feature = "xxh3"))]
+use ahash::RandomState;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+#[cfg(not(feature = "xxh3"))]
+use core::hash::BuildHasher;
+use core::hash::Hasher;
 use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(feature = "xxh3")]
+use xxhash_rust::xxh3::xxh3_64;
 
 use serde::{Deserialize, Serialize};
 
@@ -207,6 +214,32 @@ fn display_error_backtrace(f: &mut fmt::Formatter, err: &ErrorBacktrace) -> fmt:
 #[allow(clippy::unnecessary_wraps)]
 fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fmt::Result {
     fmt::Result::Ok(())
+}
+
+/// Returns the hasher for the input with a given hash, depending on features:
+/// [`xxh3_64`](https://docs.rs/xxhash-rust/latest/xxhash_rust/xxh3/fn.xxh3_64.html)
+/// if the `xxh3` feature is used, /// else [`ahash`](https://docs.rs/ahash/latest/ahash/).
+#[must_use]
+pub fn hasher_std() -> impl Hasher + Clone {
+    #[cfg(feature = "xxh3")]
+    return xxhash_rust::xxh3::Xxh3::new();
+    #[cfg(not(feature = "xxh3"))]
+    RandomState::with_seeds(0, 0, 0, 0).build_hasher()
+}
+
+/// Hashes the input with a given hash, depending on features:
+/// [`xxh3_64`](https://docs.rs/xxhash-rust/latest/xxhash_rust/xxh3/fn.xxh3_64.html)
+/// if the `xxh3` feature is used, /// else [`ahash`](https://docs.rs/ahash/latest/ahash/).
+#[must_use]
+pub fn hash_std(input: &[u8]) -> u64 {
+    #[cfg(feature = "xxh3")]
+    return xxh3_64(input);
+    #[cfg(not(feature = "xxh3"))]
+    {
+        let mut hasher = hasher_std();
+        hasher.write(input);
+        hasher.finish()
+    }
 }
 
 /// Main error struct for `LibAFL`
