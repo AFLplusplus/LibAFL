@@ -57,7 +57,7 @@ use crate::{
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 
 /// The env variable to set in order to enable child output
-#[cfg(feature = "fork")]
+#[cfg(all(feature = "fork", unix))]
 const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
 
 /// Provides a [`Launcher`], which can be used to launch a fuzzing run on a specified list of cores
