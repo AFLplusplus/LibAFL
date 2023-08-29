@@ -2,7 +2,7 @@
 //!
 //! ## Usage
 //!
-//! To use LibAFL in place of libfuzzer, change the following line in your fuzz/Cargo.toml:
+//! To use `LibAFL` in place of `LibFuzzer`, change the following line in your `fuzz/Cargo.toml`:
 //!
 //! ```toml
 //! libfuzzer-sys = { version = "*", features = [...] }
@@ -14,11 +14,14 @@
 //! libfuzzer-sys = { version = "*", features = [...], package = "libafl_libfuzzer" }
 //! ```
 //!
-//! To use bleeding changes from upstream, use the following:
+//! To use bleeding-edge changes from upstream, use the following:
 //!
 //! ```toml
 //! libfuzzer-sys = { version = "*", features = [...], package = "libafl_libfuzzer", git = "https://github.com/AFLplusplus/LibAFL" }
 //! ```
+//!
+//! You could also specify a specific git revision using `rev = "..."` in this case.
+//!
 //!
 //! ## Flags
 //!
