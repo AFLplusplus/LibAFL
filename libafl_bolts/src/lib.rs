@@ -130,17 +130,21 @@ pub mod serdeany;
 pub mod shmem;
 #[cfg(feature = "std")]
 pub mod staterestore;
+// TODO: reenable once ahash works in no-alloc
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
 pub mod tuples;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(not(feature = "xxh3"))]
-use core::hash::BuildHasher;
-use core::{hash::Hasher, iter::Iterator, time};
+#[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
+use core::hash::{BuildHasher, Hasher};
+use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[cfg(not(feature = "xxh3"))]
+// There's a bug in ahash that doesn't let it build in `alloc` without once_cell right now.
+// TODO: re-enable once <https://github.com/tkaitchuck/aHash/issues/155> is resolved.
+#[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use ahash::RandomState;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "xxh3")]
@@ -218,6 +222,7 @@ fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fm
 /// Returns the hasher for the input with a given hash, depending on features:
 /// [`xxh3_64`](https://docs.rs/xxhash-rust/latest/xxhash_rust/xxh3/fn.xxh3_64.html)
 /// if the `xxh3` feature is used, /// else [`ahash`](https://docs.rs/ahash/latest/ahash/).
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
 #[must_use]
 pub fn hasher_std() -> impl Hasher + Clone {
     #[cfg(feature = "xxh3")]
@@ -229,6 +234,7 @@ pub fn hasher_std() -> impl Hasher + Clone {
 /// Hashes the input with a given hash, depending on features:
 /// [`xxh3_64`](https://docs.rs/xxhash-rust/latest/xxhash_rust/xxh3/fn.xxh3_64.html)
 /// if the `xxh3` feature is used, /// else [`ahash`](https://docs.rs/ahash/latest/ahash/).
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
 #[must_use]
 pub fn hash_std(input: &[u8]) -> u64 {
     #[cfg(feature = "xxh3")]

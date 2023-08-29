@@ -9,7 +9,9 @@ use core::{
 
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
-use crate::{hash_std, Named};
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+use crate::hash_std;
+use crate::Named;
 
 /// Returns if the type `T` is equal to `U`
 /// From <https://stackoverflow.com/a/60138532/7658998>

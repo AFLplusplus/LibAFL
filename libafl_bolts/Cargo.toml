@@ -27,7 +27,7 @@ document-features = ["dep:document-features"]
 std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "uuid", "backtrace", "uds", "serial_test", "alloc"]
 
 ## Enables all features that allocate in `no_std`
-alloc = ["serde/alloc",  "hashbrown", "postcard", "erased-serde/alloc"]
+alloc = ["serde/alloc",  "hashbrown", "postcard", "erased-serde/alloc", "ahash"]
 
 ## Provide the `#[derive(SerdeAny)]` macro.
 derive = ["libafl_derive"]
@@ -58,6 +58,7 @@ gzip = ["miniz_oxide", "alloc"]
 
 ## Replaces `ahash` with the potentially faster [`xxh3`](https://github.com/Cyan4973/xxHash) in some parts of the lib.
 ## This yields a stable and fast hash, but may increase the resulting binary size slightly
+## This also enables certain hashing and rand features in `no_std` no-alloc.
 xxh3 = ["xxhash-rust"]
 
 #! ### SerdeAny features
@@ -98,7 +99,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"] } # s
 erased-serde = { version = "0.3.21", default-features = false, optional = true } # erased serde
 postcard = { version = "1.0", features = ["alloc"], default-features = false, optional = true } # no_std compatible serde serialization format
 num_enum = { version = "0.6", default-features = false }
-ahash = { version = "0.8", default-features=false } # The hash function already used in hashbrown
+ahash = { version = "0.8", default-features=false, optional = true } # The hash function already used in hashbrown
 backtrace = {version = "0.3", optional = true} # Used to get the stacktrace in StacktraceObserver
 
 ctor = { optional = true, version = "0.2" }
