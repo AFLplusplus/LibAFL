@@ -642,12 +642,12 @@ pub use serdeany_registry::*;
 ///
 /// Do nothing for without the `serdeany_autoreg` feature, you'll have to register it manually
 /// in `main()` with [`RegistryBuilder::register`] or using `<T>::register()`.
+#[cfg(all(feature = "serdeany_autoreg", not(miri)))]
 #[macro_export]
 macro_rules! create_register {
     ($struct_type:ty) => {
         const _: () = {
             /// Automatically register this type
-            #[cfg(all(feature = "serdeany_autoreg", not(miri)))]
             #[$crate::ctor]
             fn register() {
                 // # Safety
@@ -658,6 +658,16 @@ macro_rules! create_register {
             }
         };
     };
+}
+
+/// Register a `SerdeAny` type in the [`RegistryBuilder`]
+///
+/// Do nothing for without the `serdeany_autoreg` feature, you'll have to register it manually
+/// in `main()` with [`RegistryBuilder::register`] or using `<T>::register()`.
+#[cfg(not(all(feature = "serdeany_autoreg", not(miri))))]
+#[macro_export]
+macro_rules! create_register {
+    ($struct_type:ty) => {};
 }
 
 /// Implement a [`SerdeAny`], registering it in the [`RegistryBuilder`] when on std

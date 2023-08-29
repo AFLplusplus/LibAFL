@@ -25,7 +25,6 @@ rustversion = "1.0"
 
 [features]
 #! ## Feature Flags
-document-features = ["dep:document-features"]
 
 ## Enables the derive macros for the arbitrary dependency, transparently forwarded from libfuzzer-sys
 arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
@@ -34,7 +33,7 @@ introspection = []
 
 [dependencies]
 libfuzzer-sys = { version = "0.4.7", default-features = false }
-document-features = { version = "0.2", optional = true }
+document-features = { version = "0.2" }
 
 [package.metadata.docs.rs]
 all-features = true

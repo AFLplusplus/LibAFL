@@ -41,7 +41,7 @@ fn main() {
 
     command.arg("build");
 
-    let mut features = vec!["serdeany_autoreg"];
+    let mut features = vec![];
 
     if cfg!(any(feature = "fork")) {
         features.push("fork");
@@ -50,13 +50,17 @@ fn main() {
         features.push("libafl/introspection");
     }
 
+    if features.is_empty() {
+        command
+            .arg("--features")
+            .arg(features.join(","));
+    }
+
     command
         .arg("--release")
         .arg("--no-default-features")
         .arg("--target-dir")
         .arg(&custom_lib_dir)
-        .arg("--features")
-        .arg(features.join(","))
         .arg("--target")
         .arg(std::env::var_os("TARGET").unwrap());
 
