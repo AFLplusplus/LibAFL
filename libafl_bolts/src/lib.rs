@@ -132,20 +132,19 @@ pub mod shmem;
 pub mod staterestore;
 pub mod tuples;
 
-#[cfg(not(feature = "xxh3"))]
-use ahash::RandomState;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(not(feature = "xxh3"))]
 use core::hash::BuildHasher;
-use core::hash::Hasher;
-use core::{iter::Iterator, time};
+use core::{hash::Hasher, iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
+
+#[cfg(not(feature = "xxh3"))]
+use ahash::RandomState;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "xxh3")]
 use xxhash_rust::xxh3::xxh3_64;
-
-use serde::{Deserialize, Serialize};
 
 /// The client ID == the sender id.
 #[repr(transparent)]
