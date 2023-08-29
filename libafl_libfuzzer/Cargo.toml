@@ -9,6 +9,14 @@ keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
 categories = ["development-tools::testing", "fuzzing"]
 
+include = [
+  "/src",
+  "/Cargo.toml",
+  "/build.rs",
+  "/libafl_libfuzzer_runtime",
+  "!/libafl_libfuzzer_runtime/target"
+]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
@@ -29,7 +37,6 @@ libfuzzer-sys = { version = "0.4.7", default-features = false }
 document-features = { version = "0.2" }
 
 [package.metadata.docs.rs]
-features = ["document-features"]
 all-features = true
 
 rustdoc-args = [

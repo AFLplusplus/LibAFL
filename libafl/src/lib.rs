@@ -1,7 +1,7 @@
 /*!
 Welcome to `LibAFL`
 */
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!("../README.md")]
 /*! */
 #![doc = document_features::document_features!()]
 #![allow(incomplete_features)]
