@@ -28,7 +28,7 @@ COPY Cargo.toml README.md ./
 COPY libafl_derive/Cargo.toml libafl_derive/Cargo.toml
 COPY scripts/dummy.rs libafl_derive/src/lib.rs
 
-COPY libafl/Cargo.toml libafl/build.rs libafl/
+COPY libafl/Cargo.toml libafl/build.rs libafl/README.md libafl/
 COPY scripts/dummy.rs libafl/src/lib.rs
 
 COPY libafl_bolts/Cargo.toml libafl_bolts/build.rs libafl_bolts/README.md libafl_bolts/

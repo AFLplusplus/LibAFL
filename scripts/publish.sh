@@ -78,5 +78,5 @@ cargo publish "$@"
 cd ../.. || exit 1
 
 cd libafl_libfuzzer
-cargo publish "$@"
-cd ../.. || exit 1
+./publish.sh "$@"
+cd .. || exit 1

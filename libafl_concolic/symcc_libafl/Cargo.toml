@@ -18,8 +18,10 @@ all-features = true
 
 [features]
 default = ["build", "clone"]
-build = ["which", "cmake"] # common functionality to build symcc
-clone = ["which"] # common functionality to check out the symcc repo using git
+## common functionality to build symcc
+build = ["which", "cmake"]
+## common functionality to check out the symcc repo using git
+clone = ["which"]
 
 [dependencies]
 which = { version = "4.4", optional = true }

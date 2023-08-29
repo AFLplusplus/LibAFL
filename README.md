@@ -45,7 +45,7 @@ We highly recommend *not* to use e.g. your Linux distribition package as this is
 Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
 
 - LLVM tools  
-The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 but older than LLVM 15.0.0)
+The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 up to LLVM 17.0.0)
  - When compiling LLVM tools on Windows, you can try to compile LLVM with below commands (tested on LLVM 16.0.6).
  - NOTE: This assumes you have Visual Studio 17 2022 installed and MSVC v143 Tools installed as "Individual Components"
 ```sh

@@ -1282,17 +1282,12 @@ where
             let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
             let other = other_testcase.load_input(state.corpus())?;
 
-            let mut counter: u32 = 0;
-            loop {
-                let (f, l) = locate_diffs(input.bytes(), other.bytes());
+            let (f, l) = locate_diffs(input.bytes(), other.bytes());
 
-                if f != l && f >= 0 && l >= 2 {
-                    break (f as u64, l as u64);
-                }
-                if counter == 3 {
-                    return Ok(MutationResult::Skipped);
-                }
-                counter += 1;
+            if f != l && f >= 0 && l >= 2 {
+                (f as u64, l as u64)
+            } else {
+                return Ok(MutationResult::Skipped);
             }
         };
 
