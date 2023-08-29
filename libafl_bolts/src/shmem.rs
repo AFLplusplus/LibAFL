@@ -623,7 +623,7 @@ pub mod unix_shmem {
 
         use libc::{
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
-            perror, shm_open, shm_unlink, shmat, shmctl, shmget,
+            perror, shm_open, shm_unlink, shmat, shmctl, shmdt, shmget,
         };
 
         use crate::{
@@ -971,13 +971,15 @@ pub mod unix_shmem {
             }
         }
 
-        /// [`Drop`] implementation for [`UnixShMem`], which cleans up the mapping.
+        /// [`Drop`] implementation for [`UnixShMem`], which detaches the memory and cleans up the mapping.
         #[cfg(unix)]
         impl Drop for CommonUnixShMem {
             fn drop(&mut self) {
                 unsafe {
                     let id_int: i32 = self.id.into();
                     shmctl(id_int, libc::IPC_RMID, ptr::null_mut());
+
+                    shmdt(self.map as *mut _);
                 }
             }
         }
