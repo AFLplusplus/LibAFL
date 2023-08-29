@@ -42,6 +42,7 @@ To use launcher, first you need to write an anonymous function `let mut run_clie
 This first starts a broker, then spawns `n` clients, according to the value passed to `cores`.
 The value is a string indicating the cores to bind to, for example, `0,2,5` or `0-3`.
 For each client, `run_client` will be called.
+It will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
 On Windows, the Launcher will restart each client, while on Unix-alikes, it will use `fork`.
 
 Advanced use-cases:
