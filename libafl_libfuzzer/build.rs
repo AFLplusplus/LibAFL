@@ -37,6 +37,8 @@ fn main() {
         .env("PATH", std::env::var_os("PATH").unwrap())
         .current_dir(&lib_src);
 
+    let _ = std::fs::rename(lib_src.join("Cargo.toml.orig"), lib_src.join("Cargo.toml"));
+
     command.arg("build");
 
     let mut features = vec!["serdeany_autoreg"];
