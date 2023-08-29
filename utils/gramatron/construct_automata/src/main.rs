@@ -3,6 +3,7 @@ use std::{
     fs,
     io::{BufReader, Write},
     path::{Path, PathBuf},
+    rc::Rc,
     sync::OnceLock,
 };
 
@@ -50,7 +51,7 @@ fn read_grammar_from_file<P: AsRef<Path>>(path: P) -> Value {
 #[derive(Debug)]
 struct Element<'src> {
     pub state: usize,
-    pub items: VecDeque<&'src str>,
+    pub items: Rc<VecDeque<&'src str>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
@@ -65,7 +66,7 @@ struct Transition<'src> {
 
 #[derive(Default)]
 struct Stacks<'src> {
-    pub q: Vec<VecDeque<&'src str>>,
+    pub q: Vec<Rc<VecDeque<&'src str>>>,
     pub s: Vec<Vec<&'src str>>,
 }
 
@@ -116,10 +117,10 @@ fn prepare_transitions<'pda, 'src: 'pda>(
         let mut state_stack = state_stacks
             .q
             .get(state.wrapping_sub(1))
-            .map_or(VecDeque::new(), Clone::clone);
+            .map_or(VecDeque::new(), |state_stack| (**state_stack).clone());
 
         state_stack.pop_front();
-        for symbol in ss.iter().rev() {
+        for symbol in ss.into_iter().rev() {
             state_stack.push_front(symbol);
         }
         let mut state_stack_sorted: Vec<_> = state_stack.iter().copied().collect();
@@ -137,9 +138,9 @@ fn prepare_transitions<'pda, 'src: 'pda>(
 
         // Check if a recursive transition state being created, if so make a backward
         // edge and don't add anything to the worklist
-        for (key, val) in state_stacks.s.iter().enumerate() {
-            if state_stack_sorted == *val {
-                transition.dest = key + 1;
+        for (dest, stack) in state_stacks.s.iter().enumerate() {
+            if state_stack_sorted == *stack {
+                transition.dest = dest + 1;
                 // i += 1;
                 pda.push(transition);
 
@@ -156,10 +157,12 @@ fn prepare_transitions<'pda, 'src: 'pda>(
             continue;
         }
 
+        let state_stack = Rc::new(state_stack);
+
         // Create transitions for the non-recursive relations and add to the worklist
         worklist.push_back(Element {
             state: dest,
-            items: state_stack.clone(),
+            items: Rc::clone(&state_stack),
         });
 
         // we should just be able to use indexes as before
@@ -325,7 +328,7 @@ fn main() {
     start_vec.push_back(start_symbol);
     worklist.push_back(Element {
         state: 0,
-        items: start_vec,
+        items: Rc::new(start_vec),
     });
 
     while let Some(element) = worklist.pop_front() {
