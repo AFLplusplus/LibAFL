@@ -57,6 +57,7 @@ use crate::{
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 
 /// The env variable to set in order to enable child output
+#[cfg(feature = "fork")]
 const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
 
 /// Provides a [`Launcher`], which can be used to launch a fuzzing run on a specified list of cores
@@ -284,7 +285,8 @@ where
             Ok(core_conf) => {
                 let core_id = core_conf.parse()?;
 
-                //todo: silence stdout and stderr for clients
+                // TODO: silence stdout and stderr for clients
+                // let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
                 // the actual client. do the fuzzing
                 let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
