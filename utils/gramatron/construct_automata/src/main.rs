@@ -115,7 +115,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
         // Creating a state stack for the new state
         let mut state_stack = state_stacks
             .q
-            .get(state)
+            .get(state.wrapping_sub(1))
             .map_or(VecDeque::new(), Clone::clone);
 
         state_stack.pop_front();
@@ -139,7 +139,7 @@ fn prepare_transitions<'pda, 'src: 'pda>(
         // edge and don't add anything to the worklist
         for (key, val) in state_stacks.s.iter().enumerate() {
             if state_stack_sorted == *val {
-                transition.dest = key;
+                transition.dest = key + 1;
                 // i += 1;
                 pda.push(transition);
 
