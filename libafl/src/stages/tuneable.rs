@@ -323,10 +323,7 @@ where
     }
 
     /// Set the number of iterations to be used by the std [`TuneableMutationalStage`]
-    pub fn set_iters_std<S>(state: &mut S, iters: u64) -> Result<(), Error>
-    where
-        S: HasNamedMetadata,
-    {
+    pub fn set_iters_std(state: &mut Z::State, iters: u64) -> Result<(), Error> {
         set_iters_by_name(state, iters, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
@@ -347,10 +344,7 @@ where
     }
 
     /// Get the set iterations for the std [`TuneableMutationalStage`]
-    pub fn iters_std<S>(state: &S) -> Result<Option<u64>, Error>
-    where
-        S: HasNamedMetadata,
-    {
+    pub fn iters_std(state: &Z::State) -> Result<Option<u64>, Error> {
         get_iters_by_name(state, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
@@ -371,10 +365,7 @@ where
     }
 
     /// Set the time to mutate a single input in the std [`TuneableMutationalStage`]
-    pub fn set_seed_fuzz_time_std<S>(state: &mut S, fuzz_time: Duration) -> Result<(), Error>
-    where
-        S: HasNamedMetadata,
-    {
+    pub fn set_seed_fuzz_time_std(state: &mut Z::State, fuzz_time: Duration) -> Result<(), Error> {
         set_seed_fuzz_time_by_name(state, fuzz_time, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
@@ -399,10 +390,7 @@ where
     }
 
     /// Set the time to mutate a single input for the std [`TuneableMutationalStage`]
-    pub fn seed_fuzz_time_std<S>(&self, state: &S) -> Result<Option<Duration>, Error>
-    where
-        S: HasNamedMetadata,
-    {
+    pub fn seed_fuzz_time_std(&self, state: &Z::State) -> Result<Option<Duration>, Error> {
         get_seed_fuzz_time_by_name(state, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
@@ -427,10 +415,7 @@ where
     }
 
     /// Reset the std stage to a normal, randomized, stage
-    pub fn reset_std<S>(state: &mut S) -> Result<(), Error>
-    where
-        S: HasNamedMetadata,
-    {
+    pub fn reset_std(state: &mut Z::State) -> Result<(), Error> {
         reset_by_name(state, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
