@@ -3,7 +3,7 @@
 */
 #![doc = include_str!("../README.md")]
 /*! */
-#![doc = document_features::document_features!()]
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`

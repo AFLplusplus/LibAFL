@@ -18,7 +18,7 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 all-features = true
 
 [features]
-# skips building and linking the C++ part of the runtime
+## skips building and linking the C++ part of the runtime
 no-cpp-runtime = []
 
 [dependencies]
