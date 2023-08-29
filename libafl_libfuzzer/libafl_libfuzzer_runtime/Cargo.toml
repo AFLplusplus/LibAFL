@@ -8,7 +8,8 @@ publish = false
 
 [features]
 default = ["fork", "serdeany_autoreg"]
-fork = ["libafl/fork"] # Enables forking mode for the LibAFL launcher (instead of starting new processes)
+## Enables forking mode for the LibAFL launcher (instead of starting new processes)
+fork = ["libafl/fork"]
 
 serdeany_autoreg = [] # TODO: drop this when fixed in libafl proper
 

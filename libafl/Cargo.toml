@@ -17,6 +17,7 @@ all-features = true
 
 [features]
 default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor"]
+document-features = ["dep:document-features"]
 
 #! # Feature Flags
 #! ### General Features
@@ -117,7 +118,7 @@ llmp_small_maps = ["libafl_bolts/llmp_small_maps"] # reduces initial map size fo
 
 #! ## License-Changing Dependencies(!)
 
-## Enables features hiding dependencies licensed under `AGPL`
+## Enables all features hiding dependencies licensed under `AGPL`
 agpl = ["nautilus"]
 
 ## Enables the [`Nautilus`](https://wcventure.github.io/FuzzingPaper/Paper/NDSS19_Nautilus.pdf) Grammar Mutator (AGPL-licensed)
@@ -176,7 +177,7 @@ libcasr = { version = "2.7", optional = true}
 serial_test = { version = "2", optional = true, default-features = false, features = ["logging"] }
 
 # Document all features of this crate (for `cargo doc`)
-document-features = { version = "0.2" }
+document-features = { version = "0.2", optional = true }
 
 # AGPL
 # !!! this create requires nightly
