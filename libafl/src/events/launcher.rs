@@ -1,6 +1,6 @@
 //! The [`Launcher`] launches multiple fuzzer instances in parallel.
 //! Thanks to it, we won't need a `for` loop in a shell script...
-//! 
+//!
 //! It will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
 //!
 //! To use multiple [`Launcher`]`s` for individual configurations,
