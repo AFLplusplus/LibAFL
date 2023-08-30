@@ -204,19 +204,20 @@ pub struct Forkserver {
 
 impl Drop for Forkserver {
     fn drop(&mut self) {
-        let _ = self.fsrv_handle.kill().map_err(|err| {
+        if let Err(err) = self.fsrv_handle.kill() {
             log::warn!("Failed kill forkserver: {err}",);
-        });
+        }
         if let Some(pid) = self.child_pid {
-            let _ = kill(pid, Signal::SIGKILL).map_err(|err| {
+            if let Err(err) = kill(pid, Signal::SIGKILL) {
                 log::warn!(
                     "Failed to deliver kill signal to child process {}: {err} ({})",
                     pid,
                     io::Error::last_os_error()
                 );
-            });
-            let _ = waitpid(pid, None)
-                .map_err(|err| log::warn!("Failed to wait for child pid ({pid}): {err}",));
+            }
+            if let Err(err) = waitpid(pid, None) {
+                log::warn!("Failed to wait for child pid ({pid}): {err}",);
+            }
         }
     }
 }
@@ -486,9 +487,11 @@ where
 
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out_raw();
 
-
         if self.executor.uses_shmem_testcase() {
-            debug_assert!(self.executor.shmem_mut().is_some(), "The uses_shmem_testcase() bool can only exist when a map is set");
+            debug_assert!(
+                self.executor.shmem_mut().is_some(),
+                "The uses_shmem_testcase() bool can only exist when a map is set"
+            );
             // # SAFETY
             // Struct can never be created when uses_shmem_testcase is true and map is none.
             let map = unsafe { self.executor.shmem_mut().as_mut().unwrap_unchecked() };
@@ -698,7 +701,9 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         );
 
         if self.uses_shmem_testcase && map.is_none() {
-            return Err(Error::illegal_state("Map must always be set for `uses_shmem_testcase`"));
+            return Err(Error::illegal_state(
+                "Map must always be set for `uses_shmem_testcase`",
+            ));
         }
 
         Ok(ForkserverExecutor {
@@ -747,7 +752,9 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         let observers: (MO, OT) = other_observers.prepend(map_observer);
 
         if self.uses_shmem_testcase && map.is_none() {
-            return Err(Error::illegal_state("Map must always be set for `uses_shmem_testcase`"));
+            return Err(Error::illegal_state(
+                "Map must always be set for `uses_shmem_testcase`",
+            ));
         }
 
         Ok(ForkserverExecutor {
@@ -1157,7 +1164,10 @@ where
 
         // Write to testcase
         if self.uses_shmem_testcase {
-            debug_assert!(self.map.is_some(), "The uses_shmem_testcase bool can only exist when a map is set");
+            debug_assert!(
+                self.map.is_some(),
+                "The uses_shmem_testcase bool can only exist when a map is set"
+            );
             // # SAFETY
             // Struct can never be created when uses_shmem_testcase is true and map is none.
             let map = unsafe { self.map.as_mut().unwrap_unchecked() };
