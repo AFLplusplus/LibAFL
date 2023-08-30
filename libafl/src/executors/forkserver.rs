@@ -4,7 +4,6 @@ use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr,
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
@@ -13,7 +12,7 @@ use std::{
     io::{self, prelude::*, ErrorKind},
     os::unix::{io::RawFd, process::CommandExt},
     path::Path,
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
 };
 
 use libafl_bolts::{
@@ -28,6 +27,7 @@ use nix::{
         select::{pselect, FdSet},
         signal::{kill, SigSet, Signal},
         time::{TimeSpec, TimeValLike},
+        wait::waitpid,
     },
     unistd::Pid,
 };
@@ -151,6 +151,9 @@ impl ConfigTarget for Command {
         if memlimit == 0 {
             return self;
         }
+        // SAFETY
+        // This method does not do shady pointer foo.
+        // It merely call libc functions.
         let func = move || {
             let memlimit: libc::rlim_t = (memlimit as libc::rlim_t) << 20;
             let r = libc::rlimit {
@@ -175,6 +178,8 @@ impl ConfigTarget for Command {
             }
             Ok(())
         };
+        // # SAFETY
+        // This calls our non-shady function from above.
         unsafe { self.pre_exec(func) }
     }
 }
@@ -183,35 +188,35 @@ impl ConfigTarget for Command {
 /// The communication happens via pipe.
 #[derive(Debug)]
 pub struct Forkserver {
+    /// The "actual" forkserver we spawned in the target
+    fsrv_handle: Child,
+    /// Status pipe
     st_pipe: Pipe,
+    /// Control pipe
     ctl_pipe: Pipe,
+    /// Pid of the current forked child (child of the forkserver) during execution
     child_pid: Option<Pid>,
+    /// The last status reported to us by the in-target forkserver
     status: i32,
+    /// If the last run timed out (in in-target i32)
     last_run_timed_out: i32,
 }
 
 impl Drop for Forkserver {
     fn drop(&mut self) {
+        let _ = self.fsrv_handle.kill().map_err(|err| {
+            log::warn!("Failed kill forkserver: {err}",);
+        });
         if let Some(pid) = self.child_pid {
-            let res: Result<(), nix::errno::Errno> = kill(pid, Signal::SIGKILL);
-            if let Err(err) = res {
+            let _ = kill(pid, Signal::SIGKILL).map_err(|err| {
                 log::warn!(
                     "Failed to deliver kill signal to child process {}: {err} ({})",
                     pid,
                     io::Error::last_os_error()
                 );
-            }
-
-            unsafe {
-                let res = libc::waitpid(pid.as_raw(), ptr::null_mut(), 0);
-                if res != pid.as_raw() {
-                    log::warn!(
-                        "Failed to wait for child pid ({}) res: {}",
-                        pid,
-                        io::Error::last_os_error()
-                    )
-                }
-            }
+            });
+            let _ = waitpid(pid, None)
+                .map_err(|err| log::warn!("Failed to wait for child pid ({pid}): {err}",));
         }
     }
 }
@@ -261,7 +266,7 @@ impl Forkserver {
         #[cfg(feature = "regex")]
         command.env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path());
 
-        match command
+        let fsrv_handle = match command
             .env("LD_BIND_NOW", "1")
             .envs(envs)
             .setlimit(memlimit)
@@ -275,7 +280,7 @@ impl Forkserver {
             )
             .spawn()
         {
-            Ok(_) => (),
+            Ok(fsrv_handle) => fsrv_handle,
             Err(err) => {
                 return Err(Error::illegal_state(format!(
                     "Could not spawn the forkserver: {err:#?}"
@@ -288,6 +293,7 @@ impl Forkserver {
         st_pipe.close_write_end();
 
         Ok(Self {
+            fsrv_handle,
             st_pipe,
             ctl_pipe,
             child_pid: None,
@@ -296,15 +302,28 @@ impl Forkserver {
         })
     }
 
-    /// If the last run timed out
+    /// If the last run timed out (as in-target i32)
     #[must_use]
-    pub fn last_run_timed_out(&self) -> i32 {
+    pub fn last_run_timed_out_raw(&self) -> i32 {
         self.last_run_timed_out
     }
 
-    /// Sets if the last run timed out
-    pub fn set_last_run_timed_out(&mut self, last_run_timed_out: i32) {
+    /// If the last run timed out
+    #[must_use]
+    pub fn last_run_timed_out(&self) -> bool {
+        self.last_run_timed_out_raw() != 0
+    }
+
+    /// Sets if the last run timed out (as in-target i32)
+    #[inline]
+    pub fn set_last_run_timed_out_raw(&mut self, last_run_timed_out: i32) {
         self.last_run_timed_out = last_run_timed_out;
+    }
+
+    /// Sets if the last run timed out
+    #[inline]
+    pub fn set_last_run_timed_out(&mut self, last_run_timed_out: bool) {
+        self.last_run_timed_out = i32::from(last_run_timed_out);
     }
 
     /// The status
@@ -465,9 +484,13 @@ where
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
-        let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
+        let last_run_timed_out = self.executor.forkserver().last_run_timed_out_raw();
+
 
         if self.executor.uses_shmem_testcase() {
+            debug_assert!(self.executor.shmem_mut().is_some(), "The uses_shmem_testcase() bool can only exist when a map is set");
+            // # SAFETY
+            // Struct can never be created when uses_shmem_testcase is true and map is none.
             let map = unsafe { self.executor.shmem_mut().as_mut().unwrap_unchecked() };
             let target_bytes = input.target_bytes();
             let mut size = target_bytes.as_slice().len();
@@ -493,7 +516,7 @@ where
             .forkserver_mut()
             .write_ctl(last_run_timed_out)?;
 
-        self.executor.forkserver_mut().set_last_run_timed_out(0);
+        self.executor.forkserver_mut().set_last_run_timed_out(false);
 
         if send_len != 4 {
             return Err(Error::unknown(
@@ -535,11 +558,10 @@ where
                 }
             }
         } else {
-            self.executor.forkserver_mut().set_last_run_timed_out(1);
+            self.executor.forkserver_mut().set_last_run_timed_out(true);
 
             // We need to kill the child in case he has timed out, or we can't get the correct pid in the next call to self.executor.forkserver_mut().read_st()?
-            let _: Result<(), nix::errno::Errno> =
-                kill(self.executor.forkserver().child_pid(), self.signal);
+            let _ = kill(self.executor.forkserver().child_pid(), self.signal);
             let (recv_status_len, _) = self.executor.forkserver_mut().read_st()?;
             if recv_status_len != 4 {
                 return Err(Error::unknown("Could not kill timed-out child".to_string()));
@@ -675,6 +697,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             self.use_stdin
         );
 
+        if self.uses_shmem_testcase && map.is_none() {
+            return Err(Error::illegal_state("Map must always be set for `uses_shmem_testcase`"));
+        }
+
         Ok(ForkserverExecutor {
             target,
             args: self.arguments.clone(),
@@ -719,6 +745,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         }
 
         let observers: (MO, OT) = other_observers.prepend(map_observer);
+
+        if self.uses_shmem_testcase && map.is_none() {
+            return Err(Error::illegal_state("Map must always be set for `uses_shmem_testcase`"));
+        }
 
         Ok(ForkserverExecutor {
             target,
@@ -1127,6 +1157,9 @@ where
 
         // Write to testcase
         if self.uses_shmem_testcase {
+            debug_assert!(self.map.is_some(), "The uses_shmem_testcase bool can only exist when a map is set");
+            // # SAFETY
+            // Struct can never be created when uses_shmem_testcase is true and map is none.
             let map = unsafe { self.map.as_mut().unwrap_unchecked() };
             let target_bytes = input.target_bytes();
             let mut size = target_bytes.as_slice().len();
@@ -1150,7 +1183,7 @@ where
 
         let send_len = self
             .forkserver
-            .write_ctl(self.forkserver().last_run_timed_out())?;
+            .write_ctl(self.forkserver().last_run_timed_out_raw())?;
         if send_len != 4 {
             return Err(Error::illegal_state(
                 "Unable to request new process from fork server (OOM?)".to_string(),
