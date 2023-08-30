@@ -211,6 +211,6 @@ pub fn main() {
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
-        .fuzz_loop_for(&mut stages, &mut executor, &mut state, &mut mgr, 100)
+        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }
