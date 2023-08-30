@@ -4,12 +4,12 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use tui::{
+use ratatui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     symbols,
-    text::{Span, Spans},
+    text::{Line, Span},
     widgets::{
         Axis, Block, Borders, Cell, Chart, Dataset, List, ListItem, Paragraph, Row, Table, Tabs,
     },
@@ -117,7 +117,7 @@ impl TuiUI {
         let mut status_bar: String = self.title.clone();
         status_bar = status_bar + " (" + self.version.as_str() + ")";
 
-        let text = vec![Spans::from(Span::styled(
+        let text = vec![Line::from(Span::styled(
             &status_bar,
             Style::default()
                 .fg(Color::LightMagenta)
@@ -135,15 +135,15 @@ impl TuiUI {
             .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
             .split(top_layout[1]);
         let titles = vec![
-            Spans::from(Span::styled(
+            Line::from(Span::styled(
                 "speed",
                 Style::default().fg(Color::LightGreen),
             )),
-            Spans::from(Span::styled(
+            Line::from(Span::styled(
                 "corpus",
                 Style::default().fg(Color::LightGreen),
             )),
-            Spans::from(Span::styled(
+            Line::from(Span::styled(
                 "objectives",
                 Style::default().fg(Color::LightGreen),
             )),
