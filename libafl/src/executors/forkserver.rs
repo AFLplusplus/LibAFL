@@ -4,6 +4,7 @@ use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    ptr,
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
@@ -184,9 +185,35 @@ impl ConfigTarget for Command {
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
-    child_pid: Pid,
+    child_pid: Option<Pid>,
     status: i32,
     last_run_timed_out: i32,
+}
+
+impl Drop for Forkserver {
+    fn drop(&mut self) {
+        if let Some(pid) = self.child_pid {
+            let res: Result<(), nix::errno::Errno> = kill(pid, Signal::SIGKILL);
+            if let Err(err) = res {
+                log::warn!(
+                    "Failed to deliver kill signal to child process {}: {err} ({})",
+                    pid,
+                    io::Error::last_os_error()
+                );
+            }
+
+            unsafe {
+                let res = libc::waitpid(pid.as_raw(), ptr::null_mut(), 0);
+                if res != pid.as_raw() {
+                    log::warn!(
+                        "Failed to wait for child pid ({}) res: {}",
+                        pid,
+                        io::Error::last_os_error()
+                    )
+                }
+            }
+        }
+    }
 }
 
 #[allow(clippy::fn_params_excessive_bools)]
@@ -263,7 +290,7 @@ impl Forkserver {
         Ok(Self {
             st_pipe,
             ctl_pipe,
-            child_pid: Pid::from_raw(0),
+            child_pid: None,
             status: 0,
             last_run_timed_out: 0,
         })
@@ -294,12 +321,17 @@ impl Forkserver {
     /// The child pid
     #[must_use]
     pub fn child_pid(&self) -> Pid {
-        self.child_pid
+        self.child_pid.unwrap()
     }
 
     /// Set the child pid
     pub fn set_child_pid(&mut self, child_pid: Pid) {
-        self.child_pid = child_pid;
+        self.child_pid = Some(child_pid);
+    }
+
+    /// Remove the child pid.
+    pub fn reset_child_pid(&mut self) {
+        self.child_pid = None;
     }
 
     /// Read from the st pipe
@@ -515,9 +547,7 @@ where
             exit_kind = ExitKind::Timeout;
         }
 
-        self.executor
-            .forkserver_mut()
-            .set_child_pid(Pid::from_raw(0));
+        self.executor.forkserver_mut().reset_child_pid();
 
         Ok(exit_kind)
     }
@@ -1170,7 +1200,7 @@ where
             }
         }
 
-        self.forkserver.set_child_pid(Pid::from_raw(0));
+        self.forkserver.reset_child_pid();
 
         // Clear the observer map after the execution is finished
         compiler_fence(Ordering::SeqCst);
