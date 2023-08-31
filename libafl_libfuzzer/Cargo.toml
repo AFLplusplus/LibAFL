@@ -30,7 +30,9 @@ rustversion = "1.0"
 arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
 ## Enables fuzzer introspection with LibAFL's `introspection` feature
 introspection = []
-## Embeds the built libafl_libfuzzer_runtime library into the crate with include_bytes!
+## Embeds the built libafl_libfuzzer_runtime library into the crate with include_bytes! for use
+## in downstream cases like libafl_cc linking the runtime with:
+## `-fsanitize=fuzzer-no-link -l:libafl_libfuzzer_runtime.a`
 embed-runtime = []
 
 [dependencies]
