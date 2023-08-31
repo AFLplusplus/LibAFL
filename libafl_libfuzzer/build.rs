@@ -70,6 +70,16 @@ fn main() {
     let mut lib_path = custom_lib_dir.join(std::env::var_os("TARGET").unwrap());
     lib_path.push("release");
 
+    #[cfg(all(feature = "embed-runtime", target_family = "unix"))]
+    {
+        // NOTE: lib, .a are added always on unix-like systems as described in:
+        // https://gist.github.com/novafacing/1389cbb2f0a362d7eb103e67b4468e2b
+        println!(
+            "cargo:rustc-env=LIBAFL_LIBFUZZER_RUNTIME_PATH={}",
+            lib_path.join("libafl_libfuzzer_runtime.a").display()
+        );
+    }
+
     println!(
         "cargo:rustc-link-search=native={}",
         lib_path.to_str().unwrap()

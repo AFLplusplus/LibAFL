@@ -14,7 +14,7 @@ include = [
   "/Cargo.toml",
   "/build.rs",
   "/libafl_libfuzzer_runtime",
-  "!/libafl_libfuzzer_runtime/target"
+  "!/libafl_libfuzzer_runtime/target",
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -30,6 +30,8 @@ rustversion = "1.0"
 arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
 ## Enables fuzzer introspection with LibAFL's `introspection` feature
 introspection = []
+## Embeds the built libafl_libfuzzer_runtime library into the crate with include_bytes!
+embed-runtime = []
 
 [dependencies]
 libfuzzer-sys = { version = "0.4.7", default-features = false }
@@ -39,6 +41,4 @@ document-features = { version = "0.2" }
 features = ["document-features"]
 all-features = true
 
-rustdoc-args = [
-    "--cfg", "docsrs",
-]
+rustdoc-args = ["--cfg", "docsrs"]
