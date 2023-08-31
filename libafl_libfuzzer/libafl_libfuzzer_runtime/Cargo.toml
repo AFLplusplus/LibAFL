@@ -1,17 +1,15 @@
 [package]
 name = "libafl_libfuzzer_runtime"
-version = "0.1.0"
+version = "0.11.1"
 edition = "2021"
 publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["fork", "serdeany_autoreg"]
+default = ["fork"]
 ## Enables forking mode for the LibAFL launcher (instead of starting new processes)
 fork = ["libafl/fork"]
-
-serdeany_autoreg = [] # TODO: drop this when fixed in libafl proper
 
 [profile.release]
 lto = true

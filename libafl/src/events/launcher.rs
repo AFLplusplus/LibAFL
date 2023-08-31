@@ -1,6 +1,8 @@
 //! The [`Launcher`] launches multiple fuzzer instances in parallel.
 //! Thanks to it, we won't need a `for` loop in a shell script...
 //!
+//! It will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
+//!
 //! To use multiple [`Launcher`]`s` for individual configurations,
 //! we can set `spawn_broker` to `false` on all but one.
 //!
@@ -54,7 +56,13 @@ use crate::{
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 
-/// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
+/// The env variable to set in order to enable child output
+#[cfg(all(feature = "fork", unix))]
+const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
+
+/// Provides a [`Launcher`], which can be used to launch a fuzzing run on a specified list of cores
+///
+/// Will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
 #[cfg(feature = "std")]
 #[allow(
     clippy::type_complexity,
@@ -168,7 +176,7 @@ where
             .map(|filename| File::create(filename).unwrap());
 
         #[cfg(feature = "std")]
-        let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
+        let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
         // Spawn clients
         let mut index = 0_u64;
@@ -277,7 +285,8 @@ where
             Ok(core_conf) => {
                 let core_id = core_conf.parse()?;
 
-                //todo: silence stdout and stderr for clients
+                // TODO: silence stdout and stderr for clients
+                // let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
                 // the actual client. do the fuzzing
                 let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
@@ -493,7 +502,7 @@ where
             .stderr_file
             .map(|filename| File::create(filename).unwrap());
 
-        let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
+        let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
         // Spawn centralized broker
         self.shmem_provider.pre_fork()?;

@@ -16,7 +16,7 @@ features = ["document-features"]
 all-features = true
 
 [features]
-default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor"]
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor", "libafl_bolts/xxh3"]
 document-features = ["dep:document-features"]
 
 #! # Feature Flags
@@ -74,7 +74,7 @@ prometheus_monitor = ["std", "async-std", "prometheus-client", "tide", "futures"
 concolic_mutation = ["z3"]
 
 ## Enable the fancy TuiMonitor for a termanal UI using crossterm
-tui_monitor = ["tui", "crossterm"]
+tui_monitor = ["ratatui", "crossterm"]
 
 
 #! ## LibAFL-Bolts Features
@@ -133,8 +133,8 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 bytecount = "0.6.3"
 
 [dependencies]
-libafl_bolts = { version = "0.11.0", path = "../libafl_bolts", default-features = false, features = ["alloc"] }
-libafl_derive = { version = "0.11.0", path = "../libafl_derive", optional = true }
+libafl_bolts = { version = "0.11.1", path = "../libafl_bolts", default-features = false, features = ["alloc"] }
+libafl_derive = { version = "0.11.1", path = "../libafl_derive", optional = true }
 
 rustversion = "1.0"
 tuple_list = { version = "0.1.3" }
@@ -154,8 +154,8 @@ nix = { version = "0.26", optional = true }
 regex = { version = "1", optional = true }
 uuid = { version = "1.4", optional = true, features = ["serde", "v4"] }
 libm = "0.2.2"
-tui = { version = "0.19", default-features = false, features = ['crossterm'], optional = true } # Commandline rendering, for TUI Monitor
-crossterm = { version = "0.25", optional = true }
+ratatui = { version = "0.23.0", default-features = false, features = ['crossterm'], optional = true } # Commandline rendering, for TUI Monitor
+crossterm = { version = "0.27.0", optional = true }
 
 prometheus-client = { version= "0.19", optional = true} # For the prometheus monitor
 tide = { version = "0.16.0", optional = true }

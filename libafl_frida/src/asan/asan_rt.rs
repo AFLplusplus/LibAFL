@@ -1672,13 +1672,12 @@ impl AsanRuntime {
         );
 
         let blob = ops.finalize().unwrap();
-        let mut map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE;
 
         // apple aarch64 requires MAP_JIT to allocates WX pages
-        #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-        {
-            map_flags |= MapFlags::MAP_JIT;
-        }
+        #[cfg(target_vendor = "apple")]
+        let map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE | MapFlags::MAP_JIT;
+        #[cfg(not(target_vendor = "apple"))]
+        let map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE;
 
         unsafe {
             let mapping = mmap(

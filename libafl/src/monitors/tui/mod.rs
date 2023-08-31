@@ -1,4 +1,4 @@
-//! Monitor based on tui-rs
+//! Monitor based on ratatui
 
 use alloc::boxed::Box;
 use std::{
@@ -21,7 +21,7 @@ use crossterm::{
 };
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
-use tui::{backend::CrosstermBackend, Terminal};
+use ratatui::{backend::CrosstermBackend, Terminal};
 
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
@@ -230,7 +230,7 @@ impl TuiContext {
     }
 }
 
-/// Tracking monitor during fuzzing and display with tui-rs.
+/// Tracking monitor during fuzzing and display with ratatui
 #[derive(Debug, Clone)]
 pub struct TuiMonitor {
     pub(crate) context: Arc<RwLock<TuiContext>>,
