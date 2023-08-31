@@ -201,8 +201,8 @@ pub fn merge(
         let loaded_dirs = options
             .dirs()
             .iter()
+            .filter(|&dir| state.corpus().dir_path() != dir)
             .cloned()
-            .filter(|dir| state.corpus().dir_path() != dir)
             .collect::<Vec<_>>();
         // Load from disk
         state
