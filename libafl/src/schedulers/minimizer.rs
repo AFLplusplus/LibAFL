@@ -23,12 +23,20 @@ pub const DEFAULT_SKIP_NON_FAVORED_PROB: u64 = 95;
 
 /// A testcase metadata saying if a testcase is favored
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct IsFavoredMetadata {}
 
 libafl_bolts::impl_serdeany!(IsFavoredMetadata);
 
 /// A state metadata holding a map of favoreds testcases for each map entry
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct TopRatedsMetadata {
     /// map index -> corpus index
     pub map: HashMap<usize, CorpusId>,
@@ -93,7 +101,7 @@ where
         self.update_score(state, idx)
     }
 
-    /// Removes an entry from the corpus, returning M if M was present.
+    /// Removes an entry from the corpus
     fn on_remove(
         &mut self,
         state: &mut CS::State,
@@ -244,7 +252,7 @@ where
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
-    /// Update the `Corpus` score using the `MinimizerScheduler`
+    /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_score(&self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
@@ -319,7 +327,7 @@ where
         Ok(())
     }
 
-    /// Cull the `Corpus` using the `MinimizerScheduler`
+    /// Cull the [`Corpus`] using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
     pub fn cull(&self, state: &CS::State) -> Result<(), Error> {
         let Some(top_rated) = state.metadata_map().get::<TopRatedsMetadata>() else {

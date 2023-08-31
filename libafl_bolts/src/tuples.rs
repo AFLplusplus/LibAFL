@@ -8,8 +8,9 @@ use core::{
 };
 
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
-use xxhash_rust::xxh3::xxh3_64;
 
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+use crate::hash_std;
 use crate::Named;
 
 /// Returns if the type `T` is equal to `U`
@@ -87,7 +88,7 @@ pub trait HasNameId {
 
     /// Gets the `name_id` for this entry
     fn name_id(&self) -> u64 {
-        xxh3_64(self.const_name().as_bytes())
+        hash_std(self.const_name().as_bytes())
     }
 }
 

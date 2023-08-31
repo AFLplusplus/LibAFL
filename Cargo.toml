@@ -10,6 +10,7 @@ members = [
     "libafl_concolic/test/runtime_test",
     "libafl_derive",
     "libafl_frida",
+    "libafl_libfuzzer",
     "libafl_nyx",
     "libafl_qemu",
     "libafl_sugar",
@@ -36,11 +37,10 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.10.1"
+version = "0.11.1"
 
 [profile.release]
 lto = true
 codegen-units = 1
 opt-level = 3
 debug = true
-

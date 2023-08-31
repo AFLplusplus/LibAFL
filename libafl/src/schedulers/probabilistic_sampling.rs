@@ -27,6 +27,10 @@ where
 
 /// A state metadata holding a map of probability of corpus elements.
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct ProbabilityMetadata {
     /// corpus index -> probability
     pub map: HashMap<CorpusId, f64>,
@@ -187,6 +191,11 @@ mod tests {
 
     #[test]
     fn test_prob_sampling() {
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            super::ProbabilityMetadata::register();
+        }
+
         // the first 3 probabilities will be .69, .86, .44
         let rand = StdRand::with_seed(12);
 

@@ -260,6 +260,9 @@ pub struct StdState<I, C, R, SC> {
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
+    #[cfg(feature = "std")]
+    /// Remaining initial inputs to load, if any
+    dont_reenter: Option<Vec<PathBuf>>,
     /// The last time we reported progress (if available/used).
     /// This information is used by fuzzer `maybe_report_progress`.
     last_report_time: Option<Duration>,
@@ -458,30 +461,48 @@ where
     }
 
     /// List initial inputs from a directory.
-    fn visit_initial_directory(files: &mut Vec<PathBuf>, in_dir: &Path) -> Result<(), Error> {
-        for entry in fs::read_dir(in_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.file_name().unwrap().to_string_lossy().starts_with('.') {
-                continue;
-            }
+    fn next_file(&mut self) -> Result<PathBuf, Error> {
+        loop {
+            if let Some(path) = self.remaining_initial_files.as_mut().and_then(Vec::pop) {
+                let filename = path.file_name().unwrap().to_string_lossy();
+                if filename.starts_with('.')
+                // || filename
+                //     .rsplit_once('-')
+                //     .map_or(false, |(_, s)| u64::from_str(s).is_ok())
+                {
+                    continue;
+                }
 
-            let attributes = fs::metadata(&path);
+                let attributes = fs::metadata(&path);
 
-            if attributes.is_err() {
-                continue;
-            }
+                if attributes.is_err() {
+                    continue;
+                }
 
-            let attr = attributes?;
+                let attr = attributes?;
 
-            if attr.is_file() && attr.len() > 0 {
-                files.push(path);
-            } else if attr.is_dir() {
-                Self::visit_initial_directory(files, &path)?;
+                if attr.is_file() && attr.len() > 0 {
+                    return Ok(path);
+                } else if attr.is_dir() {
+                    let files = self.remaining_initial_files.as_mut().unwrap();
+                    path.read_dir()?
+                        .try_for_each(|entry| entry.map(|e| files.push(e.path())))?;
+                } else if attr.is_symlink() {
+                    let path = fs::canonicalize(path)?;
+                    let dont_reenter = self.dont_reenter.get_or_insert_with(Default::default);
+                    if dont_reenter.iter().any(|p| path.starts_with(p)) {
+                        continue;
+                    }
+                    if path.is_dir() {
+                        dont_reenter.push(path.clone());
+                    }
+                    let files = self.remaining_initial_files.as_mut().unwrap();
+                    files.push(path);
+                }
+            } else {
+                return Err(Error::iterator_end("No remaining files to load."));
             }
         }
-
-        Ok(())
     }
 
     /// Loads initial inputs from the passed-in `in_dirs`.
@@ -506,11 +527,13 @@ where
                 return Ok(());
             }
         } else {
-            let mut files = vec![];
-            for in_dir in in_dirs {
-                Self::visit_initial_directory(&mut files, in_dir)?;
-            }
-
+            let files = in_dirs.iter().try_fold(Vec::new(), |mut res, file| {
+                file.canonicalize().map(|canonicalized| {
+                    res.push(canonicalized);
+                    res
+                })
+            })?;
+            self.dont_reenter = Some(files.clone());
             self.remaining_initial_files = Some(files);
         }
 
@@ -562,20 +585,22 @@ where
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
-        if self.remaining_initial_files.is_none() {
-            return Err(Error::illegal_state("No initial files were loaded, cannot continue loading. Call a `load_initial_input` fn first!"));
-        }
-
-        while let Some(path) = self.remaining_initial_files.as_mut().unwrap().pop() {
-            log::info!("Loading file {:?} ...", &path);
-            let input = loader(fuzzer, self, &path)?;
-            if forced {
-                let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
-            } else {
-                let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
-                if res == ExecuteInputResult::None {
-                    log::warn!("File {:?} was not interesting, skipped.", &path);
+        loop {
+            match self.next_file() {
+                Ok(path) => {
+                    log::info!("Loading file {:?} ...", &path);
+                    let input = loader(fuzzer, self, &path)?;
+                    if forced {
+                        let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
+                    } else {
+                        let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+                        if res == ExecuteInputResult::None {
+                            log::warn!("File {:?} was not interesting, skipped.", &path);
+                        }
+                    }
                 }
+                Err(Error::IteratorEnd(_, _)) => break,
+                Err(e) => return Err(e),
             }
         }
 
@@ -797,6 +822,8 @@ where
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "std")]
             remaining_initial_files: None,
+            #[cfg(feature = "std")]
+            dont_reenter: None,
             last_report_time: None,
             phantom: PhantomData,
         };

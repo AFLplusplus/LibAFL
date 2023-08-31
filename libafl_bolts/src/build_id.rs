@@ -12,6 +12,8 @@ use std::{
 
 use uuid::Uuid;
 
+use crate::hasher_std;
+
 static BUILD_ID: OnceLock<Uuid> = OnceLock::new();
 
 /// Returns a [Uuid] uniquely representing the build of the current binary.
@@ -81,15 +83,16 @@ fn from_type_id<H: Hasher>(mut hasher: H) -> H {
 }
 
 fn calculate() -> Uuid {
-    let hasher = xxhash_rust::xxh3::Xxh3::with_seed(0);
+    let hasher = hasher_std();
 
     let hasher = from_exe(hasher.clone()).unwrap_or(hasher);
     let mut hasher = from_type_id(hasher);
 
     let mut bytes = [0; 16];
-    <byteorder::NativeEndian as byteorder::ByteOrder>::write_u64(&mut bytes[..8], hasher.finish());
+    bytes[..8].copy_from_slice(&hasher.finish().to_ne_bytes());
+
     hasher.write_u8(0);
-    <byteorder::NativeEndian as byteorder::ByteOrder>::write_u64(&mut bytes[8..], hasher.finish());
+    bytes[8..].copy_from_slice(&hasher.finish().to_ne_bytes());
 
     *uuid::Builder::from_bytes(bytes)
         .set_variant(uuid::Variant::RFC4122)

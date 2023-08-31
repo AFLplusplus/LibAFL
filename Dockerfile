@@ -28,7 +28,7 @@ COPY Cargo.toml README.md ./
 COPY libafl_derive/Cargo.toml libafl_derive/Cargo.toml
 COPY scripts/dummy.rs libafl_derive/src/lib.rs
 
-COPY libafl/Cargo.toml libafl/build.rs libafl/
+COPY libafl/Cargo.toml libafl/build.rs libafl/README.md libafl/
 COPY scripts/dummy.rs libafl/src/lib.rs
 
 COPY libafl_bolts/Cargo.toml libafl_bolts/build.rs libafl_bolts/README.md libafl_bolts/
@@ -78,6 +78,10 @@ COPY scripts/dummy.rs libafl_nyx/src/lib.rs
 COPY libafl_tinyinst/Cargo.toml libafl_tinyinst/
 COPY scripts/dummy.rs libafl_tinyinst/src/lib.rs
 
+# avoid pulling in the runtime, as this is quite an expensive build, until later
+COPY libafl_libfuzzer/Cargo.toml libafl_libfuzzer/
+COPY scripts/dummy.rs libafl_libfuzzer/src/lib.rs
+
 COPY utils utils
 
 RUN cargo build && cargo build --release
@@ -117,6 +121,10 @@ COPY libafl_concolic/symcc_runtime libafl_concolic/symcc_runtime
 COPY libafl_concolic/test libafl_concolic/test
 COPY libafl_nyx/src libafl_nyx/src
 RUN touch libafl_nyx/src/lib.rs
+COPY libafl_libfuzzer/src libafl_libfuzzer/src
+COPY libafl_libfuzzer/libafl_libfuzzer_runtime libafl_libfuzzer/libafl_libfuzzer_runtime
+COPY libafl_libfuzzer/build.rs libafl_libfuzzer/build.rs
+RUN touch libafl_libfuzzer/src/lib.rs
 RUN cargo build && cargo build --release
 
 # Copy fuzzers over

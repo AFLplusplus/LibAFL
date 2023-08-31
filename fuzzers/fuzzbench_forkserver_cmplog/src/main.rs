@@ -22,7 +22,7 @@ use libafl::{
         StdMOptMutator, Tokens,
     },
     observers::{
-        AFLppCmpMap, AFLppForkserverCmpObserver, HitcountsMapObserver, StdMapObserver, TimeObserver,
+        AFLppCmpMap, AFLppCmpObserver, HitcountsMapObserver, StdMapObserver, TimeObserver,
     },
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
@@ -350,7 +350,7 @@ fn fuzz(
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
         let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpMap>() };
 
-        let cmplog_observer = AFLppForkserverCmpObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AFLppCmpObserver::new("cmplog", cmpmap, true);
 
         let cmplog_forkserver = ForkserverExecutor::builder()
             .program(exec)

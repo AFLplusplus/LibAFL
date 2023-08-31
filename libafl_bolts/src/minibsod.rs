@@ -631,6 +631,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 }
 
 #[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
+#[allow(clippy::cast_ptr_alignment)]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     let mut s: usize = 0;
     #[cfg(target_os = "freebsd")]
@@ -641,7 +642,9 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
         libc::VM_PROC,
         libc::VM_PROC_MAP,
         -1,
-        std::mem::size_of::<libc::kinfo_vmentry>() as i32,
+        std::mem::size_of::<libc::kinfo_vmentry>()
+            .try_into()
+            .expect("Invalid libc::kinfo_vmentry size"),
     ];
     let mib = arr.as_ptr();
     let miblen = arr.len() as u32;
@@ -667,7 +670,10 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
                 while start < end {
                     let entry = start as *mut u8 as *mut libc::kinfo_vmentry;
                     #[cfg(target_os = "freebsd")]
-                    let sz = (*entry).kve_structsize as usize;
+                    let sz: usize = (*entry)
+                        .kve_structsize
+                        .try_into()
+                        .expect("invalid kve_structsize value");
                     #[cfg(target_os = "netbsd")]
                     let sz = std::mem::size_of::<libc::kinfo_vmentry>();
                     if sz == 0 {
@@ -680,9 +686,9 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
                         (*entry).kve_end,
                         (*entry).kve_path
                     );
-                    writer.write(&i.into_bytes())?;
+                    writer.write_all(&i.into_bytes())?;
 
-                    start = start + sz;
+                    start += sz;
                 }
             }
         } else {
@@ -733,7 +739,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
                 }
                 // OpenBSD's vm mappings have no knowledge of their paths on disk
                 let i = format!("{}-{}\n", entry.kve_start, entry.kve_end);
-                writer.write(&i.into_bytes())?;
+                writer.write_all(&i.into_bytes())?;
                 entry.kve_start = entry.kve_start + 1;
             }
         }

@@ -26,8 +26,8 @@ use windows::Win32::{
     Foundation::FILETIME,
     System::Threading::{
         CreateThreadpoolTimer, EnterCriticalSection, InitializeCriticalSection,
-        LeaveCriticalSection, SetThreadpoolTimer, RTL_CRITICAL_SECTION, TP_CALLBACK_ENVIRON_V3,
-        TP_CALLBACK_INSTANCE, TP_TIMER,
+        LeaveCriticalSection, SetThreadpoolTimer, CRITICAL_SECTION, PTP_CALLBACK_INSTANCE,
+        PTP_TIMER, TP_CALLBACK_ENVIRON_V3,
     },
 };
 
@@ -92,9 +92,9 @@ pub struct TimeoutExecutor<E> {
     #[cfg(windows)]
     milli_sec: i64,
     #[cfg(windows)]
-    tp_timer: *mut TP_TIMER,
+    ptp_timer: PTP_TIMER,
     #[cfg(windows)]
-    critical: RTL_CRITICAL_SECTION,
+    critical: CRITICAL_SECTION,
 
     exec_tmout: Duration,
 
@@ -148,9 +148,9 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
 #[cfg(windows)]
 #[allow(non_camel_case_types)]
 type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
-    param0: *mut TP_CALLBACK_INSTANCE,
+    param0: PTP_CALLBACK_INSTANCE,
     param1: *mut c_void,
-    param2: *mut TP_TIMER,
+    param2: PTP_TIMER,
 );
 
 #[cfg(target_os = "linux")]
@@ -326,14 +326,15 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         let milli_sec = exec_tmout.as_millis() as i64;
         let timeout_handler: PTP_TIMER_CALLBACK =
             unsafe { std::mem::transmute(executor.inprocess_handlers().timeout_handler) };
-        let tp_timer = unsafe {
+        let ptp_timer = unsafe {
             CreateThreadpoolTimer(
                 Some(timeout_handler),
                 Some(addr_of_mut!(GLOBAL_STATE) as *mut c_void),
                 Some(&TP_CALLBACK_ENVIRON_V3::default()),
             )
-        };
-        let mut critical = RTL_CRITICAL_SECTION::default();
+        }
+        .expect("CreateThreadpoolTimer failed!");
+        let mut critical = CRITICAL_SECTION::default();
 
         unsafe {
             InitializeCriticalSection(&mut critical);
@@ -342,7 +343,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         Self {
             executor,
             milli_sec,
-            tp_timer,
+            ptp_timer,
             critical,
             exec_tmout,
             batch_mode: false,
@@ -394,7 +395,7 @@ where
                 self as *mut _ as *mut c_void,
             );
 
-            write_volatile(&mut data.tp_timer, self.tp_timer as *mut _ as *mut c_void);
+            write_volatile(&mut data.ptp_timer, Some(self.ptp_timer));
             write_volatile(
                 &mut data.critical,
                 addr_of_mut!(self.critical) as *mut c_void,
@@ -417,7 +418,7 @@ where
             LeaveCriticalSection(&mut self.critical);
             compiler_fence(Ordering::SeqCst);
 
-            SetThreadpoolTimer(self.tp_timer, Some(&ft), 0, 0);
+            SetThreadpoolTimer(self.ptp_timer, Some(&ft), 0, 0);
 
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
 
@@ -442,7 +443,7 @@ where
     /// Will dereference the given `tp_timer` pointer, unchecked.
     fn post_run_reset(&mut self) {
         unsafe {
-            SetThreadpoolTimer(self.tp_timer, None, 0, 0);
+            SetThreadpoolTimer(self.ptp_timer, None, 0, 0);
         }
         self.executor.post_run_reset();
     }

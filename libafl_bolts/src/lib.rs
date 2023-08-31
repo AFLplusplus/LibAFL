@@ -1,9 +1,9 @@
-#![doc = include_str!("../README.md")]
-
 /*!
-Welcome to `LibAFL`
+* Welcome to `LibAFL_bolts`
 */
-
+#![doc = include_str!("../README.md")]
+/*! */
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`
@@ -75,6 +75,21 @@ Welcome to `LibAFL`
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
 
+/// We need some sort of "[`String`]" for errors in `no_alloc`...
+/// We can only support `'static` without allocator, so let's do that.
+#[cfg(not(feature = "alloc"))]
+type String = &'static str;
+
+/// We also need a non-allocating format...
+/// This one simply returns the `fmt` string.
+/// Good enough for simple errors, for anything else, use the `alloc` feature.
+#[cfg(not(feature = "alloc"))]
+macro_rules! format {
+    ($fmt:literal) => {{
+        $fmt
+    }};
+}
+
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate std;
@@ -85,6 +100,67 @@ pub extern crate alloc;
 #[cfg(feature = "ctor")]
 #[doc(hidden)]
 pub use ctor::ctor;
+#[cfg(feature = "alloc")]
+pub mod anymap;
+#[cfg(feature = "std")]
+pub mod build_id;
+#[cfg(all(
+    any(feature = "cli", feature = "frida_cli", feature = "qemu_cli"),
+    feature = "std"
+))]
+pub mod cli;
+#[cfg(feature = "gzip")]
+pub mod compress;
+#[cfg(feature = "std")]
+pub mod core_affinity;
+pub mod cpu;
+#[cfg(feature = "std")]
+pub mod fs;
+#[cfg(feature = "alloc")]
+pub mod llmp;
+pub mod math;
+#[cfg(all(feature = "std", unix))]
+pub mod minibsod;
+pub mod os;
+#[cfg(feature = "alloc")]
+pub mod ownedref;
+pub mod rands;
+#[cfg(feature = "alloc")]
+pub mod serdeany;
+pub mod shmem;
+#[cfg(feature = "std")]
+pub mod staterestore;
+// TODO: reenable once ahash works in no-alloc
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+pub mod tuples;
+
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+#[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
+use core::hash::BuildHasher;
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+use core::hash::Hasher;
+use core::{iter::Iterator, time};
+#[cfg(feature = "std")]
+use std::time::{SystemTime, UNIX_EPOCH};
+
+// There's a bug in ahash that doesn't let it build in `alloc` without once_cell right now.
+// TODO: re-enable once <https://github.com/tkaitchuck/aHash/issues/155> is resolved.
+#[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
+use ahash::RandomState;
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "xxh3")]
+use xxhash_rust::xxh3::xxh3_64;
+
+/// The client ID == the sender id.
+#[repr(transparent)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
+pub struct ClientId(pub u32);
+
+#[cfg(feature = "std")]
+use log::{Metadata, Record};
 
 #[deprecated(
     since = "0.11.0",
@@ -111,21 +187,6 @@ use std::{env::VarError, io};
 
 #[cfg(feature = "libafl_derive")]
 pub use libafl_derive::SerdeAny;
-
-/// We need some sort of "[`String`]" for errors in `no_alloc`...
-/// We can only support `'static` without allocator, so let's do that.
-#[cfg(not(feature = "alloc"))]
-type String = &'static str;
-
-/// We also need a non-allocating format...
-/// This one simply returns the `fmt` string.
-/// Good enough for simple errors, for anything else, use the `alloc` feature.
-#[cfg(not(feature = "alloc"))]
-macro_rules! format {
-    ($fmt:literal) => {{
-        $fmt
-    }};
-}
 
 /// We need fixed names for many parts of this lib.
 pub trait Named {
@@ -160,13 +221,41 @@ fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fm
     fmt::Result::Ok(())
 }
 
+/// Returns the hasher for the input with a given hash, depending on features:
+/// [`xxh3_64`](https://docs.rs/xxhash-rust/latest/xxhash_rust/xxh3/fn.xxh3_64.html)
+/// if the `xxh3` feature is used, /// else [`ahash`](https://docs.rs/ahash/latest/ahash/).
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+#[must_use]
+pub fn hasher_std() -> impl Hasher + Clone {
+    #[cfg(feature = "xxh3")]
+    return xxhash_rust::xxh3::Xxh3::new();
+    #[cfg(not(feature = "xxh3"))]
+    RandomState::with_seeds(0, 0, 0, 0).build_hasher()
+}
+
+/// Hashes the input with a given hash, depending on features:
+/// [`xxh3_64`](https://docs.rs/xxhash-rust/latest/xxhash_rust/xxh3/fn.xxh3_64.html)
+/// if the `xxh3` feature is used, /// else [`ahash`](https://docs.rs/ahash/latest/ahash/).
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+#[must_use]
+pub fn hash_std(input: &[u8]) -> u64 {
+    #[cfg(feature = "xxh3")]
+    return xxh3_64(input);
+    #[cfg(not(feature = "xxh3"))]
+    {
+        let mut hasher = hasher_std();
+        hasher.write(input);
+        hasher.finish()
+    }
+}
+
 /// Main error struct for `LibAFL`
 #[derive(Debug)]
 pub enum Error {
     /// Serialization error
     Serialize(String, ErrorBacktrace),
     /// Compression error
-    #[cfg(feature = "llmp_compression")]
+    #[cfg(feature = "gzip")]
     Compression(ErrorBacktrace),
     /// File related error
     #[cfg(feature = "std")]
@@ -202,7 +291,7 @@ impl Error {
     {
         Error::Serialize(arg.into(), ErrorBacktrace::new())
     }
-    #[cfg(feature = "llmp_compression")]
+    #[cfg(feature = "gzip")]
     /// Compression error
     #[must_use]
     pub fn compression() -> Self {
@@ -300,7 +389,7 @@ impl Display for Error {
                 write!(f, "Error in Serialization: `{0}`", &s)?;
                 display_error_backtrace(f, b)
             }
-            #[cfg(feature = "llmp_compression")]
+            #[cfg(feature = "gzip")]
             Self::Compression(b) => {
                 write!(f, "Error in decompression")?;
                 display_error_backtrace(f, b)
@@ -467,55 +556,6 @@ pub unsafe extern "C" fn external_current_millis() -> u64 {
     1000
 }
 
-#[cfg(feature = "alloc")]
-pub mod anymap;
-#[cfg(feature = "std")]
-pub mod build_id;
-#[cfg(all(
-    any(feature = "cli", feature = "frida_cli", feature = "qemu_cli"),
-    feature = "std"
-))]
-pub mod cli;
-#[cfg(feature = "llmp_compression")]
-pub mod compress;
-#[cfg(feature = "std")]
-pub mod core_affinity;
-pub mod cpu;
-#[cfg(feature = "std")]
-pub mod fs;
-#[cfg(feature = "alloc")]
-pub mod llmp;
-#[cfg(all(feature = "std", unix))]
-pub mod minibsod;
-pub mod os;
-#[cfg(feature = "alloc")]
-pub mod ownedref;
-pub mod rands;
-#[cfg(feature = "alloc")]
-pub mod serdeany;
-pub mod shmem;
-#[cfg(feature = "std")]
-pub mod staterestore;
-pub mod tuples;
-
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
-use core::{iter::Iterator, ops::AddAssign, time};
-#[cfg(feature = "std")]
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use serde::{Deserialize, Serialize};
-
-/// The client ID == the sender id.
-#[repr(transparent)]
-#[derive(
-    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
-)]
-pub struct ClientId(pub u32);
-
-#[cfg(feature = "std")]
-use log::{Metadata, Record};
-
 /// Can be converted to a slice
 pub trait AsSlice {
     /// Type of the entries in this slice
@@ -656,23 +696,6 @@ pub fn current_time() -> time::Duration {
     time::Duration::from_millis(millis)
 }
 
-/// Given a u64 number, return a hashed number using this mixing function
-/// This function is used to hash an address into a more random number (used in `libafl_frida`).
-/// Mixing function: <http://mostlymangling.blogspot.com/2018/07/on-mixing-functions-in-fast-splittable.html>
-#[inline]
-#[must_use]
-pub fn xxh3_rrmxmx_mixer(v: u64) -> u64 {
-    let tmp = (v >> 32) + ((v & 0xffffffff) << 32);
-    let bitflip = 0x1cad21f72c81017c ^ 0xdb979082e96dd4de;
-    let mut h64 = tmp ^ bitflip;
-    h64 = h64.rotate_left(49) & h64.rotate_left(24);
-    h64 = h64.wrapping_mul(0x9FB21C651E98DF25);
-    h64 ^= (h64 >> 35) + 8;
-    h64 = h64.wrapping_mul(0x9FB21C651E98DF25);
-    h64 ^= h64 >> 28;
-    h64
-}
-
 /// Gets current nanoseconds since [`UNIX_EPOCH`]
 #[must_use]
 #[inline]
@@ -693,30 +716,6 @@ pub fn current_milliseconds() -> u64 {
 pub fn format_duration_hms(duration: &time::Duration) -> String {
     let secs = duration.as_secs();
     format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
-}
-
-/// Calculates the cumulative sum for a slice, in-place.
-/// The values are useful for example for cumulative probabilities.
-///
-/// So, to give an example:
-/// ```rust
-/// # extern crate libafl_bolts;
-/// use libafl_bolts::calculate_cumulative_sum_in_place;
-///
-/// let mut value = [2, 4, 1, 3];
-/// calculate_cumulative_sum_in_place(&mut value);
-/// assert_eq!(&[2, 6, 7, 10], &value);
-/// ```
-pub fn calculate_cumulative_sum_in_place<T>(mut_slice: &mut [T])
-where
-    T: Default + AddAssign<T> + Copy,
-{
-    let mut acc = T::default();
-
-    for val in mut_slice {
-        acc += *val;
-        *val = acc;
-    }
 }
 
 /// Stderr logger
@@ -828,7 +827,7 @@ pub mod bolts_prelude {
         feature = "std"
     ))]
     pub use super::cli::*;
-    #[cfg(feature = "llmp_compression")]
+    #[cfg(feature = "gzip")]
     pub use super::compress::*;
     #[cfg(feature = "std")]
     pub use super::core_affinity::*;

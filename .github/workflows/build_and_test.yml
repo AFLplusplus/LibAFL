@@ -91,7 +91,7 @@ jobs:
       
     # ---- doc check ----
     - name: Build Docs
-      run: cargo doc
+      run: cargo +nightly doc --all-features
     - name: Test Docs
       run: cargo +nightly test --doc --all-features
 
@@ -397,7 +397,7 @@ jobs:
         sync: rsync
         copyback: false
         mem: 2048
-        release: 13.1
+        release: 13.2
         prepare: |
           pkg install -y curl bash sudo llvm16
           curl https://sh.rustup.rs -sSf | sh -s -- -y

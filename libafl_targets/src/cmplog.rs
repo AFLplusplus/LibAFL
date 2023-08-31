@@ -8,7 +8,7 @@ use core::fmt::{self, Debug, Formatter};
 use libafl::{
     executors::ExitKind,
     inputs::UsesInput,
-    observers::{CmpMap, CmpObserver, CmpValues, Observer},
+    observers::{cmp::CmpValuesMetadata, CmpMap, CmpObserver, CmpValues, Observer},
     state::HasMetadata,
     Error,
 };
@@ -148,8 +148,12 @@ impl CmpMap for CmpLogMap {
 
     fn reset(&mut self) -> Result<(), Error> {
         // For performance, we reset just the headers
-        self.headers = unsafe { core::mem::zeroed() };
-        // self.vals.operands = unsafe { core::mem::zeroed() };
+        self.headers.fill(CmpLogHeader {
+            hits: 0,
+            shape: 0,
+            kind: 0,
+        });
+
         Ok(())
     }
 }
@@ -185,7 +189,7 @@ pub struct CmpLogObserver {
     name: String,
 }
 
-impl<S> CmpObserver<CmpLogMap, S> for CmpLogObserver
+impl<'a, S> CmpObserver<'a, CmpLogMap, S, CmpValuesMetadata> for CmpLogObserver
 where
     S: UsesInput + HasMetadata,
 {
@@ -206,10 +210,10 @@ where
     }
 }
 
-impl<S> Observer<S> for CmpLogObserver
+impl<'a, S> Observer<S> for CmpLogObserver
 where
     S: UsesInput + HasMetadata,
-    Self: CmpObserver<CmpLogMap, S>,
+    Self: CmpObserver<'a, CmpLogMap, S, CmpValuesMetadata>,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.map.as_mut().reset()?;
@@ -228,9 +232,11 @@ where
         unsafe {
             CMPLOG_ENABLED = 0;
         }
+
         if self.add_meta {
             self.add_cmpvalues_meta(state);
         }
+
         Ok(())
     }
 }

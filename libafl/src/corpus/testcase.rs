@@ -204,7 +204,17 @@ where
         input.wrapped_as_testcase();
         Self {
             input: Some(input),
-            ..Testcase::default()
+            filename: None,
+            #[cfg(feature = "std")]
+            file_path: None,
+            metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
+            metadata_path: None,
+            exec_time: None,
+            cached_len: None,
+            executions: 0,
+            scheduled_count: 0,
+            parent_id: None,
         }
     }
 
@@ -212,10 +222,19 @@ where
     /// that this [`Testcase`] was derived from on creation
     pub fn with_parent_id(mut input: I, parent_id: CorpusId) -> Self {
         input.wrapped_as_testcase();
-        Self {
+        Testcase {
             input: Some(input),
+            filename: None,
+            #[cfg(feature = "std")]
+            file_path: None,
+            metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
+            metadata_path: None,
+            exec_time: None,
+            cached_len: None,
+            executions: 0,
+            scheduled_count: 0,
             parent_id: Some(parent_id),
-            ..Testcase::default()
         }
     }
 
@@ -226,7 +245,16 @@ where
         Self {
             input: Some(input),
             filename: Some(filename),
-            ..Testcase::default()
+            #[cfg(feature = "std")]
+            file_path: None,
+            metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
+            metadata_path: None,
+            exec_time: None,
+            cached_len: None,
+            executions: 0,
+            scheduled_count: 0,
+            parent_id: None,
         }
     }
 
@@ -236,8 +264,17 @@ where
         input.wrapped_as_testcase();
         Self {
             input: Some(input),
+            filename: None,
+            #[cfg(feature = "std")]
+            file_path: None,
+            metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
+            metadata_path: None,
+            exec_time: None,
+            cached_len: None,
             executions,
-            ..Testcase::default()
+            scheduled_count: 0,
+            parent_id: None,
         }
     }
 
@@ -326,6 +363,10 @@ where
 
 /// The Metadata for each testcase used in power schedules.
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct SchedulerTestcaseMetadata {
     /// Number of bits set in bitmap, updated in calibrate_case
     bitmap_size: u64,
@@ -431,6 +472,21 @@ impl SchedulerTestcaseMetadata {
 }
 
 libafl_bolts::impl_serdeany!(SchedulerTestcaseMetadata);
+
+#[cfg(feature = "std")]
+impl<I> Drop for Testcase<I>
+where
+    I: Input,
+{
+    fn drop(&mut self) {
+        if let Some(filename) = &self.filename {
+            let mut path = PathBuf::from(filename);
+            let lockname = format!(".{}.lafl_lock", path.file_name().unwrap().to_str().unwrap());
+            path.set_file_name(lockname);
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]

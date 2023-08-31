@@ -4,12 +4,11 @@ use core::{debug_assert, fmt::Debug};
 #[cfg(feature = "rand_trait")]
 use rand_core::{self, impls::fill_bytes_via_next, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
 use crate::current_nanos;
-
-const HASH_CONST: u64 = 0xa5b35705;
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+use crate::hash_std;
 
 /// The standard rand implementation for `LibAFL`.
 /// It is usually the right choice, with very good speed and a reasonable randomness.
@@ -98,6 +97,7 @@ macro_rules! default_rand {
 }
 
 // Derive Default by calling `new(DEFAULT_SEED)` on each of the following Rand types.
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
 default_rand!(Xoshiro256StarRand);
 default_rand!(XorShift64Rand);
 default_rand!(Lehmer64Rand);
@@ -145,6 +145,7 @@ macro_rules! impl_random {
     };
 }
 
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
 impl_random!(Xoshiro256StarRand);
 impl_random!(XorShift64Rand);
 impl_random!(Lehmer64Rand);
@@ -157,10 +158,12 @@ pub struct Xoshiro256StarRand {
     rand_seed: [u64; 4],
 }
 
+// TODO: re-enable ahash works without alloc
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
 impl Rand for Xoshiro256StarRand {
     #[allow(clippy::unreadable_literal)]
     fn set_seed(&mut self, seed: u64) {
-        self.rand_seed[0] = xxh3_64_with_seed(&HASH_CONST.to_le_bytes(), seed);
+        self.rand_seed[0] = hash_std(&seed.to_be_bytes());
         self.rand_seed[1] = self.rand_seed[0] ^ 0x1234567890abcdef;
         self.rand_seed[2] = self.rand_seed[0] & 0x0123456789abcdef;
         self.rand_seed[3] = self.rand_seed[0] | 0x01abcde43f567908;
@@ -187,6 +190,7 @@ impl Rand for Xoshiro256StarRand {
     }
 }
 
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
 impl Xoshiro256StarRand {
     /// Creates a new Xoshiro rand with the given seed
     #[must_use]
@@ -376,9 +380,9 @@ impl XkcdRand {
 mod tests {
     //use xxhash_rust::xxh3::xxh3_64_with_seed;
 
-    use crate::rands::{
-        Rand, RomuDuoJrRand, RomuTrioRand, StdRand, XorShift64Rand, Xoshiro256StarRand,
-    };
+    #[cfg(any(feature = "xxh3", feature = "alloc"))]
+    use crate::rands::Xoshiro256StarRand;
+    use crate::rands::{Rand, RomuDuoJrRand, RomuTrioRand, StdRand, XorShift64Rand};
 
     fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());
@@ -395,6 +399,7 @@ mod tests {
         test_single_rand(&mut RomuTrioRand::with_seed(0));
         test_single_rand(&mut RomuDuoJrRand::with_seed(0));
         test_single_rand(&mut XorShift64Rand::with_seed(0));
+        #[cfg(any(feature = "xxh3", feature = "alloc"))]
         test_single_rand(&mut Xoshiro256StarRand::with_seed(0));
     }
 

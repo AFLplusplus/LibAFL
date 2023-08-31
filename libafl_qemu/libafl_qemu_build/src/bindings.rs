@@ -115,6 +115,7 @@ pub fn generate(
         .allowlist_function("tlb_plugin_lookup")
         .allowlist_function("qemu_plugin_hwaddr_phys_addr")
         .allowlist_function("qemu_plugin_get_hwaddr")
+        .allowlist_function("qemu_target_page_size")
         .allowlist_function("syx_snapshot_init")
         .allowlist_function("syx_snapshot_create")
         .allowlist_function("syx_snapshot_root_restore")

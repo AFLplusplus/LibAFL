@@ -59,6 +59,22 @@ pub type StdShMemProvider = UnixShMemProvider;
 ))]
 pub type StdShMemService = DummyShMemService;
 
+// for unix only
+/// The standard served shmem provider
+#[cfg(all(target_os = "android", feature = "std"))]
+pub type StdServedShMemProvider =
+    RcShMemProvider<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
+/// The standard served shmem provider
+#[cfg(all(feature = "std", target_vendor = "apple"))]
+pub type StdServedShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
+/// The standard served shmem provider
+#[cfg(all(
+    feature = "std",
+    unix,
+    not(any(target_os = "android", target_vendor = "apple"))
+))]
+pub type StdServedShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
+
 /// Description of a shared map.
 /// May be used to restore the map by id.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -125,13 +141,13 @@ impl ShMemId {
     /// Returns `true` if this `ShMemId` has an empty backing slice.
     /// If this is the case something went wrong, and this `ShMemId` may not be read from.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.id[0] == 0
     }
 
     /// Get the id as a fixed-length slice
     #[must_use]
-    pub fn as_array(&self) -> &[u8; 20] {
+    pub const fn as_array(&self) -> &[u8; 20] {
         &self.id
     }
 
@@ -210,6 +226,28 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
             .unwrap()
     }
 
+    /// Convert to a slice of type &\[T\]
+    ///
+    /// # Safety
+    /// This function is not safe as the object may be not initialized.
+    /// The user is responsible to initialize the objects in the slice
+    unsafe fn as_objects_slice<T: Sized + 'static>(&self, len: usize) -> &[T] {
+        assert!(self.len() >= core::mem::size_of::<T>() * len);
+        let ptr = self.as_slice().as_ptr() as *const () as *const T;
+        core::slice::from_raw_parts(ptr, len)
+    }
+
+    /// Convert to a slice of type &mut \[T\]
+    ///
+    /// # Safety
+    /// This function is not safe as the object may be not initialized.
+    /// The user is responsible to initialize the objects in the slice
+    unsafe fn as_objects_slice_mut<T: Sized + 'static>(&mut self, len: usize) -> &mut [T] {
+        assert!(self.len() >= core::mem::size_of::<T>() * len);
+        let ptr = self.as_mut_slice().as_mut_ptr() as *mut () as *mut T;
+        core::slice::from_raw_parts_mut(ptr, len)
+    }
+
     /// Get the description of the shared memory mapping
     fn description(&self) -> ShMemDescription {
         ShMemDescription {
@@ -248,6 +286,14 @@ pub trait ShMemProvider: Clone + Default + Debug {
     /// Create a new shared memory mapping to hold an object of the given type
     fn new_shmem_object<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
         self.new_shmem(core::mem::size_of::<T>())
+    }
+
+    /// Create a new shared memory mapping to hold an array of objects of the given type
+    fn new_shmem_objects_array<T: Sized + 'static>(
+        &mut self,
+        len: usize,
+    ) -> Result<Self::ShMem, Error> {
+        self.new_shmem(core::mem::size_of::<T>() * len)
     }
 
     /// Get a mapping given its id to hold an object of the given type
@@ -527,6 +573,17 @@ where
     }
 }
 
+#[cfg(all(unix, feature = "std"))]
+impl<SP> RcShMemProvider<ServedShMemProvider<SP>>
+where
+    SP: ShMemProvider + Debug,
+{
+    /// Forward to `ServedShMemProvider::on_restart`
+    pub fn on_restart(&mut self) {
+        self.internal.borrow_mut().on_restart();
+    }
+}
+
 /// A Unix sharedmem implementation.
 ///
 /// On Android, this is partially reused to wrap [`unix_shmem::ashmem::AshmemShMem`],
@@ -566,7 +623,7 @@ pub mod unix_shmem {
 
         use libc::{
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
-            perror, shm_open, shm_unlink, shmat, shmctl, shmget,
+            perror, shm_open, shm_unlink, shmat, shmctl, shmdt, shmget,
         };
 
         use crate::{
@@ -856,6 +913,7 @@ pub mod unix_shmem {
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
                     if map as c_int == -1 || map.is_null() {
+                        perror(b"shmat\0".as_ptr() as *const _);
                         shmctl(os_id, libc::IPC_RMID, ptr::null_mut());
                         return Err(Error::unknown(
                             "Failed to map the shared mapping".to_string(),
@@ -877,9 +935,10 @@ pub mod unix_shmem {
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
                     if map.is_null() || map == ptr::null_mut::<c_uchar>().wrapping_sub(1) {
-                        return Err(Error::unknown(
-                            "Failed to map the shared mapping".to_string(),
-                        ));
+                        perror(b"shmat\0".as_ptr() as *const _);
+                        return Err(Error::unknown(format!(
+                            "Failed to map the shared mapping with id {id_int}"
+                        )));
                     }
 
                     Ok(Self { id, map, map_size })
@@ -912,13 +971,15 @@ pub mod unix_shmem {
             }
         }
 
-        /// [`Drop`] implementation for [`UnixShMem`], which cleans up the mapping.
+        /// [`Drop`] implementation for [`UnixShMem`], which detaches the memory and cleans up the mapping.
         #[cfg(unix)]
         impl Drop for CommonUnixShMem {
             fn drop(&mut self) {
                 unsafe {
                     let id_int: i32 = self.id.into();
                     shmctl(id_int, libc::IPC_RMID, ptr::null_mut());
+
+                    shmdt(self.map as *mut _);
                 }
             }
         }
@@ -1209,7 +1270,7 @@ pub mod win32_shmem {
             Foundation::{CloseHandle, BOOL, HANDLE},
             System::Memory::{
                 CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
-                FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
+                FILE_MAP_ALL_ACCESS, MEMORY_MAPPED_VIEW_ADDRESS, PAGE_READWRITE,
             },
         },
     };
@@ -1250,7 +1311,8 @@ pub mod win32_shmem {
                     PCSTR(map_str_bytes.as_mut_ptr()),
                 )?;
 
-                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                let map =
+                    MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size).Value as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(
                         "Cannot map shared memory {}",
@@ -1277,7 +1339,8 @@ pub mod win32_shmem {
                     PCSTR(map_str_bytes.as_ptr() as *mut _),
                 )?;
 
-                let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
+                let map =
+                    MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size).Value as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(
                         "Cannot map shared memory {}",
@@ -1321,8 +1384,18 @@ pub mod win32_shmem {
     impl Drop for Win32ShMem {
         fn drop(&mut self) {
             unsafe {
-                UnmapViewOfFile(self.map as *mut c_void);
-                CloseHandle(self.handle);
+                let res = UnmapViewOfFile(MEMORY_MAPPED_VIEW_ADDRESS {
+                    Value: self.map as *mut c_void,
+                });
+                if let Err(err) = res {
+                    // ignore result: nothing we can do if this goes wrong..
+                    log::warn!("Failed to unmap memory at {:?}: {err}", self.map);
+                }
+                let res = CloseHandle(self.handle);
+                if let Err(err) = res {
+                    // ignore result: nothing we can do if this goes wrong..
+                    log::warn!("Failed to close mem handle {:?}: {err}", self.handle);
+                }
             }
         }
     }

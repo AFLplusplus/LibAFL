@@ -335,8 +335,7 @@ where
     }
 }
 
-/// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
-/// using low-level message passing, [`libafl_bolts::tcp`].
+/// An [`EventManager`] that forwards all events to other attached via tcp.
 pub struct TcpEventManager<S>
 where
     S: UsesInput,
@@ -733,7 +732,9 @@ where
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer
-            .save(&if self.save_state { Some(state) } else { None })
+            .save(&if self.save_state { Some(state) } else { None })?;
+        self.await_restart_safe();
+        Ok(())
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
@@ -842,7 +843,7 @@ pub enum ManagerKind {
         /// The CPU core ID of this client
         cpu_core: Option<CoreId>,
     },
-    /// A [`tcp::TcpBroker`], forwarding the packets of local clients.
+    /// A broker, forwarding all packets of local clients via TCP.
     Broker,
 }
 

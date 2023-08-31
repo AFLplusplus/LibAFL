@@ -16,6 +16,12 @@ cd .. || exit 1
 
 sleep 20
 
+cd libafl_bolts
+cargo publish "$@"
+cd .. || exit 1
+
+sleep 20
+
 cd libafl
 cargo publish "$@"
 cd .. || exit 1
@@ -70,3 +76,7 @@ fi
 cd libafl_concolic/symcc_runtime
 cargo publish "$@"
 cd ../.. || exit 1
+
+cd libafl_libfuzzer
+./publish.sh "$@"
+cd .. || exit 1

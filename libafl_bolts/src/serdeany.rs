@@ -79,6 +79,7 @@ macro_rules! create_serde_registry_for_trait {
             use serde::{Deserialize, Serialize};
             use $crate::{
                 anymap::{pack_type_id, unpack_type_id},
+                hash_std,
                 serdeany::{DeserializeCallback, DeserializeCallbackSeed},
                 Error,
             };
@@ -178,6 +179,7 @@ macro_rules! create_serde_registry_for_trait {
 
             /// A (de)serializable anymap containing (de)serializable trait objects registered
             /// in the registry
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[derive(Debug, Serialize, Deserialize)]
             pub struct SerdeAnyMap {
                 map: HashMap<u128, Box<dyn $trait_name>>,
@@ -252,8 +254,7 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     T: $trait_name,
                 {
-                    self.map
-                        .insert(unpack_type_id(TypeId::of::<T>()), Box::new(t));
+                    self.insert_boxed(Box::new(t));
                 }
 
                 /// Insert a boxed element into the map.
@@ -262,7 +263,21 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     T: $trait_name,
                 {
-                    self.map.insert(unpack_type_id(TypeId::of::<T>()), t);
+                    let id = unpack_type_id(TypeId::of::<T>());
+                    assert!(
+                        unsafe {
+                            REGISTRY
+                                .deserializers
+                                .as_ref()
+                                .expect("Empty types registry")
+                                .get(&id)
+                                .is_some()
+                        },
+                        "Type {} was inserted without registration! Call {}::register or use serde_autoreg.",
+                        core::any::type_name::<T>(),
+                        core::any::type_name::<T>()
+                    );
+                    self.map.insert(id, t);
                 }
 
                 /// Returns the count of elements in this map.
@@ -304,6 +319,7 @@ macro_rules! create_serde_registry_for_trait {
             }
 
             /// A serializable [`HashMap`] wrapper for [`SerdeAny`] types, addressable by name.
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[allow(unused_qualifications)]
             #[derive(Debug, Serialize, Deserialize)]
             pub struct NamedSerdeAnyMap {
@@ -331,7 +347,7 @@ macro_rules! create_serde_registry_for_trait {
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
                         Some(h) => h
-                            .get(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
+                            .get(&hash_std(name.as_bytes()))
                             .map(|x| x.as_any().downcast_ref::<T>().unwrap()),
                     }
                 }
@@ -344,7 +360,7 @@ macro_rules! create_serde_registry_for_trait {
                     match self.map.get(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => h
-                            .get(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
+                            .get(&hash_std(name.as_bytes()))
                             .map(AsRef::as_ref),
                     }
                 }
@@ -359,7 +375,7 @@ macro_rules! create_serde_registry_for_trait {
                     match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
                         Some(h) => h
-                            .get_mut(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
+                            .get_mut(&hash_std(name.as_bytes()))
                             .map(|x| x.as_any_mut().downcast_mut::<T>().unwrap()),
                     }
                 }
@@ -375,7 +391,7 @@ macro_rules! create_serde_registry_for_trait {
                     match self.map.get_mut(&unpack_type_id(*typeid)) {
                         None => None,
                         Some(h) => h
-                            .get_mut(&xxhash_rust::xxh3::xxh3_64(name.as_bytes()))
+                            .get_mut(&hash_std(name.as_bytes()))
                             .map(AsMut::as_mut),
                     }
                 }
@@ -518,13 +534,26 @@ macro_rules! create_serde_registry_for_trait {
                     T: $trait_name,
                 {
                     let id = unpack_type_id(TypeId::of::<T>());
+                    assert!(
+                        unsafe {
+                            REGISTRY
+                                .deserializers
+                                .as_ref()
+                                .expect("Empty types registry")
+                                .get(&id)
+                                .is_some()
+                        },
+                        "Type {} was inserted without registration! Call {}::register or use serde_autoreg.",
+                        core::any::type_name::<T>(),
+                        core::any::type_name::<T>()
+                    );
                     if !self.map.contains_key(&id) {
                         self.map.insert(id, HashMap::default());
                     }
                     self.map
                         .get_mut(&id)
                         .unwrap()
-                        .insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), Box::new(val));
+                        .insert(hash_std(name.as_bytes()), Box::new(val));
                 }
 
                 /// Returns the `len` of this map.
@@ -559,7 +588,7 @@ macro_rules! create_serde_registry_for_trait {
                 {
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
                         None => false,
-                        Some(h) => h.contains_key(&xxhash_rust::xxh3::xxh3_64(name.as_bytes())),
+                        Some(h) => h.contains_key(&hash_std(name.as_bytes())),
                     }
                 }
 
@@ -614,21 +643,12 @@ pub use serdeany_registry::*;
 ///
 /// Do nothing for without the `serdeany_autoreg` feature, you'll have to register it manually
 /// in `main()` with [`RegistryBuilder::register`] or using `<T>::register()`.
+#[cfg(all(feature = "serdeany_autoreg", not(miri)))]
 #[macro_export]
 macro_rules! create_register {
     ($struct_type:ty) => {
         const _: () = {
-            /// Manually register this type at a later point in time
-            ///
-            /// # Safety
-            /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
-            #[cfg(not(feature = "serdeany_autoreg"))]
-            pub unsafe fn register() {
-                $crate::serdeany::RegistryBuilder::register::<$struct_type>();
-            }
-
             /// Automatically register this type
-            #[cfg(feature = "serdeany_autoreg")]
             #[$crate::ctor]
             fn register() {
                 // # Safety
@@ -639,6 +659,16 @@ macro_rules! create_register {
             }
         };
     };
+}
+
+/// Register a `SerdeAny` type in the [`RegistryBuilder`]
+///
+/// Do nothing for without the `serdeany_autoreg` feature, you'll have to register it manually
+/// in `main()` with [`RegistryBuilder::register`] or using `<T>::register()`.
+#[cfg(not(all(feature = "serdeany_autoreg", not(miri))))]
+#[macro_export]
+macro_rules! create_register {
+    ($struct_type:ty) => {};
 }
 
 /// Implement a [`SerdeAny`], registering it in the [`RegistryBuilder`] when on std
@@ -665,6 +695,18 @@ macro_rules! impl_serdeany {
             }
         }
 
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        impl< $( $lt $( : $clt $(+ $dlt )* )? ),+ > $struct_name < $( $lt ),+ > {
+
+            /// Manually register this type at a later point in time
+            ///
+            /// # Safety
+            /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
+            pub unsafe fn register() {
+                $crate::serdeany::RegistryBuilder::register::<$struct_name < $( $lt ),+ >>();
+            }
+        }
+
         $(
             $crate::create_register!($struct_name < $( $opt ),+ >);
         )*
@@ -687,6 +729,17 @@ macro_rules! impl_serdeany {
                 self: $crate::alloc::boxed::Box<$struct_name>,
             ) -> $crate::alloc::boxed::Box<dyn ::core::any::Any> {
                 self
+            }
+        }
+
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        impl $struct_name {
+            /// Manually register this type at a later point in time
+            ///
+            /// # Safety
+            /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
+            pub unsafe fn register() {
+                $crate::serdeany::RegistryBuilder::register::<$struct_name>();
             }
         }
 

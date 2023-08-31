@@ -29,6 +29,6 @@ feel free to use and mutate an Abstract Syntax Tree instead, for structured fuzz
 - `scalable`: As part of LibAFL, we developed `Low Level Message Passing`, `LLMP` for short, which allows LibAFL to scale almost linearly over cores. That is, if you chose to use this feature - it is your fuzzer, after all.
 Scaling to multiple machines over TCP is also possible, using LLMP's `broker2broker` feature.
 - `fast`: We do everything we can at compile time so that the runtime overhead is as minimal as it can get.
-- `bring your own target`: We support binary-only modes, like QEMU-Mode and Frida-Mode with ASAN and CmpLog, as well as multiple compilation passes for sourced-based instrumentation.
+- `bring your own target`: We support binary-only modes, like (full-system) QEMU-Mode and Frida-Mode with ASan and CmpLog, as well as multiple compilation passes for sourced-based instrumentation.
 Of course, we also support custom instrumentation, as you can see in the Python example based on Google's Atheris.
 - `usable`: This one is on you to decide. Dig right in!

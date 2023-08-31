@@ -16,6 +16,10 @@ use crate::{
 };
 
 /// Metadata used to store information about disk dump indexes for names
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct DumpToDiskMetadata {
     last_corpus: Option<CorpusId>,

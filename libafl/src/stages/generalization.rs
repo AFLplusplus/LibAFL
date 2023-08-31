@@ -25,7 +25,7 @@ use crate::{
 
 const MAX_GENERALIZED_LEN: usize = 8192;
 
-fn increment_by_offset(_list: &[Option<u8>], idx: usize, off: u8) -> usize {
+const fn increment_by_offset(_list: &[Option<u8>], idx: usize, off: u8) -> usize {
     idx + 1 + off as usize
 }
 
@@ -100,6 +100,9 @@ where
                         "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_idx} (check the arguments of MapFeedback::new(...))"
                     ))
                 })?;
+            if meta.as_slice().is_empty() {
+                return Ok(()); // don't generalise inputs which don't have novelties
+            }
             (payload, original, meta.as_slice().to_vec())
         };
 

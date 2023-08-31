@@ -222,6 +222,10 @@ where
 
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct MapIndexesMetadata {
     /// The list of indexes.
     pub list: Vec<usize>,
@@ -266,6 +270,10 @@ impl MapIndexesMetadata {
 
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct MapNoveltiesMetadata {
     /// A `list` of novelties.
     pub list: Vec<usize>,
@@ -300,6 +308,10 @@ impl MapNoveltiesMetadata {
 /// The state of [`MapFeedback`]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: DeserializeOwned")]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct MapFeedbackMetadata<T>
 where
     T: Default + Copy + 'static + Serialize,
@@ -310,7 +322,7 @@ where
 
 libafl_bolts::impl_serdeany!(
     MapFeedbackMetadata<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned>,
-    <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<f32>,<f64>,<bool>,<char>
+    <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<f32>,<f64>,<bool>,<char>,<usize>
 );
 
 impl<T> MapFeedbackMetadata<T>
@@ -444,6 +456,10 @@ where
             .named_metadata_map_mut()
             .get_mut::<MapFeedbackMetadata<T>>(&self.name)
             .unwrap();
+        let len = observer.len();
+        if map_state.history_map.len() < len {
+            map_state.history_map.resize(len, observer.initial());
+        }
 
         let history_map = map_state.history_map.as_mut_slice();
         if self.indexes {

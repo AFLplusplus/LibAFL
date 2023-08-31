@@ -11,6 +11,9 @@ keywords = ["fuzzing", "qemu", "instrumentation"]
 edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["fork", "build_libqasan", "serdeany_autoreg"]
 python = ["pyo3", "pyo3-build-config"]
@@ -39,10 +42,10 @@ slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslir
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.10.1", default-features = false, features = ["std", "derive", "regex"] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.10.1", default-features = false, features = ["std", "derive"] }
-libafl_targets = { path = "../libafl_targets", version = "0.10.1" }
-libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.10.1" }
+libafl = { path = "../libafl", version = "0.11.1", default-features = false, features = ["std", "derive", "regex"] }
+libafl_bolts = { path = "../libafl_bolts", version = "0.11.1", default-features = false, features = ["std", "derive"] }
+libafl_targets = { path = "../libafl_targets", version = "0.11.1" }
+libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.11.1" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.14", features = ["serde"] } # A faster hashmap, nostd compatible
@@ -53,7 +56,7 @@ libc = "0.2"
 strum = "0.25"
 strum_macros = "0.25"
 syscall-numbers = "3.0"
-meminterval = "0.3"
+meminterval = "0.4"
 thread_local = "1.1.4"
 capstone = "0.11.0"
 pyo3 = { version = "0.18.3", optional = true }

@@ -7,7 +7,7 @@ use alloc::{
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
-use libafl_bolts::{current_time, AsIter, Named};
+use libafl_bolts::{current_time, impl_serdeany, AsIter, Named};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
@@ -26,15 +26,19 @@ use crate::{
     Error,
 };
 
-libafl_bolts::impl_serdeany!(UnstableEntriesMetadata);
 /// The metadata to keep unstable entries
 /// In libafl, the stability is the number of the unstable entries divided by the size of the map
 /// This is different from AFL++, which shows the number of the unstable entries divided by the number of filled entries.
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    allow(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UnstableEntriesMetadata {
     unstable_entries: HashSet<usize>,
     map_len: usize,
 }
+impl_serdeany!(UnstableEntriesMetadata);
 
 impl UnstableEntriesMetadata {
     #[must_use]
