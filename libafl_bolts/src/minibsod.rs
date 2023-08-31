@@ -4,6 +4,8 @@
 //! function to get a [`ucontext_t`].
 
 use std::io::{BufWriter, Write};
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
+use std::process::Command;
 
 use libc::siginfo_t;
 
@@ -794,12 +796,27 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     Ok(())
 }
 
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
+fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
+    let pid = format!("{}", unsafe { libc::getpid() });
+    let mut cmdname = Command::new("pmap");
+    let cmd = cmdname.args(["-x", &pid]);
+
+    match cmd.output() {
+        Ok(s) => writer.write_all(&s.stdout)?,
+        Err(e) => writeln!(writer, "Couldn't load mappings: {e:?}")?,
+    }
+
+    Ok(())
+}
+
 #[cfg(not(any(
     target_os = "freebsd",
     target_os = "openbsd",
     target_os = "netbsd",
     target_env = "apple",
     any(target_os = "linux", target_os = "android"),
+    any(target_os = "solaris", target_os = "illumos"),
 )))]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     // TODO for other platforms
