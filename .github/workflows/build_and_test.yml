@@ -105,6 +105,10 @@ jobs:
     - name: Run miri tests
       run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
 
+    # --- test embedding the libafl_libfuzzer_runtime library
+    - name: Test Build libafl_libfuzzer with embed
+      run: cargo +nightly test --features=embed-runtime --manifest-path libafl_libfuzzer/Cargo.toml
+
   ubuntu-check:
     runs-on: ubuntu-22.04
     steps:
