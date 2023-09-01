@@ -316,7 +316,7 @@ jobs:
       with:
         command: clippy
     - name: Build docs
-      run: cargo doc --all-features
+      run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features
     - name: Set LIBCLANG_PATH
       run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
     - name: install cargo-make
