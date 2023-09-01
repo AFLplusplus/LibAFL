@@ -872,8 +872,7 @@ mod solaris {
     #[allow(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
-            .into_iter()
-            .map(|n| CoreId(n))
+            .map(CoreId)
             .collect::<Vec<_>>())
     }
 
@@ -882,7 +881,7 @@ mod solaris {
             libc::processor_bind(
                 libc::P_PID,
                 libc::PS_MYID,
-                core_id.0 as i32,
+                core_id.0.try_into().unwrap(),
                 std::ptr::null_mut(),
             )
         };
