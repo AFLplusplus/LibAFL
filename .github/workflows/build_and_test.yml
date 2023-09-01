@@ -94,7 +94,6 @@ jobs:
       run: cargo +nightly doc --all-features
     - name: Test Docs
       run: cargo +nightly test --doc --all-features
-
     # ---- build normal and examples ----
     - name: Run a normal build
       run: cargo build --verbose
@@ -317,7 +316,7 @@ jobs:
       with:
         command: clippy
     - name: Build docs
-      run: cargo doc
+      run: cargo doc --all-features
     - name: Set LIBCLANG_PATH
       run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
     - name: install cargo-make
