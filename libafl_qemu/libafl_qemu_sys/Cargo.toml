@@ -13,6 +13,7 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 
 [package.metadata.docs.rs]
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 # The following architecture features are mutually exclusive.

@@ -91,10 +91,9 @@ jobs:
       
     # ---- doc check ----
     - name: Build Docs
-      run: cargo +nightly doc --all-features
+      run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features
     - name: Test Docs
-      run: cargo +nightly test --doc --all-features
-
+      run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
     # ---- build normal and examples ----
     - name: Run a normal build
       run: cargo build --verbose

@@ -8,7 +8,7 @@ fn main() {
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     assert!(
-        cfg!(not(feature = "nautilus")),
+        cfg!(all(not(docrs), not(feature = "nautilus"))),
         "The 'nautilus' feature of libafl requires a nightly compiler"
     );
 }
