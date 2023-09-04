@@ -512,23 +512,23 @@ impl InProcessExecutorHandlerData {
 
 /// Exception handling needs some nasty unsafe.
 pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
-    /// The state ptr for signal handling
+    // The state ptr for signal handling
     state_ptr: null_mut(),
-    /// The event manager ptr for signal handling
+    // The event manager ptr for signal handling
     event_mgr_ptr: null_mut(),
-    /// The fuzzer ptr for signal handling
+    // The fuzzer ptr for signal handling
     fuzzer_ptr: null_mut(),
-    /// The executor ptr for signal handling
+    // The executor ptr for signal handling
     executor_ptr: ptr::null(),
-    /// The current input for signal handling
+    // The current input for signal handling
     current_input_ptr: ptr::null(),
 
     in_handler: false,
 
-    /// The crash handler fn
+    // The crash handler fn
     #[cfg(any(unix, feature = "std"))]
     crash_handler: ptr::null(),
-    /// The timeout handler fn
+    // The timeout handler fn
     #[cfg(any(unix, feature = "std"))]
     timeout_handler: ptr::null(),
     #[cfg(all(windows, feature = "std"))]
