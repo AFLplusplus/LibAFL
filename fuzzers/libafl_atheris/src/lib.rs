@@ -170,7 +170,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         .get_one::<String>("remote_broker_addr")
         .map(|s| s.parse().expect("Invalid broker address"));
     let input_dirs: Vec<PathBuf> = matches
-        .get_many::<PathBuf>("input")
+        .get_many::<String>("input")
         .map(|v| v.map(PathBuf::from).collect())
         .unwrap_or_default();
     let output_dir = matches
