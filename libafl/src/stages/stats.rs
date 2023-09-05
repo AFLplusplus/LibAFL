@@ -19,7 +19,7 @@ use crate::{
 #[cfg(feature = "std")]
 use crate::{events::Event, monitors::UserStats};
 
-/// The [`AFLStatsStage`] is a simple stage that computes and reports some stats.
+/// The [`AflStatsStage`] is a simple stage that computes and reports some stats.
 #[derive(Debug, Clone)]
 pub struct AflStatsStage<E, EM, Z>
 where
@@ -129,7 +129,7 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasImported + HasCorpus + HasMetadata,
 {
-    /// create a new instance of the [`AFLStatsStage`]
+    /// create a new instance of the [`AflStatsStage`]
     #[must_use]
     pub fn new(interval: Duration) -> Self {
         Self {
@@ -146,7 +146,7 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasImported + HasCorpus + HasMetadata,
 {
-    /// the default instance of the [`AFLStatsStage`]
+    /// the default instance of the [`AflStatsStage`]
     #[must_use]
     fn default() -> Self {
         Self {
