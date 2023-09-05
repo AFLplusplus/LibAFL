@@ -193,7 +193,7 @@ void *__libqasan_malloc(size_t size) {
   else
     QASAN_POISON((char *)&p[1] + size, REDZONE_SIZE, ASAN_HEAP_RIGHT_RZ);
 
-  __builtin_memset(&p[1], 0xff, size);
+  __libqasan_memset(&p[1], 0xff, size);
 
   return &p[1];
 }
@@ -249,7 +249,7 @@ void *__libqasan_calloc(size_t nmemb, size_t size) {
   char *p = __libqasan_malloc(size);
   if (!p) return NULL;
 
-  __builtin_memset(p, 0, size);
+  __libqasan_memset(p, 0, size);
 
   return p;
 }
@@ -263,7 +263,7 @@ void *__libqasan_realloc(void *ptr, size_t size) {
   size_t n = ((struct chunk_begin *)ptr)[-1].requested_size;
   if (size < n) n = size;
 
-  __builtin_memcpy(p, ptr, n);
+  __libqasan_memcpy(p, ptr, n);
 
   __libqasan_free(ptr);
   return p;
@@ -306,7 +306,7 @@ int __libqasan_posix_memalign(void **ptr, size_t align, size_t len) {
   else
     QASAN_POISON(data + len, REDZONE_SIZE, ASAN_HEAP_RIGHT_RZ);
 
-  __builtin_memset(data, 0xff, len);
+  __libqasan_memset(data, 0xff, len);
 
   *ptr = data;
 
