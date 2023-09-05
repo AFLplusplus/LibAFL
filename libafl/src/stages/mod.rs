@@ -28,7 +28,7 @@ pub mod generalization;
 pub use generalization::GeneralizationStage;
 
 pub mod stats;
-pub use stats::AFLStatsStage;
+pub use stats::AflStatsStage;
 
 pub mod owned;
 pub use owned::StagesOwnedList;
@@ -70,8 +70,8 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasImported, HasLastReportTime,
-        HasMetadata, HasRand, UsesState,
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand,
+        UsesState,
     },
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
@@ -259,7 +259,6 @@ where
         + HasMetadata
         + HasRand
         + HasCorpus
-        + HasImported
         + HasLastReportTime,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>

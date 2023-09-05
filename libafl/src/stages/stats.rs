@@ -4,11 +4,11 @@
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
+use libafl_bolts::current_time;
 #[cfg(feature = "std")]
 use serde_json::json;
 
 use crate::{
-    bolts::current_time,
     corpus::{Corpus, CorpusId},
     events::EventFirer,
     schedulers::minimizer::IsFavoredMetadata,
@@ -21,7 +21,7 @@ use crate::{events::Event, monitors::UserStats};
 
 /// The [`AFLStatsStage`] is a simple stage that computes and reports some stats.
 #[derive(Debug, Clone)]
-pub struct AFLStatsStage<E, EM, Z>
+pub struct AflStatsStage<E, EM, Z>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
@@ -43,7 +43,7 @@ where
     phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<E, EM, Z> UsesState for AFLStatsStage<E, EM, Z>
+impl<E, EM, Z> UsesState for AflStatsStage<E, EM, Z>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
@@ -52,7 +52,7 @@ where
     type State = E::State;
 }
 
-impl<E, EM, Z> Stage<E, EM, Z> for AFLStatsStage<E, EM, Z>
+impl<E, EM, Z> Stage<E, EM, Z> for AflStatsStage<E, EM, Z>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
@@ -69,7 +69,6 @@ where
     ) -> Result<(), Error> {
         // Report your stats every `STATS_REPORT_INTERVAL`
         // compute pending, pending_favored, imported, own_finds
-
         {
             let testcase = state.corpus().get(corpus_idx)?.borrow();
             if testcase.scheduled_count() == 0 {
@@ -77,14 +76,16 @@ where
                 if testcase.has_metadata::<IsFavoredMetadata>() {
                     self.is_favored_size += 1;
                 }
+            } else {
+                return Ok(());
             }
         }
 
         let corpus_size = state.corpus().count();
         let pending_size = corpus_size - self.has_fuzzed_size;
-        let pend_favored_size = pending_size - self.is_favored_size;
+        let pend_favored_size = corpus_size - self.is_favored_size;
         self.imported_size = *state.imported();
-        self.own_finds_size = corpus_size - self.own_finds_size;
+        self.own_finds_size = corpus_size - self.imported_size;
 
         let cur = current_time();
 
@@ -93,7 +94,7 @@ where
             {
                 let json = json!({
                         "pending":pending_size,
-                        "pend_favored":pend_favored_size,
+                        "pend_fav":pend_favored_size,
                         "own_finds":self.own_finds_size,
                         "imported":self.imported_size,
                 });
@@ -114,14 +115,14 @@ where
                 self.own_finds_size,
                 self.imported_size
             );
+            self.last_report_time = cur;
         }
-        self.last_report_time = cur;
 
         Ok(())
     }
 }
 
-impl<E, EM, Z> AFLStatsStage<E, EM, Z>
+impl<E, EM, Z> AflStatsStage<E, EM, Z>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
@@ -138,7 +139,7 @@ where
     }
 }
 
-impl<E, EM, Z> Default for AFLStatsStage<E, EM, Z>
+impl<E, EM, Z> Default for AflStatsStage<E, EM, Z>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
