@@ -91,10 +91,9 @@ jobs:
       
     # ---- doc check ----
     - name: Build Docs
-      run: cargo +nightly doc --all-features
+      run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features
     - name: Test Docs
-      run: cargo +nightly test --doc --all-features
-
+      run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
     # ---- build normal and examples ----
     - name: Run a normal build
       run: cargo build --verbose
@@ -104,6 +103,15 @@ jobs:
     # --- miri undefined behavior test --
     - name: Run miri tests
       run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
+
+    # Clean up files to save up disk space
+    - name: Cleanup
+      run: cargo clean
+      
+    # --- test embedding the libafl_libfuzzer_runtime library
+    # Fix me plz
+    # - name: Test Build libafl_libfuzzer with embed
+    #  run: cargo +nightly test --features=embed-runtime --manifest-path libafl_libfuzzer/Cargo.toml
 
   ubuntu-check:
     runs-on: ubuntu-22.04

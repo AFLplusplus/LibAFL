@@ -14,6 +14,7 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 [package.metadata.docs.rs]
 features = ["document-features"]
 all-features = true
+rustc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor", "libafl_bolts/xxh3"]

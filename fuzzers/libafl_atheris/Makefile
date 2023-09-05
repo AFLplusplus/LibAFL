@@ -32,7 +32,7 @@ fuzzer: target/release/libafl_atheris.a atheris env
 	)
 
 clean:
-	rm env
+	rm -rf env
 
 env:
 	python3 -m venv env
