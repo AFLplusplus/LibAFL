@@ -476,7 +476,7 @@ impl TuiUI {
             .constraints(
                 [
                     Constraint::Length(2 + items.len() as u16),
-                    Constraint::Min(8),
+                    Constraint::Min(0),
                 ]
                 .as_ref(),
             )
