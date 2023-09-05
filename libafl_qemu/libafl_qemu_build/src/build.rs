@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "659539eaceb7acf242f2f6a573b705e1be1befb6";
+const QEMU_REVISION: &str = "ff5bc3d934044a5a5466759525f0371ccf86152e";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -60,6 +60,7 @@ pub fn build(
 
     build_dep_check(&["git", "make"]);
 
+    let cc_compiler = cc::Build::new().cpp(false).get_compiler();
     let cpp_compiler = cc::Build::new().cpp(true).get_compiler();
 
     let qemu_path = if let Some(qemu_dir) = custum_qemu_dir.as_ref() {
@@ -139,10 +140,15 @@ pub fn build(
             cmd.current_dir(&qemu_path)
                 //.arg("--as-static-lib")
                 .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
+                .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
                 .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
                 .arg(&format!(
-                    "--cxx={}",
+                    "--cc={}",
                     qemu_path.join("linker_interceptor.py").display()
+                ))
+                .arg(&format!(
+                    "--cxx={}",
+                    qemu_path.join("linker_interceptor++.py").display()
                 ))
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
@@ -161,11 +167,16 @@ pub fn build(
             cmd.current_dir(&qemu_path)
                 //.arg("--as-static-lib")
                 .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
+                .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
                 .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
                 .arg(&format!(
-                    "--cxx={}",
+                    "--cc={}",
                     qemu_path.join("linker_interceptor.py").display()
-                )) // TODO set __LIBAFL_QEMU_BUILD_CXX
+                ))
+                .arg(&format!(
+                    "--cxx={}",
+                    qemu_path.join("linker_interceptor++.py").display()
+                ))
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
                 .arg(if cfg!(feature = "slirp") {

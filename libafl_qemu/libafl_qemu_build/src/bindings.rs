@@ -4,6 +4,10 @@ use bindgen::{BindgenError, Bindings};
 
 const WRAPPER_HEADER: &str = r#"
 
+// https://github.com/rust-lang/rust-bindgen/issues/2500
+#define __AVX512VLFP16INTRIN_H
+#define __AVX512FP16INTRIN_H
+
 // QEMU_BUILD_BUG* cause an infinite recursion in bindgen when target is arm
 #include "qemu/compiler.h"
 
