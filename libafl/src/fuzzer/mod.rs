@@ -24,8 +24,8 @@ use crate::{
     stages::StagesTuple,
     start_timer,
     state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata,
-        HasSolutions, UsesState,
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasImported, HasLastReportTime,
+        HasMetadata, HasSolutions, UsesState,
     },
     Error,
 };
@@ -333,7 +333,8 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasCorpus,
+    CS::State:
+        HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasCorpus + HasImported,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -415,6 +416,9 @@ where
                             forward_id: None,
                         },
                     )?;
+                } else {
+                    // This testcase is from the other fuzzers.
+                    *state.imported_mut() += 1;
                 }
                 Ok((res, Some(idx)))
             }
@@ -450,7 +454,7 @@ where
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasImported,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -483,7 +487,7 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasImported,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -591,6 +595,7 @@ where
         + HasMetadata
         + HasCorpus
         + HasTestcase
+        + HasImported
         + HasLastReportTime,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
@@ -633,11 +638,9 @@ where
         {
             let mut testcase = state.testcase_mut(idx)?;
             let scheduled_count = testcase.scheduled_count();
-
             // increase scheduled count, this was fuzz_level in afl
             testcase.set_scheduled_count(scheduled_count + 1);
         }
-
         Ok(idx)
     }
 }

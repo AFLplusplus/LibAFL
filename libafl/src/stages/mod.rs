@@ -27,6 +27,9 @@ pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 pub mod generalization;
 pub use generalization::GeneralizationStage;
 
+pub mod stats;
+pub use stats::AflStatsStage;
+
 pub mod owned;
 pub use owned::StagesOwnedList;
 
