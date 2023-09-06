@@ -210,6 +210,15 @@ pub trait HasExecutions {
     fn executions_mut(&mut self) -> &mut usize;
 }
 
+/// Trait for some stats of AFL
+pub trait HasImported {
+    ///the imported testcases counter
+    fn imported(&self) -> &usize;
+
+    ///the imported testcases counter (mutable)
+    fn imported_mut(&mut self) -> &mut usize;
+}
+
 /// Trait for the starting time
 pub trait HasStartTime {
     /// The starting time
@@ -244,6 +253,8 @@ pub struct StdState<I, C, R, SC> {
     executions: usize,
     /// At what time the fuzzing started
     start_time: Duration,
+    /// the number of new paths that imported from other fuzzers
+    imported: usize,
     /// The corpus
     corpus: C,
     // Solutions corpus
@@ -404,6 +415,20 @@ impl<I, C, R, SC> HasExecutions for StdState<I, C, R, SC> {
     #[inline]
     fn executions_mut(&mut self) -> &mut usize {
         &mut self.executions
+    }
+}
+
+impl<I, C, R, SC> HasImported for StdState<I, C, R, SC> {
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn imported(&self) -> &usize {
+        &self.imported
+    }
+
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn imported_mut(&mut self) -> &mut usize {
+        &mut self.imported
     }
 }
 
@@ -812,6 +837,7 @@ where
         let mut state = Self {
             rand,
             executions: 0,
+            imported: 0,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
