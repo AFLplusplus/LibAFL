@@ -726,23 +726,23 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     {
         let end: u64 = s as u64;
         unsafe {
-            let mut entry = pentry.assume_init();
+            let mut e = pentry.assume_init();
             while libc::sysctl(
                 mib,
                 miblen,
-                &mut entry as *mut libc::kinfo_vmentry as *mut libc::c_void,
+                &mut e as *mut libc::kinfo_vmentry as *mut libc::c_void,
                 &mut s,
                 std::ptr::null_mut(),
                 0,
             ) == 0
             {
-                if entry.kve_end == end {
+                if e.kve_end == end {
                     break;
                 }
                 // OpenBSD's vm mappings have no knowledge of their paths on disk
-                let i = format!("{}-{}\n", entry.kve_start, entry.kve_end);
+                let i = format!("{}-{}\n", e.kve_start, e.kve_end);
                 writer.write_all(&i.into_bytes())?;
-                entry.kve_start = entry.kve_start + 1;
+                e.kve_start += 1;
             }
         }
     } else {

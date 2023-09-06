@@ -828,6 +828,7 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 }
 
 #[cfg(target_os = "openbsd")]
+#[allow(clippy::unnecessary_wraps)]
 #[inline]
 fn set_for_current_helper(_: CoreId) -> Result<(), Error> {
     Ok(()) // There is no notion of cpu affinity on this platform
