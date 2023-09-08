@@ -40,8 +40,7 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_targets::{
-    extra_counters, CmpLogObserver, __sanitizer_cov_trace_cmp1, __sanitizer_cov_trace_cmp2,
-    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, std_edges_map_observer, COUNTERS_MAPS,
+    extra_counters, CmpLogObserver, std_edges_map_observer,
 };
 
 /// It's called by Atheris after the fuzzer has been initialized.
