@@ -17,7 +17,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    monitors::tui::{ui::TuiUI,TuiMonitor},
+    monitors::tui::{ui::TuiUI, TuiMonitor},
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
@@ -26,7 +26,7 @@ use libafl::{
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
-    stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage,stats::AflStatsStage},
+    stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage, stats::AflStatsStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
@@ -64,8 +64,12 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     // let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    //Setup an Monitor with AFL-Style UI to display the stats 
-    let ui = TuiUI::with_version(String::from("Libfuzzer For Libpng"), String::from("0.0.1"), false);
+    //Setup an Monitor with AFL-Style UI to display the stats
+    let ui = TuiUI::with_version(
+        String::from("Libfuzzer For Libpng"),
+        String::from("0.0.1"),
+        false,
+    );
     let monitor = TuiMonitor::new(ui);
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
@@ -147,8 +151,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let power = StdPowerMutationalStage::new(mutator);
 
-    // Setup a stage that can collect and send the AFL-like data 
-    let aflstats = AflStatsStage::new(Duration::from_secs(3)); 
+    // Setup a stage that can collect and send the AFL-like data
+    let aflstats = AflStatsStage::new(Duration::from_secs(3));
 
     let mut stages = tuple_list!(calibration, power, aflstats);
 
