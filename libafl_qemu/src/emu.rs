@@ -194,6 +194,46 @@ impl IntoPy<PyObject> for MmapPerms {
     }
 }
 
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
+#[repr(i32)]
+pub enum MmapFlags {
+    None = -1,
+    Fixed = libc::MAP_FIXED,
+    Private = libc::MAP_PRIVATE,
+    Anonymous = libc::MAP_ANONYMOUS,
+    Huge = libc::MAP_HUGETLB,
+}
+
+impl MmapFlags {
+    #[must_use]
+    pub fn is_fixed(&self) -> bool {
+        *self as i32 & MmapFlags::Fixed as i32 != 0
+    }
+
+    #[must_use]
+    pub fn is_priv(&self) -> bool {
+        *self as i32 & MmapFlags::Private as i32 != 0
+    }
+
+    #[must_use]
+    pub fn is_anon(&self) -> bool {
+        *self as i32 & MmapFlags::Anonymous as i32 != 0
+    }
+
+    #[must_use]
+    pub fn is_huge(&self) -> bool {
+        *self as i32 & MmapFlags::Huge as i32 != 0
+    }
+}
+
+#[cfg(feature = "python")]
+impl IntoPy<PyObject> for MmapFlags {
+    fn into_py(self, py: Python) -> PyObject {
+        let n: i32 = self.into();
+        n.into_py(py)
+    }
+}
+
 #[repr(C)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", derive(FromPyObject))]
@@ -245,6 +285,7 @@ pub struct MapInfo {
     end: GuestAddr,
     offset: GuestAddr,
     path: *const u8,
+    perms: i32,
     flags: i32,
     is_priv: i32,
 }
@@ -281,8 +322,13 @@ impl MapInfo {
     }
 
     #[must_use]
-    pub fn flags(&self) -> MmapPerms {
-        MmapPerms::try_from(self.flags).unwrap()
+    pub fn perms(&self) -> MmapPerms {
+        MmapPerms::try_from(self.perms).unwrap()
+    }
+
+    #[must_use]
+    pub fn flags(&self) -> MmapFlags {
+        MmapFlags::try_from(self.flags).unwrap()
     }
 
     #[must_use]

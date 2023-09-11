@@ -22,7 +22,7 @@ use crate::SYS_mmap2;
 )))]
 use crate::SYS_newfstatat;
 use crate::{
-    emu::{Emulator, MmapPerms, SyscallHookResult},
+    emu::{Emulator, MmapFlags, MmapPerms, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple},
     hooks::QemuHooks,
     GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
@@ -39,6 +39,9 @@ pub type StopExecutionCallback = Box<dyn FnMut(&mut QemuSnapshotHelper, &Emulato
 pub struct SnapshotPageInfo {
     pub addr: GuestAddr,
     pub perms: MmapPerms,
+    pub flags: MmapFlags,
+    // TODO using it
+    pub huge: bool,
     pub private: bool,
     pub data: Option<Box<[u8; SNAPSHOT_PAGE_SIZE]>>,
 }
@@ -61,6 +64,7 @@ impl SnapshotAccessInfo {
 #[derive(Clone, Default, Debug)]
 pub struct MemoryRegionInfo {
     pub perms: Option<MmapPerms>,
+    pub flags: Option<MmapFlags>,
     pub changed: bool,
 }
 
@@ -144,11 +148,13 @@ impl QemuSnapshotHelper {
             while addr < map.end() {
                 let mut info = SnapshotPageInfo {
                     addr,
-                    perms: map.flags(),
+                    perms: map.perms(),
+                    flags: map.flags(),
+                    huge: map.flags().is_huge(),
                     private: map.is_priv(),
                     data: None,
                 };
-                if map.flags().is_r() {
+                if map.perms().is_r() {
                     // TODO not just for R pages
                     unsafe {
                         info.data = Some(Box::new(core::mem::zeroed()));
@@ -162,7 +168,8 @@ impl QemuSnapshotHelper {
             self.maps.tree.insert(
                 map.start()..map.end(),
                 MemoryRegionInfo {
-                    perms: Some(map.flags()),
+                    perms: Some(map.perms()),
+                    flags: Some(map.flags()),
                     changed: false,
                 },
             );
@@ -307,7 +314,13 @@ impl QemuSnapshotHelper {
             .is_none()
     }
 
-    pub fn add_mapped(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
+    pub fn add_mapped(
+        &mut self,
+        start: GuestAddr,
+        mut size: usize,
+        perms: Option<MmapPerms>,
+        flags: Option<MmapFlags>,
+    ) {
         if size == 0 {
             return;
         }
@@ -321,6 +334,7 @@ impl QemuSnapshotHelper {
                 start..(start + (size as GuestAddr)),
                 MemoryRegionInfo {
                     perms,
+                    flags,
                     changed: true,
                 },
             );
@@ -336,7 +350,13 @@ impl QemuSnapshotHelper {
         }
     }
 
-    pub fn change_mapped(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
+    pub fn change_mapped(
+        &mut self,
+        start: GuestAddr,
+        mut size: usize,
+        perms: Option<MmapPerms>,
+        flags: Option<MmapFlags>,
+    ) {
         if size % SNAPSHOT_PAGE_SIZE != 0 {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
@@ -358,6 +378,7 @@ impl QemuSnapshotHelper {
                     i.start..overlap.start,
                     MemoryRegionInfo {
                         perms,
+                        flags,
                         changed: true,
                     },
                 );
@@ -367,6 +388,7 @@ impl QemuSnapshotHelper {
                     overlap.end..i.end,
                     MemoryRegionInfo {
                         perms,
+                        flags,
                         changed: true,
                     },
                 );
@@ -377,6 +399,7 @@ impl QemuSnapshotHelper {
             interval,
             MemoryRegionInfo {
                 perms,
+                flags,
                 changed: true,
             },
         );
@@ -408,6 +431,7 @@ impl QemuSnapshotHelper {
                     i.start..overlap.start,
                     MemoryRegionInfo {
                         perms,
+                        flags: Some(MmapFlags::None),
                         changed: true,
                     },
                 );
@@ -417,6 +441,7 @@ impl QemuSnapshotHelper {
                     overlap.end..i.end,
                     MemoryRegionInfo {
                         perms,
+                        flags: Some(MmapFlags::None),
                         changed: true,
                     },
                 );
@@ -678,21 +703,23 @@ where
                 return result;
             }
 
-            // TODO handle huge pages
+            // TODO using the huge pages info
 
             #[cfg(any(cpu_target = "arm", cpu_target = "mips"))]
             if sys_const == SYS_mmap2 {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                    h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
+                    h.add_mapped(result as GuestAddr, a1 as usize, Some(prot), None);
                 }
             }
 
             #[cfg(not(cpu_target = "arm"))]
             if sys_const == SYS_mmap {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
-                    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                    h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
+                    if let Ok(flags) = MmapFlags::try_from(a3 as i32) {
+                        let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+                        h.add_mapped(result as GuestAddr, a1 as usize, Some(prot), Some(flags));
+                    }
                 }
             }
 
@@ -700,11 +727,11 @@ where
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
                 // TODO get the old permissions from the removed mapping
                 h.remove_mapped(a0 as GuestAddr, a1 as usize);
-                h.add_mapped(result as GuestAddr, a2 as usize, None);
+                h.add_mapped(result as GuestAddr, a2 as usize, None, None);
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                    h.add_mapped(a0 as GuestAddr, a1 as usize, Some(prot));
+                    h.add_mapped(a0 as GuestAddr, a1 as usize, Some(prot), None);
                 }
             } else if sys_const == SYS_munmap {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();

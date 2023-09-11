@@ -136,6 +136,10 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
         let v: i32 = r.into();
         mmapm.add(&format!("{r:?}"), v)?;
     }
+    for r in emu::MmapFlags::iter() {
+        let v: i32 = r.into();
+        mmapm.add(&format!("{r:?}"), v)?;
+    }
     m.add_submodule(mmapm)?;
 
     m.add_class::<emu::MapInfo>()?;
