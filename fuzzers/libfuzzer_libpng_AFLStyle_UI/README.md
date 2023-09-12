@@ -57,9 +57,6 @@ The first time you run the binary, the broker will open a tcp port (currently on
 
 ```
 ./fuzzer_libpng
-
-[libafl/src/bolts/llmp.rs:407] "We're the broker" = "We\'re the broker"
-Doing broker things. Run this tool again to start fuzzing in a client.
 ```
 
 And after running the above again in a separate terminal:
@@ -72,6 +69,7 @@ And after running the above again in a separate terminal:
 [New Testcase #2] clients: 3, corpus: 6, objectives: 0, executions: 5, exec/sec: 0
 < fuzzing stats >
 ```
+You will get an AFL-Style UI in your terminal.
 
 As this example uses in-process fuzzing, we added a Restarting Event Manager (`setup_restarting_mgr`).
 This means each client will start itself again to listen for crashes and timeouts.

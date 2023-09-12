@@ -608,13 +608,7 @@ impl TuiUI {
         ];
 
         let chunks = Layout::default()
-            .constraints(
-                [
-                    Constraint::Length(2 + items.len() as u16),
-                    Constraint::Min(0),
-                ]
-                .as_ref(),
-            )
+            .constraints([Constraint::Percentage(100)].as_ref())
             .split(area);
 
         let table = Table::new(items)
@@ -673,13 +667,7 @@ impl TuiUI {
         ];
 
         let chunks = Layout::default()
-            .constraints(
-                [
-                    Constraint::Length(2 + items.len() as u16),
-                    Constraint::Min(0),
-                ]
-                .as_ref(),
-            )
+            .constraints([Constraint::Percentage(100)].as_ref())
             .split(area);
 
         let table = Table::new(items)
@@ -741,13 +729,7 @@ impl TuiUI {
         ];
 
         let chunks = Layout::default()
-            .constraints(
-                [
-                    Constraint::Length(2 + items.len() as u16),
-                    Constraint::Min(0),
-                ]
-                .as_ref(),
-            )
+            .constraints([Constraint::Percentage(100)].as_ref())
             .split(area);
 
         let table = Table::new(items)

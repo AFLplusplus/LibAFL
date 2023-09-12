@@ -10,7 +10,7 @@ use std::ptr;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
@@ -120,7 +120,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
-            InMemoryCorpus::new(),
+            InMemoryOnDiskCorpus::new(&corpus_dirs.get(0).unwrap()).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
