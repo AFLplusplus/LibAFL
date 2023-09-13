@@ -175,16 +175,14 @@ where
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let metadata: &TuneableMutationalStageMetadata = state.metadata()?;
+        let fuzz_time = self.seed_fuzz_time(state)?;
+        let iters = self.iters(state)?;
 
-        let fuzz_time = metadata.fuzz_time;
-        let iters = metadata.iters;
-
-        let (start_time, iters) = if fuzz_time.is_some() {
-            (Some(current_time()), iters)
-        } else {
-            (None, Some(self.iterations(state, corpus_idx)?))
-        };
+        if fuzz_time.is_some() && iters.is_some() {
+            return Err(Error::illegal_state(
+                "Both fuzz_time and iters specified; failing fast!",
+            ));
+        }
 
         start_timer!(state);
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
@@ -194,39 +192,22 @@ where
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
-        let mut i = 0_usize;
-        loop {
-            if let Some(start_time) = start_time {
-                if current_time() - start_time >= fuzz_time.unwrap() {
+        if let Some(fuzz_time) = fuzz_time {
+            let mut i = 0u64;
+            let start_time = current_time();
+            loop {
+                if current_time() - start_time >= fuzz_time {
                     break;
                 }
             }
-            if let Some(iters) = iters {
-                if i >= iters as usize {
-                    break;
-                }
-            } else {
-                i += 1;
+
+            i += 1;
+            self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+        } else {
+            let iters = iters.map_or_else(|| self.iterations(state, corpus_idx), Ok)?;
+            for i in 1..=iters {
+                self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
             }
-
-            let mut input = input.clone();
-
-            start_timer!(state);
-            let mutated = self.mutator_mut().mutate(state, &mut input, i as i32)?;
-            mark_feature_time!(state, PerfFeature::Mutate);
-
-            if mutated == MutationResult::Skipped {
-                continue;
-            }
-
-            // Time is measured directly the `evaluate_input` function
-            let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-
-            start_timer!(state);
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
-            post.post_exec(state, i as i32, corpus_idx)?;
-            mark_feature_time!(state, PerfFeature::MutatePostExec);
         }
         Ok(())
     }
@@ -302,6 +283,7 @@ where
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// Creates a new default tuneable mutational stage
     #[must_use]
@@ -425,6 +407,40 @@ where
         S: HasNamedMetadata,
     {
         reset_by_name(state, name)
+    }
+
+    fn perform_mutation(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Z::State,
+        manager: &mut EM,
+        input: &I,
+        stage_idx: u64,
+    ) -> Result<(), Error> {
+        let mut input = input.clone();
+
+        start_timer!(state);
+        let mutated = self
+            .mutator_mut()
+            .mutate(state, &mut input, stage_idx as i32)?;
+        mark_feature_time!(state, PerfFeature::Mutate);
+
+        if mutated == MutationResult::Skipped {
+            return Ok(());
+        }
+
+        // Time is measured directly the `evaluate_input` function
+        let (untransformed, post) = input.try_transform_into(state)?;
+        let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+
+        start_timer!(state);
+        self.mutator_mut()
+            .post_exec(state, stage_idx as i32, corpus_idx)?;
+        post.post_exec(state, stage_idx as i32, corpus_idx)?;
+        mark_feature_time!(state, PerfFeature::MutatePostExec);
+
+        Ok(())
     }
 }
 
