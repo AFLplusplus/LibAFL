@@ -199,10 +199,10 @@ where
                 if current_time() - start_time >= fuzz_time {
                     break;
                 }
-            }
 
-            i += 1;
-            self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                i += 1;
+                self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+            }
         } else {
             let iters = iters.map_or_else(|| self.iterations(state, corpus_idx), Ok)?;
             for i in 1..=iters {
