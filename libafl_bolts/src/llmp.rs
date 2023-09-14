@@ -1934,6 +1934,7 @@ where
     clients_to_remove: Vec<usize>,
     /// The ShMemProvider to use
     shmem_provider: SP,
+    #[cfg(feature = "std")]
     /// The duration after which a non-communicative client is considered dead.
     client_timeout: Duration,
 }
