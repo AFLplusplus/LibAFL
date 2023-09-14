@@ -176,7 +176,7 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let fuzz_time = self.seed_fuzz_time(state)?;
-        let iters = self.iters(state)?;
+        let iters = self.fixed_iters(state)?;
 
         if fuzz_time.is_some() && iters.is_some() {
             return Err(Error::illegal_state(
@@ -192,21 +192,41 @@ where
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
-        if let Some(fuzz_time) = fuzz_time {
-            let mut i = 0u64;
-            let start_time = current_time();
-            loop {
-                if current_time() - start_time >= fuzz_time {
-                    break;
-                }
+        match (fuzz_time, iters) {
+            (Some(fuzz_time), Some(iters)) => {
+                // perform n iterations or fuzz for provided time, whichever comes first
+                let start_time = current_time();
+                for i in 1..=iters {
+                    if current_time() - start_time >= fuzz_time {
+                        break;
+                    }
 
-                i += 1;
-                self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                }
             }
-        } else {
-            let iters = iters.map_or_else(|| self.iterations(state, corpus_idx), Ok)?;
-            for i in 1..=iters {
-                self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+            (Some(fuzz_time), None) => {
+                // fuzz for provided time
+                let start_time = current_time();
+                for i in 1.. {
+                    if current_time() - start_time >= fuzz_time {
+                        break;
+                    }
+
+                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                }
+            }
+            (None, Some(iters)) => {
+                // perform n iterations
+                for i in 1..=iters {
+                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                }
+            }
+            (None, None) => {
+                // fall back to random
+                let iters = self.iterations(state, corpus_idx)?;
+                for i in 1..=iters {
+                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                }
             }
         }
         Ok(())
@@ -227,12 +247,10 @@ where
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_possible_truncation)]
     fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
-        Ok(if let Some(iters) = self.iters(state)? {
-            iters
-        } else {
+        Ok(
             // fall back to random
-            1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS)
-        })
+            1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS),
+        )
     }
 }
 
@@ -317,20 +335,20 @@ where
         set_iters_by_name(state, iters, name)
     }
 
-    /// Get the set iterations for this [`TuneableMutationalStage`]
-    pub fn iters<S>(&self, state: &S) -> Result<Option<u64>, Error>
+    /// Get the set iterations for this [`TuneableMutationalStage`], if any
+    pub fn fixed_iters<S>(&self, state: &S) -> Result<Option<u64>, Error>
     where
         S: HasNamedMetadata,
     {
         get_iters_by_name(state, &self.name)
     }
 
-    /// Get the set iterations for the std [`TuneableMutationalStage`]
+    /// Get the set iterations for the std [`TuneableMutationalStage`], if any
     pub fn iters_std(state: &Z::State) -> Result<Option<u64>, Error> {
         get_iters_by_name(state, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
-    /// Get the set iterations for the [`TuneableMutationalStage`] with the given name
+    /// Get the set iterations for the [`TuneableMutationalStage`] with the given name, if any
     pub fn iters_by_name<S>(state: &S, name: &str) -> Result<Option<u64>, Error>
     where
         S: HasNamedMetadata,
