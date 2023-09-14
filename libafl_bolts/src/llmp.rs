@@ -110,8 +110,9 @@ use crate::{
 /// [`DEFAULT_CLIENT_TIMEOUT`] for the broker's stale client detection.
 const _LLMP_CLIENT_TIMEOUT_ENV_STR: &str = "LLMP_CLIENT_TIMEOUT";
 
-/// The timeout after which a client will be considered stale, and removed. Defaults to 5 minutes.
-/// If LLMP_CLIENT_TIMEOUT is set, it will be used instead.
+/// The timeout in seconds after which a client will be considered stale, and removed.
+/// Defaults to 5 minutes.  If the `LLMP_CLIENT_TIMEOUT` environment variable is set, it
+/// will be used instead.
 #[cfg(feature = "std")]
 const DEFAULT_CLIENT_TIMEOUT: u64 = 60 * 5;
 
