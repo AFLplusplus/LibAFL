@@ -175,16 +175,14 @@ where
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let metadata: &TuneableMutationalStageMetadata = state.metadata()?;
+        let fuzz_time = self.seed_fuzz_time(state)?;
+        let iters = self.fixed_iters(state)?;
 
-        let fuzz_time = metadata.fuzz_time;
-        let iters = metadata.iters;
-
-        let (start_time, iters) = if fuzz_time.is_some() {
-            (Some(current_time()), iters)
-        } else {
-            (None, Some(self.iterations(state, corpus_idx)?))
-        };
+        if fuzz_time.is_some() && iters.is_some() {
+            return Err(Error::illegal_state(
+                "Both fuzz_time and iters specified; failing fast!",
+            ));
+        }
 
         start_timer!(state);
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
@@ -194,39 +192,42 @@ where
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
-        let mut i = 0_usize;
-        loop {
-            if let Some(start_time) = start_time {
-                if current_time() - start_time >= fuzz_time.unwrap() {
-                    break;
+        match (fuzz_time, iters) {
+            (Some(fuzz_time), Some(iters)) => {
+                // perform n iterations or fuzz for provided time, whichever comes first
+                let start_time = current_time();
+                for i in 1..=iters {
+                    if current_time() - start_time >= fuzz_time {
+                        break;
+                    }
+
+                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
                 }
             }
-            if let Some(iters) = iters {
-                if i >= iters as usize {
-                    break;
+            (Some(fuzz_time), None) => {
+                // fuzz for provided time
+                let start_time = current_time();
+                for i in 1.. {
+                    if current_time() - start_time >= fuzz_time {
+                        break;
+                    }
+
+                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
                 }
-            } else {
-                i += 1;
             }
-
-            let mut input = input.clone();
-
-            start_timer!(state);
-            let mutated = self.mutator_mut().mutate(state, &mut input, i as i32)?;
-            mark_feature_time!(state, PerfFeature::Mutate);
-
-            if mutated == MutationResult::Skipped {
-                continue;
+            (None, Some(iters)) => {
+                // perform n iterations
+                for i in 1..=iters {
+                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                }
             }
-
-            // Time is measured directly the `evaluate_input` function
-            let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
-
-            start_timer!(state);
-            self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
-            post.post_exec(state, i as i32, corpus_idx)?;
-            mark_feature_time!(state, PerfFeature::MutatePostExec);
+            (None, None) => {
+                // fall back to random
+                let iters = self.iterations(state, corpus_idx)?;
+                for i in 1..=iters {
+                    self.perform_mutation(fuzzer, executor, state, manager, &input, i)?;
+                }
+            }
         }
         Ok(())
     }
@@ -246,12 +247,10 @@ where
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_possible_truncation)]
     fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
-        Ok(if let Some(iters) = self.iters(state)? {
-            iters
-        } else {
+        Ok(
             // fall back to random
-            1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS)
-        })
+            1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS),
+        )
     }
 }
 
@@ -302,6 +301,7 @@ where
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// Creates a new default tuneable mutational stage
     #[must_use]
@@ -335,20 +335,20 @@ where
         set_iters_by_name(state, iters, name)
     }
 
-    /// Get the set iterations for this [`TuneableMutationalStage`]
-    pub fn iters<S>(&self, state: &S) -> Result<Option<u64>, Error>
+    /// Get the set iterations for this [`TuneableMutationalStage`], if any
+    pub fn fixed_iters<S>(&self, state: &S) -> Result<Option<u64>, Error>
     where
         S: HasNamedMetadata,
     {
         get_iters_by_name(state, &self.name)
     }
 
-    /// Get the set iterations for the std [`TuneableMutationalStage`]
+    /// Get the set iterations for the std [`TuneableMutationalStage`], if any
     pub fn iters_std(state: &Z::State) -> Result<Option<u64>, Error> {
         get_iters_by_name(state, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
-    /// Get the set iterations for the [`TuneableMutationalStage`] with the given name
+    /// Get the set iterations for the [`TuneableMutationalStage`] with the given name, if any
     pub fn iters_by_name<S>(state: &S, name: &str) -> Result<Option<u64>, Error>
     where
         S: HasNamedMetadata,
@@ -425,6 +425,40 @@ where
         S: HasNamedMetadata,
     {
         reset_by_name(state, name)
+    }
+
+    fn perform_mutation(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Z::State,
+        manager: &mut EM,
+        input: &I,
+        stage_idx: u64,
+    ) -> Result<(), Error> {
+        let mut input = input.clone();
+
+        start_timer!(state);
+        let mutated = self
+            .mutator_mut()
+            .mutate(state, &mut input, stage_idx as i32)?;
+        mark_feature_time!(state, PerfFeature::Mutate);
+
+        if mutated == MutationResult::Skipped {
+            return Ok(());
+        }
+
+        // Time is measured directly the `evaluate_input` function
+        let (untransformed, post) = input.try_transform_into(state)?;
+        let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+
+        start_timer!(state);
+        self.mutator_mut()
+            .post_exec(state, stage_idx as i32, corpus_idx)?;
+        post.post_exec(state, stage_idx as i32, corpus_idx)?;
+        mark_feature_time!(state, PerfFeature::MutatePostExec);
+
+        Ok(())
     }
 }
 
