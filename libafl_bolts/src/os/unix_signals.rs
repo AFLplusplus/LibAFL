@@ -390,7 +390,11 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
             None => return,
         }
     };
-    handler.handle(*signal, info, &mut *(void as *mut ucontext_t));
+    handler.handle(
+        *signal,
+        info,
+        &mut ptr::read_unaligned(void as *mut ucontext_t),
+    );
 }
 
 /// Setup signal handlers in a somewhat rusty way.
