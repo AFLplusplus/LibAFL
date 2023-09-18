@@ -4,7 +4,7 @@ cd "$SCRIPT_DIR/.." || exit 1
 
 set -e
 
-RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --release --tests --examples --benches -- -Z macro-backtrace \
+RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --tests --examples --benches -- -Z macro-backtrace \
    -D clippy::all \
    -D clippy::pedantic \
    -W clippy::similar_names \
@@ -21,7 +21,7 @@ RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --release --tests
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
   cd libafl_libfuzzer/libafl_libfuzzer_runtime
-  RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --release --tests --examples --benches -- -Z macro-backtrace \
+  RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --tests --examples --benches -- -Z macro-backtrace \
      -D clippy::all \
      -D clippy::pedantic \
      -W clippy::similar_names \
