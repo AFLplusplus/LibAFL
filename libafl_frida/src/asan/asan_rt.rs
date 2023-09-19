@@ -299,7 +299,7 @@ impl AsanRuntime {
         Self {
             check_for_leaks_enabled: options.detect_leaks,
             current_report_impl: 0,
-            allocator: Allocator::new(options.clone()),
+            allocator: Allocator::new(&options),
             regs: [0; ASAN_SAVE_REGISTER_COUNT],
             blob_report: None,
             blob_check_mem_byte: None,
