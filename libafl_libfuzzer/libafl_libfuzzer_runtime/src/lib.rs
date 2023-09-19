@@ -71,7 +71,9 @@
 #![allow(clippy::borrow_deref_ref)]
 
 use core::ffi::{c_char, c_int, CStr};
+use std::{fs::File, io::stderr, os::fd::RawFd};
 
+use env_logger::Target;
 use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     Error,
@@ -207,7 +209,7 @@ macro_rules! fuzz_with {
             let backtrace_observer = BacktraceObserver::new(
                 "BacktraceObserver",
                 unsafe { &mut BACKTRACE },
-                libafl::observers::HarnessType::InProcess,
+                if $options.forks().is_some() || $options.tui() { libafl::observers::HarnessType::Child } else { libafl::observers::HarnessType::InProcess }
             );
 
             // New maximization map feedback linked to the edges observer
@@ -528,6 +530,9 @@ extern "C" {
     fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
 }
 
+/// Communicate the stderr duplicated fd to subprocesses
+pub const STDERR_FD_VAR: &str = "_LIBAFL_LIBFUZZER_STDERR_FD";
+
 /// A method to start the fuzzer at a later point in time from a library.
 /// To quote the `libfuzzer` docs:
 /// > when it’s ready to start fuzzing, it can call `LLVMFuzzerRunDriver`, passing in the program arguments and a callback. This callback is invoked just like `LLVMFuzzerTestOneInput`, and has the same signature.
@@ -546,6 +551,29 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
     let harness = harness_fn
         .as_ref()
         .expect("Illegal harness provided to libafl.");
+
+    // early duplicate the stderr fd so we can close it later for the target
+    #[cfg(unix)]
+    {
+        use std::{
+            os::fd::{AsRawFd, FromRawFd},
+            str::FromStr,
+        };
+
+        let stderr_fd = std::env::var(STDERR_FD_VAR)
+            .map_err(|e| Error::from(e))
+            .and_then(|s| RawFd::from_str(&s).map_err(|e| Error::from(e)))
+            .unwrap_or_else(|_| {
+                let stderr = libc::dup(stderr().as_raw_fd());
+                std::env::set_var(STDERR_FD_VAR, stderr.to_string());
+                stderr
+            });
+        let stderr = File::from_raw_fd(stderr_fd);
+        env_logger::builder()
+            .parse_default_env()
+            .target(Target::Pipe(Box::new(stderr)))
+            .init();
+    }
 
     // it appears that no one, not even libfuzzer, uses this return value
     // https://github.com/llvm/llvm-project/blob/llvmorg-15.0.7/compiler-rt/lib/fuzzer/FuzzerDriver.cpp#L648
