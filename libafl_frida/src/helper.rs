@@ -164,31 +164,8 @@ where
     #[allow(clippy::too_many_lines)]
     #[must_use]
     pub fn new(gum: &'a Gum, options: &'a FuzzerOptions, mut runtimes: RT) -> Self {
-        // workaround frida's frida-gum-allocate-near bug:
         #[cfg(unix)]
-        unsafe {
-            for _ in 0..512 {
-                mmap(
-                    None,
-                    std::num::NonZeroUsize::new_unchecked(128 * 1024),
-                    ProtFlags::PROT_NONE,
-                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
-                    -1,
-                    0,
-                )
-                .expect("Failed to map dummy regions for frida workaround");
-                mmap(
-                    None,
-                    std::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
-                    ProtFlags::PROT_NONE,
-                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
-                    -1,
-                    0,
-                )
-                .expect("Failed to map dummy regions for frida workaround");
-            }
-        }
-
+        Self::workaround_gum_allocate_near();
         let mut modules_to_instrument = vec![options
             .harness
             .as_ref()
@@ -395,6 +372,33 @@ where
         (*self.runtimes).borrow_mut().match_first_type_mut::<R>()
     }
     */
+
+    // workaround frida's frida-gum-allocate-near bug:
+    #[cfg(unix)]
+    fn workaround_gum_allocate_near() {
+        unsafe {
+            for _ in 0..512 {
+                mmap(
+                    None,
+                    std::num::NonZeroUsize::new_unchecked(128 * 1024),
+                    ProtFlags::PROT_NONE,
+                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                    -1,
+                    0,
+                )
+                .expect("Failed to map dummy regions for frida workaround");
+                mmap(
+                    None,
+                    std::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
+                    ProtFlags::PROT_NONE,
+                    ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                    -1,
+                    0,
+                )
+                .expect("Failed to map dummy regions for frida workaround");
+            }
+        }
+    }
 
     /// Returns ref to the Transformer
     pub fn transformer(&self) -> &Transformer<'a> {
