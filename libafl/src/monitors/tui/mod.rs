@@ -436,7 +436,8 @@ impl TuiMonitor {
         let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
 
         enable_raw_mode().unwrap();
-        if cfg!(unix) {
+        #[cfg(unix)]
+        {
             use std::{
                 fs::File,
                 os::fd::{AsRawFd, FromRawFd},
@@ -450,7 +451,9 @@ impl TuiMonitor {
                 tui_ui,
                 move || stdout.try_clone().unwrap(),
             );
-        } else {
+        }
+        #[cfg(not(unix))]
+        {
             run_tui_thread(
                 context.clone(),
                 Duration::from_millis(250),

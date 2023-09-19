@@ -152,8 +152,8 @@ where
 {
     destroy_output_fds(options);
     let broker_port = std::env::var(PORT_PROVIDER_VAR)
-        .map_err(|e| Error::from(e))
-        .and_then(|s| u16::from_str(&s).map_err(|e| Error::from(e)))
+        .map_err(Error::from)
+        .and_then(|s| u16::from_str(&s).map_err(Error::from))
         .or_else(|_| {
             TcpListener::bind("127.0.0.1:0").map(|sock| {
                 let port = sock.local_addr().unwrap().port();

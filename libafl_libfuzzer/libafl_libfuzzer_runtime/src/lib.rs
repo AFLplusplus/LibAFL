@@ -561,8 +561,8 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
         };
 
         let stderr_fd = std::env::var(STDERR_FD_VAR)
-            .map_err(|e| Error::from(e))
-            .and_then(|s| RawFd::from_str(&s).map_err(|e| Error::from(e)))
+            .map_err(Error::from)
+            .and_then(|s| RawFd::from_str(&s).map_err(Error::from))
             .unwrap_or_else(|_| {
                 let stderr = libc::dup(stderr().as_raw_fd());
                 std::env::set_var(STDERR_FD_VAR, stderr.to_string());
