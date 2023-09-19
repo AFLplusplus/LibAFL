@@ -24,7 +24,7 @@ windows_alias = "fuzzer_windows"
 [tasks.fuzzer_windows]
 dependencies = ["harness"]
 command = "cargo"
-args = ["build", "--release"]
+args = ["build"]
 
 # Run the fuzzer
 [tasks.run]
@@ -35,7 +35,7 @@ windows_alias = "run_windows"
 [tasks.run_windows]
 dependencies = ["harness", "fuzzer"]
 command = "cargo"
-args = ["run", "--release"]
+args = ["run"]
 
 
 # Run the fuzzer
@@ -47,7 +47,7 @@ windows_alias = "test_windows"
 [tasks.test_windows]
 script_runner = "@shell"
 script='''
-copy .\target\release\tinyinst_simple.exe .
+copy .\target\debug\tinyinst_simple.exe .
 start "" "tinyinst_simple.exe"
 #ping is for timeout
 ping -n 10 127.0.0.1>NUL && taskkill /im tinyinst_simple.exe /F

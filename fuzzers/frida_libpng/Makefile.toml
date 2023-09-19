@@ -68,15 +68,15 @@ windows_alias = "fuzzer_windows"
 [tasks.fuzzer_unix]
 script_runner="@shell"
 script='''
-cargo build --release
-cp ${CARGO_TARGET_DIR}/release/${FUZZER_NAME} .
+cargo build
+cp ${CARGO_TARGET_DIR}/debug/${FUZZER_NAME} .
 '''
 
 [tasks.fuzzer_windows]
 script_runner="@shell"
 script='''
-cargo build --release
-cp ./target/release/${FUZZER_NAME} .
+cargo build
+cp ./target/debug/${FUZZER_NAME} .
 '''
 
 # Run the fuzzer
