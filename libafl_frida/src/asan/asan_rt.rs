@@ -170,7 +170,7 @@ impl FridaRuntime for AsanRuntime {
         module_map: &Rc<ModuleMap>,
     ) {
         unsafe {
-            ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
+            ASAN_ERRORS = Some(AsanErrors::new(self.options.continue_on_error));
         }
 
         self.generate_instrumentation_blobs();
