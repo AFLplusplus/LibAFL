@@ -46,7 +46,7 @@ pub trait FridaRuntime: 'static + Debug {
         &mut self,
         gum: &Gum,
         ranges: &RangeMap<usize, (u16, String)>,
-        modules_to_instrument: &[&str],
+        module_map: &Rc<ModuleMap>,
     );
 
     /// Method called before execution
@@ -63,7 +63,7 @@ pub trait FridaRuntimeTuple: MatchFirstType + Debug {
         &mut self,
         gum: &Gum,
         ranges: &RangeMap<usize, (u16, String)>,
-        modules_to_instrument: &[&str],
+        module_map: &Rc<ModuleMap>,
     );
 
     /// Method called before execution
@@ -78,7 +78,7 @@ impl FridaRuntimeTuple for () {
         &mut self,
         _gum: &Gum,
         _ranges: &RangeMap<usize, (u16, String)>,
-        _modules_to_instrument: &[&str],
+        _module_map: &Rc<ModuleMap>,
     ) {
     }
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
@@ -98,10 +98,10 @@ where
         &mut self,
         gum: &Gum,
         ranges: &RangeMap<usize, (u16, String)>,
-        modules_to_instrument: &[&str],
+        module_map: &Rc<ModuleMap>,
     ) {
-        self.0.init(gum, ranges, modules_to_instrument);
-        self.1.init_all(gum, ranges, modules_to_instrument);
+        self.0.init(gum, ranges, module_map);
+        self.1.init_all(gum, ranges, module_map);
     }
 
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
@@ -205,7 +205,7 @@ where
                 "instrumented libraries must not include the fuzzer"
             );
 
-            runtimes.init_all(gum, &ranges, &modules_to_instrument);
+            runtimes.init_all(gum, &ranges, &Rc::new(module_map));
         }
 
         // Wrap ranges and runtimes in reference-counted refcells in order to move
@@ -427,11 +427,11 @@ where
         &mut self,
         gum: &'a Gum,
         ranges: &RangeMap<usize, (u16, String)>,
-        modules_to_instrument: &'a [&str],
+        module_map: &Rc<ModuleMap>,
     ) {
         (*self.runtimes)
             .borrow_mut()
-            .init_all(gum, ranges, modules_to_instrument);
+            .init_all(gum, ranges, module_map);
     }
 
     /// Method called before execution

@@ -10,7 +10,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile};
+use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile, rc::Rc};
 
 use backtrace::Backtrace;
 #[cfg(target_arch = "x86_64")]
@@ -140,7 +140,7 @@ pub struct AsanRuntime {
     blob_check_mem_64bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
     options: FuzzerOptions,
-    module_map: Option<ModuleMap>,
+    module_map: Option<Rc<ModuleMap>>,
     suppressed_addresses: Vec<usize>,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
 
@@ -167,7 +167,7 @@ impl FridaRuntime for AsanRuntime {
         &mut self,
         gum: &Gum,
         _ranges: &RangeMap<usize, (u16, String)>,
-        modules_to_instrument: &[&str],
+        module_map: &Rc<ModuleMap>,
     ) {
         unsafe {
             ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
@@ -178,7 +178,7 @@ impl FridaRuntime for AsanRuntime {
         self.generate_shadow_check_function();
         self.unpoison_all_existing_memory();
 
-        self.module_map = Some(ModuleMap::new_from_names(gum, modules_to_instrument));
+        self.module_map = Some(module_map.clone());
         if !self.options.dont_instrument.is_empty() {
             for (module_name, offset) in self.options.dont_instrument.clone() {
                 let module_details = ModuleDetails::with_name(module_name).unwrap();

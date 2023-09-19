@@ -2,9 +2,11 @@
 use std::{
     collections::HashMap,
     hash::{BuildHasher, Hasher},
+    rc::Rc,
 };
 
 use ahash::RandomState;
+use frida_gum::ModuleMap;
 use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
@@ -31,7 +33,7 @@ impl FridaRuntime for DrCovRuntime {
         &mut self,
         _gum: &frida_gum::Gum,
         ranges: &RangeMap<usize, (u16, String)>,
-        _modules_to_instrument: &[&str],
+        _module_map: &Rc<ModuleMap>,
     ) {
         self.ranges = ranges.clone();
         std::fs::create_dir_all("./coverage")
