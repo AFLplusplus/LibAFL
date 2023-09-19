@@ -114,10 +114,11 @@ where
 
 /// An helper that feeds `FridaInProcessExecutor` with edge-coverage instrumentation
 pub struct FridaInstrumentationHelper<'a, RT: 'a> {
-    options: &'a FuzzerOptions,
     transformer: Transformer<'a>,
     ranges: Rc<RefCell<RangeMap<usize, (u16, String)>>>,
     runtimes: Rc<RefCell<RT>>,
+    stalker_enabled: bool,
+    pub(crate) disable_excludes: bool,
 }
 
 impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
@@ -126,7 +127,7 @@ impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
         dbg_me
             .field("ranges", &self.ranges)
             .field("module_map", &"<ModuleMap>")
-            .field("options", &self.options);
+            .field("stalker_enabled", &self.stalker_enabled);
         dbg_me.finish()
     }
 }
@@ -201,7 +202,9 @@ where
         let module_map = ModuleMap::new_from_names(gum, &modules_to_instrument);
         let mut ranges = RangeMap::new();
 
-        if options.cmplog || options.asan || !options.disable_coverage {
+        let stalker_enabled = options.cmplog || options.asan || !options.disable_coverage;
+
+        if stalker_enabled {
             for (i, module) in module_map.values().iter().enumerate() {
                 let range = module.range();
                 let start = range.base_address().0 as usize;
@@ -367,10 +370,11 @@ where
         };
 
         Self {
-            options,
             transformer,
             ranges,
             runtimes,
+            stalker_enabled,
+            disable_excludes: options.disable_excludes,
         }
     }
 
@@ -421,7 +425,7 @@ where
 
     /// If stalker is enabled
     pub fn stalker_enabled(&self) -> bool {
-        self.options.cmplog || self.options.asan || !self.options.disable_coverage
+        self.stalker_enabled
     }
 
     /// Pointer to coverage map
@@ -440,11 +444,5 @@ where
     /// Mutable ranges
     pub fn ranges_mut(&mut self) -> RefMut<RangeMap<usize, (u16, String)>> {
         (*self.ranges).borrow_mut()
-    }
-
-    /// Return the ref to options
-    #[inline]
-    pub fn options(&self) -> &FuzzerOptions {
-        self.options
     }
 }
