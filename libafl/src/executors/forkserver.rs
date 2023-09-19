@@ -69,7 +69,7 @@ const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
 
 /// The default signal to use to kill child processes
-const DEFAULT_KILL_SIGNAL: Signal = Signal::SIGTERM;
+const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;
 
 /// Configure the target, `limit`, `setsid`, `pipe_stdin`, the code was borrowed from the [`Angora`](https://github.com/AngoraFuzzer/Angora) fuzzer
 pub trait ConfigTarget {
@@ -232,15 +232,13 @@ impl Drop for Forkserver {
                 io::Error::last_os_error()
             );
             let _ = kill(forkserver_pid, Signal::SIGKILL);
-        } else {
-            if let Err(err) = waitpid(forkserver_pid, None) {
-                log::warn!(
-                    "Waitpid on forkserver {} failed: {err} ({})",
-                    forkserver_pid,
-                    io::Error::last_os_error()
-                );
-                let _ = kill(forkserver_pid, Signal::SIGKILL);
-            }
+        } else if let Err(err) = waitpid(forkserver_pid, None) {
+            log::warn!(
+                "Waitpid on forkserver {} failed: {err} ({})",
+                forkserver_pid,
+                io::Error::last_os_error()
+            );
+            let _ = kill(forkserver_pid, Signal::SIGKILL);
         }
     }
 }
@@ -270,7 +268,7 @@ impl Forkserver {
             is_persistent,
             is_deferred_frksrv,
             debug_output,
-            DEFAULT_KILL_SIGNAL,
+            KILL_SIGNAL_DEFAULT,
         )
     }
 
@@ -353,7 +351,7 @@ impl Forkserver {
             child_pid: None,
             status: 0,
             last_run_timed_out: 0,
-            kill_signal: kill_signal,
+            kill_signal,
         })
     }
 
@@ -865,7 +863,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 self.is_persistent,
                 self.is_deferred_frksrv,
                 self.debug_child,
-                self.kill_signal.unwrap_or(DEFAULT_KILL_SIGNAL),
+                self.kill_signal.unwrap_or(KILL_SIGNAL_DEFAULT),
             )?,
             None => {
                 return Err(Error::illegal_argument(
