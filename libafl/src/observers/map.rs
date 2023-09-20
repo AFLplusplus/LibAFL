@@ -1248,7 +1248,7 @@ where
                 *map.get_unchecked_mut(0) =
                     *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(0) as usize);
             }
-            len = len - 1;
+            len -= 1;
         }
 
         // Fix the last element
