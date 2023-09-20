@@ -3,8 +3,8 @@
 use alloc::{boxed::Box, string::ToString};
 use std::{
     collections::VecDeque,
-    fmt::Write,
-    io::{self, BufRead},
+    fmt::Write as _,
+    io::{self, BufRead, Write},
     panic,
     string::String,
     sync::{Arc, RwLock},
@@ -434,7 +434,33 @@ impl TuiMonitor {
     #[must_use]
     pub fn with_time(tui_ui: TuiUI, start_time: Duration) -> Self {
         let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
-        run_tui_thread(context.clone(), Duration::from_millis(250), tui_ui);
+
+        enable_raw_mode().unwrap();
+        #[cfg(unix)]
+        {
+            use std::{
+                fs::File,
+                os::fd::{AsRawFd, FromRawFd},
+            };
+
+            let stdout = unsafe { libc::dup(io::stdout().as_raw_fd()) };
+            let stdout = unsafe { File::from_raw_fd(stdout) };
+            run_tui_thread(
+                context.clone(),
+                Duration::from_millis(250),
+                tui_ui,
+                move || stdout.try_clone().unwrap(),
+            );
+        }
+        #[cfg(not(unix))]
+        {
+            run_tui_thread(
+                context.clone(),
+                Duration::from_millis(250),
+                tui_ui,
+                io::stdout,
+            );
+        }
         Self {
             context,
             start_time,
@@ -528,11 +554,15 @@ impl TuiMonitor {
     }
 }
 
-fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration, tui_ui: TuiUI) {
+fn run_tui_thread<W: Write + Send + Sync + 'static>(
+    context: Arc<RwLock<TuiContext>>,
+    tick_rate: Duration,
+    tui_ui: TuiUI,
+    stdout_provider: impl Send + Sync + 'static + Fn() -> W,
+) {
     thread::spawn(move || -> io::Result<()> {
         // setup terminal
-        let mut stdout = io::stdout();
-        enable_raw_mode()?;
+        let mut stdout = stdout_provider();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
         let backend = CrosstermBackend::new(stdout);
@@ -546,9 +576,10 @@ fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration, tui_ui:
         // Catching panics when the main thread dies
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
+            let mut stdout = stdout_provider();
             disable_raw_mode().unwrap();
             execute!(
-                io::stdout(),
+                stdout,
                 LeaveAlternateScreen,
                 DisableMouseCapture,
                 Show,
