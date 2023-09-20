@@ -214,6 +214,11 @@ where
 
     fn content_mut(&mut self) -> &mut StateShMemContent {
         let ptr = self.shmem.as_slice().as_ptr();
+        debug_assert_eq!(
+            ptr.align_offset(size_of::<StateShMemContent>()),
+            0,
+            "Beginning of the page is not aligned at {ptr:?}!"
+        );
         #[allow(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
         unsafe {
             &mut *(ptr as *mut StateShMemContent)
