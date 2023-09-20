@@ -15,12 +15,12 @@ use crate::{
     Error,
 };
 
-/// Compute the favor factor of a [`Testcase`]. Lower is better.
+/// Compute the favor factor of a [`Testcase`]. Higher is better.
 pub trait TestcaseScore<S>
 where
     S: HasMetadata + HasCorpus,
 {
-    /// Computes the favor factor of a [`Testcase`]. Lower is better.
+    /// Computes the favor factor of a [`Testcase`]. Higher is better.
     fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error>;
 }
 
