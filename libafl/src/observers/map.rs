@@ -10,7 +10,7 @@ use core::{
     iter::Flatten,
     marker::PhantomData,
     mem::size_of,
-    slice::{from_raw_parts, Iter, IterMut},
+    slice::{self, Iter, IterMut},
 };
 
 use ahash::RandomState;
@@ -73,9 +73,9 @@ fn init_count_class_16() {
 fn hash_slice<T>(slice: &[T]) -> u64 {
     let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
     let ptr = slice.as_ptr() as *const u8;
-    let map_size = slice.len() / core::mem::size_of::<T>();
+    let map_size = slice.len() / size_of::<T>();
     unsafe {
-        hasher.write(from_raw_parts(ptr, map_size));
+        hasher.write(slice::from_raw_parts(ptr, map_size));
     }
     hasher.finish()
 }
@@ -1262,7 +1262,7 @@ where
         let cnt = len / 2;
 
         let map16 = unsafe {
-            core::slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt)
+            slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt)
         };
         // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
         for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
@@ -1797,9 +1797,9 @@ where
         for map in &self.maps {
             let slice = map.as_slice();
             let ptr = slice.as_ptr() as *const u8;
-            let map_size = slice.len() / core::mem::size_of::<T>();
+            let map_size = slice.len() / size_of::<T>();
             unsafe {
-                hasher.write(from_raw_parts(ptr, map_size));
+                hasher.write(slice::from_raw_parts(ptr, map_size));
             }
         }
         hasher.finish()
