@@ -70,7 +70,7 @@ jobs:
       with:
         packages: llvm-15 llvm-15-dev clang-15 ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: get clang version
-      run: command -v llvm-config-15 && clang -v
+      run: command -v llvm-config-15 && clang-15 -v
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
     - uses: actions/checkout@v3
@@ -131,7 +131,7 @@ jobs:
       with:
         packages: llvm-15 llvm-15-dev clang-15 ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: get clang version
-      run: command -v llvm-config-15 && clang -v
+      run: command -v llvm-config-15 && clang-15 -v
     - name: Install cargo-hack
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
     - name: Add nightly
@@ -217,7 +217,7 @@ jobs:
       run: brew uninstall llvm clang
     - name: Remove obsolete llvm (Linux)
       if: runner.os == 'Linux'
-      run: sudo apt uninstall llvm* clang*
+      run: sudo apt purge llvm* clang*
     - uses: lyricwulf/abc@v1
       with: 
         # todo: remove afl++-clang when nyx support samcov_pcguard
@@ -275,7 +275,7 @@ jobs:
       run: brew uninstall llvm clang
     - name: Remove obsolete llvm (Linux)
       if: runner.os == 'Linux'
-      run: sudo apt uninstall llvm* clang*
+      run: sudo apt purge llvm* clang*
     - uses: lyricwulf/abc@v1
       with: 
         linux: llvm-15 llvm-15-dev clang-15
