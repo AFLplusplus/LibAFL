@@ -214,7 +214,7 @@ jobs:
       run: rm /usr/local/bin/2to3* /usr/local/bin/idle3* /usr/local/bin/pydoc3* /usr/local/bin/python3*; brew install --force-bottle --overwrite python
     - name: Remove obsolete llvm (macOS)
       if: runner.os == 'macOS'
-      run: brew uninstall llvm clang
+      run: brew uninstall --force llvm clang
     - name: Remove obsolete llvm (Linux)
       if: runner.os == 'Linux'
       run: sudo apt purge llvm* clang*
@@ -272,7 +272,7 @@ jobs:
       run: rm /usr/local/bin/2to3* /usr/local/bin/idle3* /usr/local/bin/pydoc3* /usr/local/bin/python3*
     - name: Remove obsolete llvm (macOS)
       if: runner.os == 'macOS'
-      run: brew uninstall llvm clang
+      run: brew uninstall --force llvm clang
     - name: Remove obsolete llvm (Linux)
       if: runner.os == 'Linux'
       run: sudo apt purge llvm* clang*
