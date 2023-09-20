@@ -169,7 +169,7 @@ jobs:
     - name: Remove existing clang and LLVM
       run: sudo apt purge llvm* clang*
     - name: Install deps
-      run: sudo apt-get install -y llvm-15 llvm-15-dev clang ninja-build python3-dev python3-pip python3-venv libz3-dev
+      run: sudo apt-get install -y llvm-15 llvm-15-dev clang-15 ninja-build python3-dev python3-pip python3-venv libz3-dev
     - name: Install maturin
       run: python3 -m pip install maturin
     - uses: actions/checkout@v3
