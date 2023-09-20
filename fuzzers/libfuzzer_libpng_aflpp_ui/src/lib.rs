@@ -52,6 +52,7 @@ pub extern "C" fn libafl_main() {
     );
     fuzz(
         &[PathBuf::from("./corpus")],
+        PathBuf::from("./out"),
         PathBuf::from("./crashes"),
         1337,
     )
@@ -60,7 +61,12 @@ pub extern "C" fn libafl_main() {
 
 /// The actual fuzzer
 #[cfg(not(test))]
-fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
+fn fuzz(
+    initial_input_dirs: &[PathBuf],
+    corpus_dir: PathBuf,
+    objective_dir: PathBuf,
+    broker_port: u16,
+) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     // let monitor = MultiMonitor::new(|s| println!("{s}"));
 
@@ -120,7 +126,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
             // RNG
             StdRand::with_seed(current_nanos()),
             // Corpus that will be evolved, we keep it in memory for performance
-            InMemoryOnDiskCorpus::new(&corpus_dirs.get(0).unwrap()).unwrap(),
+            InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
@@ -205,8 +211,15 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
         state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
+            .load_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut restarting_mgr,
+                initial_input_dirs,
+            )
+            .unwrap_or_else(|_| {
+                panic!("Failed to load initial corpus at {:?}", &initial_input_dirs)
+            });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
