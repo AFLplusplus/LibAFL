@@ -9,6 +9,7 @@ use core::{
     hash::{BuildHasher, Hasher},
     iter::Flatten,
     marker::PhantomData,
+    mem::size_of,
     slice::{from_raw_parts, Iter, IterMut},
 };
 
@@ -1234,7 +1235,23 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         let map = self.as_mut_slice();
-        let len = map.len();
+        let mut len = map.len();
+        let align_offset = map.as_ptr().align_offset(size_of::<u16>());
+
+        // if len == 1, the next branch will already do this lookup
+        if len > 1 && align_offset != 0 {
+            debug_assert_eq!(
+                align_offset, 1,
+                "Aligning u8 to u16 should always be offset of 1?"
+            );
+            unsafe {
+                *map.get_unchecked_mut(0) =
+                    *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(0) as usize);
+            }
+            len = len - 1;
+        }
+
+        // Fix the last element
         if (len & 1) != 0 {
             unsafe {
                 *map.get_unchecked_mut(len - 1) =
@@ -1243,13 +1260,17 @@ where
         }
 
         let cnt = len / 2;
-        let map16 = unsafe { core::slice::from_raw_parts_mut(map.as_mut_ptr() as *mut u16, cnt) };
+
+        let map16 = unsafe {
+            core::slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt)
+        };
         // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
         for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
             unsafe {
                 *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);
             }
         }
+
         self.base.post_exec(state, input, exit_kind)
     }
 }
