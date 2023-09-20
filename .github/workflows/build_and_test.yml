@@ -63,12 +63,14 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Remove existing clang and LLVM
+      run: sudo apt purge llvm* clang*
     - name: Install and cache deps
       uses: awalsh128/cache-apt-pkgs-action@v1.1.0
       with:
-        packages: llvm llvm-dev clang ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+        packages: llvm-15 llvm-15-dev clang-15 ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: get clang version
-      run: command -v llvm-config && clang -v
+      run: command -v llvm-config-15 && clang-15 -v
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
     - uses: actions/checkout@v3
@@ -122,12 +124,14 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Remove existing clang and LLVM
+      run: sudo apt purge llvm* clang*
     - name: Install and cache deps
       uses: awalsh128/cache-apt-pkgs-action@v1.1.0
       with:
-        packages: llvm llvm-dev clang ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+        packages: llvm-15 llvm-15-dev clang-15 ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: get clang version
-      run: command -v llvm-config && clang -v
+      run: command -v llvm-config-15 && clang-15 -v
     - name: Install cargo-hack
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
     - name: Add nightly
@@ -166,14 +170,16 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: Remove existing clang and LLVM
+      run: sudo apt purge llvm* clang*
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang ninja-build python3-dev python3-pip python3-venv libz3-dev
+      run: sudo apt-get install -y llvm-15 llvm-15-dev clang-15 ninja-build python3-dev python3-pip python3-venv libz3-dev
     - name: Install maturin
       run: python3 -m pip install maturin
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Run a maturin build
-      run: cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
+      run: LLVM_CONFIG_PATH=llvm-config-15 cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
     - name: Run python test
       run: . ./bindings/pylibafl/.env/bin/activate && cd ./fuzzers/baby_fuzzer && python3 baby_fuzzer.py 2>&1 | grep "Bye"
 
@@ -206,12 +212,18 @@ jobs:
       # Removing macOS things already installed in CI against failed linking
       if: runner.os == 'macOS'
       run: rm /usr/local/bin/2to3* /usr/local/bin/idle3* /usr/local/bin/pydoc3* /usr/local/bin/python3*; brew install --force-bottle --overwrite python
+    - name: Remove obsolete llvm (macOS)
+      if: runner.os == 'macOS'
+      run: brew remove --force llvm clang
+    - name: Remove obsolete llvm (Linux)
+      if: runner.os == 'Linux'
+      run: sudo apt purge llvm* clang*
     - uses: lyricwulf/abc@v1
       with: 
         # todo: remove afl++-clang when nyx support samcov_pcguard
-        linux: llvm llvm-dev clang nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi gcc-aarch64-linux-gnu g++-aarch64-linux-gnu gcc-mipsel-linux-gnu g++-mipsel-linux-gnu gcc-powerpc-linux-gnu g++-powerpc-linux-gnu libc6-dev-i386-cross libc6-dev libc6-dev-i386 lib32gcc-11-dev lib32stdc++-11-dev libgtk-3-dev afl++-clang pax-utils libz3-dev
+        linux: llvm-15 llvm-15-dev clang-15 nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi gcc-aarch64-linux-gnu g++-aarch64-linux-gnu gcc-mipsel-linux-gnu g++-mipsel-linux-gnu gcc-powerpc-linux-gnu g++-powerpc-linux-gnu libc6-dev-i386-cross libc6-dev libc6-dev-i386 lib32gcc-11-dev lib32stdc++-11-dev libgtk-3-dev afl++-clang pax-utils libz3-dev
         # update bash for macos to support `declare -A` command`
-        macos: llvm libpng nasm coreutils z3 bash wget
+        macos: llvm@15 libpng nasm coreutils z3 bash wget
     - name: pip install
       run: python3 -m pip install msgpack jinja2 find_libpython
     # Note that nproc needs to have coreutils installed on macOS, so the order of CI commands matters.
@@ -258,10 +270,16 @@ jobs:
     - name: Fix python (macOS)
       if: runner.os == 'macOS'
       run: rm /usr/local/bin/2to3* /usr/local/bin/idle3* /usr/local/bin/pydoc3* /usr/local/bin/python3*
+    - name: Remove obsolete llvm (macOS)
+      if: runner.os == 'macOS'
+      run: brew remove --force llvm clang
+    - name: Remove obsolete llvm (Linux)
+      if: runner.os == 'Linux'
+      run: sudo apt purge llvm* clang*
     - uses: lyricwulf/abc@v1
       with: 
-        linux: llvm llvm-dev clang 
-        macos: python@3.11 llvm bash coreutils
+        linux: llvm-15 llvm-15-dev clang-15
+        macos: python@3.11 llvm@15 bash coreutils
     - uses: actions/checkout@v3
       with:
         submodules: true # recursively checkout submodules
