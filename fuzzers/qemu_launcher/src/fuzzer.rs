@@ -33,6 +33,7 @@ pub struct Fuzzer {
 impl Fuzzer {
     pub fn new() -> Fuzzer {
         let options = FuzzerOptions::parse();
+        options.validate();
         return Fuzzer { options };
     }
 

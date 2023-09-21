@@ -1,6 +1,6 @@
 use {
     crate::version::Version,
-    clap::Parser,
+    clap::{error::ErrorKind, CommandFactory, Parser},
     core::time::Duration,
     libafl::Error,
     libafl_bolts::core_affinity::{CoreId, Cores},
@@ -130,5 +130,39 @@ impl FuzzerOptions {
         let mut dir = self.output_dir(core_id).clone();
         dir.push("crashes");
         dir
+    }
+
+    pub fn validate(&self) {
+        if let Some(asan_cores) = &self.asan_cores {
+            for id in &asan_cores.ids {
+                if !self.cores.contains(*id) {
+                    let mut cmd = FuzzerOptions::command();
+                    cmd.error(
+                        ErrorKind::ValueValidation,
+                        format!(
+                            "Cmplog cores ({}) must be a subset of total cores ({})",
+                            asan_cores.cmdline, self.cores.cmdline
+                        ),
+                    )
+                    .exit();
+                }
+            }
+        }
+
+        if let Some(cmplog_cores) = &self.cmplog_cores {
+            for id in &cmplog_cores.ids {
+                if !self.cores.contains(*id) {
+                    let mut cmd = FuzzerOptions::command();
+                    cmd.error(
+                        ErrorKind::ValueValidation,
+                        format!(
+                            "Cmplog cores ({}) must be a subset of total cores ({})",
+                            cmplog_cores.cmdline, self.cores.cmdline
+                        ),
+                    )
+                    .exit();
+                }
+            }
+        }
     }
 }
