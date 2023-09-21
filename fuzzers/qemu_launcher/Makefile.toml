@@ -225,7 +225,6 @@ windows_alias = "unsupported"
 [tasks.debug_unix]
 command = "${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
-    "--coverage", "${TARGET_DIR}/drcov.log",
     "--input", "./corpus",
     "--output", "${TARGET_DIR}/output/",
     "--log", "${TARGET_DIR}/output/log.txt",
@@ -247,7 +246,6 @@ windows_alias = "unsupported"
 [tasks.run_unix]
 command = "${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
-    "--coverage", "${TARGET_DIR}/drcov.log",
     "--input", "./corpus",
     "--output", "${TARGET_DIR}/output/",
     "--log", "${TARGET_DIR}/output/log.txt",

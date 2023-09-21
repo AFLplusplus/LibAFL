@@ -14,12 +14,9 @@ use {
     name = format!("qemu-coverage-{}",env!("CPU_TARGET")),
     version = Version::default(),
     about,
-    long_about = "Tool for generating DrCov coverage data using QEMU instrumentation"
+    long_about = "Binary fuzzer using QEMU binary instrumentation"
 )]
 pub struct FuzzerOptions {
-    #[arg(long, help = "Coverage file")]
-    pub coverage: String,
-
     #[arg(long, help = "Input directory")]
     pub input: String,
 

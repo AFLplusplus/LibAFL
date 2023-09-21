@@ -13,19 +13,15 @@ use {
     libafl_qemu::{
         asan::{init_with_asan, QemuAsanHelper},
         cmplog::QemuCmpLogHelper,
-        drcov::QemuDrCovHelper,
         edges::QemuEdgeCoverageHelper,
         elf::EasyElf,
         ArchExtras, Emulator, GuestAddr, QemuInstrumentationFilter,
     },
-    rangemap::RangeMap,
-    std::{env, ops::Range, path::PathBuf},
+    std::{env, ops::Range},
 };
 
 pub type ClientState =
     StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
-
-pub type ClientRangeMap = RangeMap<usize, (u16, String)>;
 
 pub struct Client<'a> {
     options: &'a FuzzerOptions,
@@ -61,30 +57,6 @@ impl<'a> Client<'a> {
             .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
             .ok_or_else(|| Error::empty_optional("Symbol LLVMFuzzerTestOneInput not found"))?;
         Ok(start_pc)
-    }
-
-    fn range_map(emu: &Emulator) -> Result<ClientRangeMap, Error> {
-        Ok(emu
-            .mappings()
-            .filter_map(|m| {
-                println!(
-                    "Mapping: 0x{:016x}-0x{:016x}, {}",
-                    m.start(),
-                    m.end(),
-                    m.path().unwrap_or("<EMPTY>")
-                );
-                m.path()
-                    .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
-                    .filter(|(_, p)| !p.is_empty())
-            })
-            .enumerate()
-            .fold(
-                RangeMap::<usize, (u16, String)>::new(),
-                |mut rm, (i, (r, p))| {
-                    rm.insert(r, (i as u16, p));
-                    rm
-                },
-            ))
     }
 
     fn coverage_filter(&self, emu: &Emulator) -> Result<QemuInstrumentationFilter, Error> {
@@ -149,8 +121,6 @@ impl<'a> Client<'a> {
         println!("ret_addr = {ret_addr:#x}");
         emu.set_breakpoint(ret_addr);
 
-        let rangemap = Self::range_map(&emu)?;
-
         let is_asan = self.options.is_asan_core(core_id);
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
@@ -160,12 +130,6 @@ impl<'a> Client<'a> {
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuCmpLogHelper::default(),
-                QemuDrCovHelper::new(
-                    self.coverage_filter(&emu)?,
-                    rangemap,
-                    PathBuf::from(&self.options.coverage),
-                    false,
-                ),
                 QemuAsanHelper::default(),
             );
             Instance::builder()
@@ -176,16 +140,7 @@ impl<'a> Client<'a> {
                 .build()
                 .run(helpers, state)
         } else if is_asan {
-            let helpers = tuple_list!(
-                edge_coverage_helper,
-                QemuDrCovHelper::new(
-                    self.coverage_filter(&emu)?,
-                    rangemap,
-                    PathBuf::from(&self.options.coverage),
-                    false,
-                ),
-                QemuAsanHelper::default(),
-            );
+            let helpers = tuple_list!(edge_coverage_helper, QemuAsanHelper::default(),);
             Instance::builder()
                 .options(&self.options)
                 .emu(&emu)
@@ -194,16 +149,7 @@ impl<'a> Client<'a> {
                 .build()
                 .run(helpers, state)
         } else if is_cmplog {
-            let helpers = tuple_list!(
-                edge_coverage_helper,
-                QemuCmpLogHelper::default(),
-                QemuDrCovHelper::new(
-                    self.coverage_filter(&emu)?,
-                    rangemap,
-                    PathBuf::from(&self.options.coverage),
-                    false,
-                ),
-            );
+            let helpers = tuple_list!(edge_coverage_helper, QemuCmpLogHelper::default(),);
             Instance::builder()
                 .options(&self.options)
                 .emu(&emu)
@@ -212,15 +158,7 @@ impl<'a> Client<'a> {
                 .build()
                 .run(helpers, state)
         } else {
-            let helpers = tuple_list!(
-                edge_coverage_helper,
-                QemuDrCovHelper::new(
-                    self.coverage_filter(&emu)?,
-                    rangemap,
-                    PathBuf::from(&self.options.coverage),
-                    false,
-                ),
-            );
+            let helpers = tuple_list!(edge_coverage_helper,);
             Instance::builder()
                 .options(&self.options)
                 .emu(&emu)
