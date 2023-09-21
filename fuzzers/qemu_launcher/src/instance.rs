@@ -27,7 +27,6 @@ use {
     libafl_bolts::{
         core_affinity::CoreId,
         current_nanos,
-        os::dup2,
         rands::StdRand,
         shmem::StdShMemProvider,
         tuples::{tuple_list, Merge},
@@ -38,16 +37,9 @@ use {
         helper::QemuHelperTuple,
         Emulator, QemuExecutor, QemuHooks,
     },
-    std::{
-        fs::File,
-        io::{self},
-        process,
-    },
+    std::process,
     typed_builder::TypedBuilder,
 };
-
-#[cfg(unix)]
-use std::os::unix::io::AsRawFd;
 
 pub type ClientState =
     StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
@@ -225,14 +217,6 @@ impl<'a> Instance<'a> {
                     process::exit(0);
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());
-        }
-
-        #[cfg(unix)]
-        {
-            let file_null = File::open("/dev/null")?;
-            let null_fd = file_null.as_raw_fd();
-            dup2(null_fd, io::stdout().as_raw_fd())?;
-            dup2(null_fd, io::stderr().as_raw_fd())?;
         }
 
         if let Some(iters) = self.options.iterations {

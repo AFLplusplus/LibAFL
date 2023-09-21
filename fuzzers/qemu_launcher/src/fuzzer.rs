@@ -42,7 +42,7 @@ impl Fuzzer {
             let ui = TuiUI::with_version(
                 String::from("QEMU Launcher For Libpng"),
                 String::from("0.10.1"),
-                false,
+                true,
             );
             let monitor = TuiMonitor::new(ui);
             self.launch(monitor)
