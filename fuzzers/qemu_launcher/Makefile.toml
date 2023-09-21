@@ -259,6 +259,23 @@ args = [
 ]
 dependencies = [ "harness", "fuzzer" ]
 
+[tasks.single]
+linux_alias = "single_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.single_unix]
+command = "${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}"
+args = [
+    "--input", "./corpus",
+    "--output", "${TARGET_DIR}/output/",
+    "--log", "${TARGET_DIR}/output/log.txt",
+    "--cores", "0",
+    "--",
+    "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
+]
+dependencies = [ "harness", "fuzzer" ]
+
 [tasks.test]
 linux_alias = "test_unix"
 mac_alias = "unsupported"

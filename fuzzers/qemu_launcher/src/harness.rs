@@ -16,10 +16,12 @@ pub struct Harness<'a> {
     ret_addr: GuestAddr,
 }
 
+pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
+
 impl<'a> Harness<'a> {
     pub fn new(emu: &Emulator) -> Result<Harness, Error> {
         let input_addr = emu
-            .map_private(0, 4096, MmapPerms::ReadWrite)
+            .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
             .map_err(|e| Error::unknown(format!("Failed to map input buffer: {e:}")))?;
 
         let pc: GuestReg = emu
@@ -50,12 +52,13 @@ impl<'a> Harness<'a> {
 
     fn reset(&self, input: &BytesInput) -> Result<(), Error> {
         let target = input.target_bytes();
-        let buf = target
-            .as_slice()
-            .chunks(4096)
-            .next()
-            .ok_or_else(|| Error::unknown(format!("Failed to read input buffer")))?;
-        let len = buf.len() as GuestReg;
+        let mut buf = target.as_slice();
+        let mut len = buf.len();
+        if len > MAX_INPUT_SIZE {
+            buf = &buf[0..MAX_INPUT_SIZE];
+            len = MAX_INPUT_SIZE;
+        }
+        let len = len as GuestReg;
 
         unsafe { self.emu.write_mem(self.input_addr, buf) };
 
