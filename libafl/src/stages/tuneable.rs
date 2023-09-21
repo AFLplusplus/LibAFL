@@ -178,12 +178,6 @@ where
         let fuzz_time = self.seed_fuzz_time(state)?;
         let iters = self.fixed_iters(state)?;
 
-        if fuzz_time.is_some() && iters.is_some() {
-            return Err(Error::illegal_state(
-                "Both fuzz_time and iters specified; failing fast!",
-            ));
-        }
-
         start_timer!(state);
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
