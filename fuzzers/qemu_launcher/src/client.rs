@@ -61,6 +61,7 @@ impl<'a> Client<'a> {
 
     fn coverage_filter(&self, emu: &Emulator) -> Result<QemuInstrumentationFilter, Error> {
         if let Some(includes) = &self.options.include {
+            #[allow(clippy::useless_conversion)]
             let rules = includes
                 .iter()
                 .map(|x| Range {
@@ -70,6 +71,7 @@ impl<'a> Client<'a> {
                 .collect::<Vec<Range<GuestAddr>>>();
             Ok(QemuInstrumentationFilter::AllowList(rules))
         } else if let Some(excludes) = &self.options.exclude {
+            #[allow(clippy::useless_conversion)]
             let rules = excludes
                 .iter()
                 .map(|x| Range {
@@ -133,7 +135,7 @@ impl<'a> Client<'a> {
                 QemuAsanHelper::default(),
             );
             Instance::builder()
-                .options(&self.options)
+                .options(self.options)
                 .emu(&emu)
                 .mgr(mgr)
                 .core_id(core_id)
@@ -142,7 +144,7 @@ impl<'a> Client<'a> {
         } else if is_asan {
             let helpers = tuple_list!(edge_coverage_helper, QemuAsanHelper::default(),);
             Instance::builder()
-                .options(&self.options)
+                .options(self.options)
                 .emu(&emu)
                 .mgr(mgr)
                 .core_id(core_id)
@@ -151,7 +153,7 @@ impl<'a> Client<'a> {
         } else if is_cmplog {
             let helpers = tuple_list!(edge_coverage_helper, QemuCmpLogHelper::default(),);
             Instance::builder()
-                .options(&self.options)
+                .options(self.options)
                 .emu(&emu)
                 .mgr(mgr)
                 .core_id(core_id)
@@ -160,7 +162,7 @@ impl<'a> Client<'a> {
         } else {
             let helpers = tuple_list!(edge_coverage_helper,);
             Instance::builder()
-                .options(&self.options)
+                .options(self.options)
                 .emu(&emu)
                 .mgr(mgr)
                 .core_id(core_id)

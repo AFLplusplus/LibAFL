@@ -125,7 +125,7 @@ impl<'a> Instance<'a> {
             }
         }
 
-        let harness = Harness::new(&self.emu)?;
+        let harness = Harness::new(self.emu)?;
         let mut harness = |input: &BytesInput| harness.run(input);
 
         // A fuzzer with feedbacks and a corpus scheduler
