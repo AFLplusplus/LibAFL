@@ -80,11 +80,11 @@ impl<'a> EasyElf<'a> {
                         None
                     } else if self.is_pic() {
                         let start = section.sh_addr as GuestAddr + load_addr;
-                        let end = start + section.sh_size;
+                        let end = start + section.sh_size as GuestAddr;
                         Some(Range { start, end })
                     } else {
                         let start = section.sh_addr as GuestAddr;
-                        let end = start + section.sh_size;
+                        let end = start + section.sh_size as GuestAddr;
                         Some(Range { start, end })
                     };
                 }

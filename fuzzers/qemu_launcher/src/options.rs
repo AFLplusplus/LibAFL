@@ -4,6 +4,7 @@ use std::{env, ops::Range, path::PathBuf};
 use clap::{error::ErrorKind, CommandFactory, Parser};
 use libafl::Error;
 use libafl_bolts::core_affinity::{CoreId, Cores};
+use libafl_qemu::GuestAddr;
 
 use crate::version::Version;
 
@@ -54,10 +55,10 @@ pub struct FuzzerOptions {
     pub iterations: Option<u64>,
 
     #[arg(long = "include", help="Include address ranges", value_parser = FuzzerOptions::parse_ranges)]
-    pub include: Option<Vec<Range<u64>>>,
+    pub include: Option<Vec<Range<GuestAddr>>>,
 
     #[arg(long = "exclude", help="Exclude address ranges", value_parser = FuzzerOptions::parse_ranges, conflicts_with="include")]
-    pub exclude: Option<Vec<Range<u64>>>,
+    pub exclude: Option<Vec<Range<GuestAddr>>>,
 
     #[arg(last = true, help = "Arguments passed to the target")]
     pub args: Vec<String>,
@@ -68,26 +69,25 @@ impl FuzzerOptions {
         Ok(Duration::from_millis(src.parse()?))
     }
 
-    fn parse_ranges(src: &str) -> Result<Vec<Range<u64>>, Error> {
+    fn parse_ranges(src: &str) -> Result<Vec<Range<GuestAddr>>, Error> {
         src.split(',')
             .map(|r| {
                 let parts = r.split('-').collect::<Vec<&str>>();
                 if parts.len() == 2 {
-                    let start = u64::from_str_radix(parts[0].trim_start_matches("0x"), 16)
+                    let start = GuestAddr::from_str_radix(parts[0].trim_start_matches("0x"), 16)
                         .map_err(|e| {
                             Error::illegal_argument(format!(
                                 "Invalid start address: {} ({e:})",
                                 parts[0]
                             ))
                         })?;
-                    let end = u64::from_str_radix(parts[1].trim_start_matches("0x"), 16).map_err(
-                        |e| {
+                    let end = GuestAddr::from_str_radix(parts[1].trim_start_matches("0x"), 16)
+                        .map_err(|e| {
                             Error::illegal_argument(format!(
                                 "Invalid end address: {} ({e:})",
                                 parts[1]
                             ))
-                        },
-                    )?;
+                        })?;
                     Ok(Range { start, end })
                 } else {
                     Err(Error::illegal_argument(format!(
@@ -95,7 +95,7 @@ impl FuzzerOptions {
                     )))
                 }
             })
-            .collect::<Result<Vec<Range<u64>>, Error>>()
+            .collect::<Result<Vec<Range<GuestAddr>>, Error>>()
     }
 
     pub fn is_asan_core(&self, core_id: CoreId) -> bool {
