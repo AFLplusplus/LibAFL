@@ -1,45 +1,45 @@
-use {
-    crate::{harness::Harness, options::FuzzerOptions},
-    core::ptr::addr_of_mut,
-    libafl::{
-        corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-        events::{EventRestarter, LlmpRestartingEventManager},
-        executors::{ShadowExecutor, TimeoutExecutor},
-        feedback_or, feedback_or_fast,
-        feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-        fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-        inputs::BytesInput,
-        mutators::{
-            scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-            StdMOptMutator, StdScheduledMutator, Tokens,
-        },
-        observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
-        schedulers::{
-            powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
-        },
-        stages::{
-            calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
-            StagesTuple, StdMutationalStage,
-        },
-        state::{HasCorpus, HasMetadata, StdState, UsesState},
-        Error,
+use core::ptr::addr_of_mut;
+use std::process;
+
+use libafl::{
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    events::{EventRestarter, LlmpRestartingEventManager},
+    executors::{ShadowExecutor, TimeoutExecutor},
+    feedback_or, feedback_or_fast,
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    fuzzer::{Evaluator, Fuzzer, StdFuzzer},
+    inputs::BytesInput,
+    mutators::{
+        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
+        StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    libafl_bolts::{
-        core_affinity::CoreId,
-        current_nanos,
-        rands::StdRand,
-        shmem::StdShMemProvider,
-        tuples::{tuple_list, Merge},
+    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
-    libafl_qemu::{
-        cmplog::CmpLogObserver,
-        edges::{edges_map_mut_slice, MAX_EDGES_NUM},
-        helper::QemuHelperTuple,
-        Emulator, QemuExecutor, QemuHooks,
+    stages::{
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
+        StagesTuple, StdMutationalStage,
     },
-    std::process,
-    typed_builder::TypedBuilder,
+    state::{HasCorpus, HasMetadata, StdState, UsesState},
+    Error,
 };
+use libafl_bolts::{
+    core_affinity::CoreId,
+    current_nanos,
+    rands::StdRand,
+    shmem::StdShMemProvider,
+    tuples::{tuple_list, Merge},
+};
+use libafl_qemu::{
+    cmplog::CmpLogObserver,
+    edges::{edges_map_mut_slice, MAX_EDGES_NUM},
+    helper::QemuHelperTuple,
+    Emulator, QemuExecutor, QemuHooks,
+};
+use typed_builder::TypedBuilder;
+
+use crate::{harness::Harness, options::FuzzerOptions};
 
 pub type ClientState =
     StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;

@@ -1,30 +1,29 @@
-use {
-    crate::{client::Client, options::FuzzerOptions},
-    clap::Parser,
-    libafl::{
-        events::{EventConfig, Launcher},
-        monitors::{
-            tui::{ui::TuiUI, TuiMonitor},
-            Monitor, MultiMonitor,
-        },
-        Error,
-    },
-    libafl_bolts::{
-        current_time,
-        shmem::{ShMemProvider, StdShMemProvider},
-    },
-    std::{
-        cell::RefCell,
-        fs::{File, OpenOptions},
-        io::{self, Write},
-    },
+use std::{
+    cell::RefCell,
+    fs::{File, OpenOptions},
+    io::{self, Write},
 };
 
+use clap::Parser;
+use libafl::{
+    events::{EventConfig, Launcher},
+    monitors::{
+        tui::{ui::TuiUI, TuiMonitor},
+        Monitor, MultiMonitor,
+    },
+    Error,
+};
+use libafl_bolts::{
+    current_time,
+    shmem::{ShMemProvider, StdShMemProvider},
+};
 #[cfg(unix)]
 use {
     nix::unistd::dup,
     std::os::unix::io::{AsRawFd, FromRawFd},
 };
+
+use crate::{client::Client, options::FuzzerOptions};
 
 pub struct Fuzzer {
     options: FuzzerOptions,

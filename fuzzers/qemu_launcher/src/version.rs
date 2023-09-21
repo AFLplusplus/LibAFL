@@ -1,4 +1,6 @@
-use {clap::builder::Str, std::env};
+use std::env;
+
+use clap::builder::Str;
 
 #[derive(Default)]
 pub struct Version;

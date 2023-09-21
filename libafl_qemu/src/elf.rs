@@ -1,6 +1,6 @@
 //! Utilities to parse and process ELFs
 
-use std::{convert::AsRef, fs::File, io::Read, path::Path, str, ops::Range};
+use std::{convert::AsRef, fs::File, io::Read, ops::Range, path::Path, str};
 
 use goblin::elf::{header::ET_DYN, Elf};
 use libafl::Error;
@@ -71,7 +71,10 @@ impl<'a> EasyElf<'a> {
     pub fn get_section(&self, name: &str, load_addr: GuestAddr) -> Option<Range<GuestAddr>> {
         for section in &self.elf.section_headers {
             if let Some(section_name) = self.elf.shdr_strtab.get_at(section.sh_name) {
-                println!("section_name: {section_name:}, sh_addr: 0x{:x}, sh_size: 0x{:x}", section.sh_addr, section.sh_size);
+                println!(
+                    "section_name: {section_name:}, sh_addr: 0x{:x}, sh_size: 0x{:x}",
+                    section.sh_addr, section.sh_size
+                );
                 if section_name == name {
                     return if section.sh_addr == 0 {
                         None

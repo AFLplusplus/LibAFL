@@ -1,11 +1,11 @@
-use {
-    crate::version::Version,
-    clap::{error::ErrorKind, CommandFactory, Parser},
-    core::time::Duration,
-    libafl::Error,
-    libafl_bolts::core_affinity::{CoreId, Cores},
-    std::{env, ops::Range, path::PathBuf},
-};
+use core::time::Duration;
+use std::{env, ops::Range, path::PathBuf};
+
+use clap::{error::ErrorKind, CommandFactory, Parser};
+use libafl::Error;
+use libafl_bolts::core_affinity::{CoreId, Cores};
+
+use crate::version::Version;
 
 #[readonly::make]
 #[derive(Parser, Debug)]

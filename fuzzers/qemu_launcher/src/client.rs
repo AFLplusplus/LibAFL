@@ -1,24 +1,24 @@
-use {
-    crate::{instance::Instance, options::FuzzerOptions},
-    libafl::{
-        corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
-        events::LlmpRestartingEventManager,
-        inputs::BytesInput,
-        state::StdState,
-        Error,
-    },
-    libafl_bolts::{
-        core_affinity::CoreId, rands::StdRand, shmem::StdShMemProvider, tuples::tuple_list,
-    },
-    libafl_qemu::{
-        asan::{init_with_asan, QemuAsanHelper},
-        cmplog::QemuCmpLogHelper,
-        edges::QemuEdgeCoverageHelper,
-        elf::EasyElf,
-        ArchExtras, Emulator, GuestAddr, QemuInstrumentationFilter,
-    },
-    std::{env, ops::Range},
+use std::{env, ops::Range};
+
+use libafl::{
+    corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
+    events::LlmpRestartingEventManager,
+    inputs::BytesInput,
+    state::StdState,
+    Error,
 };
+use libafl_bolts::{
+    core_affinity::CoreId, rands::StdRand, shmem::StdShMemProvider, tuples::tuple_list,
+};
+use libafl_qemu::{
+    asan::{init_with_asan, QemuAsanHelper},
+    cmplog::QemuCmpLogHelper,
+    edges::QemuEdgeCoverageHelper,
+    elf::EasyElf,
+    ArchExtras, Emulator, GuestAddr, QemuInstrumentationFilter,
+};
+
+use crate::{instance::Instance, options::FuzzerOptions};
 
 pub type ClientState =
     StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;

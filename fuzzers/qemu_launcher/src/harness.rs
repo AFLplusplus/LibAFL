@@ -1,12 +1,10 @@
-use {
-    libafl::{
-        executors::ExitKind,
-        inputs::{BytesInput, HasTargetBytes},
-        Error,
-    },
-    libafl_bolts::AsSlice,
-    libafl_qemu::{ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Regs},
+use libafl::{
+    executors::ExitKind,
+    inputs::{BytesInput, HasTargetBytes},
+    Error,
 };
+use libafl_bolts::AsSlice;
+use libafl_qemu::{ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Regs};
 
 pub struct Harness<'a> {
     emu: &'a Emulator,
