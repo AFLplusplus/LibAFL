@@ -139,7 +139,6 @@ use alloc::vec::Vec;
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::Hasher;
-use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -178,8 +177,11 @@ extern crate libafl_derive;
 use alloc::string::{FromUtf8Error, String};
 use core::{
     array::TryFromSliceError,
+    cell::{BorrowError, BorrowMutError},
     fmt::{self, Display},
+    iter::Iterator,
     num::{ParseIntError, TryFromIntError},
+    time,
 };
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
@@ -440,6 +442,22 @@ impl Display for Error {
                 display_error_backtrace(f, b)
             }
         }
+    }
+}
+
+impl From<BorrowError> for Error {
+    fn from(err: BorrowError) -> Self {
+        Self::illegal_state(format!(
+            "Couldn't borrow from a RefCell as immutable: {err:?}"
+        ))
+    }
+}
+
+impl From<BorrowMutError> for Error {
+    fn from(err: BorrowMutError) -> Self {
+        Self::illegal_state(format!(
+            "Couldn't borrow from a RefCell as mutable: {err:?}"
+        ))
     }
 }
 

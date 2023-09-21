@@ -36,7 +36,7 @@ use crate::{inputs::UsesInput, Error};
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
-pub struct CorpusId(pub(crate) usize);
+pub struct CorpusId(pub usize); // MUST BE PUB -- downstream Corpus/Input implementations need it
 
 impl fmt::Display for CorpusId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

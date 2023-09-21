@@ -79,9 +79,11 @@ use libafl::{
     Error,
 };
 use libafl_bolts::AsSlice;
+use libc::_exit;
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
+mod corpus;
 mod feedbacks;
 mod fuzz;
 mod merge;
@@ -152,7 +154,7 @@ macro_rules! fuzz_with {
                 AsSlice,
         };
         use libafl::{
-            corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
+            corpus::Corpus,
             executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
             feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,
             feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
@@ -179,6 +181,7 @@ macro_rules! fuzz_with {
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
 
         use crate::{BACKTRACE, CustomMutationStatus};
+        use crate::corpus::{ArtifactCorpus, LibfuzzerCorpus};
         use crate::feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback, ShrinkMapFeedback};
         use crate::misc::should_use_grimoire;
         use crate::observers::{MappedEdgeMapObserver, SizeValueObserver};
@@ -243,7 +246,7 @@ macro_rules! fuzz_with {
 
             // A feedback to choose if an input is a solution or not
             let mut objective = feedback_or_fast!(
-                LibfuzzerCrashCauseFeedback::new($options.artifact_prefix().cloned()),
+                LibfuzzerCrashCauseFeedback::new($options.artifact_prefix().clone()),
                 OomFeedback,
                 feedback_and_fast!(
                     CrashFeedback::new(),
@@ -269,13 +272,7 @@ macro_rules! fuzz_with {
                 dir
             };
 
-            let crash_corpus = if let Some(prefix) = $options.artifact_prefix() {
-                OnDiskCorpus::with_meta_format_and_prefix(prefix.dir(), None, prefix.filename_prefix().clone(), false)
-                    .unwrap()
-            } else {
-                OnDiskCorpus::with_meta_format_and_prefix(&std::env::current_dir().unwrap(), None, None, false)
-                    .unwrap()
-            };
+            let crash_corpus = ArtifactCorpus::new();
 
             // If not restarting, create a State from scratch
             let mut state = state.unwrap_or_else(|| {
@@ -283,7 +280,7 @@ macro_rules! fuzz_with {
                     // RNG
                     StdRand::with_seed(current_nanos()),
                     // Corpus that will be evolved, we keep it in memory for performance
-                    CachedOnDiskCorpus::with_meta_format_and_prefix(corpus_dir.clone(), 4096, None, None, true).unwrap(),
+                    LibfuzzerCorpus::new(corpus_dir.clone(), 4096),
                     // Corpus in which we store solutions (crashes in this example),
                     // on disk so the user can get them after stopping the fuzzer
                     crash_corpus,
@@ -591,7 +588,21 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
     .unwrap();
 
     if !options.unknown().is_empty() {
-        println!("Unrecognised options: {:?}", options.unknown());
+        eprintln!("Unrecognised options: {:?}", options.unknown());
+    }
+
+    for folder in options
+        .dirs()
+        .iter()
+        .chain(std::iter::once(options.artifact_prefix().dir()))
+    {
+        if !folder.try_exists().unwrap_or(false) {
+            eprintln!(
+                "Required folder {} did not exist; failing fast.",
+                folder.to_string_lossy()
+            );
+            _exit(1);
+        }
     }
 
     if *options.mode() != LibfuzzerMode::Tmin

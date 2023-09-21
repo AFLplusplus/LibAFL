@@ -8,7 +8,7 @@ use std::{
 };
 
 use libafl::{
-    corpus::{Corpus, OnDiskCorpus},
+    corpus::Corpus,
     events::{EventRestarter, SimpleRestartingEventManager},
     executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
     feedback_and_fast, feedback_or_fast,
@@ -29,6 +29,7 @@ use libafl_bolts::{
 use libafl_targets::{OomFeedback, OomObserver, COUNTERS_MAPS};
 
 use crate::{
+    corpus::{ArtifactCorpus, LibfuzzerCorpus},
     feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback},
     observers::{MappedEdgeMapObserver, SizeTimeValueObserver},
     options::LibfuzzerOptions,
@@ -44,23 +45,7 @@ pub fn merge(
         return Err(Error::illegal_argument("Missing corpora to minimize; you should provide one directory to minimize into and one-to-many from which the inputs are loaded."));
     }
 
-    let crash_corpus = if let Some(prefix) = options.artifact_prefix() {
-        OnDiskCorpus::with_meta_format_and_prefix(
-            prefix.dir(),
-            None,
-            prefix.filename_prefix().clone(),
-            true,
-        )
-        .unwrap()
-    } else {
-        OnDiskCorpus::with_meta_format_and_prefix(
-            &std::env::current_dir().unwrap(),
-            None,
-            None,
-            true,
-        )
-        .unwrap()
-    };
+    let crash_corpus = ArtifactCorpus::new();
 
     let keep_observer = LibfuzzerKeepFeedback::new();
     let keep = keep_observer.keep();
@@ -130,7 +115,7 @@ pub fn merge(
 
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_or_fast!(
-        LibfuzzerCrashCauseFeedback::new(options.artifact_prefix().cloned()),
+        LibfuzzerCrashCauseFeedback::new(options.artifact_prefix().clone()),
         OomFeedback,
         CrashFeedback::new(),
         TimeoutFeedback::new()
@@ -163,7 +148,7 @@ pub fn merge(
             // RNG
             StdRand::new(),
             // Corpus that will be evolved, we keep it in memory for performance
-            OnDiskCorpus::with_meta_format_and_prefix(&corpus_dir, None, None, true).unwrap(),
+            LibfuzzerCorpus::new(corpus_dir, 4096),
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             crash_corpus,

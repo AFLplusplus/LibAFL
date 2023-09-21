@@ -1,7 +1,6 @@
 use std::{
     ffi::c_int,
     fs::{read, write},
-    path::PathBuf,
 };
 
 use libafl::{
@@ -119,21 +118,10 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
             options.dirs()[0].as_path().as_os_str().to_str().unwrap()
         );
     } else {
-        let (mut dest, filename_prefix) = options.artifact_prefix().map_or_else(
-            || (PathBuf::default(), ""),
-            |artifact_prefix| {
-                (
-                    artifact_prefix.dir().clone(),
-                    artifact_prefix
-                        .filename_prefix()
-                        .as_ref()
-                        .map_or("", String::as_str),
-                )
-            },
-        );
+        let mut dest = options.artifact_prefix().dir().clone();
         dest.push(format!(
             "{}minimized-from-{}",
-            filename_prefix,
+            options.artifact_prefix().filename_prefix(),
             options.dirs()[0].file_name().unwrap().to_str().unwrap()
         ));
         write(&dest, input)?;
