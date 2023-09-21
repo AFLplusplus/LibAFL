@@ -36,7 +36,7 @@ impl<'a> Client<'a> {
         Client { options }
     }
 
-    fn get_args(&self) -> Result<Vec<String>, Error> {
+    fn args(&self) -> Result<Vec<String>, Error> {
         let program = env::args()
             .next()
             .ok_or_else(|| Error::empty_optional("Failed to read program name"))?;
@@ -46,14 +46,14 @@ impl<'a> Client<'a> {
         Ok(args)
     }
 
-    fn get_env(&self) -> Result<Vec<(String, String)>, Error> {
+    fn env(&self) -> Result<Vec<(String, String)>, Error> {
         let env = env::vars()
             .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
             .collect::<Vec<(String, String)>>();
         Ok(env)
     }
 
-    fn get_start_pc(emu: &Emulator) -> Result<GuestAddr, Error> {
+    fn start_pc(emu: &Emulator) -> Result<GuestAddr, Error> {
         let mut elf_buffer = Vec::new();
         let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
 
@@ -63,7 +63,7 @@ impl<'a> Client<'a> {
         Ok(start_pc)
     }
 
-    fn get_range_map(emu: &Emulator) -> Result<ClientRangeMap, Error> {
+    fn range_map(emu: &Emulator) -> Result<ClientRangeMap, Error> {
         Ok(emu
             .mappings()
             .filter_map(|m| {
@@ -87,7 +87,7 @@ impl<'a> Client<'a> {
             ))
     }
 
-    fn get_coverage_filter(&self, emu: &Emulator) -> Result<QemuInstrumentationFilter, Error> {
+    fn coverage_filter(&self, emu: &Emulator) -> Result<QemuInstrumentationFilter, Error> {
         if let Some(includes) = &self.options.include {
             let rules = includes
                 .iter()
@@ -122,10 +122,10 @@ impl<'a> Client<'a> {
         mgr: LlmpRestartingEventManager<ClientState, StdShMemProvider>,
         core_id: CoreId,
     ) -> Result<(), Error> {
-        let mut args = self.get_args()?;
+        let mut args = self.args()?;
         println!("ARGS: {:#?}", args);
 
-        let mut env = self.get_env()?;
+        let mut env = self.env()?;
         println!("ENV: {:#?}", env);
 
         let emu = {
@@ -136,7 +136,7 @@ impl<'a> Client<'a> {
             }
         };
 
-        let start_pc = Self::get_start_pc(&emu)?;
+        let start_pc = Self::start_pc(&emu)?;
         println!("start_pc @ {start_pc:#x}");
 
         emu.set_breakpoint(start_pc);
@@ -149,19 +149,19 @@ impl<'a> Client<'a> {
         println!("ret_addr = {ret_addr:#x}");
         emu.set_breakpoint(ret_addr);
 
-        let rangemap = Self::get_range_map(&emu)?;
+        let rangemap = Self::range_map(&emu)?;
 
         let is_asan = self.options.is_asan_core(core_id);
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
-        let edge_coverage_helper = QemuEdgeCoverageHelper::new(self.get_coverage_filter(&emu)?);
+        let edge_coverage_helper = QemuEdgeCoverageHelper::new(self.coverage_filter(&emu)?);
 
         if is_asan && is_cmplog {
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuCmpLogHelper::default(),
                 QemuDrCovHelper::new(
-                    self.get_coverage_filter(&emu)?,
+                    self.coverage_filter(&emu)?,
                     rangemap,
                     PathBuf::from(&self.options.coverage),
                     false,
@@ -179,7 +179,7 @@ impl<'a> Client<'a> {
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuDrCovHelper::new(
-                    self.get_coverage_filter(&emu)?,
+                    self.coverage_filter(&emu)?,
                     rangemap,
                     PathBuf::from(&self.options.coverage),
                     false,
@@ -198,7 +198,7 @@ impl<'a> Client<'a> {
                 edge_coverage_helper,
                 QemuCmpLogHelper::default(),
                 QemuDrCovHelper::new(
-                    self.get_coverage_filter(&emu)?,
+                    self.coverage_filter(&emu)?,
                     rangemap,
                     PathBuf::from(&self.options.coverage),
                     false,
@@ -215,7 +215,7 @@ impl<'a> Client<'a> {
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuDrCovHelper::new(
-                    self.get_coverage_filter(&emu)?,
+                    self.coverage_filter(&emu)?,
                     rangemap,
                     PathBuf::from(&self.options.coverage),
                     false,

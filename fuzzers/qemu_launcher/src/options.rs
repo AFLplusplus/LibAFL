@@ -113,24 +113,24 @@ impl FuzzerOptions {
             .map_or(false, |c| c.contains(core_id))
     }
 
-    pub fn get_input_dir(&self) -> PathBuf {
+    pub fn input_dir(&self) -> PathBuf {
         PathBuf::from(&self.input)
     }
 
-    pub fn get_output_dir(&self, core_id: CoreId) -> PathBuf {
+    pub fn output_dir(&self, core_id: CoreId) -> PathBuf {
         let mut dir = PathBuf::from(&self.output);
         dir.push(format!("cpu_{:03}", core_id.0));
         dir
     }
 
-    pub fn get_queue_dir(&self, core_id: CoreId) -> PathBuf {
-        let mut dir = self.get_output_dir(core_id).clone();
+    pub fn queue_dir(&self, core_id: CoreId) -> PathBuf {
+        let mut dir = self.output_dir(core_id).clone();
         dir.push("queue");
         dir
     }
 
-    pub fn get_crashes_dir(&self, core_id: CoreId) -> PathBuf {
-        let mut dir = self.get_output_dir(core_id).clone();
+    pub fn crashes_dir(&self, core_id: CoreId) -> PathBuf {
+        let mut dir = self.output_dir(core_id).clone();
         dir.push("crashes");
         dir
     }
