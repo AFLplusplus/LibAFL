@@ -223,6 +223,12 @@ jobs:
         linux: llvm-15 llvm-15-dev clang-15 nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi gcc-aarch64-linux-gnu g++-aarch64-linux-gnu gcc-mipsel-linux-gnu g++-mipsel-linux-gnu gcc-powerpc-linux-gnu g++-powerpc-linux-gnu libc6-dev-i386-cross libc6-dev libc6-dev-i386 lib32gcc-11-dev lib32stdc++-11-dev libgtk-3-dev pax-utils libz3-dev
         # update bash for macos to support `declare -A` command`
         macos: llvm@15 libpng nasm coreutils z3 bash wget
+    - name: Set clang version
+      if: runner.os == 'Linux'
+      run: sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100
+    - name: Set clang++ version
+      if: runner.os == 'Linux'
+      run: sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 100
     - name: pip install
       run: python3 -m pip install msgpack jinja2 find_libpython
     # Note that nproc needs to have coreutils installed on macOS, so the order of CI commands matters.
