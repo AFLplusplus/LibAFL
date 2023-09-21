@@ -191,6 +191,7 @@ args = [
 dependencies = ["build"]
 script_runner="@shell"
 script='''
+rm -f ${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}
 mv ${TARGET_DIR}/release/qemu_launcher ${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}
 '''
 
