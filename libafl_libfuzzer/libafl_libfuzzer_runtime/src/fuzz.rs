@@ -1,14 +1,12 @@
 use core::ffi::c_int;
+#[cfg(unix)]
+use std::io::Write;
 use std::{
     fmt::Debug,
     fs::File,
     net::TcpListener,
+    str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
-};
-#[cfg(unix)]
-use std::{
-    io::Write,
-    os::fd::{AsRawFd, FromRawFd, IntoRawFd},
 };
 
 use libafl::{
@@ -36,6 +34,31 @@ use libafl_bolts::{
 };
 
 use crate::{feedbacks::LibfuzzerCrashCauseMetadata, fuzz_with, options::LibfuzzerOptions};
+
+fn destroy_output_fds(options: &LibfuzzerOptions) {
+    #[cfg(unix)]
+    {
+        use std::os::fd::AsRawFd;
+
+        if options.tui() {
+            let file_null = File::open("/dev/null").unwrap();
+            unsafe {
+                libc::dup2(file_null.as_raw_fd(), 1);
+                libc::dup2(file_null.as_raw_fd(), 2);
+            }
+        } else if options.close_fd_mask() != 0 {
+            let file_null = File::open("/dev/null").unwrap();
+            unsafe {
+                if options.close_fd_mask() & 1 != 0 {
+                    libc::dup2(file_null.as_raw_fd(), 1);
+                }
+                if options.close_fd_mask() & 2 != 0 {
+                    libc::dup2(file_null.as_raw_fd(), 2);
+                }
+            }
+        }
+    }
+}
 
 fn do_fuzz<F, ST, E, S, EM>(
     options: &LibfuzzerOptions,
@@ -93,6 +116,7 @@ fn fuzz_single_forking<M>(
 where
     M: Monitor + Debug,
 {
+    destroy_output_fds(options);
     fuzz_with!(options, harness, do_fuzz, |fuzz_single| {
         let (state, mgr): (
             Option<StdState<_, _, _, _>>,
@@ -109,23 +133,12 @@ where
                 }
             },
         };
-        #[cfg(unix)]
-        {
-            if options.close_fd_mask() != 0 {
-                let file_null = File::open("/dev/null")?;
-                unsafe {
-                    if options.close_fd_mask() & 1 != 0 {
-                        libc::dup2(file_null.as_raw_fd(), 1);
-                    }
-                    if options.close_fd_mask() & 2 != 0 {
-                        libc::dup2(file_null.as_raw_fd(), 2);
-                    }
-                }
-            }
-        }
         crate::start_fuzzing_single(fuzz_single, state, mgr)
     })
 }
+
+/// Communicate the selected port to subprocesses
+const PORT_PROVIDER_VAR: &str = "_LIBAFL_LIBFUZZER_FORK_PORT";
 
 fn fuzz_many_forking<M>(
     options: &LibfuzzerOptions,
@@ -137,12 +150,19 @@ fn fuzz_many_forking<M>(
 where
     M: Monitor + Clone + Debug,
 {
+    destroy_output_fds(options);
+    let broker_port = std::env::var(PORT_PROVIDER_VAR)
+        .map_err(Error::from)
+        .and_then(|s| u16::from_str(&s).map_err(Error::from))
+        .or_else(|_| {
+            TcpListener::bind("127.0.0.1:0").map(|sock| {
+                let port = sock.local_addr().unwrap().port();
+                std::env::set_var(PORT_PROVIDER_VAR, port.to_string());
+                port
+            })
+        })?;
     fuzz_with!(options, harness, do_fuzz, |mut run_client| {
         let cores = Cores::from((0..forks).collect::<Vec<_>>());
-        let broker_port = TcpListener::bind("127.0.0.1:0")?
-            .local_addr()
-            .unwrap()
-            .port();
 
         match Launcher::builder()
             .shmem_provider(shmem_provider)
@@ -164,6 +184,26 @@ where
     })
 }
 
+fn create_monitor_closure() -> impl Fn(String) + Clone {
+    #[cfg(unix)]
+    let stderr_fd =
+        std::os::fd::RawFd::from_str(&std::env::var(crate::STDERR_FD_VAR).unwrap()).unwrap(); // set in main
+    move |s| {
+        #[cfg(unix)]
+        {
+            use std::os::fd::FromRawFd;
+
+            // unfortunate requirement to meet Clone... thankfully, this does not
+            // generate effectively any overhead (no allocations, calls get merged)
+            let mut stderr = unsafe { File::from_raw_fd(stderr_fd) };
+            writeln!(stderr, "{s}").expect("Could not write to stderr???");
+            std::mem::forget(stderr); // do not close the descriptor!
+        }
+        #[cfg(not(unix))]
+        eprintln!("{s}");
+    }
+}
+
 pub fn fuzz(
     options: &LibfuzzerOptions,
     harness: &extern "C" fn(*const u8, usize) -> c_int,
@@ -174,37 +214,14 @@ pub fn fuzz(
             let monitor = TuiMonitor::new(TuiUI::new(options.fuzzer_name().to_string(), true));
             fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
         } else if forks == 1 {
-            #[cfg(unix)]
-            let mut stderr = unsafe {
-                let new_fd = libc::dup(std::io::stderr().as_raw_fd());
-                File::from_raw_fd(new_fd)
-            };
             let monitor = MultiMonitor::with_time(
-                move |s| {
-                    #[cfg(unix)]
-                    writeln!(stderr, "{s}").expect("Could not write to stderr???");
-                    #[cfg(not(unix))]
-                    eprintln!("{s}");
-                },
+                create_monitor_closure(),
                 SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
             );
             fuzz_single_forking(options, harness, shmem_provider, monitor)
         } else {
-            #[cfg(unix)]
-            let stderr_fd = unsafe { libc::dup(std::io::stderr().as_raw_fd()) };
             let monitor = MultiMonitor::with_time(
-                move |s| {
-                    #[cfg(unix)]
-                    {
-                        // unfortunate requirement to meet Clone... thankfully, this does not
-                        // generate effectively any overhead (no allocations, calls get merged)
-                        let mut stderr = unsafe { File::from_raw_fd(stderr_fd) };
-                        writeln!(stderr, "{s}").expect("Could not write to stderr???");
-                        let _ = stderr.into_raw_fd(); // discard the file without closing
-                    }
-                    #[cfg(not(unix))]
-                    eprintln!("{s}");
-                },
+                create_monitor_closure(),
                 SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
             );
             fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
@@ -216,8 +233,9 @@ pub fn fuzz(
         let monitor = TuiMonitor::new(TuiUI::new(options.fuzzer_name().to_string(), true));
         fuzz_many_forking(options, harness, shmem_provider, 1, monitor)
     } else {
+        destroy_output_fds(options);
         fuzz_with!(options, harness, do_fuzz, |fuzz_single| {
-            let mgr = SimpleEventManager::new(SimpleMonitor::new(|s| eprintln!("{s}")));
+            let mgr = SimpleEventManager::new(SimpleMonitor::new(create_monitor_closure()));
             crate::start_fuzzing_single(fuzz_single, None, mgr)
         })
     }

@@ -30,9 +30,9 @@ path = "src/lib.rs"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-libafl = { version = "0.11", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "errors_backtrace", "regex", "serdeany_autoreg", "tui_monitor"] }
-libafl_bolts = { version = "0.11", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "errors_backtrace"] }
-libafl_targets = { version = "0.11", features = ["sancov_8bit", "sancov_cmplog", "libfuzzer", "libfuzzer_oom", "libfuzzer_define_run_driver", "sanitizers_flags"] }
+libafl = { path = "../../libafl", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "regex", "errors_backtrace", "serdeany_autoreg", "tui_monitor"] }
+libafl_bolts = { path = "../../libafl_bolts", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "serdeany_autoreg", "errors_backtrace"] }
+libafl_targets = { path = "../../libafl_targets", features = ["sancov_8bit", "sancov_cmplog", "libfuzzer", "libfuzzer_oom", "libfuzzer_define_run_driver", "sanitizers_flags"] }
 
 ahash = { version = "0.8.3", default-features = false }
 libc = "0.2.139"
@@ -46,10 +46,12 @@ serde = { version = "1.0", default-features = false, features = ["alloc", "deriv
 bytecount = "0.6.3"
 
 # for identifying if we can grimoire-ify
-utf8-chars = "2.0.3"
+utf8-chars = "3.0.1"
+
+env_logger = "0.10"
 
 [build-dependencies]
-bindgen = "0.65.1"
+bindgen = "0.68.1"
 cc = { version = "1.0", features = ["parallel"] }
 
 [workspace]

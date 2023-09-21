@@ -28,9 +28,10 @@ use crate::asan::errors::{AsanError, AsanErrors};
 /// An allocator wrapper with binary-only address sanitization
 #[derive(Debug)]
 pub struct Allocator {
-    /// The fuzzer options
-    #[allow(dead_code)]
-    options: FuzzerOptions,
+    max_allocation: usize,
+    max_total_allocation: usize,
+    max_allocation_panics: bool,
+    allocation_backtraces: bool,
     /// The page size
     page_size: usize,
     /// The shadow offsets
@@ -104,130 +105,13 @@ impl Allocator {
         all(target_arch = "aarch64", target_os = "android")
     ))]
     #[must_use]
-    #[allow(clippy::too_many_lines)]
-    pub fn new(options: FuzzerOptions) -> Self {
-        let ret = unsafe { sysconf(_SC_PAGESIZE) };
-        assert!(
-            ret >= 0,
-            "Failed to read pagesize {:?}",
-            io::Error::last_os_error()
-        );
-
-        #[allow(clippy::cast_sign_loss)]
-        let page_size = ret as usize;
-        // probe to find a usable shadow bit:
-        let mut shadow_bit = 0;
-
-        let mut occupied_ranges: Vec<(usize, usize)> = vec![];
-        // max(userspace address) this is usually 0x8_0000_0000_0000 - 1 on x64 linux.
-        let mut userspace_max: usize = 0;
-
-        // Enumerate memory ranges that are already occupied.
-        for prot in [
-            PageProtection::Read,
-            PageProtection::Write,
-            PageProtection::Execute,
-        ] {
-            RangeDetails::enumerate_with_prot(prot, &mut |details| {
-                let start = details.memory_range().base_address().0 as usize;
-                let end = start + details.memory_range().size();
-                occupied_ranges.push((start, end));
-                // log::trace!("{:x} {:x}", start, end);
-                let base: usize = 2;
-                // On x64, if end > 2**48, then that's in vsyscall or something.
-                #[cfg(target_arch = "x86_64")]
-                if end <= base.pow(48) && end > userspace_max {
-                    userspace_max = end;
-                }
-
-                // On x64, if end > 2**52, then range is not in userspace
-                #[cfg(target_arch = "aarch64")]
-                if end <= base.pow(52) && end > userspace_max {
-                    userspace_max = end;
-                }
-
-                true
-            });
-        }
-
-        let mut maxbit = 0;
-        for power in 1..64 {
-            let base: usize = 2;
-            if base.pow(power) > userspace_max {
-                maxbit = power;
-                break;
-            }
-        }
-
-        {
-            for try_shadow_bit in &[maxbit - 4, maxbit - 3, maxbit - 2] {
-                let addr: usize = 1 << try_shadow_bit;
-                let shadow_start = addr;
-                let shadow_end = addr + addr + addr;
-
-                // check if the proposed shadow bit overlaps with occupied ranges.
-                for (start, end) in &occupied_ranges {
-                    if (shadow_start <= *end) && (*start <= shadow_end) {
-                        // log::trace!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
-                        log::warn!("shadow_bit {try_shadow_bit:x} is not suitable");
-                        break;
-                    }
-                }
-
-                if unsafe {
-                    mmap(
-                        NonZeroUsize::new(addr),
-                        NonZeroUsize::new_unchecked(page_size),
-                        ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                        MapFlags::MAP_PRIVATE
-                            | ANONYMOUS_FLAG
-                            | MapFlags::MAP_FIXED
-                            | MapFlags::MAP_NORESERVE,
-                        -1,
-                        0,
-                    )
-                }
-                .is_ok()
-                {
-                    shadow_bit = (*try_shadow_bit).try_into().unwrap();
-                    break;
-                }
-            }
-        }
-
-        log::warn!("shadow_bit {shadow_bit:x} is suitable");
-        assert!(shadow_bit != 0);
-        // attempt to pre-map the entire shadow-memory space
-
-        let addr: usize = 1 << shadow_bit;
-        let pre_allocated_shadow = unsafe {
-            mmap(
-                NonZeroUsize::new(addr),
-                NonZeroUsize::new_unchecked(addr + addr),
-                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                ANONYMOUS_FLAG
-                    | MapFlags::MAP_FIXED
-                    | MapFlags::MAP_PRIVATE
-                    | MapFlags::MAP_NORESERVE,
-                -1,
-                0,
-            )
-        }
-        .is_ok();
-
+    pub fn new(options: &FuzzerOptions) -> Self {
         Self {
-            options,
-            page_size,
-            pre_allocated_shadow,
-            shadow_offset: 1 << shadow_bit,
-            shadow_bit,
-            allocations: HashMap::new(),
-            shadow_pages: RangeSet::new(),
-            allocation_queue: BTreeMap::new(),
-            largest_allocation: 0,
-            total_allocation_size: 0,
-            base_mapping_addr: addr + addr + addr,
-            current_mapping_addr: addr + addr + addr,
+            max_allocation: options.max_allocation,
+            max_allocation_panics: options.max_allocation_panics,
+            max_total_allocation: options.max_total_allocation,
+            allocation_backtraces: options.allocation_backtraces,
+            ..Self::default()
         }
     }
 
@@ -272,9 +156,9 @@ impl Allocator {
         } else {
             size
         };
-        if size > self.options.max_allocation {
+        if size > self.max_allocation {
             #[allow(clippy::manual_assert)]
-            if self.options.max_allocation_panics {
+            if self.max_allocation_panics {
                 panic!("ASAN: Allocation is too large: 0x{size:x}");
             }
 
@@ -282,7 +166,7 @@ impl Allocator {
         }
         let rounded_up_size = self.round_up_to_page(size) + 2 * self.page_size;
 
-        if self.total_allocation_size + rounded_up_size > self.options.max_total_allocation {
+        if self.total_allocation_size + rounded_up_size > self.max_total_allocation {
             return std::ptr::null_mut();
         }
         self.total_allocation_size += rounded_up_size;
@@ -291,7 +175,7 @@ impl Allocator {
             //log::trace!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
             metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
-            if self.options.allocation_backtraces {
+            if self.allocation_backtraces {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
             metadata
@@ -324,7 +208,7 @@ impl Allocator {
                 actual_size: rounded_up_size,
                 ..AllocationMetadata::default()
             };
-            if self.options.allocation_backtraces {
+            if self.allocation_backtraces {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
 
@@ -367,7 +251,7 @@ impl Allocator {
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
         metadata.freed = true;
-        if self.options.allocation_backtraces {
+        if self.allocation_backtraces {
             metadata.release_site_backtrace = Some(Backtrace::new_unresolved());
         }
 
@@ -561,5 +445,147 @@ impl Allocator {
             }
             true
         });
+    }
+}
+
+impl Default for Allocator {
+    /// Creates a new [`Allocator`] (not supported on this platform!)
+    #[cfg(not(any(
+        target_os = "linux",
+        target_vendor = "apple",
+        all(target_arch = "aarch64", target_os = "android")
+    )))]
+    fn default() -> Self {
+        todo!("Shadow region not yet supported for this platform!");
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn default() -> Self {
+        let ret = unsafe { sysconf(_SC_PAGESIZE) };
+        assert!(
+            ret >= 0,
+            "Failed to read pagesize {:?}",
+            io::Error::last_os_error()
+        );
+
+        #[allow(clippy::cast_sign_loss)]
+        let page_size = ret as usize;
+        // probe to find a usable shadow bit:
+        let mut shadow_bit = 0;
+
+        let mut occupied_ranges: Vec<(usize, usize)> = vec![];
+        // max(userspace address) this is usually 0x8_0000_0000_0000 - 1 on x64 linux.
+        let mut userspace_max: usize = 0;
+
+        // Enumerate memory ranges that are already occupied.
+        for prot in [
+            PageProtection::Read,
+            PageProtection::Write,
+            PageProtection::Execute,
+        ] {
+            RangeDetails::enumerate_with_prot(prot, &mut |details| {
+                let start = details.memory_range().base_address().0 as usize;
+                let end = start + details.memory_range().size();
+                occupied_ranges.push((start, end));
+                // log::trace!("{:x} {:x}", start, end);
+                let base: usize = 2;
+                // On x64, if end > 2**48, then that's in vsyscall or something.
+                #[cfg(target_arch = "x86_64")]
+                if end <= base.pow(48) && end > userspace_max {
+                    userspace_max = end;
+                }
+
+                // On x64, if end > 2**52, then range is not in userspace
+                #[cfg(target_arch = "aarch64")]
+                if end <= base.pow(52) && end > userspace_max {
+                    userspace_max = end;
+                }
+
+                true
+            });
+        }
+
+        let mut maxbit = 0;
+        for power in 1..64 {
+            let base: usize = 2;
+            if base.pow(power) > userspace_max {
+                maxbit = power;
+                break;
+            }
+        }
+
+        {
+            for try_shadow_bit in &[maxbit - 4, maxbit - 3, maxbit - 2] {
+                let addr: usize = 1 << try_shadow_bit;
+                let shadow_start = addr;
+                let shadow_end = addr + addr + addr;
+
+                // check if the proposed shadow bit overlaps with occupied ranges.
+                for (start, end) in &occupied_ranges {
+                    if (shadow_start <= *end) && (*start <= shadow_end) {
+                        // log::trace!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
+                        log::warn!("shadow_bit {try_shadow_bit:x} is not suitable");
+                        break;
+                    }
+                }
+
+                if unsafe {
+                    mmap(
+                        NonZeroUsize::new(addr),
+                        NonZeroUsize::new_unchecked(page_size),
+                        ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                        MapFlags::MAP_PRIVATE
+                            | ANONYMOUS_FLAG
+                            | MapFlags::MAP_FIXED
+                            | MapFlags::MAP_NORESERVE,
+                        -1,
+                        0,
+                    )
+                }
+                .is_ok()
+                {
+                    shadow_bit = (*try_shadow_bit).try_into().unwrap();
+                    break;
+                }
+            }
+        }
+
+        log::warn!("shadow_bit {shadow_bit:x} is suitable");
+        assert!(shadow_bit != 0);
+        // attempt to pre-map the entire shadow-memory space
+
+        let addr: usize = 1 << shadow_bit;
+        let pre_allocated_shadow = unsafe {
+            mmap(
+                NonZeroUsize::new(addr),
+                NonZeroUsize::new_unchecked(addr + addr),
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                ANONYMOUS_FLAG
+                    | MapFlags::MAP_FIXED
+                    | MapFlags::MAP_PRIVATE
+                    | MapFlags::MAP_NORESERVE,
+                -1,
+                0,
+            )
+        }
+        .is_ok();
+
+        Self {
+            max_allocation: 1 << 30,
+            max_allocation_panics: false,
+            max_total_allocation: 1 << 32,
+            allocation_backtraces: false,
+            page_size,
+            pre_allocated_shadow,
+            shadow_offset: 1 << shadow_bit,
+            shadow_bit,
+            allocations: HashMap::new(),
+            shadow_pages: RangeSet::new(),
+            allocation_queue: BTreeMap::new(),
+            largest_allocation: 0,
+            total_allocation_size: 0,
+            base_mapping_addr: addr + addr + addr,
+            current_mapping_addr: addr + addr + addr,
+        }
     }
 }

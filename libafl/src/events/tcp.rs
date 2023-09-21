@@ -171,7 +171,7 @@ where
                 spawn(async move {
                     // In a loop, read data from the socket and write the data back.
                     loop {
-                        let buf: Vec<u8> = rx_inner.recv().await.expect("Could not receive");
+                        let buf: Vec<u8> = rx_inner.recv().await.unwrap_or(vec![]);
 
                         #[cfg(feature = "tcp_debug")]
                         println!("{buf:?}");

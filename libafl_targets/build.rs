@@ -156,7 +156,7 @@ fn main() {
         .file(src_dir.join("cmplog.c"))
         .compile("cmplog");
 
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    #[cfg(unix)]
     {
         println!("cargo:rerun-if-changed=src/forkserver.c");
 
