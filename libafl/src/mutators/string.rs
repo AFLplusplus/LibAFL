@@ -18,13 +18,13 @@ use crate::{
 };
 
 /// Input shape for string property-preserving mutations.
-pub type UnicodeInput = (BytesInput, Rc<(PropertyRanges, SubpropertyRanges)>);
+pub type UnicodeInput = (BytesInput, (Rc<(PropertyRanges, SubpropertyRanges)>, bool));
 
 impl<S> MutatedTransform<BytesInput, S> for UnicodeInput
 where
     S: HasCorpus<Input = BytesInput> + HasTestcase,
 {
-    type Post = Rc<(PropertyRanges, SubpropertyRanges)>;
+    type Post = (Rc<(PropertyRanges, SubpropertyRanges)>, bool);
 
     fn try_transform_from(
         base: &mut Testcase<BytesInput>,
@@ -35,7 +35,7 @@ where
         if let Ok(meta) = meta {
             if let StringPropertiesMetadata::PropertyRanges { properties } = meta.clone() {
                 let input = base.load_input(state.corpus())?.clone();
-                return Ok((input, properties));
+                return Ok((input, (properties, true)));
             }
         }
         Err(Error::key_not_found(
@@ -48,7 +48,7 @@ where
     }
 }
 
-impl<S> MutatedTransformPost<S> for Rc<(PropertyRanges, SubpropertyRanges)>
+impl<S> MutatedTransformPost<S> for (Rc<(PropertyRanges, SubpropertyRanges)>, bool)
 where
     S: HasCorpus<Input = BytesInput> + HasTestcase,
 {
@@ -58,10 +58,13 @@ where
         _stage_idx: i32,
         corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
-        // we already spent time computing these properties during mutation, so we can skip this later
-        if let Some(corpus_idx) = corpus_idx {
-            let mut testcase = state.testcase_mut(corpus_idx)?;
-            testcase.add_metadata(StringPropertiesMetadata::PropertyRanges { properties: self });
+        let (properties, preserve) = self;
+        if preserve {
+            // we already spent time computing these properties during mutation, so we can skip this later
+            if let Some(corpus_idx) = corpus_idx {
+                let mut testcase = state.testcase_mut(corpus_idx)?;
+                testcase.add_metadata(StringPropertiesMetadata::PropertyRanges { properties });
+            }
         }
         Ok(())
     }
@@ -69,9 +72,9 @@ where
 
 /// Mutator which retains the general property of a randomly selected range of bytes
 #[derive(Debug, Default)]
-pub struct StringPropertyPreservingMutator;
+pub struct StringPropertyPreservingMutator<const STACKING: bool>;
 
-impl Named for StringPropertyPreservingMutator {
+impl<const STACKING: bool> Named for StringPropertyPreservingMutator<STACKING> {
     fn name(&self) -> &str {
         "string-property-preserving"
     }
@@ -79,14 +82,14 @@ impl Named for StringPropertyPreservingMutator {
 
 const MAX_CHARS: usize = 16;
 
-impl<S> Mutator<UnicodeInput, S> for StringPropertyPreservingMutator
+impl<S, const STACKING: bool> Mutator<UnicodeInput, S> for StringPropertyPreservingMutator<STACKING>
 where
     S: HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        (input, ranges): &mut UnicodeInput,
+        (input, (ranges, preserve)): &mut UnicodeInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_len = state.max_size();
@@ -164,9 +167,14 @@ where
         }
 
         input.bytes_mut().splice(replaced_bytes, new_bytes);
-        *ranges = Rc::new(StringPropertiesStage::<S>::group_by_properties(
-            core::str::from_utf8(input.bytes()).unwrap(),
-        ));
+
+        if STACKING {
+            *ranges = Rc::new(StringPropertiesStage::<S>::group_by_properties(
+                core::str::from_utf8(input.bytes()).unwrap(),
+            ));
+        } else {
+            *preserve = false;
+        }
 
         Ok(MutationResult::Mutated)
     }
@@ -174,22 +182,23 @@ where
 
 /// Mutator which retains the specific byte range of a property of a randomly selected range of bytes
 #[derive(Debug, Default)]
-pub struct StringSubpropertyPreservingMutator;
+pub struct StringSubpropertyPreservingMutator<const STACKING: bool>;
 
-impl Named for StringSubpropertyPreservingMutator {
+impl<const STACKING: bool> Named for StringSubpropertyPreservingMutator<STACKING> {
     fn name(&self) -> &str {
         "string-subproperty-preserving"
     }
 }
 
-impl<S> Mutator<UnicodeInput, S> for StringSubpropertyPreservingMutator
+impl<S, const STACKING: bool> Mutator<UnicodeInput, S>
+    for StringSubpropertyPreservingMutator<STACKING>
 where
     S: HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        (input, ranges): &mut UnicodeInput,
+        (input, (ranges, preserve)): &mut UnicodeInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_len = state.max_size();
@@ -253,9 +262,14 @@ where
         }
 
         input.bytes_mut().splice(replaced_bytes, new_bytes);
-        *ranges = Rc::new(StringPropertiesStage::<S>::group_by_properties(
-            core::str::from_utf8(input.bytes()).unwrap(),
-        ));
+
+        if STACKING {
+            *ranges = Rc::new(StringPropertiesStage::<S>::group_by_properties(
+                core::str::from_utf8(input.bytes()).unwrap(),
+            ));
+        } else {
+            *preserve = false;
+        }
 
         Ok(MutationResult::Mutated)
     }
@@ -282,7 +296,7 @@ mod test {
                 StringPropertiesStage::<NopState<BytesInput>>::group_by_properties(hex);
             let bytes = BytesInput::from(hex.as_bytes());
 
-            let mut mutator = StringPropertyPreservingMutator::default();
+            let mut mutator = StringPropertyPreservingMutator::<true>;
 
             let mut state = StdState::new(
                 StdRand::with_seed(0),
@@ -316,7 +330,7 @@ mod test {
                 StringPropertiesStage::<NopState<BytesInput>>::group_by_properties(hex);
             let bytes = BytesInput::from(hex.as_bytes());
 
-            let mut mutator = StringSubpropertyPreservingMutator::default();
+            let mut mutator = StringSubpropertyPreservingMutator::<true>;
 
             let mut state = StdState::new(
                 StdRand::with_seed(0),
