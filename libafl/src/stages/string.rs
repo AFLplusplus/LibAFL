@@ -1,6 +1,5 @@
 use alloc::{collections::BTreeSet, vec::Vec};
 use core::{cmp::Ordering, marker::PhantomData};
-use std::collections::VecDeque;
 
 use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
@@ -20,11 +19,16 @@ pub mod unicode_properties {
 
 pub type PropertyRange = ((usize, usize), usize);
 pub type PropertyRanges = Vec<PropertyRange>;
+pub type SubpropertyRange = ((usize, usize), (u32, u32));
+pub type SubpropertyRanges = Vec<SubpropertyRange>;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum StringPropertiesMetadata {
     Unclassifiable,
-    PropertyRanges(PropertyRanges),
+    PropertyRanges {
+        properties: PropertyRanges,
+        subproperties: SubpropertyRanges,
+    },
 }
 
 impl_serdeany!(StringPropertiesMetadata);
@@ -35,9 +39,12 @@ pub struct StringPropertiesStage<S> {
 }
 
 impl<S> StringPropertiesStage<S> {
-    pub(crate) fn group_by_properties(string: &str) -> PropertyRanges {
-        let mut char_properties = vec![VecDeque::new(); string.chars().count()];
+    pub(crate) fn group_by_properties(string: &str) -> (PropertyRanges, SubpropertyRanges) {
+        let mut char_properties = vec![BTreeSet::new(); string.chars().count()];
         let mut all_properties = BTreeSet::new();
+
+        let mut char_subproperties = vec![BTreeSet::new(); char_properties.len()];
+        let mut all_subproperties = BTreeSet::new();
         for (prop, &(_, ranges)) in unicode_properties::BY_NAME.iter().enumerate() {
             // type inference help for IDEs
             let prop: usize = prop;
@@ -46,28 +53,33 @@ impl<S> StringPropertiesStage<S> {
             let min = ranges.first().unwrap().0;
             let max = ranges.last().unwrap().1;
 
-            for (c, properties) in string.chars().zip(char_properties.iter_mut()) {
+            for (c, (properties, subproperties)) in string.chars().zip(
+                char_properties
+                    .iter_mut()
+                    .zip(char_subproperties.iter_mut()),
+            ) {
                 let value = c as u32;
                 if min <= value && value <= max {
-                    if ranges
-                        .binary_search_by(|&(min, max)| match min.cmp(&value) {
+                    if let Ok(subprop) =
+                        ranges.binary_search_by(|&(min, max)| match min.cmp(&value) {
                             Ordering::Less | Ordering::Equal => match value.cmp(&max) {
                                 Ordering::Less | Ordering::Equal => Ordering::Equal,
                                 Ordering::Greater => Ordering::Less,
                             },
                             Ordering::Greater => Ordering::Greater,
                         })
-                        .is_ok()
                     {
-                        properties.push_back(prop);
+                        properties.insert(prop);
                         all_properties.insert(prop);
+                        subproperties.insert(ranges[subprop]);
+                        all_subproperties.insert(ranges[subprop]);
                     }
                 }
             }
         }
 
-        fn top_is_property(props: &VecDeque<usize>, prop: usize) -> bool {
-            props.front().map_or(false, |&i| i == prop)
+        fn top_is_property<T: Copy + Eq + Ord>(props: &BTreeSet<T>, prop: T) -> bool {
+            props.first().map_or(false, |&i| i == prop)
         }
 
         let mut prop_ranges = Vec::new();
@@ -78,7 +90,7 @@ impl<S> StringPropertiesStage<S> {
                     .skip_while(|(_, props)| !top_is_property(props, curr_property))
                     .take_while(|(_, props)| top_is_property(props, curr_property))
                     .map(|((i, c), props)| {
-                        props.pop_front();
+                        props.pop_first();
                         (i, c)
                     });
                 if let Some((min, min_c)) = prop_iter.next() {
@@ -90,7 +102,27 @@ impl<S> StringPropertiesStage<S> {
             }
         }
 
-        prop_ranges
+        let mut subprop_ranges = Vec::new();
+        for curr_subproperty in all_subproperties {
+            let mut prop_iter = string.char_indices().zip(char_subproperties.iter_mut());
+            loop {
+                let mut prop_iter = (&mut prop_iter)
+                    .skip_while(|(_, props)| !top_is_property(props, curr_subproperty))
+                    .take_while(|(_, props)| top_is_property(props, curr_subproperty))
+                    .map(|((i, c), props)| {
+                        props.pop_first();
+                        (i, c)
+                    });
+                if let Some((min, min_c)) = prop_iter.next() {
+                    let (max, max_c) = prop_iter.last().unwrap_or((min, min_c));
+                    subprop_ranges.push(((min, max + max_c.len_utf8()), curr_subproperty));
+                } else {
+                    break;
+                }
+            }
+        }
+
+        (prop_ranges, subprop_ranges)
     }
 }
 
@@ -127,7 +159,11 @@ where
 
         let bytes = input.bytes();
         let metadata = if let Ok(string) = core::str::from_utf8(bytes) {
-            StringPropertiesMetadata::PropertyRanges(Self::group_by_properties(string))
+            let (properties, subproperties) = Self::group_by_properties(string);
+            StringPropertiesMetadata::PropertyRanges {
+                properties,
+                subproperties,
+            }
         } else {
             StringPropertiesMetadata::Unclassifiable
         };
@@ -148,7 +184,7 @@ mod test {
         let property_ranges =
             StringPropertiesStage::<NopState<BytesInput>>::group_by_properties(hex);
 
-        for (range, prop) in property_ranges {
+        for (range, prop) in property_ranges.0 {
             let prop = unicode_properties::BY_NAME[prop].0;
             println!(
                 "{prop}: {} ({range:?})",
