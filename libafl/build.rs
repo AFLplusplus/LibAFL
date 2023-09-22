@@ -37,7 +37,7 @@ fn build_unicode_property_map() -> Result<(), Box<dyn Error>> {
 
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let ucd_dir = out_dir.join("ucd-dir");
-    let generated_file = out_dir.join("unicode_properties.rs");
+    let generated_file = out_dir.join("unicode_categories.rs");
 
     std::fs::create_dir_all(&ucd_dir)?;
 
@@ -59,7 +59,7 @@ fn build_unicode_property_map() -> Result<(), Box<dyn Error>> {
     std::fs::remove_file(zip_path)?;
 
     let status = Command::new("ucd-generate")
-        .arg("property-bool")
+        .arg("general-category")
         .arg(ucd_dir.as_os_str())
         .stdout(Stdio::from(File::create(generated_file)?))
         .status()?;
