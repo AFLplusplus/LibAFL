@@ -77,6 +77,9 @@ concolic_mutation = ["z3"]
 ## Enable the fancy TuiMonitor for a termanal UI using crossterm
 tui_monitor = ["ratatui", "crossterm"]
 
+## Enables `StringClassificationStage` and associated mutators, which allow for mutations which preserve the Unicode property data
+unicode = ["std", "ahash/std"]
+
 
 #! ## LibAFL-Bolts Features
 
@@ -126,7 +129,9 @@ agpl = ["nautilus"]
 nautilus = ["grammartec", "std", "serde_json/std"]
 
 [build-dependencies]
+reqwest = { version = "0.11", features = ["blocking"] }
 rustversion = "1.0"
+zip = "0.6"
 
 [dev-dependencies]
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
