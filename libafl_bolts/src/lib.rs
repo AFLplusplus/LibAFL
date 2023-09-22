@@ -446,7 +446,7 @@ impl Display for Error {
 }
 
 impl From<BorrowError> for Error {
-    fn from(err: BorrowError) -> Self {
+    fn from(_: BorrowError) -> Self {
         Self::illegal_state(format!(
             "Couldn't borrow from a RefCell as immutable: {err:?}"
         ))
@@ -454,7 +454,7 @@ impl From<BorrowError> for Error {
 }
 
 impl From<BorrowMutError> for Error {
-    fn from(err: BorrowMutError) -> Self {
+    fn from(_: BorrowMutError) -> Self {
         Self::illegal_state(format!(
             "Couldn't borrow from a RefCell as mutable: {err:?}"
         ))
