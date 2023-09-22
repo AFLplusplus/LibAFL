@@ -210,6 +210,8 @@ jobs:
     - name: Install cxxbridge
       if: runner.os == 'macOS'
       run: cargo install cxxbridge-cmd
+    - name: Install ucd-generate
+      run: cargo install -f ucd-generate
     - name: Install python (macOS)
       # Removing macOS things already installed in CI against failed linking
       if: runner.os == 'macOS'
