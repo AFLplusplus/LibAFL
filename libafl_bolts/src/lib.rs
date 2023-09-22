@@ -180,6 +180,7 @@ use core::{
     iter::Iterator,
     num::{ParseIntError, TryFromIntError},
     time,
+    str::Utf8Error,
 };
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
@@ -501,6 +502,13 @@ impl From<io::Error> for Error {
 impl From<FromUtf8Error> for Error {
     #[allow(unused_variables)]
     fn from(err: FromUtf8Error) -> Self {
+        Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
+    }
+}
+
+impl From<Utf8Error> for Error {
+    #[allow(unused_variables)]
+    fn from(err: Utf8Error) -> Self {
         Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
     }
 }

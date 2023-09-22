@@ -1,6 +1,6 @@
 use alloc::{collections::BTreeSet, vec::Vec};
 use core::{cmp::Ordering, marker::PhantomData};
-use std::ops::Range;
+use std::collections::VecDeque;
 
 use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ pub mod unicode_properties {
     include!(concat!(env!("OUT_DIR"), "/unicode_properties.rs"));
 }
 
-pub type PropertyRange = (Range<usize>, usize);
+pub type PropertyRange = ((usize, usize), usize);
 pub type PropertyRanges = Vec<PropertyRange>;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -35,8 +35,8 @@ pub struct StringPropertiesStage<S> {
 }
 
 impl<S> StringPropertiesStage<S> {
-    fn group_by_properties(string: &str) -> PropertyRanges {
-        let mut char_properties = vec![BTreeSet::new(); string.chars().count()];
+    pub(crate) fn group_by_properties(string: &str) -> PropertyRanges {
+        let mut char_properties = vec![VecDeque::new(); string.chars().count()];
         let mut all_properties = BTreeSet::new();
         for (prop, &(_, ranges)) in unicode_properties::BY_NAME.iter().enumerate() {
             // type inference help for IDEs
@@ -59,15 +59,15 @@ impl<S> StringPropertiesStage<S> {
                         })
                         .is_ok()
                     {
-                        properties.insert(prop);
+                        properties.push_back(prop);
                         all_properties.insert(prop);
                     }
                 }
             }
         }
 
-        fn top_is_property(props: &BTreeSet<usize>, prop: usize) -> bool {
-            props.first().map_or(false, |&i| i == prop)
+        fn top_is_property(props: &VecDeque<usize>, prop: usize) -> bool {
+            props.front().map_or(false, |&i| i == prop)
         }
 
         let mut prop_ranges = Vec::new();
@@ -78,12 +78,12 @@ impl<S> StringPropertiesStage<S> {
                     .skip_while(|(_, props)| !top_is_property(props, curr_property))
                     .take_while(|(_, props)| top_is_property(props, curr_property))
                     .map(|((i, c), props)| {
-                        props.pop_first();
+                        props.pop_front();
                         (i, c)
                     });
                 if let Some((min, min_c)) = prop_iter.next() {
                     let (max, max_c) = prop_iter.last().unwrap_or((min, min_c));
-                    prop_ranges.push((min..(max + max_c.len_utf8()), curr_property));
+                    prop_ranges.push(((min, max + max_c.len_utf8()), curr_property));
                 } else {
                     break;
                 }
@@ -152,7 +152,7 @@ mod test {
             let prop = unicode_properties::BY_NAME[prop].0;
             println!(
                 "{prop}: {} ({range:?})",
-                core::str::from_utf8(&hex.as_bytes()[range.clone()]).unwrap()
+                core::str::from_utf8(&hex.as_bytes()[range.0..range.1]).unwrap()
             );
         }
     }
