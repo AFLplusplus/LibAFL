@@ -1,4 +1,4 @@
-//! Analysis of bytes-like inputs for string properties, which may be useful for certain targets which are primarily string-oriented.
+//! Analysis of bytes-like inputs for string categories, which may be useful for certain targets which are primarily string-oriented.
 
 use alloc::{collections::BTreeSet, rc::Rc, vec::Vec};
 use core::{cmp::Ordering, marker::PhantomData};
@@ -13,44 +13,44 @@ use crate::{
     state::{HasCorpus, HasMetadata, UsesState},
 };
 
-/// Unicode property data, as used by string analysis and mutators.
-pub mod unicode_properties {
+/// Unicode category data, as used by string analysis and mutators.
+pub mod unicode_categories {
     #![allow(unused)]
     #![allow(missing_docs)]
 
-    include!(concat!(env!("OUT_DIR"), "/unicode_properties.rs"));
+    include!(concat!(env!("OUT_DIR"), "/unicode_categories.rs"));
 }
 
-/// A map from a range of bytes to an index into the unicode properties data.
-pub type PropertyRange = ((usize, usize), usize);
-/// All the ranges which share a common unicode property in a particular input.
-pub type PropertyRanges = Vec<PropertyRange>;
-/// A map from a range of bytes to an specific sub-range of a unicode property.
-pub type SubpropertyRange = ((usize, usize), (u32, u32));
-/// All the ranges which share a common unicode property byte range in a particular input.
-pub type SubpropertyRanges = Vec<SubpropertyRange>;
+/// A map from a range of bytes to an index into the unicode categories data.
+pub type CategoryRange = ((usize, usize), usize);
+/// All the ranges which share a common unicode category in a particular input.
+pub type CategoryRanges = Vec<CategoryRange>;
+/// A map from a range of bytes to an specific sub-range of a unicode category.
+pub type SubcategoryRange = ((usize, usize), (u32, u32));
+/// All the ranges which share a common unicode category byte range in a particular input.
+pub type SubcategoryRanges = Vec<SubcategoryRange>;
 
-/// The metadata representing the properties of a particular input.
+/// The metadata representing the categories of a particular input.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum StringPropertiesMetadata {
-    /// The input could not be classified into properties (likely because it is not UTF-8).
+pub enum StringCategoryMetadata {
+    /// The input could not be classified into categories (likely because it is not UTF-8).
     Unclassifiable,
     /// The input was classified.
-    PropertyRanges {
-        /// The ranges associated with the general properties and specific byte-ranges of general properties.
-        properties: Rc<(PropertyRanges, SubpropertyRanges)>,
+    CategoryRanges {
+        /// The ranges associated with the general categories and specific byte-ranges of general categories.
+        categories: Rc<(CategoryRanges, SubcategoryRanges)>,
     },
 }
 
-impl_serdeany!(StringPropertiesMetadata);
+impl_serdeany!(StringCategoryMetadata);
 
-/// Stage which attaches [`StringPropertiesMetadata`] to a testcase if it does not have it already.
+/// Stage which attaches [`StringCategoryMetadata`] to a testcase if it does not have it already.
 #[derive(Debug)]
-pub struct StringPropertiesStage<S> {
+pub struct StringCategoriesStage<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S> StringPropertiesStage<S> {
+impl<S> StringCategoriesStage<S> {
     /// Create a new copy of this stage.
     pub fn new() -> Self {
         Self {
@@ -58,13 +58,13 @@ impl<S> StringPropertiesStage<S> {
         }
     }
 
-    pub(crate) fn group_by_properties(string: &str) -> (PropertyRanges, SubpropertyRanges) {
-        let mut char_properties = vec![BTreeSet::new(); string.chars().count()];
-        let mut all_properties = BTreeSet::new();
+    pub(crate) fn group_by_categories(string: &str) -> (CategoryRanges, SubcategoryRanges) {
+        let mut char_categories = vec![BTreeSet::new(); string.chars().count()];
+        let mut all_categories = BTreeSet::new();
 
-        let mut char_subproperties = vec![BTreeSet::new(); char_properties.len()];
-        let mut all_subproperties = BTreeSet::new();
-        for (prop, &(_, ranges)) in unicode_properties::BY_NAME.iter().enumerate() {
+        let mut char_subcategories = vec![BTreeSet::new(); char_categories.len()];
+        let mut all_subcategories = BTreeSet::new();
+        for (prop, &(_, ranges)) in unicode_categories::BY_NAME.iter().enumerate() {
             // type inference help for IDEs
             let prop: usize = prop;
             let ranges: &'static [(u32, u32)] = ranges;
@@ -72,10 +72,10 @@ impl<S> StringPropertiesStage<S> {
             let min = ranges.first().unwrap().0;
             let max = ranges.last().unwrap().1;
 
-            for (c, (properties, subproperties)) in string.chars().zip(
-                char_properties
+            for (c, (categories, subcategories)) in string.chars().zip(
+                char_categories
                     .iter_mut()
-                    .zip(char_subproperties.iter_mut()),
+                    .zip(char_subcategories.iter_mut()),
             ) {
                 let value = c as u32;
                 if min <= value && value <= max {
@@ -88,33 +88,33 @@ impl<S> StringPropertiesStage<S> {
                             Ordering::Greater => Ordering::Greater,
                         })
                     {
-                        properties.insert(prop);
-                        all_properties.insert(prop);
-                        subproperties.insert(ranges[subprop]);
-                        all_subproperties.insert(ranges[subprop]);
+                        categories.insert(prop);
+                        all_categories.insert(prop);
+                        subcategories.insert(ranges[subprop]);
+                        all_subcategories.insert(ranges[subprop]);
                     }
                 }
             }
         }
 
-        fn top_is_property<T: Copy + Eq + Ord>(props: &BTreeSet<T>, prop: T) -> bool {
+        fn top_is_category<T: Copy + Eq + Ord>(props: &BTreeSet<T>, prop: T) -> bool {
             props.first().map_or(false, |&i| i == prop)
         }
 
         let mut prop_ranges = Vec::new();
-        for curr_property in all_properties {
-            let mut prop_iter = string.char_indices().zip(char_properties.iter_mut());
+        for curr_category in all_categories {
+            let mut prop_iter = string.char_indices().zip(char_categories.iter_mut());
             loop {
                 let mut prop_iter = (&mut prop_iter)
-                    .skip_while(|(_, props)| !top_is_property(props, curr_property))
-                    .take_while(|(_, props)| top_is_property(props, curr_property))
+                    .skip_while(|(_, props)| !top_is_category(props, curr_category))
+                    .take_while(|(_, props)| top_is_category(props, curr_category))
                     .map(|((i, c), props)| {
                         props.pop_first();
                         (i, c)
                     });
                 if let Some((min, min_c)) = prop_iter.next() {
                     let (max, max_c) = prop_iter.last().unwrap_or((min, min_c));
-                    prop_ranges.push(((min, max + max_c.len_utf8()), curr_property));
+                    prop_ranges.push(((min, max + max_c.len_utf8()), curr_category));
                 } else {
                     break;
                 }
@@ -122,19 +122,19 @@ impl<S> StringPropertiesStage<S> {
         }
 
         let mut subprop_ranges = Vec::new();
-        for curr_subproperty in all_subproperties {
-            let mut prop_iter = string.char_indices().zip(char_subproperties.iter_mut());
+        for curr_subcategory in all_subcategories {
+            let mut prop_iter = string.char_indices().zip(char_subcategories.iter_mut());
             loop {
                 let mut prop_iter = (&mut prop_iter)
-                    .skip_while(|(_, props)| !top_is_property(props, curr_subproperty))
-                    .take_while(|(_, props)| top_is_property(props, curr_subproperty))
+                    .skip_while(|(_, props)| !top_is_category(props, curr_subcategory))
+                    .take_while(|(_, props)| top_is_category(props, curr_subcategory))
                     .map(|((i, c), props)| {
                         props.pop_first();
                         (i, c)
                     });
                 if let Some((min, min_c)) = prop_iter.next() {
                     let (max, max_c) = prop_iter.last().unwrap_or((min, min_c));
-                    subprop_ranges.push(((min, max + max_c.len_utf8()), curr_subproperty));
+                    subprop_ranges.push(((min, max + max_c.len_utf8()), curr_subcategory));
                 } else {
                     break;
                 }
@@ -145,14 +145,14 @@ impl<S> StringPropertiesStage<S> {
     }
 }
 
-impl<S> UsesState for StringPropertiesStage<S>
+impl<S> UsesState for StringCategoriesStage<S>
 where
     S: UsesInput,
 {
     type State = S;
 }
 
-impl<S, E, EM, Z> Stage<E, EM, Z> for StringPropertiesStage<S>
+impl<S, E, EM, Z> Stage<E, EM, Z> for StringCategoriesStage<S>
 where
     S: UsesInput<Input = BytesInput> + HasCorpus + HasTestcase,
     E: UsesState<State = S>,
@@ -168,7 +168,7 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let mut testcase = state.testcase_mut(corpus_idx)?;
-        if testcase.has_metadata::<StringPropertiesMetadata>() {
+        if testcase.has_metadata::<StringCategoryMetadata>() {
             return Ok(()); // already classified
         }
 
@@ -176,10 +176,10 @@ where
 
         let bytes = input.bytes();
         let metadata = if let Ok(string) = core::str::from_utf8(bytes) {
-            let properties = Rc::new(Self::group_by_properties(string));
-            StringPropertiesMetadata::PropertyRanges { properties }
+            let categories = Rc::new(Self::group_by_categories(string));
+            StringCategoryMetadata::CategoryRanges { categories }
         } else {
-            StringPropertiesMetadata::Unclassifiable
+            StringCategoryMetadata::Unclassifiable
         };
         testcase.add_metadata(metadata);
         Ok(())
@@ -195,11 +195,11 @@ mod test {
     #[test]
     fn check_hex() {
         let hex = "0123456789abcdef0123456789abcdef";
-        let property_ranges =
-            StringPropertiesStage::<NopState<BytesInput>>::group_by_properties(hex);
+        let category_ranges =
+            StringCategoriesStage::<NopState<BytesInput>>::group_by_categories(hex);
 
-        for (range, prop) in property_ranges.0 {
-            let prop = unicode_properties::BY_NAME[prop].0;
+        for (range, prop) in category_ranges.0 {
+            let prop = unicode_categories::BY_NAME[prop].0;
             println!(
                 "{prop}: {} ({range:?})",
                 core::str::from_utf8(&hex.as_bytes()[range.0..range.1]).unwrap()

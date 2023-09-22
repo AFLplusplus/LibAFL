@@ -1,4 +1,4 @@
-//! Mutators for preserving string properties, which may be useful for certain targets which are primarily string-oriented.
+//! Mutators for preserving string categories, which may be useful for certain targets which are primarily string-oriented.
 
 use alloc::{rc::Rc, vec::Vec};
 
@@ -11,35 +11,35 @@ use crate::{
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
         string::{
-            PropertyRanges, StringPropertiesMetadata, StringPropertiesStage, SubpropertyRanges,
+            CategoryRanges, StringCategoriesStage, StringCategoryMetadata, SubcategoryRanges,
         },
     },
     state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
 };
 
-/// Input shape for string property-preserving mutations.
-pub type UnicodeInput = (BytesInput, (Rc<(PropertyRanges, SubpropertyRanges)>, bool));
+/// Input shape for string category-preserving mutations.
+pub type UnicodeInput = (BytesInput, (Rc<(CategoryRanges, SubcategoryRanges)>, bool));
 
 impl<S> MutatedTransform<BytesInput, S> for UnicodeInput
 where
     S: HasCorpus<Input = BytesInput> + HasTestcase,
 {
-    type Post = (Rc<(PropertyRanges, SubpropertyRanges)>, bool);
+    type Post = (Rc<(CategoryRanges, SubcategoryRanges)>, bool);
 
     fn try_transform_from(
         base: &mut Testcase<BytesInput>,
         state: &S,
         _corpus_idx: CorpusId,
     ) -> Result<Self, Error> {
-        let meta = base.metadata::<StringPropertiesMetadata>();
+        let meta = base.metadata::<StringCategoryMetadata>();
         if let Ok(meta) = meta {
-            if let StringPropertiesMetadata::PropertyRanges { properties } = meta.clone() {
+            if let StringCategoryMetadata::CategoryRanges { categories } = meta.clone() {
                 let input = base.load_input(state.corpus())?.clone();
-                return Ok((input, (properties, true)));
+                return Ok((input, (categories, true)));
             }
         }
         Err(Error::key_not_found(
-            "No usable StringPropertiesMetadata for the provided testcase.",
+            "No usable StringCategoriesMetadata for the provided testcase.",
         ))
     }
 
@@ -48,7 +48,7 @@ where
     }
 }
 
-impl<S> MutatedTransformPost<S> for (Rc<(PropertyRanges, SubpropertyRanges)>, bool)
+impl<S> MutatedTransformPost<S> for (Rc<(CategoryRanges, SubcategoryRanges)>, bool)
 where
     S: HasCorpus<Input = BytesInput> + HasTestcase,
 {
@@ -58,31 +58,31 @@ where
         _stage_idx: i32,
         corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error> {
-        let (properties, preserve) = self;
+        let (categories, preserve) = self;
         if preserve {
-            // we already spent time computing these properties during mutation, so we can skip this later
+            // we already spent time computing these categories during mutation, so we can skip this later
             if let Some(corpus_idx) = corpus_idx {
                 let mut testcase = state.testcase_mut(corpus_idx)?;
-                testcase.add_metadata(StringPropertiesMetadata::PropertyRanges { properties });
+                testcase.add_metadata(StringCategoryMetadata::CategoryRanges { categories });
             }
         }
         Ok(())
     }
 }
 
-/// Mutator which retains the general property of a randomly selected range of bytes
+/// Mutator which retains the general category of a randomly selected range of bytes
 #[derive(Debug, Default)]
-pub struct StringPropertyPreservingMutator<const STACKING: bool>;
+pub struct StringCategoryPreservingMutator<const STACKING: bool>;
 
-impl<const STACKING: bool> Named for StringPropertyPreservingMutator<STACKING> {
+impl<const STACKING: bool> Named for StringCategoryPreservingMutator<STACKING> {
     fn name(&self) -> &str {
-        "string-property-preserving"
+        "string-category-preserving"
     }
 }
 
 const MAX_CHARS: usize = 16;
 
-impl<S, const STACKING: bool> Mutator<UnicodeInput, S> for StringPropertyPreservingMutator<STACKING>
+impl<S, const STACKING: bool> Mutator<UnicodeInput, S> for StringCategoryPreservingMutator<STACKING>
 where
     S: HasRand + HasMaxSize,
 {
@@ -130,7 +130,7 @@ where
         let replaced_bytes = bytes_start..bytes_end;
 
         let mutation_destinations: &[(u32, u32)] =
-            crate::stages::string::unicode_properties::BY_NAME[prop].1;
+            crate::stages::string::unicode_categories::BY_NAME[prop].1;
         let choices: u64 = mutation_destinations
             .iter()
             .map(|&(min, max)| (max - min + 1) as u64)
@@ -169,7 +169,7 @@ where
         input.bytes_mut().splice(replaced_bytes, new_bytes);
 
         if STACKING {
-            *ranges = Rc::new(StringPropertiesStage::<S>::group_by_properties(
+            *ranges = Rc::new(StringCategoriesStage::<S>::group_by_categories(
                 core::str::from_utf8(input.bytes()).unwrap(),
             ));
         } else {
@@ -180,18 +180,18 @@ where
     }
 }
 
-/// Mutator which retains the specific byte range of a property of a randomly selected range of bytes
+/// Mutator which retains the specific byte range of a category of a randomly selected range of bytes
 #[derive(Debug, Default)]
-pub struct StringSubpropertyPreservingMutator<const STACKING: bool>;
+pub struct StringSubcategoryPreservingMutator<const STACKING: bool>;
 
-impl<const STACKING: bool> Named for StringSubpropertyPreservingMutator<STACKING> {
+impl<const STACKING: bool> Named for StringSubcategoryPreservingMutator<STACKING> {
     fn name(&self) -> &str {
-        "string-subproperty-preserving"
+        "string-subcategory-preserving"
     }
 }
 
 impl<S, const STACKING: bool> Mutator<UnicodeInput, S>
-    for StringSubpropertyPreservingMutator<STACKING>
+    for StringSubcategoryPreservingMutator<STACKING>
 where
     S: HasRand + HasMaxSize,
 {
@@ -264,7 +264,7 @@ where
         input.bytes_mut().splice(replaced_bytes, new_bytes);
 
         if STACKING {
-            *ranges = Rc::new(StringPropertiesStage::<S>::group_by_properties(
+            *ranges = Rc::new(StringCategoriesStage::<S>::group_by_categories(
                 core::str::from_utf8(input.bytes()).unwrap(),
             ));
         } else {
@@ -282,7 +282,7 @@ mod test {
     use super::*;
     use crate::{
         corpus::InMemoryCorpus,
-        stages::string::StringPropertiesStage,
+        stages::string::StringCategoriesStage,
         state::{NopState, StdState},
     };
 
@@ -292,11 +292,11 @@ mod test {
         let result: Result<(), Error> = (|| {
             let hex = "0123456789abcdef0123456789abcdef";
             let len = hex.chars().count();
-            let property_ranges =
-                StringPropertiesStage::<NopState<BytesInput>>::group_by_properties(hex);
+            let category_ranges =
+                StringCategoriesStage::<NopState<BytesInput>>::group_by_categories(hex);
             let bytes = BytesInput::from(hex.as_bytes());
 
-            let mut mutator = StringPropertyPreservingMutator::<true>;
+            let mut mutator = StringCategoryPreservingMutator::<true>;
 
             let mut state = StdState::new(
                 StdRand::with_seed(0),
@@ -306,7 +306,7 @@ mod test {
                 &mut (),
             )?;
 
-            let mut unicode_input = (bytes, Rc::new(property_ranges));
+            let mut unicode_input = (bytes, Rc::new(category_ranges));
             for _ in 0..(1 << 12) {
                 let _ = mutator.mutate(&mut state, &mut unicode_input, 0);
                 let hex = core::str::from_utf8(unicode_input.0.bytes()).unwrap();
@@ -326,11 +326,11 @@ mod test {
         let result: Result<(), Error> = (|| {
             let hex = "0123456789abcdef0123456789abcdef";
             let len = hex.chars().count();
-            let property_ranges =
-                StringPropertiesStage::<NopState<BytesInput>>::group_by_properties(hex);
+            let category_ranges =
+                StringCategoriesStage::<NopState<BytesInput>>::group_by_categories(hex);
             let bytes = BytesInput::from(hex.as_bytes());
 
-            let mut mutator = StringSubpropertyPreservingMutator::<true>;
+            let mut mutator = StringSubcategoryPreservingMutator::<true>;
 
             let mut state = StdState::new(
                 StdRand::with_seed(0),
@@ -340,7 +340,7 @@ mod test {
                 &mut (),
             )?;
 
-            let mut unicode_input = (bytes, Rc::new(property_ranges));
+            let mut unicode_input = (bytes, Rc::new(category_ranges));
             for _ in 0..(1 << 12) {
                 let _ = mutator.mutate(&mut state, &mut unicode_input, 0);
                 let hex = core::str::from_utf8(unicode_input.0.bytes()).unwrap();
