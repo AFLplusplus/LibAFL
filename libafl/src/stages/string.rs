@@ -1,4 +1,6 @@
-use alloc::{collections::BTreeSet, vec::Vec};
+//! Analysis of bytes-like inputs for string properties, which may be useful for certain targets which are primarily string-oriented.
+
+use alloc::{collections::BTreeSet, rc::Rc, vec::Vec};
 use core::{cmp::Ordering, marker::PhantomData};
 
 use libafl_bolts::{impl_serdeany, Error};
@@ -13,32 +15,51 @@ use crate::{
     state::{HasCorpus, HasMetadata, UsesState},
 };
 
+/// Unicode property data, as used by string analysis and mutators.
 pub mod unicode_properties {
+    #![allow(unused)]
+    #![allow(missing_docs)]
+
     include!(concat!(env!("OUT_DIR"), "/unicode_properties.rs"));
 }
 
+/// A map from a range of bytes to an index into the unicode properties data.
 pub type PropertyRange = ((usize, usize), usize);
+/// All the ranges which share a common unicode property in a particular input.
 pub type PropertyRanges = Vec<PropertyRange>;
+/// A map from a range of bytes to an specific sub-range of a unicode property.
 pub type SubpropertyRange = ((usize, usize), (u32, u32));
+/// All the ranges which share a common unicode property byte range in a particular input.
 pub type SubpropertyRanges = Vec<SubpropertyRange>;
 
+/// The metadata representing the properties of a particular input.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum StringPropertiesMetadata {
+    /// The input could not be classified into properties (likely because it is not UTF-8).
     Unclassifiable,
+    /// The input was classified.
     PropertyRanges {
-        properties: PropertyRanges,
-        subproperties: SubpropertyRanges,
+        /// The ranges associated with the general properties and specific byte-ranges of general properties.
+        properties: Rc<(PropertyRanges, SubpropertyRanges)>,
     },
 }
 
 impl_serdeany!(StringPropertiesMetadata);
 
+/// Stage which attaches [`StringPropertiesMetadata`] to a testcase if it does not have it already.
 #[derive(Debug)]
 pub struct StringPropertiesStage<S> {
     phantom: PhantomData<S>,
 }
 
 impl<S> StringPropertiesStage<S> {
+    /// Create a new copy of this stage.
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+
     pub(crate) fn group_by_properties(string: &str) -> (PropertyRanges, SubpropertyRanges) {
         let mut char_properties = vec![BTreeSet::new(); string.chars().count()];
         let mut all_properties = BTreeSet::new();
@@ -159,11 +180,8 @@ where
 
         let bytes = input.bytes();
         let metadata = if let Ok(string) = core::str::from_utf8(bytes) {
-            let (properties, subproperties) = Self::group_by_properties(string);
-            StringPropertiesMetadata::PropertyRanges {
-                properties,
-                subproperties,
-            }
+            let properties = Rc::new(Self::group_by_properties(string));
+            StringPropertiesMetadata::PropertyRanges { properties }
         } else {
             StringPropertiesMetadata::Unclassifiable
         };
