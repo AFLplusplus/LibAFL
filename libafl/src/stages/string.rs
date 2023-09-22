@@ -64,9 +64,9 @@ impl<S> StringCategoriesStage<S> {
 
         let mut char_subcategories = vec![BTreeSet::new(); char_categories.len()];
         let mut all_subcategories = BTreeSet::new();
-        for (prop, &(_, ranges)) in unicode_categories::BY_NAME.iter().enumerate() {
+        for (cat, &(_, ranges)) in unicode_categories::BY_NAME.iter().enumerate() {
             // type inference help for IDEs
-            let prop: usize = prop;
+            let cat: usize = cat;
             let ranges: &'static [(u32, u32)] = ranges;
 
             let min = ranges.first().unwrap().0;
@@ -79,7 +79,7 @@ impl<S> StringCategoriesStage<S> {
             ) {
                 let value = c as u32;
                 if min <= value && value <= max {
-                    if let Ok(subprop) =
+                    if let Ok(subcat) =
                         ranges.binary_search_by(|&(min, max)| match min.cmp(&value) {
                             Ordering::Less | Ordering::Equal => match value.cmp(&max) {
                                 Ordering::Less | Ordering::Equal => Ordering::Equal,
@@ -88,60 +88,60 @@ impl<S> StringCategoriesStage<S> {
                             Ordering::Greater => Ordering::Greater,
                         })
                     {
-                        categories.insert(prop);
-                        all_categories.insert(prop);
-                        subcategories.insert(ranges[subprop]);
-                        all_subcategories.insert(ranges[subprop]);
+                        categories.insert(cat);
+                        all_categories.insert(cat);
+                        subcategories.insert(ranges[subcat]);
+                        all_subcategories.insert(ranges[subcat]);
                     }
                 }
             }
         }
 
-        fn top_is_category<T: Copy + Eq + Ord>(props: &BTreeSet<T>, prop: T) -> bool {
-            props.first().map_or(false, |&i| i == prop)
+        fn top_is_category<T: Copy + Eq + Ord>(cats: &BTreeSet<T>, cat: T) -> bool {
+            cats.first().map_or(false, |&i| i == cat)
         }
 
-        let mut prop_ranges = Vec::new();
+        let mut cat_ranges = Vec::new();
         for curr_category in all_categories {
-            let mut prop_iter = string.char_indices().zip(char_categories.iter_mut());
+            let mut cat_iter = string.char_indices().zip(char_categories.iter_mut());
             loop {
-                let mut prop_iter = (&mut prop_iter)
-                    .skip_while(|(_, props)| !top_is_category(props, curr_category))
-                    .take_while(|(_, props)| top_is_category(props, curr_category))
-                    .map(|((i, c), props)| {
-                        props.pop_first();
+                let mut cat_iter = (&mut cat_iter)
+                    .skip_while(|(_, cats)| !top_is_category(cats, curr_category))
+                    .take_while(|(_, cats)| top_is_category(cats, curr_category))
+                    .map(|((i, c), cats)| {
+                        cats.pop_first();
                         (i, c)
                     });
-                if let Some((min, min_c)) = prop_iter.next() {
-                    let (max, max_c) = prop_iter.last().unwrap_or((min, min_c));
-                    prop_ranges.push(((min, max + max_c.len_utf8()), curr_category));
+                if let Some((min, min_c)) = cat_iter.next() {
+                    let (max, max_c) = cat_iter.last().unwrap_or((min, min_c));
+                    cat_ranges.push(((min, max + max_c.len_utf8()), curr_category));
                 } else {
                     break;
                 }
             }
         }
 
-        let mut subprop_ranges = Vec::new();
+        let mut subcat_ranges = Vec::new();
         for curr_subcategory in all_subcategories {
-            let mut prop_iter = string.char_indices().zip(char_subcategories.iter_mut());
+            let mut cat_iter = string.char_indices().zip(char_subcategories.iter_mut());
             loop {
-                let mut prop_iter = (&mut prop_iter)
-                    .skip_while(|(_, props)| !top_is_category(props, curr_subcategory))
-                    .take_while(|(_, props)| top_is_category(props, curr_subcategory))
-                    .map(|((i, c), props)| {
-                        props.pop_first();
+                let mut cat_iter = (&mut cat_iter)
+                    .skip_while(|(_, cats)| !top_is_category(cats, curr_subcategory))
+                    .take_while(|(_, cats)| top_is_category(cats, curr_subcategory))
+                    .map(|((i, c), cats)| {
+                        cats.pop_first();
                         (i, c)
                     });
-                if let Some((min, min_c)) = prop_iter.next() {
-                    let (max, max_c) = prop_iter.last().unwrap_or((min, min_c));
-                    subprop_ranges.push(((min, max + max_c.len_utf8()), curr_subcategory));
+                if let Some((min, min_c)) = cat_iter.next() {
+                    let (max, max_c) = cat_iter.last().unwrap_or((min, min_c));
+                    subcat_ranges.push(((min, max + max_c.len_utf8()), curr_subcategory));
                 } else {
                     break;
                 }
             }
         }
 
-        (prop_ranges, subprop_ranges)
+        (cat_ranges, subcat_ranges)
     }
 }
 
@@ -198,10 +198,10 @@ mod test {
         let category_ranges =
             StringCategoriesStage::<NopState<BytesInput>>::group_by_categories(hex);
 
-        for (range, prop) in category_ranges.0 {
-            let prop = unicode_categories::BY_NAME[prop].0;
+        for (range, cat) in category_ranges.0 {
+            let cat = unicode_categories::BY_NAME[cat].0;
             println!(
-                "{prop}: {} ({range:?})",
+                "{cat}: {} ({range:?})",
                 core::str::from_utf8(&hex.as_bytes()[range.0..range.1]).unwrap()
             );
         }
