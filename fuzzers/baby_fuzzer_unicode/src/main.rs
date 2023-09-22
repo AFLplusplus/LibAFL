@@ -13,7 +13,10 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::{scheduled::StdScheduledMutator, StringSubpropertyPreservingMutator},
+    mutators::{
+        StringPropertyPreservingMutator, StringSubpropertyPreservingMutator,
+        TuneableScheduledMutator,
+    },
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, StringPropertiesStage},
@@ -37,7 +40,7 @@ pub fn main() {
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
-        let goal = b"abcdefghijklmnop";
+        let goal = b"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz";
         let mut i = 0;
         for _ in buf.iter().zip(goal).take_while(|(b, c)| b == c) {
             signals_set(i);
@@ -120,13 +123,17 @@ pub fn main() {
         .unwrap();
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_stack_pow(
+    let mutator = TuneableScheduledMutator::new(
+        &mut state,
         tuple_list!(
-            StringSubpropertyPreservingMutator,
-            StringSubpropertyPreservingMutator
+            StringPropertyPreservingMutator::<false>,
+            StringSubpropertyPreservingMutator::<false>,
+            StringSubpropertyPreservingMutator::<false>,
+            StringSubpropertyPreservingMutator::<false>,
+            StringSubpropertyPreservingMutator::<false>
         ),
-        2,
     );
+    TuneableScheduledMutator::set_iters(&mut state, 1);
     let mut stages = tuple_list!(
         StringPropertiesStage::new(),
         StdMutationalStage::transforming(mutator)
