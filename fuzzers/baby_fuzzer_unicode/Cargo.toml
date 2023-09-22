@@ -1,0 +1,24 @@
+[package]
+name = "baby_fuzzer"
+version = "0.10.0"
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+edition = "2021"
+
+[features]
+default = ["std"]
+tui = []
+std = []
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+libafl = { path = "../../libafl/", features = ["unicode"] }
+libafl_bolts = { path = "../../libafl_bolts/" }

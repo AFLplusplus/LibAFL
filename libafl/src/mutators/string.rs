@@ -97,15 +97,22 @@ where
             .iter()
             .filter(|(range, _)| range.0 <= idx && idx < range.1)
             .count();
+        if relevant_group_count == 0 {
+            return Ok(MutationResult::Skipped);
+        }
         let group_idx = state.rand_mut().below(relevant_group_count as u64) as usize;
 
-        let &(byte_range, prop) = ranges.0.iter().nth(group_idx).unwrap();
+        let &(byte_range, prop) = ranges
+            .0
+            .iter()
+            .filter(|(range, _)| range.0 <= idx && idx < range.1)
+            .nth(group_idx)
+            .unwrap();
 
         let string = core::str::from_utf8(&input.bytes()[byte_range.0..byte_range.1])?;
         let char_count = string.chars().count();
 
         let replaced_chars = rand_range(state, char_count, MAX_CHARS);
-        let chars_len = replaced_chars.end - replaced_chars.start;
 
         let (bytes_start, _) = string.char_indices().nth(replaced_chars.start).unwrap();
         let bytes_end = string
@@ -128,6 +135,8 @@ where
 
         let mut new_len = input.len() - (bytes_end - bytes_start);
         let mut new_bytes = Vec::new();
+
+        let chars_len = state.rand_mut().below(MAX_CHARS as u64);
 
         let mut scratch = [0u8; 4];
         'outerloop: for _ in 0..chars_len {
@@ -191,15 +200,22 @@ where
             .iter()
             .filter(|(range, _)| range.0 <= idx && idx < range.1)
             .count();
+        if relevant_group_count == 0 {
+            return Ok(MutationResult::Skipped);
+        }
         let group_idx = state.rand_mut().below(relevant_group_count as u64) as usize;
 
-        let &(byte_range, (subprop_start, subprop_end)) = ranges.1.iter().nth(group_idx).unwrap();
+        let &(byte_range, (subprop_start, subprop_end)) = ranges
+            .1
+            .iter()
+            .filter(|(range, _)| range.0 <= idx && idx < range.1)
+            .nth(group_idx)
+            .unwrap();
 
         let string = core::str::from_utf8(&input.bytes()[byte_range.0..byte_range.1])?;
         let char_count = string.chars().count();
 
         let replaced_chars = rand_range(state, char_count, MAX_CHARS);
-        let chars_len = replaced_chars.end - replaced_chars.start;
 
         let (bytes_start, _) = string.char_indices().nth(replaced_chars.start).unwrap();
         let bytes_end = string
@@ -215,6 +231,8 @@ where
 
         let mut new_len = input.len() - (bytes_end - bytes_start);
         let mut new_bytes = Vec::new();
+
+        let chars_len = state.rand_mut().below(MAX_CHARS as u64);
 
         let mut scratch = [0u8; 4];
         for _ in 0..chars_len {
@@ -279,7 +297,6 @@ mod test {
                 let _ = mutator.mutate(&mut state, &mut unicode_input, 0);
                 let hex = core::str::from_utf8(unicode_input.0.bytes()).unwrap();
                 println!("{hex:?}");
-                assert_eq!(hex.chars().count(), len);
             }
 
             Ok(())
@@ -314,7 +331,6 @@ mod test {
                 let _ = mutator.mutate(&mut state, &mut unicode_input, 0);
                 let hex = core::str::from_utf8(unicode_input.0.bytes()).unwrap();
                 println!("{hex:?}");
-                assert_eq!(hex.chars().count(), len);
             }
 
             Ok(())
