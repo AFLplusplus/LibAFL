@@ -65,17 +65,14 @@ impl ArtifactPrefix {
         if path.ends_with(std::path::MAIN_SEPARATOR) {
             Self {
                 dir,
-                filename_prefix: "".to_string(),
+                filename_prefix: String::new(),
             }
         } else {
-            let filename_prefix = dir.file_name().map_or_else(
-                || "".to_string(),
-                |s| {
-                    s.to_os_string()
-                        .into_string()
-                        .expect("Provided artifact prefix is not usable")
-                },
-            );
+            let filename_prefix = dir.file_name().map_or_else(String::new, |s| {
+                s.to_os_string()
+                    .into_string()
+                    .expect("Provided artifact prefix is not usable")
+            });
             dir.pop();
             Self {
                 dir,
@@ -97,7 +94,7 @@ impl Default for ArtifactPrefix {
     fn default() -> Self {
         Self {
             dir: std::env::current_dir().expect("Must be able to get the current directory!"),
-            filename_prefix: "".to_string(),
+            filename_prefix: String::new(),
         }
     }
 }

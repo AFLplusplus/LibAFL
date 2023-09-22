@@ -37,8 +37,8 @@ where
     pub fn new(corpus_dir: PathBuf, max_len: usize) -> Self {
         Self {
             corpus_dir,
-            loaded_mapping: RefCell::new(Default::default()),
-            loaded_entries: RefCell::new(Default::default()),
+            loaded_mapping: RefCell::new(HashMap::default()),
+            loaded_entries: RefCell::new(BTreeMap::default()),
             mapping: TestcaseStorage::new(),
             max_len,
             current: None,
@@ -249,7 +249,7 @@ where
         let path = testcase.file_path().as_ref().ok_or_else(|| {
             Error::illegal_state("Should have set the path in the LibfuzzerCrashCauseFeedback.")
         })?;
-        match input.to_file(&path) {
+        match input.to_file(path) {
             Err(Error::File(e, _)) if e.kind() == ErrorKind::AlreadyExists => {
                 // we do not care if the file already exists; in this case, we assume it is equal
             }
