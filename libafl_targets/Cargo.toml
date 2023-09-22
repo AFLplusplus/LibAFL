@@ -33,6 +33,7 @@ sancov_pcguard = ["sancov_pcguard_hitcounts"]
 sanitizer_interfaces = []
 clippy = [] # Ignore compiler warnings during clippy
 observers = ["meminterval", "ahash"]
+whole_archive = [] # use +whole-archive to ensure the presence of weak symbols
 
 [build-dependencies]
 bindgen = "0.68"

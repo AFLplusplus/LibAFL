@@ -1,6 +1,5 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
-//!
-//!
+#![cfg_attr(feature = "whole_archive", feature(packed_bundled_libs))]
 #![no_std]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]

@@ -72,6 +72,10 @@ fn main() {
 
         #[cfg(unix)]
         sancov_cmp.flag("-Wno-sign-compare");
+        #[cfg(feature = "whole_archive")]
+        {
+            sancov_cmp.link_lib_modifier("+whole-archive");
+        }
 
         #[cfg(feature = "sancov_value_profile")]
         {
@@ -125,6 +129,11 @@ fn main() {
         let mut libfuzzer = cc::Build::new();
         libfuzzer.file(src_dir.join("libfuzzer.c"));
 
+        #[cfg(feature = "whole_archive")]
+        {
+            libfuzzer.link_lib_modifier("+whole-archive");
+        }
+
         #[cfg(feature = "libfuzzer_no_link_main")]
         libfuzzer.define("FUZZER_NO_LINK_MAIN", "1");
         #[cfg(feature = "libfuzzer_define_run_driver")]
@@ -159,6 +168,11 @@ fn main() {
 
     let mut common = cc::Build::new();
 
+    #[cfg(feature = "whole_archive")]
+    {
+        common.link_lib_modifier("+whole-archive");
+    }
+
     #[cfg(feature = "sanitizers_flags")]
     {
         common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
@@ -168,7 +182,14 @@ fn main() {
 
     println!("cargo:rerun-if-changed=src/coverage.c");
 
-    cc::Build::new()
+    let mut coverage = cc::Build::new();
+
+    #[cfg(feature = "whole_archive")]
+    {
+        coverage.link_lib_modifier("+whole-archive");
+    }
+
+    coverage
         .file(src_dir.join("coverage.c"))
         .define("EDGES_MAP_SIZE", Some(&*format!("{edges_map_size}")))
         .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
@@ -177,49 +198,47 @@ fn main() {
     println!("cargo:rerun-if-changed=src/cmplog.h");
     println!("cargo:rerun-if-changed=src/cmplog.c");
 
-    #[cfg(unix)]
+    let mut cmplog = cc::Build::new();
+
+    #[cfg(feature = "whole_archive")]
     {
-        cc::Build::new()
-            .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
-            .flag("-Wno-sign-compare")
-            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-            .define(
-                "AFLPP_CMPLOG_MAP_W",
-                Some(&*format!("{aflpp_cmplog_map_w}")),
-            )
-            .define(
-                "AFLPP_CMPLOG_MAP_H",
-                Some(&*format!("{aflpp_cmplog_map_h}")),
-            )
-            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-            .file(src_dir.join("cmplog.c"))
-            .compile("cmplog");
+        cmplog.link_lib_modifier("+whole-archive");
     }
 
-    #[cfg(not(unix))]
+    #[cfg(unix)]
     {
-        cc::Build::new()
-            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-            .define(
-                "AFLPP_CMPLOG_MAP_W",
-                Some(&*format!("{aflpp_cmplog_map_w}")),
-            )
-            .define(
-                "AFLPP_CMPLOG_MAP_H",
-                Some(&*format!("{aflpp_cmplog_map_h}")),
-            )
-            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-            .file(src_dir.join("cmplog.c"))
-            .compile("cmplog");
+        cmplog
+            .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
+            .flag("-Wno-sign-compare")
     }
+
+    cmplog
+        .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+        .define(
+            "AFLPP_CMPLOG_MAP_W",
+            Some(&*format!("{aflpp_cmplog_map_w}")),
+        )
+        .define(
+            "AFLPP_CMPLOG_MAP_H",
+            Some(&*format!("{aflpp_cmplog_map_h}")),
+        )
+        .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+        .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+        .file(src_dir.join("cmplog.c"))
+        .compile("cmplog");
 
     #[cfg(unix)]
     {
         println!("cargo:rerun-if-changed=src/forkserver.c");
 
-        cc::Build::new()
+        let mut forkserver = cc::Build::new();
+
+        #[cfg(feature = "whole_archive")]
+        {
+            forkserver.link_lib_modifier("+whole-archive");
+        }
+
+        forkserver
             .file(src_dir.join("forkserver.c"))
             .compile("forkserver");
     }
@@ -228,7 +247,14 @@ fn main() {
     {
         println!("cargo:rerun-if-changed=src/windows_asan.c");
 
-        cc::Build::new()
+        let mut winasan = cc::Build::new();
+
+        #[cfg(feature = "whole_archive")]
+        {
+            winasan.link_lib_modifier("+whole-archive");
+        }
+
+        winasan
             .file(src_dir.join("windows_asan.c"))
             .compile("windows_asan");
     }
