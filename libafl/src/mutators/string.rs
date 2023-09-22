@@ -42,6 +42,7 @@ where
         let group_idx = state.rand_mut().below(relevant_group_count as u64) as usize;
 
         let &(byte_range, prop) = ranges.iter().nth(group_idx).unwrap();
+        print!("{}..{} => ", byte_range.0, byte_range.1);
 
         let string = core::str::from_utf8(&input.bytes()[byte_range.0..byte_range.1])?;
         let char_count = string.chars().count();
@@ -50,15 +51,17 @@ where
         let chars_len = replaced_chars.end - replaced_chars.start;
 
         let (bytes_start, _) = string.char_indices().nth(replaced_chars.start).unwrap();
-        let (bytes_end, _) = string
+        let bytes_end = string
             .char_indices()
             .nth(replaced_chars.end)
-            .unwrap_or_else(|| string.char_indices().last().unwrap());
+            .map(|(i, _)| i)
+            .unwrap_or_else(|| byte_range.1);
 
         let bytes_start = bytes_start + byte_range.0;
         let bytes_end = bytes_end + byte_range.0;
 
         let replaced_bytes = bytes_start..bytes_end;
+        println!("{replaced_bytes:?}");
 
         let mutation_destinations: &[(u32, u32)] =
             crate::stages::string::unicode_properties::BY_NAME[prop].1;
@@ -120,6 +123,7 @@ mod test {
     fn mutate_hex() {
         let result: Result<(), Error> = (|| {
             let hex = "0123456789abcdef0123456789abcdef";
+            let len = hex.len();
             let property_ranges =
                 StringPropertiesStage::<NopState<BytesInput>>::group_by_properties(hex);
             let bytes = BytesInput::from(hex.as_bytes());
@@ -136,11 +140,11 @@ mod test {
 
             let mut unicode_input = (bytes, property_ranges);
             for _ in 0..(1 << 12) {
+                unicode_input.1.truncate(1);
                 let _ = mutator.mutate(&mut state, &mut unicode_input, 0);
-                println!(
-                    "{:?}",
-                    core::str::from_utf8(unicode_input.0.bytes()).unwrap()
-                );
+                let hex = core::str::from_utf8(unicode_input.0.bytes()).unwrap();
+                println!("{hex:?}");
+                assert_eq!(hex.len(), len);
             }
 
             Ok(())
