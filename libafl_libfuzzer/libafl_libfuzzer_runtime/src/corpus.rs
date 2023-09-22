@@ -110,7 +110,7 @@ where
                         "The testcase, when added to the corpus, must have an input present!",
                     )
                 })?;
-                let name = input.generate_name(idx.0);
+                let name = input.generate_name(idx.into());
                 let path = self.corpus_dir.join(&name);
 
                 match input.to_file(&path) {
