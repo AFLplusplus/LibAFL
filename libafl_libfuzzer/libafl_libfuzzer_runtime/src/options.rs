@@ -97,6 +97,7 @@ pub struct LibfuzzerOptions {
     artifact_prefix: Option<ArtifactPrefix>,
     timeout: Duration,
     grimoire: Option<bool>,
+    unicode: bool,
     forks: Option<usize>,
     dict: Option<Tokens>,
     dirs: Vec<PathBuf>,
@@ -150,6 +151,10 @@ impl LibfuzzerOptions {
 
     pub fn grimoire(&self) -> Option<bool> {
         self.grimoire
+    }
+
+    pub fn unicode(&self) -> bool {
+        self.unicode
     }
 
     pub fn forks(&self) -> Option<usize> {
@@ -220,6 +225,7 @@ struct LibfuzzerOptionsBuilder<'a> {
     artifact_prefix: Option<&'a str>,
     timeout: Option<Duration>,
     grimoire: Option<bool>,
+    unicode: Option<bool>,
     forks: Option<usize>,
     dict: Option<&'a str>,
     dirs: Vec<&'a str>,
@@ -282,6 +288,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                             }
                         }
                         "grimoire" => self.grimoire = Some(parse_or_bail!(name, value, u64) > 0),
+                        "unicode" => self.unicode = Some(parse_or_bail!(name, value, u64) > 0),
                         "artifact_prefix" => {
                             self.artifact_prefix = Some(value);
                         }
@@ -336,6 +343,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             artifact_prefix: self.artifact_prefix.map(ArtifactPrefix::new),
             timeout: self.timeout.unwrap_or(Duration::from_secs(1200)),
             grimoire: self.grimoire,
+            unicode: self.unicode.unwrap_or(true),
             forks: self.forks,
             dict: self.dict.map(|path| {
                 Tokens::from_file(path).expect("Couldn't load tokens from specified dictionary")

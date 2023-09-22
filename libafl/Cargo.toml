@@ -78,7 +78,7 @@ concolic_mutation = ["z3"]
 tui_monitor = ["ratatui", "crossterm"]
 
 ## Enables `StringClassificationStage` and associated mutators, which allow for mutations which preserve the Unicode property data
-unicode = ["libafl_bolts/alloc", "ahash/std"]
+unicode = ["libafl_bolts/alloc", "ahash/std", "serde/rc"]
 
 
 #! ## LibAFL-Bolts Features

@@ -30,7 +30,7 @@ path = "src/lib.rs"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-libafl = { path = "../../libafl", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "regex", "errors_backtrace", "serdeany_autoreg", "tui_monitor"] }
+libafl = { path = "../../libafl", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "regex", "errors_backtrace", "serdeany_autoreg", "tui_monitor", "unicode"] }
 libafl_bolts = { path = "../../libafl_bolts", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait", "serdeany_autoreg", "errors_backtrace"] }
 libafl_targets = { path = "../../libafl_targets", features = ["sancov_8bit", "sancov_cmplog", "libfuzzer", "libfuzzer_oom", "libfuzzer_define_run_driver", "sanitizers_flags"] }
 
