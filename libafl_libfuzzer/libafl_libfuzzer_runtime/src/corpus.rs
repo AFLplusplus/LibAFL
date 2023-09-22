@@ -257,6 +257,7 @@ where
         }
 
         // we DO NOT save metadata!
+        self.last = Some(RefCell::new(testcase));
 
         Ok(CorpusId::from(idx))
     }
