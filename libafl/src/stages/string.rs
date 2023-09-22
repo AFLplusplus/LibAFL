@@ -9,9 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{CorpusId, HasTestcase},
     inputs::{BytesInput, HasBytesVec, UsesInput},
-    mark_feature_time,
     stages::Stage,
-    start_timer,
     state::{HasCorpus, HasMetadata, UsesState},
 };
 
@@ -169,14 +167,12 @@ where
         _manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        start_timer!(state);
         let mut testcase = state.testcase_mut(corpus_idx)?;
         if testcase.has_metadata::<StringPropertiesMetadata>() {
             return Ok(()); // already classified
         }
 
         let input = testcase.load_input(state.corpus())?;
-        mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         let bytes = input.bytes();
         let metadata = if let Ok(string) = core::str::from_utf8(bytes) {
