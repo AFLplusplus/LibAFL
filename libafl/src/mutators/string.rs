@@ -142,7 +142,11 @@ where
         let chars_len = state.rand_mut().below(MAX_CHARS as u64);
 
         let mut scratch = [0u8; 4];
-        'outerloop: for _ in 0..chars_len {
+        let mut i = 0;
+        'outerloop: loop {
+            if i >= chars_len {
+                break;
+            }
             let mut choice = state.rand_mut().below(choices);
             for &(subcat_start, subcat_end) in mutation_destinations {
                 if let Some(next_choice) =
@@ -151,7 +155,10 @@ where
                     choice = next_choice;
                 } else {
                     let c = subcat_start + choice as u32;
-                    let c = char::from_u32(c).unwrap();
+                    let Some(c) = char::from_u32(c) else {
+                        // rare case: Rust disagrees with us on what is valid character!
+                        continue 'outerloop;
+                    };
                     let c_as_str = c.encode_utf8(&mut scratch);
                     let c_as_bytes = c_as_str.as_bytes();
 
@@ -164,6 +171,7 @@ where
                     break;
                 }
             }
+            i += 1;
         }
 
         input.bytes_mut().splice(replaced_bytes, new_bytes);
@@ -244,12 +252,19 @@ where
         let chars_len = state.rand_mut().below(MAX_CHARS as u64);
 
         let mut scratch = [0u8; 4];
-        for _ in 0..chars_len {
+        let mut i = 0;
+        loop {
+            if i >= chars_len {
+                break;
+            }
             let choice = state
                 .rand_mut()
                 .below((subcat_end - subcat_start) as u64 + 1) as u32;
             let c = subcat_start + choice;
-            let c = char::from_u32(c).unwrap();
+            let Some(c) = char::from_u32(c) else {
+                // rare case: Rust disagrees with us on what is valid character!
+                continue;
+            };
             let c_as_str = c.encode_utf8(&mut scratch);
             let c_as_bytes = c_as_str.as_bytes();
 
@@ -259,6 +274,7 @@ where
             new_len += c_as_bytes.len();
 
             new_bytes.extend_from_slice(c_as_str.as_bytes());
+            i += 1;
         }
 
         input.bytes_mut().splice(replaced_bytes, new_bytes);
