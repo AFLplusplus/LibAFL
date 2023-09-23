@@ -14,12 +14,12 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     mutators::{
-        StringPropertyPreservingMutator, StringSubpropertyPreservingMutator,
+        StringCategoryPreservingMutator, StringSubcategoryPreservingMutator,
         TuneableScheduledMutator,
     },
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::{mutational::StdMutationalStage, StringPropertiesStage},
+    stages::{mutational::StdMutationalStage, StringCategoriesStage},
     state::StdState,
     Evaluator,
 };
@@ -126,16 +126,16 @@ pub fn main() {
     let mutator = TuneableScheduledMutator::new(
         &mut state,
         tuple_list!(
-            StringPropertyPreservingMutator::<false>,
-            StringSubpropertyPreservingMutator::<false>,
-            StringSubpropertyPreservingMutator::<false>,
-            StringSubpropertyPreservingMutator::<false>,
-            StringSubpropertyPreservingMutator::<false>
+            StringCategoryPreservingMutator::<false>,
+            StringSubcategoryPreservingMutator::<false>,
+            StringSubcategoryPreservingMutator::<false>,
+            StringSubcategoryPreservingMutator::<false>,
+            StringSubcategoryPreservingMutator::<false>
         ),
     );
     TuneableScheduledMutator::set_iters(&mut state, 1);
     let mut stages = tuple_list!(
-        StringPropertiesStage::new(),
+        StringCategoriesStage::new(),
         StdMutationalStage::transforming(mutator)
     );
 
