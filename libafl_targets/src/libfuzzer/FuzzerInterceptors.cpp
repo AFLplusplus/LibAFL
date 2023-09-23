@@ -107,6 +107,7 @@ static size_t internal_strlen(const char *s) {
   return i;
 }
 
+/*
 static char *internal_strstr(const char *haystack, const char *needle) {
   // This is O(N^2), but we are not using it in hot places.
   size_t len1 = internal_strlen(haystack);
@@ -119,6 +120,7 @@ static char *internal_strstr(const char *haystack, const char *needle) {
   }
   return nullptr;
 }
+*/
 
 extern "C" {
 
@@ -134,12 +136,14 @@ void __sanitizer_weak_hook_strcmp(void *called_pc, const char *s1,
                                   const char *s2, int result);
 void __sanitizer_weak_hook_strcasecmp(void *called_pc, const char *s1,
                                       const char *s2, int result);
+/*
 void __sanitizer_weak_hook_strstr(void *called_pc, const char *s1,
                                   const char *s2, char *result);
 void __sanitizer_weak_hook_strcasestr(void *called_pc, const char *s1,
                                       const char *s2, char *result);
 void __sanitizer_weak_hook_memmem(void *called_pc, const void *s1, size_t len1,
                                   const void *s2, size_t len2, void *result);
+*/
 
 DEFINE_REAL(int, bcmp, const void *, const void *, size_t)
 DEFINE_REAL(int, memcmp, const void *, const void *, size_t)
@@ -147,9 +151,11 @@ DEFINE_REAL(int, strncmp, const char *, const char *, size_t)
 DEFINE_REAL(int, strcmp, const char *, const char *)
 DEFINE_REAL(int, strncasecmp, const char *, const char *, size_t)
 DEFINE_REAL(int, strcasecmp, const char *, const char *)
+/*
 DEFINE_REAL(char *, strstr, const char *, const char *)
 DEFINE_REAL(char *, strcasestr, const char *, const char *)
 DEFINE_REAL(void *, memmem, const void *, size_t, const void *, size_t)
+*/
 
 ATTRIBUTE_INTERFACE int bcmp(const void *s1, const void *s2, size_t n) {
   if (!FuzzerInited)
@@ -197,6 +203,7 @@ ATTRIBUTE_INTERFACE int strcasecmp(const char *s1, const char *s2) {
   return result;
 }
 
+/*
 ATTRIBUTE_INTERFACE char *strstr(const char *s1, const char *s2) {
   if (!FuzzerInited)
     return internal_strstr(s1, s2);
@@ -219,6 +226,7 @@ void *memmem(const void *s1, size_t len1, const void *s2, size_t len2) {
   __sanitizer_weak_hook_memmem(GET_CALLER_PC(), s1, len1, s2, len2, result);
   return result;
 }
+*/
 
 __attribute__((section(".preinit_array"),
                used)) static void (*__local_fuzzer_preinit)(void) = fuzzerInit;
@@ -243,12 +251,14 @@ static void fuzzerInit() {
       getFuncAddr("strncasecmp", reinterpret_cast<uintptr_t>(&strncasecmp)));
   REAL(strcasecmp) = reinterpret_cast<strcasecmp_type>(
       getFuncAddr("strcasecmp", reinterpret_cast<uintptr_t>(&strcasecmp)));
+  /*
   REAL(strstr) = reinterpret_cast<strstr_type>(
       getFuncAddr("strstr", reinterpret_cast<uintptr_t>(&strstr)));
   REAL(strcasestr) = reinterpret_cast<strcasestr_type>(
       getFuncAddr("strcasestr", reinterpret_cast<uintptr_t>(&strcasestr)));
   REAL(memmem) = reinterpret_cast<memmem_type>(
       getFuncAddr("memmem", reinterpret_cast<uintptr_t>(&memmem)));
+  */
 
   FuzzerInitIsRunning = false;
   FuzzerInited = 1;
