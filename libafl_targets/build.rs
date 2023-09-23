@@ -140,6 +140,21 @@ fn main() {
         libfuzzer.define("FUZZER_DEFINE_RUN_DRIVER", "1");
 
         libfuzzer.compile("libfuzzer");
+
+        #[cfg(all(feature = "sancov_cmplog", target_os = "linux"))]
+        {
+            println!("cargo:rerun-if-changed=src/libfuzzer/FuzzerInterceptors.cpp");
+
+            let mut interceptors = cc::Build::new();
+            interceptors.file(src_dir.join("libfuzzer/FuzzerInterceptors.cpp"));
+
+            #[cfg(feature = "whole_archive")]
+            {
+                interceptors.link_lib_modifier("+whole-archive");
+            }
+
+            interceptors.cpp(true).compile("interceptors");
+        }
     }
 
     println!("cargo:rerun-if-changed=src/common.h");
