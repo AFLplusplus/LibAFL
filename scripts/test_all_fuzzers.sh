@@ -7,6 +7,7 @@ cd "$SCRIPT_DIR/.." || exit 1
 if [[ -z "${RUN_ON_CI}" ]]; then
   fuzzers=$(find ./fuzzers -mindepth 1 -maxdepth 1 -type d)
   backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -mindepth 1 -maxdepth 1 -type d)
+  export PROFILE=dev
 else
   cargo build -p build_and_test_fuzzers
   fuzzers=$(cargo run -p build_and_test_fuzzers -- "remotes/origin/main" "HEAD^")

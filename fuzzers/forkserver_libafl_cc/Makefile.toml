@@ -2,9 +2,10 @@
 [env]
 FUZZER_NAME='fuzzer_libafl_cc'
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-LIBAFL_CC = '${CARGO_TARGET_DIR}/release/libafl_cc'
-LIBAFL_CXX = '${CARGO_TARGET_DIR}/release/libafl_cxx'
-FUZZER = '${CARGO_TARGET_DIR}/release/${FUZZER_NAME}'
+PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE}/libafl_cc'
+LIBAFL_CXX = '${CARGO_TARGET_DIR}/${PROFILE}/libafl_cxx'
+FUZZER = '${CARGO_TARGET_DIR}/${PROFILE}/${FUZZER_NAME}'
 PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
@@ -21,7 +22,7 @@ windows_alias = "unsupported"
 
 [tasks.cxx_unix]
 command = "cargo"
-args = ["build" , "--release"]
+args = ["build" , "--${PROFILE}"]
 
 [tasks.cc]
 linux_alias = "cc_unix"
@@ -30,7 +31,7 @@ windows_alias = "unsupported"
 
 [tasks.cc_unix]
 command = "cargo"
-args = ["build" , "--release"]
+args = ["build" , "--${PROFILE}"]
 
 [tasks.crash_cxx]
 linux_alias = "crash_cxx_unix"
@@ -39,7 +40,7 @@ windows_alias = "unsupported"
 
 [tasks.crash_cxx_unix]
 command = "cargo"
-args = ["build" , "--release", "--features=crash"]
+args = ["build" , "--${PROFILE}", "--features=crash"]
 
 [tasks.crash_cc]
 linux_alias = "crash_cc_unix"
@@ -48,7 +49,7 @@ windows_alias = "unsupported"
 
 [tasks.crash_cc_unix]
 command = "cargo"
-args = ["build" , "--release", "--features=crash"]
+args = ["build" , "--${PROFILE}", "--features=crash"]
 
 # Harness
 [tasks.fuzzer]
@@ -57,7 +58,7 @@ mac_alias = "fuzzer_unix"
 windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
-command = "${CARGO_TARGET_DIR}/release/libafl_cc"
+command = "${CARGO_TARGET_DIR}/${PROFILE}/libafl_cc"
 args = ["${PROJECT_DIR}/src/program.c", "-o", "${FUZZER_NAME}", "-lm"]
 dependencies = [ "cxx", "cc" ]
 
@@ -68,7 +69,7 @@ mac_alias = "fuzzer_crash_unix"
 windows_alias = "unsupported"
 
 [tasks.fuzzer_crash_unix]
-command = "${CARGO_TARGET_DIR}/release/libafl_cc"
+command = "${CARGO_TARGET_DIR}/${PROFILE}/libafl_cc"
 args = ["${PROJECT_DIR}/src/program.c", "-o", "${FUZZER_NAME}_crash", "-lm"]
 dependencies = [ "crash_cxx", "crash_cc" ]
 
@@ -81,7 +82,7 @@ windows_alias = "unsupported"
 [tasks.run_unix]
 script_runner = "@shell"
 script='''
-taskset -c 1 ${CARGO_TARGET_DIR}/release/${CARGO_MAKE_PROJECT_NAME} ./${FUZZER_NAME} ./corpus/ -t 1000
+taskset -c 1 ${CARGO_TARGET_DIR}/${PROFILE}/${CARGO_MAKE_PROJECT_NAME} ./${FUZZER_NAME} ./corpus/ -t 1000
 '''
 dependencies = [ "fuzzer" ]
 
@@ -95,7 +96,7 @@ windows_alias = "unsupported"
 [tasks.crash_unix]
 script_runner = "@shell"
 script='''
-taskset -c 1 ${CARGO_TARGET_DIR}/release/${CARGO_MAKE_PROJECT_NAME} ./${FUZZER_NAME}_crash ./corpus/ -t 1000
+taskset -c 1 ${CARGO_TARGET_DIR}/${PROFILE}/${CARGO_MAKE_PROJECT_NAME} ./${FUZZER_NAME}_crash ./corpus/ -t 1000
 '''
 dependencies = [ "fuzzer_crash" ]
 
