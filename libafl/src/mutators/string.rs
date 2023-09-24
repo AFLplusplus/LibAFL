@@ -131,18 +131,22 @@ fn choose_category_range<R: Rand>(
 ) -> Option<(Range<usize>, &'static [(u32, u32)])> {
     // figure out the categories for this char
     let expanded = c as u32;
+    #[cfg(test)]
+    let mut names = Vec::new();
     let mut categories = Vec::new();
-    for category in unicode_categories::BY_NAME
-        .iter()
-        .map(|&(_name, category)| category)
-    {
+    for (_name, category) in unicode_categories::BY_NAME.iter() {
+        #[cfg(test)]
+        names.push(_name);
         if get_subcategory(expanded, category).is_some() {
             categories.push(category);
         }
     }
 
-    let selected = rand.below(categories.len() as u64) as usize;
-    let selected = categories[selected];
+    let selected_idx = rand.below(categories.len() as u64) as usize;
+    let selected = categories[selected_idx];
+
+    #[cfg(test)]
+    println!("category: {}", names[selected_idx]);
 
     Some((
         find_range(bytes, c, idx, |c| {
@@ -160,18 +164,22 @@ fn choose_subcategory_range<R: Rand>(
 ) -> Option<(Range<usize>, (u32, u32))> {
     // figure out the categories for this char
     let expanded = c as u32;
+    #[cfg(test)]
+    let mut names = Vec::new();
     let mut subcategories = Vec::new();
-    for category in unicode_categories::BY_NAME
-        .iter()
-        .map(|&(_name, category)| category)
-    {
+    for (_name, category) in unicode_categories::BY_NAME.iter() {
+        #[cfg(test)]
+        names.push(_name);
         if let Some(subcategory) = get_subcategory(expanded, category) {
             subcategories.push(subcategory);
         }
     }
 
-    let selected = rand.below(subcategories.len() as u64) as usize;
-    let selected = subcategories[selected];
+    let selected_idx = rand.below(subcategories.len() as u64) as usize;
+    let selected = subcategories[selected_idx];
+
+    #[cfg(test)]
+    println!("subcategory: {} ({:?})", names[selected_idx], selected);
 
     Some((
         find_range(bytes, c, idx, |c| {
@@ -190,6 +198,14 @@ fn mutate_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
 ) -> Result<MutationResult, Error> {
     let temp_range = rand_range(state, range.end - range.start, MAX_CHARS);
     let range = (range.start + temp_range.start)..(range.start + temp_range.end);
+
+    #[cfg(test)]
+    println!(
+        "{:?} => {:?}",
+        range,
+        core::str::from_utf8(&input.bytes()[range.clone()])
+    );
+
     let replace_len = state.rand_mut().below(MAX_CHARS as u64) as usize;
     let orig_len = range.end - range.start;
     if input.len() - orig_len + replace_len > state.max_size() {
@@ -230,6 +246,13 @@ where
         if let Some((c, idx)) = choose_index(state.rand_mut(), bytes) {
             if let Some((range, category)) = choose_category_range(state.rand_mut(), bytes, c, idx)
             {
+                #[cfg(test)]
+                println!(
+                    "{:?} => {:?}",
+                    range,
+                    core::str::from_utf8(&bytes[range.clone()])
+                );
+
                 let options: u64 = category
                     .iter()
                     .map(|&(start, end)| end as u64 - start as u64 + 1)
@@ -242,7 +265,7 @@ where
                             selected.checked_sub(max as u64 - min as u64 + 1)
                         {
                             selected = next_selected;
-                        } else if let Some(new_c) = char::from_u32(selected as u32) {
+                        } else if let Some(new_c) = char::from_u32(selected as u32 + min) {
                             return new_c;
                         } else {
                             break;
@@ -283,10 +306,17 @@ where
             if let Some((range, subcategory)) =
                 choose_subcategory_range(state.rand_mut(), bytes, c, idx)
             {
+                #[cfg(test)]
+                println!(
+                    "{:?} => {:?}",
+                    range,
+                    core::str::from_utf8(&bytes[range.clone()])
+                );
+
                 let options: u64 = subcategory.1 as u64 - subcategory.0 as u64 + 1;
                 let char_gen = |state: &mut S| loop {
                     let selected = state.rand_mut().below(options);
-                    if let Some(new_c) = char::from_u32(selected as u32) {
+                    if let Some(new_c) = char::from_u32(selected as u32 + subcategory.0) {
                         return new_c;
                     }
                 };
@@ -334,6 +364,13 @@ where
         let bytes = input.bytes();
         if let Some((c, idx)) = choose_index(state.rand_mut(), bytes) {
             if let Some((range, _)) = choose_category_range(state.rand_mut(), bytes, c, idx) {
+                #[cfg(test)]
+                println!(
+                    "{:?} => {:?}",
+                    range,
+                    core::str::from_utf8(&bytes[range.clone()])
+                );
+
                 let meta = state.metadata_map().get::<Tokens>().unwrap();
                 let token = &meta.tokens()[token_idx];
 
@@ -385,6 +422,13 @@ where
         let bytes = input.bytes();
         if let Some((c, idx)) = choose_index(state.rand_mut(), bytes) {
             if let Some((range, _)) = choose_subcategory_range(state.rand_mut(), bytes, c, idx) {
+                #[cfg(test)]
+                println!(
+                    "{:?} => {:?}",
+                    range,
+                    core::str::from_utf8(&bytes[range.clone()])
+                );
+
                 let meta = state.metadata_map().get::<Tokens>().unwrap();
                 let token = &meta.tokens()[token_idx];
 
@@ -406,7 +450,7 @@ mod test {
     use libafl_bolts::rands::StdRand;
 
     use super::*;
-    use crate::{corpus::InMemoryCorpus, state::StdState};
+    use crate::{corpus::NopCorpus, state::StdState};
 
     // a not-so-useful test for this
     #[test]
@@ -419,8 +463,8 @@ mod test {
 
             let mut state = StdState::new(
                 StdRand::with_seed(0),
-                InMemoryCorpus::<BytesInput>::new(),
-                InMemoryCorpus::new(),
+                NopCorpus::<BytesInput>::new(),
+                NopCorpus::new(),
                 &mut (),
                 &mut (),
             )?;
@@ -450,8 +494,8 @@ mod test {
 
             let mut state = StdState::new(
                 StdRand::with_seed(0),
-                InMemoryCorpus::<BytesInput>::new(),
-                InMemoryCorpus::new(),
+                NopCorpus::<BytesInput>::new(),
+                NopCorpus::new(),
                 &mut (),
                 &mut (),
             )?;
