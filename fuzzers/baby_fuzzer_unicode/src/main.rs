@@ -14,12 +14,11 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     mutators::{
-        StringCategoryPreservingMutator, StringSubcategoryPreservingMutator,
-        TuneableScheduledMutator,
+        StdScheduledMutator, StringCategoryPreservingMutator, StringSubcategoryPreservingMutator,
     },
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::{mutational::StdMutationalStage, StringCategoriesStage},
+    stages::mutational::StdMutationalStage,
     state::StdState,
     Evaluator,
 };
@@ -123,21 +122,14 @@ pub fn main() {
         .unwrap();
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = TuneableScheduledMutator::new(
-        &mut state,
-        tuple_list!(
-            StringCategoryPreservingMutator::<false>,
-            StringSubcategoryPreservingMutator::<false>,
-            StringSubcategoryPreservingMutator::<false>,
-            StringSubcategoryPreservingMutator::<false>,
-            StringSubcategoryPreservingMutator::<false>
-        ),
-    );
-    TuneableScheduledMutator::set_iters(&mut state, 1);
-    let mut stages = tuple_list!(
-        StringCategoriesStage::new(),
-        StdMutationalStage::transforming(mutator)
-    );
+    let mutator = StdScheduledMutator::new(tuple_list!(
+        StringCategoryPreservingMutator,
+        StringSubcategoryPreservingMutator,
+        StringSubcategoryPreservingMutator,
+        StringSubcategoryPreservingMutator,
+        StringSubcategoryPreservingMutator
+    ));
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
