@@ -162,7 +162,7 @@ rm -rf libafl_unix_shmem_server || true
 (timeout --foreground 11s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true) &
 sleep 0.2
 timeout --foreground 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
-cd ./out
+cd "${PROJECT_DIR}"/out
 if [ $(ls -al |grep "^-"|wc -l) -gt 4 ]; then
     echo "Fuzzer is working"
 else
