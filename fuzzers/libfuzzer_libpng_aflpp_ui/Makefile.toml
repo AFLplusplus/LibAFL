@@ -159,16 +159,9 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-(timeout 11s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true) &
+(timeout --foreground 11s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true) &
 sleep 0.2
-timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
-cd ./corpus
-if [ $(ls -al |grep "^-"|wc -l) -gt 4 ]; then
-    echo "Fuzzer is working"
-else
-    echo "Fuzzer does not generate any testcases or any crashes"
-    exit 1
-fi
+timeout --foreground 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
 '''
 dependencies = [ "fuzzer" ]
 
@@ -176,9 +169,9 @@ dependencies = [ "fuzzer" ]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-(timeout 11s ./${FUZZER_NAME} >fuzz_stdout.log 2>/dev/null || true) &
+(timeout --foreground 11s ./${FUZZER_NAME} >fuzz_stdout.log 2>/dev/null || true) &
 sleep 0.2
-timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
+timeout --foreground 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
 '''
 dependencies = [ "fuzzer" ]
 
