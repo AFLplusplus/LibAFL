@@ -19,9 +19,9 @@ extern "C" {
     pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);
 }
 
-use frida_gum::ModuleMap;
 use std::rc::Rc;
 
+use frida_gum::ModuleMap;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::{
     instruction_writer::{Aarch64Register, IndexMode, InstructionWriter},
