@@ -162,7 +162,7 @@ macro_rules! fuzz_with {
                 GrimoireExtensionMutator, GrimoireRecursiveReplacementMutator, GrimoireRandomDeleteMutator,
                 GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
                 I2SRandReplace, StdScheduledMutator, StringCategoryPreservingMutator, StringSubcategoryPreservingMutator,
-                StringCategoryReplaceMutator, StringSubcategoryReplaceMutator, Tokens, tokens_mutations, TuneableScheduledMutator
+                StringCategoryReplaceMutator, StringSubcategoryReplaceMutator, Tokens, tokens_mutations
             },
             observers::{stacktrace::BacktraceObserver, TimeObserver},
             schedulers::{
@@ -170,7 +170,7 @@ macro_rules! fuzz_with {
             },
             stages::{
                 CalibrationStage, GeneralizationStage, IfStage, StdMutationalStage,
-                StdPowerMutationalStage, StringCategoriesStage, TracingStage,
+                StdPowerMutationalStage, TracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
@@ -299,32 +299,27 @@ macro_rules! fuzz_with {
 
             // Set up a string category analysis stage for unicode mutations
             let unicode_used = $options.unicode();
-            let string_analysis = StringCategoriesStage::new();
-            let string_mutator = TuneableScheduledMutator::new(
-                &mut state,
+            let string_mutator = StdScheduledMutator::new(
                 tuple_list!(
-                    StringCategoryPreservingMutator::<false>,
-                    StringSubcategoryPreservingMutator::<false>,
-                    StringSubcategoryPreservingMutator::<false>,
-                    StringSubcategoryPreservingMutator::<false>,
-                    StringSubcategoryPreservingMutator::<false>,
+                    StringCategoryPreservingMutator,
+                    StringSubcategoryPreservingMutator,
+                    StringSubcategoryPreservingMutator,
+                    StringSubcategoryPreservingMutator,
+                    StringSubcategoryPreservingMutator,
                 )
             );
-            let string_replace_mutator = TuneableScheduledMutator::new(
-                &mut state,
+            let string_replace_mutator = StdScheduledMutator::new(
                 tuple_list!(
-                    StringCategoryReplaceMutator::<false>,
-                    StringSubcategoryReplaceMutator::<false>,
-                    StringSubcategoryReplaceMutator::<false>,
-                    StringSubcategoryReplaceMutator::<false>,
-                    StringSubcategoryReplaceMutator::<false>,
+                    StringCategoryReplaceMutator,
+                    StringSubcategoryReplaceMutator,
+                    StringSubcategoryReplaceMutator,
+                    StringSubcategoryReplaceMutator,
+                    StringSubcategoryReplaceMutator,
                 )
             );
-            let string_power = StdMutationalStage::transforming(string_mutator);
-            let string_replace_power = StdMutationalStage::transforming(string_replace_mutator);
-
-            TuneableScheduledMutator::set_iters(&mut state, 1);
-            let string_analysis = IfStage::new(|_, _, _, _, _| Ok((unicode_used && mutator_status.std_mutational).into()), tuple_list!(string_analysis, string_power, string_replace_power));
+            let string_power = StdMutationalStage::new(string_mutator);
+            let string_replace_power = StdMutationalStage::new(string_replace_mutator);
+            let string_analysis = IfStage::new(|_, _, _, _, _| Ok((unicode_used && mutator_status.std_mutational).into()), tuple_list!(string_power, string_replace_power));
 
             // Attempt to use tokens from libfuzzer dicts
             if !state.has_metadata::<Tokens>() {

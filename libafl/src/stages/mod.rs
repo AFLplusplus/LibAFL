@@ -56,15 +56,10 @@ pub use sync::*;
 
 #[cfg(feature = "std")]
 pub mod dump;
-#[cfg(feature = "std")]
-pub use dump::*;
-
-#[cfg(feature = "unicode")]
-pub mod string;
 use core::{convert::From, marker::PhantomData};
 
-#[cfg(feature = "unicode")]
-pub use string::*;
+#[cfg(feature = "std")]
+pub use dump::*;
 
 use self::push::PushStage;
 use crate::{
