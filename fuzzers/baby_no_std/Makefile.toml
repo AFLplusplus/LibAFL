@@ -11,7 +11,7 @@ echo "Cargo-make not integrated yet on this"
 # Fuzzer
 [tasks.build]
 command = "cargo"
-args = ["build", "-Zbuild-std=core,alloc", "--target", "x86_64-unknown-linux-gnu"]
+args = ["build", "--release", "-Zbuild-std=core,alloc", "--target", "x86_64-unknown-linux-gnu"]
 
 # Test
 [tasks.test]
@@ -26,7 +26,7 @@ cargo run -Zbuild-std=core,alloc --target x86_64-unknown-linux-gnu || true
 dependencies = ["build"]
 
 [tasks.build_aarch]
-script = "cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v"
+script = "cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release"
 
 # Clean
 [tasks.clean]

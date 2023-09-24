@@ -32,8 +32,8 @@ windows_alias = "fuzzer_windows"
 [tasks.fuzzer_windows]
 script_runner="@shell"
 script='''
-cargo build
-cp ./target/debug/${FUZZER_NAME} .
+cargo build --release
+cp ./target/release/${FUZZER_NAME} .
 '''
 
 # Run the fuzzer

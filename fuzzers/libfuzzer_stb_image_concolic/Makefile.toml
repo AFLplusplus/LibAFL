@@ -15,7 +15,7 @@ condition = { files_not_exist = ["${CARGO_TARGET_DIR}/libSymRuntime.so"] }
 script_runner = "@shell"
 script = '''
 cd runtime
-cargo build
+cargo build --release
 '''
 
 # Build the fuzzer
@@ -29,7 +29,7 @@ dependencies = ["runtime"]
 script_runner = "@shell"
 script = '''
 cd fuzzer
-cargo build
+cargo build --release
 '''
 
 [tasks.test]

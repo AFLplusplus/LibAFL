@@ -182,6 +182,7 @@ windows_alias = "unsupported"
 command = "cargo"
 args = [
     "build",
+    "--release",
     "--features", "${FEATURE}",
     "--target-dir", "${TARGET_DIR}"
 ]
@@ -190,7 +191,7 @@ args = [
 dependencies = ["build"]
 script_runner="@shell"
 script='''
-mv ${TARGET_DIR}/debug/qemu_launcher ${TARGET_DIR}/debug/qemu_launcher-${CARGO_MAKE_PROFILE}
+mv ${TARGET_DIR}/release/qemu_launcher ${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}
 '''
 
 [tasks.harness]
@@ -221,7 +222,7 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.run_unix]
-command = "${TARGET_DIR}/debug/qemu_launcher-${CARGO_MAKE_PROFILE}"
+command = "${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
     "--coverage", "${TARGET_DIR}/drcov.log",
     "--input", "./corpus",
