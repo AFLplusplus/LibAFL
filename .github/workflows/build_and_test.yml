@@ -250,8 +250,6 @@ jobs:
       if: runner.os == 'Linux'
       # We can't install gcc-multilib which would usually do this for us due to collisions with other packages
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
     - name: Build and run example fuzzers (Linux)
       if: runner.os == 'Linux'
       run: RUN_ON_CI=1 ./scripts/test_all_fuzzers.sh
