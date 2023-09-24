@@ -104,7 +104,7 @@ unsafe fn fuzz(
 
                 let coverage = CoverageRuntime::new();
                 #[cfg(unix)]
-                let asan = AsanRuntime::new(options.clone());
+                let asan = AsanRuntime::new(&options);
 
                 #[cfg(unix)]
                 let mut frida_helper =

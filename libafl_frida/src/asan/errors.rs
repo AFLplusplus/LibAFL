@@ -17,7 +17,7 @@ use libafl::{
     state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
-use libafl_bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, Named, SerdeAny};
+use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 
@@ -95,17 +95,17 @@ impl AsanError {
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
-    options: FuzzerOptions,
+    continue_on_error: bool,
     errors: Vec<AsanError>,
 }
 
 impl AsanErrors {
     /// Creates a new `AsanErrors` struct
     #[must_use]
-    pub fn new(options: FuzzerOptions) -> Self {
+    pub fn new(continue_on_error: bool) -> Self {
         Self {
-            options,
             errors: Vec::new(),
+            continue_on_error,
         }
     }
 
@@ -529,7 +529,7 @@ impl AsanErrors {
         };
 
         #[allow(clippy::manual_assert)]
-        if !self.options.continue_on_error {
+        if !self.continue_on_error {
             panic!("ASAN: Crashing target!");
         }
     }

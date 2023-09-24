@@ -68,6 +68,9 @@ const fn fs_opt_get_mapsize(x: i32) -> i32 {
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
 
+/// The default signal to use to kill child processes
+const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;
+
 /// Configure the target, `limit`, `setsid`, `pipe_stdin`, the code was borrowed from the [`Angora`](https://github.com/AngoraFuzzer/Angora) fuzzer
 pub trait ConfigTarget {
     /// Sets the sid
@@ -200,24 +203,42 @@ pub struct Forkserver {
     status: i32,
     /// If the last run timed out (in in-target i32)
     last_run_timed_out: i32,
+    /// The signal this [`Forkserver`] will use to kill (defaults to [`self.kill_signal`])
+    kill_signal: Signal,
 }
 
 impl Drop for Forkserver {
     fn drop(&mut self) {
-        if let Err(err) = self.fsrv_handle.kill() {
-            log::warn!("Failed kill forkserver: {err}",);
-        }
+        // Modelled after <https://github.com/AFLplusplus/AFLplusplus/blob/dee76993812fa9b5d8c1b75126129887a10befae/src/afl-forkserver.c#L1429>
+        log::debug!("Dropping forkserver",);
+
         if let Some(pid) = self.child_pid {
-            if let Err(err) = kill(pid, Signal::SIGKILL) {
+            log::debug!("Sending {} to child {pid}", self.kill_signal);
+            if let Err(err) = kill(pid, self.kill_signal) {
                 log::warn!(
                     "Failed to deliver kill signal to child process {}: {err} ({})",
                     pid,
                     io::Error::last_os_error()
                 );
             }
-            if let Err(err) = waitpid(pid, None) {
-                log::warn!("Failed to wait for child pid ({pid}): {err}",);
-            }
+        }
+
+        let forkserver_pid = Pid::from_raw(self.fsrv_handle.id().try_into().unwrap());
+        if let Err(err) = kill(forkserver_pid, self.kill_signal) {
+            log::warn!(
+                "Failed to deliver {} signal to forkserver {}: {err} ({})",
+                self.kill_signal,
+                forkserver_pid,
+                io::Error::last_os_error()
+            );
+            let _ = kill(forkserver_pid, Signal::SIGKILL);
+        } else if let Err(err) = waitpid(forkserver_pid, None) {
+            log::warn!(
+                "Waitpid on forkserver {} failed: {err} ({})",
+                forkserver_pid,
+                io::Error::last_os_error()
+            );
+            let _ = kill(forkserver_pid, Signal::SIGKILL);
         }
     }
 }
@@ -236,6 +257,36 @@ impl Forkserver {
         is_persistent: bool,
         is_deferred_frksrv: bool,
         debug_output: bool,
+    ) -> Result<Self, Error> {
+        Self::with_kill_signal(
+            target,
+            args,
+            envs,
+            input_filefd,
+            use_stdin,
+            memlimit,
+            is_persistent,
+            is_deferred_frksrv,
+            debug_output,
+            KILL_SIGNAL_DEFAULT,
+        )
+    }
+
+    /// Create a new [`Forkserver`] that will kill child processes
+    /// with the given `kill_signal`.
+    /// Using `Forkserver::new(..)` will default to [`Signal::SIGTERM`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_kill_signal(
+        target: OsString,
+        args: Vec<OsString>,
+        envs: Vec<(OsString, OsString)>,
+        input_filefd: RawFd,
+        use_stdin: bool,
+        memlimit: u64,
+        is_persistent: bool,
+        is_deferred_frksrv: bool,
+        debug_output: bool,
+        kill_signal: Signal,
     ) -> Result<Self, Error> {
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
@@ -300,6 +351,7 @@ impl Forkserver {
             child_pid: None,
             status: 0,
             last_run_timed_out: 0,
+            kill_signal,
         })
     }
 
@@ -674,6 +726,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     max_input_size: usize,
     map_size: Option<usize>,
     real_map_size: i32,
+    kill_signal: Option<Signal>,
 }
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
@@ -800,7 +853,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         };
 
         let mut forkserver = match &self.program {
-            Some(t) => Forkserver::new(
+            Some(t) => Forkserver::with_kill_signal(
                 t.clone(),
                 self.arguments.clone(),
                 self.envs.clone(),
@@ -810,6 +863,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 self.is_persistent,
                 self.is_deferred_frksrv,
                 self.debug_child,
+                self.kill_signal.unwrap_or(KILL_SIGNAL_DEFAULT),
             )?,
             None => {
                 return Err(Error::illegal_argument(
@@ -1030,11 +1084,11 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         self
     }
 
-    #[must_use]
     /// Place the input at this position and set the filename for the input.
     ///
     /// Note: If you use this, you should ensure that there is only one instance using this
     /// file at any given time.
+    #[must_use]
     pub fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
         let mut moved = self.arg(path.as_ref());
 
@@ -1050,38 +1104,45 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         moved
     }
 
-    #[must_use]
     /// Place the input at this position and set the default filename for the input.
+    #[must_use]
     /// The filename includes the PID of the fuzzer to ensure that no two fuzzers write to the same file
     pub fn arg_input_file_std(self) -> Self {
         self.arg_input_file(get_unique_std_input_file())
     }
 
-    #[must_use]
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
+    #[must_use]
     pub fn debug_child(mut self, debug_child: bool) -> Self {
         self.debug_child = debug_child;
         self
     }
 
-    #[must_use]
     /// Call this if you want to run it under persistent mode; default is false
+    #[must_use]
     pub fn is_persistent(mut self, is_persistent: bool) -> Self {
         self.is_persistent = is_persistent;
         self
     }
 
-    #[must_use]
     /// Call this if the harness uses deferred forkserver mode; default is false
+    #[must_use]
     pub fn is_deferred_frksrv(mut self, is_deferred_frksrv: bool) -> Self {
         self.is_deferred_frksrv = is_deferred_frksrv;
         self
     }
 
-    #[must_use]
     /// Call this to set a defauult const coverage map size
+    #[must_use]
     pub fn coverage_map_size(mut self, size: usize) -> Self {
         self.map_size = Some(size);
+        self
+    }
+
+    /// Call this to set a signal to be used to kill child processes after executions
+    #[must_use]
+    pub fn kill_signal(mut self, kill_signal: Signal) -> Self {
+        self.kill_signal = Some(kill_signal);
         self
     }
 }
@@ -1110,6 +1171,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             map_size: None,
             real_map_size: 0,
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
+            kill_signal: None,
         }
     }
 
@@ -1133,6 +1195,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             map_size: self.map_size,
             real_map_size: self.real_map_size,
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
+            kill_signal: None,
         }
     }
 }
