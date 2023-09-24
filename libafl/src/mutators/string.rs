@@ -41,7 +41,7 @@ fn choose_index<R: Rand>(rand: &mut R, bytes: &[u8]) -> Option<(char, usize)> {
         let (c, idx, max_idx) = 'outerloop: loop {
             if let Some(idx) = indices.next() {
                 let idx = idx as usize;
-                for max_idx in (idx + 1)..(idx + 4).min(bytes.len()) {
+                for max_idx in (idx + 1)..=(idx + 3).min(bytes.len()) {
                     if let Ok(string) = core::str::from_utf8(&bytes[idx..max_idx]) {
                         // we found a valid character
                         break 'outerloop (string.chars().next().unwrap(), idx, max_idx);
