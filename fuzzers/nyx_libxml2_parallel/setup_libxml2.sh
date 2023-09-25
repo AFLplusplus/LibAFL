@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # cargo build --release
 # PWD=$(pwd)
 # export CC="$PWD/target/release/libafl_cc"
