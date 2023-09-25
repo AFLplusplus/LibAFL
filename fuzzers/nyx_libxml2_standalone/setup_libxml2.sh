@@ -8,7 +8,7 @@
 if ! command -v afl-clang-fast &> /dev/null
 then
     echo "afl-clang-fast not found. Cloning and compiling AFLplusplus..."
-    git clone https://github.com/AFLplusplus/AFLplusplus.git .
+    git clone https://github.com/AFLplusplus/AFLplusplus.git
     pushd AFLplusplus
     make
     popd
