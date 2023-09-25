@@ -466,7 +466,8 @@ mod test {
     use libafl_bolts::rands::StdRand;
 
     use super::*;
-    use crate::{corpus::NopCorpus, state::StdState};
+    use crate::{corpus::NopCorpus, state::StdState, Error};
+    use alloc::string::ToString;
 
     // a not-so-useful test for this
     #[test]
@@ -489,6 +490,9 @@ mod test {
                 let _ = mutator.mutate(&mut state, &mut bytes, 0);
                 if let Ok(hex) = core::str::from_utf8(bytes.bytes()) {
                     println!("{hex:?}");
+                }
+                else {
+                    return Err(Error::unknown("Failed to decode as utf8".to_string()))
                 }
             }
 
@@ -520,6 +524,9 @@ mod test {
                 let _ = mutator.mutate(&mut state, &mut bytes, 0);
                 if let Ok(hex) = core::str::from_utf8(bytes.bytes()) {
                     println!("{hex:?}");
+                }
+                else {
+                    return Err(Error::unknown("Failed to decode as utf8".to_string()))
                 }
             }
 
