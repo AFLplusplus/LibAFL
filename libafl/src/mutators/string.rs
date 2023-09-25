@@ -142,7 +142,19 @@ fn choose_category_range<R: Rand>(
         }
     }
 
-    let selected_idx = rand.below(categories.len() as u64) as usize;
+    // ok -- we want to bias towards smaller regions to keep the mutations "tight" to original
+    // we sort the options by descending length, then pick isqrt of below(n^2)
+
+    categories.sort_by_cached_key(|cat| {
+        usize::MAX
+            - cat
+                .iter()
+                .map(|&(min, max)| (max - min + 1) as usize)
+                .sum::<usize>()
+    });
+    let options = categories.len() * categories.len();
+    let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options as u64)) as usize;
+
     let selected = categories[selected_idx];
 
     #[cfg(test)]
@@ -175,7 +187,11 @@ fn choose_subcategory_range<R: Rand>(
         }
     }
 
-    let selected_idx = rand.below(subcategories.len() as u64) as usize;
+    // see reasoning for selection pattern in choose_category_range
+
+    subcategories.sort_by_key(|&(min, max)| max - min + 1);
+    let options = subcategories.len() * subcategories.len();
+    let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options as u64)) as usize;
     let selected = subcategories[selected_idx];
 
     #[cfg(test)]
