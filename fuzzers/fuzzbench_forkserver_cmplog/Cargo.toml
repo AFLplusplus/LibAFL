@@ -10,6 +10,11 @@ codegen-units = 1
 opt-level = 3
 debug = true
 
+[profile.release-fuzzbench]
+inherits = "release"
+debug = false
+strip = true
+
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 which = "4.4"
