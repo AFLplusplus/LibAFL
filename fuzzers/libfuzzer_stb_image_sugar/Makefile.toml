@@ -12,19 +12,19 @@ FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TAR
 [tasks.cxx]
 condition = { files_not_exist = ["${LIBAFL_CXX}"] }
 command = "cargo"
-args = ["build" , "--${PROFILE}"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 [tasks.cc]
 condition = { files_not_exist = ["${LIBAFL_CC}"] }
 command = "cargo"
-args = ["build" , "--${PROFILE}"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 
 # Build the fuzzer
 [tasks.fuzzer]
 script_runner="@shell"
 script='''
-cargo build --${PROFILE}
+cargo build --profile ${PROFILE}
 cp ${FUZZER} .
 '''
 dependencies = ["cc", "cxx"]

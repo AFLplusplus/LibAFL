@@ -10,12 +10,12 @@ FUZZER = '${CARGO_TARGET_DIR}/${PROFILE}/${FUZZER_NAME}'
 # Compilers
 [tasks.cc]
 command = "cargo"
-args = ["build" , "--${PROFILE}", "--bin", "libafl_cc"]
+args = ["build" , "--profile", "${PROFILE}", "--bin", "libafl_cc"]
 
 # Harness
 [tasks.fuzzer]
 command = "cargo"
-args = ["build" , "--${PROFILE}", "--bin", "${FUZZER_NAME}"]
+args = ["build" , "--profile", "${PROFILE}", "--bin", "${FUZZER_NAME}"]
 dependencies = [ "cc" ]
 
 # Run the fuzzer

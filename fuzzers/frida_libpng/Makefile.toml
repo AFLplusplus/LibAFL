@@ -68,14 +68,14 @@ windows_alias = "fuzzer_windows"
 [tasks.fuzzer_unix]
 script_runner="@shell"
 script='''
-cargo build --${PROFILE}
+cargo build --profile ${PROFILE}
 cp ${CARGO_TARGET_DIR}/${PROFILE}/${FUZZER_NAME} .
 '''
 
 [tasks.fuzzer_windows]
 script_runner="@shell"
 script='''
-cargo build --${PROFILE}
+cargo build --profile ${PROFILE}
 cp ./target/${PROFILE}/${FUZZER_NAME} .
 '''
 

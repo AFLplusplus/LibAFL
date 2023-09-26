@@ -32,7 +32,7 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
 command = "cargo"
-args = ["build", "--${PROFILE}"]
+args = ["build", "--profile", "${PROFILE}"]
 
 # Harness
 [tasks.harness]
@@ -66,7 +66,7 @@ windows_alias = "unsupported"
 
 [tasks.run_unix]
 command = "cargo"
-args = ["run", "--${PROFILE}", "./${FUZZER_NAME}", "--", "--libafl-in", "../libfuzzer_libpng/corpus", "--libafl-out", "./out", "./${FUZZER_NAME}"]
+args = ["run", "--profile", "${PROFILE}", "./${FUZZER_NAME}", "--", "--libafl-in", "../libfuzzer_libpng/corpus", "--libafl-out", "./out", "./${FUZZER_NAME}"]
 dependencies = [ "harness", "fuzzer" ]
 
 # Run the fuzzer

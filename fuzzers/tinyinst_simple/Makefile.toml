@@ -27,7 +27,7 @@ windows_alias = "fuzzer_windows"
 [tasks.fuzzer_windows]
 dependencies = ["harness"]
 command = "cargo"
-args = ["build", "--${PROFILE}"]
+args = ["build", "--profile", "${PROFILE}"]
 
 # Run the fuzzer
 [tasks.run]
@@ -38,7 +38,7 @@ windows_alias = "run_windows"
 [tasks.run_windows]
 dependencies = ["harness", "fuzzer"]
 command = "cargo"
-args = ["run", "--${PROFILE}"]
+args = ["run", "--profile", "${PROFILE}"]
 
 
 # Run the fuzzer

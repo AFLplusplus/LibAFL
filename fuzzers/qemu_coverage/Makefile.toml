@@ -183,7 +183,8 @@ windows_alias = "unsupported"
 command = "cargo"
 args = [
     "build",
-    "--${PROFILE}",
+    "--profile",
+    "${PROFILE}",
     "--features", "${FEATURE}",
     "--target-dir", "${TARGET_DIR}"
 ]

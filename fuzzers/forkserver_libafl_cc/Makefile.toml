@@ -22,7 +22,7 @@ windows_alias = "unsupported"
 
 [tasks.cxx_unix]
 command = "cargo"
-args = ["build" , "--${PROFILE}"]
+args = ["build" , "--profile","${PROFILE}"]
 
 [tasks.cc]
 linux_alias = "cc_unix"
@@ -31,7 +31,7 @@ windows_alias = "unsupported"
 
 [tasks.cc_unix]
 command = "cargo"
-args = ["build" , "--${PROFILE}"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 [tasks.crash_cxx]
 linux_alias = "crash_cxx_unix"
@@ -40,7 +40,7 @@ windows_alias = "unsupported"
 
 [tasks.crash_cxx_unix]
 command = "cargo"
-args = ["build" , "--${PROFILE}", "--features=crash"]
+args = ["build" , "--profile", "${PROFILE}", "--features=crash"]
 
 [tasks.crash_cc]
 linux_alias = "crash_cc_unix"
@@ -49,7 +49,7 @@ windows_alias = "unsupported"
 
 [tasks.crash_cc_unix]
 command = "cargo"
-args = ["build" , "--${PROFILE}", "--features=crash"]
+args = ["build" , "--profile", "${PROFILE}", "--features=crash"]
 
 # Harness
 [tasks.fuzzer]

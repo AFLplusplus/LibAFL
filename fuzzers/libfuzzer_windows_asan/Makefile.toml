@@ -18,7 +18,7 @@ windows_alias = "cxx_unix"
 
 [tasks.cxx_unix]
 command = "cargo"
-args = ["build" , "--${PROFILE}"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 [tasks.cc]
 linux_alias = "cc_unix"
@@ -27,7 +27,7 @@ windows_alias = "cc_unix"
 
 [tasks.cc_unix]
 command = "cargo"
-args = ["build" , "--${PROFILE}"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 [tasks.crash_cxx]
 linux_alias = "unsupported"
