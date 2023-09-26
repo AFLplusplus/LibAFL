@@ -109,6 +109,7 @@ where
 
     /// Run in the broker until all clients exit
     #[tokio::main(flavor = "current_thread")]
+    #[allow(clippy::too_many_lines)]
     pub async fn broker_loop(&mut self) -> Result<(), Error> {
         let (tx_bc, rx) = broadcast::channel(1024);
         let (tx, mut rx_mpsc) = mpsc::channel(1024);
