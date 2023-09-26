@@ -13,9 +13,10 @@ use crate::{
         mutational::{MutatedTransform, MutatedTransformPost},
         StringIdentificationMetadata,
     },
-    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
 };
 
+/// Input which contains the context necessary to perform unicode mutations
 pub type UnicodeInput = (BytesInput, StringIdentificationMetadata);
 
 impl<S> MutatedTransform<BytesInput, S> for UnicodeInput

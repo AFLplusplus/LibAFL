@@ -1,3 +1,5 @@
+//! Stages which analysis common to Unicode-style mutations
+
 use alloc::{rc::Rc, vec::Vec};
 use core::marker::PhantomData;
 use std::collections::VecDeque;
@@ -13,6 +15,7 @@ use crate::{
     state::{HasCorpus, HasMetadata, UsesState},
 };
 
+/// Metadata which stores the list of pre-computed string-like ranges in the input
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct StringIdentificationMetadata {
     ranges: Rc<Vec<(usize, BitVec)>>,
@@ -21,6 +24,7 @@ pub struct StringIdentificationMetadata {
 impl_serdeany!(StringIdentificationMetadata);
 
 impl StringIdentificationMetadata {
+    /// The list of pre-computed string-like ranges in the input
     pub fn ranges(&self) -> &Vec<(usize, BitVec)> {
         self.ranges.as_ref()
     }
@@ -64,12 +68,14 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> StringIdentificationMetadata {
     }
 }
 
+/// Stage which identifies potential strings in the provided input
 #[derive(Debug)]
 pub struct StringIdentificationStage<S> {
     phantom: PhantomData<S>,
 }
 
 impl<S> StringIdentificationStage<S> {
+    /// Create a new instance of the string identification stage
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
