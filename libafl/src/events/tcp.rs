@@ -463,7 +463,7 @@ where
         let mut tcp = TcpStream::connect(addr)?;
 
         let mut our_client_id_buf = client_id.0.to_le_bytes();
-        tcp.write(&mut our_client_id_buf)
+        tcp.write(&our_client_id_buf)
             .expect("Cannot write to the broker");
 
         tcp.read_exact(&mut our_client_id_buf)
