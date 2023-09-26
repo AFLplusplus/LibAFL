@@ -4,9 +4,10 @@ FUZZER_NAME='libfuzzer_stb_image_sugar'
 PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-LIBAFL_CC = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/${PROFILE}/libafl_cc", mapping = {"windows" = '.\\target\\${PROFILE}\\libafl_cc.exe'} }
-LIBAFL_CXX = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/${PROFILE}/libafl_cxx", mapping = {"windows" = '.\\target\\${PROFILE}\\libafl_cxx.exe'} }
-FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/${PROFILE}/libfuzzer_stb_image_sugar", mapping = {"windows" = '.\\target\\${PROFILE}\\libfuzzer_stb_image_sugar.exe'} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+LIBAFL_CC = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc", mapping = {"windows" = '.\\target\\${PROFILE_DIR}\\libafl_cc.exe'} }
+LIBAFL_CXX = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx", mapping = {"windows" = '.\\target\\${PROFILE_DIR}\\libafl_cxx.exe'} }
+FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libfuzzer_stb_image_sugar", mapping = {"windows" = '.\\target\\${PROFILE_DIR}\\libfuzzer_stb_image_sugar.exe'} }
 
 # Compilers
 [tasks.cxx]

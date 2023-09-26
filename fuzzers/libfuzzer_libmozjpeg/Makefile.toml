@@ -3,6 +3,7 @@
 FUZZER_NAME='fuzzer_mozjpeg'
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE}/libafl_cc'
 LIBAFL_CXX = '${CARGO_TARGET_DIR}/${PROFILE}/libafl_cxx'
 FUZZER = '${CARGO_TARGET_DIR}/${PROFILE}/${FUZZER_NAME}'
@@ -69,7 +70,7 @@ mac_alias = "fuzzer_unix"
 windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
-command = "${CARGO_TARGET_DIR}/${PROFILE}/libafl_cxx"
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/mozjpeg-4.0.3/libjpeg.a", "${PROJECT_DIR}/mozjpeg-4.0.3/libturbojpeg.a", "-I", "${PROJECT_DIR}/mozjpeg-4.0.3/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
 dependencies = [ "lib", "cxx", "cc" ]
 

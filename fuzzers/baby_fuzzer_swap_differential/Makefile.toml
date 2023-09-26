@@ -4,8 +4,9 @@ FUZZER_NAME='fuzzer_sd'
 PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE}/libafl_cc'
-FUZZER = '${CARGO_TARGET_DIR}/${PROFILE}/${FUZZER_NAME}'
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc'
+FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 
 # Compilers
 [tasks.cc]
@@ -20,7 +21,7 @@ dependencies = [ "cc" ]
 
 # Run the fuzzer
 [tasks.run]
-command = "${CARGO_TARGET_DIR}/${PROFILE}/${FUZZER_NAME}"
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}"
 dependencies = [ "fuzzer" ]
 
 # Test
@@ -32,7 +33,7 @@ windows_alias = "unsupported"
 [tasks.test_unix]
 script_runner = "@shell"
 script='''
-timeout 10s ${CARGO_TARGET_DIR}/${PROFILE}/${FUZZER_NAME} >fuzz_stdout.log || true
+timeout 10s ${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME} >fuzz_stdout.log || true
 if [ -z "$(grep "objectives: 1" fuzz_stdout.log)" ]; then
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1

@@ -1,5 +1,6 @@
 [env]
 PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -50,7 +51,7 @@ windows_alias = "test_windows"
 [tasks.test_windows]
 script_runner = "@shell"
 script='''
-copy .\target\${PROFILE}\tinyinst_simple.exe .
+copy .\target\${PROFILE_DIR}\tinyinst_simple.exe .
 start "" "tinyinst_simple.exe"
 #ping is for timeout
 ping -n 10 127.0.0.1>NUL && taskkill /im tinyinst_simple.exe /F
