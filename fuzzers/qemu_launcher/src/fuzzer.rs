@@ -38,11 +38,8 @@ impl Fuzzer {
 
     pub fn fuzz(&self) -> Result<(), Error> {
         if self.options.tui {
-            let ui = TuiUI::with_version(
-                String::from("QEMU Launcher For Libpng"),
-                String::from("0.10.1"),
-                true,
-            );
+            let ui =
+                TuiUI::with_version(String::from("QEMU Launcher"), String::from("0.10.1"), true);
             let monitor = TuiMonitor::new(ui);
             self.launch(monitor)
         } else {
@@ -56,15 +53,12 @@ impl Fuzzer {
             });
 
             #[cfg(unix)]
-            let stdout_cpy = RefCell::new(unsafe {
-                let new_fd = dup(io::stdout().as_raw_fd())?;
-                File::from_raw_fd(new_fd)
-            });
+            let new_fd = dup(io::stdout().as_raw_fd())?;
 
             // The stats reporter for the broker
             let monitor = MultiMonitor::new(|s| {
                 #[cfg(unix)]
-                writeln!(stdout_cpy.borrow_mut(), "{s}").unwrap();
+                writeln!(unsafe { File::from_raw_fd(new_fd) }, "{s}").unwrap();
                 #[cfg(windows)]
                 println!("{s}");
 
@@ -83,6 +77,7 @@ impl Fuzzer {
         // The shared memory allocator
         let shmem_provider = StdShMemProvider::new()?;
 
+        /* If we are running in verbose, don't provide a replacement stdout, otherwise, use /dev/null */
         let stdout = if self.options.verbose {
             None
         } else {

@@ -60,8 +60,9 @@ impl<'a> Client<'a> {
     }
 
     fn coverage_filter(&self, emu: &Emulator) -> Result<QemuInstrumentationFilter, Error> {
+        /* Conversion is required on 32-bit targets, but not on 64-bit ones */
         if let Some(includes) = &self.options.include {
-            #[allow(clippy::useless_conversion)]
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
             let rules = includes
                 .iter()
                 .map(|x| Range {
@@ -71,7 +72,7 @@ impl<'a> Client<'a> {
                 .collect::<Vec<Range<GuestAddr>>>();
             Ok(QemuInstrumentationFilter::AllowList(rules))
         } else if let Some(excludes) = &self.options.exclude {
-            #[allow(clippy::useless_conversion)]
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
             let rules = excludes
                 .iter()
                 .map(|x| Range {
@@ -97,10 +98,10 @@ impl<'a> Client<'a> {
         core_id: CoreId,
     ) -> Result<(), Error> {
         let mut args = self.args()?;
-        println!("ARGS: {:#?}", args);
+        log::debug!("ARGS: {:#?}", args);
 
         let mut env = self.env()?;
-        println!("ENV: {:#?}", env);
+        log::debug!("ENV: {:#?}", env);
 
         let emu = {
             if self.options.is_asan_core(core_id) {
@@ -111,16 +112,14 @@ impl<'a> Client<'a> {
         };
 
         let start_pc = Self::start_pc(&emu)?;
-        println!("start_pc @ {start_pc:#x}");
+        log::debug!("start_pc @ {start_pc:#x}");
 
-        emu.set_breakpoint(start_pc);
-        unsafe { emu.run() };
-        emu.remove_breakpoint(start_pc);
+        emu.entry_break(start_pc);
 
         let ret_addr: GuestAddr = emu
             .read_return_address()
             .map_err(|e| Error::unknown(format!("Failed to read return address: {e:}")))?;
-        println!("ret_addr = {ret_addr:#x}");
+        log::debug!("ret_addr = {ret_addr:#x}");
         emu.set_breakpoint(ret_addr);
 
         let is_asan = self.options.is_asan_core(core_id);
@@ -128,46 +127,27 @@ impl<'a> Client<'a> {
 
         let edge_coverage_helper = QemuEdgeCoverageHelper::new(self.coverage_filter(&emu)?);
 
+        let instance = Instance::builder()
+            .options(self.options)
+            .emu(&emu)
+            .mgr(mgr)
+            .core_id(core_id);
         if is_asan && is_cmplog {
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuCmpLogHelper::default(),
                 QemuAsanHelper::default(),
             );
-            Instance::builder()
-                .options(self.options)
-                .emu(&emu)
-                .mgr(mgr)
-                .core_id(core_id)
-                .build()
-                .run(helpers, state)
+            instance.build().run(helpers, state)
         } else if is_asan {
             let helpers = tuple_list!(edge_coverage_helper, QemuAsanHelper::default(),);
-            Instance::builder()
-                .options(self.options)
-                .emu(&emu)
-                .mgr(mgr)
-                .core_id(core_id)
-                .build()
-                .run(helpers, state)
+            instance.build().run(helpers, state)
         } else if is_cmplog {
             let helpers = tuple_list!(edge_coverage_helper, QemuCmpLogHelper::default(),);
-            Instance::builder()
-                .options(self.options)
-                .emu(&emu)
-                .mgr(mgr)
-                .core_id(core_id)
-                .build()
-                .run(helpers, state)
+            instance.build().run(helpers, state)
         } else {
             let helpers = tuple_list!(edge_coverage_helper,);
-            Instance::builder()
-                .options(self.options)
-                .emu(&emu)
-                .mgr(mgr)
-                .core_id(core_id)
-                .build()
-                .run(helpers, state)
+            instance.build().run(helpers, state)
         }
     }
 }
