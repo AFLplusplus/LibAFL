@@ -13,12 +13,10 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::{
-        StdScheduledMutator, StringCategoryPreservingMutator, StringSubcategoryPreservingMutator,
-    },
+    mutators::{StdScheduledMutator, StringCategoryRandMutator, StringSubcategoryRandMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
+    stages::{mutational::StdMutationalStage, StringIdentificationStage},
     state::StdState,
     Evaluator,
 };
@@ -123,13 +121,16 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(tuple_list!(
-        StringCategoryPreservingMutator,
-        StringSubcategoryPreservingMutator,
-        StringSubcategoryPreservingMutator,
-        StringSubcategoryPreservingMutator,
-        StringSubcategoryPreservingMutator
+        StringCategoryRandMutator,
+        StringSubcategoryRandMutator,
+        StringSubcategoryRandMutator,
+        StringSubcategoryRandMutator,
+        StringSubcategoryRandMutator
     ));
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let mut stages = tuple_list!(
+        StringIdentificationStage::new(),
+        StdMutationalStage::transforming(mutator)
+    );
 
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
