@@ -5,20 +5,24 @@ use core::{cmp::Ordering, ops::Range};
 use libafl_bolts::{rands::Rand, Error, HasLen, Named};
 
 use crate::{
-    corpus::{CorpusId, Testcase},
+    corpus::{CorpusId, HasTestcase, Testcase},
     inputs::{BytesInput, HasBytesVec},
     mutators::{rand_range, MutationResult, Mutator, Tokens},
-    stages::{mutational::MutatedTransform, StringIdentificationMetadata},
-    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
+    stages::{
+        extract_metadata,
+        mutational::{MutatedTransform, MutatedTransformPost},
+        StringIdentificationMetadata,
+    },
+    state::{HasCorpus, HasMaxSize, HasMetadata, HasRand, UsesState},
 };
 
 pub type UnicodeInput = (BytesInput, StringIdentificationMetadata);
 
 impl<S> MutatedTransform<BytesInput, S> for UnicodeInput
 where
-    S: HasCorpus<Input = BytesInput>,
+    S: HasCorpus<Input = BytesInput> + HasTestcase,
 {
-    type Post = ();
+    type Post = StringIdentificationMetadata;
 
     fn try_transform_from(
         base: &mut Testcase<BytesInput>,
@@ -31,7 +35,25 @@ where
     }
 
     fn try_transform_into(self, _state: &S) -> Result<(BytesInput, Self::Post), Error> {
-        Ok((self.0, ()))
+        Ok(self)
+    }
+}
+
+impl<S> MutatedTransformPost<S> for StringIdentificationMetadata
+where
+    S: HasTestcase,
+{
+    fn post_exec(
+        self,
+        state: &mut S,
+        _stage_idx: i32,
+        corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        if let Some(corpus_idx) = corpus_idx {
+            let mut tc = state.testcase_mut(corpus_idx)?;
+            tc.add_metadata(self)
+        }
+        Ok(())
     }
 }
 
@@ -47,7 +69,7 @@ fn choose_start<'a, R: Rand>(
     for (start, range) in meta.ranges() {
         if idx
             .checked_sub(*start) // idx adjusted to start
-            .and_then(|idx| (range.len() >= idx).then(|| range[idx])) // idx in range
+            .and_then(|idx| (idx < range.len()).then(|| range[idx])) // idx in range
             .map_or(false, |r| r)
         {
             options.push((*start, range));
@@ -194,15 +216,15 @@ fn choose_subcategory_range<R: Rand>(
     ))
 }
 
-fn mutate_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
+fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     state: &mut S,
-    input: &mut BytesInput,
+    input: &mut UnicodeInput,
     range: Range<usize>,
     char_gen: F,
 ) -> Result<MutationResult, Error> {
     let temp_range = rand_range(state, range.end - range.start, MAX_CHARS);
     let range = (range.start + temp_range.start)..(range.start + temp_range.end);
-    let range = match core::str::from_utf8(&input.bytes()[range.clone()]) {
+    let range = match core::str::from_utf8(&input.0.bytes()[range.clone()]) {
         Ok(_) => range,
         Err(e) => range.start..(range.start + e.valid_up_to()),
     };
@@ -211,7 +233,7 @@ fn mutate_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     println!(
         "mutating range: {:?} ({:?})",
         range,
-        core::str::from_utf8(&input.bytes()[range.clone()])
+        core::str::from_utf8(&input.0.bytes()[range.clone()])
     );
     if range.start == range.end {
         return Ok(MutationResult::Skipped);
@@ -219,7 +241,7 @@ fn mutate_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
 
     let replace_len = state.rand_mut().below(MAX_CHARS as u64) as usize;
     let orig_len = range.end - range.start;
-    if input.len() - orig_len + replace_len > state.max_size() {
+    if input.0.len() - orig_len + replace_len > state.max_size() {
         return Ok(MutationResult::Skipped);
     }
 
@@ -238,7 +260,8 @@ fn mutate_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
         }
     }
 
-    input.bytes_mut().splice(range, replacement);
+    input.0.bytes_mut().splice(range, replacement);
+    input.1 = extract_metadata(input.0.bytes());
 
     return Ok(MutationResult::Mutated);
 }
@@ -251,17 +274,18 @@ pub mod unicode_categories {
     include!(concat!(env!("OUT_DIR"), "/unicode_categories.rs"));
 }
 
-/// Mutator which retains the general category of a randomly selected range of bytes
+/// Mutator which randomly replaces a randomly selected range of bytes with bytes that preserve the
+/// range's category
 #[derive(Debug, Default)]
-pub struct StringCategoryPreservingMutator;
+pub struct StringCategoryRandMutator;
 
-impl Named for StringCategoryPreservingMutator {
+impl Named for StringCategoryRandMutator {
     fn name(&self) -> &str {
-        "string-category-preserving"
+        "string-category-rand"
     }
 }
 
-impl<S> Mutator<UnicodeInput, S> for StringCategoryPreservingMutator
+impl<S> Mutator<UnicodeInput, S> for StringCategoryRandMutator
 where
     S: HasRand + HasMaxSize,
 {
@@ -271,6 +295,10 @@ where
         input: &mut UnicodeInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
+        if input.0.bytes().is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
+
         let bytes = input.0.bytes();
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
@@ -303,7 +331,7 @@ where
                     }
                 };
 
-                return mutate_range(state, &mut input.0, range, char_gen);
+                return rand_replace_range(state, input, range, char_gen);
             }
         }
 
@@ -311,17 +339,18 @@ where
     }
 }
 
-/// Mutator which retains the specific byte range of a category of a randomly selected range of bytes
+/// Mutator which randomly replaces a randomly selected range of bytes with bytes that preserve the
+/// range's subcategory
 #[derive(Debug, Default)]
-pub struct StringSubcategoryPreservingMutator;
+pub struct StringSubcategoryRandMutator;
 
-impl Named for StringSubcategoryPreservingMutator {
+impl Named for StringSubcategoryRandMutator {
     fn name(&self) -> &str {
-        "string-subcategory-preserving"
+        "string-subcategory-rand"
     }
 }
 
-impl<S> Mutator<UnicodeInput, S> for StringSubcategoryPreservingMutator
+impl<S> Mutator<UnicodeInput, S> for StringSubcategoryRandMutator
 where
     S: HasRand + HasMaxSize,
 {
@@ -331,6 +360,10 @@ where
         input: &mut UnicodeInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
+        if input.0.bytes().is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
+
         let bytes = input.0.bytes();
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
@@ -353,7 +386,7 @@ where
                     }
                 };
 
-                return mutate_range(state, &mut input.0, range, char_gen);
+                return rand_replace_range(state, input, range, char_gen);
             }
         }
 
@@ -363,15 +396,15 @@ where
 
 /// Mutator which randomly replaces a full category-contiguous region of chars with a random token
 #[derive(Debug, Default)]
-pub struct StringCategoryReplaceMutator;
+pub struct StringCategoryTokenReplaceMutator;
 
-impl Named for StringCategoryReplaceMutator {
+impl Named for StringCategoryTokenReplaceMutator {
     fn name(&self) -> &str {
-        "string-category-replace"
+        "string-category-token-replace"
     }
 }
 
-impl<S> Mutator<UnicodeInput, S> for StringCategoryReplaceMutator
+impl<S> Mutator<UnicodeInput, S> for StringCategoryTokenReplaceMutator
 where
     S: HasRand + HasMaxSize + HasMetadata,
 {
@@ -381,6 +414,10 @@ where
         input: &mut UnicodeInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
+        if input.0.bytes().is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
+
         let tokens_len = {
             let meta = state.metadata_map().get::<Tokens>();
             if meta.is_none() {
@@ -413,6 +450,7 @@ where
                 }
 
                 input.0.bytes_mut().splice(range, token.iter().copied());
+                input.1 = extract_metadata(input.0.bytes());
                 return Ok(MutationResult::Mutated);
             }
         }
@@ -423,15 +461,15 @@ where
 
 /// Mutator which randomly replaces a full subcategory-contiguous region of chars with a random token
 #[derive(Debug, Default)]
-pub struct StringSubcategoryReplaceMutator;
+pub struct StringSubcategoryTokenReplaceMutator;
 
-impl Named for StringSubcategoryReplaceMutator {
+impl Named for StringSubcategoryTokenReplaceMutator {
     fn name(&self) -> &str {
         "string-subcategory-replace"
     }
 }
 
-impl<S> Mutator<UnicodeInput, S> for StringSubcategoryReplaceMutator
+impl<S> Mutator<UnicodeInput, S> for StringSubcategoryTokenReplaceMutator
 where
     S: HasRand + HasMaxSize + HasMetadata,
 {
@@ -441,6 +479,10 @@ where
         input: &mut UnicodeInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
+        if input.0.bytes().is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
+
         let tokens_len = {
             let meta = state.metadata_map().get::<Tokens>();
             if meta.is_none() {
@@ -473,6 +515,7 @@ where
                 }
 
                 input.0.bytes_mut().splice(range, token.iter().copied());
+                input.1 = extract_metadata(input.0.bytes());
                 return Ok(MutationResult::Mutated);
             }
         }
@@ -495,7 +538,7 @@ mod test {
             let hex = "0123456789abcdef0123456789abcdef";
             let mut bytes = BytesInput::from(hex.as_bytes());
 
-            let mut mutator = StringCategoryPreservingMutator;
+            let mut mutator = StringCategoryRandMutator;
 
             let mut state = StdState::new(
                 StdRand::with_seed(0),
@@ -527,7 +570,7 @@ mod test {
             let hex = "0123456789abcdef0123456789abcdef";
             let mut bytes = BytesInput::from(hex.as_bytes());
 
-            let mut mutator = StringSubcategoryPreservingMutator;
+            let mut mutator = StringSubcategoryRandMutator;
 
             let mut state = StdState::new(
                 StdRand::with_seed(0),

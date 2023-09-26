@@ -35,20 +35,20 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> StringIdentificationMetadata {
         queue.push_back(0);
 
         while let Some(i) = queue.pop_front() {
-            if visited[i] {
+            if i >= bytes.len() || visited[i] {
                 // if we've already visited a particular entry, then we already know its range(s)
                 continue;
             }
             visited.set(i, true); // we always visit the current entry
             let s = core::str::from_utf8(&bytes[i..]).unwrap_or_else(|e| {
-                queue.push_back(e.valid_up_to() + 1); // push to the next region
+                queue.push_back(i + e.valid_up_to() + 1); // push to the next region
                 core::str::from_utf8(&bytes[i..][..e.valid_up_to()]).unwrap()
             });
             if s.len() > 0 {
                 let mut entries = bitvec![0; s.bytes().len()];
                 for (c_idx, _) in s.char_indices() {
                     entries.set(c_idx, true);
-                    visited.set(c_idx, true);
+                    visited.set(i + c_idx, true);
                 }
                 for unset in entries.iter_zeros() {
                     // each unset index potentially represents a new UTF-8 start point
@@ -67,6 +67,14 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> StringIdentificationMetadata {
 #[derive(Debug)]
 pub struct StringIdentificationStage<S> {
     phantom: PhantomData<S>,
+}
+
+impl<S> StringIdentificationStage<S> {
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<S> UsesState for StringIdentificationStage<S>
@@ -92,6 +100,10 @@ where
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let mut tc = state.testcase_mut(corpus_idx)?;
+        if tc.has_metadata::<StringIdentificationMetadata>() {
+            return Ok(()); // skip recompute
+        }
+
         let input = tc.load_input(state.corpus())?;
 
         let bytes = input.bytes();
