@@ -506,6 +506,7 @@ impl From<FromUtf8Error> for Error {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl From<Utf8Error> for Error {
     #[allow(unused_variables)]
     fn from(err: Utf8Error) -> Self {
