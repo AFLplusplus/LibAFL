@@ -443,7 +443,7 @@ where
                     range: *offset..*offset + 4,
                 }
             }))
-            .build(gum, runtimes);
+            .build(gum, runtimes)
     }
 
     #[allow(clippy::too_many_lines)]
