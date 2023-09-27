@@ -271,6 +271,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
 pub mod unicode_categories {
     #![allow(unused)]
     #![allow(missing_docs)]
+    #![allow(clippy::redundant_static_lifetimes)]
 
     include!(concat!(env!("OUT_DIR"), "/unicode_categories.rs"));
 }
