@@ -53,12 +53,15 @@ impl Fuzzer {
             });
 
             #[cfg(unix)]
-            let new_fd = dup(io::stdout().as_raw_fd())?;
+            let stdout_cpy = RefCell::new(unsafe {
+                let new_fd = dup(io::stdout().as_raw_fd())?;
+                File::from_raw_fd(new_fd)
+            });
 
             // The stats reporter for the broker
             let monitor = MultiMonitor::new(|s| {
                 #[cfg(unix)]
-                writeln!(unsafe { File::from_raw_fd(new_fd) }, "{s}").unwrap();
+                writeln!(stdout_cpy.borrow_mut(), "{s}").unwrap();
                 #[cfg(windows)]
                 println!("{s}");
 
