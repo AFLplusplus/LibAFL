@@ -12,7 +12,7 @@ use crate::version::Version;
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 #[command(
-    name = format!("qemu-coverage-{}",env!("CPU_TARGET")),
+    name = format!("qemu_coverage-{}",env!("CPU_TARGET")),
     version = Version::default(),
     about,
     long_about = "Binary fuzzer using QEMU binary instrumentation"

@@ -1,5 +1,6 @@
 [env]
 PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 CROSS_CC = "x86_64-linux-gnu-gcc"
 CROSS_CXX = "x86_64-linux-gnu-g++"
 CROSS_CFLAGS = ""
@@ -183,7 +184,8 @@ windows_alias = "unsupported"
 command = "cargo"
 args = [
     "build",
-    "--${PROFILE}",
+    "--profile",
+    "${PROFILE}",
     "--features", "${FEATURE}",
     "--target-dir", "${TARGET_DIR}"
 ]
@@ -192,8 +194,8 @@ args = [
 dependencies = ["build"]
 script_runner="@shell"
 script='''
-rm -f ${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}
-mv ${TARGET_DIR}/release/qemu_launcher ${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}
+rm -f ${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}
+mv ${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher ${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}
 '''
 
 [tasks.harness]
@@ -224,7 +226,7 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.debug_unix]
-command = "${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}"
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
     "--input", "./corpus",
     "--output", "${TARGET_DIR}/output/",
@@ -233,7 +235,7 @@ args = [
     "--asan-cores", "0-3",
     "--cmplog-cores", "2-5",
     "--iterations", "100000",
-    "--verbose",    
+    "--verbose",
     "--",
     "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]
@@ -245,7 +247,7 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.run_unix]
-command = "${TARGET_DIR}/${PROFILE}/qemu_launcher-${CARGO_MAKE_PROFILE}"
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
     "--input", "./corpus",
     "--output", "${TARGET_DIR}/output/",
@@ -254,7 +256,7 @@ args = [
     "--asan-cores", "0-3",
     "--cmplog-cores", "2-5",
     "--iterations", "1000000",
-    "--tui",    
+    "--tui",
     "--",
     "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]
@@ -266,7 +268,7 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.single_unix]
-command = "${TARGET_DIR}/release/qemu_launcher-${CARGO_MAKE_PROFILE}"
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher-${CARGO_MAKE_PROFILE}"
 args = [
     "--input", "./corpus",
     "--output", "${TARGET_DIR}/output/",

@@ -33,6 +33,7 @@
   #include "llvm/IR/PassManager.h"
 #else
   #include "llvm/IR/LegacyPassManager.h"
+  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #endif
 
 #include "llvm/ADT/Statistic.h"
@@ -40,9 +41,6 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#if LLVM_VERSION_MAJOR < 11
-  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#endif
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Pass.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -466,7 +464,6 @@ bool CmpLogRoutines::runOnModule(Module &M) {
 
 #if USE_NEW_PM
 #else
-  #if LLVM_VERSION_MAJOR < 11 /* use old pass manager */
 static void registerCmpLogRoutinesPass(const PassManagerBuilder &,
                                        legacy::PassManagerBase &PM) {
   auto p = new CmpLogRoutines();
@@ -483,5 +480,4 @@ static RegisterStandardPasses RegisterCmpLogRoutinesPassLTO(
     PassManagerBuilder::EP_FullLinkTimeOptimizationLast,
     registerCmpLogRoutinesPass);
 
-  #endif
 #endif
