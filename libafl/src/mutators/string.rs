@@ -55,7 +55,7 @@ where
     ) -> Result<(), Error> {
         if let Some(corpus_idx) = corpus_idx {
             let mut tc = state.testcase_mut(corpus_idx)?;
-            tc.add_metadata(self)
+            tc.add_metadata(self);
         }
         Ok(())
     }
@@ -63,10 +63,10 @@ where
 
 const MAX_CHARS: usize = 16;
 
-fn choose_start<'a, R: Rand>(
+fn choose_start<R: Rand>(
     rand: &mut R,
     bytes: &[u8],
-    meta: &'a StringIdentificationMetadata,
+    meta: &StringIdentificationMetadata,
 ) -> Option<(usize, usize)> {
     let idx = rand.below(bytes.len() as u64) as usize;
     let mut options = Vec::new();
@@ -143,7 +143,7 @@ fn choose_category_range<R: Rand>(
     #[cfg(test)]
     let mut names = Vec::new();
     let mut categories = Vec::new();
-    for (_name, category) in unicode_categories::BY_NAME.iter() {
+    for (_name, category) in unicode_categories::BY_NAME {
         if get_subcategory(expanded, category).is_some() {
             #[cfg(test)]
             names.push(_name);
@@ -190,7 +190,7 @@ fn choose_subcategory_range<R: Rand>(
     #[cfg(test)]
     let mut names = Vec::new();
     let mut subcategories = Vec::new();
-    for (_name, category) in unicode_categories::BY_NAME.iter() {
+    for (_name, category) in unicode_categories::BY_NAME {
         if let Some(subcategory) = get_subcategory(expanded, category) {
             #[cfg(test)]
             names.push(_name);
@@ -225,7 +225,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     input: &mut UnicodeInput,
     range: Range<usize>,
     char_gen: F,
-) -> Result<MutationResult, Error> {
+) -> MutationResult {
     let temp_range = rand_range(state, range.end - range.start, MAX_CHARS);
     let range = (range.start + temp_range.start)..(range.start + temp_range.end);
     let range = match core::str::from_utf8(&input.0.bytes()[range.clone()]) {
@@ -240,13 +240,13 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
         core::str::from_utf8(&input.0.bytes()[range.clone()])
     );
     if range.start == range.end {
-        return Ok(MutationResult::Skipped);
+        return MutationResult::Skipped;
     }
 
     let replace_len = state.rand_mut().below(MAX_CHARS as u64) as usize;
     let orig_len = range.end - range.start;
     if input.0.len() - orig_len + replace_len > state.max_size() {
-        return Ok(MutationResult::Skipped);
+        return MutationResult::Skipped;
     }
 
     let mut replacement = Vec::with_capacity(replace_len);
@@ -267,7 +267,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     input.0.bytes_mut().splice(range, replacement);
     input.1 = extract_metadata(input.0.bytes());
 
-    return Ok(MutationResult::Mutated);
+    MutationResult::Mutated
 }
 
 /// Unicode category data, as used by string analysis and mutators.
@@ -317,14 +317,13 @@ where
 
                 let options: u64 = category
                     .iter()
-                    .map(|&(start, end)| end as u64 - start as u64 + 1)
+                    .map(|&(start, end)| u64::from(end) - u64::from(start) + 1)
                     .sum();
                 let char_gen = |state: &mut S| loop {
                     let mut selected = state.rand_mut().below(options);
-                    let mut subcategories = category.iter();
-                    while let Some(&(min, max)) = subcategories.next() {
+                    for &(min, max) in category {
                         if let Some(next_selected) =
-                            selected.checked_sub(max as u64 - min as u64 + 1)
+                            selected.checked_sub(u64::from(max) - u64::from(min) + 1)
                         {
                             selected = next_selected;
                         } else if let Some(new_c) = char::from_u32(selected as u32 + min) {
@@ -335,7 +334,7 @@ where
                     }
                 };
 
-                return rand_replace_range(state, input, range, char_gen);
+                return Ok(rand_replace_range(state, input, range, char_gen));
             }
         }
 
@@ -382,7 +381,7 @@ where
                     core::str::from_utf8(&bytes[range.clone()])
                 );
 
-                let options: u64 = subcategory.1 as u64 - subcategory.0 as u64 + 1;
+                let options: u64 = u64::from(subcategory.1) - u64::from(subcategory.0) + 1;
                 let char_gen = |state: &mut S| loop {
                     let selected = state.rand_mut().below(options);
                     if let Some(new_c) = char::from_u32(selected as u32 + subcategory.0) {
@@ -390,7 +389,7 @@ where
                     }
                 };
 
-                return rand_replace_range(state, input, range, char_gen);
+                return Ok(rand_replace_range(state, input, range, char_gen));
             }
         }
 

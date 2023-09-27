@@ -25,6 +25,7 @@ impl_serdeany!(StringIdentificationMetadata);
 
 impl StringIdentificationMetadata {
     /// The list of pre-computed string-like ranges in the input
+    #[must_use]
     pub fn ranges(&self) -> &Vec<(usize, BitVec)> {
         self.ranges.as_ref()
     }
@@ -48,7 +49,7 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> StringIdentificationMetadata {
                 queue.push_back(i + e.valid_up_to() + 1); // push to the next region
                 core::str::from_utf8(&bytes[i..][..e.valid_up_to()]).unwrap()
             });
-            if s.len() > 0 {
+            if !s.is_empty() {
                 let mut entries = bitvec![0; s.bytes().len()];
                 for (c_idx, _) in s.char_indices() {
                     entries.set(c_idx, true);
@@ -69,17 +70,16 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> StringIdentificationMetadata {
 }
 
 /// Stage which identifies potential strings in the provided input
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct StringIdentificationStage<S> {
     phantom: PhantomData<S>,
 }
 
 impl<S> StringIdentificationStage<S> {
     /// Create a new instance of the string identification stage
+    #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self::default()
     }
 }
 
