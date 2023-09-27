@@ -171,6 +171,8 @@ impl FridaRuntime for AsanRuntime {
         _ranges: &RangeMap<usize, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     ) {
+        self.allocator.init();
+
         unsafe {
             ASAN_ERRORS = Some(AsanErrors::new(self.continue_on_error));
         }
