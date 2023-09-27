@@ -171,16 +171,15 @@ pub mod launcher {}
 
 // Re-export derive(SerdeAny)
 #[cfg(feature = "libafl_derive")]
-#[allow(unused_imports)]
 #[macro_use]
 extern crate libafl_derive;
+
 use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
     iter::Iterator,
     num::{ParseIntError, TryFromIntError},
     time,
-    str::Utf8Error,
 };
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
@@ -191,6 +190,7 @@ pub use libafl_derive::SerdeAny;
 use {
     alloc::string::{FromUtf8Error, String},
     core::cell::{BorrowError, BorrowMutError},
+    core::str::Utf8Error,
 };
 
 /// We need fixed names for many parts of this lib.
