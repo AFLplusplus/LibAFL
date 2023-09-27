@@ -267,30 +267,32 @@ impl FridaInstrumentationHelperBuilder {
         let module_map = Rc::new(ModuleMap::new_with_filter(gum, &mut module_filter));
 
         let mut ranges = RangeMap::new();
+        // Wrap ranges and runtimes in reference-counted refcells in order to move
+        // these references both into the struct that we return and the transformer callback
+        // that we pass to frida-gum.
+        //
+        // These moves MUST occur before the runtimes are init-ed
+        let ranges = Rc::new(RefCell::new(ranges));
+        let runtimes = Rc::new(RefCell::new(runtimes));
+
         if stalker_enabled {
             for (i, module) in module_map.values().iter().enumerate() {
                 let range = module.range();
                 let start = range.base_address().0 as usize;
-                ranges.insert(start..(start + range.size()), (i as u16, module.path()));
+                ranges.borrow_mut().insert(start..(start + range.size()), (i as u16, module.path()));
             }
             for skip in skip_ranges {
                 match skip {
-                    SkipRange::Absolute(range) => ranges.remove(range),
+                    SkipRange::Absolute(range) => ranges.borrow_mut().remove(range),
                     SkipRange::ModuleRelative { name, range } => {
                         let module_details = ModuleDetails::with_name(name).unwrap();
                         let lib_start = module_details.range().base_address().0 as usize;
-                        ranges.remove((lib_start + range.start)..(lib_start + range.end));
+                        ranges.borrow_mut().remove((lib_start + range.start)..(lib_start + range.end));
                     }
                 }
             }
-            runtimes.init_all(gum, &ranges, &module_map);
+            runtimes.borrow_mut().init_all(gum, &ranges.borrow(), &module_map);
         }
-
-        // Wrap ranges and runtimes in reference-counted refcells in order to move
-        // these references both into the struct that we return and the transformer callback
-        // that we pass to frida-gum.
-        let ranges = Rc::new(RefCell::new(ranges));
-        let runtimes = Rc::new(RefCell::new(runtimes));
 
         let transformer = FridaInstrumentationHelper::build_transformer(gum, &ranges, &runtimes);
 
@@ -422,7 +424,7 @@ where
             .iter()
             .map(PathBuf::from)
             .collect::<Vec<_>>();
-        return FridaInstrumentationHelper::builder()
+         FridaInstrumentationHelper::builder()
             .enable_stalker(options.cmplog || options.asan || !options.disable_coverage)
             .disable_excludes(options.disable_excludes)
             .instrument_module_if(move |module| pathlist_contains_module(&harness, module))
@@ -487,7 +489,7 @@ where
             #[cfg(unix)]
             let instr_size = instr.bytes().len();
             let address = instr.address();
-            //log::trace!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+            // log::trace!("block @ {:x} transformed to {:x}", address, output.writer().pc());
 
             if ranges.borrow().contains_key(&(address as usize)) {
                 let mut runtimes = (*runtimes).borrow_mut();

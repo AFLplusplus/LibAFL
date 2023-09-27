@@ -225,7 +225,7 @@ impl Allocator {
 
         self.allocations
             .insert(metadata.address + self.page_size, metadata);
-        //log::trace!("serving address: {:?}, size: {:x}", address, size);
+        // log::trace!("serving address: {:?}, size: {:x}", address, size);
         address
     }
 
@@ -369,7 +369,7 @@ impl Allocator {
         end: usize,
         unpoison: bool,
     ) -> (usize, usize) {
-        //log::trace!("start: {:x}, end {:x}, size {:x}", start, end, end - start);
+        // log::trace!("start: {:x}, end {:x}, size {:x}", start, end, end - start);
 
         let shadow_mapping_start = map_to_shadow!(self, start);
 
@@ -400,7 +400,7 @@ impl Allocator {
             self.shadow_pages.insert(shadow_start..shadow_end);
         }
 
-        //log::trace!("shadow_mapping_start: {:x}, shadow_size: {:x}", shadow_mapping_start, (end - start) / 8);
+        // log::trace!("shadow_mapping_start: {:x}, shadow_size: {:x}", shadow_mapping_start, (end - start) / 8);
         if unpoison {
             Self::unpoison(shadow_mapping_start, end - start);
         }
@@ -446,31 +446,14 @@ impl Allocator {
             true
         });
     }
-}
 
-impl Default for Allocator {
-    /// Creates a new [`Allocator`] (not supported on this platform!)
-    #[cfg(not(any(
-        target_os = "linux",
-        target_vendor = "apple",
-        all(target_arch = "aarch64", target_os = "android")
-    )))]
-    fn default() -> Self {
-        todo!("Shadow region not yet supported for this platform!");
-    }
-
-    #[allow(clippy::too_many_lines)]
-    fn default() -> Self {
-        let ret = unsafe { sysconf(_SC_PAGESIZE) };
-        assert!(
-            ret >= 0,
-            "Failed to read pagesize {:?}",
-            io::Error::last_os_error()
-        );
-
-        #[allow(clippy::cast_sign_loss)]
-        let page_size = ret as usize;
+    /// Initialize the allocator, making sure a valid shadow bit is selected.
+    pub fn init(&mut self) {
         // probe to find a usable shadow bit:
+        if self.shadow_bit != 0 {
+            return;
+        }
+
         let mut shadow_bit = 0;
 
         let mut occupied_ranges: Vec<(usize, usize)> = vec![];
@@ -487,7 +470,7 @@ impl Default for Allocator {
                 let start = details.memory_range().base_address().0 as usize;
                 let end = start + details.memory_range().size();
                 occupied_ranges.push((start, end));
-                // log::trace!("{:x} {:x}", start, end);
+                log::trace!("{:x} {:x}", start, end);
                 let base: usize = 2;
                 // On x64, if end > 2**48, then that's in vsyscall or something.
                 #[cfg(target_arch = "x86_64")]
@@ -523,7 +506,7 @@ impl Default for Allocator {
                 // check if the proposed shadow bit overlaps with occupied ranges.
                 for (start, end) in &occupied_ranges {
                     if (shadow_start <= *end) && (*start <= shadow_end) {
-                        // log::trace!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
+                        log::trace!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
                         log::warn!("shadow_bit {try_shadow_bit:x} is not suitable");
                         break;
                     }
@@ -532,7 +515,7 @@ impl Default for Allocator {
                 if unsafe {
                     mmap(
                         NonZeroUsize::new(addr),
-                        NonZeroUsize::new_unchecked(page_size),
+                        NonZeroUsize::new_unchecked(self.page_size),
                         ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                         MapFlags::MAP_PRIVATE
                             | ANONYMOUS_FLAG
@@ -551,7 +534,7 @@ impl Default for Allocator {
         }
 
         log::warn!("shadow_bit {shadow_bit:x} is suitable");
-        assert!(shadow_bit != 0);
+        // assert!(shadow_bit != 0);
         // attempt to pre-map the entire shadow-memory space
 
         let addr: usize = 1 << shadow_bit;
@@ -569,6 +552,37 @@ impl Default for Allocator {
             )
         }
         .is_ok();
+        
+        self.pre_allocated_shadow = pre_allocated_shadow;
+        self.shadow_offset = 1 << shadow_bit;
+        self.shadow_bit = shadow_bit;
+        self.base_mapping_addr = addr + addr +addr;
+        self.current_mapping_addr = addr + addr +addr;
+    }
+}
+
+impl Default for Allocator {
+    /// Creates a new [`Allocator`] (not supported on this platform!)
+    #[cfg(not(any(
+        target_os = "linux",
+        target_vendor = "apple",
+        all(target_arch = "aarch64", target_os = "android")
+    )))]
+    fn default() -> Self {
+        todo!("Shadow region not yet supported for this platform!");
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn default() -> Self {
+        let ret = unsafe { sysconf(_SC_PAGESIZE) };
+        assert!(
+            ret >= 0,
+            "Failed to read pagesize {:?}",
+            io::Error::last_os_error()
+        );
+
+        #[allow(clippy::cast_sign_loss)]
+        let page_size = ret as usize;
 
         Self {
             max_allocation: 1 << 30,
@@ -576,16 +590,16 @@ impl Default for Allocator {
             max_total_allocation: 1 << 32,
             allocation_backtraces: false,
             page_size,
-            pre_allocated_shadow,
-            shadow_offset: 1 << shadow_bit,
-            shadow_bit,
+            pre_allocated_shadow : false,
+            shadow_offset: 0,
+            shadow_bit : 0,
             allocations: HashMap::new(),
             shadow_pages: RangeSet::new(),
             allocation_queue: BTreeMap::new(),
             largest_allocation: 0,
             total_allocation_size: 0,
-            base_mapping_addr: addr + addr + addr,
-            current_mapping_addr: addr + addr + addr,
+            base_mapping_addr: 0,
+            current_mapping_addr: 0,
         }
     }
 }
