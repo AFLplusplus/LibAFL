@@ -169,11 +169,6 @@ use log::{Metadata, Record};
 /// out of `libafl_bolts` into `libafl::events::launcher`.
 pub mod launcher {}
 
-// Re-export derive(SerdeAny)
-#[cfg(feature = "libafl_derive")]
-#[macro_use]
-extern crate libafl_derive;
-
 use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
