@@ -1,6 +1,9 @@
 //! Mutators for preserving string categories, which may be useful for certain targets which are primarily string-oriented.
 use alloc::vec::Vec;
-use core::{cmp::Ordering, ops::Range};
+use core::{
+    cmp::{Ordering, Reverse},
+    ops::Range,
+};
 
 use libafl_bolts::{rands::Rand, Error, HasLen, Named};
 
@@ -152,11 +155,11 @@ fn choose_category_range<R: Rand>(
     // we sort the options by descending length, then pick isqrt of below(n^2)
 
     categories.sort_by_cached_key(|cat| {
-        usize::MAX
-            - cat
-                .iter()
+        Reverse(
+            cat.iter()
                 .map(|&(min, max)| (max - min + 1) as usize)
-                .sum::<usize>()
+                .sum::<usize>(),
+        )
     });
     let options = categories.len() * categories.len();
     let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options as u64)) as usize;
@@ -197,7 +200,7 @@ fn choose_subcategory_range<R: Rand>(
 
     // see reasoning for selection pattern in choose_category_range
 
-    subcategories.sort_by_key(|&(min, max)| max - min + 1);
+    subcategories.sort_by_key(|&(min, max)| Reverse(max - min + 1));
     let options = subcategories.len() * subcategories.len();
     let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options as u64)) as usize;
     let selected = subcategories[selected_idx];
