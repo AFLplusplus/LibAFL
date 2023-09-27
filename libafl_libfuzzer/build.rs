@@ -1,4 +1,9 @@
-use std::{path::PathBuf, process::Command};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader, BufWriter, Write},
+    path::PathBuf,
+    process::{Command, Stdio},
+};
 
 fn main() {
     if cfg!(any(feature = "cargo-clippy", docsrs)) {
@@ -83,6 +88,9 @@ fn main() {
         let rust_lld = target_libdir.join("../bin/rust-lld");
         let rust_ar = target_libdir.join("../bin/llvm-ar"); // NOTE: depends on llvm-tools
         let rust_objcopy = target_libdir.join("../bin/llvm-objcopy"); // NOTE: depends on llvm-tools
+        let nm = "nm"; // NOTE: we use system nm here because llvm-nm doesn't respect the encoding?
+
+        let redefined_symbols = custom_lib_dir.join("redefs.txt");
 
         let objfile_orig = custom_lib_dir.join("libFuzzer.o");
         let objfile_dest = custom_lib_dir.join("libFuzzer-mimalloc.o");
@@ -100,27 +108,67 @@ fn main() {
             "Couldn't link runtime crate! Do you have the llvm-tools component installed?"
         );
 
+        let mut child = Command::new(nm)
+            .arg(&objfile_orig)
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+
+        let mut redefinitions_file = BufWriter::new(File::create(&redefined_symbols).unwrap());
+
+        // redefine all the rust-mangled symbols we can
+        // TODO this will break when v0 mangling is stabilised
+        for line in BufReader::new(child.stdout.take().unwrap()).lines() {
+            let line = line.unwrap();
+            let (_, symbol) = line.rsplit_once(' ').unwrap();
+            if symbol.starts_with("_ZN") {
+                writeln!(
+                    redefinitions_file,
+                    "{} {}",
+                    symbol,
+                    symbol.replacen("_ZN", "_ZN26__libafl_libfuzzer_runtime", 1)
+                )
+                .unwrap();
+            }
+        }
+        redefinitions_file.flush().unwrap();
+        drop(redefinitions_file);
+
+        assert!(
+            !child.wait().map(|s| !s.success()).unwrap_or(true),
+            "Couldn't link runtime crate! Do you have the llvm-tools component installed?"
+        );
+
         let mut command = Command::new(rust_objcopy);
+
+        for symbol in [
+            "__rust_drop_panic",
+            "__rust_foreign_exception",
+            "rust_begin_unwind",
+            "rust_panic",
+            "rust_eh_personality",
+            "__rg_oom",
+            "__rdl_oom",
+            "__rdl_alloc",
+            "__rust_alloc",
+            "__rdl_dealloc",
+            "__rust_dealloc",
+            "__rdl_realloc",
+            "__rust_realloc",
+            "__rdl_alloc_zeroed",
+            "__rust_alloc_zeroed",
+            "__rust_alloc_error_handler",
+            "__rust_no_alloc_shim_is_unstable",
+            "__rust_alloc_error_handler_should_panic",
+        ] {
+            command
+                .arg("--redefine-sym")
+                .arg(format!("{symbol}={symbol}_libafl_libfuzzer_runtime"));
+        }
+
         command
-            .args(["--redefine-sym", "__rust_alloc=__rust_alloc_mimalloc"])
-            .args(["--redefine-sym", "__rust_dealloc=__rust_dealloc_mimalloc"])
-            .args(["--redefine-sym", "__rust_realloc=__rust_realloc_mimalloc"])
-            .args([
-                "--redefine-sym",
-                "__rust_alloc_zeroed=__rust_alloc_zeroed_mimalloc",
-            ])
-            .args([
-                "--redefine-sym",
-                "__rust_alloc_error_handler=__rust_alloc_error_handler_mimalloc",
-            ])
-            .args([
-                "--redefine-sym",
-                "__rust_no_alloc_shim_is_unstable=__rust_no_alloc_shim_is_unstable_mimalloc",
-            ])
-            .args([
-                "--redefine-sym",
-                "__rust_alloc_error_handler_should_panic=__rust_alloc_error_handler_should_panic_mimalloc",
-            ])
+            .arg("--redefine-syms")
+            .arg(redefined_symbols)
             .args([&objfile_orig, &objfile_dest]);
 
         assert!(
