@@ -506,7 +506,7 @@ impl Allocator {
                 // check if the proposed shadow bit overlaps with occupied ranges.
                 for (start, end) in &occupied_ranges {
                     if (shadow_start <= *end) && (*start <= shadow_end) {
-                        log::trace!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
+                        log::trace!("{:x} {:x}, {:x} {:x}", shadow_start, shadow_end, start, end);
                         log::warn!("shadow_bit {try_shadow_bit:x} is not suitable");
                         break;
                     }
@@ -552,12 +552,12 @@ impl Allocator {
             )
         }
         .is_ok();
-        
+
         self.pre_allocated_shadow = pre_allocated_shadow;
         self.shadow_offset = 1 << shadow_bit;
         self.shadow_bit = shadow_bit;
-        self.base_mapping_addr = addr + addr +addr;
-        self.current_mapping_addr = addr + addr +addr;
+        self.base_mapping_addr = addr + addr + addr;
+        self.current_mapping_addr = addr + addr + addr;
     }
 }
 
@@ -590,9 +590,9 @@ impl Default for Allocator {
             max_total_allocation: 1 << 32,
             allocation_backtraces: false,
             page_size,
-            pre_allocated_shadow : false,
+            pre_allocated_shadow: false,
             shadow_offset: 0,
-            shadow_bit : 0,
+            shadow_bit: 0,
             allocations: HashMap::new(),
             shadow_pages: RangeSet::new(),
             allocation_queue: BTreeMap::new(),

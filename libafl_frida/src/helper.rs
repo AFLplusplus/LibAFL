@@ -279,7 +279,9 @@ impl FridaInstrumentationHelperBuilder {
             for (i, module) in module_map.values().iter().enumerate() {
                 let range = module.range();
                 let start = range.base_address().0 as usize;
-                ranges.borrow_mut().insert(start..(start + range.size()), (i as u16, module.path()));
+                ranges
+                    .borrow_mut()
+                    .insert(start..(start + range.size()), (i as u16, module.path()));
             }
             for skip in skip_ranges {
                 match skip {
@@ -287,11 +289,15 @@ impl FridaInstrumentationHelperBuilder {
                     SkipRange::ModuleRelative { name, range } => {
                         let module_details = ModuleDetails::with_name(name).unwrap();
                         let lib_start = module_details.range().base_address().0 as usize;
-                        ranges.borrow_mut().remove((lib_start + range.start)..(lib_start + range.end));
+                        ranges
+                            .borrow_mut()
+                            .remove((lib_start + range.start)..(lib_start + range.end));
                     }
                 }
             }
-            runtimes.borrow_mut().init_all(gum, &ranges.borrow(), &module_map);
+            runtimes
+                .borrow_mut()
+                .init_all(gum, &ranges.borrow(), &module_map);
         }
 
         let transformer = FridaInstrumentationHelper::build_transformer(gum, &ranges, &runtimes);
@@ -424,7 +430,7 @@ where
             .iter()
             .map(PathBuf::from)
             .collect::<Vec<_>>();
-         FridaInstrumentationHelper::builder()
+        FridaInstrumentationHelper::builder()
             .enable_stalker(options.cmplog || options.asan || !options.disable_coverage)
             .disable_excludes(options.disable_excludes)
             .instrument_module_if(move |module| pathlist_contains_module(&harness, module))
