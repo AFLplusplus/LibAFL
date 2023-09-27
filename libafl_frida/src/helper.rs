@@ -245,7 +245,7 @@ impl FridaInstrumentationHelperBuilder {
     pub fn build<RT: FridaRuntimeTuple>(
         self,
         gum: &Gum,
-        mut runtimes: RT,
+        runtimes: RT,
     ) -> FridaInstrumentationHelper<'_, RT> {
         let Self {
             stalker_enabled,
@@ -266,7 +266,7 @@ impl FridaInstrumentationHelperBuilder {
         });
         let module_map = Rc::new(ModuleMap::new_with_filter(gum, &mut module_filter));
 
-        let mut ranges = RangeMap::new();
+        let ranges = RangeMap::new();
         // Wrap ranges and runtimes in reference-counted refcells in order to move
         // these references both into the struct that we return and the transformer callback
         // that we pass to frida-gum.
