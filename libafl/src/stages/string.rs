@@ -70,16 +70,24 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> StringIdentificationMetadata {
 }
 
 /// Stage which identifies potential strings in the provided input
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct StringIdentificationStage<S> {
     phantom: PhantomData<S>,
+}
+
+impl<S> Default for StringIdentificationStage<S> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<S> StringIdentificationStage<S> {
     /// Create a new instance of the string identification stage
     #[must_use]
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            phantom: PhantomData,
+        }
     }
 }
 

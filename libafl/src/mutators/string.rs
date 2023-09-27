@@ -133,7 +133,7 @@ fn find_range<F: Fn(char) -> bool>(
 fn choose_category_range<R: Rand>(
     rand: &mut R,
     string: &str,
-) -> Option<(Range<usize>, &'static [(u32, u32)])> {
+) -> (Range<usize>, &'static [(u32, u32)]) {
     let chars = string.char_indices().collect::<Vec<_>>();
     let idx = rand.below(chars.len() as u64) as usize;
     let c = chars[idx].1;
@@ -169,18 +169,15 @@ fn choose_category_range<R: Rand>(
     #[cfg(test)]
     println!("category for `{c}' ({}): {}", c as u32, names[selected_idx]);
 
-    Some((
+    (
         find_range(&chars, idx, |c| {
             get_subcategory(c as u32, selected).is_some()
         }),
         selected,
-    ))
+    )
 }
 
-fn choose_subcategory_range<R: Rand>(
-    rand: &mut R,
-    string: &str,
-) -> Option<(Range<usize>, (u32, u32))> {
+fn choose_subcategory_range<R: Rand>(rand: &mut R, string: &str) -> (Range<usize>, (u32, u32)) {
     let chars = string.char_indices().collect::<Vec<_>>();
     let idx = rand.below(chars.len() as u64) as usize;
     let c = chars[idx].1;
@@ -211,13 +208,13 @@ fn choose_subcategory_range<R: Rand>(
         c as u32, names[selected_idx], selected
     );
 
-    Some((
+    (
         find_range(&chars, idx, |c| {
             let expanded = c as u32;
             selected.0 <= expanded && expanded <= selected.1
         }),
         selected,
-    ))
+    )
 }
 
 fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
@@ -307,35 +304,34 @@ where
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
-            if let Some((range, category)) = choose_category_range(state.rand_mut(), substring) {
-                #[cfg(test)]
-                println!(
-                    "{:?} => {:?}",
-                    range,
-                    core::str::from_utf8(&bytes[range.clone()])
-                );
+            let (range, category) = choose_category_range(state.rand_mut(), substring);
+            #[cfg(test)]
+            println!(
+                "{:?} => {:?}",
+                range,
+                core::str::from_utf8(&bytes[range.clone()])
+            );
 
-                let options: u64 = category
-                    .iter()
-                    .map(|&(start, end)| u64::from(end) - u64::from(start) + 1)
-                    .sum();
-                let char_gen = |state: &mut S| loop {
-                    let mut selected = state.rand_mut().below(options);
-                    for &(min, max) in category {
-                        if let Some(next_selected) =
-                            selected.checked_sub(u64::from(max) - u64::from(min) + 1)
-                        {
-                            selected = next_selected;
-                        } else if let Some(new_c) = char::from_u32(selected as u32 + min) {
-                            return new_c;
-                        } else {
-                            break;
-                        }
+            let options: u64 = category
+                .iter()
+                .map(|&(start, end)| u64::from(end) - u64::from(start) + 1)
+                .sum();
+            let char_gen = |state: &mut S| loop {
+                let mut selected = state.rand_mut().below(options);
+                for &(min, max) in category {
+                    if let Some(next_selected) =
+                        selected.checked_sub(u64::from(max) - u64::from(min) + 1)
+                    {
+                        selected = next_selected;
+                    } else if let Some(new_c) = char::from_u32(selected as u32 + min) {
+                        return new_c;
+                    } else {
+                        break;
                     }
-                };
+                }
+            };
 
-                return Ok(rand_replace_range(state, input, range, char_gen));
-            }
+            return Ok(rand_replace_range(state, input, range, char_gen));
         }
 
         Ok(MutationResult::Skipped)
@@ -371,26 +367,23 @@ where
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
-            if let Some((range, subcategory)) =
-                choose_subcategory_range(state.rand_mut(), substring)
-            {
-                #[cfg(test)]
-                println!(
-                    "{:?} => {:?}",
-                    range,
-                    core::str::from_utf8(&bytes[range.clone()])
-                );
+            let (range, subcategory) = choose_subcategory_range(state.rand_mut(), substring);
+            #[cfg(test)]
+            println!(
+                "{:?} => {:?}",
+                range,
+                core::str::from_utf8(&bytes[range.clone()])
+            );
 
-                let options: u64 = u64::from(subcategory.1) - u64::from(subcategory.0) + 1;
-                let char_gen = |state: &mut S| loop {
-                    let selected = state.rand_mut().below(options);
-                    if let Some(new_c) = char::from_u32(selected as u32 + subcategory.0) {
-                        return new_c;
-                    }
-                };
+            let options: u64 = u64::from(subcategory.1) - u64::from(subcategory.0) + 1;
+            let char_gen = |state: &mut S| loop {
+                let selected = state.rand_mut().below(options);
+                if let Some(new_c) = char::from_u32(selected as u32 + subcategory.0) {
+                    return new_c;
+                }
+            };
 
-                return Ok(rand_replace_range(state, input, range, char_gen));
-            }
+            return Ok(rand_replace_range(state, input, range, char_gen));
         }
 
         Ok(MutationResult::Skipped)
@@ -437,25 +430,25 @@ where
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
-            if let Some((range, _)) = choose_category_range(state.rand_mut(), substring) {
-                #[cfg(test)]
-                println!(
-                    "{:?} => {:?}",
-                    range,
-                    core::str::from_utf8(&bytes[range.clone()])
-                );
+            let (range, _) = choose_category_range(state.rand_mut(), substring);
 
-                let meta = state.metadata_map().get::<Tokens>().unwrap();
-                let token = &meta.tokens()[token_idx];
+            #[cfg(test)]
+            println!(
+                "{:?} => {:?}",
+                range,
+                core::str::from_utf8(&bytes[range.clone()])
+            );
 
-                if input.0.len() - (range.end - range.start) + token.len() > state.max_size() {
-                    return Ok(MutationResult::Skipped);
-                }
+            let meta = state.metadata_map().get::<Tokens>().unwrap();
+            let token = &meta.tokens()[token_idx];
 
-                input.0.bytes_mut().splice(range, token.iter().copied());
-                input.1 = extract_metadata(input.0.bytes());
-                return Ok(MutationResult::Mutated);
+            if input.0.len() - (range.end - range.start) + token.len() > state.max_size() {
+                return Ok(MutationResult::Skipped);
             }
+
+            input.0.bytes_mut().splice(range, token.iter().copied());
+            input.1 = extract_metadata(input.0.bytes());
+            return Ok(MutationResult::Mutated);
         }
 
         Ok(MutationResult::Skipped)
@@ -502,25 +495,25 @@ where
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
-            if let Some((range, _)) = choose_subcategory_range(state.rand_mut(), substring) {
-                #[cfg(test)]
-                println!(
-                    "{:?} => {:?}",
-                    range,
-                    core::str::from_utf8(&bytes[range.clone()])
-                );
+            let (range, _) = choose_subcategory_range(state.rand_mut(), substring);
 
-                let meta = state.metadata_map().get::<Tokens>().unwrap();
-                let token = &meta.tokens()[token_idx];
+            #[cfg(test)]
+            println!(
+                "{:?} => {:?}",
+                range,
+                core::str::from_utf8(&bytes[range.clone()])
+            );
 
-                if input.0.len() - (range.end - range.start) + token.len() > state.max_size() {
-                    return Ok(MutationResult::Skipped);
-                }
+            let meta = state.metadata_map().get::<Tokens>().unwrap();
+            let token = &meta.tokens()[token_idx];
 
-                input.0.bytes_mut().splice(range, token.iter().copied());
-                input.1 = extract_metadata(input.0.bytes());
-                return Ok(MutationResult::Mutated);
+            if input.0.len() - (range.end - range.start) + token.len() > state.max_size() {
+                return Ok(MutationResult::Skipped);
             }
+
+            input.0.bytes_mut().splice(range, token.iter().copied());
+            input.1 = extract_metadata(input.0.bytes());
+            return Ok(MutationResult::Mutated);
         }
 
         Ok(MutationResult::Skipped)
