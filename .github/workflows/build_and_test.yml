@@ -196,9 +196,22 @@ jobs:
     - name: Remove Dotnet (macOS)
       if: runner.os == 'macOS'
       run: rm -rf /usr/local/bin/dotnet
-    - name: Remove Dotnet & Haskell (Linux)
+    - name: Free Disk Space (Ubuntu)
       if: runner.os == 'Linux'
-      run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
+      uses: jlumbroso/free-disk-space@main
+      with:
+        # this might remove tools that are actually needed,
+        # if set to "true" but frees about 6 GB
+        tool-cache: false
+        
+        # all of these default to true, but feel free to set to
+        # "false" if necessary for your workflow
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Add no_std toolchain

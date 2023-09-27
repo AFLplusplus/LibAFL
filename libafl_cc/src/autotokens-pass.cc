@@ -694,5 +694,4 @@ static RegisterStandardPasses RegisterAutoTokensPass(
 
 static RegisterStandardPasses RegisterAutoTokensPass0(
     PassManagerBuilder::EP_EnabledOnOptLevel0, registerAutoTokensPass);
-  #endif
 #endif

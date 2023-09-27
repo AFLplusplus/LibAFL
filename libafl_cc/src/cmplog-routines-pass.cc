@@ -480,5 +480,4 @@ static RegisterStandardPasses RegisterCmpLogRoutinesPassLTO(
     PassManagerBuilder::EP_FullLinkTimeOptimizationLast,
     registerCmpLogRoutinesPass);
 
-  #endif
 #endif
