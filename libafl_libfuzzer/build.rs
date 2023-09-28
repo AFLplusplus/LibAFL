@@ -116,6 +116,11 @@ fn main() {
 
         let mut redefinitions_file = BufWriter::new(File::create(&redefined_symbols).unwrap());
 
+        const NAMESPACE: &str = "🐇";
+        const NAMESPACE_LEN: usize = NAMESPACE.as_bytes().len();
+
+        let replacement = format!("_ZN{NAMESPACE_LEN}{NAMESPACE}");
+
         // redefine all the rust-mangled symbols we can
         // TODO this will break when v0 mangling is stabilised
         for line in BufReader::new(child.stdout.take().unwrap()).lines() {
@@ -126,7 +131,7 @@ fn main() {
                     redefinitions_file,
                     "{} {}",
                     symbol,
-                    symbol.replacen("_ZN", "_ZN26__libafl_libfuzzer_runtime", 1)
+                    symbol.replacen("_ZN", &replacement, 1)
                 )
                 .unwrap();
             }
