@@ -170,7 +170,7 @@ impl ToolWrapper for ArWrapper {
                         let extension = extension.to_str().unwrap();
                         let extension_lowercase = extension.to_lowercase();
                         match &extension_lowercase[..] {
-                            "o" | "lo" | "a" | "la" | "so" => {
+                            "o" | "lo" | "a" | "la" | "so" | "ao" | "c.o" => {
                                 configuration.replace_extension(&arg_as_path)
                             }
                             _ => arg_as_path,
