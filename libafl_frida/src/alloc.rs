@@ -393,8 +393,7 @@ impl Allocator {
         } else {
             let mut new_shadow_mappings = Vec::new();
             for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
-                for ((start, end), shadow_mapping) in &mut self.pre_allocated_shadow_mappings
-                {
+                for ((start, end), shadow_mapping) in &mut self.pre_allocated_shadow_mappings {
                     if *start <= range.start && range.start < *start + shadow_mapping.len() {
                         let mut start_mapping =
                             shadow_mapping.split_off(range.start - *start).unwrap();
