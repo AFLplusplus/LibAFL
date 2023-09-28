@@ -47,6 +47,7 @@ use libc::{c_char, wchar_t};
 use libc::{getrlimit, rlimit};
 #[cfg(all(unix, not(target_vendor = "apple")))]
 use libc::{getrlimit64, rlimit64};
+#[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 
@@ -72,7 +73,7 @@ extern "C" {
 
 #[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(not(target_vendor = "apple"))]
+#[cfg(all(not(windows), not(target_vendor = "apple")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// The count of registers that need to be saved by the asan runtime
@@ -179,7 +180,6 @@ impl FridaRuntime for AsanRuntime {
 
         self.generate_instrumentation_blobs();
 
-        self.generate_shadow_check_function();
         self.unpoison_all_existing_memory();
 
         self.module_map = Some(module_map.clone());
@@ -454,30 +454,64 @@ impl AsanRuntime {
         unsafe {
             write_volatile(&mut stack_var, 0xfadbeef);
         }
+        let mut range = None;
+        #[cfg(windows)]
+        let mut prev_start = 0;
+        #[cfg(windows)]
+        let mut prev_prev_start = 0;
+        for area in mmap_rs::MemoryAreas::open(None).unwrap() {
+            let area_ref = area.as_ref().unwrap();
+            log::trace!("area: {:x} - {:x} ", area_ref.start(), area_ref.end());
+            if area_ref.start() <= stack_address && stack_address <= area_ref.end() {
+                #[cfg(unix)]
+                {
+                    range = Some((area_ref.start(), area_ref.end()));
+                }
+                #[cfg(windows)]
+                {
+                    range = Some((prev_prev_start, area_ref.end()));
+                }
+                break;
+            }
 
-        let start = range_details.memory_range().base_address().0 as usize;
-        let end = start + range_details.memory_range().size();
-
-        let max_start = end - Self::max_stack_size();
-
-        let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
-        #[cfg(not(target_vendor = "apple"))]
-        let flags = flags | MapFlags::MAP_STACK;
-
-        if start != max_start {
-            let mapping = unsafe {
-                mmap(
-                    NonZeroUsize::new(max_start),
-                    NonZeroUsize::new(start - max_start).unwrap(),
-                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                    flags,
-                    -1,
-                    0,
-                )
-            };
-            assert!(mapping.unwrap() as usize == max_start);
+            #[cfg(windows)]
+            {
+                prev_prev_start = prev_start;
+                prev_start = area_ref.start();
+            }
         }
-        (max_start, end)
+        if let Some((start, end)) = range {
+            #[cfg(unix)]
+            {
+                use std::num::NonZeroUsize;
+
+                use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+                let max_start = end - Self::max_stack_size();
+
+                let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
+                #[cfg(not(target_vendor = "apple"))]
+                let flags = flags | MapFlags::MAP_STACK;
+
+                if start != max_start {
+                    let mapping = unsafe {
+                        mmap(
+                            NonZeroUsize::new(max_start),
+                            NonZeroUsize::new(start - max_start).unwrap(),
+                            ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                            flags,
+                            -1,
+                            0,
+                        )
+                    };
+                    assert!(mapping.unwrap() as usize == max_start);
+                }
+                (max_start, end)
+            }
+            #[cfg(windows)]
+            (start, end)
+        } else {
+            panic!("Couldn't find stack mapping!");
+        }
     }
 
     /// Determine the tls start, end for the currently running thread
@@ -1308,400 +1342,6 @@ impl AsanRuntime {
         log::info!("actual rip: {:x}", self.regs[18]);
     }
 
-    // https://godbolt.org/z/oajhcP5sv
-    /*
-    #include <stdio.h>
-    #include <stdint.h>
-    uint8_t shadow_bit = 44;
-
-    uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
-        // calculate the shadow address
-        uint64_t addr = 0;
-        addr = addr + (start >> 3);
-        uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
-        addr = addr & mask;
-        addr = addr + (1ULL << shadow_bit);
-
-        if(size == 0){
-            // goto return_success
-            return 1;
-        }
-        else{
-            // check if the ptr is not aligned to 8 bytes
-            uint8_t remainder = start & 0b111;
-            if(remainder != 0){
-                // we need to test the high bits from the first shadow byte
-                uint8_t shift;
-                if(size < 8){
-                    shift = size;
-                }
-                else{
-                    shift = 8 - remainder;
-                }
-                // goto check_bits
-                uint8_t mask = (1 << shift) - 1;
-
-                // bitwise reverse for amd64 :<
-                // https://gist.github.com/yantonov/4359090
-                // we need 16bit number here, (not 8bit)
-                uint16_t val = *(uint16_t *)addr;
-                val = (val & 0xff00) >> 8 | (val & 0x00ff) << 8;
-                val = (val & 0xf0f0) >> 4 | (val & 0x0f0f) << 4;
-                val = (val & 0xcccc) >> 2 | (val & 0x3333) << 2;
-                val = (val & 0xaaaa) >> 1 | (val & 0x5555) << 1;
-                val = (val >> 8) | (val << 8); // swap the byte
-                val = (val >> remainder);
-                if((val & mask) != mask){
-                    // goto return failure
-                    return 0;
-                }
-
-                size = size - shift;
-                addr += 1;
-            }
-
-            // no_start_offset
-            uint64_t num_shadow_bytes = size >> 3;
-            uint64_t mask = -1;
-
-            while(true){
-                if(num_shadow_bytes < 8){
-                    // goto less_than_8_shadow_bytes_remaining
-                    break;
-                }
-                else{
-                    uint64_t val = *(uint64_t *)addr;
-                    addr += 8;
-                    if(val != mask){
-                        // goto return failure
-                        return 0;
-                    }
-                    num_shadow_bytes -= 8;
-                    size -= 64;
-                }
-            }
-
-            while(true){
-                if(num_shadow_bytes < 1){
-                    // goto check_trailing_bits
-                    break;
-                }
-                else{
-                    uint8_t val = *(uint8_t *)addr;
-                    addr += 1;
-                    if(val != 0xff){
-                        // goto return failure
-                        return 0;
-                    }
-                    num_shadow_bytes -= 1;
-                    size -= 8;
-                }
-            }
-
-            if(size == 0){
-                // goto return success
-                return 1;
-            }
-
-            uint8_t mask2 = ((1 << (size & 0b111)) - 1);
-            uint8_t val = *(uint8_t *)addr;
-            val = (val & 0xf0) >> 4 | (val & 0x0f) << 4;
-            val = (val & 0xff) >> 2 | (val & 0x33) << 2;
-            val = (val & 0xaa) >> 1 | (val & 0x55) << 1;
-
-            if((val & mask2) != mask2){
-                // goto return failure
-                return 0;
-            }
-            return 1;
-        }
-    }
-        */
-    #[cfg(target_arch = "x86_64")]
-    #[allow(clippy::unused_self, clippy::identity_op)]
-    #[allow(clippy::too_many_lines)]
-    fn generate_shadow_check_function(&mut self) {
-        let shadow_bit = self.allocator.shadow_bit();
-        let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
-
-        // Rdi start, Rsi size
-        dynasm!(ops
-        ;       .arch x64
-        ;        mov     cl, BYTE shadow_bit as i8
-        ;        mov     r10, -2
-        ;        shl     r10, cl
-        ;        mov     eax, 1
-        ;        mov     edx, 1
-        ;        shl     rdx, cl
-        ;        test    rsi, rsi
-        ;        je      >LBB0_15
-        ;        mov     rcx, rdi
-        ;        shr     rcx, 3
-        ;        not     r10
-        ;        and     r10, rcx
-        ;        add     r10, rdx
-        ;        and     edi, 7
-        ;        je      >LBB0_4
-        ;        mov     cl, 8
-        ;        sub     cl, dil
-        ;        cmp     rsi, 8
-        ;        movzx   ecx, cl
-        ;        mov     r8d, esi
-        ;        cmovae  r8d, ecx
-        ;        mov     r9d, -1
-        ;        mov     ecx, r8d
-        ;        shl     r9d, cl
-        ;        movzx   ecx, WORD [r10]
-        ;        rol     cx, 8
-        ;        mov     edx, ecx
-        ;        shr     edx, 4
-        ;        and     edx, 3855
-        ;        shl     ecx, 4
-        ;        and     ecx, -3856
-        ;        or      ecx, edx
-        ;        mov     edx, ecx
-        ;        shr     edx, 2
-        ;        and     edx, 13107
-        ;        and     ecx, -3277
-        ;        lea     ecx, [rdx + 4*rcx]
-        ;        mov     edx, ecx
-        ;        shr     edx, 1
-        ;        and     edx, 21845
-        ;        and     ecx, -10923
-        ;        lea     ecx, [rdx + 2*rcx]
-        ;        rol     cx, 8
-        ;        movzx   edx, cx
-        ;        mov     ecx, edi
-        ;        shr     edx, cl
-        ;        not     r9d
-        ;        movzx   ecx, r9b
-        ;        and     edx, ecx
-        ;        cmp     edx, ecx
-        ;        jne     >LBB0_11
-        ;        movzx   ecx, r8b
-        ;        sub     rsi, rcx
-        ;        add     r10, 1
-        ;LBB0_4:
-        ;        mov     r8, rsi
-        ;        shr     r8, 3
-        ;        mov     r9, r8
-        ;        and     r9, -8
-        ;        mov     edi, r8d
-        ;        and     edi, 7
-        ;        add     r9, r10
-        ;        and     esi, 63
-        ;        mov     rdx, r8
-        ;        mov     rcx, r10
-        ;LBB0_5:
-        ;        cmp     rdx, 7
-        ;        jbe     >LBB0_8
-        ;        add     rdx, -8
-        ;        cmp     QWORD [rcx], -1
-        ;        lea     rcx, [rcx + 8]
-        ;        je      <LBB0_5
-        ;        jmp     >LBB0_11
-        ;LBB0_8:
-        ;        lea     rcx, [8*rdi]
-        ;        sub     rsi, rcx
-        ;LBB0_9:
-        ;        test    rdi, rdi
-        ;        je      >LBB0_13
-        ;        add     rdi, -1
-        ;        cmp     BYTE [r9], -1
-        ;        lea     r9, [r9 + 1]
-        ;        je      <LBB0_9
-        ;LBB0_11:
-        ;        xor     eax, eax
-        ;        ret
-        ;LBB0_13:
-        ;        test    rsi, rsi
-        ;        je      >LBB0_15
-        ;        and     sil, 7
-        ;        mov     dl, -1
-        ;        mov     ecx, esi
-        ;        shl     dl, cl
-        ;        not     dl
-        ;        mov     cl, BYTE [r8 + r10]
-        ;        rol     cl, 4
-        ;        mov     eax, ecx
-        ;        shr     al, 2
-        ;        shl     cl, 2
-        ;        and     cl, -52
-        ;        or      cl, al
-        ;        mov     eax, ecx
-        ;        shr     al, 1
-        ;        and     al, 85
-        ;        add     cl, cl
-        ;        and     cl, -86
-        ;        or      cl, al
-        ;        and     cl, dl
-        ;        xor     eax, eax
-        ;        cmp     cl, dl
-        ;        sete    al
-        ;LBB0_15:
-        ;       ret
-            );
-        let blob = ops.finalize().unwrap();
-        unsafe {
-            let mapping = mmap(
-                None,
-                std::num::NonZeroUsize::new_unchecked(0x1000),
-                ProtFlags::all(),
-                MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
-                -1,
-                0,
-            )
-            .unwrap();
-            blob.as_ptr()
-                .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
-            self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
-        }
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    // identity_op appears to be a false positive in ubfx
-    #[allow(clippy::unused_self, clippy::identity_op, clippy::too_many_lines)]
-    fn generate_shadow_check_function(&mut self) {
-        let shadow_bit = self.allocator.shadow_bit();
-        let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
-        dynasm!(ops
-            ; .arch aarch64
-
-            // calculate the shadow address
-            ; mov x5, #0
-            // ; add x5, xzr, x5, lsl #shadow_bit
-            ; add x5, x5, x0, lsr #3
-            ; ubfx x5, x5, #0, #(shadow_bit + 1)
-            ; mov x6, #1
-            ; add x5, x5, x6, lsl #shadow_bit
-
-            ; cmp x1, #0
-            ; b.eq >return_success
-            // check if the ptr is not aligned to 8 bytes
-            ; ands x6, x0, #7
-            ; b.eq >no_start_offset
-
-            // we need to test the high bits from the first shadow byte
-            ; ldrh w7, [x5, #0]
-            ; rev16 w7, w7
-            ; rbit w7, w7
-            ; lsr x7, x7, #16
-            ; lsr x7, x7, x6
-
-            ; cmp x1, #8
-            ; b.lt >dont_fill_to_8
-            ; mov x2, #8
-            ; sub x6, x2, x6
-            ; b >check_bits
-            ; dont_fill_to_8:
-            ; mov x6, x1
-            ; check_bits:
-            ; mov x2, #1
-            ; lsl x2, x2, x6
-            ; sub x4, x2, #1
-
-            // if shadow_bits & size_to_test != size_to_test: fail
-            ; and x7, x7, x4
-            ; cmp x7, x4
-            ; b.ne >return_failure
-
-            // size -= size_to_test
-            ; sub x1, x1, x6
-            // shadow_addr += 1 (we consumed the initial byte in the above test)
-            ; add x5, x5, 1
-
-            ; no_start_offset:
-            // num_shadow_bytes = size / 8
-            ; lsr x4, x1, #3
-            ; eor x3, x3, x3
-            ; sub x3, x3, #1
-
-            // if num_shadow_bytes < 8; then goto check_bytes; else check_8_shadow_bytes
-            ; check_8_shadow_bytes:
-            ; cmp x4, #0x8
-            ; b.lt >less_than_8_shadow_bytes_remaining
-            ; ldr x7, [x5], #8
-            ; cmp x7, x3
-            ; b.ne >return_failure
-            ; sub x4, x4, #8
-            ; sub x1, x1, #64
-            ; b <check_8_shadow_bytes
-
-            ; less_than_8_shadow_bytes_remaining:
-            ; cmp x4, #1
-            ; b.lt >check_trailing_bits
-            ; ldrb w7, [x5], #1
-            ; cmp w7, #0xff
-            ; b.ne >return_failure
-            ; sub x4, x4, #1
-            ; sub x1, x1, #8
-            ; b <less_than_8_shadow_bytes_remaining
-
-            ; check_trailing_bits:
-            ; cmp x1, #0x0
-            ; b.eq >return_success
-
-            ; and x4, x1, #7
-            ; mov x2, #1
-            ; lsl x2, x2, x4
-            ; sub x4, x2, #1
-
-            ; ldrh w7, [x5, #0]
-            ; rev16 w7, w7
-            ; rbit w7, w7
-            ; lsr x7, x7, #16
-            ; and x7, x7, x4
-            ; cmp x7, x4
-            ; b.ne >return_failure
-
-            ; return_success:
-            ; mov x0, #1
-            ; b >prologue
-
-            ; return_failure:
-            ; mov x0, #0
-
-
-            ; prologue:
-            ; ret
-        );
-
-        let blob = ops.finalize().unwrap();
-
-        // apple aarch64 requires MAP_JIT to allocates WX pages
-        #[cfg(target_vendor = "apple")]
-        let map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE | MapFlags::MAP_JIT;
-        #[cfg(not(target_vendor = "apple"))]
-        let map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE;
-
-        unsafe {
-            let mapping = mmap(
-                None,
-                NonZeroUsize::try_from(0x1000).unwrap(),
-                ProtFlags::all(),
-                map_flags,
-                -1,
-                0,
-            )
-            .unwrap();
-
-            // on apple aarch64, WX pages can't be both writable and executable at the same time.
-            // pthread_jit_write_protect_np flips them from executable (1) to writable (0)
-            #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-            {
-                libc::pthread_jit_write_protect_np(0);
-            }
-
-            blob.as_ptr()
-                .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
-
-            #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-            {
-                libc::pthread_jit_write_protect_np(1);
-            }
-            self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
-        }
-    }
 
     // https://godbolt.org/z/ah8vG8sWo
     /*

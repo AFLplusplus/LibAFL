@@ -92,7 +92,7 @@ pub fn writer_register(reg: capstone::RegId) -> Aarch64Register {
 /// The writer registers
 /// frida registers: <https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html>
 /// capstone registers: <https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html>
-#[cfg(all(target_arch = "x86_64", unix))]
+#[cfg(all(target_arch = "x86_64"))]
 #[must_use]
 #[inline]
 #[allow(clippy::unused_self)]

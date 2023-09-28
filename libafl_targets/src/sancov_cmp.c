@@ -6,7 +6,9 @@
 
 #ifdef SANCOV_CMPLOG
   #include "cmplog.h"
+#ifndef _WIN32
   #include <sanitizer/common_interface_defs.h>
+#endif
 #endif
 
 void __sanitizer_cov_trace_cmp1(uint8_t arg1, uint8_t arg2) {

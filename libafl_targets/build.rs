@@ -156,8 +156,9 @@ fn main() {
         .file(src_dir.join("cmplog.c"))
         .compile("cmplog");
 
-    #[cfg(unix)]
-    {
+    let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+
+    if target_family == "unix" {
         println!("cargo:rerun-if-changed=src/forkserver.c");
 
         cc::Build::new()
@@ -165,8 +166,7 @@ fn main() {
             .compile("forkserver");
     }
 
-    #[cfg(windows)]
-    {
+    if target_family == "windows" {
         println!("cargo:rerun-if-changed=src/windows_asan.c");
 
         cc::Build::new()

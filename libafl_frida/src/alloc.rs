@@ -1,4 +1,5 @@
 #[cfg(any(
+    windows,
     target_os = "linux",
     target_vendor = "apple",
     all(target_arch = "aarch64", target_os = "android")
@@ -10,12 +11,12 @@ use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
 #[cfg(any(
+    windows,
     target_os = "linux",
     target_vendor = "apple",
     all(target_arch = "aarch64", target_os = "android")
 ))]
 use mmap_rs::{MemoryAreas, MmapFlags, MmapMut, MmapOptions, ReservedMut};
-use nix::libc::memset;
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 
@@ -330,16 +331,12 @@ impl Allocator {
         // log::trace!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
             // log::trace!("memset: {:?}", start as *mut c_void);
-            memset(start as *mut c_void, 0xff, size / 8);
+            std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0xff);
 
             let remainder = size % 8;
             if remainder > 0 {
                 // log::trace!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
-                memset(
-                    (start + size / 8) as *mut c_void,
-                    (0xff << (8 - remainder)) & 0xff,
-                    1,
-                );
+                ((start + size / 8) as *mut u8).write(0xff << (8 - remainder));
             }
         }
     }
@@ -349,12 +346,12 @@ impl Allocator {
         // log::trace!("poisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
             // log::trace!("memset: {:?}", start as *mut c_void);
-            memset(start as *mut c_void, 0x00, size / 8);
+            std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0x0);
 
             let remainder = size % 8;
             if remainder > 0 {
                 // log::trace!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
-                memset((start + size / 8) as *mut c_void, 0x00, 1);
+            ((start + size / 8) as *mut u8).write(0x00);
             }
         }
     }
@@ -424,6 +421,51 @@ impl Allocator {
         (shadow_mapping_start, (end - start) / 8)
     }
 
+
+    /// Checks whether the given address up till size is valid unpoisoned shadow memory.
+    /// TODO: check edge cases
+    #[inline]
+    #[must_use]
+    pub fn check_shadow(&self, address: *const c_void, size: usize) -> bool {
+       if size == 0 {
+            return true;
+        }
+        let address = address as usize;
+        let mut shadow_size = size / 8;
+
+        let mut shadow_addr = map_to_shadow!(self, address);
+
+        if address & 0x7 > 0 {
+            if unsafe { (shadow_addr as *mut u8).read() } & (address & 7) as u8
+                != (address & 7) as u8
+            {
+                return false;
+            }
+            shadow_addr += 1;
+            shadow_size -= 1;
+        }
+
+        let buf = unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
+
+        let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
+
+        if prefix.iter().all(|&x| x == 0xff)
+            && suffix.iter().all(|&x| x == 0xff)
+            && aligned
+                .iter()
+                .all(|&x| x == 0xffffffffffffffffffffffffffffffffu128)
+        {
+            let shadow_remainder = (size % 8) as u8;
+            if shadow_remainder > 0 {
+                (unsafe { ((shadow_addr + shadow_size) as *mut u8).read() } & shadow_remainder)
+                    == shadow_remainder
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+    }
     /// Maps the address to a shadow address
     #[inline]
     #[must_use]

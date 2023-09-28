@@ -3,7 +3,6 @@ use std::ffi::c_void;
 
 use backtrace::Backtrace;
 use libc::{c_char, wchar_t};
-use nix::libc::memset;
 
 use crate::{
     alloc::Allocator,
@@ -110,6 +109,9 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
+        extern "C" {
+            fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
+        }
         let ret = unsafe { self.allocator_mut().alloc(size * nmemb, 8) };
         unsafe {
             memset(ret, 0, size * nmemb);

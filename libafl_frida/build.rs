@@ -7,6 +7,8 @@ fn main() {
     }
 
     // Force linking against libc++
-    #[cfg(unix)]
-    println!("cargo:rustc-link-lib=dylib=c++");
+    let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+    if target_family == "unix" {
+        println!("cargo:rustc-link-lib=dylib=c++");
+    }
 }
