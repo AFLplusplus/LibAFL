@@ -194,6 +194,7 @@ args = [
 dependencies = ["build"]
 script_runner="@shell"
 script='''
+rm -f ${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage-${CARGO_MAKE_PROFILE}
 mv ${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage ${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage-${CARGO_MAKE_PROFILE}
 '''
 
