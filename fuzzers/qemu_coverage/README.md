@@ -1,4 +1,4 @@
-# qemu-coverage
+# qemu_coverage
 
 This folder contains an example fuzzer which runs each entry in the input corpus and collects
 the cumuative coverage data in drcov format. This fuzzer also distributes the test cases in

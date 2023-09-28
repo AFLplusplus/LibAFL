@@ -12,6 +12,7 @@ else
     fuzzers=$(cargo run -p build_and_test_fuzzers -- "remotes/origin/main" "HEAD^")
     backtrace_fuzzers=""
     export PROFILE=dev
+    export PROFILE_DIR=debug
 fi
 
 libafl=$(pwd)

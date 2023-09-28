@@ -43,9 +43,6 @@
   #include "llvm/IR/PassManager.h"
 #else
   #include "llvm/IR/LegacyPassManager.h"
-#endif
-
-#if LLVM_VERSION_MAJOR < 11
   #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #endif
 #include "llvm/IR/BasicBlock.h"
@@ -683,7 +680,6 @@ bool AutoTokensPass::runOnModule(Module &M) {
 #if USE_NEW_PM
 
 #else
-  #if LLVM_VERSION_MAJOR < 11
 static void registerAutoTokensPass(const PassManagerBuilder &,
                                    legacy::PassManagerBase &PM) {
   PM.add(new AutoTokensPass());
@@ -698,5 +694,4 @@ static RegisterStandardPasses RegisterAutoTokensPass(
 
 static RegisterStandardPasses RegisterAutoTokensPass0(
     PassManagerBuilder::EP_EnabledOnOptLevel0, registerAutoTokensPass);
-  #endif
 #endif
