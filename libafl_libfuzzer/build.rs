@@ -11,6 +11,7 @@ const NAMESPACE: &str = "🐇";
 const NAMESPACE: &str = "__libafl";
 const NAMESPACE_LEN: usize = NAMESPACE.as_bytes().len();
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     if cfg!(any(feature = "cargo-clippy", docsrs)) {
         return; // skip when clippy or docs is running
