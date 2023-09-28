@@ -53,9 +53,13 @@ impl FridaRuntime for DrCovRuntime {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         hasher.write(input.target_bytes().as_slice());
 
-        let filename = self
-            .coverage_directory
-            .join(format!("{:016x}.drcov", hasher.finish(),));
+        let hash = hasher.finish();
+        let mut filename = self.coverage_directory.join(format!("{hash:016x}.drcov"));
+        let mut i = 0;
+        while filename.exists() {
+            filename.set_file_name(format!("{hash:016x}_{i}.drcov"));
+            i += 1;
+        }
         DrCovWriter::new(&self.ranges).write(filename, &self.drcov_basic_blocks)?;
         self.drcov_basic_blocks.clear();
 
