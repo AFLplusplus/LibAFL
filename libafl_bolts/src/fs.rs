@@ -45,7 +45,7 @@ where
 
         let mut tmpfile = OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(true)
             .open(&tmpfile_name)?;
 
         tmpfile.write_all(bytes)?;
