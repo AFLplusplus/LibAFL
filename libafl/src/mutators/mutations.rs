@@ -491,7 +491,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let range = rand_range(state, size, size);
+        let range = rand_range(state, size, size - 1);
 
         input.bytes_mut().drain(range);
 
