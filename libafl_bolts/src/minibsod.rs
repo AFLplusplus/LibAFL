@@ -12,7 +12,10 @@ use libc::siginfo_t;
 use crate::os::unix_signals::{ucontext_t, Signal};
 
 /// Write the content of all important registers
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[cfg(all(
+    any(target_os = "linux", target_os = "android"),
+    target_arch = "x86_64"
+))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -414,7 +417,10 @@ fn dump_registers<W: Write>(
     Ok(())
 }
 
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[cfg(all(
+    any(target_os = "linux", target_os = "android"),
+    target_arch = "x86_64"
+))]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
