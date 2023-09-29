@@ -25,7 +25,6 @@ use core::{
 #[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
 
-use libafl_bolts::current_time;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", unix))]
