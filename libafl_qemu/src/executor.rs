@@ -1,5 +1,8 @@
 //! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
-use core::fmt::{self, Debug, Formatter};
+use core::{
+    ffi::c_void,
+    fmt::{self, Debug, Formatter},
+};
 
 #[cfg(feature = "fork")]
 use libafl::{
@@ -9,7 +12,10 @@ use libafl::{
 };
 use libafl::{
     events::{EventFirer, EventRestarter},
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
+    executors::{
+        inprocess::{InProcessExecutor, InProcessExecutorHandlerData},
+        Executor, ExitKind, HasObservers,
+    },
     feedbacks::Feedback,
     fuzzer::{HasFeedback, HasObjective, HasScheduler},
     inputs::UsesInput,
@@ -17,6 +23,7 @@ use libafl::{
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
 
@@ -29,9 +36,9 @@ where
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
 {
-    first_exec: bool,
-    hooks: &'a mut QemuHooks<'a, QT, S>,
     inner: InProcessExecutor<'a, H, OT, S>,
+    hooks: &'a mut QemuHooks<'a, QT, S>,
+    first_exec: bool,
 }
 
 impl<'a, H, OT, QT, S> Debug for QemuExecutor<'a, H, OT, QT, S>
@@ -47,6 +54,32 @@ where
             .field("inner", &self.inner)
             .finish()
     }
+}
+
+extern "C" {
+    // Original QEMU user signal handler
+    fn host_signal_handler(signal: i32, info: siginfo_t, puc: *mut c_void);
+}
+
+pub unsafe fn inproc_qemu_crash_handler<CF, E, EM, OF, Z>(
+    signal: Signal,
+    info: siginfo_t,
+    context: &mut ucontext_t,
+    data: &mut InProcessExecutorHandlerData,
+) where
+    E: Executor<EM, Z> + HasObservers,
+    EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+    CF: Feedback<E::State>,
+    OF: Feedback<E::State>,
+    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
+    Z: HasObjective<Objective = OF, State = E::State>
+        + HasFeedback<Feedback = CF, State = E::State>
+        + HasScheduler,
+{
+    host_signal_handler(signal as i32, info, context as *mut _ as *mut c_void);
+    libafl::executors::inprocess::unix_signal_handler::inproc_crash_handler::<CF, E, EM, OF, Z>(
+        signal, info, context, data,
+    );
 }
 
 impl<'a, H, OT, QT, S> QemuExecutor<'a, H, OT, QT, S>
@@ -73,10 +106,15 @@ where
             + HasFeedback<Feedback = CF, State = S>
             + HasScheduler,
     {
+        let mut inner = InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?;
+        inner.handlers_mut().crash_handler =
+            inproc_qemu_crash_handler::<CF, InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
+                as *const c_void;
+
         Ok(Self {
             first_exec: true,
             hooks,
-            inner: InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?,
+            inner,
         })
     }
 

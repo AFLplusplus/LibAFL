@@ -429,7 +429,7 @@ impl InProcessHandlers {
 
 /// The global state of the in-process harness.
 #[derive(Debug)]
-pub(crate) struct InProcessExecutorHandlerData {
+pub struct InProcessExecutorHandlerData {
     state_ptr: *mut c_void,
     event_mgr_ptr: *mut c_void,
     fuzzer_ptr: *mut c_void,
@@ -684,7 +684,7 @@ pub fn run_observers_and_save_state<CF, E, EM, OF, Z>(
 }
 
 #[cfg(unix)]
-mod unix_signal_handler {
+pub mod unix_signal_handler {
     use alloc::vec::Vec;
     #[cfg(feature = "std")]
     use alloc::{boxed::Box, string::String};
@@ -804,7 +804,7 @@ mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-    pub(crate) unsafe fn inproc_timeout_handler<CF, E, EM, OF, Z>(
+    pub unsafe fn inproc_timeout_handler<CF, E, EM, OF, Z>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -854,7 +854,7 @@ mod unix_signal_handler {
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
-    pub(crate) unsafe fn inproc_crash_handler<CF, E, EM, OF, Z>(
+    pub unsafe fn inproc_crash_handler<CF, E, EM, OF, Z>(
         signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -1055,7 +1055,7 @@ pub mod windows_asan_handler {
 }
 
 #[cfg(all(windows, feature = "std"))]
-mod windows_exception_handler {
+pub mod windows_exception_handler {
     #[cfg(feature = "std")]
     use alloc::boxed::Box;
     use alloc::{string::String, vec::Vec};
@@ -1251,7 +1251,7 @@ mod windows_exception_handler {
     }
 
     #[allow(clippy::too_many_lines)]
-    pub(crate) unsafe fn inproc_crash_handler<CF, E, EM, OF, Z>(
+    pub unsafe fn inproc_crash_handler<CF, E, EM, OF, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
