@@ -44,7 +44,7 @@ libafl_targets = { path = "../libafl_targets", version = "0.11.1", features = [
     "sancov_cmplog",
 ] }
 
-nix = "0.26"
+nix = "0.27"
 libc = "0.2"
 hashbrown = "0.14"
 rangemap = "1.3"
@@ -61,7 +61,7 @@ frida-gum = { version = "0.13.2", features = [
 ] }
 dynasmrt = "2"
 capstone = "0.11.0"
-color-backtrace = { version = "0.5", features = ["resolve-modules"] }
+color-backtrace = { version = "0.6", features = ["resolve-modules"] }
 termcolor = "1.1.3"
 serde = "1.0"
 backtrace = { version = "0.3", default-features = false, features = [

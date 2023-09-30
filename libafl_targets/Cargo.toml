@@ -35,7 +35,7 @@ clippy = [] # Ignore compiler warnings during clippy
 observers = ["meminterval", "ahash"]
 
 [build-dependencies]
-bindgen = "0.64.0"
+bindgen = "0.68"
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
