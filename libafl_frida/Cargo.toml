@@ -44,7 +44,7 @@ libafl_targets = { path = "../libafl_targets", version = "0.11.1", features = [
     "sancov_cmplog",
 ] }
 
-nix = "0.27"
+nix = "0.26"
 libc = "0.2"
 hashbrown = "0.14"
 rangemap = "1.3"
