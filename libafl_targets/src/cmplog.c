@@ -93,7 +93,6 @@ static long area_is_valid(const void *ptr, size_t len) {
   }
 }
 
-
 // cmplog routines after area check
 void __libafl_targets_cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
                                               const uint8_t *ptr2, size_t len) {
@@ -108,7 +107,8 @@ void __libafl_targets_cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
   } else {
     hits = libafl_cmplog_map_ptr->headers[k].hits++;
     if (libafl_cmplog_map_ptr->headers[k].shape < len) {
-      libafl_cmplog_map_ptr->headers[k].shape = len; // TODO; adjust len for AFL++'s cmplog protocol
+      libafl_cmplog_map_ptr->headers[k].shape =
+          len;  // TODO; adjust len for AFL++'s cmplog protocol
     }
   }
 
@@ -117,7 +117,6 @@ void __libafl_targets_cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
   MEMCPY(libafl_cmplog_map_ptr->vals.routines[k][hits].v1, ptr2, len);
   libafl_cmplog_enabled = true;
 }
-
 
 // Very generic cmplog routines callback
 void __libafl_targets_cmplog_routines(uintptr_t k, const uint8_t *ptr1,
@@ -155,27 +154,26 @@ void __cmplog_rtn_hook(const uint8_t *ptr1, const uint8_t *ptr2) {
   __libafl_targets_cmplog_routines(k, ptr1, ptr2);
 }
 
-void __cmplog_rtn_hook_n(const uint8_t *ptr1, const uint8_t *ptr2, uint64_t len) {
+void __cmplog_rtn_hook_n(const uint8_t *ptr1, const uint8_t *ptr2,
+                         uint64_t len) {
   (void)(len);
   __cmplog_rtn_hook(ptr1, ptr2);
 }
 
-
 /* hook for string functions, eg. strcmp, strcasecmp etc. */
 void __cmplog_rtn_hook_str(const uint8_t *ptr1, uint8_t *ptr2) {
-
   if (!libafl_cmplog_enabled) { return; }
   if (unlikely(!ptr1 || !ptr2)) return;
-  
+
   // should we check here?? need to test
   int len1 = strnlen(ptr1, 30) + 1;
   int len2 = strnlen(ptr2, 30) + 1;
   int l = MAX(len1, len2);
   if (l < 3) return;
-  
+
   intptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
-  k &= CMPLOG_MAP_W - 1; 
+  k &= CMPLOG_MAP_W - 1;
 
   __libafl_targets_cmplog_routines_checked(k, ptr1, ptr2, l);
 }
@@ -183,10 +181,9 @@ void __cmplog_rtn_hook_str(const uint8_t *ptr1, uint8_t *ptr2) {
 /* hook for string with length functions, eg. strncmp, strncasecmp etc.
    Note that we ignore the len parameter and take longer strings if present. */
 void __cmplog_rtn_hook_strn(uint8_t *ptr1, uint8_t *ptr2, uint64_t len) {
-
   if (!libafl_cmplog_enabled) { return; }
   if (unlikely(!ptr1 || !ptr2)) return;
-  
+
   int len0 = MIN(len, 31);
   int len1 = strnlen(ptr1, len0);
   if (len1 < 31) len1 = area_is_valid(ptr1, len1 + 1);
@@ -194,14 +191,13 @@ void __cmplog_rtn_hook_strn(uint8_t *ptr1, uint8_t *ptr2, uint64_t len) {
   if (len2 < 31) len2 = area_is_valid(ptr1, len2 + 1);
   int l = MAX(len1, len2);
   if (l < 2) return;
-  
+
   intptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
-  k &= CMPLOG_MAP_W - 1; 
+  k &= CMPLOG_MAP_W - 1;
 
   __libafl_targets_cmplog_routines_checked(k, ptr1, ptr2, l);
 }
-
 
 // gcc libstdc++
 // _ZNKSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE7compareEPKc
@@ -234,40 +230,33 @@ void __cmplog_rtn_gcc_stdstring_cstring(const uint8_t *stdstring,
                                         const uint8_t *cstring) {
   if (!libafl_cmplog_enabled) { return; }
   int l1 = area_is_valid(stdstring, 32);
-  if (l1 <= 0) {
-    return;
-  }
+  if (l1 <= 0) { return; }
   int l2 = area_is_valid(cstring, 32);
-  if (l2 <= 0) {
-    return;
-  }
+  if (l2 <= 0) { return; }
 
   int len = MIN(31, MIN(l1, l2));
-  
+
   uintptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
-  __libafl_targets_cmplog_routines_checked(k, get_gcc_stdstring(stdstring), cstring, len);
+  __libafl_targets_cmplog_routines_checked(k, get_gcc_stdstring(stdstring),
+                                           cstring, len);
 }
 
 void __cmplog_rtn_gcc_stdstring_stdstring(const uint8_t *stdstring1,
                                           const uint8_t *stdstring2) {
   if (!libafl_cmplog_enabled) { return; }
   int l1 = area_is_valid(stdstring1, 32);
-  if (l1 <= 0) {
-    return;
-  }
+  if (l1 <= 0) { return; }
   int l2 = area_is_valid(stdstring2, 32);
-  if (l2 <= 0) {
-    return;
-  }
+  if (l2 <= 0) { return; }
 
-  int len = MIN(31, MIN(l1, l2));
+  int       len = MIN(31, MIN(l1, l2));
   uintptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
   __libafl_targets_cmplog_routines_checked(k, get_gcc_stdstring(stdstring1),
-                    get_gcc_stdstring(stdstring2), len);
+                                           get_gcc_stdstring(stdstring2), len);
 }
 
 void __cmplog_rtn_llvm_stdstring_cstring(const uint8_t *stdstring,
@@ -275,32 +264,25 @@ void __cmplog_rtn_llvm_stdstring_cstring(const uint8_t *stdstring,
   if (!libafl_cmplog_enabled) { return; }
   if (area_is_valid(stdstring, 32) <= 0) { return; }
   int l1 = area_is_valid(stdstring, 32);
-  if (l1 <= 0) {
-    return;
-  }
+  if (l1 <= 0) { return; }
   int l2 = area_is_valid(cstring, 32);
-  if (l2 <= 0) {
-    return;
-  }
+  if (l2 <= 0) { return; }
 
-  int len = MIN(31, MIN(l1, l2));
+  int       len = MIN(31, MIN(l1, l2));
   uintptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
-  __libafl_targets_cmplog_routines_checked(k, get_llvm_stdstring(stdstring), cstring, len);
+  __libafl_targets_cmplog_routines_checked(k, get_llvm_stdstring(stdstring),
+                                           cstring, len);
 }
 
 void __cmplog_rtn_llvm_stdstring_stdstring(const uint8_t *stdstring1,
                                            const uint8_t *stdstring2) {
   if (!libafl_cmplog_enabled) { return; }
   int l1 = area_is_valid(stdstring1, 32);
-  if (l1 <= 0) {
-    return;
-  }
+  if (l1 <= 0) { return; }
   int l2 = area_is_valid(stdstring2, 32);
-  if (l2 <= 0) {
-    return;
-  }
+  if (l2 <= 0) { return; }
 
   int len = MIN(31, MIN(l1, l2));
 
@@ -308,5 +290,5 @@ void __cmplog_rtn_llvm_stdstring_stdstring(const uint8_t *stdstring1,
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
   __libafl_targets_cmplog_routines_checked(k, get_llvm_stdstring(stdstring1),
-                    get_llvm_stdstring(stdstring2), len);
+                                           get_llvm_stdstring(stdstring2), len);
 }

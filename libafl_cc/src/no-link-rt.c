@@ -16,7 +16,8 @@ void __cmplog_rtn_hook(uint8_t *ptr1, uint8_t *ptr2) {
   (void)ptr2;
 }
 
-void __cmplog_rtn_hook_n(const uint8_t *ptr1, const uint8_t *ptr2, uint64_t len) {
+void __cmplog_rtn_hook_n(const uint8_t *ptr1, const uint8_t *ptr2,
+                         uint64_t len) {
   (void)ptr1;
   (void)ptr2;
   (void)len;
