@@ -170,6 +170,7 @@ llvmGetPassPluginInfo() {
 #else
 char CmpLogRoutines::ID = 0;
 #endif
+#include<iostream>
 
 bool CmpLogRoutines::hookRtns(Module &M) {
   std::vector<CallInst *> calls, llvmStdStd, llvmStdC, gccStdStd, gccStdC,
@@ -475,6 +476,9 @@ bool CmpLogRoutines::hookRtns(Module &M) {
           if (isPtrRtnN) { isPtrRtn = false; }
 
           if (isPtrRtn) { calls.push_back(callInst); }
+	  if (isMemcmp || isPtrRtnN) { Memcmp.push_back(callInst); }
+          if (isStrcmp) { Strcmp.push_back(callInst); }
+          if (isStrncmp) { Strncmp.push_back(callInst); }
           if (isGccStdStringStdString) { gccStdStd.push_back(callInst); }
           if (isGccStdStringCString) { gccStdC.push_back(callInst); }
           if (isLlvmStdStringStdString) { llvmStdStd.push_back(callInst); }
@@ -511,6 +515,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
           *v3P = callInst->getArgOperand(2);
 
     IRBuilder<> IRB(callInst->getParent());
+    IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
@@ -532,6 +537,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<>          IRB(callInst->getParent());
+    IRB.SetInsertPoint(callInst);
     std::vector<Value *> args;
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
     Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
@@ -548,6 +554,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
           *v3P = callInst->getArgOperand(2);
 
     IRBuilder<>          IRB(callInst->getParent());
+    IRB.SetInsertPoint(callInst);
     std::vector<Value *> args;
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
     Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
