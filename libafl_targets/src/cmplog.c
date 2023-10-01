@@ -174,7 +174,6 @@ void __cmplog_rtn_hook_str(const uint8_t *ptr1, uint8_t *ptr2) {
   l = MIN(l, area_is_valid(ptr2, l + 1)); // can we really access it? check
 
   if (l < 2) return;
-  if (l < 3) return;
 
   intptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
