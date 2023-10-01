@@ -149,6 +149,39 @@ void __cmplog_rtn_hook(const uint8_t *ptr1, const uint8_t *ptr2) {
   __libafl_targets_cmplog_routines(k, ptr1, ptr2);
 }
 
+void __cmplog_rtn_hook_n(const uint8_t *ptr1, const uint8_t *ptr2, uint64_t len) {
+  void(len);
+  __cmplog_rtn_hook(ptr1, ptr2);
+}
+
+
+/* hook for string functions, eg. strcmp, strcasecmp etc. */
+void __cmplog_rtn_hook_str(u8 *ptr1, u8 *ptr2) {
+
+  if (!libafl_cmplog_enabled) { return; }
+  if (unlikely(!ptr1 || !ptr2)) return;
+  int len1 = strnlen(ptr1, 30) + 1;
+  int len2 = strnlen(ptr2, 30) + 1;
+  int l = MAX(len1, len2);
+  if (l < 3) return;
+  
+  // __cmplog_rtn_hook(ptr1, ptr2);
+}
+
+/* hook for string functions, eg. strcmp, strcasecmp etc. */
+void __cmplog_rtn_hook_strn(u8 *ptr1, u8 *ptr2) {
+
+  if (!libafl_cmplog_enabled) { return; }
+  if (unlikely(!ptr1 || !ptr2)) return;
+  int len1 = strnlen(ptr1, 30) + 1;
+  int len2 = strnlen(ptr2, 30) + 1;
+  int l = MAX(len1, len2);
+  if (l < 3) return;
+  
+  // __cmplog_rtn_hook(ptr1, ptr2);
+}
+
+
 // gcc libstdc++
 // _ZNKSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE7compareEPKc
 static const uint8_t *get_gcc_stdstring(const uint8_t *string) {
