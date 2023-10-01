@@ -46,6 +46,22 @@
   #define EXPORT_FN
 #endif
 
+#if __GNUC__ < 6
+  #ifndef likely
+    #define likely(_x) (_x)
+  #endif
+  #ifndef unlikely
+    #define unlikely(_x) (_x)
+  #endif
+#else
+  #ifndef likely
+    #define likely(_x) __builtin_expect(!!(_x), 1)
+  #endif
+  #ifndef unlikely
+    #define unlikely(_x) __builtin_expect(!!(_x), 0)
+  #endif
+#endif
+
 #ifdef __GNUC__
   #define MAX(a, b)           \
     ({                        \

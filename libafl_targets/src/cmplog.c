@@ -3,6 +3,7 @@
 #define CMPLOG_MODULE
 #include "common.h"
 #include "cmplog.h"
+#include <string.h>
 
 #if defined(_WIN32)
 
@@ -155,13 +156,13 @@ void __cmplog_rtn_hook(const uint8_t *ptr1, const uint8_t *ptr2) {
 }
 
 void __cmplog_rtn_hook_n(const uint8_t *ptr1, const uint8_t *ptr2, uint64_t len) {
-  void(len);
+  (void)(len);
   __cmplog_rtn_hook(ptr1, ptr2);
 }
 
 
 /* hook for string functions, eg. strcmp, strcasecmp etc. */
-void __cmplog_rtn_hook_str(u8 *ptr1, u8 *ptr2) {
+void __cmplog_rtn_hook_str(const uint8_t *ptr1, uint8_t *ptr2) {
 
   if (!libafl_cmplog_enabled) { return; }
   if (unlikely(!ptr1 || !ptr2)) return;
@@ -181,7 +182,7 @@ void __cmplog_rtn_hook_str(u8 *ptr1, u8 *ptr2) {
 
 /* hook for string with length functions, eg. strncmp, strncasecmp etc.
    Note that we ignore the len parameter and take longer strings if present. */
-void __cmplog_rtn_hook_strn(u8 *ptr1, u8 *ptr2, u64 len) {
+void __cmplog_rtn_hook_strn(uint8_t *ptr1, uint8_t *ptr2, uint64_t len) {
 
   if (!libafl_cmplog_enabled) { return; }
   if (unlikely(!ptr1 || !ptr2)) return;
