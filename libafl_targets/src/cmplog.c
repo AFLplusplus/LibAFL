@@ -269,7 +269,6 @@ void __cmplog_rtn_gcc_stdstring_stdstring(const uint8_t *stdstring1,
 void __cmplog_rtn_llvm_stdstring_cstring(const uint8_t *stdstring,
                                          const uint8_t *cstring) {
   if (!libafl_cmplog_enabled) { return; }
-  if (area_is_valid(stdstring, 32) <= 0) { return; }
   int l1 = area_is_valid(stdstring, 32);
   if (l1 <= 0) { return; }
   int l2 = area_is_valid(cstring, 32);
