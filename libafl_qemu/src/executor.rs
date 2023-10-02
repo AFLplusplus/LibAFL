@@ -58,7 +58,7 @@ where
 
 extern "C" {
     // Original QEMU user signal handler
-    fn host_signal_handler(signal: i32, info: siginfo_t, puc: *mut c_void);
+    fn libafl_qemu_handle_crash(signal: i32, info: siginfo_t, puc: *mut c_void) -> i32;
 }
 
 pub unsafe fn inproc_qemu_crash_handler<CF, E, EM, OF, Z>(
@@ -76,10 +76,12 @@ pub unsafe fn inproc_qemu_crash_handler<CF, E, EM, OF, Z>(
         + HasFeedback<Feedback = CF, State = E::State>
         + HasScheduler,
 {
-    host_signal_handler(signal as i32, info, context as *mut _ as *mut c_void);
-    libafl::executors::inprocess::unix_signal_handler::inproc_crash_handler::<CF, E, EM, OF, Z>(
-        signal, info, context, data,
-    );
+    let real_crash = libafl_qemu_handle_crash(signal as i32, info, context as *mut _ as *mut c_void) != 0;
+    if real_crash {
+        libafl::executors::inprocess::unix_signal_handler::inproc_crash_handler::<CF, E, EM, OF, Z>(
+            signal, info, context, data,
+        );
+    }
 }
 
 impl<'a, H, OT, QT, S> QemuExecutor<'a, H, OT, QT, S>
