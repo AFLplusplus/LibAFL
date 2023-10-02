@@ -165,13 +165,14 @@ void __cmplog_rtn_hook_str(const uint8_t *ptr1, uint8_t *ptr2) {
   if (!libafl_cmplog_enabled) { return; }
   if (unlikely(!ptr1 || !ptr2)) return;
 
-  // these strnlen could indeed fail. but if it fails here it will sigsegv in the following hooked function call anyways
+  // these strnlen could indeed fail. but if it fails here it will sigsegv in
+  // the following hooked function call anyways
   int len1 = strnlen(ptr1, 30) + 1;
   int len2 = strnlen(ptr2, 30) + 1;
   int l = MAX(len1, len2);
 
-  l = MIN(l, area_is_valid(ptr1, l + 1)); // can we really access it? check
-  l = MIN(l, area_is_valid(ptr2, l + 1)); // can we really access it? check
+  l = MIN(l, area_is_valid(ptr1, l + 1));  // can we really access it? check
+  l = MIN(l, area_is_valid(ptr2, l + 1));  // can we really access it? check
 
   if (l < 2) return;
 
@@ -188,14 +189,15 @@ void __cmplog_rtn_hook_strn(uint8_t *ptr1, uint8_t *ptr2, uint64_t len) {
   if (!libafl_cmplog_enabled) { return; }
   if (unlikely(!ptr1 || !ptr2)) return;
 
-  int len0 = MIN(len, 31); // cap by 31
-  // these strnlen could indeed fail. but if it fails here it will sigsegv in the following hooked function call anyways
+  int len0 = MIN(len, 31);  // cap by 31
+  // these strnlen could indeed fail. but if it fails here it will sigsegv in
+  // the following hooked function call anyways
   int len1 = strnlen(ptr1, len0);
   int len2 = strnlen(ptr2, len0);
   int l = MAX(len1, len2);
 
-  l = MIN(l, area_is_valid(ptr1, l + 1)); // can we really access it? check
-  l = MIN(l, area_is_valid(ptr2, l + 1)); // can we really access it? check
+  l = MIN(l, area_is_valid(ptr1, l + 1));  // can we really access it? check
+  l = MIN(l, area_is_valid(ptr2, l + 1));  // can we really access it? check
 
   if (l < 2) return;
 
@@ -236,9 +238,15 @@ static const uint8_t *get_llvm_stdstring(const uint8_t *string) {
 void __cmplog_rtn_gcc_stdstring_cstring(const uint8_t *stdstring,
                                         const uint8_t *cstring) {
   if (!libafl_cmplog_enabled) { return; }
-  int l1 = area_is_valid(stdstring, 32);
+  // This gcc string structure has 32 bytes of content at max
+  // That's what 32 means!
+  if (area_is_valid(stdstring, 32) <= 0) { return; }
+
+  int l1 = area_is_valid(cstring, CMPLOG_RTN_LEN);
   if (l1 <= 0) { return; }
-  int l2 = area_is_valid(cstring, 32);
+
+  const uint8_t *string_ptr = get_gcc_stdstring(stdstring);
+  int            l2 = area_is_valid(string_ptr, CMPLOG_RTN_LEN);
   if (l2 <= 0) { return; }
 
   int len = MIN(31, MIN(l1, l2));
@@ -246,48 +254,22 @@ void __cmplog_rtn_gcc_stdstring_cstring(const uint8_t *stdstring,
   uintptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
-  __libafl_targets_cmplog_routines_checked(k, get_gcc_stdstring(stdstring),
-                                           cstring, len);
+  __libafl_targets_cmplog_routines_checked(k, string_ptr, cstring, len);
 }
 
 void __cmplog_rtn_gcc_stdstring_stdstring(const uint8_t *stdstring1,
                                           const uint8_t *stdstring2) {
   if (!libafl_cmplog_enabled) { return; }
-  int l1 = area_is_valid(stdstring1, 32);
+
+  if (area_is_valid(stdstring1, 32) <= 0) { return; };
+  if (area_is_valid(stdstring2, 32) <= 0) { return; };
+
+  const uint8_t *string_ptr1 = get_gcc_stdstring(stdstring1);
+  int            l1 = area_is_valid(string_ptr1, CMPLOG_RTN_LEN);
   if (l1 <= 0) { return; }
-  int l2 = area_is_valid(stdstring2, 32);
-  if (l2 <= 0) { return; }
 
-  int       len = MIN(31, MIN(l1, l2));
-  uintptr_t k = RETADDR;
-  k = (k >> 4) ^ (k << 8);
-  k &= CMPLOG_MAP_W - 1;
-  __libafl_targets_cmplog_routines_checked(k, get_gcc_stdstring(stdstring1),
-                                           get_gcc_stdstring(stdstring2), len);
-}
-
-void __cmplog_rtn_llvm_stdstring_cstring(const uint8_t *stdstring,
-                                         const uint8_t *cstring) {
-  if (!libafl_cmplog_enabled) { return; }
-  int l1 = area_is_valid(stdstring, 32);
-  if (l1 <= 0) { return; }
-  int l2 = area_is_valid(cstring, 32);
-  if (l2 <= 0) { return; }
-
-  int       len = MIN(31, MIN(l1, l2));
-  uintptr_t k = RETADDR;
-  k = (k >> 4) ^ (k << 8);
-  k &= CMPLOG_MAP_W - 1;
-  __libafl_targets_cmplog_routines_checked(k, get_llvm_stdstring(stdstring),
-                                           cstring, len);
-}
-
-void __cmplog_rtn_llvm_stdstring_stdstring(const uint8_t *stdstring1,
-                                           const uint8_t *stdstring2) {
-  if (!libafl_cmplog_enabled) { return; }
-  int l1 = area_is_valid(stdstring1, 32);
-  if (l1 <= 0) { return; }
-  int l2 = area_is_valid(stdstring2, 32);
+  const uint8_t *string_ptr2 = get_gcc_stdstring(stdstring2);
+  int            l2 = area_is_valid(string_ptr2, CMPLOG_RTN_LEN);
   if (l2 <= 0) { return; }
 
   int len = MIN(31, MIN(l1, l2));
@@ -295,6 +277,49 @@ void __cmplog_rtn_llvm_stdstring_stdstring(const uint8_t *stdstring1,
   uintptr_t k = RETADDR;
   k = (k >> 4) ^ (k << 8);
   k &= CMPLOG_MAP_W - 1;
-  __libafl_targets_cmplog_routines_checked(k, get_llvm_stdstring(stdstring1),
-                                           get_llvm_stdstring(stdstring2), len);
+  __libafl_targets_cmplog_routines_checked(k, string_ptr1, string_ptr2, len);
+}
+
+void __cmplog_rtn_llvm_stdstring_cstring(const uint8_t *stdstring,
+                                         const uint8_t *cstring) {
+  if (!libafl_cmplog_enabled) { return; }
+
+  if (area_is_valid(stdstring, 32) <= 0) { return; }
+
+  int l1 = area_is_valid(cstring, CMPLOG_RTN_LEN);
+  if (l1 <= 0) { return; }
+
+  const uint8_t *string_ptr = get_llvm_stdstring(stdstring);
+  int            l2 = area_is_valid(string_ptr, CMPLOG_RTN_LEN);
+  if (l2 <= 0) { return; }
+
+  int len = MIN(31, MIN(l1, l2));
+
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+  __libafl_targets_cmplog_routines_checked(k, string_ptr, cstring, len);
+}
+
+void __cmplog_rtn_llvm_stdstring_stdstring(const uint8_t *stdstring1,
+                                           const uint8_t *stdstring2) {
+  if (!libafl_cmplog_enabled) { return; }
+
+  if (area_is_valid(stdstring1, 32) <= 0) { return; };
+  if (area_is_valid(stdstring2, 32) <= 0) { return; };
+
+  const uint8_t *string_ptr1 = get_gcc_stdstring(stdstring1);
+  int l1 = area_is_valid(get_gcc_stdstring(stdstring1), CMPLOG_RTN_LEN);
+  if (l1 <= 0) { return; }
+
+  const uint8_t *string_ptr2 = get_gcc_stdstring(stdstring2);
+  int l2 = area_is_valid(get_gcc_stdstring(stdstring2), CMPLOG_RTN_LEN);
+  if (l2 <= 0) { return; }
+
+  int len = MIN(31, MIN(l1, l2));
+
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+  __libafl_targets_cmplog_routines_checked(k, string_ptr1, string_ptr2, len);
 }
