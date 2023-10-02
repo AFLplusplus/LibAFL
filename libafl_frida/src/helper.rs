@@ -13,8 +13,6 @@ use capstone::{
 };
 #[cfg(unix)]
 use frida_gum::instruction_writer::InstructionWriter;
-#[cfg(unix)]
-use frida_gum::CpuContext;
 use frida_gum::{
     stalker::{StalkerIterator, StalkerOutput, Transformer},
     Gum, Module, ModuleDetails, ModuleMap, PageProtection,
@@ -379,16 +377,6 @@ pub fn get_module_size(module_name: &str) -> usize {
     code_size
 }
 
-#[cfg(target_arch = "aarch64")]
-fn pc(context: &CpuContext) -> usize {
-    context.pc() as usize
-}
-
-#[cfg(all(target_arch = "x86_64", unix))]
-fn pc(context: &CpuContext) -> usize {
-    context.rip() as usize
-}
-
 fn pathlist_contains_module<I, P>(list: I, module: &ModuleDetails) -> bool
 where
     I: IntoIterator<Item = P>,
@@ -490,6 +478,8 @@ where
         #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))] capstone: &Capstone,
     ) {
         let mut first = true;
+        let mut basic_block_start = 0;
+        let mut basic_block_size = 0;
         for instruction in basic_block {
             let instr = instruction.instr();
             #[cfg(unix)]
@@ -511,16 +501,8 @@ where
                     }
 
                     #[cfg(unix)]
-                    if let Some(rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
-                        instruction.put_callout(|context| {
-                            let real_address = rt.real_address_for_stalked(pc(&context));
-                            //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
-                            //log::trace!("{}:0x{:016x}", name, real_address - range.start);
-                            rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
-                                real_address,
-                                real_address + instr_size,
-                            ));
-                        });
+                    if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
+                        basic_block_start = address;
                     }
                 }
 
@@ -582,14 +564,21 @@ where
                 }
 
                 #[cfg(unix)]
-                if let Some(rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
-                    rt.add_stalked_address(
-                        output.writer().pc() as usize - instr_size,
-                        address as usize,
-                    );
+                if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
+                    basic_block_size += instr_size;
                 }
             }
             instruction.keep();
+        }
+        #[cfg(unix)]
+        if basic_block_size != 0 {
+            if let Some(rt) = runtimes.borrow_mut().match_first_type_mut::<DrCovRuntime>() {
+                log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
+                rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
+                    basic_block_start as usize,
+                    basic_block_start as usize + basic_block_size,
+                ));
+            }
         }
     }
 
