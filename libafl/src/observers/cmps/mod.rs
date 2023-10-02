@@ -6,7 +6,10 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{inputs::UsesInput, observers::Observer, state::HasMetadata, Error};
 
+/// cmplog map for afl++ instrumentation
 pub mod aflppcmp;
+
+/// cmplog map for value profiles
 pub mod cmp;
 
 /// `CmpLog` instruction kind

@@ -13,7 +13,8 @@ pub mod stacktrace;
 #[cfg(feature = "regex")]
 pub use stacktrace::*;
 
-pub mod cmp;
+/// observers related comparison observation
+pub mod cmps;
 pub mod concolic;
 
 pub mod value;

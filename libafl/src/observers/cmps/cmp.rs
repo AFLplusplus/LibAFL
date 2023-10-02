@@ -13,7 +13,7 @@ use crate::{
     executors::ExitKind,
     inputs::UsesInput,
     observers::{
-        cmp::{
+        cmps::{
             CmpLogHeader, CmpMap, CmpObserver, CmpObserverMetadata, CmpValues, CmpValuesMetadata,
             CMPLOG_KIND_INS,
         },
@@ -68,7 +68,9 @@ impl Debug for CmpLogVals {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct CmpLogMap {
+    /// The headers
     pub headers: [CmpLogHeader; CMPLOG_MAP_W],
+    /// The actual values
     pub vals: CmpLogVals,
 }
 

@@ -27,7 +27,7 @@ use crate::{
     mutators::{
         buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
     },
-    observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
+    observers::cmps::{aflppcmp::AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
     state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
     Error,

@@ -2,7 +2,22 @@
 //! The values will then be used in subsequent mutations.
 //!
 
-use libafl::observers::cmp::{CmpLogHeader, CmpLogInstruction, CmpLogMap, CmpLogVals};
+use alloc::string::{String, ToString};
+
+use libafl::{
+    executors::ExitKind,
+    inputs::UsesInput,
+    observers::{
+        cmps::{
+            cmp::{CmpLogInstruction, CmpLogMap, CmpLogVals},
+            CmpLogHeader, CmpMap, CmpObserver, CmpValuesMetadata,
+        },
+        Observer,
+    },
+    state::HasMetadata,
+    Error,
+};
+use libafl_bolts::{ownedref::OwnedMutPtr, Named};
 
 use crate::{CMPLOG_MAP_H, CMPLOG_MAP_W};
 
@@ -39,7 +54,7 @@ pub static mut libafl_cmplog_enabled: u8 = 0;
 
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 
-/// A [`CmpObserver`] observer for `CmpLog`
+/// A [`CmpObserver`] observer for `CmpLog`. This one is just the same as `StdCmpObserver` except that it toggles `CMPLOG_ENABLED`
 #[derive(Debug)]
 pub struct CmpLogObserver {
     map: OwnedMutPtr<CmpLogMap>,

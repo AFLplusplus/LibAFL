@@ -12,7 +12,7 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     inputs::{BytesInput, UsesInput},
     mark_feature_time,
-    observers::{AFLppCmpObserver, ObserversTuple},
+    observers::{cmps::aflppcmp::AFLppCmpObserver, ObserversTuple},
     stages::{colorization::TaintMetadata, Stage},
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, State, UsesState},

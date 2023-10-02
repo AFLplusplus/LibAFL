@@ -19,7 +19,7 @@ use crate::{
     executors::ExitKind,
     inputs::UsesInput,
     observers::{
-        cmp::{CmpMap, CmpObserver, CmpObserverMetadata, CmpValues},
+        cmps::{CmpMap, CmpObserver, CmpObserverMetadata, CmpValues},
         Observer,
     },
     state::HasMetadata,
