@@ -3,9 +3,6 @@
 pub mod map;
 pub use map::*;
 
-pub mod cmp;
-pub use cmp::*;
-
 #[cfg(feature = "std")]
 pub mod stdio;
 #[cfg(feature = "std")]
@@ -16,6 +13,7 @@ pub mod stacktrace;
 #[cfg(feature = "regex")]
 pub use stacktrace::*;
 
+pub mod cmp;
 pub mod concolic;
 
 pub mod value;

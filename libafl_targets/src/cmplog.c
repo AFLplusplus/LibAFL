@@ -39,6 +39,7 @@ __attribute__((weak)) void *__asan_region_is_poisoned(const void *beg,
 #endif
 
 CmpLogMap *libafl_cmplog_map_ptr = &libafl_cmplog_map;
+CmpLogMapExt *libafl_cmplog_map_ext_ptr = &libafl_cmplog_map_ext;
 
 void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
                                           uint64_t arg1, uint64_t arg2) {
@@ -52,12 +53,12 @@ void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
   if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
     libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_INS;
     libafl_cmplog_map_ptr->headers[k].hits = 1;
-    libafl_cmplog_map_ptr->headers[k].shape = shape;
+    libafl_cmplog_map_ptr->headers[k].shape = shape - 1;
     hits = 0;
   } else {
     hits = libafl_cmplog_map_ptr->headers[k].hits++;
     if (libafl_cmplog_map_ptr->headers[k].shape < shape) {
-      libafl_cmplog_map_ptr->headers[k].shape = shape;
+      libafl_cmplog_map_ptr->headers[k].shape = shape - 1;
     }
   }
 
@@ -70,28 +71,28 @@ void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
 void __libafl_targets_cmplog_instructions_ext(uintptr_t k, uint8_t shape,
                                           uint64_t arg1, uint64_t arg2, uint8_t attr) {
   if (!libafl_cmplog_enabled) { return; }
-  STATIC_ASSERT(sizeof(libafl_cmplog_map_ptr->vals.operands) ==
-                sizeof(libafl_cmplog_map_ptr->vals.routines));
+  STATIC_ASSERT(sizeof(libafl_cmplog_map_ext_ptr->vals.operands) ==
+                sizeof(libafl_cmplog_map_ext_ptr->vals.routines));
 
   libafl_cmplog_enabled = false;
 
   uint16_t hits;
-  if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
-    libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_INS;
-    libafl_cmplog_map_ptr->headers[k].hits = 1;
-    libafl_cmplog_map_ptr->headers[k].shape = shape;
+  if (libafl_cmplog_map_ext_ptr->headers[k].type != CMPLOG_KIND_INS) {
+    libafl_cmplog_map_ext_ptr->headers[k].type = CMPLOG_KIND_INS;
+    libafl_cmplog_map_ext_ptr->headers[k].hits = 1;
+    libafl_cmplog_map_ext_ptr->headers[k].shape = shape;
     hits = 0;
   } else {
-    hits = libafl_cmplog_map_ptr->headers[k].hits++;
-    if (libafl_cmplog_map_ptr->headers[k].shape < shape) {
-      libafl_cmplog_map_ptr->headers[k].shape = shape;
+    hits = libafl_cmplog_map_ext_ptr->headers[k].hits++;
+    if (libafl_cmplog_map_ext_ptr->headers[k].shape < shape) {
+      libafl_cmplog_map_ext_ptr->headers[k].shape = shape;
     }
   }
 
   hits &= CMPLOG_MAP_H - 1;
-  libafl_cmplog_map_ptr->headers[k].attribute = attr;
-  libafl_cmplog_map_ptr->vals.operands[k][hits].v0 = arg1;
-  libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_map_ext_ptr->headers[k].attribute = attr;
+  libafl_cmplog_map_ext_ptr->vals.operands[k][hits].v0 = arg1;
+  libafl_cmplog_map_ext_ptr->vals.operands[k][hits].v1 = arg2;
   libafl_cmplog_enabled = true;
 }
 

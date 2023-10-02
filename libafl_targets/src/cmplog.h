@@ -19,8 +19,7 @@
 #define CMPLOG_KIND_INS 0
 #define CMPLOG_KIND_RTN 1
 
-#ifdef CMPLOG_EXTENDED_HEADER
-typedef struct cmp_header {
+typedef struct CmpLogHeaderExt {
   unsigned hits : 24;
   unsigned id : 24;
   unsigned shape : 5;
@@ -28,8 +27,8 @@ typedef struct cmp_header {
   unsigned attribute : 4;
   unsigned overflow : 1;
   unsigned reserved : 4;
-} __attribute__((packed));
-#else
+} __attribute__((packed)) CmpLogHeaderExt;
+
 typedef struct CmpLogHeader {
   uint16_t hits;
   uint8_t  shape;
@@ -47,6 +46,14 @@ typedef struct CmpLogRoutine {
   uint8_t v1[CMPLOG_RTN_LEN];
 } CmpLogRoutine;
 
+typedef struct CmpLogMapExt {
+  CmpLogHeaderExt headers[CMPLOG_MAP_W];
+  union {
+    CmpLogInstruction operands[CMPLOG_MAP_W][CMPLOG_MAP_H];
+    CmpLogRoutine     routines[CMPLOG_MAP_W][CMPLOG_MAP_RTN_H];
+  } vals;
+} CmpLogMapExt;
+
 typedef struct CmpLogMap {
   CmpLogHeader headers[CMPLOG_MAP_W];
   union {
@@ -54,6 +61,9 @@ typedef struct CmpLogMap {
     CmpLogRoutine     routines[CMPLOG_MAP_W][CMPLOG_MAP_RTN_H];
   } vals;
 } CmpLogMap;
+
+extern CmpLogMapExt libafl_cmplog_map_ext;
+extern CmpLogMapExt *libafl_cmplog_map_ext_ptr;
 
 extern CmpLogMap  libafl_cmplog_map;
 extern CmpLogMap *libafl_cmplog_map_ptr;
@@ -74,5 +84,4 @@ void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
 #ifdef CMPLOG_EXTENDED_HEADER
 void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t shape,
                                            uint64_t arg1, uint64_t arg2, );
-#endif
 #endif

@@ -95,7 +95,7 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 #endif
 #ifdef SANCOV_CMPLOG
     k &= CMPLOG_MAP_W - 1;
-    __libafl_targets_cmplog(k, cases[1] / 8, val, cases[i + 2]);
+    __libafl_targets_cmplog_instructions(k, cases[1] / 8, val, cases[i + 2]);
 #endif
   }
 }

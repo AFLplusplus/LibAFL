@@ -2,34 +2,9 @@
 //! The values will then be used in subsequent mutations.
 //!
 
-use alloc::string::{String, ToString};
-use core::fmt::{self, Debug, Formatter};
-
-use libafl::{
-    executors::ExitKind,
-    inputs::UsesInput,
-    observers::{cmp::CmpValuesMetadata, CmpMap, CmpObserver, CmpValues, Observer},
-    state::HasMetadata,
-    Error,
-};
-use libafl_bolts::{ownedref::OwnedMutPtr, Named};
+use libafl::observers::cmp::{CmpLogHeader, CmpLogInstruction, CmpLogMap, CmpLogVals};
 
 use crate::{CMPLOG_MAP_H, CMPLOG_MAP_W};
-
-/// The `CmpLog` map size
-pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
-
-/// The size of a logged routine argument in bytes
-pub const CMPLOG_RTN_LEN: usize = 32;
-
-/// The hight of a cmplog routine map
-pub const CMPLOG_MAP_RTN_H: usize = (CMPLOG_MAP_H * core::mem::size_of::<CmpLogInstruction>())
-    / core::mem::size_of::<CmpLogRoutine>();
-
-/// `CmpLog` instruction kind
-pub const CMPLOG_KIND_INS: u8 = 0;
-/// `CmpLog` routine kind
-pub const CMPLOG_KIND_RTN: u8 = 1;
 
 // void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2)
 extern "C" {
@@ -41,122 +16,6 @@ extern "C" {
 }
 
 pub use libafl_cmplog_map_ptr as CMPLOG_MAP_PTR;
-
-/// The header for `CmpLog` hits.
-#[repr(C)]
-#[derive(Default, Debug, Clone, Copy)]
-pub struct CmpLogHeader {
-    hits: u16,
-    shape: u8,
-    kind: u8,
-}
-
-/// The operands logged during `CmpLog`.
-#[repr(C)]
-#[derive(Default, Debug, Clone, Copy)]
-pub struct CmpLogInstruction(u64, u64);
-
-/// The routine arguments logged during `CmpLog`.
-#[repr(C)]
-#[derive(Default, Debug, Clone, Copy)]
-pub struct CmpLogRoutine([u8; CMPLOG_RTN_LEN], [u8; CMPLOG_RTN_LEN]);
-
-/// Union of cmplog operands and routines
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub union CmpLogVals {
-    operands: [[CmpLogInstruction; CMPLOG_MAP_H]; CMPLOG_MAP_W],
-    routines: [[CmpLogRoutine; CMPLOG_MAP_RTN_H]; CMPLOG_MAP_W],
-}
-
-impl Debug for CmpLogVals {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CmpLogVals").finish_non_exhaustive()
-    }
-}
-
-/// A struct containing the `CmpLog` metadata for a `LibAFL` run.
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct CmpLogMap {
-    headers: [CmpLogHeader; CMPLOG_MAP_W],
-    vals: CmpLogVals,
-}
-
-impl Default for CmpLogMap {
-    fn default() -> Self {
-        unsafe { core::mem::zeroed() }
-    }
-}
-
-impl CmpMap for CmpLogMap {
-    fn len(&self) -> usize {
-        CMPLOG_MAP_W
-    }
-
-    fn executions_for(&self, idx: usize) -> usize {
-        self.headers[idx].hits as usize
-    }
-
-    fn usable_executions_for(&self, idx: usize) -> usize {
-        if self.headers[idx].kind == CMPLOG_KIND_INS {
-            if self.executions_for(idx) < CMPLOG_MAP_H {
-                self.executions_for(idx)
-            } else {
-                CMPLOG_MAP_H
-            }
-        } else if self.executions_for(idx) < CMPLOG_MAP_RTN_H {
-            self.executions_for(idx)
-        } else {
-            CMPLOG_MAP_RTN_H
-        }
-    }
-
-    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues> {
-        if self.headers[idx].kind == CMPLOG_KIND_INS {
-            unsafe {
-                match self.headers[idx].shape {
-                    1 => Some(CmpValues::U8((
-                        self.vals.operands[idx][execution].0 as u8,
-                        self.vals.operands[idx][execution].1 as u8,
-                    ))),
-                    2 => Some(CmpValues::U16((
-                        self.vals.operands[idx][execution].0 as u16,
-                        self.vals.operands[idx][execution].1 as u16,
-                    ))),
-                    4 => Some(CmpValues::U32((
-                        self.vals.operands[idx][execution].0 as u32,
-                        self.vals.operands[idx][execution].1 as u32,
-                    ))),
-                    8 => Some(CmpValues::U64((
-                        self.vals.operands[idx][execution].0,
-                        self.vals.operands[idx][execution].1,
-                    ))),
-                    // other => panic!("Invalid CmpLog shape {}", other),
-                    _ => None,
-                }
-            }
-        } else {
-            unsafe {
-                Some(CmpValues::Bytes((
-                    self.vals.routines[idx][execution].0.to_vec(),
-                    self.vals.routines[idx][execution].1.to_vec(),
-                )))
-            }
-        }
-    }
-
-    fn reset(&mut self) -> Result<(), Error> {
-        // For performance, we reset just the headers
-        self.headers.fill(CmpLogHeader {
-            hits: 0,
-            shape: 0,
-            kind: 0,
-        });
-
-        Ok(())
-    }
-}
 
 /// The global `CmpLog` map for the current `LibAFL` run.
 #[no_mangle]
