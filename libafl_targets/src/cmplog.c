@@ -80,12 +80,12 @@ void __libafl_targets_cmplog_instructions_ext(uintptr_t k, uint8_t shape,
   if (libafl_cmplog_map_ext_ptr->headers[k].type != CMPLOG_KIND_INS) {
     libafl_cmplog_map_ext_ptr->headers[k].type = CMPLOG_KIND_INS;
     libafl_cmplog_map_ext_ptr->headers[k].hits = 1;
-    libafl_cmplog_map_ext_ptr->headers[k].shape = shape;
+    libafl_cmplog_map_ext_ptr->headers[k].shape = shape - 1;
     hits = 0;
   } else {
     hits = libafl_cmplog_map_ext_ptr->headers[k].hits++;
     if (libafl_cmplog_map_ext_ptr->headers[k].shape < shape) {
-      libafl_cmplog_map_ext_ptr->headers[k].shape = shape;
+      libafl_cmplog_map_ext_ptr->headers[k].shape = shape - 1;
     }
   }
 
