@@ -1,5 +1,6 @@
 // From AFL++'s afl-compiler-rt.c
 
+#include <stdint.h>
 #define CMPLOG_MODULE
 #include "common.h"
 #include "cmplog.h"
@@ -41,10 +42,89 @@ CmpLogMap *libafl_cmplog_map_ptr = &libafl_cmplog_map;
 
 void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
                                           uint64_t arg1, uint64_t arg2) {
+  if (!libafl_cmplog_enabled) { return; }
   STATIC_ASSERT(sizeof(libafl_cmplog_map_ptr->vals.operands) ==
                 sizeof(libafl_cmplog_map_ptr->vals.routines));
 
-  __libafl_targets_cmplog(k, shape, arg1, arg2);
+  libafl_cmplog_enabled = false;
+
+  uint16_t hits;
+  if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
+    libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_INS;
+    libafl_cmplog_map_ptr->headers[k].hits = 1;
+    libafl_cmplog_map_ptr->headers[k].shape = shape;
+    hits = 0;
+  } else {
+    hits = libafl_cmplog_map_ptr->headers[k].hits++;
+    if (libafl_cmplog_map_ptr->headers[k].shape < shape) {
+      libafl_cmplog_map_ptr->headers[k].shape = shape;
+    }
+  }
+
+  hits &= CMPLOG_MAP_H - 1;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v0 = arg1;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_enabled = true;
+}
+
+void __libafl_targets_cmplog_instructions_ext(uintptr_t k, uint8_t shape,
+                                          uint64_t arg1, uint64_t arg2, uint8_t attr) {
+  if (!libafl_cmplog_enabled) { return; }
+  STATIC_ASSERT(sizeof(libafl_cmplog_map_ptr->vals.operands) ==
+                sizeof(libafl_cmplog_map_ptr->vals.routines));
+
+  libafl_cmplog_enabled = false;
+
+  uint16_t hits;
+  if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
+    libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_INS;
+    libafl_cmplog_map_ptr->headers[k].hits = 1;
+    libafl_cmplog_map_ptr->headers[k].shape = shape;
+    hits = 0;
+  } else {
+    hits = libafl_cmplog_map_ptr->headers[k].hits++;
+    if (libafl_cmplog_map_ptr->headers[k].shape < shape) {
+      libafl_cmplog_map_ptr->headers[k].shape = shape;
+    }
+  }
+
+  hits &= CMPLOG_MAP_H - 1;
+  libafl_cmplog_map_ptr->headers[k].attribute = attr;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v0 = arg1;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_enabled = true;
+}
+
+void __cmplog_ins_hook1(uint8_t arg1, uint8_t arg2, uint8_t attr) {
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+
+  __libafl_targets_cmplog_instructions_ext(k, 0, arg1, arg2, attr);
+}
+
+void __cmplog_ins_hook2(uint8_t arg1, uint8_t arg2, uint8_t attr) {
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+
+  __libafl_targets_cmplog_instructions_ext(k, 1, arg1, arg2, attr);
+}
+
+void __cmplog_ins_hook4(uint8_t arg1, uint8_t arg2, uint8_t attr) {
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+
+  __libafl_targets_cmplog_instructions_ext(k, 3, arg1, arg2, attr);
+}
+
+void __cmplog_ins_hook8(uint8_t arg1, uint8_t arg2, uint8_t attr) {
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+
+  __libafl_targets_cmplog_instructions_ext(k, 7, arg1, arg2, attr);
 }
 
 // POSIX shenanigan to see if an area is mapped.
