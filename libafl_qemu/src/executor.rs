@@ -75,12 +75,14 @@ pub unsafe fn inproc_qemu_crash_handler<CF, E, EM, OF, Z>(
     Z: HasObjective<Objective = OF, State = E::State>
         + HasFeedback<Feedback = CF, State = E::State>
         + HasScheduler,
-{
+{eprintln!("cccc {:?}", context as *mut _ as *mut c_void);
     let real_crash = libafl_qemu_handle_crash(signal as i32, info, context as *mut _ as *mut c_void) != 0;
+    eprintln!("AAA {}", real_crash);
     if real_crash {
         libafl::executors::inprocess::unix_signal_handler::inproc_crash_handler::<CF, E, EM, OF, Z>(
             signal, info, context, data,
         );
+        eprintln!("asdasdasd {}", real_crash);
     }
 }
 
