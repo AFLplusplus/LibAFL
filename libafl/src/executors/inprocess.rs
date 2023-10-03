@@ -658,12 +658,12 @@ pub mod unix_signal_handler {
     };
 
     pub(crate) type HandlerFuncPtr =
-        unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessExecutorHandlerData);
+        unsafe fn(Signal, &mut siginfo_t, &mut ucontext_t, data: &mut InProcessExecutorHandlerData);
 
     /// A handler that does nothing.
     /*pub fn nop_handler(
         _signal: Signal,
-        _info: siginfo_t,
+        _info: &mut siginfo_t,
         _context: &mut ucontext_t,
         _data: &mut InProcessExecutorHandlerData,
     ) {
@@ -671,7 +671,7 @@ pub mod unix_signal_handler {
 
     #[cfg(unix)]
     impl Handler for InProcessExecutorHandlerData {
-        fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
+        fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: &mut ucontext_t) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 let in_handler = data.set_in_handler(true);
@@ -749,9 +749,9 @@ pub mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
         _signal: Signal,
-        _info: siginfo_t,
+        _info: &mut siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -798,7 +798,7 @@ pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
     #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         signal: Signal,
-        _info: siginfo_t,
+        _info: &mut siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -1303,7 +1303,7 @@ pub mod windows_exception_handler {
 /// The signature of the crash handler function
 #[cfg(all(feature = "std", unix))]
 pub(crate) type ForkHandlerFuncPtr =
-    unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessForkExecutorGlobalData);
+    unsafe fn(Signal, &mut siginfo_t, &mut ucontext_t, data: &mut InProcessForkExecutorGlobalData);
 
 /// The inmem fork executor's handlers.
 #[cfg(all(feature = "std", unix))]
@@ -1443,7 +1443,7 @@ pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData
 
 #[cfg(all(feature = "std", unix))]
 impl Handler for InProcessForkExecutorGlobalData {
-    fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
+    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: &mut ucontext_t) {
         match signal {
             Signal::SigUser2 | Signal::SigAlarm => unsafe {
                 if !FORK_EXECUTOR_GLOBAL_DATA.timeout_handler.is_null() {
@@ -2052,7 +2052,7 @@ pub mod child_signal_handlers {
     #[cfg(unix)]
     pub(crate) unsafe fn child_crash_handler<E>(
         _signal: Signal,
-        _info: siginfo_t,
+        _info: &mut siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
@@ -2074,7 +2074,7 @@ pub mod child_signal_handlers {
     #[cfg(unix)]
     pub(crate) unsafe fn child_timeout_handler<E>(
         _signal: Signal,
-        _info: siginfo_t,
+        _info: &mut siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
