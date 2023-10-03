@@ -165,13 +165,14 @@ void __cmplog_rtn_hook_str(const uint8_t *ptr1, uint8_t *ptr2) {
   if (!libafl_cmplog_enabled) { return; }
   if (unlikely(!ptr1 || !ptr2)) return;
 
-  // these strnlen could indeed fail. but if it fails here it will sigsegv in the following hooked function call anyways
+  // these strnlen could indeed fail. but if it fails here it will sigsegv in
+  // the following hooked function call anyways
   int len1 = strnlen(ptr1, 30) + 1;
   int len2 = strnlen(ptr2, 30) + 1;
   int l = MAX(len1, len2);
 
-  l = MIN(l, area_is_valid(ptr1, l + 1)); // can we really access it? check
-  l = MIN(l, area_is_valid(ptr2, l + 1)); // can we really access it? check
+  l = MIN(l, area_is_valid(ptr1, l + 1));  // can we really access it? check
+  l = MIN(l, area_is_valid(ptr2, l + 1));  // can we really access it? check
 
   if (l < 2) return;
 
@@ -188,14 +189,15 @@ void __cmplog_rtn_hook_strn(uint8_t *ptr1, uint8_t *ptr2, uint64_t len) {
   if (!libafl_cmplog_enabled) { return; }
   if (unlikely(!ptr1 || !ptr2)) return;
 
-  int len0 = MIN(len, 31); // cap by 31
-  // these strnlen could indeed fail. but if it fails here it will sigsegv in the following hooked function call anyways
+  int len0 = MIN(len, 31);  // cap by 31
+  // these strnlen could indeed fail. but if it fails here it will sigsegv in
+  // the following hooked function call anyways
   int len1 = strnlen(ptr1, len0);
   int len2 = strnlen(ptr2, len0);
   int l = MAX(len1, len2);
 
-  l = MIN(l, area_is_valid(ptr1, l + 1)); // can we really access it? check
-  l = MIN(l, area_is_valid(ptr2, l + 1)); // can we really access it? check
+  l = MIN(l, area_is_valid(ptr1, l + 1));  // can we really access it? check
+  l = MIN(l, area_is_valid(ptr2, l + 1));  // can we really access it? check
 
   if (l < 2) return;
 
