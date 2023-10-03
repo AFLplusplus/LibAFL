@@ -1195,6 +1195,10 @@ pub mod windows_exception_handler {
         // log::info!("TIMER INVOKED!");
     }
 
+    /// Crash handler for windows
+    ///
+    /// # Safety
+    /// Well, exception handling is not safe
     #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
