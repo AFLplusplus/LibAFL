@@ -317,6 +317,8 @@ where
 
                 log::info!("spawning on cores: {:?}", self.cores);
 
+                let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
+
                 //spawn clients
                 for (id, _) in core_ids.iter().enumerate().take(num_cores) {
                     if self.cores.ids.iter().any(|&x| x == id.into()) {
@@ -327,7 +329,13 @@ where
                         };
 
                         std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
-                        let child = startable_self()?.stdout(stdio).spawn()?;
+                        let mut child = startable_self()?;
+                        let child = (if debug_output {
+                            &mut child
+                        } else {
+                            child.stdout(stdio)
+                        })
+                        .spawn()?;
                         handles.push(child);
                     }
                 }

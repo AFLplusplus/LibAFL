@@ -418,7 +418,7 @@ impl AsanGiovese {
             }
 
             if self.snapshot_shadow {
-                tree.clear();
+                *tree = self.saved_tree.clone();
             }
         }
 

@@ -19,6 +19,9 @@ extern "C" {
     pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);
 }
 
+use std::rc::Rc;
+
+use frida_gum::ModuleMap;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::{
     instruction_writer::{Aarch64Register, IndexMode, InstructionWriter},
@@ -90,7 +93,7 @@ impl FridaRuntime for CmpLogRuntime {
         &mut self,
         _gum: &frida_gum::Gum,
         _ranges: &RangeMap<usize, (u16, String)>,
-        _modules_to_instrument: &[&str],
+        _module_map: &Rc<ModuleMap>,
     ) {
         self.generate_instrumentation_blobs();
     }

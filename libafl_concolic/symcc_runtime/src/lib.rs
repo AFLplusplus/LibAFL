@@ -127,7 +127,7 @@ macro_rules! unwrap_option {
     };
 }
 
-/// Creates an exported extern C function for the given runtime function declaration, forwarding to the runtime as obtained by $rt_cb (which should be `fn (fn (&mut impl Runtime))`).
+/// Creates an exported extern C function for the given runtime function declaration, forwarding to the runtime as obtained by `$rt_cb` (which should be `fn (fn (&mut impl Runtime))`).
 #[doc(hidden)]
 #[macro_export]
 macro_rules! export_rust_runtime_fn {

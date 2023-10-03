@@ -981,6 +981,14 @@ impl Emulator {
         }
     }
 
+    pub fn entry_break(&self, addr: GuestAddr) {
+        self.set_breakpoint(addr);
+        unsafe {
+            self.run();
+        }
+        self.remove_breakpoint(addr);
+    }
+
     pub fn set_hook(
         &self,
         addr: GuestAddr,
@@ -1425,6 +1433,10 @@ pub mod pybind {
 
         fn set_breakpoint(&self, addr: GuestAddr) {
             self.emu.set_breakpoint(addr);
+        }
+
+        fn entry_break(&self, addr: GuestAddr) {
+            self.emu.entry_break(addr);
         }
 
         fn remove_breakpoint(&self, addr: GuestAddr) {

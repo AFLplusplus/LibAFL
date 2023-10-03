@@ -61,7 +61,7 @@ impl From<Version> for Str {
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 #[command(
-    name = format!("qemu-coverage-{}",env!("CPU_TARGET")),
+    name = format!("qemu_coverage-{}",env!("CPU_TARGET")),
     version = Version::default(),
     about,
     long_about = "Tool for generating DrCov coverage data using QEMU instrumentation"
@@ -89,6 +89,8 @@ pub struct FuzzerOptions {
     args: Vec<String>,
 }
 
+pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
+
 pub fn fuzz() {
     let mut options = FuzzerOptions::parse();
 
@@ -105,10 +107,10 @@ pub fn fuzz() {
     let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
 
     let program = env::args().next().unwrap();
-    println!("Program: {program:}");
+    log::debug!("Program: {program:}");
 
     options.args.insert(0, program);
-    println!("ARGS: {:#?}", options.args);
+    log::debug!("ARGS: {:#?}", options.args);
 
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
@@ -120,13 +122,12 @@ pub fn fuzz() {
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
-    println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+    log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    emu.set_breakpoint(test_one_input_ptr);
-    unsafe { emu.run() };
+    emu.entry_break(test_one_input_ptr);
 
     for m in emu.mappings() {
-        println!(
+        log::debug!(
             "Mapping: 0x{:016x}-0x{:016x}, {}",
             m.start(),
             m.end(),
@@ -135,16 +136,17 @@ pub fn fuzz() {
     }
 
     let pc: GuestReg = emu.read_reg(Regs::Pc).unwrap();
-    println!("Break at {pc:#x}");
+    log::debug!("Break at {pc:#x}");
 
     let ret_addr: GuestAddr = emu.read_return_address().unwrap();
-    println!("Return address = {ret_addr:#x}");
+    log::debug!("Return address = {ret_addr:#x}");
 
-    emu.remove_breakpoint(test_one_input_ptr);
     emu.set_breakpoint(ret_addr);
 
-    let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
-    println!("Placing input at {input_addr:#x}");
+    let input_addr = emu
+        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
+        .unwrap();
+    log::debug!("Placing input at {input_addr:#x}");
 
     let stack_ptr: GuestAddr = emu.read_reg(Regs::Sp).unwrap();
 
@@ -163,12 +165,13 @@ pub fn fuzz() {
 
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target
-            .as_slice()
-            .chunks(4096)
-            .next()
-            .expect("Failed to get chunk");
-        let len = buf.len() as GuestReg;
+        let mut buf = target.as_slice();
+        let mut len = buf.len();
+        if len > MAX_INPUT_SIZE {
+            buf = &buf[0..MAX_INPUT_SIZE];
+            len = MAX_INPUT_SIZE;
+        }
+        let len = len as GuestReg;
         reset(buf, len).unwrap();
         ExitKind::Ok
     };
@@ -226,12 +229,18 @@ pub fn fuzz() {
                 },
             );
 
+        let mut coverage = PathBuf::from(&options.coverage);
+        let coverage_name = coverage.file_stem().unwrap().to_str().unwrap();
+        let coverage_extension = coverage.extension().unwrap_or_default().to_str().unwrap();
+        let core = core_id.0;
+        coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+
         let mut hooks = QemuHooks::new(
             &emu,
             tuple_list!(QemuDrCovHelper::new(
                 QemuInstrumentationFilter::None,
                 rangemap,
-                PathBuf::from(&options.coverage),
+                PathBuf::from(coverage),
                 false,
             )),
         );
@@ -255,10 +264,10 @@ pub fn fuzz() {
                     println!("Failed to load initial corpus at {:?}", &corpus_dir);
                     process::exit(0);
                 });
-            println!("We imported {} inputs from disk.", state.corpus().count());
+            log::debug!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        println!("Processed {} inputs from disk.", files.len());
+        log::debug!("Processed {} inputs from disk.", files.len());
 
         mgr.send_exiting()?;
         Err(Error::ShuttingDown)?

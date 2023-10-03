@@ -16,8 +16,6 @@ pub fn build_with_bindings(
     jobs: Option<u32>,
     bindings_file: &Path,
 ) {
-    println!("cargo:rerun-if-changed={}", bindings_file.display());
-
     let (qemu_dir, build_dir) = build::build(cpu_target, is_big_endian, is_usermode, jobs);
     let clang_args = qemu_bindgen_clang_args(&qemu_dir, &build_dir, cpu_target, is_usermode);
 

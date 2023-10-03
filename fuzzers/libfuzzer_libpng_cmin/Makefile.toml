@@ -3,9 +3,11 @@
 FUZZER_NAME='fuzzer_libpng'
 PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-LIBAFL_CC = '${CARGO_TARGET_DIR}/release/libafl_cc'
-LIBAFL_CXX = '${CARGO_TARGET_DIR}/release/libafl_cxx'
-FUZZER = '${CARGO_TARGET_DIR}/release/${FUZZER_NAME}'
+PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc'
+LIBAFL_CXX = '${CARGO_TARGET_DIR}/${PROFILE}/libafl_cxx'
+FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -35,7 +37,7 @@ windows_alias = "unsupported"
 
 [tasks.cxx_unix]
 command = "cargo"
-args = ["build" , "--release"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 [tasks.cc]
 linux_alias = "cc_unix"
@@ -44,7 +46,7 @@ windows_alias = "unsupported"
 
 [tasks.cc_unix]
 command = "cargo"
-args = ["build" , "--release"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 [tasks.crash_cxx]
 linux_alias = "crash_cxx_unix"
@@ -53,7 +55,7 @@ windows_alias = "unsupported"
 
 [tasks.crash_cxx_unix]
 command = "cargo"
-args = ["build" , "--release", "--features=crash"]
+args = ["build" , "--profile", "${PROFILE}", "--features=crash"]
 
 [tasks.crash_cc]
 linux_alias = "crash_cc_unix"
@@ -62,7 +64,7 @@ windows_alias = "unsupported"
 
 [tasks.crash_cc_unix]
 command = "cargo"
-args = ["build" , "--release", "--features=crash"]
+args = ["build" , "--profile", "${PROFILE}", "--features=crash"]
 
 # Library
 [tasks.lib]
@@ -75,7 +77,7 @@ script_runner="@shell"
 script='''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
 cd "${PROJECT_DIR}"
-make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/release/libafl_cc" CXX="${CARGO_TARGET_DIR}/release/libafl_cxx"
+make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc" CXX="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 '''
 dependencies = [ "libpng", "cxx", "cc" ]
 
@@ -90,7 +92,7 @@ script_runner="@shell"
 script='''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
 cd "${PROJECT_DIR}"
-make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/release/libafl_cc" CXX="${CARGO_TARGET_DIR}/release/libafl_cxx"
+make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc" CXX="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 '''
 dependencies = [ "libpng", "crash_cxx", "crash_cc" ]
 
@@ -101,7 +103,7 @@ mac_alias = "fuzzer_unix"
 windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
-command = "${CARGO_TARGET_DIR}/release/libafl_cxx"
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
 dependencies = [ "lib", "cxx", "cc" ]
 
@@ -112,7 +114,7 @@ mac_alias = "fuzzer_crash_unix"
 windows_alias = "unsupported"
 
 [tasks.fuzzer_crash_unix]
-command = "${CARGO_TARGET_DIR}/release/libafl_cxx"
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}_crash", "-lm", "-lz"]
 dependencies = [ "crash_lib", "crash_cxx", "crash_cc" ]
 

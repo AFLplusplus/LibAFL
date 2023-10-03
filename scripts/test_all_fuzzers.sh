@@ -5,12 +5,14 @@ cd "$SCRIPT_DIR/.." || exit 1
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
 if [[ -z "${RUN_ON_CI}" ]]; then
-  fuzzers=$(find ./fuzzers -mindepth 1 -maxdepth 1 -type d)
-  backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -mindepth 1 -maxdepth 1 -type d)
+    fuzzers=$(find ./fuzzers -mindepth 1 -maxdepth 1 -type d)
+    backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -mindepth 1 -maxdepth 1 -type d)
 else
-  cargo build -p build_and_test_fuzzers
-  fuzzers=$(cargo run -p build_and_test_fuzzers -- "remotes/origin/main" "HEAD^")
-  backtrace_fuzzers=""
+    cargo build -p build_and_test_fuzzers
+    fuzzers=$(cargo run -p build_and_test_fuzzers -- "remotes/origin/main" "HEAD^")
+    backtrace_fuzzers=""
+    export PROFILE=dev
+    export PROFILE_DIR=debug
 fi
 
 libafl=$(pwd)

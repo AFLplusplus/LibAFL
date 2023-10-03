@@ -10,7 +10,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile};
+use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile, rc::Rc};
 
 use backtrace::Backtrace;
 #[cfg(target_arch = "x86_64")]
@@ -57,7 +57,7 @@ use crate::utils::instruction_width;
 use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
-    helper::FridaRuntime,
+    helper::{FridaRuntime, SkipRange},
     utils::writer_register,
 };
 
@@ -139,9 +139,10 @@ pub struct AsanRuntime {
     blob_check_mem_48bytes: Option<Box<[u8]>>,
     blob_check_mem_64bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
-    options: FuzzerOptions,
-    module_map: Option<ModuleMap>,
+    module_map: Option<Rc<ModuleMap>>,
     suppressed_addresses: Vec<usize>,
+    skip_ranges: Vec<SkipRange>,
+    continue_on_error: bool,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
 
     #[cfg(target_arch = "aarch64")]
@@ -152,8 +153,9 @@ impl Debug for AsanRuntime {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("AsanRuntime")
             .field("stalked_addresses", &self.stalked_addresses)
-            .field("options", &self.options)
+            .field("continue_on_error", &self.continue_on_error)
             .field("module_map", &"<ModuleMap>")
+            .field("skip_ranges", &self.skip_ranges)
             .field("suppressed_addresses", &self.suppressed_addresses)
             .finish_non_exhaustive()
     }
@@ -167,10 +169,12 @@ impl FridaRuntime for AsanRuntime {
         &mut self,
         gum: &Gum,
         _ranges: &RangeMap<usize, (u16, String)>,
-        modules_to_instrument: &[&str],
+        module_map: &Rc<ModuleMap>,
     ) {
+        self.allocator.init();
+
         unsafe {
-            ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
+            ASAN_ERRORS = Some(AsanErrors::new(self.continue_on_error));
         }
 
         self.generate_instrumentation_blobs();
@@ -178,14 +182,16 @@ impl FridaRuntime for AsanRuntime {
         self.generate_shadow_check_function();
         self.unpoison_all_existing_memory();
 
-        self.module_map = Some(ModuleMap::new_from_names(gum, modules_to_instrument));
-        if !self.options.dont_instrument.is_empty() {
-            for (module_name, offset) in self.options.dont_instrument.clone() {
-                let module_details = ModuleDetails::with_name(module_name).unwrap();
-                let lib_start = module_details.range().base_address().0 as usize;
-                self.suppressed_addresses.push(lib_start + offset);
-            }
-        }
+        self.module_map = Some(module_map.clone());
+        self.suppressed_addresses
+            .extend(self.skip_ranges.iter().map(|skip| match skip {
+                SkipRange::Absolute(range) => range.start,
+                SkipRange::ModuleRelative { name, range } => {
+                    let module_details = ModuleDetails::with_name(name.clone()).unwrap();
+                    let lib_start = module_details.range().base_address().0 as usize;
+                    lib_start + range.start
+                }
+            }));
 
         self.hook_functions(gum);
         /*
@@ -295,33 +301,22 @@ impl FridaRuntime for AsanRuntime {
 impl AsanRuntime {
     /// Create a new `AsanRuntime`
     #[must_use]
-    pub fn new(options: FuzzerOptions) -> AsanRuntime {
+    pub fn new(options: &FuzzerOptions) -> AsanRuntime {
+        let skip_ranges = options
+            .dont_instrument
+            .iter()
+            .map(|(name, offset)| SkipRange::ModuleRelative {
+                name: name.clone(),
+                range: *offset..*offset + 4,
+            })
+            .collect();
+        let continue_on_error = options.continue_on_error;
         Self {
             check_for_leaks_enabled: options.detect_leaks,
-            current_report_impl: 0,
-            allocator: Allocator::new(options.clone()),
-            regs: [0; ASAN_SAVE_REGISTER_COUNT],
-            blob_report: None,
-            blob_check_mem_byte: None,
-            blob_check_mem_halfword: None,
-            blob_check_mem_dword: None,
-            blob_check_mem_qword: None,
-            blob_check_mem_16bytes: None,
-            blob_check_mem_3bytes: None,
-            blob_check_mem_6bytes: None,
-            blob_check_mem_12bytes: None,
-            blob_check_mem_24bytes: None,
-            blob_check_mem_32bytes: None,
-            blob_check_mem_48bytes: None,
-            blob_check_mem_64bytes: None,
-            stalked_addresses: HashMap::new(),
-            options,
-            module_map: None,
-            suppressed_addresses: Vec::new(),
-            shadow_check_func: None,
-
-            #[cfg(target_arch = "aarch64")]
-            eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],
+            allocator: Allocator::new(options),
+            skip_ranges,
+            continue_on_error,
+            ..Self::default()
         }
     }
 
@@ -2714,5 +2709,37 @@ impl AsanRuntime {
             16 + i64::from(redzone_size),
             IndexMode::PostAdjust,
         ));
+    }
+}
+
+impl Default for AsanRuntime {
+    fn default() -> Self {
+        Self {
+            check_for_leaks_enabled: false,
+            current_report_impl: 0,
+            allocator: Allocator::default(),
+            regs: [0; ASAN_SAVE_REGISTER_COUNT],
+            blob_report: None,
+            blob_check_mem_byte: None,
+            blob_check_mem_halfword: None,
+            blob_check_mem_dword: None,
+            blob_check_mem_qword: None,
+            blob_check_mem_16bytes: None,
+            blob_check_mem_3bytes: None,
+            blob_check_mem_6bytes: None,
+            blob_check_mem_12bytes: None,
+            blob_check_mem_24bytes: None,
+            blob_check_mem_32bytes: None,
+            blob_check_mem_48bytes: None,
+            blob_check_mem_64bytes: None,
+            stalked_addresses: HashMap::new(),
+            module_map: None,
+            suppressed_addresses: Vec::new(),
+            skip_ranges: Vec::new(),
+            continue_on_error: false,
+            shadow_check_func: None,
+            #[cfg(target_arch = "aarch64")]
+            eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],
+        }
     }
 }
