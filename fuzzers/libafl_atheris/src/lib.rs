@@ -39,9 +39,7 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-use libafl_targets::{
-    extra_counters, CmpLogObserver, std_edges_map_observer,
-};
+use libafl_targets::{extra_counters, std_edges_map_observer, CmpLogObserver};
 
 /// It's called by Atheris after the fuzzer has been initialized.
 /// The main entrypoint to our fuzzer, which will be called by `Atheris` when fuzzing starts.
@@ -97,9 +95,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         .get_matches();
 
     let workdir = env::current_dir().unwrap();
-    println!(
-        env::current_dir().unwrap().to_string_lossy().to_string()
-    );
+    println!(env::current_dir().unwrap().to_string_lossy().to_string());
 
     let cores = Cores::from_cmdline(matches.get_one::<String>("cores").unwrap())
         .expect("No valid core count given!");
