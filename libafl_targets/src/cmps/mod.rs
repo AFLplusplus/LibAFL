@@ -11,7 +11,7 @@ use core::{
 };
 
 use libafl::{
-    observers::{cmp::AFLppCmpHeader, CmpMap, CmpValues},
+    observers::{cmp::AFLppCmpLogHeader, CmpMap, CmpValues},
     Error,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -37,7 +37,7 @@ pub const CMPLOG_KIND_INS: u8 = 0;
 pub const CMPLOG_KIND_RTN: u8 = 1;
 
 /// The height for RTN
-pub const AFL_CMP_MAP_RTN_H: usize = AFLPP_CMPLOG_MAP_H / 2;
+pub const AFL_CMPLOG_MAP_RTN_H: usize = AFLPP_CMPLOG_MAP_H / 2;
 
 /// The AFL++ `CMP_TYPE_INS`
 pub const AFL_CMP_TYPE_INS: u32 = 1;
@@ -82,17 +82,17 @@ pub struct CmpLogHeader {
 /// Comparison operands, represented as either two (left and right of comparison) u64 values or
 /// two (left and right of comparison) u128 values, split into two u64 values. If the left and
 /// right values are smaller than u64, they can be sign or zero extended to 64 bits, as the actual
-/// comparison size is determined by the `hits` field of the associated `AFLppCmpHeader`.
-pub struct AFLppCmpOperands {
+/// comparison size is determined by the `hits` field of the associated `AFLppCmpLogHeader`.
+pub struct AFLppCmpLogOperands {
     v0: u64,
     v1: u64,
     v0_128: u64,
     v1_128: u64,
 }
 
-impl AFLppCmpOperands {
+impl AFLppCmpLogOperands {
     #[must_use]
-    /// Create new `AFLppCmpOperands`
+    /// Create new `AFLppCmpLogOperands`
     pub fn new(v0: u64, v1: u64) -> Self {
         Self {
             v0,
@@ -103,7 +103,7 @@ impl AFLppCmpOperands {
     }
 
     #[must_use]
-    /// Create new `AFLppCmpOperands` with 128-bit comparison values
+    /// Create new `AFLppCmpLogOperands` with 128-bit comparison values
     pub fn new_128bit(v0: u128, v1: u128) -> Self {
         let v0_128 = (v0 >> 64) as u64;
         let v0 = v0 as u64;
@@ -171,14 +171,14 @@ impl AFLppCmpOperands {
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C, packed)]
 /// Comparison function operands, like for strcmp/memcmp, represented as two byte arrays.
-pub struct AFLppCmpFnOperands {
+pub struct AFLppCmpLogFnOperands {
     v0: [u8; 31],
     v0_len: u8,
     v1: [u8; 31],
     v1_len: u8,
 }
 
-impl AFLppCmpFnOperands {
+impl AFLppCmpLogFnOperands {
     #[must_use]
     /// Create a new AFL++ function operands comparison values from two byte slices
     pub fn new(v0: &[u8], v1: &[u8]) -> Self {
@@ -263,21 +263,21 @@ impl Debug for CmpLogVals {
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
 /// Comparison values
-pub union AFLppCmpVals {
-    operands: [[AFLppCmpOperands; AFLPP_CMPLOG_MAP_H]; AFLPP_CMPLOG_MAP_W],
-    fn_operands: [[AFLppCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W],
+pub union AFLppCmpLogVals {
+    operands: [[AFLppCmpLogOperands; AFLPP_CMPLOG_MAP_H]; AFLPP_CMPLOG_MAP_W],
+    fn_operands: [[AFLppCmpLogFnOperands; AFL_CMPLOG_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W],
 }
 
-impl Debug for AFLppCmpVals {
+impl Debug for AFLppCmpLogVals {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AFLppCmpVals").finish_non_exhaustive()
+        f.debug_struct("AFLppCmpLogVals").finish_non_exhaustive()
     }
 }
 
-impl AFLppCmpVals {
+impl AFLppCmpLogVals {
     #[must_use]
     /// Reference comparison values as comparison operands
-    pub fn operands(&self) -> &[[AFLppCmpOperands; AFLPP_CMPLOG_MAP_H]; AFLPP_CMPLOG_MAP_W] {
+    pub fn operands(&self) -> &[[AFLppCmpLogOperands; AFLPP_CMPLOG_MAP_H]; AFLPP_CMPLOG_MAP_W] {
         unsafe { &self.operands }
     }
 
@@ -285,13 +285,13 @@ impl AFLppCmpVals {
     /// Mutably reference comparison values as comparison operands
     pub fn operands_mut(
         &mut self,
-    ) -> &mut [[AFLppCmpOperands; AFLPP_CMPLOG_MAP_H]; AFLPP_CMPLOG_MAP_W] {
+    ) -> &mut [[AFLppCmpLogOperands; AFLPP_CMPLOG_MAP_H]; AFLPP_CMPLOG_MAP_W] {
         unsafe { &mut self.operands }
     }
 
     #[must_use]
     /// Reference comparison values as comparison function operands
-    pub fn fn_operands(&self) -> &[[AFLppCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W] {
+    pub fn fn_operands(&self) -> &[[AFLppCmpLogFnOperands; AFL_CMPLOG_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W] {
         unsafe { &self.fn_operands }
     }
 
@@ -299,7 +299,7 @@ impl AFLppCmpVals {
     /// Mutably reference comparison values as comparison function operands
     pub fn fn_operands_mut(
         &mut self,
-    ) -> &mut [[AFLppCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W] {
+    ) -> &mut [[AFLppCmpLogFnOperands; AFL_CMPLOG_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W] {
         unsafe { &mut self.fn_operands }
     }
 }
@@ -408,46 +408,46 @@ pub use libafl_cmplog_map as CMPLOG_MAP;
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
 /// Comparison map compatible with AFL++ cmplog instrumentation
-pub struct AFLppCmpMap {
-    headers: [AFLppCmpHeader; AFLPP_CMPLOG_MAP_W],
-    vals: AFLppCmpVals,
+pub struct AFLppCmpLogMap {
+    headers: [AFLppCmpLogHeader; AFLPP_CMPLOG_MAP_W],
+    vals: AFLppCmpLogVals,
 }
 
-impl AFLppCmpMap {
+impl AFLppCmpLogMap {
     #[must_use]
-    /// Instantiate a new boxed zeroed `AFLppCmpMap`. This should be used to create a new
+    /// Instantiate a new boxed zeroed `AFLppCmpLogMap`. This should be used to create a new
     /// map, because it is so large it cannot be allocated on the stack with default
     /// runtime configuration.
     pub fn boxed() -> Box<Self> {
-        unsafe { Box::from_raw(alloc_zeroed(Layout::new::<AFLppCmpMap>()) as *mut AFLppCmpMap) }
+        unsafe { Box::from_raw(alloc_zeroed(Layout::new::<AFLppCmpLogMap>()) as *mut AFLppCmpLogMap) }
     }
 
     #[must_use]
     /// Reference the headers for the map
-    pub fn headers(&self) -> &[AFLppCmpHeader] {
+    pub fn headers(&self) -> &[AFLppCmpLogHeader] {
         &self.headers
     }
 
     #[must_use]
     /// Mutably reference the headers for the map
-    pub fn headers_mut(&mut self) -> &mut [AFLppCmpHeader] {
+    pub fn headers_mut(&mut self) -> &mut [AFLppCmpLogHeader] {
         &mut self.headers
     }
 
     #[must_use]
     /// Reference the values for the map
-    pub fn values(&self) -> &AFLppCmpVals {
+    pub fn values(&self) -> &AFLppCmpLogVals {
         &self.vals
     }
 
     #[must_use]
     /// Mutably reference the headers for the map
-    pub fn values_mut(&mut self) -> &mut AFLppCmpVals {
+    pub fn values_mut(&mut self) -> &mut AFLppCmpLogVals {
         &mut self.vals
     }
 }
 
-impl Serialize for AFLppCmpMap {
+impl Serialize for AFLppCmpLogMap {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -462,7 +462,7 @@ impl Serialize for AFLppCmpMap {
     }
 }
 
-impl<'de> Deserialize<'de> for AFLppCmpMap {
+impl<'de> Deserialize<'de> for AFLppCmpLogMap {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -473,7 +473,7 @@ impl<'de> Deserialize<'de> for AFLppCmpMap {
     }
 }
 
-impl CmpMap for AFLppCmpMap {
+impl CmpMap for AFLppCmpLogMap {
     fn len(&self) -> usize {
         AFLPP_CMPLOG_MAP_W
     }
@@ -489,10 +489,10 @@ impl CmpMap for AFLppCmpMap {
             } else {
                 AFLPP_CMPLOG_MAP_H
             }
-        } else if self.executions_for(idx) < AFL_CMP_MAP_RTN_H {
+        } else if self.executions_for(idx) < AFL_CMPLOG_MAP_RTN_H {
             self.executions_for(idx)
         } else {
-            AFL_CMP_MAP_RTN_H
+            AFL_CMPLOG_MAP_RTN_H
         }
     }
 
@@ -535,7 +535,7 @@ impl CmpMap for AFLppCmpMap {
 
     fn reset(&mut self) -> Result<(), Error> {
         // For performance, we reset just the headers
-        self.headers.fill(AFLppCmpHeader { data: [0; 8] });
+        self.headers.fill(AFLppCmpLogHeader { data: [0; 8] });
 
         Ok(())
     }

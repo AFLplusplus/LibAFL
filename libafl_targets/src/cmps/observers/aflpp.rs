@@ -17,7 +17,7 @@ use libafl::{
 use libafl_bolts::{ownedref::OwnedRefMut, Named};
 use serde::{Deserialize, Serialize};
 
-use crate::cmps::AFLppCmpMap;
+use crate::cmps::AFLppCmpLogMap;
 
 /* From AFL++ cmplog.h
 
@@ -71,15 +71,15 @@ pub struct AFLppCmpObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
-    cmp_map: OwnedRefMut<'a, AFLppCmpMap>,
+    cmp_map: OwnedRefMut<'a, AFLppCmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: String,
     add_meta: bool,
-    original: <AFLppCmpValuesMetadata as CmpObserverMetadata<'a, AFLppCmpMap>>::Data,
+    original: <AFLppCmpValuesMetadata as CmpObserverMetadata<'a, AFLppCmpLogMap>>::Data,
     phantom: PhantomData<S>,
 }
 
-impl<'a, S> CmpObserver<'a, AFLppCmpMap, S, AFLppCmpValuesMetadata> for AFLppCmpObserver<'a, S>
+impl<'a, S> CmpObserver<'a, AFLppCmpLogMap, S, AFLppCmpValuesMetadata> for AFLppCmpObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -91,17 +91,17 @@ where
         }
     }
 
-    fn cmp_map(&self) -> &AFLppCmpMap {
+    fn cmp_map(&self) -> &AFLppCmpLogMap {
         self.cmp_map.as_ref()
     }
 
-    fn cmp_map_mut(&mut self) -> &mut AFLppCmpMap {
+    fn cmp_map_mut(&mut self) -> &mut AFLppCmpLogMap {
         self.cmp_map.as_mut()
     }
 
     fn cmp_observer_data(
         &self,
-    ) -> <AFLppCmpValuesMetadata as CmpObserverMetadata<'a, AFLppCmpMap>>::Data {
+    ) -> <AFLppCmpValuesMetadata as CmpObserverMetadata<'a, AFLppCmpLogMap>>::Data {
         self.original
     }
 
@@ -178,7 +178,7 @@ where
 {
     /// Creates a new [`AFLppCmpObserver`] with the given name and map.
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut AFLppCmpMap, add_meta: bool) -> Self {
+    pub fn new(name: &'static str, map: &'a mut AFLppCmpLogMap, add_meta: bool) -> Self {
         Self {
             name: name.to_string(),
             size: None,
@@ -197,7 +197,7 @@ where
     #[must_use]
     pub fn with_size(
         name: &'static str,
-        map: &'a mut AFLppCmpMap,
+        map: &'a mut AFLppCmpLogMap,
         add_meta: bool,
         original: bool,
         size: &'a mut usize,
@@ -213,7 +213,7 @@ where
     }
 }
 
-impl<'a> CmpObserverMetadata<'a, AFLppCmpMap> for AFLppCmpValuesMetadata {
+impl<'a> CmpObserverMetadata<'a, AFLppCmpLogMap> for AFLppCmpValuesMetadata {
     type Data = bool;
 
     fn new_metadata() -> Self {
@@ -223,7 +223,7 @@ impl<'a> CmpObserverMetadata<'a, AFLppCmpMap> for AFLppCmpValuesMetadata {
     fn add_from(
         &mut self,
         usable_count: usize,
-        cmp_map: &mut AFLppCmpMap,
+        cmp_map: &mut AFLppCmpLogMap,
         cmp_observer_data: Self::Data,
     ) {
         let count = usable_count;

@@ -463,15 +463,15 @@ struct cmp_map {
     allow(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct AFLppCmpValuesMetadata {
-    /// The first map of AFLppCmpVals retrieved by running the un-mutated input
+    /// The first map of AFLppCmpLogVals retrieved by running the un-mutated input
     #[serde(skip)]
     pub orig_cmpvals: HashMap<usize, Vec<CmpValues>>,
-    /// The second map of AFLppCmpVals retrieved by runnning the mutated input
+    /// The second map of AFLppCmpLogVals retrieved by runnning the mutated input
     #[serde(skip)]
     pub new_cmpvals: HashMap<usize, Vec<CmpValues>>,
     /// The list of logged idx and headers retrieved by runnning the mutated input
     #[serde(skip)]
-    pub headers: Vec<(usize, AFLppCmpHeader)>,
+    pub headers: Vec<(usize, AFLppCmpLogHeader)>,
 }
 
 libafl_bolts::impl_serdeany!(AFLppCmpValuesMetadata);
@@ -501,7 +501,7 @@ impl AFLppCmpValuesMetadata {
 
     /// Getter for `headers`
     #[must_use]
-    pub fn headers(&self) -> &Vec<(usize, AFLppCmpHeader)> {
+    pub fn headers(&self) -> &Vec<(usize, AFLppCmpLogHeader)> {
         &self.headers
     }
 }
@@ -520,7 +520,7 @@ impl AFLppCmpValuesMetadata {
 /// - attribute: OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
 /// - overflow:  Whether the comparison overflows
 /// - reserved:  Reserved for future use
-pub struct AFLppCmpHeader {
+pub struct AFLppCmpLogHeader {
     /// The header values
     #[bitfield(name = "hits", ty = "u32", bits = "0..=23")]
     #[bitfield(name = "id", ty = "u32", bits = "24..=47")]
