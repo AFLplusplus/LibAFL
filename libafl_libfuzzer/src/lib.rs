@@ -36,10 +36,10 @@
 //!
 //! - `-dedup=n`, with `n` = 1 enabling deduplication of crashes by stacktrace.
 //! - `-grimoire=n`, with `n` set to 0 or 1 disabling or enabling [grimoire] mutations, respectively.
-//!   - if not specified explicitly, `libafl_libfuzzer` will "guess" which setting is appropriate
+//!   - if not specified explicitly, `libafl_libfuzzer` will select based on whether existing inputs are UTF-8
 //!   - you should disable grimoire if your target is not string-like
 //! - `-report=n`, with `n` = 1 causing `libafl_libfuzzer` to emit a report on the corpus content.
-//! - `-skip_tracing=n`, with `n` = 1 causing `libafl_libfuzzer` to disable comparison log tracing.
+//! - `-skip_tracing=n`, with `n` = 1 causing `libafl_libfuzzer` to disable cmplog tracing.
 //!   - you should do this if your target performs many comparisons on memory sequences which are
 //!     not contained in the input
 //! - `-tui=n`, with `n` = 1 enabling a graphical terminal interface.
