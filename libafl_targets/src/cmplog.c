@@ -39,12 +39,28 @@ __attribute__((weak)) void *__asan_region_is_poisoned(const void *beg,
 
 CmpLogMap *libafl_cmplog_map_ptr = &libafl_cmplog_map;
 
-void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
-                                          uint64_t arg1, uint64_t arg2) {
-  STATIC_ASSERT(sizeof(libafl_cmplog_map_ptr->vals.operands) ==
-                sizeof(libafl_cmplog_map_ptr->vals.routines));
+inline void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
+                                                 uint64_t arg1, uint64_t arg2) {
+  if (!libafl_cmplog_enabled) { return; }
+  libafl_cmplog_enabled = false;
 
-  __libafl_targets_cmplog(k, shape, arg1, arg2);
+  uint16_t hits;
+  if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
+    libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_INS;
+    libafl_cmplog_map_ptr->headers[k].hits = 1;
+    libafl_cmplog_map_ptr->headers[k].shape = shape;
+    hits = 0;
+  } else {
+    hits = libafl_cmplog_map_ptr->headers[k].hits++;
+    if (libafl_cmplog_map_ptr->headers[k].shape < shape) {
+      libafl_cmplog_map_ptr->headers[k].shape = shape;
+    }
+  }
+
+  hits &= CMPLOG_MAP_H - 1;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v0 = arg1;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_enabled = true;
 }
 
 // POSIX shenanigan to see if an area is mapped.
@@ -165,13 +181,14 @@ void __cmplog_rtn_hook_str(const uint8_t *ptr1, uint8_t *ptr2) {
   if (!libafl_cmplog_enabled) { return; }
   if (unlikely(!ptr1 || !ptr2)) return;
 
-  // these strnlen could indeed fail. but if it fails here it will sigsegv in the following hooked function call anyways
+  // these strnlen could indeed fail. but if it fails here it will sigsegv in
+  // the following hooked function call anyways
   int len1 = strnlen(ptr1, 30) + 1;
   int len2 = strnlen(ptr2, 30) + 1;
   int l = MAX(len1, len2);
 
-  l = MIN(l, area_is_valid(ptr1, l + 1)); // can we really access it? check
-  l = MIN(l, area_is_valid(ptr2, l + 1)); // can we really access it? check
+  l = MIN(l, area_is_valid(ptr1, l + 1));  // can we really access it? check
+  l = MIN(l, area_is_valid(ptr2, l + 1));  // can we really access it? check
 
   if (l < 2) return;
 
@@ -188,14 +205,15 @@ void __cmplog_rtn_hook_strn(uint8_t *ptr1, uint8_t *ptr2, uint64_t len) {
   if (!libafl_cmplog_enabled) { return; }
   if (unlikely(!ptr1 || !ptr2)) return;
 
-  int len0 = MIN(len, 31); // cap by 31
-  // these strnlen could indeed fail. but if it fails here it will sigsegv in the following hooked function call anyways
+  int len0 = MIN(len, 31);  // cap by 31
+  // these strnlen could indeed fail. but if it fails here it will sigsegv in
+  // the following hooked function call anyways
   int len1 = strnlen(ptr1, len0);
   int len2 = strnlen(ptr2, len0);
   int l = MAX(len1, len2);
 
-  l = MIN(l, area_is_valid(ptr1, l + 1)); // can we really access it? check
-  l = MIN(l, area_is_valid(ptr2, l + 1)); // can we really access it? check
+  l = MIN(l, area_is_valid(ptr1, l + 1));  // can we really access it? check
+  l = MIN(l, area_is_valid(ptr2, l + 1));  // can we really access it? check
 
   if (l < 2) return;
 

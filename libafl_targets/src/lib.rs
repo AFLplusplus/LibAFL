@@ -108,8 +108,9 @@ pub use coverage::*;
 pub mod value_profile;
 pub use value_profile::*;
 
-pub mod cmplog;
-pub use cmplog::*;
+/// runtime related to comparisons
+pub mod cmps;
+pub use cmps::*;
 
 #[cfg(feature = "std")]
 pub mod drcov;
