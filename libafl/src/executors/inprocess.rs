@@ -751,6 +751,9 @@ pub mod unix_signal_handler {
 
     /// Timeout-Handler for in-process fuzzing.
     /// It will store the current State to shmem, then exit.
+    ///
+    /// # Safety
+    /// Well, signal handling is not safe
     #[cfg(unix)]
     pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
         _signal: Signal,
@@ -798,6 +801,9 @@ pub mod unix_signal_handler {
     /// Crash-Handler for in-process fuzzing.
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
+    ///
+    /// # Safety
+    /// Well, signal handling is not safe
     #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         signal: Signal,
@@ -1061,6 +1067,9 @@ pub mod windows_exception_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
+    ///
+    /// # Safety
+    /// Well, exception handling is not safe
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, OF, Z>()
     where
@@ -1120,6 +1129,9 @@ pub mod windows_exception_handler {
     }
 
     /// Timeout handler for windows
+    ///
+    /// # Safety
+    /// Well, exception handling is not safe
     pub unsafe extern "system" fn inproc_timeout_handler<E, EM, OF, Z>(
         _p0: *mut u8,
         global_state: *mut c_void,
