@@ -424,7 +424,7 @@ unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
     };
     handler.handle(
         *signal,
-        &mut ptr::read_unaligned(info as *mut siginfo_t),
+        &mut ptr::read_unaligned(info),
         &mut ptr::read_unaligned(void as *mut ucontext_t),
     );
 }
