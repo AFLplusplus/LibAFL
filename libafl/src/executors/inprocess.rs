@@ -423,8 +423,8 @@ pub struct InProcessExecutorHandlerData {
     event_mgr_ptr: *mut c_void,
     fuzzer_ptr: *mut c_void,
     executor_ptr: *const c_void,
-    pub current_input_ptr: *const c_void,
-    pub in_handler: bool,
+    pub(crate) current_input_ptr: *const c_void,
+    pub(crate) in_handler: bool,
 
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
@@ -478,7 +478,7 @@ impl InProcessExecutorHandlerData {
     }
 
     #[cfg(any(unix, feature = "std"))]
-    pub fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }
 
@@ -631,6 +631,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     log::info!("Bye!");
 }
 
+/// The inprocess executor singal handling code for unix
 #[cfg(unix)]
 pub mod unix_signal_handler {
     use alloc::vec::Vec;
@@ -748,6 +749,8 @@ pub mod unix_signal_handler {
         }));
     }
 
+    /// Timeout-Handler for in-process fuzzing.
+    /// It will store the current State to shmem, then exit.
     #[cfg(unix)]
     pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
         _signal: Signal,
