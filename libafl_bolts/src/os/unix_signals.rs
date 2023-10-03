@@ -323,6 +323,7 @@ impl TryFrom<&str> for Signal {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<Signal> for nix::sys::signal::Signal {
     fn from(value: Signal) -> Self {
         // we can be semi-certain that all signals exist in nix.
