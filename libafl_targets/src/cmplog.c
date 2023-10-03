@@ -60,7 +60,7 @@ static long area_is_valid(const void *ptr, size_t len) {
   valid_len = (long)len;
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
   if (!dymmy_initialized) {
-    if ((dummy_fd[1] = open("/dev/null", O_WRONLY)) < 0) {
+    if ((dummy_fd[1] = open("/dev/urandom", O_WRONLY)) < 0) {
       if (pipe(dummy_fd) < 0) { dummy_fd[1] = 1; }
     }
     dymmy_initialized = 1;
@@ -269,7 +269,6 @@ void __cmplog_rtn_gcc_stdstring_stdstring(const uint8_t *stdstring1,
 void __cmplog_rtn_llvm_stdstring_cstring(const uint8_t *stdstring,
                                          const uint8_t *cstring) {
   if (!libafl_cmplog_enabled) { return; }
-  if (area_is_valid(stdstring, 32) <= 0) { return; }
   int l1 = area_is_valid(stdstring, 32);
   if (l1 <= 0) { return; }
   int l2 = area_is_valid(cstring, 32);

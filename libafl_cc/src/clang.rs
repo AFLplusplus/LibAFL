@@ -194,7 +194,7 @@ impl ToolWrapper for ClangWrapper {
                         continue;
                     }
                 }
-                "--libafl-ignore-configurations" => {
+                "--libafl-ignore-configurations" | "-print-prog-name=ld" => {
                     self.ignoring_configurations = true;
                     i += 1;
                     continue;
@@ -346,42 +346,51 @@ impl ToolWrapper for ClangWrapper {
             })
             .collect::<Vec<_>>();
 
-        if let Some(output) = self.output.clone() {
+        if let crate::Configuration::Default = configuration {
+            if let Some(output) = self.output.clone() {
+                let output = configuration.replace_extension(&output);
+                let new_filename = output.into_os_string().into_string().unwrap();
+                args.push("-o".to_string());
+                args.push(new_filename);
+            }
+        } else if let Some(output) = self.output.clone() {
             let output = configuration.replace_extension(&output);
             let new_filename = output.into_os_string().into_string().unwrap();
             args.push("-o".to_string());
             args.push(new_filename);
-            args.extend_from_slice(base_args.as_slice());
         } else {
-            // No output specified, we need to rewrite the single .c file's name.
-            args.extend(
-                base_args
-                    .iter()
-                    .map(|r| {
-                        let arg_as_path = std::path::PathBuf::from(r);
-                        if r.ends_with('.') {
-                            r.to_string()
-                        } else {
-                            if let Some(extension) = arg_as_path.extension() {
-                                let extension = extension.to_str().unwrap();
-                                let extension_lowercase = extension.to_lowercase();
-                                match &extension_lowercase[..] {
-                                    "c" | "cc" | "cxx" | "cpp" => {
-                                        configuration.replace_extension(&arg_as_path)
-                                    }
-                                    _ => arg_as_path,
-                                }
-                            } else {
-                                arg_as_path
+            // No output specified, we need to rewrite the single .c file's name into a -o
+            // argument.
+            for arg in &base_args {
+                let arg_as_path = std::path::PathBuf::from(arg);
+                if !arg.ends_with('.') && !arg.starts_with('-') {
+                    if let Some(extension) = arg_as_path.extension() {
+                        let extension = extension.to_str().unwrap();
+                        let extension_lowercase = extension.to_lowercase();
+                        match &extension_lowercase[..] {
+                            "c" | "cc" | "cxx" | "cpp" => {
+                                args.push("-o".to_string());
+                                args.push(if self.linking {
+                                    configuration
+                                        .replace_extension(&std::path::PathBuf::from("a.out"))
+                                        .into_os_string()
+                                        .into_string()
+                                        .unwrap()
+                                } else {
+                                    let mut result = configuration.replace_extension(&arg_as_path);
+                                    result.set_extension("o");
+                                    result.into_os_string().into_string().unwrap()
+                                });
+                                break;
                             }
-                            .into_os_string()
-                            .into_string()
-                            .unwrap()
+                            _ => {}
                         }
-                    })
-                    .collect::<Vec<_>>(),
-            );
+                    }
+                }
+            }
         }
+
+        args.extend_from_slice(base_args.as_slice());
 
         args.extend_from_slice(&configuration.to_flags()?);
 
