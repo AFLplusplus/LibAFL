@@ -179,10 +179,10 @@ pub fn build(
                 ))
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-                .args(if cfg!(feature = "slirp") {
-                    &["--enable-slirp"]
+                .arg(if cfg!(feature = "slirp") {
+                    "--enable-slirp"
                 } else {
-                    &["--disable-slirp", "--disable-hax"]
+                    "--disable-slirp"
                 })
                 .arg("--enable-fdt=internal")
                 .arg("--audio-drv-list=")
