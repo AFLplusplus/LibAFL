@@ -2,6 +2,10 @@
 
 use std::{env, fs::File, io::Write, path::Path};
 
+#[cfg(feature = "whole_archive")]
+#[rustversion::not(nightly)]
+compile_error!("Must use a nightly release with whole_archive!");
+
 #[allow(clippy::too_many_lines)]
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
@@ -141,7 +145,7 @@ fn main() {
 
         libfuzzer.compile("libfuzzer");
 
-        #[cfg(all(feature = "sancov_cmplog", target_os = "linux"))]
+        #[cfg(feature = "libfuzzer_interceptors")]
         {
             println!("cargo:rerun-if-changed=src/libfuzzer/FuzzerInterceptors.cpp");
 

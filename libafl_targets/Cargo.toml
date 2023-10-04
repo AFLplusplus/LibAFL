@@ -21,6 +21,7 @@ std = ["libafl/std"]
 libfuzzer = ["std", "sanitizer_interfaces"]
 libfuzzer_no_link_main = ["libfuzzer"]
 libfuzzer_define_run_driver = ["libfuzzer"]
+libfuzzer_interceptors = ["libfuzzer", "sancov_cmplog"]
 libfuzzer_oom = ["libfuzzer"]
 sanitizers_flags = []
 pointer_maps = []
@@ -28,7 +29,7 @@ sancov_pcguard_edges = []
 sancov_pcguard_hitcounts = []
 sancov_value_profile = []
 sancov_8bit = []
-sancov_cmplog = [] # Defines cmp and __sanitizer_weak_hook functions. Use in combination with libfuzzer to define interceptors (only compatible with Linux)
+sancov_cmplog = [] # Defines cmp and __sanitizer_weak_hook functions. Use libfuzzer_interceptors to define interceptors (only compatible with Linux)
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
 sanitizer_interfaces = []
 clippy = [] # Ignore compiler warnings during clippy
@@ -38,6 +39,7 @@ whole_archive = [] # use +whole-archive to ensure the presence of weak symbols
 [build-dependencies]
 bindgen = "0.68"
 cc = { version = "1.0", features = ["parallel"] }
+rustversion = "1.0"
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.11.1", default-features = false, features = [] }
