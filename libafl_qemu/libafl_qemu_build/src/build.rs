@@ -179,10 +179,10 @@ pub fn build(
                 ))
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-                .arg(if cfg!(feature = "slirp") {
-                    "--enable-slirp"
+                .args(if cfg!(feature = "slirp") {
+                    &["--enable-slirp"]
                 } else {
-                    "--disable-slirp"
+                    &["--disable-slirp", "--disable-hax"]
                 })
                 .arg("--enable-fdt=internal")
                 .arg("--audio-drv-list=")
@@ -216,7 +216,6 @@ pub fn build(
                 .arg("--disable-gtk")
                 .arg("--disable-guest-agent")
                 .arg("--disable-guest-agent-msi")
-                .arg("--disable-hax")
                 .arg("--disable-hvf")
                 .arg("--disable-iconv")
                 .arg("--disable-jack")
