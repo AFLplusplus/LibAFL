@@ -223,3 +223,84 @@ where
         }
     }
 }
+
+/// A stage wrapper where the stages do not need to be initialized, but can be [`None`].
+#[derive(Debug)]
+pub struct OptionalStage<E, EM, ST, Z>
+where
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    ST: StagesTuple<E, EM, E::State, Z>,
+    Z: UsesState<State = E::State>,
+{
+    stages: Option<ST>,
+    phantom: PhantomData<(E, EM, Z)>,
+}
+
+impl<E, EM, ST, Z> UsesState for OptionalStage<E, EM, ST, Z>
+where
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    ST: StagesTuple<E, EM, E::State, Z>,
+    Z: UsesState<State = E::State>,
+{
+    type State = E::State;
+}
+
+impl<E, EM, ST, Z> Stage<E, EM, Z> for OptionalStage<E, EM, ST, Z>
+where
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    ST: StagesTuple<E, EM, E::State, Z>,
+    Z: UsesState<State = E::State>,
+{
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut E::State,
+        manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<(), Error> {
+        if let Some(stages) = &mut self.stages {
+            stages.perform_all(fuzzer, executor, state, manager, corpus_idx)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl<E, EM, ST, Z> OptionalStage<E, EM, ST, Z>
+where
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    ST: StagesTuple<E, EM, E::State, Z>,
+    Z: UsesState<State = E::State>,
+{
+    /// Constructor for this conditionally enabled stage.
+    #[must_use]
+    pub fn new(stages: Option<ST>) -> Self {
+        Self {
+            stages,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Constructor for this conditionally enabled stage with set stages.
+    #[must_use]
+    pub fn some(stages: ST) -> Self {
+        Self {
+            stages: Some(stages),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Constructor for this conditionally enabled stage, without stages set.
+    #[must_use]
+    pub fn none() -> Self {
+        Self {
+            stages: None,
+            phantom: PhantomData,
+        }
+    }
+}
