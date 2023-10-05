@@ -21,9 +21,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{
-        AFLppCmpLogMap, HitcountsMapObserver, StdCmpValuesObserver, StdMapObserver, TimeObserver,
-    },
+    observers::{HitcountsMapObserver, StdCmpValuesObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -41,6 +39,7 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsMutSlice,
 };
+use libafl_targets::cmps::AFLppCmpLogMap;
 use nix::sys::signal::Signal;
 
 pub fn main() {
