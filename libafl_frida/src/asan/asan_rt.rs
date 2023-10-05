@@ -395,15 +395,16 @@ impl AsanRuntime {
     #[cfg(not(target_os = "ios"))]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
-        self.allocator
-            .map_shadow_for_region(stack_start, stack_end, true);
-
         let (tls_start, tls_end) = Self::current_tls();
-        self.allocator
-            .map_shadow_for_region(tls_start, tls_end, true);
         log::info!(
             "registering thread with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}"
         );
+        self.allocator
+            .map_shadow_for_region(stack_start, stack_end, true);
+
+        #[cfg(unix)]
+        self.allocator
+            .map_shadow_for_region(tls_start, tls_end, true);
     }
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack mapping.
@@ -455,30 +456,14 @@ impl AsanRuntime {
         unsafe {
             write_volatile(&mut stack_var, 0xfadbeef);
         }
+        log::trace!("stack_address: {:x}", stack_address);
         let mut range = None;
-        #[cfg(windows)]
-        let mut prev_start = 0;
-        #[cfg(windows)]
-        let mut prev_prev_start = 0;
         for area in mmap_rs::MemoryAreas::open(None).unwrap() {
             let area_ref = area.as_ref().unwrap();
             log::trace!("area: {:x} - {:x} ", area_ref.start(), area_ref.end());
             if area_ref.start() <= stack_address && stack_address <= area_ref.end() {
-                #[cfg(unix)]
-                {
-                    range = Some((area_ref.start(), area_ref.end()));
-                }
-                #[cfg(windows)]
-                {
-                    range = Some((prev_prev_start, area_ref.end()));
-                }
+                range = Some((area_ref.start(), area_ref.end()));
                 break;
-            }
-
-            #[cfg(windows)]
-            {
-                prev_prev_start = prev_start;
-                prev_start = area_ref.start();
             }
         }
         if let Some((start, end)) = range {
@@ -562,6 +547,7 @@ impl AsanRuntime {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let real_address = this.real_address_for_stalked(invocation.return_addr());
+                log::trace!("called with return_addr: {:x}, {:x}", invocation.return_addr(), real_address);
                         if !this.suppressed_addresses.contains(&real_address) && this.module_map.as_ref().unwrap().find(real_address as u64).is_some() {
                             this.[<hook_ $name>]($($param),*)
                         } else {
@@ -603,7 +589,7 @@ impl AsanRuntime {
         }
 
         // Hook the memory allocator functions
-        hook_func!(None, malloc, (size: usize), *mut c_void);
+        hook_func!(Some("ucrtbase.dll"), malloc, (size: usize), *mut c_void);
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
         hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
         hook_func_with_check!(None, free, (ptr: *mut c_void), ());
@@ -618,6 +604,32 @@ impl AsanRuntime {
         );
         #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
+        #[cfg(windows)]
+        hook_func!(
+            Some("kernel32"),
+            HeapAlloc,
+            (handle: *mut c_void, flags: u32, size: usize),
+            *mut c_void
+        );
+        #[cfg(windows)]
+        hook_func!(
+            Some("kernel32"),
+            HeapReAlloc,
+            (
+                handle: *mut c_void,
+                flags: u32,
+                ptr: *mut c_void,
+                size: usize
+            ),
+            *mut c_void
+        );
+        #[cfg(windows)]
+        hook_func!(
+            Some("kernel32"),
+            HeapFree,
+            (handle: *mut c_void, flags: u32, ptr: *mut c_void),
+            bool
+        );
 
         #[cfg(not(windows))]
         for libname in ["libc++.so", "libc++.so.1", "libc++_shared.so"] {
@@ -776,13 +788,24 @@ impl AsanRuntime {
         hook_func!(None, munmap, (addr: *const c_void, length: usize), i32);
 
         // Hook libc functions which may access allocated memory
+        #[cfg(not(windows))]
         hook_func!(
             None,
             write,
             (fd: i32, buf: *const c_void, count: usize),
             usize
         );
+        #[cfg(windows)]
+        hook_func!(
+            None,
+            _write,
+            (fd: i32, buf: *const c_void, count: usize),
+            usize
+        );
+        #[cfg(not(windows))]
         hook_func!(None, read, (fd: i32, buf: *mut c_void, count: usize), usize);
+        #[cfg(windows)]
+        hook_func!(None, _read, (fd: i32, buf: *mut c_void, count: usize), usize);
         hook_func!(
             None,
             fgets,
@@ -801,7 +824,7 @@ impl AsanRuntime {
             (dest: *mut c_void, src: *const c_void, n: usize),
             *mut c_void
         );
-        #[cfg(not(target_vendor = "apple"))]
+        #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(
             None,
             mempcpy,
@@ -904,7 +927,10 @@ impl AsanRuntime {
             (dest: *mut c_char, src: *const c_char),
             *mut c_char
         );
+        #[cfg(not(windows))]
         hook_func!(None, strdup, (s: *const c_char), *mut c_char);
+        #[cfg(windows)]
+        hook_func!(None, _strdup, (s: *const c_char), *mut c_char);
         hook_func!(None, strlen, (s: *const c_char), usize);
         hook_func!(None, strnlen, (s: *const c_char, n: usize), usize);
         hook_func!(
