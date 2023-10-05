@@ -363,7 +363,7 @@ impl Allocator {
             let remainder = size % 8;
             if remainder > 0 {
                 // log::trace!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
-            ((start + size / 8) as *mut u8).write(0x00);
+                ((start + size / 8) as *mut u8).write(0x00);
             }
         }
     }
@@ -433,13 +433,12 @@ impl Allocator {
         (shadow_mapping_start, (end - start) / 8)
     }
 
-
     /// Checks whether the given address up till size is valid unpoisoned shadow memory.
     /// TODO: check edge cases
     #[inline]
     #[must_use]
     pub fn check_shadow(&self, address: *const c_void, size: usize) -> bool {
-       if size == 0 {
+        if size == 0 {
             return true;
         }
         let address = address as usize;

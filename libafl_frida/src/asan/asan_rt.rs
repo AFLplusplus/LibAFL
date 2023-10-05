@@ -1351,7 +1351,6 @@ impl AsanRuntime {
         log::info!("actual rip: {:x}", self.regs[18]);
     }
 
-
     // https://godbolt.org/z/ah8vG8sWo
     /*
     #include <stdio.h>

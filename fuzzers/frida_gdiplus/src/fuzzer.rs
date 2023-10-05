@@ -19,8 +19,8 @@ use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{launcher::Launcher, llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
-    feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedback_and_fast, feedback_or, feedback_or_fast,
+    feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -34,7 +34,6 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-use libafl::{feedback_and_fast, feedbacks::ConstFeedback};
 use libafl_bolts::{
     cli::{parse_args, FuzzerOptions},
     current_nanos,
@@ -43,9 +42,11 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-use libafl_frida::asan::asan_rt::AsanRuntime;
-use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
 use libafl_frida::{
+    asan::{
+        asan_rt::AsanRuntime,
+        errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
+    },
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
