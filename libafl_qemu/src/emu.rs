@@ -14,7 +14,11 @@ use std::{
     ffi::{CStr, CString},
     ptr::null_mut,
 };
-use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{
+    ops::{BitOr, BitOrAssign},
+    slice::from_raw_parts,
+    str::from_utf8_unchecked,
+};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
@@ -197,7 +201,7 @@ impl IntoPy<PyObject> for MmapPerms {
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 #[repr(i32)]
 pub enum MmapFlags {
-    None = -1,
+    None = 0,
     Fixed = libc::MAP_FIXED,
     Private = libc::MAP_PRIVATE,
     Anonymous = libc::MAP_ANONYMOUS,
@@ -223,6 +227,20 @@ impl MmapFlags {
     #[must_use]
     pub fn is_huge(&self) -> bool {
         *self as i32 & MmapFlags::Huge as i32 != 0
+    }
+}
+
+impl BitOr<MmapFlags> for MmapFlags {
+    type Output = MmapFlags;
+
+    fn bitor(self, o: MmapFlags) -> MmapFlags {
+        unsafe { std::mem::transmute(self as i32 | o as i32) }
+    }
+}
+
+impl BitOrAssign<MmapFlags> for MmapFlags {
+    fn bitor_assign(&mut self, o: MmapFlags) {
+        *self = *self | o;
     }
 }
 
@@ -287,7 +305,6 @@ pub struct MapInfo {
     path: *const u8,
     perms: i32,
     flags: i32,
-    is_priv: i32,
 }
 
 #[cfg_attr(feature = "python", pymethods)]
@@ -329,11 +346,6 @@ impl MapInfo {
     #[must_use]
     pub fn flags(&self) -> MmapFlags {
         MmapFlags::try_from(self.flags).unwrap()
-    }
-
-    #[must_use]
-    pub fn is_priv(&self) -> bool {
-        self.is_priv != 0
     }
 }
 

@@ -42,7 +42,6 @@ pub struct SnapshotPageInfo {
     pub flags: MmapFlags,
     // TODO using it
     pub huge: bool,
-    pub private: bool,
     pub data: Option<Box<[u8; SNAPSHOT_PAGE_SIZE]>>,
 }
 
@@ -151,7 +150,6 @@ impl QemuSnapshotHelper {
                     perms: map.perms(),
                     flags: map.flags(),
                     huge: map.flags().is_huge(),
-                    private: map.is_priv(),
                     data: None,
                 };
                 if map.perms().is_r() {
@@ -500,6 +498,18 @@ impl QemuSnapshotHelper {
 
         *new_maps = self.maps.clone();
     }
+
+    pub fn map_entry(&mut self, start: GuestAddr, mut size: usize) -> *const MemoryRegionInfo {
+        if size % SNAPSHOT_PAGE_SIZE != 0 {
+            size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
+        }
+        self.maps
+            .tree
+            .query(start..(start + (size as GuestAddr)))
+            .next()
+            .unwrap()
+            .value
+    }
 }
 
 impl Default for QemuSnapshotHelper {
@@ -726,8 +736,16 @@ where
             if sys_const == SYS_mremap {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
                 // TODO get the old permissions from the removed mapping
+                let entry = h.map_entry(a0 as GuestAddr, a1 as usize);
                 h.remove_mapped(a0 as GuestAddr, a1 as usize);
-                h.add_mapped(result as GuestAddr, a2 as usize, None, None);
+                unsafe {
+                    h.add_mapped(
+                        result as GuestAddr,
+                        a2 as usize,
+                        Some((*entry).perms.unwrap()),
+                        Some((*entry).flags.unwrap()),
+                    );
+                }
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
