@@ -299,6 +299,38 @@ pub enum Signal {
     SigTrap = SIGTRAP,
 }
 
+impl TryFrom<&str> for Signal {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value {
+            "SIGABRT" => Signal::SigAbort,
+            "SIGBUS" => Signal::SigBus,
+            "SIGFPE" => Signal::SigFloatingPointException,
+            "SIGILL" => Signal::SigIllegalInstruction,
+            "SIGPIPE" => Signal::SigPipe,
+            "SIGSEGV" => Signal::SigSegmentationFault,
+            "SIGUSR2" => Signal::SigUser2,
+            "SIGALRM" => Signal::SigAlarm,
+            "SIGHUP" => Signal::SigHangUp,
+            "SIGKILL" => Signal::SigKill,
+            "SIGQUIT" => Signal::SigQuit,
+            "SIGTERM" => Signal::SigTerm,
+            "SIGINT" => Signal::SigInterrupt,
+            "SIGTRAP" => Signal::SigTrap,
+            _ => return Err(Error::illegal_argument(format!("No signal named {value}"))),
+        })
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<Signal> for nix::sys::signal::Signal {
+    fn from(value: Signal) -> Self {
+        // we can be semi-certain that all signals exist in nix.
+        i32::from(value).try_into().unwrap()
+    }
+}
+
 /// A list of crashing signals
 pub static CRASH_SIGNALS: &[Signal] = &[
     Signal::SigAbort,
