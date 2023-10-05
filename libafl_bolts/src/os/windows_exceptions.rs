@@ -31,7 +31,7 @@ const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
 
 // For SEH
-//const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
+const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
 
 // From https://github.com/Alexpux/mingw-w64/blob/master/mingw-w64-headers/crt/signal.h
 pub const SIGINT: i32 = 2;
@@ -350,9 +350,12 @@ pub unsafe extern "system" fn handle_exception(
         .as_mut()
         .unwrap()
         .ExceptionCode;
-    let exception_code = ExceptionCode::try_from(code.0).unwrap();
-    // log::info!("Received exception; code: {}", exception_code);
-    internal_handle_exception(exception_code, exception_pointers)
+    if let Ok(exception_code) = ExceptionCode::try_from(code.0) {
+        internal_handle_exception(exception_code, exception_pointers)
+    } else {
+        log::warn!("Unknown exception code {:x}", code.0);
+        EXCEPTION_CONTINUE_SEARCH
+    }
 }
 
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);
