@@ -150,13 +150,25 @@ fn main() {
     println!("cargo:rerun-if-changed=src/cmplog.h");
     println!("cargo:rerun-if-changed=src/cmplog.c");
 
-    cc::Build::new()
-        .flag("-Wno-pointer-sign")
-        .flag("-Wno-sign-compare")
-        .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-        .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-        .file(src_dir.join("cmplog.c"))
-        .compile("cmplog");
+    #[cfg(unix)]
+    {
+        cc::Build::new()
+            .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
+            .flag("-Wno-sign-compare")
+            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+            .file(src_dir.join("cmplog.c"))
+            .compile("cmplog");
+    }
+
+    #[cfg(not(unix))]
+    {
+        cc::Build::new()
+            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+            .file(src_dir.join("cmplog.c"))
+            .compile("cmplog");
+    }
 
     #[cfg(unix)]
     {
