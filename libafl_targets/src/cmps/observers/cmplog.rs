@@ -98,7 +98,7 @@ impl CmpLogObserver {
         }
     }
 
-    /// Creates a new [`CmpLogObserver`] with the given name from the default [`CMPLOG_MAP`]
+    /// Creates a new [`CmpLogObserver`] with the given name from the default cmplog map
     #[must_use]
     pub fn new(name: &'static str, add_meta: bool) -> Self {
         unsafe { Self::with_map_ptr(name, libafl_cmplog_map_ptr, add_meta) }
