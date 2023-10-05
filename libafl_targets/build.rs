@@ -58,6 +58,9 @@ fn main() {
 
         let mut sancov_cmp = cc::Build::new();
 
+        #[cfg(unix)]
+        sancov_cmp.flag("-Wno-sign-compare");
+
         #[cfg(feature = "sancov_value_profile")]
         {
             sancov_cmp.define("SANCOV_VALUE_PROFILE", "1");

@@ -17,7 +17,8 @@ The tinyinst module for `LibAFL`.
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::unreadable_literal
+    clippy::unreadable_literal,
+    clippy::negative_feature_names,
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
