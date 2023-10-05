@@ -39,7 +39,7 @@ use crate::{
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple, UsesObservers},
-    state::{UsesState, HasExecutions},
+    state::{HasExecutions, UsesState},
     Error,
 };
 

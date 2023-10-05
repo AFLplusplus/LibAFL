@@ -30,7 +30,7 @@ use crate::{inputs::Input, Error};
 use crate::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::{UsesState, HasExecutions},
+    state::{HasExecutions, UsesState},
     std::borrow::ToOwned,
 };
 

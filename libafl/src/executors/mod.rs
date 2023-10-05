@@ -41,7 +41,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::{UsesState, HasExecutions},
+    state::{HasExecutions, UsesState},
     Error,
 };
 

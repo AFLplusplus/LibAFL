@@ -52,7 +52,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasClientPerfMonitor, HasCorpus, HasSolutions, UsesState, HasExecutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, UsesState},
     Error,
 };
 
@@ -1641,7 +1641,6 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-
         *state.executions_mut() += 1;
         unsafe {
             self.shmem_provider.pre_fork()?;
