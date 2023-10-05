@@ -21,16 +21,13 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations,
         StdMOptMutator, Tokens,
     },
-    observers::{
-        AFLppCmpLogMap, AFLppCmpObserver, HitcountsMapObserver, StdMapObserver, TimeObserver,
-    },
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
         calibrate::CalibrationStage, mutational::MultiMutationalStage,
-        power::StdPowerMutationalStage, tracing::AFLppCmplogTracingStage, ColorizationStage,
-        IfStage,
+        power::StdPowerMutationalStage, ColorizationStage, IfStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -41,6 +38,10 @@ use libafl_bolts::{
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
     AsMutSlice,
+};
+use libafl_targets::{
+    cmps::{observers::AFLppCmpLogObserver, stages::AFLppCmplogTracingStage},
+    AFLppCmpLogMap,
 };
 use nix::sys::signal::Signal;
 
@@ -350,7 +351,7 @@ fn fuzz(
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
         let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpLogMap>() };
 
-        let cmplog_observer = AFLppCmpObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
 
         let cmplog_forkserver = ForkserverExecutor::builder()
             .program(exec)

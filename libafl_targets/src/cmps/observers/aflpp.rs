@@ -67,7 +67,7 @@ struct cmp_map {
 
 /// A [`CmpObserver`] observer for AFL++ redqueen
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AFLppCmpObserver<'a, S>
+pub struct AFLppCmpLogObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
@@ -79,7 +79,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<'a, S> CmpObserver<'a, AFLppCmpLogMap, S, AFLppCmpValuesMetadata> for AFLppCmpObserver<'a, S>
+impl<'a, S> CmpObserver<'a, AFLppCmpLogMap, S, AFLppCmpValuesMetadata> for AFLppCmpLogObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -141,7 +141,7 @@ where
     }
 }
 
-impl<'a, S> Observer<S> for AFLppCmpObserver<'a, S>
+impl<'a, S> Observer<S> for AFLppCmpLogObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
@@ -163,7 +163,7 @@ where
     }
 }
 
-impl<'a, S> Named for AFLppCmpObserver<'a, S>
+impl<'a, S> Named for AFLppCmpLogObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
@@ -172,11 +172,11 @@ where
     }
 }
 
-impl<'a, S> AFLppCmpObserver<'a, S>
+impl<'a, S> AFLppCmpLogObserver<'a, S>
 where
     S: UsesInput + HasMetadata,
 {
-    /// Creates a new [`AFLppCmpObserver`] with the given name and map.
+    /// Creates a new [`AFLppCmpLogObserver`] with the given name and map.
     #[must_use]
     pub fn new(name: &'static str, map: &'a mut AFLppCmpLogMap, add_meta: bool) -> Self {
         Self {
@@ -193,7 +193,7 @@ where
         self.original = v;
     }
 
-    /// Creates a new [`AFLppCmpObserver`] with the given name, map and reference to variable size.
+    /// Creates a new [`AFLppCmpLogObserver`] with the given name, map and reference to variable size.
     #[must_use]
     pub fn with_size(
         name: &'static str,

@@ -22,7 +22,7 @@ where
     CM: CmpMap + Debug,
 {
     /// Extra data used by the metadata when adding information from a `CmpObserver`, for example
-    /// the `original` field in `AFLppCmpObserver`
+    /// the `original` field in `AFLppCmpLogObserver`
     type Data: 'a + Debug + Default + Serialize + DeserializeOwned;
 
     /// Instantiate a new metadata instance. This is used by `CmpObserver` to create a new
@@ -32,7 +32,7 @@ where
 
     /// Add comparisons to a metadata from a `CmpObserver`. `cmp_map` is mutable in case
     /// it is needed for a custom map, but this is not utilized for `CmpObserver` or
-    /// `AFLppCmpObserver`.
+    /// `AFLppCmpLogObserver`.
     fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM, cmp_observer_data: Self::Data);
 }
 
