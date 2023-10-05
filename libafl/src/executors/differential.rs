@@ -11,7 +11,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::UsesInput,
     observers::{DifferentialObserversTuple, ObserversTuple, UsesObservers},
-    state::UsesState,
+    state::{UsesState, HasExecutions},
     Error,
 };
 
@@ -60,6 +60,7 @@ where
     A: Executor<EM, Z> + HasObservers,
     B: Executor<EM, Z, State = A::State> + HasObservers,
     EM: UsesState<State = A::State>,
+    EM::State: HasExecutions,
     DOT: DifferentialObserversTuple<A::Observers, B::Observers, A::State>,
     Z: UsesState<State = A::State>,
 {

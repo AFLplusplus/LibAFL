@@ -30,7 +30,7 @@ use crate::{inputs::Input, Error};
 use crate::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
+    state::{UsesState, HasExecutions},
     std::borrow::ToOwned,
 };
 
@@ -313,7 +313,7 @@ where
 impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
-    S: UsesInput,
+    S: UsesInput + HasExecutions,
     S::Input: HasTargetBytes,
     T: CommandConfigurator + Debug,
     OT: Debug + MatchName + ObserversTuple<S>,
@@ -322,13 +322,15 @@ where
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
         use wait_timeout::ChildExt;
+
+        *state.executions_mut() += 1;
 
         let mut child = self.configurer.spawn_child(input)?;
 
