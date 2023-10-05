@@ -79,7 +79,8 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<'a, S> CmpObserver<'a, AFLppCmpLogMap, S, AFLppCmpValuesMetadata> for AFLppCmpLogObserver<'a, S>
+impl<'a, S> CmpObserver<'a, AFLppCmpLogMap, S, AFLppCmpValuesMetadata>
+    for AFLppCmpLogObserver<'a, S>
 where
     S: UsesInput + Debug + HasMetadata,
 {
