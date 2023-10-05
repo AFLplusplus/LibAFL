@@ -378,7 +378,7 @@ impl Display for Signal {
 #[cfg(feature = "alloc")]
 pub trait Handler {
     /// Handle a signal
-    fn handle(&mut self, signal: Signal, info: siginfo_t, _context: &mut ucontext_t);
+    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, _context: &mut ucontext_t);
     /// Return a list of signals to handle
     fn signals(&self) -> Vec<Signal>;
 }
@@ -414,7 +414,7 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 /// This should be somewhat safe to call for signals previously registered,
 /// unless the signal handlers registered using [`setup_signal_handler()`] are broken.
 #[cfg(feature = "alloc")]
-unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
+unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
     let signal = &Signal::try_from(sig).unwrap();
     let handler = {
         match &SIGNAL_HANDLERS[*signal as usize] {
@@ -424,7 +424,7 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
     };
     handler.handle(
         *signal,
-        info,
+        &mut ptr::read_unaligned(info),
         &mut ptr::read_unaligned(void as *mut ucontext_t),
     );
 }
