@@ -151,6 +151,8 @@ fn main() {
     println!("cargo:rerun-if-changed=src/cmplog.c");
 
     cc::Build::new()
+        .flag("-Wno-pointer-sign")
+        .flag("-Wno-sign-compare")
         .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
         .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
         .file(src_dir.join("cmplog.c"))
