@@ -145,7 +145,8 @@ void __sanitizer_weak_hook_strncmp(void *called_pc, const char *s1,
       if (s1[actual_len] == 0 || s2[actual_len] == 0) { break; }
     }
 
-    __libafl_targets_cmplog_routines_len(k, (const uint8_t *) s1, (const uint8_t *) s2, actual_len);
+    __libafl_targets_cmplog_routines_len(k, (const uint8_t *)s1,
+                                         (const uint8_t *)s2, actual_len);
   }
 }
 
@@ -166,7 +167,8 @@ void __sanitizer_weak_hook_strcmp(void *called_pc, const char *s1,
       if (s1[actual_len] == 0 || s2[actual_len] == 0) { break; }
     }
 
-    __libafl_targets_cmplog_routines_len(k, (const uint8_t *) s1, (const uint8_t *) s2, actual_len);
+    __libafl_targets_cmplog_routines_len(k, (const uint8_t *)s1,
+                                         (const uint8_t *)s2, actual_len);
   }
 }
 

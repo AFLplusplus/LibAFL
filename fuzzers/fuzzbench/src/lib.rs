@@ -386,7 +386,9 @@ fn fuzz(
     {
         let null_fd = file_null.as_raw_fd();
         dup2(null_fd, io::stdout().as_raw_fd())?;
-        dup2(null_fd, io::stderr().as_raw_fd())?;
+        if !std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
+            dup2(null_fd, io::stderr().as_raw_fd())?;
+        }
     }
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);

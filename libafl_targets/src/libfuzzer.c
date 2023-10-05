@@ -33,11 +33,11 @@ EXT_FUNC_IMPL(main, int, (int argc, char **argv), false) {
     libafl_main();
     return 0;
   }
-#ifdef FUZZER_DEFINE_RUN_DRIVER
+  #ifdef FUZZER_DEFINE_RUN_DRIVER
   return LLVMFuzzerRunDriver(&argc, &argv, &LLVMFuzzerTestOneInput);
-#else
+  #else
   return 0;
-#endif
+  #endif
 }
 
   #if defined(_WIN32)

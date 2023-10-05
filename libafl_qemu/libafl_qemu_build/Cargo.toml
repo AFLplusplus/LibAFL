@@ -26,7 +26,7 @@ slirp = [] # build qemu with host libslirp (for user networking)
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
-bindgen = "0.66"
+bindgen = "0.68"
 which = "4.4"
 json = "0.12"
 shell-words = "1.1"

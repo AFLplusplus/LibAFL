@@ -194,8 +194,8 @@ args = [
 dependencies = ["build"]
 script_runner="@shell"
 script='''
-rm -f ${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage-${CARGO_MAKE_PROFILE}
-mv ${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage ${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage-${CARGO_MAKE_PROFILE}
+rm -f ${TARGET_DIR}/${PROFILE_DIR}/qemu_cmin-${CARGO_MAKE_PROFILE}
+mv ${TARGET_DIR}/${PROFILE_DIR}/qemu_cmin ${TARGET_DIR}/${PROFILE_DIR}/qemu_cmin-${CARGO_MAKE_PROFILE}
 '''
 
 [tasks.harness]
@@ -226,10 +226,11 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.run_unix]
-command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage-${CARGO_MAKE_PROFILE}"
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_cmin-${CARGO_MAKE_PROFILE}"
 args = [
-    "--coverage", "${TARGET_DIR}/drcov.log",
+    "--output", "./output",
     "--input", "./corpus",
+    "--verbose",
     "--",
     "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]

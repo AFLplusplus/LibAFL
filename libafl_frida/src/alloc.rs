@@ -2,7 +2,10 @@
     windows,
     target_os = "linux",
     target_vendor = "apple",
-    all(target_arch = "aarch64", target_os = "android")
+    all(
+        any(target_arch = "aarch64", target_arch = "x86_64"),
+        target_os = "android"
+    )
 ))]
 use std::{collections::BTreeMap, ffi::c_void};
 
@@ -14,7 +17,10 @@ use libafl_bolts::cli::FuzzerOptions;
     windows,
     target_os = "linux",
     target_vendor = "apple",
-    all(target_arch = "aarch64", target_os = "android")
+    all(
+        any(target_arch = "aarch64", target_arch = "x86_64"),
+        target_os = "android"
+    )
 ))]
 use mmap_rs::{MemoryAreas, MmapFlags, MmapMut, MmapOptions, ReservedMut};
 use rangemap::RangeSet;
@@ -86,7 +92,10 @@ impl Allocator {
         windows,
         target_os = "linux",
         target_vendor = "apple",
-        all(target_arch = "aarch64", target_os = "android")
+        all(
+            any(target_arch = "aarch64", target_arch = "x86_64"),
+            target_os = "android"
+        )
     )))]
     #[must_use]
     pub fn new(_: FuzzerOptions) -> Self {
@@ -98,7 +107,10 @@ impl Allocator {
         windows,
         target_os = "linux",
         target_vendor = "apple",
-        all(target_arch = "aarch64", target_os = "android")
+        all(
+            any(target_arch = "aarch64", target_arch = "x86_64"),
+            target_os = "android"
+        )
     ))]
     #[must_use]
     pub fn new(options: &FuzzerOptions) -> Self {
@@ -601,7 +613,10 @@ impl Default for Allocator {
         windows,
         target_os = "linux",
         target_vendor = "apple",
-        all(target_arch = "aarch64", target_os = "android")
+        all(
+            any(target_arch = "aarch64", target_arch = "x86_64"),
+            target_os = "android"
+        )
     )))]
     fn default() -> Self {
         todo!("Shadow region not yet supported for this platform!");
