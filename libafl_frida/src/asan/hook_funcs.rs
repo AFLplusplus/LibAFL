@@ -15,6 +15,66 @@ use crate::{
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 impl AsanRuntime {
     #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_HeapAlloc(&mut self, _handle: *mut c_void, flags: u32, size: usize) -> *mut c_void {
+        let ret = unsafe { self.allocator_mut().alloc(size, 8) };
+        if flags & 8 == 8 {
+            extern "C" {
+                fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
+            }
+            unsafe {
+                memset(ret, 0, size);
+            }
+        }
+        if flags & 4 == 4 && ret == std::ptr::null_mut() {
+            unimplemented!();
+        }
+        ret
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_HeapReAlloc(
+        &mut self,
+        _handle: *mut c_void,
+        flags: u32,
+        ptr: *mut c_void,
+        size: usize,
+    ) -> *mut c_void {
+        let ret = unsafe { self.allocator_mut().alloc(size, 8) };
+        if flags & 8 == 8 {
+            extern "C" {
+                fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
+            }
+            unsafe {
+                memset(ret, 0, size);
+            }
+        }
+        if flags & 4 == 4 && ret == std::ptr::null_mut() {
+            unimplemented!();
+        }
+        if flags & 0x10 == 0x10 && ret != ptr {
+            unimplemented!();
+        }
+        ret
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_HeapFree(&mut self, handle: *mut c_void, flags: u32, ptr: *mut c_void) -> bool {
+        let allocator = self.allocator_mut();
+        if allocator.is_managed(ptr) {
+            unsafe { self.allocator_mut().release(ptr) };
+            true
+        } else {
+            extern "C" {
+                fn HeapFree(handle: *mut c_void, flags: u32, ptr: *mut c_void) -> bool;
+            }
+            unsafe { HeapFree(handle, flags, ptr) }
+        }
+    }
+    #[inline]
     pub fn hook_malloc(&mut self, size: usize) -> *mut c_void {
         unsafe { self.allocator_mut().alloc(size, 8) }
     }
@@ -341,6 +401,11 @@ impl AsanRuntime {
     }
 
     #[inline]
+    #[allow(non_snake_case)]
+    pub fn hook__write(&mut self, fd: i32, buf: *const c_void, count: usize) -> usize {
+        self.hook_write(fd, buf, count)
+    }
+    #[inline]
     pub fn hook_write(&mut self, fd: i32, buf: *const c_void, count: usize) -> usize {
         extern "C" {
             fn write(fd: i32, buf: *const c_void, count: usize) -> usize;
@@ -357,6 +422,11 @@ impl AsanRuntime {
         unsafe { write(fd, buf, count) }
     }
 
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn hook__read(&mut self, fd: i32, buf: *mut c_void, count: usize) -> usize {
+        self.hook_read(fd, buf, count)
+    }
     #[inline]
     pub fn hook_read(&mut self, fd: i32, buf: *mut c_void, count: usize) -> usize {
         extern "C" {
@@ -898,6 +968,11 @@ impl AsanRuntime {
         unsafe { stpcpy(dest, src) }
     }
 
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn hook__strdup(&mut self, s: *const c_char) -> *mut c_char {
+        self.hook_strdup(s)
+    }
     #[inline]
     pub fn hook_strdup(&mut self, s: *const c_char) -> *mut c_char {
         extern "C" {
