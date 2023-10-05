@@ -10,9 +10,9 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{ffi::c_void, ptr::write_volatile, rc::Rc};
 #[cfg(unix)]
 use std::num::NonZeroUsize;
+use std::{ffi::c_void, ptr::write_volatile, rc::Rc};
 
 use backtrace::Backtrace;
 #[cfg(target_arch = "x86_64")]
