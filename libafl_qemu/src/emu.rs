@@ -7,12 +7,14 @@ use core::{
     mem::MaybeUninit,
     ptr::{addr_of, copy_nonoverlapping, null},
 };
-use std::{cell::OnceCell, slice::from_raw_parts, str::from_utf8_unchecked};
+#[cfg(emulation_mode = "usermode")]
+use std::cell::OnceCell;
 #[cfg(emulation_mode = "systemmode")]
 use std::{
     ffi::{CStr, CString},
     ptr::null_mut,
 };
+use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;

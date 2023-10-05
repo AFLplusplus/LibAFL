@@ -1,9 +1,10 @@
 //! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
-use core::{
-    ffi::c_void,
-    fmt::{self, Debug, Formatter},
-};
+#[cfg(emulation_mode = "usermode")]
+use core::ffi::c_void;
+use core::fmt::{self, Debug, Formatter};
 
+#[cfg(emulation_mode = "usermode")]
+use libafl::executors::inprocess::InProcessExecutorHandlerData;
 #[cfg(feature = "fork")]
 use libafl::{
     events::EventManager,
@@ -12,10 +13,7 @@ use libafl::{
 };
 use libafl::{
     events::{EventFirer, EventRestarter},
-    executors::{
-        inprocess::{InProcessExecutor, InProcessExecutorHandlerData},
-        Executor, ExitKind, HasObservers,
-    },
+    executors::{inprocess::InProcessExecutor, Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
@@ -23,6 +21,7 @@ use libafl::{
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
+#[cfg(emulation_mode = "usermode")]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
@@ -56,18 +55,22 @@ where
     }
 }
 
+#[cfg(emulation_mode = "usermode")]
 extern "C" {
     // Original QEMU user signal handler
     fn libafl_qemu_handle_crash(signal: i32, info: *mut siginfo_t, puc: *mut c_void) -> i32;
 }
 
+#[cfg(emulation_mode = "usermode")]
 static mut USE_LIBAFL_CRASH_HANDLER: bool = false;
 
+#[cfg(emulation_mode = "usermode")]
 #[no_mangle]
 pub unsafe extern "C" fn libafl_executor_reinstall_handlers() {
     USE_LIBAFL_CRASH_HANDLER = true;
 }
 
+#[cfg(emulation_mode = "usermode")]
 pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     signal: Signal,
     info: &mut siginfo_t,
@@ -113,15 +116,24 @@ where
         S: State + HasExecutions + HasCorpus + HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let mut inner = InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?;
-        inner.handlers_mut().crash_handler =
-            inproc_qemu_crash_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
-                as *const c_void;
-
+        #[cfg(emulation_mode = "usermode")]
+        {
+            let mut inner =
+                InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?;
+            inner.handlers_mut().crash_handler =
+                inproc_qemu_crash_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
+                    as *const c_void;
+            Ok(Self {
+                first_exec: true,
+                hooks,
+                inner,
+            })
+        }
+        #[cfg(not(emulation_mode = "usermode"))]
         Ok(Self {
             first_exec: true,
             hooks,
-            inner,
+            inner: InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?,
         })
     }
 
