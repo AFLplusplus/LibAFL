@@ -1,6 +1,5 @@
 //! Generates `DrCov` traces
 use std::{
-    collections::HashMap,
     hash::{BuildHasher, Hasher},
     path::{Path, PathBuf},
     rc::Rc,
@@ -25,7 +24,6 @@ pub struct DrCovRuntime {
     pub drcov_basic_blocks: Vec<DrCovBasicBlock>,
     /// The memory ragnes of this target
     ranges: RangeMap<usize, (u16, String)>,
-    stalked_addresses: HashMap<usize, usize>,
     coverage_directory: PathBuf,
 }
 
@@ -77,21 +75,6 @@ impl DrCovRuntime {
             ..Self::default()
         }
     }
-
-    /// Add a stalked address to real address mapping.
-    #[inline]
-    pub fn add_stalked_address(&mut self, stalked: usize, real: usize) {
-        self.stalked_addresses.insert(stalked, real);
-    }
-
-    /// Resolves the real address from a stalker stalked address if possible, if there is no
-    /// real address, the stalked address is returned.
-    #[must_use]
-    pub fn real_address_for_stalked(&self, stalked: usize) -> usize {
-        self.stalked_addresses
-            .get(&stalked)
-            .map_or(stalked, |addr| *addr)
-    }
 }
 
 impl Default for DrCovRuntime {
@@ -99,7 +82,6 @@ impl Default for DrCovRuntime {
         Self {
             drcov_basic_blocks: vec![],
             ranges: RangeMap::new(),
-            stalked_addresses: HashMap::new(),
             coverage_directory: PathBuf::from("./coverage"),
         }
     }
