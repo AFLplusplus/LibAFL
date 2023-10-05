@@ -609,17 +609,19 @@ impl AsanRuntime {
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
         hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
         hook_func_with_check!(None, free, (ptr: *mut c_void), ());
-        #[cfg(not(target_vendor = "apple"))]
+        #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(None, memalign, (size: usize, alignment: usize), *mut c_void);
+        #[cfg(not(windows))]
         hook_func!(
             None,
             posix_memalign,
             (pptr: *mut *mut c_void, size: usize, alignment: usize),
             i32
         );
-        #[cfg(not(target_vendor = "apple"))]
+        #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
 
+        #[cfg(not(windows))]
         for libname in ["libc++.so", "libc++.so.1", "libc++_shared.so"] {
             for export in Module::enumerate_exports(libname) {
                 match &export.name[..] {
@@ -758,6 +760,7 @@ impl AsanRuntime {
             }
         }
 
+        #[cfg(not(windows))]
         hook_func!(
             None,
             mmap,
@@ -771,6 +774,7 @@ impl AsanRuntime {
             ),
             *mut c_void
         );
+        #[cfg(not(windows))]
         hook_func!(None, munmap, (addr: *const c_void, length: usize), i32);
 
         // Hook libc functions which may access allocated memory
@@ -824,13 +828,14 @@ impl AsanRuntime {
             (s: *mut c_void, c: i32, n: usize),
             *mut c_void
         );
-        #[cfg(not(target_vendor = "apple"))]
+        #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(
             None,
             memrchr,
             (s: *mut c_void, c: i32, n: usize),
             *mut c_void
         );
+        #[cfg(not(windows))]
         hook_func!(
             None,
             memmem,
@@ -842,11 +847,11 @@ impl AsanRuntime {
             ),
             *mut c_void
         );
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", windows)))]
         hook_func!(None, bzero, (s: *mut c_void, n: usize), ());
-        #[cfg(not(any(target_os = "android", target_vendor = "apple")))]
+        #[cfg(not(any(target_os = "android", target_vendor = "apple", windows)))]
         hook_func!(None, explicit_bzero, (s: *mut c_void, n: usize), ());
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", windows)))]
         hook_func!(
             None,
             bcmp,
@@ -855,12 +860,14 @@ impl AsanRuntime {
         );
         hook_func!(None, strchr, (s: *mut c_char, c: i32), *mut c_char);
         hook_func!(None, strrchr, (s: *mut c_char, c: i32), *mut c_char);
+        #[cfg(not(windows))]
         hook_func!(
             None,
             strcasecmp,
             (s1: *const c_char, s2: *const c_char),
             i32
         );
+        #[cfg(not(windows))]
         hook_func!(
             None,
             strncasecmp,
@@ -892,6 +899,7 @@ impl AsanRuntime {
             (dest: *mut c_char, src: *const c_char, n: usize),
             *mut c_char
         );
+        #[cfg(not(windows))]
         hook_func!(
             None,
             stpcpy,
@@ -907,6 +915,7 @@ impl AsanRuntime {
             (haystack: *const c_char, needle: *const c_char),
             *mut c_char
         );
+        #[cfg(not(windows))]
         hook_func!(
             None,
             strcasestr,
