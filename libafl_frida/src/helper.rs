@@ -6,7 +6,7 @@ use std::{
     rc::Rc,
 };
 
-#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64")))]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone,
@@ -446,7 +446,7 @@ where
             .detail(true)
             .build()
             .expect("Failed to create Capstone object");
-        #[cfg(all(target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         let capstone = Capstone::new()
             .x86()
             .mode(arch::x86::ArchMode::Mode64)
@@ -460,7 +460,7 @@ where
                 &output,
                 &ranges,
                 &runtimes,
-                #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64")))]
+                #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
                 &capstone,
             );
         })
@@ -471,7 +471,7 @@ where
         output: &StalkerOutput,
         ranges: &Rc<RefCell<RangeMap<usize, (u16, String)>>>,
         runtimes: &Rc<RefCell<RT>>,
-        #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64")))] capstone: &Capstone,
+        #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))] capstone: &Capstone,
     ) {
         let mut first = true;
         let mut basic_block_start = 0;
@@ -505,7 +505,7 @@ where
                     None
                 };
 
-                #[cfg(all(target_arch = "x86_64"))]
+                #[cfg(target_arch = "x86_64")]
                 if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(

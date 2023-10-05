@@ -1889,7 +1889,7 @@ impl AsanRuntime {
     }
 
     /// Checks if the current instruction is interesting for address sanitization.
-    #[cfg(all(target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     #[inline]
     #[must_use]
     #[allow(clippy::result_unit_err)]
@@ -1958,7 +1958,7 @@ impl AsanRuntime {
     #[inline]
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::too_many_arguments)]
-    #[cfg(all(target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     pub fn emit_shadow_check(
         &mut self,
         address: u64,
