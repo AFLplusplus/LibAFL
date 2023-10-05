@@ -115,7 +115,6 @@ where
                 // TODO replace if process_execution adds a return value for solution index
                 let solution_count = state.solutions().count();
                 let corpus_count = state.corpus().count();
-                *state.executions_mut() += 1;
                 let (_, corpus_idx) = fuzzer.process_execution(
                     state,
                     manager,
@@ -158,7 +157,6 @@ where
         if base_hash != new_hash {
             let exit_kind = fuzzer.execute_input(state, executor, manager, &base)?;
             let observers = executor.observers();
-            *state.executions_mut() += 1;
             // assumption: this input should not be marked interesting because it was not
             // marked as interesting above; similarly, it should not trigger objectives
             fuzzer

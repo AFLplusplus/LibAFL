@@ -41,7 +41,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
+    state::{HasExecutions, UsesState},
     Error,
 };
 
@@ -166,17 +166,19 @@ where
 impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
 where
     EM: UsesState<State = S>,
-    S: UsesInput + Debug,
+    S: UsesInput + Debug + HasExecutions,
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
+
         if input.target_bytes().as_slice().is_empty() {
             Err(Error::empty("Input Empty"))
         } else {

@@ -14,7 +14,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
+    state::{HasExecutions, UsesState},
     Error,
 };
 
@@ -65,7 +65,7 @@ impl<'a, 'b, 'c, EM, H, OT, RT, S, Z> Executor<EM, Z>
 where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind,
-    S: UsesInput,
+    S: UsesInput + HasExecutions,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,

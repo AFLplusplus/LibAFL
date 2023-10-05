@@ -162,7 +162,7 @@ impl<'a, EM, H, OT, QT, S, Z> Executor<EM, Z> for QemuExecutor<'a, H, OT, QT, S>
 where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind,
-    S: UsesInput,
+    S: UsesInput + HasExecutions,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     Z: UsesState<State = S>,

@@ -4,7 +4,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::{State, UsesState},
+    state::{HasExecutions, State, UsesState},
     Error,
 };
 use libafl_bolts::AsSlice;
@@ -48,17 +48,18 @@ where
 impl<'a, EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<'a, S, OT>
 where
     EM: UsesState<State = S>,
-    S: UsesInput,
+    S: UsesInput + HasExecutions,
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
         let input_owned = input.target_bytes();
         let input = input_owned.as_slice();
         self.helper.nyx_process.set_input(

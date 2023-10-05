@@ -52,7 +52,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasClientPerfMonitor, HasCorpus, HasSolutions, UsesState},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, UsesState},
     Error,
 };
 
@@ -126,7 +126,7 @@ where
     HB: BorrowMut<H>,
     EM: UsesState<State = S>,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: UsesInput + HasExecutions,
     Z: UsesState<State = S>,
 {
     fn run_target(
@@ -136,6 +136,7 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
 
@@ -1646,7 +1647,7 @@ where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: UsesInput + HasExecutions,
     SP: ShMemProvider,
     Z: UsesState<State = S>,
 {
@@ -1659,6 +1660,7 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
         unsafe {
             self.shmem_provider.pre_fork()?;
             match fork() {
@@ -1714,7 +1716,7 @@ where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: UsesInput + HasExecutions,
     SP: ShMemProvider,
     Z: UsesState<State = S>,
 {
@@ -1727,6 +1729,8 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
+
         unsafe {
             self.shmem_provider.pre_fork()?;
             match fork() {
