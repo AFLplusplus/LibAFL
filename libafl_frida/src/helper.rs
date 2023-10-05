@@ -6,14 +6,13 @@ use std::{
     rc::Rc,
 };
 
-#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))]
+#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64")))]
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone,
 };
-#[cfg(unix)]
-use frida_gum::instruction_writer::InstructionWriter;
 use frida_gum::{
+    instruction_writer::InstructionWriter,
     stalker::{StalkerIterator, StalkerOutput, Transformer},
     Gum, Module, ModuleDetails, ModuleMap, PageProtection,
 };
@@ -22,7 +21,6 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{cli::FuzzerOptions, tuples::MatchFirstType};
-#[cfg(unix)]
 use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
@@ -30,9 +28,7 @@ use rangemap::RangeMap;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
-use crate::coverage_rt::CoverageRuntime;
-#[cfg(unix)]
-use crate::{asan::asan_rt::AsanRuntime, drcov_rt::DrCovRuntime};
+use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
 #[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
@@ -450,7 +446,7 @@ where
             .detail(true)
             .build()
             .expect("Failed to create Capstone object");
-        #[cfg(all(target_arch = "x86_64", unix))]
+        #[cfg(all(target_arch = "x86_64"))]
         let capstone = Capstone::new()
             .x86()
             .mode(arch::x86::ArchMode::Mode64)
@@ -464,7 +460,7 @@ where
                 &output,
                 &ranges,
                 &runtimes,
-                #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))]
+                #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64")))]
                 &capstone,
             );
         })
@@ -475,14 +471,13 @@ where
         output: &StalkerOutput,
         ranges: &Rc<RefCell<RangeMap<usize, (u16, String)>>>,
         runtimes: &Rc<RefCell<RT>>,
-        #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))] capstone: &Capstone,
+        #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64")))] capstone: &Capstone,
     ) {
         let mut first = true;
         let mut basic_block_start = 0;
         let mut basic_block_size = 0;
         for instruction in basic_block {
             let instr = instruction.instr();
-            #[cfg(unix)]
             let instr_size = instr.bytes().len();
             let address = instr.address();
             // log::trace!("block @ {:x} transformed to {:x}", address, output.writer().pc());
@@ -499,21 +494,18 @@ where
                     if let Some(rt) = runtimes.match_first_type_mut::<CoverageRuntime>() {
                         rt.emit_coverage_mapping(address, output);
                     }
-
-                    #[cfg(unix)]
                     if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
                         basic_block_start = address;
                     }
                 }
 
-                #[cfg(unix)]
                 let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                     AsanRuntime::asan_is_interesting_instruction(capstone, address, instr)
                 } else {
                     None
                 };
 
-                #[cfg(all(target_arch = "x86_64", unix))]
+                #[cfg(all(target_arch = "x86_64"))]
                 if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
@@ -555,7 +547,6 @@ where
                     }
                 }
 
-                #[cfg(unix)]
                 if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                     rt.add_stalked_address(
                         output.writer().pc() as usize - instr_size,
@@ -563,14 +554,12 @@ where
                     );
                 }
 
-                #[cfg(unix)]
                 if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
                     basic_block_size += instr_size;
                 }
             }
             instruction.keep();
         }
-        #[cfg(unix)]
         if basic_block_size != 0 {
             if let Some(rt) = runtimes.borrow_mut().match_first_type_mut::<DrCovRuntime>() {
                 log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");

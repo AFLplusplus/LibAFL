@@ -10,7 +10,9 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile, rc::Rc};
+use std::{ffi::c_void, ptr::write_volatile, rc::Rc};
+#[cfg(unix)]
+use std::num::NonZeroUsize;
 
 use backtrace::Backtrace;
 #[cfg(target_arch = "x86_64")]
@@ -449,7 +451,6 @@ impl AsanRuntime {
     pub fn current_stack() -> (usize, usize) {
         let mut stack_var = 0xeadbeef;
         let stack_address = addr_of_mut!(stack_var) as usize;
-        let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
         // Write something to (hopefully) make sure the val isn't optimized out
         unsafe {
             write_volatile(&mut stack_var, 0xfadbeef);
@@ -483,9 +484,6 @@ impl AsanRuntime {
         if let Some((start, end)) = range {
             #[cfg(unix)]
             {
-                use std::num::NonZeroUsize;
-
-                use nix::sys::mman::{mmap, MapFlags, ProtFlags};
                 let max_start = end - Self::max_stack_size();
 
                 let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
@@ -571,7 +569,7 @@ impl AsanRuntime {
                         }
                     }
                     interceptor.replace(
-                        frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
+                        Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
                         NativePointer([<replacement_ $name>] as *mut c_void),
                         NativePointer(self as *mut _ as *mut c_void)
                     ).ok();
@@ -596,7 +594,7 @@ impl AsanRuntime {
                         }
                     }
                     interceptor.replace(
-                        frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
+                        Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
                         NativePointer([<replacement_ $name>] as *mut c_void),
                         NativePointer(self as *mut _ as *mut c_void)
                     ).ok();
@@ -1891,7 +1889,7 @@ impl AsanRuntime {
     }
 
     /// Checks if the current instruction is interesting for address sanitization.
-    #[cfg(all(target_arch = "x86_64", unix))]
+    #[cfg(all(target_arch = "x86_64"))]
     #[inline]
     #[must_use]
     #[allow(clippy::result_unit_err)]
@@ -1960,7 +1958,7 @@ impl AsanRuntime {
     #[inline]
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::too_many_arguments)]
-    #[cfg(all(target_arch = "x86_64", unix))]
+    #[cfg(all(target_arch = "x86_64"))]
     pub fn emit_shadow_check(
         &mut self,
         address: u64,
@@ -2101,7 +2099,6 @@ impl AsanRuntime {
         writer.put_push_reg(X86Register::Rsi); // save true_rip
         writer.put_push_reg(X86Register::Rdi); // save accessed_address
 
-        #[cfg(unix)]
         let checked: bool = match width {
             1 => writer.put_bytes(self.blob_check_mem_byte()),
             2 => writer.put_bytes(self.blob_check_mem_halfword()),
