@@ -291,7 +291,9 @@ impl AFLppCmpLogVals {
 
     #[must_use]
     /// Reference comparison values as comparison function operands
-    pub fn fn_operands(&self) -> &[[AFLppCmpLogFnOperands; AFL_CMPLOG_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W] {
+    pub fn fn_operands(
+        &self,
+    ) -> &[[AFLppCmpLogFnOperands; AFL_CMPLOG_MAP_RTN_H]; AFLPP_CMPLOG_MAP_W] {
         unsafe { &self.fn_operands }
     }
 
@@ -419,7 +421,9 @@ impl AFLppCmpLogMap {
     /// map, because it is so large it cannot be allocated on the stack with default
     /// runtime configuration.
     pub fn boxed() -> Box<Self> {
-        unsafe { Box::from_raw(alloc_zeroed(Layout::new::<AFLppCmpLogMap>()) as *mut AFLppCmpLogMap) }
+        unsafe {
+            Box::from_raw(alloc_zeroed(Layout::new::<AFLppCmpLogMap>()) as *mut AFLppCmpLogMap)
+        }
     }
 
     #[must_use]
