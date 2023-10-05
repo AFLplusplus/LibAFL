@@ -418,13 +418,13 @@ impl InProcessHandlers {
 
 /// The global state of the in-process harness.
 #[derive(Debug)]
-pub(crate) struct InProcessExecutorHandlerData {
+pub struct InProcessExecutorHandlerData {
     state_ptr: *mut c_void,
     event_mgr_ptr: *mut c_void,
     fuzzer_ptr: *mut c_void,
     executor_ptr: *const c_void,
-    pub current_input_ptr: *const c_void,
-    pub in_handler: bool,
+    pub(crate) current_input_ptr: *const c_void,
+    pub(crate) in_handler: bool,
 
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
@@ -478,7 +478,7 @@ impl InProcessExecutorHandlerData {
     }
 
     #[cfg(any(unix, feature = "std"))]
-    pub fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }
 
@@ -631,8 +631,9 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     log::info!("Bye!");
 }
 
+/// The inprocess executor singal handling code for unix
 #[cfg(unix)]
-mod unix_signal_handler {
+pub mod unix_signal_handler {
     use alloc::vec::Vec;
     #[cfg(feature = "std")]
     use alloc::{boxed::Box, string::String};
@@ -658,12 +659,12 @@ mod unix_signal_handler {
     };
 
     pub(crate) type HandlerFuncPtr =
-        unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessExecutorHandlerData);
+        unsafe fn(Signal, &mut siginfo_t, &mut ucontext_t, data: &mut InProcessExecutorHandlerData);
 
     /// A handler that does nothing.
     /*pub fn nop_handler(
         _signal: Signal,
-        _info: siginfo_t,
+        _info: &mut siginfo_t,
         _context: &mut ucontext_t,
         _data: &mut InProcessExecutorHandlerData,
     ) {
@@ -671,7 +672,7 @@ mod unix_signal_handler {
 
     #[cfg(unix)]
     impl Handler for InProcessExecutorHandlerData {
-        fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
+        fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: &mut ucontext_t) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 let in_handler = data.set_in_handler(true);
@@ -748,10 +749,15 @@ mod unix_signal_handler {
         }));
     }
 
+    /// Timeout-Handler for in-process fuzzing.
+    /// It will store the current State to shmem, then exit.
+    ///
+    /// # Safety
+    /// Well, signal handling is not safe
     #[cfg(unix)]
-    pub(crate) unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
         _signal: Signal,
-        _info: siginfo_t,
+        _info: &mut siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -795,10 +801,13 @@ mod unix_signal_handler {
     /// Crash-Handler for in-process fuzzing.
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
+    ///
+    /// # Safety
+    /// Well, signal handling is not safe
     #[allow(clippy::too_many_lines)]
-    pub(crate) unsafe fn inproc_crash_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         signal: Signal,
-        _info: siginfo_t,
+        _info: &mut siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -991,7 +1000,7 @@ pub mod windows_asan_handler {
 }
 
 #[cfg(all(windows, feature = "std"))]
-mod windows_exception_handler {
+pub mod windows_exception_handler {
     #[cfg(feature = "std")]
     use alloc::boxed::Box;
     use alloc::{string::String, vec::Vec};
@@ -1058,6 +1067,9 @@ mod windows_exception_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
+    ///
+    /// # Safety
+    /// Well, exception handling is not safe
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, OF, Z>()
     where
@@ -1117,6 +1129,9 @@ mod windows_exception_handler {
     }
 
     /// Timeout handler for windows
+    ///
+    /// # Safety
+    /// Well, exception handling is not safe
     pub unsafe extern "system" fn inproc_timeout_handler<E, EM, OF, Z>(
         _p0: *mut u8,
         global_state: *mut c_void,
@@ -1180,8 +1195,12 @@ mod windows_exception_handler {
         // log::info!("TIMER INVOKED!");
     }
 
+    /// Crash handler for windows
+    ///
+    /// # Safety
+    /// Well, exception handling is not safe
     #[allow(clippy::too_many_lines)]
-    pub(crate) unsafe fn inproc_crash_handler<E, EM, OF, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -1303,7 +1322,7 @@ mod windows_exception_handler {
 /// The signature of the crash handler function
 #[cfg(all(feature = "std", unix))]
 pub(crate) type ForkHandlerFuncPtr =
-    unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessForkExecutorGlobalData);
+    unsafe fn(Signal, &mut siginfo_t, &mut ucontext_t, data: &mut InProcessForkExecutorGlobalData);
 
 /// The inmem fork executor's handlers.
 #[cfg(all(feature = "std", unix))]
@@ -1443,7 +1462,7 @@ pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData
 
 #[cfg(all(feature = "std", unix))]
 impl Handler for InProcessForkExecutorGlobalData {
-    fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
+    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: &mut ucontext_t) {
         match signal {
             Signal::SigUser2 | Signal::SigAlarm => unsafe {
                 if !FORK_EXECUTOR_GLOBAL_DATA.timeout_handler.is_null() {
@@ -2052,7 +2071,7 @@ pub mod child_signal_handlers {
     #[cfg(unix)]
     pub(crate) unsafe fn child_crash_handler<E>(
         _signal: Signal,
-        _info: siginfo_t,
+        _info: &mut siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
@@ -2074,7 +2093,7 @@ pub mod child_signal_handlers {
     #[cfg(unix)]
     pub(crate) unsafe fn child_timeout_handler<E>(
         _signal: Signal,
-        _info: siginfo_t,
+        _info: &mut siginfo_t,
         _context: &mut ucontext_t,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
