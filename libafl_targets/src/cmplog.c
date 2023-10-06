@@ -40,11 +40,27 @@ __attribute__((weak)) void *__asan_region_is_poisoned(const void *beg,
 CmpLogMap *libafl_cmplog_map_ptr = &libafl_cmplog_map;
 
 void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
-                                          uint64_t arg1, uint64_t arg2) {
-  STATIC_ASSERT(sizeof(libafl_cmplog_map_ptr->vals.operands) ==
-                sizeof(libafl_cmplog_map_ptr->vals.routines));
+                                                 uint64_t arg1, uint64_t arg2) {
+  if (!libafl_cmplog_enabled) { return; }
+  libafl_cmplog_enabled = false;
 
-  __libafl_targets_cmplog(k, shape, arg1, arg2);
+  uint16_t hits;
+  if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
+    libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_INS;
+    libafl_cmplog_map_ptr->headers[k].hits = 1;
+    libafl_cmplog_map_ptr->headers[k].shape = shape;
+    hits = 0;
+  } else {
+    hits = libafl_cmplog_map_ptr->headers[k].hits++;
+    if (libafl_cmplog_map_ptr->headers[k].shape < shape) {
+      libafl_cmplog_map_ptr->headers[k].shape = shape;
+    }
+  }
+
+  hits &= CMPLOG_MAP_H - 1;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v0 = arg1;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_enabled = true;
 }
 
 // POSIX shenanigan to see if an area is mapped.
