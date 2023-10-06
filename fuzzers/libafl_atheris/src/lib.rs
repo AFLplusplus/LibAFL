@@ -95,7 +95,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         .get_matches();
 
     let workdir = env::current_dir().unwrap();
-    println!(env::current_dir().unwrap().to_string_lossy().to_string());
+    println!("{}", env::current_dir().unwrap().to_string_lossy().to_string());
 
     let cores = Cores::from_cmdline(matches.get_one::<String>("cores").unwrap())
         .expect("No valid core count given!");
