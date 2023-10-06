@@ -106,7 +106,7 @@ where
         self.original
     }
 
-    /// Add cmpvalues metadata to the State including the logged values.
+    /// Add `AFLppCmpValuesMetadata` to the State including the logged values.
     /// This routine does a basic loop filtering because loop index cmps are not interesting.
     fn add_cmpvalues_meta(&mut self, state: &mut S)
     where
