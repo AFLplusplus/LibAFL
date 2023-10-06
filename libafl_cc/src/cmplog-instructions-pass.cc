@@ -64,7 +64,6 @@ namespace {
 /* Function that we never instrument or analyze */
 /* Note: this ignore check is also called in isInInstrumentList() */
 
-
 /* Function that we never instrument or analyze */
 /* Note: this ignore check is also called in isInInstrumentList() */
 bool isIgnoreFunction(const llvm::Function *F) {
@@ -123,8 +122,6 @@ bool isIgnoreFunction(const llvm::Function *F) {
 
   return false;
 }
-
-
 
 #if USE_NEW_PM
 class CmpLogInstructions : public PassInfoMixin<CmpLogInstructions> {
@@ -308,7 +305,6 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 #else
   Function *cmplogHookInsN = cast<Function>(cN);
 #endif
-
 
   Constant *Null = Constant::getNullValue(PointerType::get(Int8Ty, 0));
 
@@ -616,17 +612,16 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
     }
   }
 
-    if (icomps.size()) {
-        return true;
-    }
-    else {
-        return false;
-    }
-
+  if (icomps.size()) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 #if USE_NEW_PM
-PreservedAnalyses CmpLogInstructions::run(Module &M, ModuleAnalysisManager &MAM) {
+PreservedAnalyses CmpLogInstructions::run(Module                &M,
+                                          ModuleAnalysisManager &MAM) {
 #else
 bool CmpLogInstructions::runOnModule(Module &M) {
 #endif
@@ -647,7 +642,7 @@ bool CmpLogInstructions::runOnModule(Module &M) {
 #if USE_NEW_PM
 #else
 static void registerCmpLogInstructionsPass(const PassManagerBuilder &,
-                                       legacy::PassManagerBase &PM) {
+                                           legacy::PassManagerBase &PM) {
   auto p = new CmpLogInstructions();
   PM.add(p);
 }

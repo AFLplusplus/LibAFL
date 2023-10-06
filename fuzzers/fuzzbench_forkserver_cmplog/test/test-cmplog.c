@@ -16,22 +16,16 @@ int LLVMFuzzerTestOneInput(const uint8_t *buf, size_t i) {
   if (*icmp != 0x69694141) return 0;
   if (memcmp(buf + 8, "1234EF", 6) == 0) abort();
   return 0;
-
 }
 
 int main(int argc, char *argv[]) {
-
   unsigned char buf[1024];
   ssize_t       i;
   while (__AFL_LOOP(1000)) {
-
     i = read(0, (char *)buf, sizeof(buf) - 1);
     if (i > 0) buf[i] = 0;
     LLVMFuzzerTestOneInput(buf, i);
-
   }
 
   return 0;
-
 }
-
