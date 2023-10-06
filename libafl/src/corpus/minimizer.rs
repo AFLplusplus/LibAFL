@@ -142,7 +142,6 @@ where
                 .observers_mut()
                 .post_exec_all(state, &input, &kind)?;
 
-            *state.executions_mut() += 1;
             let executions = *state.executions();
 
             curr += 1;

@@ -39,7 +39,7 @@ use crate::{
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple, UsesObservers},
-    state::UsesState,
+    state::{HasExecutions, UsesState},
     Error,
 };
 
@@ -524,6 +524,7 @@ impl<E, EM, Z> Executor<EM, Z> for TimeoutForkserverExecutor<E>
 where
     E: Executor<EM, Z> + HasForkserver + HasObservers + Debug,
     E::Input: HasTargetBytes,
+    E::State: HasExecutions,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
@@ -531,10 +532,12 @@ where
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
+
         let mut exit_kind = ExitKind::Ok;
 
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out_raw();
@@ -1210,7 +1213,7 @@ impl<EM, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
-    S: UsesInput,
+    S: UsesInput + HasExecutions,
     S::Input: HasTargetBytes,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
@@ -1219,10 +1222,11 @@ where
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
         let mut exit_kind = ExitKind::Ok;
 
         // Write to testcase
