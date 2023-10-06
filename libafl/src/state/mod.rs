@@ -886,6 +886,7 @@ impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
+    execution: usize,
     rand: StdRand,
     phantom: PhantomData<I>,
 }
@@ -897,6 +898,7 @@ impl<I> NopState<I> {
     pub fn new() -> Self {
         NopState {
             metadata: SerdeAnyMap::new(),
+            execution: 0,
             rand: StdRand::default(),
             phantom: PhantomData,
         }
@@ -914,11 +916,11 @@ where
 #[cfg(test)]
 impl<I> HasExecutions for NopState<I> {
     fn executions(&self) -> &usize {
-        unimplemented!();
+        &self.execution
     }
 
     fn executions_mut(&mut self) -> &mut usize {
-        unimplemented!();
+        &mut self.execution
     }
 }
 

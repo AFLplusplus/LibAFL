@@ -187,7 +187,7 @@ where
         executor: &mut E,
         state: &mut EM::State,
         manager: &mut EM,
-    ) -> Result<CorpusId, Error> {
+    ) -> Result<(), Error> {
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
             manager.maybe_report_progress(state, monitor_timeout)?;
@@ -679,8 +679,6 @@ where
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
-        *state.executions_mut() += 1;
-
         start_timer!(state);
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
@@ -731,8 +729,6 @@ where
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
-
-        *state.executions_mut() += 1;
 
         start_timer!(state);
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;

@@ -5,7 +5,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::{State, UsesState},
+    state::{HasExecutions, State, UsesState},
     Error,
 };
 use libafl_bolts::{
@@ -43,7 +43,7 @@ where
 impl<'a, EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<'a, S, SP, OT>
 where
     EM: UsesState<State = S>,
-    S: UsesInput,
+    S: UsesInput + HasExecutions,
     S::Input: HasTargetBytes,
     SP: ShMemProvider,
     Z: UsesState<State = S>,
@@ -52,10 +52,11 @@ where
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
         match &self.map {
             Some(_) => {
                 // use shmem to pass testcase
