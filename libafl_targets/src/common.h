@@ -6,6 +6,9 @@
 #define true 1
 #define false 0
 
+typedef unsigned __int128 uint128_t;
+typedef uint128_t         u128;
+
 #define STATIC_ASSERT(pred) \
   switch (0) {              \
     case 0:                 \

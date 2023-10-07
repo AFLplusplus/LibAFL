@@ -161,6 +161,32 @@ void __libafl_targets_cmplog_routines_len(uintptr_t k, const uint8_t *ptr1,
 
   __libafl_targets_cmplog_routines_checked(k, ptr1, ptr2, len);
 }
+/*
+  CMPLOG Callback for instructions
+*/
+#include <sys/types.h>
+void __cmplog_ins_hook1(uint8_t arg1, uint8_t arg2, uint8_t attr) {
+
+}
+void __cmplog_ins_hook2(uint16_t arg1, uint16_t arg2, uint8_t attr) {
+  
+}
+void __cmplog_ins_hook4(uint32_t arg1, uint32_t arg2, uint8_t attr) {
+  
+}
+void __cmplog_ins_hook8(uint64_t arg1, uint64_t arg2, uint8_t attr) {
+  
+}
+void __cmplog_ins_hook16(uint128_t arg1, uint128_t arg2, uint8_t attr) {
+  
+}
+void __cmplog_ins_hookN(uint128_t arg1, uint128_t arg2, uint8_t attr) {
+  
+}
+
+/*
+  CMPLOG Callback for routines
+*/
 
 void __cmplog_rtn_hook(const uint8_t *ptr1, const uint8_t *ptr2) {
   uintptr_t k = RETADDR;
