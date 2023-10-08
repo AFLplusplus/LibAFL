@@ -1,8 +1,7 @@
 //! A wide variety of mutations used during fuzzing.
 
 use alloc::{borrow::ToOwned, vec::Vec};
-use core::{cmp::min, mem::size_of, ops::Range};
-use std::marker::PhantomData;
+use core::{cmp::min, marker::PhantomData, mem::size_of, ops::Range};
 
 use libafl_bolts::{rands::Rand, Named};
 
