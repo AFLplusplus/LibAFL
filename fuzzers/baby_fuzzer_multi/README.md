@@ -1,6 +1,6 @@
-# Baby fuzzer
+# Baby fuzzer multi
 
-This is a minimalistic example about how to create a libafl based fuzzer.
+This is a minimalistic example about how to create a libafl based fuzzer for targets with multipart inputs.
 
 It runs on a single core until a crash occurs and then exits.
 

@@ -1,3 +1,5 @@
+//! Mutator definitions for [`MultipartInput`]s. See [`crate::inputs::multi`] for details.
+
 use std::cmp::min;
 
 use libafl_bolts::{rands::Rand, Error};
@@ -14,6 +16,12 @@ use crate::{
     random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},
 };
+
+/// Marker trait for if the default multipart input mutator implementation is appropriate.
+///
+/// You should implement this type for your mutator if you just want a random part of the input to
+/// be selected and mutated. Use [`impl_default_multipart`] to implement this marker trait for many
+/// at once.
 pub trait DefaultMultipartMutator {}
 
 impl<I, M, S> Mutator<MultipartInput<I>, S> for M
@@ -47,6 +55,19 @@ where
     }
 }
 
+/// Implements the marker trait [`DefaultMultipartMutator`] for one to many types, e.g.:
+///
+/// ```rs
+/// impl_default_multipart!(
+///     // --- havoc ---
+///     BitFlipMutator,
+///     ByteAddMutator,
+///     ByteDecMutator,
+///     ByteFlipMutator,
+///     ByteIncMutator,
+///     ...
+/// );
+/// ```
 #[macro_export]
 macro_rules! impl_default_multipart {
     ($mutator: ty, $($mutators: ty),+$(,)?) => {
