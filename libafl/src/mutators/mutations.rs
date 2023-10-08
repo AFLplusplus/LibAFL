@@ -2,12 +2,13 @@
 
 use alloc::{borrow::ToOwned, vec::Vec};
 use core::{cmp::min, mem::size_of, ops::Range};
+use std::marker::PhantomData;
 
 use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
     corpus::Corpus,
-    inputs::HasBytesVec,
+    inputs::{HasBytesVec, Input},
     mutators::{MutationResult, Mutator},
     random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},
@@ -1085,12 +1086,45 @@ impl BytesSwapMutator {
 
 /// Crossover insert mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
-pub struct CrossoverInsertMutator;
+pub struct CrossoverInsertMutator<I> {
+    phantom: PhantomData<I>,
+}
 
-impl<S> Mutator<S::Input, S> for CrossoverInsertMutator
+impl<I: HasBytesVec> CrossoverInsertMutator<I> {
+    pub(crate) fn crossover_insert(
+        input: &mut I,
+        size: usize,
+        target: usize,
+        range: Range<usize>,
+        other: &I,
+    ) -> Result<MutationResult, Error> {
+        input.bytes_mut().resize(size + range.len(), 0);
+        unsafe {
+            buffer_self_copy(
+                input.bytes_mut(),
+                target,
+                target + range.len(),
+                size - target,
+            );
+        }
+
+        unsafe {
+            buffer_copy(
+                input.bytes_mut(),
+                other.bytes(),
+                range.start,
+                target,
+                range.len(),
+            );
+        }
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<I, S> Mutator<I, S> for CrossoverInsertMutator<I>
 where
-    S: HasCorpus + HasRand + HasMaxSize,
-    S::Input: HasBytesVec,
+    S: HasCorpus<Input = I> + HasRand + HasMaxSize,
+    I: Input + HasBytesVec,
 {
     fn mutate(
         &mut self,
@@ -1125,20 +1159,43 @@ where
         let range = rand_range(state, other_size, min(other_size, max_size - size));
         let target = state.rand_mut().below(size as u64) as usize;
 
-        input.bytes_mut().resize(size + range.len(), 0);
-        unsafe {
-            buffer_self_copy(
-                input.bytes_mut(),
-                target,
-                target + range.len(),
-                size - target,
-            );
-        }
-
         let other_testcase = state.corpus().get(idx)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other = other_testcase.input().as_ref().unwrap();
 
+        Self::crossover_insert(input, size, target, range, other)
+    }
+}
+
+impl<I> Named for CrossoverInsertMutator<I> {
+    fn name(&self) -> &str {
+        "CrossoverInsertMutator"
+    }
+}
+
+impl<I> CrossoverInsertMutator<I> {
+    /// Creates a new [`CrossoverInsertMutator`].
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Crossover replace mutation for inputs with a bytes vector
+#[derive(Debug, Default)]
+pub struct CrossoverReplaceMutator<I> {
+    phantom: PhantomData<I>,
+}
+
+impl<I: HasBytesVec> CrossoverReplaceMutator<I> {
+    pub(crate) fn crossover_replace(
+        input: &mut I,
+        target: usize,
+        range: Range<usize>,
+        other: &I,
+    ) -> Result<MutationResult, Error> {
         unsafe {
             buffer_copy(
                 input.bytes_mut(),
@@ -1152,28 +1209,10 @@ where
     }
 }
 
-impl Named for CrossoverInsertMutator {
-    fn name(&self) -> &str {
-        "CrossoverInsertMutator"
-    }
-}
-
-impl CrossoverInsertMutator {
-    /// Creates a new [`CrossoverInsertMutator`].
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-/// Crossover replace mutation for inputs with a bytes vector
-#[derive(Debug, Default)]
-pub struct CrossoverReplaceMutator;
-
-impl<S> Mutator<S::Input, S> for CrossoverReplaceMutator
+impl<I, S> Mutator<I, S> for CrossoverReplaceMutator<I>
 where
-    S: HasCorpus + HasRand,
-    S::Input: HasBytesVec,
+    S: HasCorpus<Input = I> + HasRand,
+    I: Input + HasBytesVec,
 {
     fn mutate(
         &mut self,
@@ -1210,30 +1249,23 @@ where
         // No need to load the input again, it'll still be cached.
         let other = other_testcase.input().as_ref().unwrap();
 
-        unsafe {
-            buffer_copy(
-                input.bytes_mut(),
-                other.bytes(),
-                range.start,
-                target,
-                range.len(),
-            );
-        }
-        Ok(MutationResult::Mutated)
+        Self::crossover_replace(input, target, range, other)
     }
 }
 
-impl Named for CrossoverReplaceMutator {
+impl<I> Named for CrossoverReplaceMutator<I> {
     fn name(&self) -> &str {
         "CrossoverReplaceMutator"
     }
 }
 
-impl CrossoverReplaceMutator {
+impl<I> CrossoverReplaceMutator<I> {
     /// Creates a new [`CrossoverReplaceMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self
+        Self {
+            phantom: PhantomData,
+        }
     }
 }
 
