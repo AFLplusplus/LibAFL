@@ -10,7 +10,6 @@
 use std::{collections::BTreeMap, ffi::c_void};
 
 use backtrace::Backtrace;
-use bit_reverse::ParallelReverse;
 use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
@@ -589,7 +588,7 @@ impl Allocator {
 
                 if let Ok(mapping) = MmapOptions::new(1 << (*try_shadow_bit + 1))
                     .unwrap()
-                    // .with_flags(MmapFlags::NO_RESERVE)
+                    .with_flags(MmapFlags::NO_RESERVE)
                     .with_address(addr)
                     .reserve_mut()
                 {

@@ -83,7 +83,6 @@ impl AsanRuntime {
         ret
     }
     #[inline]
-    #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_HeapFree(&mut self, handle: *mut c_void, flags: u32, ptr: *mut c_void) -> bool {
@@ -100,10 +99,12 @@ impl AsanRuntime {
         }
     }
     #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
     pub fn hook_check_HeapSize(
         &mut self,
-        handle: *mut c_void,
-        flags: u32,
+        _handle: *mut c_void,
+        _flags: u32,
         ptr: *mut c_void,
     ) -> bool {
         self.allocator_mut().is_managed(ptr)
@@ -111,14 +112,16 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[cfg(windows)]
-    pub fn hook_HeapSize(&mut self, handle: *mut c_void, flags: u32, ptr: *mut c_void) -> usize {
+    pub fn hook_HeapSize(&mut self, _handle: *mut c_void, _flags: u32, ptr: *mut c_void) -> usize {
         self.allocator().get_usable_size(ptr)
     }
     #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
     pub fn hook_check_RtlValidateHeap(
         &mut self,
-        handle: *mut c_void,
-        flags: u32,
+        _handle: *mut c_void,
+        _flags: u32,
         ptr: *mut c_void,
     ) -> bool {
         self.allocator_mut().is_managed(ptr)
@@ -128,9 +131,9 @@ impl AsanRuntime {
     #[cfg(windows)]
     pub fn hook_RtlValidateHeap(
         &mut self,
-        handle: *mut c_void,
-        flags: u32,
-        ptr: *mut c_void,
+        _handle: *mut c_void,
+        _flags: u32,
+        _ptr: *mut c_void,
     ) -> bool {
         true
     }
