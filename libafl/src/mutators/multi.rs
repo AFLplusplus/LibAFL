@@ -132,15 +132,22 @@ where
         }
 
         // we can eat the slight bias; number of parts will be small
-        let next = state.rand_mut().next() as usize;
+        let name_choice = state.rand_mut().next() as usize;
+        let part_choice = state.rand_mut().next() as usize;
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
-        let choice = next % other.parts().len();
+        let choice = name_choice % other.names().len();
         let name = &other.names()[choice];
 
-        if let Some(part) = input.part_by_name_mut(name) {
+        let parts = input.parts_by_name(name).count();
+
+        if parts > 0 {
+            let (_, part) = input
+                .parts_by_name_mut(name)
+                .nth(part_choice % parts)
+                .unwrap();
             let size = part.bytes().len();
             let other_size = other.parts()[choice].bytes().len();
 
@@ -159,7 +166,7 @@ where
             Self::crossover_insert(part, size, target, range, &other.parts()[choice])
         } else {
             // just add it!
-            input.add_part(name.clone(), other.parts()[choice].clone())?;
+            input.add_part(name.clone(), other.parts()[choice].clone());
 
             Ok(MutationResult::Mutated)
         }
@@ -186,15 +193,22 @@ where
         }
 
         // we can eat the slight bias; number of parts will be small
-        let next = state.rand_mut().next() as usize;
+        let name_choice = state.rand_mut().next() as usize;
+        let part_choice = state.rand_mut().next() as usize;
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
-        let choice = next % other.parts().len();
+        let choice = name_choice % other.names().len();
         let name = &other.names()[choice];
 
-        if let Some(part) = input.part_by_name_mut(name) {
+        let parts = input.parts_by_name(name).count();
+
+        if parts > 0 {
+            let (_, part) = input
+                .parts_by_name_mut(name)
+                .nth(part_choice % parts)
+                .unwrap();
             let size = part.bytes().len();
             let other_size = other.parts()[choice].bytes().len();
 
@@ -213,7 +227,7 @@ where
             Self::crossover_replace(part, target, range, &other.parts()[choice])
         } else {
             // just add it!
-            input.add_part(name.clone(), other.parts()[choice].clone())?;
+            input.add_part(name.clone(), other.parts()[choice].clone());
 
             Ok(MutationResult::Mutated)
         }

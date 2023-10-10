@@ -117,19 +117,10 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // a generator here is not generalisable
-    let mut initial = MultipartInput::new();
-    initial
-        .add_part(
-            "first".to_string(),
-            BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o']),
-        )
-        .unwrap();
-    initial
-        .add_part(
-            "second".to_string(),
-            BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o']),
-        )
-        .unwrap();
+    let initial = MultipartInput::from([
+        ("one", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
+        ("two", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
+    ]);
 
     fuzzer
         .evaluate_input(&mut state, &mut executor, &mut mgr, initial)

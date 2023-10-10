@@ -4,9 +4,11 @@
 //! possible to dynamically define a single input with dynamic typing. As such, [`MultipartInput`]
 //! requires that each subcomponent be the same subtype.
 
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
-use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::inputs::Input;
@@ -29,7 +31,7 @@ impl<I> MultipartInput<I> {
     }
 
     /// Get the individual parts of this input.
-    pub fn parts(&self) -> &Vec<I> {
+    pub fn parts(&self) -> &[I] {
         &self.parts
     }
 
@@ -45,33 +47,59 @@ impl<I> MultipartInput<I> {
         &self.names
     }
 
-    /// Gets a part by its name.
-    pub fn part_by_name(&self, name: &str) -> Option<&I> {
+    /// Gets a reference to each part with the provided name.
+    pub fn parts_by_name<'a, 'b>(
+        &'b self,
+        name: &'a str,
+    ) -> impl Iterator<Item = (usize, &'b I)> + 'a
+    where
+        'b: 'a,
+    {
         self.names()
             .iter()
-            .position(|s| s == name)
-            .map(|idx| &self.parts()[idx])
+            .zip(&self.parts)
+            .enumerate()
+            .filter_map(move |(i, (s, item))| (s == name).then_some((i, item)))
     }
 
-    /// Gets a mutable reference to a part by its name.
-    pub fn part_by_name_mut(&mut self, name: &str) -> Option<&mut I> {
-        self.names()
+    /// Gets a mutable reference to each part with the provided name.
+    pub fn parts_by_name_mut<'a, 'b>(
+        &'b mut self,
+        name: &'a str,
+    ) -> impl Iterator<Item = (usize, &'b mut I)> + 'a
+    where
+        'b: 'a,
+    {
+        self.names
             .iter()
-            .position(|s| s == name)
-            .map(|idx| &mut self.parts[idx])
+            .zip(&mut self.parts)
+            .enumerate()
+            .filter_map(move |(i, (s, item))| (s == name).then_some((i, item)))
     }
 
-    /// Adds a part to this input, emitting an error in the case that this part was already present.
-    pub fn add_part(&mut self, name: String, part: I) -> Result<(), Error> {
-        if self.names.contains(&name) {
-            return Err(Error::illegal_argument(format!(
-                "{} was already inserted into this multipart input!",
-                name
-            )));
-        }
+    /// Adds a part to this input, potentially with the same name as an existing part.
+    pub fn add_part(&mut self, name: String, part: I) {
         self.parts.push(part);
         self.names.push(name);
-        Ok(())
+    }
+
+    /// Iterate over the parts of this input; no order is specified.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &I)> {
+        self.names.iter().map(String::as_ref).zip(self.parts())
+    }
+}
+
+impl<I, It, S> From<It> for MultipartInput<I>
+where
+    It: IntoIterator<Item = (S, I)>,
+    S: AsRef<str>,
+{
+    fn from(parts: It) -> Self {
+        let mut input = MultipartInput::new();
+        for (name, part) in parts {
+            input.add_part(name.as_ref().to_string(), part);
+        }
+        input
     }
 }
 
