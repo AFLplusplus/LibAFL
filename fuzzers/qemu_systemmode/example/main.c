@@ -1,12 +1,11 @@
-int BREAKPOINT() {
+int __attribute__ ((noinline)) BREAKPOINT() {
   for (;;) {}
 }
 
 int LLVMFuzzerTestOneInput(unsigned int *Data, unsigned int Size) {
-  // if (Data[3] == 0) {while(1){}}  // cause a timeout
+  if (Data[3] == 0) {while(1){}}  // cause a timeout
   for (int i = 0; i < Size; i++) {
-    // if (Data[i] > 0xFFd0 && Data[i] < 0xFFFF) {return 1;}    // cause qemu to
-    // crash
+    // if (Data[i] > 0xFFd0 && Data[i] < 0xFFFF) {return 1;}    // cause qemu to crash
     for (int j = i + 1; j < Size; j++) {
       if (Data[j] == 0) { continue; }
       if (Data[j] > Data[i]) {
