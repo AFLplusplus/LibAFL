@@ -3,14 +3,13 @@
 #[cfg(feature = "i386")]
 use core::mem::size_of;
 use core::time::Duration;
-use std::{env, fs::DirEntry, io, path::PathBuf, process, ptr::addr_of_mut};
+use std::{env, fs::DirEntry, io, path::PathBuf, ptr::addr_of_mut};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    corpus::{Corpus, CorpusId, NopCorpus, OnDiskCorpus},
+    corpus::{CorpusId, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter},
     executors::{ExitKind, TimeoutExecutor},
-    feedbacks::MaxMapFeedback,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -19,7 +18,7 @@ use libafl::{
     prelude::LlmpRestartingEventManager,
     schedulers::QueueScheduler,
     stages::{MapEqualityFactory, StagesTuple, StdTMinMutationalStage},
-    state::{HasCorpus, StdState},
+    state::StdState,
     Error,
 };
 use libafl_bolts::{
@@ -206,6 +205,19 @@ pub fn fuzz() {
             Err(Error::ShuttingDown)?
         }
 
+        let mut state = state.unwrap_or_else(|| {
+            StdState::new(
+                StdRand::with_seed(current_nanos()),
+                OnDiskCorpus::new(PathBuf::from(options.output.clone())).unwrap(),
+                InMemoryCorpus::new(),
+                &mut (),
+                &mut (),
+            )
+            .unwrap()
+        });
+
+        let minimizer = StdScheduledMutator::new(havoc_mutations());
+
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
@@ -215,24 +227,16 @@ pub fn fuzz() {
         };
 
         let feedback_factory = MapEqualityFactory::with_observer(&edges_observer);
-        let mut feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
-        #[allow(clippy::let_unit_value)]
-        let mut objective = ();
-
-        let mut state = state.unwrap_or_else(|| {
-            StdState::new(
-                StdRand::with_seed(current_nanos()),
-                OnDiskCorpus::new(PathBuf::from(options.output.clone())).unwrap(),
-                NopCorpus::new(),
-                &mut feedback,
-                &mut objective,
-            )
-            .unwrap()
-        });
+        let mut stages = tuple_list!(StdTMinMutationalStage::new(
+            minimizer,
+            feedback_factory,
+            options.iterations
+        ));
 
         let scheduler = QueueScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
+        let mut fuzzer = StdFuzzer::new(scheduler, (), ());
 
         let mut hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default()));
 
@@ -248,22 +252,12 @@ pub fn fuzz() {
 
         let mut executor = TimeoutExecutor::new(executor, Duration::from_secs(options.timeout));
 
-        if state.must_load_initial_inputs() {
-            state
-                .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
-                .unwrap_or_else(|_| {
-                    println!("Failed to load initial corpus at {:?}", &corpus_dir);
-                    process::exit(0);
-                });
-            log::debug!("We imported {} inputs from disk.", state.corpus().count());
-        }
-
-        let mutator = StdScheduledMutator::new(havoc_mutations());
-        let mut stages = tuple_list!(StdTMinMutationalStage::new(
-            mutator,
-            feedback_factory,
-            options.iterations
-        ));
+        state.load_initial_inputs_by_filenames_forced(
+            &mut fuzzer,
+            &mut executor,
+            &mut mgr,
+            &files,
+        )?;
 
         stages.perform_all(
             &mut fuzzer,

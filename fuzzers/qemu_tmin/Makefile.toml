@@ -230,7 +230,7 @@ command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_tmin-${CARGO_MAKE_PROFILE}"
 args = [    
     "--input", "./corpus",
     "--output", "./output",
-    "--iterations", "100",
+    "--iterations", "10000",
     "--",
     "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]
