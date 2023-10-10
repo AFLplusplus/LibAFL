@@ -10,6 +10,7 @@
 use std::{collections::BTreeMap, ffi::c_void};
 
 use backtrace::Backtrace;
+use bit_reverse::ParallelReverse;
 use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
@@ -237,7 +238,7 @@ impl Allocator {
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
-        log::trace!("serving address: {:?}, size: {:x}", address, size);
+        // log::trace!("serving address: {:?}, size: {:x}", address, size);
         address
     }
 
@@ -342,17 +343,12 @@ impl Allocator {
     }
 
     fn unpoison(start: usize, size: usize) {
-        log::trace!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
+        // log::trace!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
-            log::trace!("memset: {:?}", start as *mut c_void);
-            let mut slice = std::slice::from_raw_parts_mut(start as *mut u8, size / 8);
-            log::trace!("sliced: {:?}", start as *mut c_void);
-            slice.fill(0xff);
-            log::trace!("fill: {:?}", start as *mut c_void);
+            std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0xff);
 
             let remainder = size % 8;
             if remainder > 0 {
-                log::trace!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
                 ((start + size / 8) as *mut u8).write(0xff << (8 - remainder));
             }
         }
@@ -362,12 +358,10 @@ impl Allocator {
     pub fn poison(start: usize, size: usize) {
         // log::trace!("poisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
-            // log::trace!("memset: {:?}", start as *mut c_void);
             std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0x0);
 
             let remainder = size % 8;
             if remainder > 0 {
-                // log::trace!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
                 ((start + size / 8) as *mut u8).write(0x00);
             }
         }
@@ -380,21 +374,14 @@ impl Allocator {
         end: usize,
         unpoison: bool,
     ) -> (usize, usize) {
-        log::trace!("start: {:x}, end {:x}, size {:x}", start, end, end - start);
+        // log::trace!("start: {:x}, end {:x}, size {:x}", start, end, end - start);
 
         let shadow_mapping_start = map_to_shadow!(self, start);
-        // winsafe::OutputDebugString(&format!("shadow_mapping_start: {:x}, shadow_size: {:x}\n", shadow_mapping_start, (end - start) / 8));
 
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
         let shadow_end = self.round_up_to_page((end - start) / 8 + self.page_size + shadow_start);
         if !self.using_pre_allocated_shadow_mapping {
             for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
-                /*
-                log::trace!(
-                    "range: {:x}-{:x}, pagesize: {}",
-                    range.start, range.end, self.page_size
-                );
-                */
                 let mapping = MmapOptions::new(range.end - range.start - 1)
                     .unwrap()
                     .with_address(range.start)
@@ -408,16 +395,11 @@ impl Allocator {
         } else {
             let mut newly_committed_regions = Vec::new();
             for gap in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
-                // winsafe::OutputDebugString(&format!("gap: {:x}..{:x}\n", gap.start, gap.end));
                 let mut new_reserved_region = None;
                 for reserved in &mut self.pre_allocated_shadow_mappings {
-                    // winsafe::OutputDebugString(&format!("prealloc start: {:x}..{:x}\n", reserved.start(), reserved.end()));
                     if gap.start >= reserved.start() && gap.end <= reserved.end() {
                         let mut to_be_commited =
                             reserved.split_off(gap.start - reserved.start()).unwrap();
-                        // winsafe::OutputDebugString(&format!("lower is {:x}..{:x}\n", reserved.start(), reserved.end()));
-                        // winsafe::OutputDebugString(&format!("to_be_commited is {:x}..{:x}\n", to_be_commited.start(), gap.end));
-                        // winsafe::OutputDebugString(&format!("upper is {:x}..{:x}\n", gap.end, to_be_commited.end()));
 
                         if to_be_commited.end() > gap.end {
                             let upper = to_be_commited
@@ -449,7 +431,6 @@ impl Allocator {
             Self::unpoison(shadow_mapping_start, end - start);
         }
 
-        // winsafe::OutputDebugString("hello\n");
         (shadow_mapping_start, (end - start) / 8 + 1)
     }
 
@@ -462,7 +443,7 @@ impl Allocator {
             return true;
         }
         let address = address as usize;
-        let mut shadow_size = size / 8;
+        let mut shadow_size = size / 8 + 1;
 
         let mut shadow_addr = map_to_shadow!(self, address);
 
@@ -473,28 +454,37 @@ impl Allocator {
                 return false;
             }
             shadow_addr += 1;
-            shadow_size -= 1;
+            if shadow_size > 0 {
+                shadow_size -= 1;
+            }
         }
 
-        let buf = unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
+        if shadow_size > 0 {
+            let buf =
+                unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
 
-        let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
+            let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
 
-        if prefix.iter().all(|&x| x == 0xff)
-            && suffix.iter().all(|&x| x == 0xff)
-            && aligned
-                .iter()
-                .all(|&x| x == 0xffffffffffffffffffffffffffffffffu128)
-        {
-            let shadow_remainder = (size % 8) as u8;
-            if shadow_remainder > 0 {
-                (unsafe { ((shadow_addr + shadow_size) as *mut u8).read() } & shadow_remainder)
-                    == shadow_remainder
+            if prefix.iter().all(|&x| x == 0xff)
+                && suffix.iter().all(|&x| x == 0xff)
+                && aligned
+                    .iter()
+                    .all(|&x| x == 0xffffffffffffffffffffffffffffffffu128)
+            {
+                let shadow_remainder = (size % 8) as u8;
+                if shadow_remainder > 0 {
+                    let remainder = unsafe { ((shadow_addr + shadow_size) as *mut u8).read() };
+                    let mask = !((1 << (8 - shadow_remainder)) - 1) as u8;
+
+                    remainder & mask == mask
+                } else {
+                    true
+                }
             } else {
-                true
+                false
             }
         } else {
-            false
+            true
         }
     }
     /// Maps the address to a shadow address
@@ -554,7 +544,6 @@ impl Allocator {
             let start = area.as_ref().unwrap().start();
             let end = area.unwrap().end();
             occupied_ranges.push((start, end));
-            log::trace!("{:x} {:x}", start, end);
             let base: usize = 2;
             // On x64, if end > 2**48, then that's in vsyscall or something.
             #[cfg(all(unix, target_arch = "x86_64"))]
@@ -592,7 +581,7 @@ impl Allocator {
                 // check if the proposed shadow bit overlaps with occupied ranges.
                 for (start, end) in &occupied_ranges {
                     if (shadow_start <= *end) && (*start <= shadow_end) {
-                        log::trace!("{:x} {:x}, {:x} {:x}", shadow_start, shadow_end, start, end);
+                        // log::trace!("{:x} {:x}, {:x} {:x}", shadow_start, shadow_end, start, end);
                         log::warn!("shadow_bit {try_shadow_bit:x} is not suitable");
                         break;
                     }
