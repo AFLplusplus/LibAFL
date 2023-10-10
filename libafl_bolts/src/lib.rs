@@ -118,7 +118,7 @@ pub mod fs;
 #[cfg(feature = "alloc")]
 pub mod llmp;
 pub mod math;
-#[cfg(all(feature = "std", unix))]
+#[cfg(feature = "std")]
 pub mod minibsod;
 pub mod os;
 #[cfg(feature = "alloc")]
