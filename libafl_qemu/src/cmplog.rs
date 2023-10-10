@@ -1,7 +1,7 @@
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, state::HasMetadata};
 pub use libafl_targets::{
-    cmplog::__libafl_targets_cmplog_instructions, CmpLogMap, CmpLogObserver, CMPLOG_MAP_H,
+    cmps::__libafl_targets_cmplog_instructions, CmpLogMap, CmpLogObserver, CMPLOG_MAP_H,
     CMPLOG_MAP_PTR, CMPLOG_MAP_SIZE, CMPLOG_MAP_W,
 };
 use serde::{Deserialize, Serialize};

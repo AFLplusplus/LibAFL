@@ -21,16 +21,13 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations,
         StdMOptMutator, Tokens,
     },
-    observers::{
-        AFLppCmpMap, AFLppCmpObserver, HitcountsMapObserver, StdMapObserver, TimeObserver,
-    },
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
         calibrate::CalibrationStage, mutational::MultiMutationalStage,
-        power::StdPowerMutationalStage, tracing::AFLppCmplogTracingStage, ColorizationStage,
-        IfStage,
+        power::StdPowerMutationalStage, ColorizationStage, IfStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -41,6 +38,10 @@ use libafl_bolts::{
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
     AsMutSlice,
+};
+use libafl_targets::{
+    cmps::{observers::AFLppCmpLogObserver, stages::AFLppCmplogTracingStage},
+    AFLppCmpLogMap,
 };
 use nix::sys::signal::Signal;
 
@@ -344,13 +345,13 @@ fn fuzz(
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
         let mut cmplog_shmem = shmem_provider
-            .new_shmem(core::mem::size_of::<AFLppCmpMap>())
+            .new_shmem(core::mem::size_of::<AFLppCmpLogMap>())
             .unwrap();
         // let the forkserver know the shmid
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
-        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpMap>() };
+        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpLogMap>() };
 
-        let cmplog_observer = AFLppCmpObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
 
         let cmplog_forkserver = ForkserverExecutor::builder()
             .program(exec)

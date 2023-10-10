@@ -248,8 +248,8 @@ impl ToolWrapper for ClangWrapper {
         self.linking = linking;
         self.shared = shared;
 
+        new_args.push("-g".into());
         if self.optimize {
-            new_args.push("-g".into());
             new_args.push("-O3".into());
             new_args.push("-funroll-loops".into());
         }
@@ -585,13 +585,13 @@ impl ClangWrapper {
         self
     }
 
-    /// Disable optimizations
+    /// Disable optimizations, call this before calling `parse_args`
     pub fn dont_optimize(&mut self) -> &'_ mut Self {
         self.optimize = false;
         self
     }
 
-    /// Set cpp mode
+    /// Set cpp mode, call this before calling `parse_args`
     pub fn cpp(&mut self, value: bool) -> &'_ mut Self {
         self.is_cpp = value;
         self
