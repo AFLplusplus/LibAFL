@@ -930,6 +930,7 @@ pub fn generate_minibsod<W: Write>(
     write_minibsod(writer)
 }
 
+#[cfg(unix)]
 #[cfg(test)]
 mod tests {
 
