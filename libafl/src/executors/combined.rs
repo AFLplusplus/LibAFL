@@ -6,7 +6,7 @@ use core::fmt::Debug;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     observers::UsesObservers,
-    state::UsesState,
+    state::{HasExecutions, UsesState},
     Error,
 };
 
@@ -45,6 +45,7 @@ where
     A: Executor<EM, Z>,
     B: Executor<EM, Z, State = A::State>,
     EM: UsesState<State = A::State>,
+    EM::State: HasExecutions,
     Z: UsesState<State = A::State>,
 {
     fn run_target(
@@ -54,6 +55,8 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
+
         let ret = self.primary.run_target(fuzzer, state, mgr, input);
         self.primary.post_run_reset();
         self.secondary.post_run_reset();

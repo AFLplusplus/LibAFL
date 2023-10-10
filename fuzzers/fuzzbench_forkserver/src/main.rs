@@ -21,9 +21,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{
-        AFLppCmpMap, HitcountsMapObserver, StdCmpValuesObserver, StdMapObserver, TimeObserver,
-    },
+    observers::{HitcountsMapObserver, StdCmpValuesObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -41,6 +39,7 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsMutSlice,
 };
+use libafl_targets::cmps::AFLppCmpLogMap;
 use nix::sys::signal::Signal;
 
 pub fn main() {
@@ -342,11 +341,11 @@ fn fuzz(
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
         let mut cmplog_shmem = shmem_provider
-            .new_shmem(core::mem::size_of::<AFLppCmpMap>())
+            .new_shmem(core::mem::size_of::<AFLppCmpLogMap>())
             .unwrap();
         // let the forkserver know the shmid
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
-        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpMap>() };
+        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpLogMap>() };
 
         let cmplog_observer = StdCmpValuesObserver::new("cmplog", cmpmap, true);
 

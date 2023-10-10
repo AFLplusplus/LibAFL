@@ -898,7 +898,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 pub fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
-    _siginfo: siginfo_t,
+    _siginfo: &siginfo_t,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     writeln!(writer, "{:━^100}", " CRASH ")?;

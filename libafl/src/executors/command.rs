@@ -30,7 +30,7 @@ use crate::{inputs::Input, Error};
 use crate::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
+    state::{HasExecutions, UsesState},
     std::borrow::ToOwned,
 };
 
@@ -313,7 +313,7 @@ where
 impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
-    S: UsesInput,
+    S: UsesInput + HasExecutions,
     S::Input: HasTargetBytes,
     T: CommandConfigurator + Debug,
     OT: Debug + MatchName + ObserversTuple<S>,
@@ -322,13 +322,15 @@ where
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
         use wait_timeout::ChildExt;
+
+        *state.executions_mut() += 1;
 
         let mut child = self.configurer.spawn_child(input)?;
 
@@ -619,7 +621,7 @@ impl CommandExecutorBuilder {
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
-/// use libafl::{Error, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::UsesState};
+/// use libafl::{Error, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
 /// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
@@ -650,7 +652,7 @@ impl CommandExecutorBuilder {
 /// where
 ///     EM: UsesState,
 ///     Z: UsesState<State = EM::State>,
-///     EM::State: UsesInput,
+///     EM::State: UsesInput + HasExecutions,
 ///     EM::Input: HasTargetBytes
 /// {
 ///     MyExecutor.into_executor(())

@@ -18,6 +18,12 @@ fn main() {
     let cmp_map_size: usize = option_env!("LIBAFL_CMP_MAP_SIZE")
         .map_or(Ok(65536), str::parse)
         .expect("Could not parse LIBAFL_CMP_MAP_SIZE");
+    let aflpp_cmplog_map_w: usize = option_env!("LIBAFL_AFLPP_CMPLOG_MAP_W")
+        .map_or(Ok(65536), str::parse)
+        .expect("Could not parse LIBAFL_AFLPP_CMPLOG_MAP_W");
+    let aflpp_cmplog_map_h: usize = option_env!("LIBAFL_AFLPP_CMPLOG_MAP_W")
+        .map_or(Ok(32), str::parse)
+        .expect("Could not parse LIBAFL_AFLPP_CMPLOG_MAP_W");
     let cmplog_map_w: usize = option_env!("LIBAFL_CMPLOG_MAP_W")
         .map_or(Ok(65536), str::parse)
         .expect("Could not parse LIBAFL_CMPLOG_MAP_W");
@@ -36,6 +42,10 @@ fn main() {
         pub const EDGES_MAP_SIZE: usize = {edges_map_size};
         /// The size of the cmps map
         pub const CMP_MAP_SIZE: usize = {cmp_map_size};
+        /// The width of the aflpp cmplog map
+        pub const AFLPP_CMPLOG_MAP_W: usize = {aflpp_cmplog_map_w};
+        /// The height of the aflpp cmplog map
+        pub const AFLPP_CMPLOG_MAP_H: usize = {aflpp_cmplog_map_h};
         /// The width of the `CmpLog` map
         pub const CMPLOG_MAP_W: usize = {cmplog_map_w};
         /// The height of the `CmpLog` map
@@ -48,6 +58,8 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMP_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_AFLPP_CMPLOG_MAP_W");
+    println!("cargo:rerun-if-env-changed=LIBAFL_AFLPP_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
@@ -57,6 +69,9 @@ fn main() {
         println!("cargo:rerun-if-changed=src/sancov_cmp.c");
 
         let mut sancov_cmp = cc::Build::new();
+
+        #[cfg(unix)]
+        sancov_cmp.flag("-Wno-sign-compare");
 
         #[cfg(feature = "sancov_value_profile")]
         {
@@ -77,6 +92,14 @@ fn main() {
 
         sancov_cmp
             .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+            .define(
+                "AFLPP_CMPLOG_MAP_W",
+                Some(&*format!("{aflpp_cmplog_map_w}")),
+            )
+            .define(
+                "AFLPP_CMPLOG_MAP_H",
+                Some(&*format!("{aflpp_cmplog_map_h}")),
+            )
             .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
             .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
             .file(src_dir.join("sancov_cmp.c"))
@@ -150,11 +173,43 @@ fn main() {
     println!("cargo:rerun-if-changed=src/cmplog.h");
     println!("cargo:rerun-if-changed=src/cmplog.c");
 
-    cc::Build::new()
-        .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-        .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-        .file(src_dir.join("cmplog.c"))
-        .compile("cmplog");
+    #[cfg(unix)]
+    {
+        cc::Build::new()
+            .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
+            .flag("-Wno-sign-compare")
+            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+            .define(
+                "AFLPP_CMPLOG_MAP_W",
+                Some(&*format!("{aflpp_cmplog_map_w}")),
+            )
+            .define(
+                "AFLPP_CMPLOG_MAP_H",
+                Some(&*format!("{aflpp_cmplog_map_h}")),
+            )
+            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+            .file(src_dir.join("cmplog.c"))
+            .compile("cmplog");
+    }
+
+    #[cfg(not(unix))]
+    {
+        cc::Build::new()
+            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+            .define(
+                "AFLPP_CMPLOG_MAP_W",
+                Some(&*format!("{aflpp_cmplog_map_w}")),
+            )
+            .define(
+                "AFLPP_CMPLOG_MAP_H",
+                Some(&*format!("{aflpp_cmplog_map_h}")),
+            )
+            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+            .file(src_dir.join("cmplog.c"))
+            .compile("cmplog");
+    }
 
     let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
 

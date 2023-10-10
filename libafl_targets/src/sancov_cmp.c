@@ -21,7 +21,7 @@ void __sanitizer_cov_trace_cmp1(uint8_t arg1, uint8_t arg2) {
 #endif
 #ifdef SANCOV_CMPLOG
   k &= CMPLOG_MAP_W - 1;
-  __libafl_targets_cmplog(k, 1, (uint64_t)arg1, (uint64_t)arg2);
+  __libafl_targets_cmplog_instructions(k, 1, (uint64_t)arg1, (uint64_t)arg2);
 #endif
 }
 
@@ -35,7 +35,7 @@ void __sanitizer_cov_trace_cmp2(uint16_t arg1, uint16_t arg2) {
 #endif
 #ifdef SANCOV_CMPLOG
   k &= CMPLOG_MAP_W - 1;
-  __libafl_targets_cmplog(k, 2, (uint64_t)arg1, (uint64_t)arg2);
+  __libafl_targets_cmplog_instructions(k, 2, (uint64_t)arg1, (uint64_t)arg2);
 #endif
 }
 
@@ -49,7 +49,7 @@ void __sanitizer_cov_trace_cmp4(uint32_t arg1, uint32_t arg2) {
 #endif
 #ifdef SANCOV_CMPLOG
   k &= CMPLOG_MAP_W - 1;
-  __libafl_targets_cmplog(k, 4, (uint64_t)arg1, (uint64_t)arg2);
+  __libafl_targets_cmplog_instructions(k, 4, (uint64_t)arg1, (uint64_t)arg2);
 #endif
 }
 
@@ -63,7 +63,7 @@ void __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2) {
 #endif
 #ifdef SANCOV_CMPLOG
   k &= CMPLOG_MAP_W - 1;
-  __libafl_targets_cmplog(k, 8, (uint64_t)arg1, (uint64_t)arg2);
+  __libafl_targets_cmplog_instructions(k, 8, (uint64_t)arg1, (uint64_t)arg2);
 #endif
 }
 
@@ -97,7 +97,7 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 #endif
 #ifdef SANCOV_CMPLOG
     k &= CMPLOG_MAP_W - 1;
-    __libafl_targets_cmplog(k, cases[1] / 8, val, cases[i + 2]);
+    __libafl_targets_cmplog_instructions(k, cases[1] / 8, val, cases[i + 2]);
 #endif
   }
 }
