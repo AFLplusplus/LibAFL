@@ -147,6 +147,7 @@ pub struct AsanRuntime {
     skip_ranges: Vec<SkipRange>,
     continue_on_error: bool,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
+    hooks_enabled: bool,
 
     #[cfg(target_arch = "aarch64")]
     eh_frame: [u32; ASAN_EH_FRAME_DWORD_COUNT],
@@ -280,6 +281,7 @@ impl FridaRuntime for AsanRuntime {
         let slice = target_bytes.as_slice();
 
         self.unpoison(slice.as_ptr() as usize, slice.len());
+        self.enable_hooks();
         Ok(())
     }
 
@@ -287,6 +289,7 @@ impl FridaRuntime for AsanRuntime {
         &mut self,
         input: &I,
     ) -> Result<(), libafl::Error> {
+        self.disable_hooks();
         if self.check_for_leaks_enabled {
             self.check_for_leaks();
         }
@@ -389,6 +392,15 @@ impl AsanRuntime {
         self.allocator.unpoison_all_existing_memory();
     }
 
+    /// Enable all function hooks
+    fn enable_hooks(&mut self) {
+        self.hooks_enabled = true;
+    }
+    /// Disable all function hooks
+    fn disable_hooks(&mut self) {
+        self.hooks_enabled = false;
+    }
+
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
     /// tls mappings.
     #[allow(clippy::unused_self)]
@@ -456,13 +468,11 @@ impl AsanRuntime {
         unsafe {
             write_volatile(&mut stack_var, 0xfadbeef);
         }
-        log::trace!("stack_address: {:x}", stack_address);
         let mut range = None;
         for area in mmap_rs::MemoryAreas::open(None).unwrap() {
             let area_ref = area.as_ref().unwrap();
-            log::trace!("area: {:x} - {:x} ", area_ref.start(), area_ref.end());
             if area_ref.start() <= stack_address && stack_address <= area_ref.end() {
-                range = Some((area_ref.start(), area_ref.end()));
+                range = Some((area_ref.end() - 1 * 1024 * 1024, area_ref.end()));
                 break;
             }
         }
@@ -535,21 +545,22 @@ impl AsanRuntime {
     #[allow(clippy::too_many_lines)]
     fn hook_functions(&mut self, gum: &Gum) {
         let mut interceptor = frida_gum::interceptor::Interceptor::obtain(gum);
-
         macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-                    extern "C" {
+                    extern "system" {
                         fn $name($($param: $param_type),*) -> $return_type;
                     }
                     #[allow(non_snake_case)]
-                    unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                    unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let real_address = this.real_address_for_stalked(invocation.return_addr());
-                log::trace!("called with return_addr: {:x}, {:x}", invocation.return_addr(), real_address);
-                        if !this.suppressed_addresses.contains(&real_address) && this.module_map.as_ref().unwrap().find(real_address as u64).is_some() {
-                            this.[<hook_ $name>]($($param),*)
+                        if this.hooks_enabled && !this.suppressed_addresses.contains(&real_address) /*&& this.module_map.as_ref().unwrap().find(real_address as u64).is_some()*/ {
+                            this.hooks_enabled = false;
+                            let result = this.[<hook_ $name>]($($param),*);
+                            this.hooks_enabled = true;
+                            result
                         } else {
                             $name($($param),*)
                         }
@@ -566,11 +577,11 @@ impl AsanRuntime {
         macro_rules! hook_func_with_check {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-                    extern "C" {
+                    extern "system" {
                         fn $name($($param: $param_type),*) -> $return_type;
                     }
                     #[allow(non_snake_case)]
-                    unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                    unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         if this.[<hook_check_ $name>]($($param),*) {
@@ -589,9 +600,13 @@ impl AsanRuntime {
         }
 
         // Hook the memory allocator functions
-        hook_func!(Some("ucrtbase.dll"), malloc, (size: usize), *mut c_void);
+        #[cfg(unix)]
+        hook_func!(None, malloc, (size: usize), *mut c_void);
+        #[cfg(unix)]
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
+        #[cfg(unix)]
         hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
+        #[cfg(unix)]
         hook_func_with_check!(None, free, (ptr: *mut c_void), ());
         #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(None, memalign, (size: usize, alignment: usize), *mut c_void);
@@ -627,6 +642,22 @@ impl AsanRuntime {
         hook_func!(
             Some("kernel32"),
             HeapFree,
+            (handle: *mut c_void, flags: u32, ptr: *mut c_void),
+            bool
+        );
+        #[cfg(windows)]
+        hook_func_with_check!(
+            Some("kernel32"),
+            HeapSize,
+            (handle: *mut c_void, flags: u32, ptr: *mut c_void),
+            usize
+        );
+        #[cfg(windows)]
+        hook_func_with_check!(
+            // Some("kernel32"),
+            // HeapValidate,
+            Some("ntdll"),
+            RtlValidateHeap,
             (handle: *mut c_void, flags: u32, ptr: *mut c_void),
             bool
         );
@@ -983,7 +1014,8 @@ impl AsanRuntime {
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::cast_sign_loss)]
     #[allow(clippy::too_many_lines)]
-    extern "C" fn handle_trap(&mut self) {
+    extern "system" fn handle_trap(&mut self) {
+        self.hooks_enabled = false;
         self.dump_registers();
 
         let fault_address = self.regs[17];
@@ -1139,7 +1171,7 @@ impl AsanRuntime {
     #[cfg(target_arch = "aarch64")]
     #[allow(clippy::cast_sign_loss)] // for displacement
     #[allow(clippy::too_many_lines)]
-    extern "C" fn handle_trap(&mut self) {
+    extern "system" fn handle_trap(&mut self) {
         let mut actual_pc = self.regs[31];
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
             Some(addr) => *addr,
@@ -1596,6 +1628,7 @@ impl AsanRuntime {
             ; mov [rsi + 0x38], rdi
 
             ; mov rdi, [>self_addr]
+            ; mov rcx, [>self_addr]
             ; mov rsi, [>trap_func]
 
             // Align the rsp to 16bytes boundary
@@ -2032,7 +2065,6 @@ impl AsanRuntime {
             writer.put_b_label(after_report_impl);
 
             self.current_report_impl = writer.pc();
-            #[cfg(unix)]
             writer.put_bytes(self.blob_report());
 
             writer.put_label(after_report_impl);
@@ -2053,7 +2085,7 @@ impl AsanRuntime {
         writer.put_push_reg(X86Register::Rdx);
         writer.put_push_reg(X86Register::Rcx);
         writer.put_push_reg(X86Register::Rax);
-
+        writer.put_push_reg(X86Register::Rbp);
         /*
         Things are a bit different when Rip is either base register or index register.
         Suppose we have an instruction like
@@ -2074,7 +2106,7 @@ impl AsanRuntime {
                     writer.put_lea_reg_reg_offset(
                         X86Register::Rdi,
                         X86Register::Rsp,
-                        redzone_size + 0x8 * 6,
+                        redzone_size + 0x8 * 7,
                     );
                 }
                 _ => {
@@ -2093,14 +2125,14 @@ impl AsanRuntime {
                 }
                 X86Register::Rdi => {
                     // In this case rdi is already clobbered, so we want it from the stack (we pushed rdi onto stack before!)
-                    writer.put_mov_reg_reg_offset_ptr(X86Register::Rsi, X86Register::Rsp, 0x20);
+                    writer.put_mov_reg_reg_offset_ptr(X86Register::Rsi, X86Register::Rsp, 0x28);
                 }
                 X86Register::Rsp => {
                     // In this case rsp is also clobbered
                     writer.put_lea_reg_reg_offset(
                         X86Register::Rsi,
                         X86Register::Rsp,
-                        redzone_size + 0x8 * 6,
+                        redzone_size + 0x8 * 7,
                     );
                 }
                 _ => {
@@ -2146,6 +2178,7 @@ impl AsanRuntime {
         writer.put_pop_reg(X86Register::Rdi);
         writer.put_pop_reg(X86Register::Rsi);
 
+        writer.put_pop_reg(X86Register::Rbp);
         writer.put_pop_reg(X86Register::Rax);
         writer.put_pop_reg(X86Register::Rcx);
         writer.put_pop_reg(X86Register::Rdx);
@@ -2409,6 +2442,7 @@ impl Default for AsanRuntime {
             skip_ranges: Vec::new(),
             continue_on_error: false,
             shadow_check_func: None,
+            hooks_enabled: false,
             #[cfg(target_arch = "aarch64")]
             eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],
         }

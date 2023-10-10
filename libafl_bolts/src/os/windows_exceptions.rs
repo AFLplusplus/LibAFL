@@ -31,7 +31,7 @@ const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
 
 // For SEH
-const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
+// const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
 
 // From https://github.com/Alexpux/mingw-w64/blob/master/mingw-w64-headers/crt/signal.h
 pub const SIGINT: i32 = 2;

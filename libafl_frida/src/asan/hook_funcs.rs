@@ -18,9 +18,10 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_HeapAlloc(&mut self, _handle: *mut c_void, flags: u32, size: usize) -> *mut c_void {
+        // log::trace!("{:?}: HeapAlloc({:?}, {:}, {:x})", std::thread::current().id(),_handle, flags, size);
         let ret = unsafe { self.allocator_mut().alloc(size, 8) };
         if flags & 8 == 8 {
-            extern "C" {
+            extern "system" {
                 fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
             }
             unsafe {
@@ -37,14 +38,36 @@ impl AsanRuntime {
     #[cfg(windows)]
     pub fn hook_HeapReAlloc(
         &mut self,
-        _handle: *mut c_void,
+        handle: *mut c_void,
         flags: u32,
         ptr: *mut c_void,
         size: usize,
     ) -> *mut c_void {
-        let ret = unsafe { self.allocator_mut().alloc(size, 8) };
+        // log::trace!("{:?}: HeapReAlloc({:?}, {:}, {:?}, {:x})", std::thread::current().id(), handle, flags, ptr, size);
+        let allocator = self.allocator_mut();
+        if !allocator.is_managed(ptr) {
+            extern "system" {
+                fn HeapReAlloc(
+                    handle: *mut c_void,
+                    flags: u32,
+                    ptr: *mut c_void,
+                    size: usize,
+                ) -> *mut c_void;
+            }
+            return unsafe { HeapReAlloc(handle, flags, ptr, size) };
+        }
+        let ret = unsafe {
+            let ret = allocator.alloc(size, 8);
+            extern "system" {
+                fn memcpy(dst: *mut c_void, src: *const c_void, size: usize) -> *mut c_void;
+            }
+            memcpy(ret as *mut c_void, ptr, allocator.get_usable_size(ptr));
+            allocator.release(ptr);
+            ret
+        };
+
         if flags & 8 == 8 {
-            extern "C" {
+            extern "system" {
                 fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
             }
             unsafe {
@@ -60,22 +83,60 @@ impl AsanRuntime {
         ret
     }
     #[inline]
+    #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_HeapFree(&mut self, handle: *mut c_void, flags: u32, ptr: *mut c_void) -> bool {
+        // log::trace!("{:?}: HeapFree({:?}, {:}, {:?})",std::thread::current().id(), handle, flags, ptr);
         let allocator = self.allocator_mut();
         if allocator.is_managed(ptr) {
             unsafe { self.allocator_mut().release(ptr) };
             true
         } else {
-            extern "C" {
+            extern "system" {
                 fn HeapFree(handle: *mut c_void, flags: u32, ptr: *mut c_void) -> bool;
             }
             unsafe { HeapFree(handle, flags, ptr) }
         }
     }
     #[inline]
+    pub fn hook_check_HeapSize(
+        &mut self,
+        handle: *mut c_void,
+        flags: u32,
+        ptr: *mut c_void,
+    ) -> bool {
+        self.allocator_mut().is_managed(ptr)
+    }
+
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_HeapSize(&mut self, handle: *mut c_void, flags: u32, ptr: *mut c_void) -> usize {
+        self.allocator().get_usable_size(ptr)
+    }
+    #[inline]
+    pub fn hook_check_RtlValidateHeap(
+        &mut self,
+        handle: *mut c_void,
+        flags: u32,
+        ptr: *mut c_void,
+    ) -> bool {
+        self.allocator_mut().is_managed(ptr)
+    }
+
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_RtlValidateHeap(
+        &mut self,
+        handle: *mut c_void,
+        flags: u32,
+        ptr: *mut c_void,
+    ) -> bool {
+        true
+    }
+    #[inline]
     pub fn hook_malloc(&mut self, size: usize) -> *mut c_void {
+        log::trace!("hook: malloc({:x})", size);
         unsafe { self.allocator_mut().alloc(size, 8) }
     }
 
@@ -117,7 +178,7 @@ impl AsanRuntime {
     pub fn hook__Znwm(&mut self, size: usize) -> *mut c_void {
         let result = unsafe { self.allocator_mut().alloc(size, 8) };
         if result.is_null() {
-            extern "C" {
+            extern "system" {
                 fn _ZSt17__throw_bad_allocv();
             }
 
@@ -145,7 +206,7 @@ impl AsanRuntime {
     pub fn hook__ZnwmSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
         let result = unsafe { self.allocator_mut().alloc(size, alignment) };
         if result.is_null() {
-            extern "C" {
+            extern "system" {
                 fn _ZSt17__throw_bad_allocv();
             }
 
@@ -169,7 +230,7 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
-        extern "C" {
+        extern "system" {
             fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         let ret = unsafe { self.allocator_mut().alloc(size * nmemb, 8) };
@@ -202,6 +263,7 @@ impl AsanRuntime {
     #[inline]
     #[allow(clippy::cmp_null)]
     pub fn hook_free(&mut self, ptr: *mut c_void) {
+        // log::trace!("hook: free({:x})", ptr as usize);
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
@@ -370,7 +432,7 @@ impl AsanRuntime {
         fd: i32,
         offset: usize,
     ) -> *mut c_void {
-        extern "C" {
+        extern "system" {
             fn mmap(
                 addr: *const c_void,
                 length: usize,
@@ -390,7 +452,7 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_munmap(&mut self, addr: *const c_void, length: usize) -> i32 {
-        extern "C" {
+        extern "system" {
             fn munmap(addr: *const c_void, length: usize) -> i32;
         }
         let res = unsafe { munmap(addr, length) };
@@ -407,10 +469,10 @@ impl AsanRuntime {
     }
     #[inline]
     pub fn hook_write(&mut self, fd: i32, buf: *const c_void, count: usize) -> usize {
-        extern "C" {
+        extern "system" {
             fn write(fd: i32, buf: *const c_void, count: usize) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(buf, count) {
+        if !self.allocator_mut().check_shadow(buf, count) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "write".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -429,10 +491,10 @@ impl AsanRuntime {
     }
     #[inline]
     pub fn hook_read(&mut self, fd: i32, buf: *mut c_void, count: usize) -> usize {
-        extern "C" {
+        extern "system" {
             fn read(fd: i32, buf: *mut c_void, count: usize) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(buf, count) {
+        if !self.allocator_mut().check_shadow(buf, count) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "read".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -446,10 +508,10 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_fgets(&mut self, s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void {
-        extern "C" {
+        extern "system" {
             fn fgets(s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(s, size as usize) {
+        if !self.allocator_mut().check_shadow(s, size as usize) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "fgets".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -463,10 +525,10 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_memcmp(&mut self, s1: *const c_void, s2: *const c_void, n: usize) -> i32 {
-        extern "C" {
+        extern "system" {
             fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
         }
-        if !(self.shadow_check_func().unwrap())(s1, n) {
+        if !self.allocator_mut().check_shadow(s1, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -475,7 +537,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(s2, n) {
+        if !self.allocator_mut().check_shadow(s2, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -489,10 +551,10 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_memcpy(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
-        extern "C" {
+        extern "system" {
             fn memcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(dest, n) {
+        if !self.allocator_mut().check_shadow(dest, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memcpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -501,7 +563,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(src, n) {
+        if !self.allocator_mut().check_shadow(src, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memcpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -516,10 +578,10 @@ impl AsanRuntime {
     #[inline]
     #[cfg(not(target_vendor = "apple"))]
     pub fn hook_mempcpy(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
-        extern "C" {
+        extern "system" {
             fn mempcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(dest, n) {
+        if !self.allocator_mut().check_shadow(dest, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "mempcpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -528,7 +590,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(src, n) {
+        if !self.allocator_mut().check_shadow(src, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "mempcpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -542,10 +604,10 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_memmove(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
-        extern "C" {
+        extern "system" {
             fn memmove(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(dest, n) {
+        if !self.allocator_mut().check_shadow(dest, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memmove".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -554,7 +616,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(src, n) {
+        if !self.allocator_mut().check_shadow(src, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmove".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -568,10 +630,10 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_memset(&mut self, dest: *mut c_void, c: i32, n: usize) -> *mut c_void {
-        extern "C" {
+        extern "system" {
             fn memset(dest: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(dest, n) {
+        if !self.allocator_mut().check_shadow(dest, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memset".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -585,10 +647,10 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_memchr(&mut self, s: *mut c_void, c: i32, n: usize) -> *mut c_void {
-        extern "C" {
+        extern "system" {
             fn memchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator_mut().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memchr".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -603,10 +665,10 @@ impl AsanRuntime {
     #[inline]
     #[cfg(not(target_vendor = "apple"))]
     pub fn hook_memrchr(&mut self, s: *mut c_void, c: i32, n: usize) -> *mut c_void {
-        extern "C" {
+        extern "system" {
             fn memrchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator_mut().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memrchr".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -626,7 +688,7 @@ impl AsanRuntime {
         needle: *const c_void,
         needlelen: usize,
     ) -> *mut c_void {
-        extern "C" {
+        extern "system" {
             fn memmem(
                 haystack: *const c_void,
                 haystacklen: usize,
@@ -634,7 +696,7 @@ impl AsanRuntime {
                 needlelen: usize,
             ) -> *mut c_void;
         }
-        if !(self.shadow_check_func().unwrap())(haystack, haystacklen) {
+        if !self.allocator_mut().check_shadow(haystack, haystacklen) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmem".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -643,7 +705,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(needle, needlelen) {
+        if !self.allocator_mut().check_shadow(needle, needlelen) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "memmem".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -658,10 +720,10 @@ impl AsanRuntime {
     #[cfg(not(target_os = "android"))]
     #[inline]
     pub fn hook_bzero(&mut self, s: *mut c_void, n: usize) {
-        extern "C" {
+        extern "system" {
             fn bzero(s: *mut c_void, n: usize);
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator_mut().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "bzero".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -676,10 +738,10 @@ impl AsanRuntime {
     #[cfg(all(not(target_os = "android"), not(target_vendor = "apple")))]
     #[inline]
     pub fn hook_explicit_bzero(&mut self, s: *mut c_void, n: usize) {
-        extern "C" {
+        extern "system" {
             fn explicit_bzero(s: *mut c_void, n: usize);
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator_mut().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "explicit_bzero".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -694,10 +756,10 @@ impl AsanRuntime {
     #[cfg(not(target_os = "android"))]
     #[inline]
     pub fn hook_bcmp(&mut self, s1: *const c_void, s2: *const c_void, n: usize) -> i32 {
-        extern "C" {
+        extern "system" {
             fn bcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
         }
-        if !(self.shadow_check_func().unwrap())(s1, n) {
+        if !self.allocator_mut().check_shadow(s1, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "bcmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -706,7 +768,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(s2, n) {
+        if !self.allocator_mut().check_shadow(s2, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "bcmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -720,11 +782,14 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strchr(&mut self, s: *mut c_char, c: i32) -> *mut c_char {
-        extern "C" {
+        extern "system" {
             fn strchr(s: *mut c_char, c: i32) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s as *const c_void, unsafe { strlen(s) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strchr".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -738,11 +803,14 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strrchr(&mut self, s: *mut c_char, c: i32) -> *mut c_char {
-        extern "C" {
+        extern "system" {
             fn strrchr(s: *mut c_char, c: i32) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s as *const c_void, unsafe { strlen(s) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strrchr".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -756,11 +824,14 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strcasecmp(&mut self, s1: *const c_char, s2: *const c_char) -> i32 {
-        extern "C" {
+        extern "system" {
             fn strcasecmp(s1: *const c_char, s2: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s1 as *const c_void, unsafe { strlen(s1) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasecmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -769,7 +840,10 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s2 as *const c_void, unsafe { strlen(s2) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasecmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -783,10 +857,10 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strncasecmp(&mut self, s1: *const c_char, s2: *const c_char, n: usize) -> i32 {
-        extern "C" {
+        extern "system" {
             fn strncasecmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, n) {
+        if !self.allocator_mut().check_shadow(s1 as *const c_void, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncasecmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -795,7 +869,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, n) {
+        if !self.allocator_mut().check_shadow(s2 as *const c_void, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncasecmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -809,11 +883,14 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strcat(&mut self, s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-        extern "C" {
+        extern "system" {
             fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s1 as *const c_void, unsafe { strlen(s1) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcat".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -822,7 +899,10 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s2 as *const c_void, unsafe { strlen(s2) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcat".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -836,11 +916,14 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strcmp(&mut self, s1: *const c_char, s2: *const c_char) -> i32 {
-        extern "C" {
+        extern "system" {
             fn strcmp(s1: *const c_char, s2: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s1 as *const c_void, unsafe { strlen(s1) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -849,7 +932,10 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s2 as *const c_void, unsafe { strlen(s2) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -863,11 +949,14 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strncmp(&mut self, s1: *const c_char, s2: *const c_char, n: usize) -> i32 {
-        extern "C" {
+        extern "system" {
             fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
             fn strnlen(s: *const c_char, n: usize) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe { strnlen(s1, n) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s1 as *const c_void, unsafe { strnlen(s1, n) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -876,7 +965,10 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe { strnlen(s2, n) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s2 as *const c_void, unsafe { strnlen(s2, n) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -890,11 +982,14 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strcpy(&mut self, dest: *mut c_char, src: *const c_char) -> *mut c_char {
-        extern "C" {
+        extern "system" {
             fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(dest as *const c_void, unsafe { strlen(src) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "strcpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -903,7 +998,10 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(src as *const c_void, unsafe { strlen(src) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(src as *const c_void, unsafe { strlen(src) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -917,10 +1015,10 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strncpy(&mut self, dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char {
-        extern "C" {
+        extern "system" {
             fn strncpy(dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char;
         }
-        if !(self.shadow_check_func().unwrap())(dest as *const c_void, n) {
+        if !self.allocator_mut().check_shadow(dest as *const c_void, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "strncpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -929,7 +1027,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(src as *const c_void, n) {
+        if !self.allocator_mut().check_shadow(src as *const c_void, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -943,11 +1041,14 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_stpcpy(&mut self, dest: *mut c_char, src: *const c_char) -> *mut c_char {
-        extern "C" {
+        extern "system" {
             fn stpcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(dest as *const c_void, unsafe { strlen(src) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "stpcpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -956,7 +1057,10 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(src as *const c_void, unsafe { strlen(src) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(src as *const c_void, unsafe { strlen(src) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "stpcpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -975,12 +1079,12 @@ impl AsanRuntime {
     }
     #[inline]
     pub fn hook_strdup(&mut self, s: *const c_char) -> *mut c_char {
-        extern "C" {
+        extern "system" {
             fn strlen(s: *const c_char) -> usize;
             fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
         }
         let size = unsafe { strlen(s) };
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, size) {
+        if !self.allocator_mut().check_shadow(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strdup".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -999,11 +1103,11 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strlen(&mut self, s: *const c_char) -> usize {
-        extern "C" {
+        extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
         let size = unsafe { strlen(s) };
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, size) {
+        if !self.allocator_mut().check_shadow(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strlen".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1017,11 +1121,11 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strnlen(&mut self, s: *const c_char, n: usize) -> usize {
-        extern "C" {
+        extern "system" {
             fn strnlen(s: *const c_char, n: usize) -> usize;
         }
         let size = unsafe { strnlen(s, n) };
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, size) {
+        if !self.allocator_mut().check_shadow(s as *const c_void, size) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strnlen".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1035,13 +1139,14 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_strstr(&mut self, haystack: *const c_char, needle: *const c_char) -> *mut c_char {
-        extern "C" {
+        extern "system" {
             fn strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(haystack as *const c_void, unsafe {
-            strlen(haystack)
-        }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(haystack as *const c_void, unsafe { strlen(haystack) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strstr".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1050,7 +1155,9 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(needle as *const c_void, unsafe { strlen(needle) })
+        if !self
+            .allocator_mut()
+            .check_shadow(needle as *const c_void, unsafe { strlen(needle) })
         {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strstr".to_string(),
@@ -1069,13 +1176,14 @@ impl AsanRuntime {
         haystack: *const c_char,
         needle: *const c_char,
     ) -> *mut c_char {
-        extern "C" {
+        extern "system" {
             fn strcasestr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(haystack as *const c_void, unsafe {
-            strlen(haystack)
-        }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(haystack as *const c_void, unsafe { strlen(haystack) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasestr".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1084,7 +1192,9 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(needle as *const c_void, unsafe { strlen(needle) })
+        if !self
+            .allocator_mut()
+            .check_shadow(needle as *const c_void, unsafe { strlen(needle) })
         {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strcasestr".to_string(),
@@ -1099,11 +1209,14 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_atoi(&mut self, s: *const c_char) -> i32 {
-        extern "C" {
+        extern "system" {
             fn atoi(s: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s as *const c_void, unsafe { strlen(s) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atoi".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1118,11 +1231,14 @@ impl AsanRuntime {
     /// Hooks `atol`
     #[inline]
     pub fn hook_atol(&mut self, s: *const c_char) -> i32 {
-        extern "C" {
+        extern "system" {
             fn atol(s: *const c_char) -> i32;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s as *const c_void, unsafe { strlen(s) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atol".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1137,11 +1253,14 @@ impl AsanRuntime {
     /// Hooks `atoll`
     #[inline]
     pub fn hook_atoll(&mut self, s: *const c_char) -> i64 {
-        extern "C" {
+        extern "system" {
             fn atoll(s: *const c_char) -> i64;
             fn strlen(s: *const c_char) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, unsafe { strlen(s) }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s as *const c_void, unsafe { strlen(s) })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "atoll".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1156,11 +1275,14 @@ impl AsanRuntime {
     /// Hooks `wcslen`
     #[inline]
     pub fn hook_wcslen(&mut self, s: *const wchar_t) -> usize {
-        extern "C" {
+        extern "system" {
             fn wcslen(s: *const wchar_t) -> usize;
         }
         let size = unsafe { wcslen(s) };
-        if !(self.shadow_check_func().unwrap())(s as *const c_void, (size + 1) * 2) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s as *const c_void, (size + 1) * 2)
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcslen".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1175,13 +1297,14 @@ impl AsanRuntime {
     /// Hooks `wcscpy`
     #[inline]
     pub fn hook_wcscpy(&mut self, dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t {
-        extern "C" {
+        extern "system" {
             fn wcscpy(dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t;
             fn wcslen(s: *const wchar_t) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(dest as *const c_void, unsafe {
-            (wcslen(src) + 1) * 2
-        }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(dest as *const c_void, unsafe { (wcslen(src) + 1) * 2 })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "wcscpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1190,9 +1313,10 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(src as *const c_void, unsafe {
-            (wcslen(src) + 1) * 2
-        }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(src as *const c_void, unsafe { (wcslen(src) + 1) * 2 })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscpy".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1207,13 +1331,14 @@ impl AsanRuntime {
     /// Hooks `wcscmp`
     #[inline]
     pub fn hook_wcscmp(&mut self, s1: *const wchar_t, s2: *const wchar_t) -> i32 {
-        extern "C" {
+        extern "system" {
             fn wcscmp(s1: *const wchar_t, s2: *const wchar_t) -> i32;
             fn wcslen(s: *const wchar_t) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe {
-            (wcslen(s1) + 1) * 2
-        }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s1 as *const c_void, unsafe { (wcslen(s1) + 1) * 2 })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1222,9 +1347,10 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe {
-            (wcslen(s2) + 1) * 2
-        }) {
+        if !self
+            .allocator_mut()
+            .check_shadow(s2 as *const c_void, unsafe { (wcslen(s2) + 1) * 2 })
+        {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "wcscmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1239,10 +1365,10 @@ impl AsanRuntime {
     #[cfg(target_vendor = "apple")]
     #[inline]
     pub fn hook_memset_pattern4(&mut self, s: *mut c_void, p4: *const c_void, n: usize) {
-        extern "C" {
+        extern "system" {
             fn memset_pattern4(s: *mut c_void, p4: *const c_void, n: usize);
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator_mut().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern4".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1251,7 +1377,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(p4, n / 4) {
+        if !self.allocator_mut().check_shadow(p4, n / 4) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern4".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1266,10 +1392,10 @@ impl AsanRuntime {
     #[cfg(target_vendor = "apple")]
     #[inline]
     pub fn hook_memset_pattern8(&mut self, s: *mut c_void, p8: *const c_void, n: usize) {
-        extern "C" {
+        extern "system" {
             fn memset_pattern8(s: *mut c_void, p8: *const c_void, n: usize);
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator_mut().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern8".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1278,7 +1404,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(p8, n / 8) {
+        if !self.allocator_mut().check_shadow(p8, n / 8) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern8".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1293,10 +1419,10 @@ impl AsanRuntime {
     #[cfg(target_vendor = "apple")]
     #[inline]
     pub fn hook_memset_pattern16(&mut self, s: *mut c_void, p16: *const c_void, n: usize) {
-        extern "C" {
+        extern "system" {
             fn memset_pattern16(s: *mut c_void, p16: *const c_void, n: usize);
         }
-        if !(self.shadow_check_func().unwrap())(s, n) {
+        if !self.allocator_mut().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern16".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -1305,7 +1431,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(p16, n / 16) {
+        if !self.allocator_mut().check_shadow(p16, n / 16) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern16".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
