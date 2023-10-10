@@ -68,7 +68,7 @@ pub struct ShutdownSignalData {
 /// Type for shutdown handler
 #[cfg(all(unix, feature = "std"))]
 pub type ShutdownFuncPtr =
-    unsafe fn(Signal, &mut siginfo_t, &mut ucontext_t, data: &mut ShutdownSignalData);
+    unsafe fn(Signal, &mut siginfo_t, Option<&mut ucontext_t>, data: &mut ShutdownSignalData);
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
@@ -80,7 +80,7 @@ pub type ShutdownFuncPtr =
 pub unsafe fn shutdown_handler<SP>(
     signal: Signal,
     _info: &mut siginfo_t,
-    _context: &mut ucontext_t,
+    _context: Option<&mut ucontext_t>,
     data: &ShutdownSignalData,
 ) where
     SP: ShMemProvider,
@@ -106,7 +106,7 @@ pub unsafe fn shutdown_handler<SP>(
 
 #[cfg(all(unix, feature = "std"))]
 impl Handler for ShutdownSignalData {
-    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: &mut ucontext_t) {
+    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: Option<&mut ucontext_t>) {
         unsafe {
             let data = &mut SHUTDOWN_SIGHANDLER_DATA;
             if !data.shutdown_handler.is_null() {

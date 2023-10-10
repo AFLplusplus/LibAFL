@@ -659,21 +659,30 @@ pub mod unix_signal_handler {
         state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
     };
 
-    pub(crate) type HandlerFuncPtr =
-        unsafe fn(Signal, &mut siginfo_t, &mut ucontext_t, data: &mut InProcessExecutorHandlerData);
+    pub(crate) type HandlerFuncPtr = unsafe fn(
+        Signal,
+        &mut siginfo_t,
+        Option<&mut ucontext_t>,
+        data: &mut InProcessExecutorHandlerData,
+    );
 
     /// A handler that does nothing.
     /*pub fn nop_handler(
         _signal: Signal,
         _info: &mut siginfo_t,
-        _context: &mut ucontext_t,
+        _context: Option<&mut ucontext_t>,
         _data: &mut InProcessExecutorHandlerData,
     ) {
     }*/
 
     #[cfg(unix)]
     impl Handler for InProcessExecutorHandlerData {
-        fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: &mut ucontext_t) {
+        fn handle(
+            &mut self,
+            signal: Signal,
+            info: &mut siginfo_t,
+            context: Option<&mut ucontext_t>,
+        ) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 let in_handler = data.set_in_handler(true);
@@ -759,7 +768,7 @@ pub mod unix_signal_handler {
     pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
         _signal: Signal,
         _info: &mut siginfo_t,
-        _context: &mut ucontext_t,
+        _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: HasObservers,
@@ -809,7 +818,7 @@ pub mod unix_signal_handler {
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         signal: Signal,
         _info: &mut siginfo_t,
-        _context: &mut ucontext_t,
+        _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: Executor<EM, Z> + HasObservers,
@@ -840,8 +849,13 @@ pub mod unix_signal_handler {
                 {
                     let mut writer = std::io::BufWriter::new(&mut bsod);
                     writeln!(writer, "input: {:?}", input.generate_name(0)).unwrap();
-                    libafl_bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
-                        .unwrap();
+                    libafl_bolts::minibsod::generate_minibsod(
+                        &mut writer,
+                        signal,
+                        _info,
+                        _context.as_deref(),
+                    )
+                    .unwrap();
                     writer.flush().unwrap();
                 }
                 log::error!("{}", std::str::from_utf8(&bsod).unwrap());
@@ -864,7 +878,7 @@ pub mod unix_signal_handler {
                 let si_addr = { _info.si_addr() as usize };
 
                 log::error!(
-                "We crashed at addr 0x{si_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
+                    "We crashed at addr 0x{si_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
                 );
 
                 #[cfg(all(feature = "std", unix))]
@@ -876,7 +890,7 @@ pub mod unix_signal_handler {
                             &mut writer,
                             signal,
                             _info,
-                            _context,
+                            _context.as_deref(),
                         )
                         .unwrap();
                         writer.flush().unwrap();
@@ -1322,8 +1336,12 @@ pub mod windows_exception_handler {
 
 /// The signature of the crash handler function
 #[cfg(all(feature = "std", unix))]
-pub(crate) type ForkHandlerFuncPtr =
-    unsafe fn(Signal, &mut siginfo_t, &mut ucontext_t, data: &mut InProcessForkExecutorGlobalData);
+pub(crate) type ForkHandlerFuncPtr = unsafe fn(
+    Signal,
+    &mut siginfo_t,
+    Option<&mut ucontext_t>,
+    data: &mut InProcessForkExecutorGlobalData,
+);
 
 /// The inmem fork executor's handlers.
 #[cfg(all(feature = "std", unix))]
@@ -1463,7 +1481,7 @@ pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData
 
 #[cfg(all(feature = "std", unix))]
 impl Handler for InProcessForkExecutorGlobalData {
-    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: &mut ucontext_t) {
+    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: Option<&mut ucontext_t>) {
         match signal {
             Signal::SigUser2 | Signal::SigAlarm => unsafe {
                 if !FORK_EXECUTOR_GLOBAL_DATA.timeout_handler.is_null() {
@@ -2076,7 +2094,7 @@ pub mod child_signal_handlers {
     pub(crate) unsafe fn child_crash_handler<E>(
         _signal: Signal,
         _info: &mut siginfo_t,
-        _context: &mut ucontext_t,
+        _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
         E: HasObservers,
@@ -2098,7 +2116,7 @@ pub mod child_signal_handlers {
     pub(crate) unsafe fn child_timeout_handler<E>(
         _signal: Signal,
         _info: &mut siginfo_t,
-        _context: &mut ucontext_t,
+        _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
         E: HasObservers,

@@ -1939,7 +1939,12 @@ pub struct LlmpShutdownSignalHandler {
 
 #[cfg(unix)]
 impl Handler for LlmpShutdownSignalHandler {
-    fn handle(&mut self, _signal: Signal, _info: &mut siginfo_t, _context: &mut ucontext_t) {
+    fn handle(
+        &mut self,
+        _signal: Signal,
+        _info: &mut siginfo_t,
+        _context: Option<&mut ucontext_t>,
+    ) {
         unsafe {
             ptr::write_volatile(&mut self.shutting_down, true);
         }

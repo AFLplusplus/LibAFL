@@ -837,12 +837,16 @@ pub fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
     _siginfo: &siginfo_t,
-    ucontext: &ucontext_t,
+    ucontext: Option<&ucontext_t>,
 ) -> Result<(), std::io::Error> {
     writeln!(writer, "{:━^100}", " CRASH ")?;
-    write_crash(writer, signal, ucontext)?;
-    writeln!(writer, "{:━^100}", " REGISTERS ")?;
-    dump_registers(writer, ucontext)?;
+    if let Some(uctx) = ucontext {
+        write_crash(writer, signal, uctx)?;
+        writeln!(writer, "{:━^100}", " REGISTERS ")?;
+        dump_registers(writer, uctx)?;
+    } else {
+        writeln!(writer, "Received signal {}", signal)?;
+    }
     writeln!(writer, "{:━^100}", " BACKTRACE ")?;
     writeln!(writer, "{:?}", backtrace::Backtrace::new())?;
     writeln!(writer, "{:━^100}", " MAPS ")?;
