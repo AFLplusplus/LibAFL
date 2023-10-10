@@ -1002,7 +1002,7 @@ mod windows_exception_handler {
         sync::atomic::{compiler_fence, Ordering},
     };
     #[cfg(feature = "std")]
-    use std::panic;
+    use std::{io::Write, panic};
 
     use libafl_bolts::os::windows_exceptions::{
         ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS,
@@ -1224,6 +1224,17 @@ mod windows_exception_handler {
             let exception_list = data.exceptions();
             if exception_list.contains(&code) {
                 log::error!("Crashed with {code}");
+                #[cfg(all(feature = "std"))]
+                {
+                    let mut bsod = Vec::new();
+                    {
+                        let mut writer = std::io::BufWriter::new(&mut bsod);
+                        libafl_bolts::minibsod::generate_minibsod(&mut writer, exception_pointers)
+                            .unwrap();
+                        writer.flush().unwrap();
+                    }
+                    log::error!("{}", std::str::from_utf8(&bsod).unwrap());
+                }
             } else {
                 // log::trace!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
                 is_crash = false;
