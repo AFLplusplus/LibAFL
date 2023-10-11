@@ -22,8 +22,18 @@ use libafl_bolts::{ownedref::OwnedRefMut, Named};
 #[cfg(feature = "casr")]
 use libcasr::{
     asan::AsanStacktrace,
+    constants::{
+        STACK_FRAME_FILEPATH_IGNORE_REGEXES_CPP, STACK_FRAME_FILEPATH_IGNORE_REGEXES_GO,
+        STACK_FRAME_FILEPATH_IGNORE_REGEXES_JAVA, STACK_FRAME_FILEPATH_IGNORE_REGEXES_PYTHON,
+        STACK_FRAME_FILEPATH_IGNORE_REGEXES_RUST, STACK_FRAME_FUNCTION_IGNORE_REGEXES_CPP,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES_GO, STACK_FRAME_FUNCTION_IGNORE_REGEXES_JAVA,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES_PYTHON, STACK_FRAME_FUNCTION_IGNORE_REGEXES_RUST,
+    },
     init_ignored_frames,
-    stacktrace::{Filter, ParseStacktrace, Stacktrace, StacktraceEntry},
+    stacktrace::{
+        Filter, ParseStacktrace, Stacktrace, StacktraceEntry, STACK_FRAME_FILEPATH_IGNORE_REGEXES,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES,
+    },
 };
 #[cfg(not(feature = "casr"))]
 use regex::Regex;
