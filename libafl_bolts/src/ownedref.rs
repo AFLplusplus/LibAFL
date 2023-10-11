@@ -286,6 +286,11 @@ impl<'a, T> OwnedSlice<'a, T> {
             }
         }
     }
+
+    /// Returns an iterator over the slice.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
 }
 
 impl<'a, 'it, T> IntoIterator for &'it OwnedSlice<'a, T> {
@@ -508,6 +513,16 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
                 }
             }
         }
+    }
+
+    /// Returns an iterator over the slice.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the slice.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 
