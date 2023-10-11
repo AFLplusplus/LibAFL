@@ -40,7 +40,7 @@ __attribute__((weak)) void *__asan_region_is_poisoned(const void *beg,
 CmpLogMap *libafl_cmplog_map_ptr = &libafl_cmplog_map;
 
 void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
-                                                 uint64_t arg1, uint64_t arg2) {
+                                          uint64_t arg1, uint64_t arg2) {
   if (!libafl_cmplog_enabled) { return; }
   libafl_cmplog_enabled = false;
 
