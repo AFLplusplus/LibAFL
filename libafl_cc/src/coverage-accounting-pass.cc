@@ -148,7 +148,7 @@ enum AccountingGranularity {
   UKNOWN_GRAN
 };
 
-static cl::opt<bool> Debug("debug", cl::desc("Debug prints"), cl::init(false),
+static cl::opt<bool> Debug("debug-coverage-accounting", cl::desc("Debug prints"), cl::init(false),
                            cl::NotHidden);
 static cl::opt<std::string> GranularityStr(
     "granularity", cl::desc("Granularity of accounting (BB, FUNC)"),
