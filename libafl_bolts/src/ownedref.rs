@@ -10,7 +10,7 @@ use core::{clone::Clone, fmt::Debug, slice};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{AsMutSlice, AsSlice, Truncate, IntoOwned};
+use crate::{AsMutSlice, AsSlice, IntoOwned, Truncate};
 
 impl<'a, T> Truncate for &'a [T] {
     fn truncate(&mut self, len: usize) {
