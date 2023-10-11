@@ -77,6 +77,7 @@ pub type ShutdownFuncPtr =
 ///
 /// This will acceess `data` and write to the global `data.staterestorer_ptr` if it's not null.
 #[cfg(all(unix, feature = "std"))]
+#[allow(clippy::needless_pass_by_value)]
 pub unsafe fn shutdown_handler<SP>(
     signal: Signal,
     _info: &mut siginfo_t,

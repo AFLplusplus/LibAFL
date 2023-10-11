@@ -556,6 +556,17 @@ pub unsafe extern "C" fn external_current_millis() -> u64 {
     1000
 }
 
+/// Trait to convert into an Owned type
+pub trait IntoOwned {
+    /// Returns if the current type is an owned type.
+    #[must_use]
+    fn is_owned(&self) -> bool;
+
+    /// Transfer the current type into an owned type.
+    #[must_use]
+    fn into_owned(self) -> Self;
+}
+
 /// Can be converted to a slice
 pub trait AsSlice {
     /// Type of the entries in this slice

@@ -189,10 +189,8 @@ where
     }
 
     fn register_location_on_hitmap(&mut self, location: usize) {
-        let mut hasher = self.build_hasher.build_hasher();
-        location.hash(&mut hasher);
         #[allow(clippy::cast_possible_truncation)] // we cannot have more than usize elements..
-        let hash = (hasher.finish() % usize::MAX as u64) as usize;
+        let hash = (self.build_hasher.hash_one(location) % usize::MAX as u64) as usize;
         let val = unsafe {
             // SAFETY: the index is modulo by the length, therefore it is always in bounds
             let len = self.hitcounts_map.len();
