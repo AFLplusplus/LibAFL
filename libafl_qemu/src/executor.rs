@@ -177,6 +177,7 @@ where
         &self.inner
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     pub fn break_on_timeout(&mut self) {
         unsafe {
             BREAK_ON_TMOUT = true;
