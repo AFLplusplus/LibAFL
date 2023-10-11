@@ -2,6 +2,7 @@
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
+    ptr,
 };
 
 #[cfg(feature = "fork")]
@@ -87,7 +88,12 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     let real_crash = if USE_LIBAFL_CRASH_HANDLER {
         true
     } else {
-        libafl_qemu_handle_crash(signal as i32, info, context as *mut _ as *mut c_void) != 0
+        let puc = if let Some(ctx) = context {
+            ctx as *mut _ as *mut c_void
+        } else {
+            ptr::null_mut()
+        };
+        libafl_qemu_handle_crash(signal as i32, info, puc) != 0
     };
     if real_crash {
         libafl::executors::inprocess::unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z>(

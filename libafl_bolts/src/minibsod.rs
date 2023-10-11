@@ -845,7 +845,7 @@ pub fn generate_minibsod<W: Write>(
         writeln!(writer, "{:━^100}", " REGISTERS ")?;
         dump_registers(writer, uctx)?;
     } else {
-        writeln!(writer, "Received signal {}", signal)?;
+        writeln!(writer, "Received signal {signal}")?;
     }
     writeln!(writer, "{:━^100}", " BACKTRACE ")?;
     writeln!(writer, "{:?}", backtrace::Backtrace::new())?;
