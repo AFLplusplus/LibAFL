@@ -81,8 +81,8 @@ typedef uint32_t prev_loc_t;
 
 using namespace llvm;
 
-static cl::opt<bool> Debug("debug", cl::desc("Debug prints"), cl::init(false),
-                           cl::NotHidden);
+static cl::opt<bool>     Debug("debug-afl-coverage", cl::desc("Debug prints"),
+                               cl::init(false), cl::NotHidden);
 static cl::opt<uint32_t> InstRatio(
     "inst_ratio", cl::desc("Instrumentation ratio in percentage"),
     cl::init(100), cl::NotHidden);

@@ -10,18 +10,7 @@ use core::{clone::Clone, fmt::Debug, slice};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{AsMutSlice, AsSlice, Truncate};
-
-/// Trait to convert into an Owned type
-pub trait IntoOwned {
-    /// Returns if the current type is an owned type.
-    #[must_use]
-    fn is_owned(&self) -> bool;
-
-    /// Transfer the current type into an owned type.
-    #[must_use]
-    fn into_owned(self) -> Self;
-}
+use crate::{AsMutSlice, AsSlice, IntoOwned, Truncate};
 
 impl<'a, T> Truncate for &'a [T] {
     fn truncate(&mut self, len: usize) {
@@ -286,6 +275,11 @@ impl<'a, T> OwnedSlice<'a, T> {
             }
         }
     }
+
+    /// Returns an iterator over the slice.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
 }
 
 impl<'a, 'it, T> IntoIterator for &'it OwnedSlice<'a, T> {
@@ -508,6 +502,16 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
                 }
             }
         }
+    }
+
+    /// Returns an iterator over the slice.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the slice.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 

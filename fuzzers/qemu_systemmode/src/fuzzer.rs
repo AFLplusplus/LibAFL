@@ -37,6 +37,8 @@ use libafl_qemu::{
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
 pub fn fuzz() {
+    env_logger::init();
+
     if let Ok(s) = env::var("FUZZ_SIZE") {
         str::parse::<usize>(&s).expect("FUZZ_SIZE was not a number");
     };
@@ -193,7 +195,7 @@ pub fn fuzz() {
         let mut hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default()));
 
         // Create a QEMU in-process executor
-        let executor = QemuExecutor::new(
+        let mut executor = QemuExecutor::new(
             &mut hooks,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
@@ -202,6 +204,9 @@ pub fn fuzz() {
             &mut mgr,
         )
         .expect("Failed to create QemuExecutor");
+
+        // Instead of calling the timeout handler and restart the process, trigger a breakpoint ASAP
+        executor.break_on_timeout();
 
         // Wrap the executor to keep track of the timeout
         let mut executor = TimeoutExecutor::new(executor, timeout);

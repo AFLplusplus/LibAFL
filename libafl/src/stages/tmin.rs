@@ -1,11 +1,7 @@
 //! The [`TMinMutationalStage`] is a stage which will attempt to minimize corpus entries.
 
 use alloc::string::{String, ToString};
-use core::{
-    fmt::Debug,
-    hash::{BuildHasher, Hash, Hasher},
-    marker::PhantomData,
-};
+use core::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{HasLen, Named};
@@ -73,9 +69,7 @@ where
 
         start_timer!(state);
         let mut base = state.corpus().cloned_input_for_id(base_corpus_idx)?;
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        base.hash(&mut hasher);
-        let base_hash = hasher.finish();
+        let base_hash = RandomState::with_seeds(0, 0, 0, 0).hash_one(&base);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         fuzzer.execute_input(state, executor, manager, &base)?;
@@ -151,9 +145,7 @@ where
             i = next_i;
         }
 
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        base.hash(&mut hasher);
-        let new_hash = hasher.finish();
+        let new_hash = RandomState::with_seeds(0, 0, 0, 0).hash_one(&base);
         if base_hash != new_hash {
             let exit_kind = fuzzer.execute_input(state, executor, manager, &base)?;
             let observers = executor.observers();
