@@ -2,7 +2,6 @@
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
-    ptr,
 };
 
 #[cfg(feature = "fork")]
@@ -76,7 +75,7 @@ pub unsafe extern "C" fn libafl_executor_reinstall_handlers() {
 pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     signal: Signal,
     info: &mut siginfo_t,
-    context: Option<&mut ucontext_t>,
+    mut context: Option<&mut ucontext_t>,
     data: &mut InProcessExecutorHandlerData,
 ) where
     E: Executor<EM, Z> + HasObservers,
@@ -88,10 +87,9 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     let real_crash = if USE_LIBAFL_CRASH_HANDLER {
         true
     } else {
-        let puc = if let Some(ctx) = context {
-            ctx as *mut _ as *mut c_void
-        } else {
-            ptr::null_mut()
+        let puc = match &mut context {
+            Some(v) => (*v) as *mut ucontext_t as *mut c_void,
+            None => core::ptr::null_mut(),
         };
         libafl_qemu_handle_crash(signal as i32, info, puc) != 0
     };
