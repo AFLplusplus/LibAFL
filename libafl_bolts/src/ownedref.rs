@@ -10,18 +10,7 @@ use core::{clone::Clone, fmt::Debug, slice};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{AsMutSlice, AsSlice, Truncate};
-
-/// Trait to convert into an Owned type
-pub trait IntoOwned {
-    /// Returns if the current type is an owned type.
-    #[must_use]
-    fn is_owned(&self) -> bool;
-
-    /// Transfer the current type into an owned type.
-    #[must_use]
-    fn into_owned(self) -> Self;
-}
+use crate::{AsMutSlice, AsSlice, Truncate, IntoOwned};
 
 impl<'a, T> Truncate for &'a [T] {
     fn truncate(&mut self, len: usize) {
