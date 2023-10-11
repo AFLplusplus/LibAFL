@@ -7,7 +7,7 @@ use alloc::{
 use core::{
     cell::{Ref, RefCell},
     fmt::Debug,
-    hash::{BuildHasher, Hash, Hasher},
+    hash::Hash,
     ops::Deref,
 };
 
@@ -96,9 +96,7 @@ where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     fn hash(&self) -> Option<u64> {
-        let mut s = RandomState::with_seeds(1, 2, 3, 4).build_hasher();
-        Hash::hash(self.value.as_ref(), &mut s);
-        Some(s.finish())
+        Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(self.value.as_ref()))
     }
 }
 
@@ -180,8 +178,6 @@ where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     fn hash(&self) -> Option<u64> {
-        let mut s = RandomState::with_seeds(1, 2, 3, 4).build_hasher();
-        self.value.as_ref().borrow().hash(&mut s);
-        Some(s.finish())
+        Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(&*self.value.as_ref().borrow()))
     }
 }

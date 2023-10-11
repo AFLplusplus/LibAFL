@@ -2,6 +2,7 @@
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 //!
 //! Needs the `fork` feature flag.
+#![allow(clippy::needless_pass_by_value)]
 
 use alloc::boxed::Box;
 #[cfg(all(unix, feature = "std"))]

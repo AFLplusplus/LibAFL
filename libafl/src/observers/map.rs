@@ -324,6 +324,28 @@ where
     }
 }
 
+impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
 impl<'a, T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Bounded
@@ -781,6 +803,28 @@ where
     }
 }
 
+impl<'a, T, const N: usize> ConstMapObserver<'a, T, N>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
 impl<'a, T, const N: usize> MapObserver for ConstMapObserver<'a, T, N>
 where
     T: Bounded
@@ -1051,6 +1095,28 @@ where
     fn into_iter(self) -> Self::IntoIter {
         let cnt = self.usable_count();
         self.as_mut_slice()[..cnt].iter_mut()
+    }
+}
+
+impl<'a, T> VariableMapObserver<'a, T>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 
@@ -1412,7 +1478,7 @@ where
 
 impl<'it, M> IntoIterator for &'it HitcountsMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned,
+    M: Serialize + serde::de::DeserializeOwned,
     &'it M: IntoIterator<Item = &'it u8>,
 {
     type Item = &'it u8;
@@ -1425,7 +1491,7 @@ where
 
 impl<'it, M> IntoIterator for &'it mut HitcountsMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned,
+    M: Serialize + serde::de::DeserializeOwned,
     &'it mut M: IntoIterator<Item = &'it mut u8>,
 {
     type Item = &'it mut u8;
@@ -1433,6 +1499,28 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.base.into_iter()
+    }
+}
+
+impl<M> HitcountsMapObserver<M>
+where
+    M: Serialize + serde::de::DeserializeOwned,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> <&M as IntoIterator>::IntoIter {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+}
+
+impl<M> HitcountsMapObserver<M>
+where
+    M: Serialize + serde::de::DeserializeOwned,
+    for<'it> &'it mut M: IntoIterator<Item = &'it mut u8>,
+{
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> <&mut M as IntoIterator>::IntoIter {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 
@@ -1639,7 +1727,7 @@ where
 
 impl<'it, M> IntoIterator for &'it HitcountsIterableMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned,
+    M: Serialize + serde::de::DeserializeOwned,
     &'it M: IntoIterator<Item = &'it u8>,
 {
     type Item = &'it u8;
@@ -1652,7 +1740,7 @@ where
 
 impl<'it, M> IntoIterator for &'it mut HitcountsIterableMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned,
+    M: Serialize + serde::de::DeserializeOwned,
     &'it mut M: IntoIterator<Item = &'it mut u8>,
 {
     type Item = &'it mut u8;
@@ -1660,6 +1748,28 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.base.into_iter()
+    }
+}
+
+impl<M> HitcountsIterableMapObserver<M>
+where
+    M: Serialize + serde::de::DeserializeOwned,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> <&M as IntoIterator>::IntoIter {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+}
+
+impl<M> HitcountsIterableMapObserver<M>
+where
+    M: Serialize + serde::de::DeserializeOwned,
+    for<'it> &'it mut M: IntoIterator<Item = &'it mut u8>,
+{
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> <&mut M as IntoIterator>::IntoIter {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 
@@ -1967,6 +2077,21 @@ where
     }
 }
 
+impl<'a, T, const DIFFERENTIAL: bool> MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> <&mut Self as IntoIterator>::IntoIter {
+        <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
 impl<'a, T, OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for MultiMapObserver<'a, T, true>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -2068,6 +2193,21 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.as_mut_slice().iter_mut()
+    }
+}
+
+impl<T> OwnedMapObserver<T>
+where
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 
