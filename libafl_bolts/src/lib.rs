@@ -737,7 +737,7 @@ pub static LIBAFL_STDERR_LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
 #[cfg(feature = "std")]
 pub static LIBAFL_STDOUT_LOGGER: SimpleStdoutLogger = SimpleStdoutLogger::new();
 
-/// A simple logger struct that logs to stderr when used with [`log::set_logger`].
+/// A simple logger struct that logs to stdout when used with [`log::set_logger`].
 #[derive(Debug)]
 #[cfg(feature = "std")]
 pub struct SimpleStdoutLogger {}
