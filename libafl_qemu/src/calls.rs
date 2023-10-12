@@ -497,8 +497,9 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
     }
 }
 
-use thread_local::ThreadLocal;
 use core::cell::UnsafeCell;
+
+use thread_local::ThreadLocal;
 
 static mut CALLSTACKS: Option<ThreadLocal<UnsafeCell<Vec<GuestAddr>>>> = None;
 
@@ -513,7 +514,7 @@ impl FullBacktraceCollector {
             }
         }
     }
-    
+
     pub fn backtrace() -> Option<&'static [GuestAddr]> {
         unsafe {
             if let Some(c) = CALLSTACKS.as_mut() {

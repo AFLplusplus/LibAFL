@@ -17,10 +17,11 @@ use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
+    calls::FullBacktraceCollector,
     emu::{EmuError, Emulator, MemAccessInfo, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
-    GuestAddr, Regs,calls::FullBacktraceCollector,
+    GuestAddr, Regs,
 };
 
 // TODO at some point, merge parts with libafl_frida
@@ -447,7 +448,11 @@ impl AsanGiovese {
         };
 
         for interval in leaks {
-            self.report(emu, emu.read_reg(Regs::Pc).unwrap(), AsanError::MemLeak(interval));
+            self.report(
+                emu,
+                emu.read_reg(Regs::Pc).unwrap(),
+                AsanError::MemLeak(interval),
+            );
         }
 
         ret
@@ -607,25 +612,29 @@ impl QemuAsanHelper {
 
     pub fn read_1(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_1(emulator, addr) {
-            self.rt.report_or_crash(emulator, pc, AsanError::Read(addr, 1));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Read(addr, 1));
         }
     }
 
     pub fn read_2(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_2(emulator, addr) {
-            self.rt.report_or_crash(emulator, pc, AsanError::Read(addr, 2));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Read(addr, 2));
         }
     }
 
     pub fn read_4(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_4(emulator, addr) {
-            self.rt.report_or_crash(emulator, pc, AsanError::Read(addr, 4));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Read(addr, 4));
         }
     }
 
     pub fn read_8(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_8(emulator, addr) {
-            self.rt.report_or_crash(emulator, pc, AsanError::Read(addr, 8));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Read(addr, 8));
         }
     }
 
@@ -638,25 +647,29 @@ impl QemuAsanHelper {
 
     pub fn write_1(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_1(emulator, addr) {
-            self.rt.report_or_crash(emulator, pc, AsanError::Write(addr, 1));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Write(addr, 1));
         }
     }
 
     pub fn write_2(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_2(emulator, addr) {
-            self.rt.report_or_crash(emulator, pc, AsanError::Write(addr, 2));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Write(addr, 2));
         }
     }
 
     pub fn write_4(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_4(emulator, addr) {
-            self.rt.report_or_crash(emulator, pc, AsanError::Write(addr, 4));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Write(addr, 4));
         }
     }
 
     pub fn write_8(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_8(emulator, addr) {
-            self.rt.report_or_crash(emulator, pc, AsanError::Write(addr, 8));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Write(addr, 8));
         }
     }
 
@@ -768,7 +781,9 @@ where
         None
     }
 }
-use libafl_bolts::tuples::MatchFirstRefMutType;use crate::calls::QemuCallTracerHelper;
+use libafl_bolts::tuples::ExtractFirstRefMutType;
+
+use crate::calls::QemuCallTracerHelper;
 pub fn trace_read1_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
@@ -779,10 +794,10 @@ pub fn trace_read1_asan<QT, S>(
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
-    let mut hooks_mut = hooks.helpers_mut().split_borrow_mut();
-    let h = hooks_mut.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    let h1 = hooks_mut.match_first_type_mut::<QemuCallTracerHelper<()>>().unwrap();
-    h.read_1(&emulator, id as GuestAddr, addr);
+    let hooks_mut = hooks.helpers_mut().split_borrow_mut();
+    let (h, hooks_mut) = hooks_mut.extract_first_refmut::<QemuAsanHelper>();
+    let (h1, hooks_mut) = hooks_mut.extract_first_refmut::<QemuCallTracerHelper<()>>();
+    h.unwrap().read_1(&emulator, id as GuestAddr, addr);
 }
 
 pub fn trace_read2_asan<QT, S>(
@@ -986,6 +1001,4 @@ where
     }
 }
 
-pub fn asan_report(emu: &Emulator, pc: GuestAddr, err: AsanError) {
-    
-}
+pub fn asan_report(emu: &Emulator, pc: GuestAddr, err: AsanError) {}
