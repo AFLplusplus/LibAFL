@@ -226,13 +226,9 @@ impl<'a> SplitBorrow<'a> for () {
     type SplitBorrowResult = ();
     type SplitBorrowMutResult = ();
 
-    fn split_borrow(&'a self) -> Self::SplitBorrowResult {
-        ()
-    }
+    fn split_borrow(&'a self) -> Self::SplitBorrowResult {}
 
-    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {
-        ()
-    }
+    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {}
 }
 
 impl<'a, Head, Tail> SplitBorrow<'a> for (Head, Tail)
