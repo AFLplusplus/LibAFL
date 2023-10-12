@@ -38,6 +38,7 @@ __attribute__((weak)) void *__asan_region_is_poisoned(const void *beg,
 #endif
 
 CmpLogMap *libafl_cmplog_map_ptr = &libafl_cmplog_map;
+CmpLogMapExtended *libafl_cmplog_map_extended_ptr = &libafl_cmplog_map_extended;
 
 void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
                                           uint64_t arg1, uint64_t arg2) {
@@ -60,6 +61,30 @@ void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
   hits &= CMPLOG_MAP_H - 1;
   libafl_cmplog_map_ptr->vals.operands[k][hits].v0 = arg1;
   libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_enabled = true;
+}
+
+void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2, uint8_t attr) {
+  if (!libafl_cmplog_enabled) { return; }
+  libafl_cmplog_enabled = false;
+
+  uint16_t hits;
+  if (libafl_cmplog_map_extended_ptr->headers[k].type != CMPLOG_KIND_INS) {
+    libafl_cmplog_map_extended_ptr->headers[k].type = CMPLOG_KIND_INS;
+    libafl_cmplog_map_extended_ptr->headers[k].hits = 1;
+    libafl_cmplog_map_extended_ptr->headers[k].shape = shape;
+    hits = 0;
+  } else {
+    hits = libafl_cmplog_map_extended_ptr->headers[k].hits++;
+    if (libafl_cmplog_map_extended_ptr->headers[k].shape < shape) {
+      libafl_cmplog_map_extended_ptr->headers[k].shape = shape;
+    }
+  }
+
+  hits &= CMPLOG_MAP_H - 1;
+  libafl_cmplog_map_extended_ptr->vals.operands[k][hits].v0 = arg1;
+  libafl_cmplog_map_extended_ptr->vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_map_extended_ptr->headers[k].attribute = attr;
   libafl_cmplog_enabled = true;
 }
 
@@ -166,22 +191,46 @@ void __libafl_targets_cmplog_routines_len(uintptr_t k, const uint8_t *ptr1,
 */
 #include <sys/types.h>
 void __cmplog_ins_hook1(uint8_t arg1, uint8_t arg2, uint8_t attr) {
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
 
+  __libafl_targets_cmplog_instructions_extended(k, 1, arg1, arg2, attr);
 }
 void __cmplog_ins_hook2(uint16_t arg1, uint16_t arg2, uint8_t attr) {
-  
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+
+  __libafl_targets_cmplog_instructions_extended(k, 2, arg1, arg2, attr);
 }
 void __cmplog_ins_hook4(uint32_t arg1, uint32_t arg2, uint8_t attr) {
-  
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+
+  __libafl_targets_cmplog_instructions_extended(k, 4, arg1, arg2, attr);
 }
 void __cmplog_ins_hook8(uint64_t arg1, uint64_t arg2, uint8_t attr) {
-  
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+
+  __libafl_targets_cmplog_instructions_extended(k, 8, arg1, arg2, attr);
 }
 void __cmplog_ins_hook16(uint128_t arg1, uint128_t arg2, uint8_t attr) {
-  
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+
+  __libafl_targets_cmplog_instructions_extended(k, 16, arg1, arg2, attr);
 }
-void __cmplog_ins_hookN(uint128_t arg1, uint128_t arg2, uint8_t attr) {
-  
+void __cmplog_ins_hookN(uint128_t arg1, uint128_t arg2, uint8_t attr, uint8_t size) {
+  uintptr_t k = RETADDR;
+  k = (k >> 4) ^ (k << 8);
+  k &= CMPLOG_MAP_W - 1;
+
+  __libafl_targets_cmplog_instructions_extended(k, size, arg1, arg2, attr);
 }
 
 /*

@@ -405,7 +405,25 @@ pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
     },
 };
 
+#[no_mangle]
+#[allow(clippy::large_stack_arrays)]
+pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
+    headers: [AFLppCmpLogHeader{
+        hits: 0,
+        id: 0,
+        shape: 0,
+        _type: 0,
+        attribute: 0,
+        overflow: 0,
+        reserved: 0,
+    }; CMPLOG_MAP_W],
+    vals: CmpLogVals {
+        operands: [[CmpLogInstruction(0, 0); CMPLOG_MAP_H]; CMPLOG_MAP_W],
+    }
+}
+
 pub use libafl_cmplog_map as CMPLOG_MAP;
+pub use libafl_cmplog_map_extended as CMPLOG_MAP_EXTENDED;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
