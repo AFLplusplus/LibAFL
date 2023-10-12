@@ -209,6 +209,45 @@ where
     }
 }
 
+/// Borrow each member of the tuple
+pub trait SplitBorrow<'a> {
+    /// The Resulting [`TupleList`], of an [`SplitBorrow::split_borrow()`] call
+    type SplitBorrowResult;
+    /// The Resulting [`TupleList`], of an [`SplitBorrow::split_borrow_mut()`] call
+    type SplitBorrowMutResult;
+
+    /// Return a tuple of borrowed references
+    fn split_borrow(&'a self) -> Self::SplitBorrowResult;
+    /// Return a tuple of borrowed mutable references
+    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult;
+}
+
+impl<'a> SplitBorrow<'a> for () {
+    type SplitBorrowResult = ();
+    type SplitBorrowMutResult = ();
+
+    fn split_borrow(&'a self) -> Self::SplitBorrowResult {}
+
+    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {}
+}
+
+impl<'a, Head, Tail> SplitBorrow<'a> for (Head, Tail)
+where
+    Head: 'a,
+    Tail: SplitBorrow<'a>,
+{
+    type SplitBorrowResult = (&'a Head, Tail::SplitBorrowResult);
+    type SplitBorrowMutResult = (&'a mut Head, Tail::SplitBorrowMutResult);
+
+    fn split_borrow(&'a self) -> Self::SplitBorrowResult {
+        (&self.0, self.1.split_borrow())
+    }
+
+    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {
+        (&mut self.0, self.1.split_borrow_mut())
+    }
+}
+
 /// A named tuple
 pub trait NamedTuple: HasConstLen {
     /// Gets the name of this tuple
