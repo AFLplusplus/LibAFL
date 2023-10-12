@@ -41,6 +41,10 @@ pub enum LLVMPasses {
     CoverageAccounting,
     /// The dump cfg pass
     DumpCfg,
+    /// The CmpLog Instruction pass
+    CmpLogInstructions,
+    /// The CmpLog Switch pass
+    CmpLogSwitches,
 }
 
 impl LLVMPasses {
@@ -60,6 +64,10 @@ impl LLVMPasses {
             LLVMPasses::DumpCfg => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("dump-cfg-pass.{}", dll_extension()))
             }
+            LLVMPasses::CmpLogInstructions => PathBuf::from(env!("OUT_DIR"))
+                .join(format!("cmplog-instructions-pass.{}", dll_extension())),
+            LLVMPasses::CmpLogSwitches => PathBuf::from(env!("OUT_DIR"))
+                .join(format!("cmplog-switches-pass.{}", dll_extension()))
         }
     }
 }
