@@ -1,5 +1,5 @@
 /*******************************************************************************
-Copyright (c) 2019-2020, Andrea Fioraldi
+Copyright (c) 2019-2023, Andrea Fioraldi
 
 
 Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <assert.h>
 #include <pthread.h>
 
-#define REDZONE_SIZE 128
+#define REDZONE_SIZE 64
 // 50 mb quarantine
 #define QUARANTINE_MAX_BYTES 52428800
 
@@ -53,13 +53,15 @@ struct chunk_begin {
   struct chunk_begin *next;
   struct chunk_begin *prev;
   char                redzone[REDZONE_SIZE];
-};
+
+} __attribute__((packed));
 
 struct chunk_struct {
   struct chunk_begin begin;
   char               redzone[REDZONE_SIZE];
   size_t             prev_size_padding;
-};
+
+} __attribute__((packed));
 
 #ifdef __GLIBC__
 
