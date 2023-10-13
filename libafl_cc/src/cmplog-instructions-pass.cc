@@ -203,8 +203,15 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 #else
   Constant *
 #endif
-      c1 = M.getOrInsertFunction("__cmplog_ins_hook1", VoidTy, Int8Ty, Int8Ty,
+#if CMPLOG_EXTENDED
+      c1 = M.getOrInsertFunction("__cmplog_ins_hook1_extended", VoidTy, Int8Ty, Int8Ty
+#else
+      c1 = M.getOrInsertFunction("__cmplog_ins_hook1", VoidTy, Int8Ty, Int8Ty
+#endif
+#if CMPLOG_EXTENDED
+                                 ,
                                  Int8Ty
+#endif
 #if LLVM_VERSION_MAJOR < 5
                                  ,
                                  NULL
@@ -221,8 +228,15 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 #else
   Constant *
 #endif
-      c2 = M.getOrInsertFunction("__cmplog_ins_hook2", VoidTy, Int16Ty, Int16Ty,
+#if CMPLOG_EXTENDED
+      c2 = M.getOrInsertFunction("__cmplog_ins_hook2_exteneded", VoidTy, Int16Ty, Int16Ty
+#else
+      c2 = M.getOrInsertFunction("__cmplog_ins_hook2", VoidTy, Int16Ty, Int16Ty
+#endif
+#if CMPLOG_EXTENDED
+                                 ,
                                  Int8Ty
+#endif
 #if LLVM_VERSION_MAJOR < 5
                                  ,
                                  NULL
@@ -239,8 +253,15 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 #else
   Constant *
 #endif
-      c4 = M.getOrInsertFunction("__cmplog_ins_hook4", VoidTy, Int32Ty, Int32Ty,
+#if CMPLOG_EXTENDED
+      c4 = M.getOrInsertFunction("__cmplog_ins_hook4_extended", VoidTy, Int32Ty, Int32Ty
+#else
+      c4 = M.getOrInsertFunction("__cmplog_ins_hook4", VoidTy, Int32Ty, Int32Ty
+#endif
+#if CMPLOG_EXTENDED
+                                 ,
                                  Int8Ty
+#endif
 #if LLVM_VERSION_MAJOR < 5
                                  ,
                                  NULL
@@ -257,8 +278,15 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 #else
   Constant *
 #endif
-      c8 = M.getOrInsertFunction("__cmplog_ins_hook8", VoidTy, Int64Ty, Int64Ty,
+#if CMPLOG_EXTENDED
+      c8 = M.getOrInsertFunction("__cmplog_ins_hook8_extended", VoidTy, Int64Ty, Int64Ty
+#else
+      c8 = M.getOrInsertFunction("__cmplog_ins_hook8", VoidTy, Int64Ty, Int64Ty
+#endif
+#if CMPLOG_EXTENDED
+                                 ,
                                  Int8Ty
+#endif
 #if LLVM_VERSION_MAJOR < 5
                                  ,
                                  NULL
@@ -275,8 +303,15 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 #else
   Constant *
 #endif
-      c16 = M.getOrInsertFunction("__cmplog_ins_hook16", VoidTy, Int128Ty,
-                                  Int128Ty, Int8Ty
+#if CMPLOG_EXTENDED
+      c16 = M.getOrInsertFunction("__cmplog_ins_hook16_extended", VoidTy, Int128Ty, Int128Ty
+#else
+      c16 = M.getOrInsertFunction("__cmplog_ins_hook16", VoidTy, Int128Ty, Int128Ty
+#endif
+#if CMPLOG_EXTENDED
+                                 ,
+                                 Int8Ty
+#endif
 #if LLVM_VERSION_MAJOR < 5
                                   ,
                                   NULL
@@ -293,8 +328,16 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 #else
   Constant *
 #endif
-      cN = M.getOrInsertFunction("__cmplog_ins_hookN", VoidTy, Int128Ty,
-                                 Int128Ty, Int8Ty, Int8Ty
+#if CMPLOG_EXTENDED
+      cN = M.getOrInsertFunction("__cmplog_ins_hookN_extended", VoidTy, Int128Ty, Int128Ty
+#else
+      cN = M.getOrInsertFunction("__cmplog_ins_hookN", VoidTy, Int128Ty, Int128Ty
+#endif
+#if CMPLOG_EXTENDED
+                                 ,Int128Ty, Int8Ty, Int8Ty
+#else
+                                 ,Int128Ty, Int8Ty
+#endif
 #if LLVM_VERSION_MAJOR < 5
                                  ,
                                  NULL
@@ -568,8 +611,11 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           // *V1
           // << "\n";
 
+#if CMPLOG_EXTENDED
+          // Only do this when using extended header
           ConstantInt *attribute = ConstantInt::get(Int8Ty, attr);
           args.push_back(attribute);
+#endif
 
           if (cast_size != max_size) {
             ConstantInt *bitsize = ConstantInt::get(Int8Ty, (max_size / 8) - 1);
