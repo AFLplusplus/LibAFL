@@ -36,8 +36,7 @@ typedef struct CmpLogHeaderExtended {
   unsigned reserved : 4;
 } __attribute__((packed)) CmpLogHeaderExtended;
 #else
-__pragma(pack(push, 1))
-typedef struct CmpLogHeaderExtended {
+__pragma(pack(push, 1)) typedef struct CmpLogHeaderExtended {
   unsigned hits : 24;
   unsigned id : 24;
   unsigned shape : 5;
