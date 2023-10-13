@@ -67,7 +67,7 @@ impl LLVMPasses {
             LLVMPasses::CmpLogInstructions => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("cmplog-instructions-pass.{}", dll_extension())),
             LLVMPasses::CmpLogSwitches => PathBuf::from(env!("OUT_DIR"))
-                .join(format!("cmplog-switches-pass.{}", dll_extension()))
+                .join(format!("cmplog-switches-pass.{}", dll_extension())),
         }
     }
 }

@@ -64,7 +64,7 @@ typedef struct CmpLogMapExtended {
 extern CmpLogMap  libafl_cmplog_map;
 extern CmpLogMap *libafl_cmplog_map_ptr;
 
-extern CmpLogMapExtended libafl_cmplog_map_extended;
+extern CmpLogMapExtended  libafl_cmplog_map_extended;
 extern CmpLogMapExtended *libafl_cmplog_map_extended_ptr;
 
 extern uint8_t libafl_cmplog_enabled;

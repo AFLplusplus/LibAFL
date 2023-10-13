@@ -78,7 +78,6 @@ void __cmplog_ins_hookN(uint128_t arg1, uint128_t arg2, uint8_t size) {
   (void)size;
 }
 
-
 void __cmplog_rtn_hook(uint8_t *ptr1, uint8_t *ptr2) {
   (void)ptr1;
   (void)ptr2;

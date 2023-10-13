@@ -59,6 +59,9 @@
 
 using namespace llvm;
 
+static cl::opt<bool> CmplogExtended("cmplog_switches_extended",
+                                    cl::desc("Uses extended header"),
+                                    cl::init(false), cl::NotHidden);
 namespace {
 
 /* Function that we never instrument or analyze */
@@ -192,77 +195,42 @@ bool CmpLogSwitches::hookInstrs(Module &M) {
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
   IntegerType *Int64Ty = IntegerType::getInt64Ty(C);
 
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee
-#else
-  Constant *
-#endif
-      c1 = M.getOrInsertFunction("__cmplog_ins_hook1", VoidTy, Int8Ty, Int8Ty,
-                                 Int8Ty
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee cmplogHookIns1 = c1;
-#else
-  Function *cmplogHookIns1 = cast<Function>(c1);
-#endif
+  FunctionCallee cmplogHookIns1;
+  FunctionCallee cmplogHookIns2;
+  FunctionCallee cmplogHookIns4;
+  FunctionCallee cmplogHookIns8;
 
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee
-#else
-  Constant *
-#endif
-      c2 = M.getOrInsertFunction("__cmplog_ins_hook2", VoidTy, Int16Ty, Int16Ty,
-                                 Int8Ty
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee cmplogHookIns2 = c2;
-#else
-  Function *cmplogHookIns2 = cast<Function>(c2);
-#endif
+  if (CmplogExtended) {
+    cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1_extended",
+                                           VoidTy, Int8Ty, Int8Ty, Int8Ty);
+  } else {
+    cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1", VoidTy, Int8Ty,
+                                           Int8Ty, Int8Ty);
+  }
 
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee
-#else
-  Constant *
-#endif
-      c4 = M.getOrInsertFunction("__cmplog_ins_hook4", VoidTy, Int32Ty, Int32Ty,
-                                 Int8Ty
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee cmplogHookIns4 = c4;
-#else
-  Function *cmplogHookIns4 = cast<Function>(c4);
-#endif
+  if (CmplogExtended) {
+    cmplogHookIns2 = M.getOrInsertFunction("__cmplog_ins_hook2_extended",
+                                           VoidTy, Int16Ty, Int16Ty, Int8Ty);
+  } else {
+    cmplogHookIns2 = M.getOrInsertFunction("__cmplog_ins_hook2", VoidTy,
+                                           Int16Ty, Int16Ty, Int8Ty);
+  }
 
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee
-#else
-  Constant *
-#endif
-      c8 = M.getOrInsertFunction("__cmplog_ins_hook8", VoidTy, Int64Ty, Int64Ty,
-                                 Int8Ty
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee cmplogHookIns8 = c8;
-#else
-  Function *cmplogHookIns8 = cast<Function>(c8);
-#endif
+  if (CmplogExtended) {
+    cmplogHookIns4 = M.getOrInsertFunction("__cmplog_ins_hook4_extended",
+                                           VoidTy, Int32Ty, Int32Ty, Int8Ty);
+  } else {
+    cmplogHookIns4 = M.getOrInsertFunction("__cmplog_ins_hook4", VoidTy,
+                                           Int32Ty, Int32Ty, Int8Ty);
+  }
+
+  if (CmplogExtended) {
+    cmplogHookIns8 = M.getOrInsertFunction("__cmplog_ins_hook8_extended",
+                                           VoidTy, Int64Ty, Int64Ty, Int8Ty);
+  } else {
+    cmplogHookIns8 = M.getOrInsertFunction("__cmplog_ins_hook8", VoidTy,
+                                           Int64Ty, Int64Ty, Int8Ty);
+  }
 
   for (auto &F : M) {
     if (!isIgnoreFunction(&F)) { continue; }
@@ -341,8 +309,10 @@ bool CmpLogSwitches::hookInstrs(Module &M) {
 
           if (new_param) {
             args.push_back(new_param);
-            ConstantInt *attribute = ConstantInt::get(Int8Ty, 1);
-            args.push_back(attribute);
+            if (CmplogExtended) {
+              ConstantInt *attribute = ConstantInt::get(Int8Ty, 1);
+              args.push_back(attribute);
+            }
             if (cast_size != max_size) {
               // not 8, 16, 32, 64, 128.
               ConstantInt *bitsize =
