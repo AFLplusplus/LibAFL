@@ -413,7 +413,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     }
 
     #[cfg(unix)]
-    for pass in &["cmplog-instructions-pass.cc"] {
+    for pass in &["cmplog-instructions-pass.cc", "cmplog-switches-pass.cc"] {
         build_pass(
             bindir_path,
             out_dir,
