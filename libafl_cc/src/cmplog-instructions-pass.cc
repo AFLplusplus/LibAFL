@@ -204,9 +204,10 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
   FunctionCallee cmplogHookIns2;
   FunctionCallee cmplogHookIns4;
   FunctionCallee cmplogHookIns8;
+#ifndef _WIN32
   FunctionCallee cmplogHookIns16;
   FunctionCallee cmplogHookInsN;
-
+#endif
   if (CmplogExtended) {
     cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1_extended",
                                            VoidTy, Int8Ty, Int8Ty, Int8Ty);
@@ -239,6 +240,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
                                            Int64Ty, Int64Ty, Int8Ty);
   }
 
+#ifndef _WIN32
   if (CmplogExtended) {
     cmplogHookIns16 = M.getOrInsertFunction("__cmplog_ins_hook16_extended",
                                             VoidTy, Int128Ty, Int128Ty, Int8Ty);
@@ -254,6 +256,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
     cmplogHookInsN = M.getOrInsertFunction("__cmplog_ins_hookN", VoidTy,
                                            Int128Ty, Int128Ty, Int8Ty);
   }
+#endif
 
   Constant *Null = Constant::getNullValue(PointerType::get(Int8Ty, 0));
 
@@ -522,11 +525,12 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
             ConstantInt *attribute = ConstantInt::get(Int8Ty, attr);
             args.push_back(attribute);
           }
-
+#ifndef _WIN32
           if (cast_size != max_size) {
             ConstantInt *bitsize = ConstantInt::get(Int8Ty, (max_size / 8) - 1);
             args.push_back(bitsize);
           }
+#endif
 
           // fprintf(stderr, "_ExtInt(%u) castTo %u with attr %u didcast %u\n",
           //         max_size, cast_size, attr);
@@ -544,6 +548,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
             case 64:
               IRB.CreateCall(cmplogHookIns8, args);
               break;
+#ifndef _WIN32
             case 128:
               if (max_size == 128) {
                 IRB.CreateCall(cmplogHookIns16, args);
@@ -553,6 +558,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
               }
 
               break;
+#endif
           }
         }
 

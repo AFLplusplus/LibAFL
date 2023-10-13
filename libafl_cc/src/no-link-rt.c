@@ -1,7 +1,9 @@
 #include <stdint.h>
 
+#ifndef _WIN32
 typedef unsigned __int128 uint128_t;
 typedef uint128_t         u128;
+#endif
 
 uint8_t *__afl_area_ptr;
 uint8_t *__afl_acc_memop_ptr;

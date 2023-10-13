@@ -6,8 +6,10 @@
 #define true 1
 #define false 0
 
+#ifndef _WIN32
 typedef unsigned __int128 uint128_t;
 typedef uint128_t         u128;
+#endif
 
 #define STATIC_ASSERT(pred) \
   switch (0) {              \
