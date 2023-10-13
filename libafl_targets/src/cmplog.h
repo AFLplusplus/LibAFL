@@ -25,7 +25,7 @@ typedef struct CmpLogHeader {
   uint8_t  kind;
 } CmpLogHeader;
 
-typedef struct CmpLogHeaderExtended {
+typedef PACK(struct CmpLogHeaderExtended {
   unsigned hits : 24;
   unsigned id : 24;
   unsigned shape : 5;
@@ -33,7 +33,7 @@ typedef struct CmpLogHeaderExtended {
   unsigned attribute : 4;
   unsigned overflow : 1;
   unsigned reserved : 4;
-} __attribute__((packed)) CmpLogHeaderExtended;
+}) CmpLogHeaderExtended;
 
 typedef struct CmpLogInstruction {
   uint64_t v0;

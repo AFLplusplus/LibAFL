@@ -11,6 +11,15 @@ typedef unsigned __int128 uint128_t;
 typedef uint128_t         u128;
 #endif
 
+#ifdef __GNUC__
+  #define PACK(__Declaration__) __Declaration__ __attribute__((__packed__))
+#endif
+
+#ifdef _MSC_VER
+  #define PACK(__Declaration__) \
+    __pragma(pack(push, 1)) __Declaration__ __pragma(pack(pop))
+#endif
+
 #define STATIC_ASSERT(pred) \
   switch (0) {              \
     case 0:                 \
