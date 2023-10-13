@@ -54,6 +54,7 @@ void __cmplog_ins_hook8(uint64_t arg1, uint64_t arg2) {
   (void)arg2;
 }
 
+#ifndef _WIN32
 void __cmplog_ins_hook16_extended(uint128_t arg1, uint128_t arg2,
                                   uint8_t attr) {
   (void)attr;
@@ -77,6 +78,7 @@ void __cmplog_ins_hookN(uint128_t arg1, uint128_t arg2, uint8_t size) {
   (void)arg2;
   (void)size;
 }
+#endif
 
 void __cmplog_rtn_hook(uint8_t *ptr1, uint8_t *ptr2) {
   (void)ptr1;

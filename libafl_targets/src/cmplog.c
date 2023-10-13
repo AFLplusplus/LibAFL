@@ -252,6 +252,7 @@ void __cmplog_ins_hook8(uint64_t arg1, uint64_t arg2) {
   __libafl_targets_cmplog_instructions(k, 8, arg1, arg2);
 }
 
+#ifndef _WIN32
 void __cmplog_ins_hook16_extended(uint128_t arg1, uint128_t arg2,
                                   uint8_t attr) {
   uintptr_t k = RETADDR;
@@ -283,7 +284,7 @@ void __cmplog_ins_hookN(uint128_t arg1, uint128_t arg2, uint8_t size) {
 
   __libafl_targets_cmplog_instructions(k, size, arg1, arg2);
 }
-
+#endif
 /*
   CMPLOG Callback for routines
 */
