@@ -1,7 +1,7 @@
 use core::{fmt::Debug, ops::Range};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
-use libafl_bolts::tuples::{MatchFirstType, SplitBorrow, SplitBorrowExtractFirstType};
+use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 
 use crate::{
     emu::{Emulator, GuestAddr},

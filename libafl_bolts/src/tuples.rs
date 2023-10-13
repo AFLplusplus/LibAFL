@@ -51,24 +51,24 @@ pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
 
 /// Borrow each member of the tuple
 pub trait SplitBorrow<'a> {
-    /// The Resulting [`TupleList`], of an [`SplitBorrow::split_borrow()`] call
+    /// The Resulting [`TupleList`], of an [`SplitBorrow::borrow()`] call
     type SplitBorrowResult;
-    /// The Resulting [`TupleList`], of an [`SplitBorrow::split_borrow_mut()`] call
+    /// The Resulting [`TupleList`], of an [`SplitBorrow::borrow_mut()`] call
     type SplitBorrowMutResult;
 
     /// Return a tuple of borrowed references
-    fn split_borrow(&'a self) -> Self::SplitBorrowResult;
+    fn borrow(&'a self) -> Self::SplitBorrowResult;
     /// Return a tuple of borrowed mutable references
-    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult;
+    fn borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult;
 }
 
 impl<'a> SplitBorrow<'a> for () {
     type SplitBorrowResult = ();
     type SplitBorrowMutResult = ();
 
-    fn split_borrow(&'a self) -> Self::SplitBorrowResult {}
+    fn borrow(&'a self) -> Self::SplitBorrowResult {}
 
-    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {}
+    fn borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {}
 }
 
 impl<'a, Head, Tail> SplitBorrow<'a> for (Head, Tail)
@@ -79,12 +79,12 @@ where
     type SplitBorrowResult = (Option<&'a Head>, Tail::SplitBorrowResult);
     type SplitBorrowMutResult = (Option<&'a mut Head>, Tail::SplitBorrowMutResult);
 
-    fn split_borrow(&'a self) -> Self::SplitBorrowResult {
-        (Some(&self.0), self.1.split_borrow())
+    fn borrow(&'a self) -> Self::SplitBorrowResult {
+        (Some(&self.0), self.1.borrow())
     }
 
-    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {
-        (Some(&mut self.0), self.1.split_borrow_mut())
+    fn borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {
+        (Some(&mut self.0), self.1.borrow_mut())
     }
 }
 
@@ -214,11 +214,11 @@ where
 /// Returns the first element with the given type (dereference mut version)
 pub trait ExtractFirstRefType {
     /// Returns the first element with the given type as borrow, or [`Option::None`]
-    fn extract_first_ref<'a, T: 'static>(self) -> (Option<&'a T>, Self);
+    fn take<'a, T: 'static>(self) -> (Option<&'a T>, Self);
 }
 
 impl ExtractFirstRefType for () {
-    fn extract_first_ref<'a, T: 'static>(self) -> (Option<&'a T>, Self) {
+    fn take<'a, T: 'static>(self) -> (Option<&'a T>, Self) {
         (None, ())
     }
 }
@@ -228,12 +228,12 @@ where
     Head: 'static,
     Tail: ExtractFirstRefType,
 {
-    fn extract_first_ref<'a, T: 'static>(mut self) -> (Option<&'a T>, Self) {
+    fn take<'a, T: 'static>(mut self) -> (Option<&'a T>, Self) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             let r = self.0.take();
             (unsafe { core::mem::transmute(r) }, self)
         } else {
-            let (r, tail) = self.1.extract_first_ref::<T>();
+            let (r, tail) = self.1.take::<T>();
             (r, (self.0, tail))
         }
     }
@@ -244,12 +244,12 @@ where
     Head: 'static,
     Tail: ExtractFirstRefType,
 {
-    fn extract_first_ref<'a, T: 'static>(mut self) -> (Option<&'a T>, Self) {
+    fn take<'a, T: 'static>(mut self) -> (Option<&'a T>, Self) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             let r = self.0.take();
             (unsafe { core::mem::transmute(r) }, self)
         } else {
-            let (r, tail) = self.1.extract_first_ref::<T>();
+            let (r, tail) = self.1.take::<T>();
             (r, (self.0, tail))
         }
     }
@@ -258,11 +258,11 @@ where
 /// Returns the first element with the given type (dereference mut version)
 pub trait ExtractFirstRefMutType {
     /// Returns the first element with the given type as borrow, or [`Option::None`]
-    fn extract_first_refmut<'a, T: 'static>(self) -> (Option<&'a mut T>, Self);
+    fn take<'a, T: 'static>(self) -> (Option<&'a mut T>, Self);
 }
 
 impl ExtractFirstRefMutType for () {
-    fn extract_first_refmut<'a, T: 'static>(self) -> (Option<&'a mut T>, Self) {
+    fn take<'a, T: 'static>(self) -> (Option<&'a mut T>, Self) {
         (None, ())
     }
 }
@@ -272,12 +272,12 @@ where
     Head: 'static,
     Tail: ExtractFirstRefMutType,
 {
-    fn extract_first_refmut<'a, T: 'static>(mut self) -> (Option<&'a mut T>, Self) {
+    fn take<'a, T: 'static>(mut self) -> (Option<&'a mut T>, Self) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             let r = self.0.take();
             (unsafe { core::mem::transmute(r) }, self)
         } else {
-            let (r, tail) = self.1.extract_first_refmut::<T>();
+            let (r, tail) = self.1.take::<T>();
             (r, (self.0, tail))
         }
     }
@@ -285,24 +285,24 @@ where
 
 /// Borrow each member of the tuple
 pub trait SplitBorrowExtractFirstType<'a> {
-    /// The Resulting [`TupleList`], of an [`SplitBorrow::split_borrow()`] call
+    /// The Resulting [`TupleList`], of an [`SplitBorrow::borrow()`] call
     type SplitBorrowResult: ExtractFirstRefType;
-    /// The Resulting [`TupleList`], of an [`SplitBorrow::split_borrow_mut()`] call
+    /// The Resulting [`TupleList`], of an [`SplitBorrow::borrow_mut()`] call
     type SplitBorrowMutResult: ExtractFirstRefType + ExtractFirstRefMutType;
 
     /// Return a tuple of borrowed references
-    fn split_borrow(&'a self) -> Self::SplitBorrowResult;
+    fn borrow(&'a self) -> Self::SplitBorrowResult;
     /// Return a tuple of borrowed mutable references
-    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult;
+    fn borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult;
 }
 
 impl<'a> SplitBorrowExtractFirstType<'a> for () {
     type SplitBorrowResult = ();
     type SplitBorrowMutResult = ();
 
-    fn split_borrow(&'a self) -> Self::SplitBorrowResult {}
+    fn borrow(&'a self) -> Self::SplitBorrowResult {}
 
-    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {}
+    fn borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {}
 }
 
 impl<'a, Head, Tail> SplitBorrowExtractFirstType<'a> for (Head, Tail)
@@ -313,12 +313,12 @@ where
     type SplitBorrowResult = (Option<&'a Head>, Tail::SplitBorrowResult);
     type SplitBorrowMutResult = (Option<&'a mut Head>, Tail::SplitBorrowMutResult);
 
-    fn split_borrow(&'a self) -> Self::SplitBorrowResult {
-        (Some(&self.0), self.1.split_borrow())
+    fn borrow(&'a self) -> Self::SplitBorrowResult {
+        (Some(&self.0), self.1.borrow())
     }
 
-    fn split_borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {
-        (Some(&mut self.0), self.1.split_borrow_mut())
+    fn borrow_mut(&'a mut self) -> Self::SplitBorrowMutResult {
+        (Some(&mut self.0), self.1.borrow_mut())
     }
 }
 

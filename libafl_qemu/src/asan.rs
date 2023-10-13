@@ -9,7 +9,6 @@ use std::{
 use libafl::{
     executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, state::HasMetadata,
 };
-use libafl_bolts::tuples::SplitBorrow;
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
@@ -97,11 +96,31 @@ pub enum AsanError {
     MemLeak(Interval<GuestAddr>),
 }
 
-pub type AsanErrorCallback = Box<dyn FnMut(&Emulator, GuestAddr, AsanError)>;
+impl core::fmt::Display for AsanError {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            AsanError::Read(addr, len) => writeln!(fmt, "Invalid {} bytes read at {:?}", len, addr),
+            AsanError::Write(addr, len) => {
+                writeln!(fmt, "Invalid {} bytes write at {:?}", len, addr)
+            }
+            AsanError::BadFree(addr, interval) => match interval {
+                Some(chunk) => writeln!(
+                    fmt,
+                    "Bad free at {:?} in the allocated chunk {}",
+                    addr, chunk
+                ),
+                None => writeln!(fmt, "Bad free at {:?} (wild pointer)", addr),
+            },
+            AsanError::MemLeak(interval) => writeln!(fmt, "Memory leak of chunk {}", interval),
+        }
+    }
+}
+
+pub type AsanErrorCallback = Box<dyn FnMut(&AsanGiovese, &Emulator, GuestAddr, AsanError)>;
 
 pub struct AsanGiovese {
-    pub alloc_tree: Mutex<IntervalTree<GuestAddr, Option<Vec<GuestAddr>>>>,
-    pub saved_tree: IntervalTree<GuestAddr, Option<Vec<GuestAddr>>>,
+    pub alloc_tree: Mutex<IntervalTree<GuestAddr, Vec<GuestAddr>>>,
+    pub saved_tree: IntervalTree<GuestAddr, Vec<GuestAddr>>,
     pub error_callback: Option<AsanErrorCallback>,
     pub dirty_shadow: Mutex<HashSet<GuestAddr>>,
     pub saved_shadow: HashMap<GuestAddr, Vec<i8>>,
@@ -354,26 +373,47 @@ impl AsanGiovese {
         }
     }
 
+    #[must_use]
+    pub fn with_asan_report(snapshot_shadow: bool) -> Self {
+        Self {
+            alloc_tree: Mutex::new(IntervalTree::new()),
+            saved_tree: IntervalTree::new(),
+            error_callback: Some(Box::new(asan_report)),
+            dirty_shadow: Mutex::new(HashSet::default()),
+            saved_shadow: HashMap::default(),
+            snapshot_shadow,
+        }
+    }
+
     pub fn report_or_crash(&mut self, emu: &Emulator, pc: GuestAddr, error: AsanError) {
-        if let Some(cb) = self.error_callback.as_mut() {
-            (cb)(emu, pc, error);
+        if let Some(mut cb) = self.error_callback.take() {
+            (cb)(self, emu, pc, error);
+            self.error_callback = Some(cb);
         } else {
             std::process::abort();
         }
     }
 
     pub fn report(&mut self, emu: &Emulator, pc: GuestAddr, error: AsanError) {
-        if let Some(cb) = self.error_callback.as_mut() {
-            (cb)(emu, pc, error);
+        if let Some(mut cb) = self.error_callback.take() {
+            (cb)(self, emu, pc, error);
+            self.error_callback = Some(cb);
         }
     }
 
-    pub fn alloc_insert(&mut self, start: GuestAddr, end: GuestAddr) {
-        let bt = FullBacktraceCollector::backtrace().map(|r| r.to_vec());
+    pub fn alloc_insert(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
+        let bt = FullBacktraceCollector::backtrace()
+            .map(|r| {
+                let mut v = r.to_vec();
+                v.push(pc);
+                v
+            })
+            .unwrap_or(vec![]);
         self.alloc_tree.lock().unwrap().insert(start..end, bt);
     }
 
     pub fn alloc_remove(&mut self, start: GuestAddr, end: GuestAddr) {
+        // TODO track freed chunks for the report
         let mut tree = self.alloc_tree.lock().unwrap();
         let mut found = vec![];
         for entry in tree.query(start..end) {
@@ -385,13 +425,23 @@ impl AsanGiovese {
     }
 
     #[must_use]
-    pub fn alloc_search(&mut self, query: GuestAddr) -> Option<Interval<GuestAddr>> {
+    pub fn alloc_search_interval(&self, query: GuestAddr) -> Option<Interval<GuestAddr>> {
         self.alloc_tree
             .lock()
             .unwrap()
             .query(query..=query)
             .next()
             .map(|entry| *entry.interval)
+    }
+
+    #[must_use]
+    pub fn alloc_search(&self, query: GuestAddr) -> Option<(Interval<GuestAddr>, Vec<GuestAddr>)> {
+        self.alloc_tree
+            .lock()
+            .unwrap()
+            .query(query..=query)
+            .next()
+            .map(|entry| (*entry.interval, entry.value.clone()))
     }
 
     pub fn snapshot(&mut self, emu: &Emulator) {
@@ -585,12 +635,12 @@ impl QemuAsanHelper {
         self.enabled = enabled;
     }
 
-    pub fn alloc(&mut self, _emulator: &Emulator, start: GuestAddr, end: GuestAddr) {
-        self.rt.alloc_insert(start, end);
+    pub fn alloc(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
+        self.rt.alloc_insert(pc, start, end);
     }
 
     pub fn dealloc(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
-        let chunk = self.rt.alloc_search(addr);
+        let chunk = self.rt.alloc_search_interval(addr);
         if let Some(ck) = chunk {
             if ck.start != addr {
                 // Free not the start of the chunk
@@ -781,9 +831,7 @@ where
         None
     }
 }
-use libafl_bolts::tuples::ExtractFirstRefMutType;
 
-use crate::calls::QemuCallTracerHelper;
 pub fn trace_read1_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
@@ -794,10 +842,8 @@ pub fn trace_read1_asan<QT, S>(
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
-    let hooks_mut = hooks.helpers_mut().split_borrow_mut();
-    let (h, hooks_mut) = hooks_mut.extract_first_refmut::<QemuAsanHelper>();
-    let (h1, hooks_mut) = hooks_mut.extract_first_refmut::<QemuCallTracerHelper<()>>();
-    h.unwrap().read_1(&emulator, id as GuestAddr, addr);
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.read_1(&emulator, id as GuestAddr, addr);
 }
 
 pub fn trace_read2_asan<QT, S>(
@@ -979,7 +1025,8 @@ where
                 }
             }
             QasanAction::Alloc => {
-                h.alloc(&emulator, a1 as GuestAddr, a2 as GuestAddr);
+                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
+                h.alloc(pc, a1 as GuestAddr, a2 as GuestAddr);
             }
             QasanAction::Dealloc => {
                 let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
@@ -1001,4 +1048,34 @@ where
     }
 }
 
-pub fn asan_report(emu: &Emulator, pc: GuestAddr, err: AsanError) {}
+pub fn asan_report(rt: &AsanGiovese, _emu: &Emulator, pc: GuestAddr, err: AsanError) {
+    let backtrace = FullBacktraceCollector::backtrace()
+        .map(|r| {
+            let mut v = r.to_vec();
+            v.push(pc);
+            v
+        })
+        .unwrap_or(vec![pc]);
+    eprintln!("AddressSanitizer Error: {}", err);
+    for (addr, i) in backtrace.iter().rev().enumerate() {
+        eprintln!("\t#{} {:?}", i, addr);
+    }
+    let (addr, entry) = match err {
+        AsanError::Read(addr, _) => (addr, rt.alloc_search(addr)),
+        AsanError::Write(addr, _) => (addr, rt.alloc_search(addr)),
+        AsanError::BadFree(addr, _) => (addr, rt.alloc_search(addr)),
+        _ => (0, None),
+    };
+    if let Some((chunk, backtrace)) = entry {
+        eprintln!(
+            "Address {:?} is {} bytes inside the chunk {} allocated at:",
+            addr,
+            addr - chunk.start,
+            chunk
+        );
+        for (addr, i) in backtrace.iter().rev().enumerate() {
+            eprintln!("\t#{} {:?}", i, addr);
+        }
+    }
+    std::process::abort();
+}

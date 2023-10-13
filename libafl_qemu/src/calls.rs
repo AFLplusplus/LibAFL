@@ -507,6 +507,11 @@ static mut CALLSTACKS: Option<ThreadLocal<UnsafeCell<Vec<GuestAddr>>>> = None;
 pub struct FullBacktraceCollector {}
 
 impl FullBacktraceCollector {
+    pub fn new() -> Self {
+        unsafe { CALLSTACKS = Some(ThreadLocal::new()) };
+        Self {}
+    }
+
     pub fn reset(&mut self) {
         unsafe {
             for tls in CALLSTACKS.as_mut().unwrap().iter_mut() {
