@@ -529,6 +529,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           if (cast_size != max_size) {
             ConstantInt *bitsize = ConstantInt::get(Int8Ty, (max_size / 8) - 1);
             args.push_back(bitsize);
+            // this means cast_size = 128
           }
 #endif
 

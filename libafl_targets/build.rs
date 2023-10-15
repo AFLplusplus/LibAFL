@@ -172,6 +172,7 @@ fn main() {
 
     println!("cargo:rerun-if-changed=src/cmplog.h");
     println!("cargo:rerun-if-changed=src/cmplog.c");
+    println!("cargo:rerun-if-changed=src/cmplog_instructions_callbacks.c");
 
     #[cfg(unix)]
     {
