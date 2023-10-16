@@ -190,7 +190,6 @@ void __libafl_targets_cmplog_routines_len(uintptr_t k, const uint8_t *ptr1,
   __libafl_targets_cmplog_routines_checked(k, ptr1, ptr2, len);
 }
 
-
 /*
   CMPLOG Callback for routines
 */

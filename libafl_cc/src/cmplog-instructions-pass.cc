@@ -250,9 +250,8 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           M.getOrInsertFunction("__cmplog_ins_hook2_ctx_extended", VoidTy,
                                 Int32Ty, Int16Ty, Int16Ty, Int16Ty);
     } else {
-      cmplogHookIns1 =
-          M.getOrInsertFunction("__cmplog_ins_hook2_ctx", VoidTy, Int32Ty,
-                                Int16Ty, Int16Ty, Int16Ty);
+      cmplogHookIns1 = M.getOrInsertFunction(
+          "__cmplog_ins_hook2_ctx", VoidTy, Int32Ty, Int16Ty, Int16Ty, Int16Ty);
     }
   }
 
@@ -270,8 +269,8 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           M.getOrInsertFunction("__cmplog_ins_hook4_ctx_extended", VoidTy,
                                 Int32Ty, Int32Ty, Int32Ty, Int8Ty);
     } else {
-      cmplogHookIns4 = M.getOrInsertFunction(
-          "__cmplog_ins_hook4_ctx", VoidTy, Int32Ty, Int32Ty, Int32Ty, Int8Ty);
+      cmplogHookIns4 = M.getOrInsertFunction("__cmplog_ins_hook4_ctx", VoidTy,
+                                             Int32Ty, Int32Ty, Int32Ty, Int8Ty);
     }
   }
 
@@ -289,8 +288,8 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           M.getOrInsertFunction("__cmplog_ins_hook8_ctx_extended", VoidTy,
                                 Int32Ty, Int64Ty, Int64Ty, Int8Ty);
     } else {
-      cmplogHookIns8 = M.getOrInsertFunction(
-          "__cmplog_ins_hook8_ctx", VoidTy, Int32Ty, Int64Ty, Int64Ty, Int8Ty);
+      cmplogHookIns8 = M.getOrInsertFunction("__cmplog_ins_hook8_ctx", VoidTy,
+                                             Int32Ty, Int64Ty, Int64Ty, Int8Ty);
     }
   }
 
@@ -410,8 +409,8 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
         if (!isa<ReturnInst>(Inst) || isa<ResumeInst>(Inst)) {
           IRBuilder<> LastIRB(Inst);
           StoreInst  *RestoreCtx = LastIRB.CreateStore(PrevCtx, AFLContext);
-          RestoreCtx->setMetadata(M.getMDKindID("nosanitize", MDNode
-                                                : get(C, None)));
+          RestoreCtx->setMetadata(M.getMDKindID("nosanitize"),
+                                  MDNode::get(C, None));
         }
       }
 
@@ -650,9 +649,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           // errs() << "[CMPLOG] cmp  " << *cmpInst << "(in function " <<
           // cmpInst->getFunction()->getName() << ")\n";
 
-          if (Ctx) {
-            args.push(AFLContext);
-          }
+          if (Ctx) { args.push_back(AFLContext); }
 
           // first bitcast to integer type of the same bitsize as the original
           // type (this is a nop, if already integer)
