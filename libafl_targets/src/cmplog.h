@@ -80,7 +80,7 @@ typedef struct CmpLogMapExtended {
   CmpLogHeaderExtended headers[CMPLOG_MAP_W];
   union {
     CmpLogInstructionExtended operands[CMPLOG_MAP_W][CMPLOG_MAP_H];
-    CmpLogRoutine             routines[CMPLOG_MAP_W][CMPLOG_MAP_RTN_H];
+    CmpLogRoutine             routines[CMPLOG_MAP_W][CMPLOG_MAP_RTN_EXTENDED_H];
   } vals;
 } CmpLogMapExtended;
 
