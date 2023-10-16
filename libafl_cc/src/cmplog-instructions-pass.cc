@@ -17,6 +17,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "common-llvm.h"
 #ifndef _WIN32
   #include <unistd.h>
   #include <sys/time.h>
@@ -57,10 +58,15 @@
 
 #include <set>
 
+#define COVERAGE_MAP_SIZE LIBAFL_EDGES_MAP_SIZE
+
 using namespace llvm;
 static cl::opt<bool> CmplogExtended("cmplog_instructions_extended",
                                     cl::desc("Uses extended header"),
                                     cl::init(false), cl::NotHidden);
+static cl::opt<bool> Ctx("ctx",
+                         cl::desc("Enable full context sensitive coverage"),
+                         cl::init(false), cl::NotHidden);
 namespace {
 
 /* Function that we never instrument or analyze */
@@ -154,8 +160,10 @@ class CmpLogInstructions : public ModulePass {
 #endif
 
  private:
-  bool hookInstrs(Module &M);
-  bool be_quiet = true;
+  uint32_t function_minimum_size = 1;
+  uint32_t coverage_map_size = COVERAGE_MAP_SIZE;
+  bool     hookInstrs(Module &M);
+  bool     be_quiet = true;
 };
 
 }  // namespace
@@ -208,63 +216,205 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
   FunctionCallee cmplogHookIns16;
   FunctionCallee cmplogHookInsN;
 #endif
-  if (CmplogExtended) {
-    cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1_extended",
-                                           VoidTy, Int8Ty, Int8Ty, Int8Ty);
+
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1_extended",
+                                             VoidTy, Int8Ty, Int8Ty, Int8Ty);
+    } else {
+      cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1", VoidTy,
+                                             Int8Ty, Int8Ty, Int8Ty);
+    }
   } else {
-    cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1", VoidTy, Int8Ty,
-                                           Int8Ty, Int8Ty);
+    if (CmplogExtended) {
+      cmplogHookIns1 =
+          M.getOrInsertFunction("__cmplog_ins_hook1_ctx_extended", VoidTy,
+                                Int32Ty, Int8Ty, Int8Ty, Int8Ty);
+    } else {
+      cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1_ctx", VoidTy,
+                                             Int32Ty, Int8Ty, Int8Ty, Int8Ty);
+    }
   }
 
-  if (CmplogExtended) {
-    cmplogHookIns2 = M.getOrInsertFunction("__cmplog_ins_hook2_extended",
-                                           VoidTy, Int16Ty, Int16Ty, Int8Ty);
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogHookIns2 = M.getOrInsertFunction("__cmplog_ins_hook2_extended",
+                                             VoidTy, Int16Ty, Int16Ty, Int8Ty);
+    } else {
+      cmplogHookIns2 = M.getOrInsertFunction("__cmplog_ins_hook2", VoidTy,
+                                             Int16Ty, Int16Ty, Int8Ty);
+    }
   } else {
-    cmplogHookIns2 = M.getOrInsertFunction("__cmplog_ins_hook2", VoidTy,
-                                           Int16Ty, Int16Ty, Int8Ty);
+    if (CmplogExtended) {
+      cmplogHookIns1 =
+          M.getOrInsertFunction("__cmplog_ins_hook2_ctx_extended", VoidTy,
+                                Int32Ty, Int16Ty, Int16Ty, Int16Ty);
+    } else {
+      cmplogHookIns1 =
+          M.getOrInsertFunction("__cmplog_ins_hook2_ctx", VoidTy, Int32Ty,
+                                Int16Ty, Int16Ty, Int16Ty);
+    }
   }
 
-  if (CmplogExtended) {
-    cmplogHookIns4 = M.getOrInsertFunction("__cmplog_ins_hook4_extended",
-                                           VoidTy, Int32Ty, Int32Ty, Int8Ty);
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogHookIns4 = M.getOrInsertFunction("__cmplog_ins_hook4_extended",
+                                             VoidTy, Int32Ty, Int32Ty, Int8Ty);
+    } else {
+      cmplogHookIns4 = M.getOrInsertFunction("__cmplog_ins_hook4", VoidTy,
+                                             Int32Ty, Int32Ty, Int8Ty);
+    }
   } else {
-    cmplogHookIns4 = M.getOrInsertFunction("__cmplog_ins_hook4", VoidTy,
-                                           Int32Ty, Int32Ty, Int8Ty);
+    if (CmplogExtended) {
+      cmplogHookIns4 =
+          M.getOrInsertFunction("__cmplog_ins_hook4_ctx_extended", VoidTy,
+                                Int32Ty, Int32Ty, Int32Ty, Int8Ty);
+    } else {
+      cmplogHookIns4 = M.getOrInsertFunction(
+          "__cmplog_ins_hook4_ctx", VoidTy, Int32Ty, Int32Ty, Int32Ty, Int8Ty);
+    }
   }
 
-  if (CmplogExtended) {
-    cmplogHookIns8 = M.getOrInsertFunction("__cmplog_ins_hook8_extended",
-                                           VoidTy, Int64Ty, Int64Ty, Int8Ty);
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogHookIns8 = M.getOrInsertFunction("__cmplog_ins_hook8_extended",
+                                             VoidTy, Int64Ty, Int64Ty, Int8Ty);
+    } else {
+      cmplogHookIns8 = M.getOrInsertFunction("__cmplog_ins_hook8", VoidTy,
+                                             Int64Ty, Int64Ty, Int8Ty);
+    }
   } else {
-    cmplogHookIns8 = M.getOrInsertFunction("__cmplog_ins_hook8", VoidTy,
-                                           Int64Ty, Int64Ty, Int8Ty);
+    if (CmplogExtended) {
+      cmplogHookIns8 =
+          M.getOrInsertFunction("__cmplog_ins_hook8_ctx_extended", VoidTy,
+                                Int32Ty, Int64Ty, Int64Ty, Int8Ty);
+    } else {
+      cmplogHookIns8 = M.getOrInsertFunction(
+          "__cmplog_ins_hook8_ctx", VoidTy, Int32Ty, Int64Ty, Int64Ty, Int8Ty);
+    }
   }
 
 #ifndef _WIN32
-  if (CmplogExtended) {
-    cmplogHookIns16 = M.getOrInsertFunction("__cmplog_ins_hook16_extended",
-                                            VoidTy, Int128Ty, Int128Ty, Int8Ty);
+
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogHookIns16 = M.getOrInsertFunction(
+          "__cmplog_ins_hook16_extended", VoidTy, Int128Ty, Int128Ty, Int8Ty);
+    } else {
+      cmplogHookIns16 = M.getOrInsertFunction("__cmplog_ins_hook16", VoidTy,
+                                              Int128Ty, Int128Ty, Int8Ty);
+    }
   } else {
-    cmplogHookIns16 = M.getOrInsertFunction("__cmplog_ins_hook16", VoidTy,
-                                            Int128Ty, Int128Ty, Int8Ty);
+    if (CmplogExtended) {
+      cmplogHookIns16 =
+          M.getOrInsertFunction("__cmplog_ins_hook16_ctx_extended", VoidTy,
+                                Int32Ty, Int128Ty, Int128Ty, Int8Ty);
+    } else {
+      cmplogHookIns16 =
+          M.getOrInsertFunction("__cmplog_ins_hook16_ctx", VoidTy, Int32Ty,
+                                Int128Ty, Int128Ty, Int8Ty);
+    }
   }
 
-  if (CmplogExtended) {
-    cmplogHookInsN = M.getOrInsertFunction("__cmplog_ins_hookN_extended",
-                                           VoidTy, Int128Ty, Int128Ty, Int8Ty);
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogHookInsN = M.getOrInsertFunction(
+          "__cmplog_ins_hookN_extended", VoidTy, Int128Ty, Int128Ty, Int8Ty);
+    } else {
+      cmplogHookInsN = M.getOrInsertFunction("__cmplog_ins_hookN", VoidTy,
+                                             Int128Ty, Int128Ty, Int8Ty);
+    }
   } else {
-    cmplogHookInsN = M.getOrInsertFunction("__cmplog_ins_hookN", VoidTy,
-                                           Int128Ty, Int128Ty, Int8Ty);
+    if (CmplogExtended) {
+      cmplogHookInsN =
+          M.getOrInsertFunction("__cmplog_ins_hookN_ctx_extended", VoidTy,
+                                Int32Ty, Int128Ty, Int128Ty, Int8Ty);
+    } else {
+      cmplogHookInsN =
+          M.getOrInsertFunction("__cmplog_ins_hookN_ctx", VoidTy, Int32Ty,
+                                Int128Ty, Int128Ty, Int8Ty);
+    }
   }
+
 #endif
 
   Constant *Null = Constant::getNullValue(PointerType::get(Int8Ty, 0));
+
+  // For ctx
+  GlobalVariable *AFLContext = new GlobalVariable(
+      M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_ctx", 0,
+      GlobalVariable::GeneralDynamicTLSModel, 0, false);
+  Value *PrevCtx = NULL;
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {
     if (!isIgnoreFunction(&F)) continue;
 
+    int has_calls = 0;
     for (auto &BB : F) {
+      if (Ctx) {
+        BasicBlock::iterator IP = BB.getFirstInsertionPt();
+        IRBuilder<>          InitialIRB(&(*IP));
+        if (&BB == &F.getEntryBlock()) {
+          // at the first basic block
+          // load the context id of the previous function and write to a local
+          // variable on the stack
+
+          LoadInst *PrevCtxLoad = InitialIRB.CreateLoad(
+#if LLVM_VERSION_MAJOR >= 14
+              InitialIRB.getInt32Ty(),
+#endif
+              AFLContext);
+          PrevCtxLoad->setMetadata(M.getMDKindID("nosanitize"),
+                                   MDNode::get(C, None));
+          PrevCtx = PrevCtxLoad;
+
+          // Next check if there are fucntion calls in this function
+
+          // does the function have calls? and is any of the calls larger than
+          // one basic block?
+          for (auto &BB_2 : F) {
+            if (has_calls) { break; }
+            for (auto &IN : BB_2) {
+              CallInst *callInst = nullptr;
+              if ((callInst = dyn_cast<CallInst>(&IN))) {
+                Function *Callee = callInst->getCalledFunction();
+                if (!Callee || Callee->size() < function_minimum_size) {
+                  continue;
+                } else {
+                  has_calls = 1;
+                  break;
+                }
+              }
+            }
+          }
+
+          // if yes we store a context ID for this function in the global var
+          if (has_calls) {
+            // if we reach here it means that we are in a function in which we
+            // have call instruction into other functions let's give this
+            // function a random 32bit number
+            Value *NewCtx =
+                ConstantInt::get(Int32Ty, RandBelow(coverage_map_size));
+
+            NewCtx = InitialIRB.CreateXor(PrevCtx, NewCtx);
+            StoreInst *StoreCtx = InitialIRB.CreateStore(NewCtx, AFLContext);
+            StoreCtx->setMetadata(M.getMDKindID("nosanitize"),
+                                  MDNode::get(C, None));
+          }
+        }
+      }
+
+      if (has_calls) {
+        Instruction *Inst = BB.getTerminator();
+        if (!isa<ReturnInst>(Inst) || isa<ResumeInst>(Inst)) {
+          IRBuilder<> LastIRB(Inst);
+          StoreInst  *RestoreCtx = LastIRB.CreateStore(PrevCtx, AFLContext);
+          RestoreCtx->setMetadata(M.getMDKindID("nosanitize", MDNode
+                                                : get(C, None)));
+        }
+      }
+
       for (auto &IN : BB) {
         CmpInst *selectcmpInst = nullptr;
         if ((selectcmpInst = dyn_cast<CmpInst>(&IN))) {
@@ -499,6 +649,10 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
         if (!skip) {
           // errs() << "[CMPLOG] cmp  " << *cmpInst << "(in function " <<
           // cmpInst->getFunction()->getName() << ")\n";
+
+          if (Ctx) {
+            args.push(AFLContext);
+          }
 
           // first bitcast to integer type of the same bitsize as the original
           // type (this is a nop, if already integer)

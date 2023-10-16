@@ -468,7 +468,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 #endif
         {
 
-          // load the context ID of the previous function and write to to a
+          // load the context ID of the previous function and write to a
           // local variable on the stack
           LoadInst *PrevCtxLoad = IRB.CreateLoad(
 #if LLVM_VERSION_MAJOR >= 14
