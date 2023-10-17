@@ -161,9 +161,12 @@ class CmpLogInstructions : public ModulePass {
 
  private:
   uint32_t function_minimum_size = 1;
-  uint32_t coverage_map_size = std::getenv("COVERAGE_MAP_SIZE") ? std::stoi(std::getenv("COVERAGE_MAP_SIZE")) : 65536;
-  bool     hookInstrs(Module &M);
-  bool     be_quiet = true;
+  uint32_t coverage_map_size =
+      std::getenv("LIBAFL_CMP_MAP_SIZE")
+          ? std::stoi(std::getenv("LIBAFL_CMP_MAP_SIZE"))
+          : 65536;
+  bool hookInstrs(Module &M);
+  bool be_quiet = true;
 };
 
 }  // namespace
@@ -222,8 +225,8 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
       cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1_extended",
                                              VoidTy, Int8Ty, Int8Ty, Int8Ty);
     } else {
-      cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1", VoidTy,
-                                             Int8Ty, Int8Ty, Int8Ty);
+      cmplogHookIns1 =
+          M.getOrInsertFunction("__cmplog_ins_hook1", VoidTy, Int8Ty, Int8Ty);
     }
   } else {
     if (CmplogExtended) {
@@ -232,7 +235,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
                                 Int32Ty, Int8Ty, Int8Ty, Int8Ty);
     } else {
       cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook1_ctx", VoidTy,
-                                             Int32Ty, Int8Ty, Int8Ty, Int8Ty);
+                                             Int32Ty, Int8Ty, Int8Ty);
     }
   }
 
@@ -241,17 +244,17 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
       cmplogHookIns2 = M.getOrInsertFunction("__cmplog_ins_hook2_extended",
                                              VoidTy, Int16Ty, Int16Ty, Int8Ty);
     } else {
-      cmplogHookIns2 = M.getOrInsertFunction("__cmplog_ins_hook2", VoidTy,
-                                             Int16Ty, Int16Ty, Int8Ty);
+      cmplogHookIns2 =
+          M.getOrInsertFunction("__cmplog_ins_hook2", VoidTy, Int16Ty, Int16Ty);
     }
   } else {
     if (CmplogExtended) {
       cmplogHookIns1 =
           M.getOrInsertFunction("__cmplog_ins_hook2_ctx_extended", VoidTy,
-                                Int32Ty, Int16Ty, Int16Ty, Int16Ty);
+                                Int32Ty, Int16Ty, Int16Ty, Int8Ty);
     } else {
-      cmplogHookIns1 = M.getOrInsertFunction(
-          "__cmplog_ins_hook2_ctx", VoidTy, Int32Ty, Int16Ty, Int16Ty, Int16Ty);
+      cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook2_ctx", VoidTy,
+                                             Int32Ty, Int16Ty, Int16Ty);
     }
   }
 
@@ -260,8 +263,8 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
       cmplogHookIns4 = M.getOrInsertFunction("__cmplog_ins_hook4_extended",
                                              VoidTy, Int32Ty, Int32Ty, Int8Ty);
     } else {
-      cmplogHookIns4 = M.getOrInsertFunction("__cmplog_ins_hook4", VoidTy,
-                                             Int32Ty, Int32Ty, Int8Ty);
+      cmplogHookIns4 =
+          M.getOrInsertFunction("__cmplog_ins_hook4", VoidTy, Int32Ty, Int32Ty);
     }
   } else {
     if (CmplogExtended) {
@@ -270,7 +273,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
                                 Int32Ty, Int32Ty, Int32Ty, Int8Ty);
     } else {
       cmplogHookIns4 = M.getOrInsertFunction("__cmplog_ins_hook4_ctx", VoidTy,
-                                             Int32Ty, Int32Ty, Int32Ty, Int8Ty);
+                                             Int32Ty, Int32Ty, Int32Ty);
     }
   }
 
@@ -279,8 +282,8 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
       cmplogHookIns8 = M.getOrInsertFunction("__cmplog_ins_hook8_extended",
                                              VoidTy, Int64Ty, Int64Ty, Int8Ty);
     } else {
-      cmplogHookIns8 = M.getOrInsertFunction("__cmplog_ins_hook8", VoidTy,
-                                             Int64Ty, Int64Ty, Int8Ty);
+      cmplogHookIns8 =
+          M.getOrInsertFunction("__cmplog_ins_hook8", VoidTy, Int64Ty, Int64Ty);
     }
   } else {
     if (CmplogExtended) {
@@ -289,7 +292,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
                                 Int32Ty, Int64Ty, Int64Ty, Int8Ty);
     } else {
       cmplogHookIns8 = M.getOrInsertFunction("__cmplog_ins_hook8_ctx", VoidTy,
-                                             Int32Ty, Int64Ty, Int64Ty, Int8Ty);
+                                             Int32Ty, Int64Ty, Int64Ty);
     }
   }
 
@@ -301,7 +304,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           "__cmplog_ins_hook16_extended", VoidTy, Int128Ty, Int128Ty, Int8Ty);
     } else {
       cmplogHookIns16 = M.getOrInsertFunction("__cmplog_ins_hook16", VoidTy,
-                                              Int128Ty, Int128Ty, Int8Ty);
+                                              Int128Ty, Int128Ty);
     }
   } else {
     if (CmplogExtended) {
@@ -309,16 +312,16 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           M.getOrInsertFunction("__cmplog_ins_hook16_ctx_extended", VoidTy,
                                 Int32Ty, Int128Ty, Int128Ty, Int8Ty);
     } else {
-      cmplogHookIns16 =
-          M.getOrInsertFunction("__cmplog_ins_hook16_ctx", VoidTy, Int32Ty,
-                                Int128Ty, Int128Ty, Int8Ty);
+      cmplogHookIns16 = M.getOrInsertFunction("__cmplog_ins_hook16_ctx", VoidTy,
+                                              Int32Ty, Int128Ty, Int128Ty);
     }
   }
 
   if (!Ctx) {
     if (CmplogExtended) {
-      cmplogHookInsN = M.getOrInsertFunction(
-          "__cmplog_ins_hookN_extended", VoidTy, Int128Ty, Int128Ty, Int8Ty);
+      cmplogHookInsN =
+          M.getOrInsertFunction("__cmplog_ins_hookN_extended", VoidTy, Int128Ty,
+                                Int128Ty, Int8Ty, Int8Ty);
     } else {
       cmplogHookInsN = M.getOrInsertFunction("__cmplog_ins_hookN", VoidTy,
                                              Int128Ty, Int128Ty, Int8Ty);
@@ -327,7 +330,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
     if (CmplogExtended) {
       cmplogHookInsN =
           M.getOrInsertFunction("__cmplog_ins_hookN_ctx_extended", VoidTy,
-                                Int32Ty, Int128Ty, Int128Ty, Int8Ty);
+                                Int32Ty, Int128Ty, Int128Ty, Int8Ty, Int8Ty);
     } else {
       cmplogHookInsN =
           M.getOrInsertFunction("__cmplog_ins_hookN_ctx", VoidTy, Int32Ty,
