@@ -149,7 +149,7 @@ void __cmplog_ins_hookN_extended_ctx(uint32_t ctx, uint128_t arg1,
   (void)arg1;
   (void)arg2;
 }
-void __cmplog_ins_hookN(uint32_t ctx, uint128_t arg1, uint128_t arg2,
+void __cmplog_ins_hookN_ctx(uint32_t ctx, uint128_t arg1, uint128_t arg2,
                         uint8_t size) {
   (void)ctx;
   (void)arg1;
