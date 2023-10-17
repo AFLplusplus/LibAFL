@@ -64,7 +64,7 @@ using namespace llvm;
 static cl::opt<bool> CmplogExtended("cmplog_instructions_extended",
                                     cl::desc("Uses extended header"),
                                     cl::init(false), cl::NotHidden);
-static cl::opt<bool> Ctx("ctx",
+static cl::opt<bool> Ctx("cmplog_ctx",
                          cl::desc("Enable full context sensitive coverage"),
                          cl::init(false), cl::NotHidden);
 namespace {
@@ -161,7 +161,7 @@ class CmpLogInstructions : public ModulePass {
 
  private:
   uint32_t function_minimum_size = 1;
-  uint32_t coverage_map_size = COVERAGE_MAP_SIZE;
+  uint32_t coverage_map_size = std::getenv("COVERAGE_MAP_SIZE") ? std::stoi(std::getenv("COVERAGE_MAP_SIZE")) : 65536;
   bool     hookInstrs(Module &M);
   bool     be_quiet = true;
 };
@@ -347,8 +347,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {
-    if (!isIgnoreFunction(&F)) continue;
-
+    if (isIgnoreFunction(&F)) continue;
     int has_calls = 0;
     for (auto &BB : F) {
       if (Ctx) {
@@ -406,7 +405,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 
       if (has_calls) {
         Instruction *Inst = BB.getTerminator();
-        if (!isa<ReturnInst>(Inst) || isa<ResumeInst>(Inst)) {
+        if (isa<ReturnInst>(Inst) || isa<ResumeInst>(Inst)) {
           IRBuilder<> LastIRB(Inst);
           StoreInst  *RestoreCtx = LastIRB.CreateStore(PrevCtx, AFLContext);
           RestoreCtx->setMetadata(M.getMDKindID("nosanitize"),
