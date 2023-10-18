@@ -85,7 +85,7 @@ jobs:
     - name: Cleanup
       run: cargo clean
     - name: Run clang-format style check for C/C++ programs.
-      run: clang-format-13 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
+      run: clang-format-13 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx' | grep -v 'xxhash*')
     - name: run shellcheck
       run: shellcheck ./scripts/*.sh
     - name: Run clippy
@@ -268,8 +268,6 @@ jobs:
       if: runner.os == 'Linux'
       # We can't install gcc-multilib which would usually do this for us due to collisions with other packages
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
     - name: Build and run example fuzzers (Linux)
       if: runner.os == 'Linux'
       run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-15 ./scripts/test_all_fuzzers.sh
