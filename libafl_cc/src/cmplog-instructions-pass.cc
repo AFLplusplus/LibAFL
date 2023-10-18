@@ -181,7 +181,7 @@ llvmGetPassPluginInfo() {
   #if LLVM_VERSION_MAJOR >= 16
             PB.registerOptimizerEarlyEPCallback(
   #else
-            PB.registerOptimizerLateEPCallback(
+            PB.registerOptimizerLastEPCallback(
   #endif
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
                   MPM.addPass(CmpLogInstructions());
