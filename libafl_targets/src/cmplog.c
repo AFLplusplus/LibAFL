@@ -112,8 +112,10 @@ inline static long area_is_valid(const void *ptr, size_t len) {
 }
 
 // cmplog routines after area check
-inline static void __libafl_targets_cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
-                                              const uint8_t *ptr2, size_t len) {
+inline static void __libafl_targets_cmplog_routines_checked(uintptr_t      k,
+                                                            const uint8_t *ptr1,
+                                                            const uint8_t *ptr2,
+                                                            size_t len) {
   libafl_cmplog_enabled = false;
   uint32_t hits;
 
