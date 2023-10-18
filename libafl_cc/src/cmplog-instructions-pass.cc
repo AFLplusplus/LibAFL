@@ -791,6 +791,9 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 
         if (cint) {
           std::vector<Value *> args;
+          if (Ctx) {
+            args.push_back(AFLContext);
+          }
           args.push_back(CompareTo);
 
           Value *new_param = cint;
