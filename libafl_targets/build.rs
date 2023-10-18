@@ -160,7 +160,10 @@ fn main() {
         common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
     }
 
-    common.file(src_dir.join("common.c")).compile("common");
+    common
+        .file(src_dir.join("common.c"))
+        .file(src_dir.join("xxhash.c"))
+        .compile("common");
 
     println!("cargo:rerun-if-changed=src/coverage.c");
 

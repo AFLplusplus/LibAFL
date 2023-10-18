@@ -17,8 +17,8 @@
 extern CmpLogMap         *libafl_cmplog_map_ptr;
 extern CmpLogMapExtended *libafl_cmplog_map_extended_ptr;
 
-inline void cmplog_instructions_inlined(uintptr_t k, uint8_t shape,
-                                        uint64_t arg1, uint64_t arg2) {
+static inline void cmplog_instructions_inlined(uintptr_t k, uint8_t shape,
+                                               uint64_t arg1, uint64_t arg2) {
   uint16_t hits;
   if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
     libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_INS;
@@ -36,10 +36,8 @@ inline void cmplog_instructions_inlined(uintptr_t k, uint8_t shape,
   libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
 }
 
-inline int16_t cmplog_instructions_extended_inlined(uintptr_t k, uint8_t shape,
-                                                    uint64_t arg1,
-                                                    uint64_t arg2,
-                                                    uint8_t  attr) {
+static inline int16_t cmplog_instructions_extended_inlined(
+    uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2, uint8_t attr) {
   uint16_t hits;
   if (libafl_cmplog_map_extended_ptr->headers[k].type != CMPLOG_KIND_INS) {
     libafl_cmplog_map_extended_ptr->headers[k].type = CMPLOG_KIND_INS;
