@@ -65,36 +65,10 @@ void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
   libafl_cmplog_enabled = true;
 }
 
-void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t shape,
-                                                   uint64_t arg1, uint64_t arg2,
-                                                   uint8_t attr) {
-  if (!libafl_cmplog_enabled) { return; }
-  libafl_cmplog_enabled = false;
-
-  uint16_t hits;
-  if (libafl_cmplog_map_extended_ptr->headers[k].type != CMPLOG_KIND_INS) {
-    libafl_cmplog_map_extended_ptr->headers[k].type = CMPLOG_KIND_INS;
-    libafl_cmplog_map_extended_ptr->headers[k].hits = 1;
-    libafl_cmplog_map_extended_ptr->headers[k].shape = shape;
-    hits = 0;
-  } else {
-    hits = libafl_cmplog_map_extended_ptr->headers[k].hits++;
-    if (libafl_cmplog_map_extended_ptr->headers[k].shape < shape) {
-      libafl_cmplog_map_extended_ptr->headers[k].shape = shape;
-    }
-  }
-
-  hits &= CMPLOG_MAP_H - 1;
-  libafl_cmplog_map_extended_ptr->vals.operands[k][hits].v0 = arg1;
-  libafl_cmplog_map_extended_ptr->vals.operands[k][hits].v1 = arg2;
-  libafl_cmplog_map_extended_ptr->headers[k].attribute = attr;
-  libafl_cmplog_enabled = true;
-}
-
 // POSIX shenanigan to see if an area is mapped.
 // If it is mapped as X-only, we have a problem, so maybe we should add a check
 // to avoid to call it on .text addresses
-static long area_is_valid(const void *ptr, size_t len) {
+inline static long area_is_valid(const void *ptr, size_t len) {
   if (!ptr || __asan_region_is_poisoned(ptr, len)) { return 0; }
 
   long valid_len;
@@ -138,7 +112,7 @@ static long area_is_valid(const void *ptr, size_t len) {
 }
 
 // cmplog routines after area check
-void __libafl_targets_cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
+inline static void __libafl_targets_cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
                                               const uint8_t *ptr2, size_t len) {
   libafl_cmplog_enabled = false;
   uint32_t hits;
