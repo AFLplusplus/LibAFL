@@ -253,11 +253,11 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
     }
   } else {
     if (CmplogExtended) {
-      cmplogHookIns1 =
+      cmplogHookIns2 =
           M.getOrInsertFunction("__cmplog_ins_hook2_ctx_extended", VoidTy,
                                 Int32Ty, Int16Ty, Int16Ty, Int8Ty);
     } else {
-      cmplogHookIns1 = M.getOrInsertFunction("__cmplog_ins_hook2_ctx", VoidTy,
+      cmplogHookIns2 = M.getOrInsertFunction("__cmplog_ins_hook2_ctx", VoidTy,
                                              Int32Ty, Int16Ty, Int16Ty);
     }
   }
