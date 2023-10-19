@@ -538,14 +538,14 @@ impl CallTraceCollector for FullBacktraceCollector {
         _hooks: &mut QemuHooks<'_, QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
-        _call_len: usize,
+        call_len: usize,
     ) where
         S: UsesInput,
         QT: QemuHelperTuple<S>,
     {
         // TODO handle Thumb
         unsafe {
-            (*CALLSTACKS.as_mut().unwrap().get_or_default().get()).push(pc);
+            (*CALLSTACKS.as_mut().unwrap().get_or_default().get()).push(pc + call_len as GuestAddr);
         }
     }
 
@@ -563,8 +563,13 @@ impl CallTraceCollector for FullBacktraceCollector {
         unsafe {
             let v = &mut *CALLSTACKS.as_mut().unwrap().get_or_default().get();
             if !v.is_empty() {
-                if *v.last().unwrap() == ret_addr {
-                    v.pop();
+                // if *v.last().unwrap() == ret_addr {
+                //    v.pop();
+                // }
+                while let Some(p) = v.pop() {
+                    if p == ret_addr {
+                        break;
+                    }
                 }
             }
         }

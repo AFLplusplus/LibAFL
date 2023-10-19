@@ -239,6 +239,31 @@ pub trait HasLastReportTime {
     fn last_report_time_mut(&mut self) -> &mut Option<Duration>;
 }
 
+/// Empty stub state
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct NopState<I> {
+    phantom: PhantomData<I>,
+}
+
+impl<I> UsesInput for NopState<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> HasMetadata for NopState<I>
+where
+    I: Input,
+{
+    fn metadata_map(&self) -> &SerdeAnyMap {
+        unreachable!();
+    }
+    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
+        unreachable!();
+    }
+}
+
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "
