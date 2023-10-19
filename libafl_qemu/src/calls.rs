@@ -1,4 +1,4 @@
-use core::fmt::Debug;
+use core::{cell::UnsafeCell, fmt::Debug};
 
 use capstone::prelude::*;
 use libafl::{
@@ -7,6 +7,7 @@ use libafl::{
     observers::{stacktrace::BacktraceObserver, ObserversTuple},
 };
 use libafl_bolts::{tuples::MatchFirstType, Named};
+use thread_local::ThreadLocal;
 
 use crate::{
     capstone,
@@ -496,10 +497,6 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
         observer.fill_external(self.callstack_hash, exit_kind);
     }
 }
-
-use core::cell::UnsafeCell;
-
-use thread_local::ThreadLocal;
 
 static mut CALLSTACKS: Option<ThreadLocal<UnsafeCell<Vec<GuestAddr>>>> = None;
 

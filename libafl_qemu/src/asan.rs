@@ -1358,5 +1358,7 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
         }
     }
 
+    eprint!("Context:\n{}", emu.current_cpu().unwrap().display_context());
+
     std::process::abort();
 }

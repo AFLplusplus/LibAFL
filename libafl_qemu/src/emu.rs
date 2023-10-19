@@ -20,9 +20,10 @@ use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
+use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::GuestReg;
+use crate::{GuestReg, Regs};
 
 pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
@@ -765,6 +766,26 @@ impl CPU {
         {
             unsafe { libafl_qemu_sys::qemu_target_page_size() }
         }
+    }
+
+    pub fn display_context(&self) -> String {
+        let mut display = String::new();
+        let mut maxl = 0;
+        for r in Regs::iter() {
+            maxl = std::cmp::max(format!("{:#?}", r).len(), maxl);
+        }
+        for (i, r) in Regs::iter().enumerate() {
+            let v: GuestAddr = self.read_reg(r).unwrap();
+            let sr = format!("{:#?}", r);
+            display += &format!("{1:>0$}: {2:#016x} ", maxl, sr, v);
+            if (i + 1) % 4 == 0 {
+                display += "\n";
+            }
+        }
+        if !display.is_empty() && display.chars().last().unwrap() != '\n' {
+            display += "\n";
+        }
+        display
     }
 }
 
