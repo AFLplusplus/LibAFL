@@ -13,10 +13,8 @@ use std::{
     vec::Vec,
 };
 
-#[cfg(test)]
-use libafl_bolts::rands::StdRand;
 use libafl_bolts::{
-    rands::Rand,
+    rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
