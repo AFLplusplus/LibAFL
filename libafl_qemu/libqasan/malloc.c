@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <assert.h>
 #include <pthread.h>
 
-#define REDZONE_SIZE 64
+#define REDZONE_SIZE 128
 // 50 mb quarantine
 #define QUARANTINE_MAX_BYTES 52428800
 
