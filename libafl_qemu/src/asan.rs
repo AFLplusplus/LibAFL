@@ -1358,6 +1358,8 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
         }
     }
 
+    // fix pc in case it is not synced (in hooks)
+    emu.write_reg(Regs::Pc, pc).unwrap();
     eprint!("Context:\n{}", emu.current_cpu().unwrap().display_context());
 
     std::process::abort();

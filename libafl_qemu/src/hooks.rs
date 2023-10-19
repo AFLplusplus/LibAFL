@@ -9,7 +9,11 @@ use core::{
     ptr::{self, addr_of},
 };
 
-use libafl::{executors::inprocess::inprocess_get_state, inputs::UsesInput};
+use libafl::{
+    executors::{inprocess::inprocess_get_state, ExitKind},
+    inputs::UsesInput,
+    state::NopState,
+};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
@@ -705,6 +709,31 @@ where
             .field("helpers", &self.helpers)
             .field("emulator", &self.emulator)
             .finish()
+    }
+}
+
+impl<'a, I, QT> QemuHooks<'a, QT, NopState<I>>
+where
+    QT: QemuHelperTuple<NopState<I>>,
+    NopState<I>: UsesInput<Input = I>,
+{
+    pub fn reproducer(emulator: &'a Emulator, helpers: QT) -> Box<Self> {
+        Self::new(emulator, helpers)
+    }
+
+    pub fn repro_run<H>(&mut self, harness: &mut H, input: &I) -> ExitKind
+    where
+        H: FnMut(&I) -> ExitKind,
+    {
+        self.helpers.first_exec_all(self);
+        self.helpers.pre_exec_all(self.emulator, input);
+
+        let mut exit_kind = harness(input);
+
+        self.helpers
+            .post_exec_all(self.emulator, input, &mut (), &mut exit_kind);
+
+        exit_kind
     }
 }
 
