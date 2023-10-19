@@ -58,7 +58,12 @@
 #include <set>
 
 using namespace llvm;
-
+static cl::opt<bool> CmplogExtended("cmplog_routines_extended",
+                                    cl::desc("Uses extended header"),
+                                    cl::init(false), cl::NotHidden);
+static cl::opt<bool> Ctx("cmplog_routines_ctx",
+                         cl::desc("Enable full context sensitive coverage"),
+                         cl::init(false), cl::NotHidden);
 namespace {
 
 /* Function that we never instrument or analyze */
@@ -181,150 +186,179 @@ bool CmpLogRoutines::hookRtns(Module &M) {
   // PointerType *VoidPtrTy = PointerType::get(VoidTy, 0);
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
   IntegerType *Int64Ty = IntegerType::getInt64Ty(C);
+  IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
   PointerType *i8PtrTy = PointerType::get(Int8Ty, 0);
 
-#if LLVM_VERSION_MAJOR < 9
-  Constant *
-#else
-  FunctionCallee
-#endif
-      c = M.getOrInsertFunction("__cmplog_rtn_hook", VoidTy, i8PtrTy, i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                ,
-                                NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR < 9
-  Function *cmplogHookFn = cast<Function>(c);
-#else
-  FunctionCallee cmplogHookFn = c;
-#endif
+  FunctionCallee cmplogHookFn;
+  FunctionCallee cmplogLlvmStdStd;
+  FunctionCallee cmplogLlvmStdC;
+  FunctionCallee cmplogGccStdStd;
+  FunctionCallee cmplogGccStdC;
+  FunctionCallee cmplogHookFnN;
+  FunctionCallee cmplogHookFnStrN;
+  FunctionCallee cmplogHookFnStr;
 
-#if LLVM_VERSION_MAJOR < 9
-  Constant *
-#else
-  FunctionCallee
-#endif
-      c1 = M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_stdstring",
-                                 VoidTy, i8PtrTy, i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR < 9
-  Function *cmplogLlvmStdStd = cast<Function>(c1);
-#else
-  FunctionCallee cmplogLlvmStdStd = c1;
-#endif
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogHookFn = M.getOrInsertFunction("__cmplog_rtn_hook_extended", VoidTy,
+                                           i8PtrTy, i8PtrTy);
+    } else {
+      cmplogHookFn =
+          M.getOrInsertFunction("__cmplog_rtn_hook", VoidTy, i8PtrTy, i8PtrTy);
+    }
+  } else {
+    if (CmplogExtended) {
+      cmplogHookFn = M.getOrInsertFunction("__cmplog_rtn_hook_ctx_extended",
+                                           VoidTy, Int32Ty, i8PtrTy, i8PtrTy);
+    } else {
+      cmplogHookFn = M.getOrInsertFunction("__cmplog_rtn_hook_ctx", VoidTy,
+                                           Int32Ty, i8PtrTy, i8PtrTy);
+    }
+  }
 
-#if LLVM_VERSION_MAJOR < 9
-  Constant *
-#else
-  FunctionCallee
-#endif
-      c2 = M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_cstring", VoidTy,
-                                 i8PtrTy, i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR < 9
-  Function *cmplogLlvmStdC = cast<Function>(c2);
-#else
-  FunctionCallee cmplogLlvmStdC = c2;
-#endif
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogLlvmStdStd = M.getOrInsertFunction(
+          "__cmplog_rtn_llvm_stdstring_stdstring_extended", VoidTy, i8PtrTy,
+          i8PtrTy);
+    } else {
+      cmplogLlvmStdStd = M.getOrInsertFunction(
+          "__cmplog_rtn_llvm_stdstring_stdstring", VoidTy, i8PtrTy, i8PtrTy);
+    }
+  } else {
+    if (CmplogExtended) {
+      cmplogLlvmStdStd = M.getOrInsertFunction(
+          "__cmplog_rtn_llvm_stdstring_stdstring_ctx_extended", VoidTy, Int32Ty,
+          i8PtrTy, i8PtrTy);
+    } else {
+      cmplogLlvmStdStd =
+          M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_stdstring_ctx",
+                                VoidTy, Int32Ty, i8PtrTy, i8PtrTy);
+    }
+  }
 
-#if LLVM_VERSION_MAJOR < 9
-  Constant *
-#else
-  FunctionCallee
-#endif
-      c3 = M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_stdstring", VoidTy,
-                                 i8PtrTy, i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR < 9
-  Function *cmplogGccStdStd = cast<Function>(c3);
-#else
-  FunctionCallee cmplogGccStdStd = c3;
-#endif
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogLlvmStdC =
+          M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_cstring_extended",
+                                VoidTy, i8PtrTy, i8PtrTy);
+    } else {
+      cmplogLlvmStdC = M.getOrInsertFunction(
+          "__cmplog_rtn_llvm_stdstring_cstring", VoidTy, i8PtrTy, i8PtrTy);
+    }
+  } else {
+    if (CmplogExtended) {
+      cmplogLlvmStdC = M.getOrInsertFunction(
+          "__cmplog_rtn_llvm_stdstring_cstring_ctx_extended", VoidTy, Int32Ty,
+          i8PtrTy, i8PtrTy);
+    } else {
+      cmplogLlvmStdC =
+          M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_cstring_ctx",
+                                VoidTy, Int32Ty, i8PtrTy, i8PtrTy);
+    }
+  }
 
-#if LLVM_VERSION_MAJOR < 9
-  Constant *
-#else
-  FunctionCallee
-#endif
-      c4 = M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_cstring", VoidTy,
-                                 i8PtrTy, i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR < 9
-  Function *cmplogGccStdC = cast<Function>(c4);
-#else
-  FunctionCallee cmplogGccStdC = c4;
-#endif
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogGccStdStd =
+          M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_stdstring_extended",
+                                VoidTy, i8PtrTy, i8PtrTy);
+    } else {
+      cmplogGccStdStd = M.getOrInsertFunction(
+          "__cmplog_rtn_gcc_stdstring_stdstring", VoidTy, i8PtrTy, i8PtrTy);
+    }
+  } else {
+    if (CmplogExtended) {
+      cmplogGccStdStd = M.getOrInsertFunction(
+          "__cmplog_rtn_gcc_stdstring_stdstring_ctx_extended", VoidTy, Int32Ty,
+          i8PtrTy, i8PtrTy);
+    } else {
+      cmplogGccStdStd =
+          M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_stdstring_ctx",
+                                VoidTy, Int32Ty, i8PtrTy, i8PtrTy);
+    }
+  }
 
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee
-#else
-  Constant *
-#endif
-      c5 = M.getOrInsertFunction("__cmplog_rtn_hook_n", VoidTy, i8PtrTy,
-                                 i8PtrTy, Int64Ty
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee cmplogHookFnN = c5;
-#else
-  Function *cmplogHookFnN = cast<Function>(c5);
-#endif
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogGccStdC =
+          M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_cstring_extended",
+                                VoidTy, i8PtrTy, i8PtrTy);
+    } else {
+      cmplogGccStdC = M.getOrInsertFunction(
+          "__cmplog_rtn_gcc_stdstring_cstring", VoidTy, i8PtrTy, i8PtrTy);
+    }
+  } else {
+    if (CmplogExtended) {
+      cmplogGccStdC = M.getOrInsertFunction(
+          "__cmplog_rtn_gcc_stdstring_cstring_ctx_extended", VoidTy, Int32Ty,
+          i8PtrTy, i8PtrTy);
+    } else {
+      cmplogGccStdC =
+          M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_cstring_ctx",
+                                VoidTy, Int32Ty, i8PtrTy, i8PtrTy);
+    }
+  }
 
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee
-#else
-  Constant *
-#endif
-      c6 = M.getOrInsertFunction("__cmplog_rtn_hook_strn", VoidTy, i8PtrTy,
-                                 i8PtrTy, Int64Ty
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee cmplogHookFnStrN = c6;
-#else
-  Function *cmplogHookFnStrN = cast<Function>(c6);
-#endif
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogHookFnN = M.getOrInsertFunction("__cmplog_rtn_hook_n_extended",
+                                            VoidTy, i8PtrTy, i8PtrTy, Int64Ty);
+    } else {
+      cmplogHookFnN = M.getOrInsertFunction("__cmplog_rtn_hook_n", VoidTy,
+                                            i8PtrTy, i8PtrTy, Int64Ty);
+    }
+  } else {
+    if (CmplogExtended) {
+      cmplogHookFnN =
+          M.getOrInsertFunction("__cmplog_rtn_hook_n_ctx_extended", VoidTy,
+                                Int32Ty, i8PtrTy, i8PtrTy, Int64Ty);
+    } else {
+      cmplogHookFnN = M.getOrInsertFunction("__cmplog_rtn_hook_n_ctx", VoidTy,
+                                            Int32Ty, i8PtrTy, i8PtrTy, Int64Ty);
+    }
+  }
 
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee
-#else
-  Constant *
-#endif
-      c7 = M.getOrInsertFunction("__cmplog_rtn_hook_str", VoidTy, i8PtrTy,
-                                 i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee cmplogHookFnStr = c7;
-#else
-  Function *cmplogHookFnStr = cast<Function>(c7);
-#endif
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogHookFnStrN = M.getOrInsertFunction(
+          "__cmplog_rtn_hook_strn_extended", VoidTy, i8PtrTy, i8PtrTy, Int64Ty);
+    } else {
+      cmplogHookFnStrN = M.getOrInsertFunction("__cmplog_rtn_hook_strn", VoidTy,
+                                               i8PtrTy, i8PtrTy, Int64Ty);
+    }
+  } else {
+    if (CmplogExtended) {
+      cmplogHookFnStrN =
+          M.getOrInsertFunction("__cmplog_rtn_hook_strn_ctx_extended", VoidTy,
+                                Int32Ty, i8PtrTy, i8PtrTy, Int64Ty);
+    } else {
+      cmplogHookFnStrN =
+          M.getOrInsertFunction("__cmplog_rtn_hook_strn_ctx", VoidTy, Int32Ty,
+                                i8PtrTy, i8PtrTy, Int64Ty);
+    }
+  }
+
+  if (!Ctx) {
+    if (CmplogExtended) {
+      cmplogHookFnStr = M.getOrInsertFunction("__cmplog_rtn_hook_str_extended",
+                                              VoidTy, i8PtrTy, i8PtrTy);
+    } else {
+      cmplogHookFnStr = M.getOrInsertFunction("__cmplog_rtn_hook_str", VoidTy,
+                                              i8PtrTy, i8PtrTy);
+    }
+  } else {
+    if (CmplogExtended) {
+      cmplogHookFnStr =
+          M.getOrInsertFunction("__cmplog_rtn_hook_str_ctx_extended", VoidTy,
+                                Int32Ty, i8PtrTy, i8PtrTy);
+    } else {
+      cmplogHookFnStr = M.getOrInsertFunction(
+          "__cmplog_rtn_hook_str_ctx", VoidTy, Int32Ty, i8PtrTy, i8PtrTy);
+    }
+  }
+
+  GlobalVariable *AFLContext = M.getGlobalVariable("__afl_prev_ctx");
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {
@@ -502,6 +536,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
     std::vector<Value *> args;
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
     Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    if (Ctx) { args.push_back(AFLContext); }
+
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
@@ -524,6 +560,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
                       v3P, IntegerType::get(C, v3P->getType()->getPrimitiveSizeInBits()));
     Value *v3Pcasted =
         IRB.CreateIntCast(v3Pbitcast, IntegerType::get(C, 64), false);
+    if (Ctx) { args.push_back(AFLContext); }
+
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
     args.push_back(v3Pcasted);
@@ -541,6 +579,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
     std::vector<Value *> args;
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
     Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    if (Ctx) { args.push_back(AFLContext); }
+
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
@@ -562,6 +602,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
                       v3P, IntegerType::get(C, v3P->getType()->getPrimitiveSizeInBits()));
     Value *v3Pcasted =
         IRB.CreateIntCast(v3Pbitcast, IntegerType::get(C, 64), false);
+    if (Ctx) { args.push_back(AFLContext); }
+
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
     args.push_back(v3Pcasted);
@@ -580,6 +622,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
     std::vector<Value *> args;
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
     Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    if (Ctx) { args.push_back(AFLContext); }
+
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
@@ -597,6 +641,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
     std::vector<Value *> args;
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
     Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    if (Ctx) { args.push_back(AFLContext); }
+
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
@@ -614,6 +660,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
     std::vector<Value *> args;
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
     Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    if (Ctx) { args.push_back(AFLContext); }
+
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
@@ -631,6 +679,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
     std::vector<Value *> args;
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
     Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    if (Ctx) { args.push_back(AFLContext); }
+
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 

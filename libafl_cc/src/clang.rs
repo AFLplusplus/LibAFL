@@ -44,6 +44,8 @@ pub enum LLVMPasses {
     #[cfg(unix)]
     /// The CmpLog Instruction pass
     CmpLogInstructions,
+    /// Logging ctx. Insert this before other CmpLog passes. This pass must be combined with other CmpLog passes
+    CmpLogCtxLogging,
 }
 
 impl LLVMPasses {
@@ -66,6 +68,8 @@ impl LLVMPasses {
             #[cfg(unix)]
             LLVMPasses::CmpLogInstructions => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("cmplog-instructions-pass.{}", dll_extension())),
+            LLVMPasses::CmpLogCtxLogging => PathBuf::from(env!("OUT_DIR"))
+                .join(format!("cmplog-ctx-logging-pass.{}", dll_extension())),
         }
     }
 }

@@ -162,9 +162,44 @@ void __cmplog_rtn_hook(uint8_t *ptr1, uint8_t *ptr2) {
   (void)ptr1;
   (void)ptr2;
 }
+void __cmplog_rtn_hook_extended(uint8_t *ptr1, uint8_t *ptr2) {
+  (void)ptr1;
+  (void)ptr2;
+}
+void __cmplog_rtn_hook_ctx(uint32_t ctx, uint8_t *ptr1, uint8_t *ptr2) {
+  (void)ctx;
+  (void)ptr1;
+  (void)ptr2;
+}
+void __cmplog_rtn_hook_ctx_extended(uint32_t ctx, uint8_t *ptr1,
+                                    uint8_t *ptr2) {
+  (void)ctx;
+  (void)ptr1;
+  (void)ptr2;
+}
 
 void __cmplog_rtn_hook_n(const uint8_t *ptr1, const uint8_t *ptr2,
                          uint64_t len) {
+  (void)ptr1;
+  (void)ptr2;
+  (void)len;
+}
+void __cmplog_rtn_hook_n_extended(const uint8_t *ptr1, const uint8_t *ptr2,
+                                  uint64_t len) {
+  (void)ptr1;
+  (void)ptr2;
+  (void)len;
+}
+void __cmplog_rtn_hook_n_ctx(uint32_t ctx, const uint8_t *ptr1,
+                             const uint8_t *ptr2, uint64_t len) {
+  (void)ctx;
+  (void)ptr1;
+  (void)ptr2;
+  (void)len;
+}
+void __cmplog_rtn_hook_n_ctx_extended(uint32_t ctx, const uint8_t *ptr1,
+                                      const uint8_t *ptr2, uint64_t len) {
+  (void)ctx;
   (void)ptr1;
   (void)ptr2;
   (void)len;
@@ -174,8 +209,44 @@ void __cmplog_rtn_hook_str(const uint8_t *ptr1, uint8_t *ptr2) {
   (void)ptr1;
   (void)ptr2;
 }
+void __cmplog_rtn_hook_str_extended(const uint8_t *ptr1, uint8_t *ptr2) {
+  (void)ptr1;
+  (void)ptr2;
+}
+void __cmplog_rtn_hook_str_ctx(uint32_t ctx, const uint8_t *ptr1,
+                               uint8_t *ptr2) {
+  (void)ctx;
+  (void)ptr1;
+  (void)ptr2;
+}
+void __cmplog_rtn_hook_str_ctx_extended(uint32_t ctx, const uint8_t *ptr1,
+                                        uint8_t *ptr2) {
+  (void)ctx;
+  (void)ptr1;
+  (void)ptr2;
+}
 
 void __cmplog_rtn_hook_strn(uint8_t *ptr1, uint8_t *ptr2, uint64_t len) {
+  (void)ptr1;
+  (void)ptr2;
+  (void)len;
+}
+void __cmplog_rtn_hook_strn_extended(uint8_t *ptr1, uint8_t *ptr2,
+                                     uint64_t len) {
+  (void)ptr1;
+  (void)ptr2;
+  (void)len;
+}
+void __cmplog_rtn_hook_strn_ctx(uint32_t ctx, uint8_t *ptr1, uint8_t *ptr2,
+                                uint64_t len) {
+  (void)ctx;
+  (void)ptr1;
+  (void)ptr2;
+  (void)len;
+}
+void __cmplog_rtn_hook_strn_ctx_extended(uint32_t ctx, uint8_t *ptr1,
+                                         uint8_t *ptr2, uint64_t len) {
+  (void)ctx;
   (void)ptr1;
   (void)ptr2;
   (void)len;
@@ -185,9 +256,45 @@ void __cmplog_rtn_gcc_stdstring_cstring(uint8_t *stdstring, uint8_t *cstring) {
   (void)stdstring;
   (void)cstring;
 }
+void __cmplog_rtn_gcc_stdstring_cstring_extended(uint8_t *stdstring,
+                                                 uint8_t *cstring) {
+  (void)stdstring;
+  (void)cstring;
+}
+void __cmplog_rtn_gcc_stdstring_cstring_ctx(uint32_t ctx, uint8_t *stdstring,
+                                            uint8_t *cstring) {
+  (void)ctx;
+  (void)stdstring;
+  (void)cstring;
+}
+void __cmplog_rtn_gcc_stdstring_cstring_ctx_extended(uint32_t ctx,
+                                                     uint8_t *stdstring,
+                                                     uint8_t *cstring) {
+  (void)ctx;
+  (void)stdstring;
+  (void)cstring;
+}
 
 void __cmplog_rtn_gcc_stdstring_stdstring(uint8_t *stdstring1,
                                           uint8_t *stdstring2) {
+  (void)stdstring1;
+  (void)stdstring2;
+}
+void __cmplog_rtn_gcc_stdstring_stdstring_extended(uint8_t *stdstring1,
+                                                   uint8_t *stdstring2) {
+  (void)stdstring1;
+  (void)stdstring2;
+}
+void __cmplog_rtn_gcc_stdstring_stdstring_ctx(uint32_t ctx, uint8_t *stdstring1,
+                                              uint8_t *stdstring2) {
+  (void)ctx;
+  (void)stdstring1;
+  (void)stdstring2;
+}
+void __cmplog_rtn_gcc_stdstring_stdstring_ctx_extended(uint32_t ctx,
+                                                       uint8_t *stdstring1,
+                                                       uint8_t *stdstring2) {
+  (void)ctx;
   (void)stdstring1;
   (void)stdstring2;
 }
@@ -196,9 +303,46 @@ void __cmplog_rtn_llvm_stdstring_cstring(uint8_t *stdstring, uint8_t *cstring) {
   (void)stdstring;
   (void)cstring;
 }
+void __cmplog_rtn_llvm_stdstring_cstring_extended(uint8_t *stdstring,
+                                                  uint8_t *cstring) {
+  (void)stdstring;
+  (void)cstring;
+}
+void __cmplog_rtn_llvm_stdstring_cstring_ctx(uint32_t ctx, uint8_t *stdstring,
+                                             uint8_t *cstring) {
+  (void)ctx;
+  (void)stdstring;
+  (void)cstring;
+}
+void __cmplog_rtn_llvm_stdstring_cstring_ctx_extended(uint32_t ctx,
+                                                      uint8_t *stdstring,
+                                                      uint8_t *cstring) {
+  (void)ctx;
+  (void)stdstring;
+  (void)cstring;
+}
 
 void __cmplog_rtn_llvm_stdstring_stdstring(uint8_t *stdstring1,
                                            uint8_t *stdstring2) {
+  (void)stdstring1;
+  (void)stdstring2;
+}
+void __cmplog_rtn_llvm_stdstring_stdstring_extended(uint8_t *stdstring1,
+                                                    uint8_t *stdstring2) {
+  (void)stdstring1;
+  (void)stdstring2;
+}
+void __cmplog_rtn_llvm_stdstring_stdstring_ctx(uint32_t ctx,
+                                               uint8_t *stdstring1,
+                                               uint8_t *stdstring2) {
+  (void)ctx;
+  (void)stdstring1;
+  (void)stdstring2;
+}
+void __cmplog_rtn_llvm_stdstring_stdstring_ctx_extended(uint32_t ctx,
+                                                        uint8_t *stdstring1,
+                                                        uint8_t *stdstring2) {
+  (void)ctx;
   (void)stdstring1;
   (void)stdstring2;
 }

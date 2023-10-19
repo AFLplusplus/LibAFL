@@ -63,7 +63,7 @@ using namespace llvm;
 static cl::opt<bool> CmplogExtended("cmplog_instructions_extended",
                                     cl::desc("Uses extended header"),
                                     cl::init(false), cl::NotHidden);
-static cl::opt<bool> Ctx("cmplog_ctx",
+static cl::opt<bool> Ctx("cmplog_instructions_ctx",
                          cl::desc("Enable full context sensitive coverage"),
                          cl::init(false), cl::NotHidden);
 namespace {
@@ -159,11 +159,6 @@ class CmpLogInstructions : public ModulePass {
 #endif
 
  private:
-  uint32_t function_minimum_size = 1;
-  uint32_t coverage_map_size =
-      std::getenv("LIBAFL_CMP_MAP_SIZE")
-          ? std::stoi(std::getenv("LIBAFL_CMP_MAP_SIZE"))
-          : 65536;
   bool hookInstrs(Module &M);
   bool be_quiet = true;
 };
@@ -347,79 +342,12 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
   Constant *Null = Constant::getNullValue(PointerType::get(Int8Ty, 0));
 
   // For ctx
-  GlobalVariable *AFLContext = new GlobalVariable(
-      M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_ctx", 0,
-      GlobalVariable::GeneralDynamicTLSModel, 0, false);
-  Value *PrevCtx = NULL;
+  GlobalVariable *AFLContext = M.getGlobalVariable("__afl_prev_ctx");
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {
     if (isIgnoreFunction(&F)) continue;
-    int has_calls = 0;
     for (auto &BB : F) {
-      if (Ctx) {
-        BasicBlock::iterator IP = BB.getFirstInsertionPt();
-        IRBuilder<>          InitialIRB(&(*IP));
-        if (&BB == &F.getEntryBlock()) {
-          // at the first basic block
-          // load the context id of the previous function and write to a local
-          // variable on the stack
-
-          LoadInst *PrevCtxLoad = InitialIRB.CreateLoad(
-#if LLVM_VERSION_MAJOR >= 14
-              InitialIRB.getInt32Ty(),
-#endif
-              AFLContext);
-          PrevCtxLoad->setMetadata(M.getMDKindID("nosanitize"),
-                                   MDNode::get(C, None));
-          PrevCtx = PrevCtxLoad;
-
-          // Next check if there are fucntion calls in this function
-
-          // does the function have calls? and is any of the calls larger than
-          // one basic block?
-          for (auto &BB_2 : F) {
-            if (has_calls) { break; }
-            for (auto &IN : BB_2) {
-              CallInst *callInst = nullptr;
-              if ((callInst = dyn_cast<CallInst>(&IN))) {
-                Function *Callee = callInst->getCalledFunction();
-                if (!Callee || Callee->size() < function_minimum_size) {
-                  continue;
-                } else {
-                  has_calls = 1;
-                  break;
-                }
-              }
-            }
-          }
-
-          // if yes we store a context ID for this function in the global var
-          if (has_calls) {
-            // if we reach here it means that we are in a function in which we
-            // have call instruction into other functions let's give this
-            // function a random 32bit number
-            Value *NewCtx =
-                ConstantInt::get(Int32Ty, RandBelow(coverage_map_size));
-
-            NewCtx = InitialIRB.CreateXor(PrevCtx, NewCtx);
-            StoreInst *StoreCtx = InitialIRB.CreateStore(NewCtx, AFLContext);
-            StoreCtx->setMetadata(M.getMDKindID("nosanitize"),
-                                  MDNode::get(C, None));
-          }
-        }
-      }
-
-      if (has_calls) {
-        Instruction *Inst = BB.getTerminator();
-        if (isa<ReturnInst>(Inst) || isa<ResumeInst>(Inst)) {
-          IRBuilder<> LastIRB(Inst);
-          StoreInst  *RestoreCtx = LastIRB.CreateStore(PrevCtx, AFLContext);
-          RestoreCtx->setMetadata(M.getMDKindID("nosanitize"),
-                                  MDNode::get(C, None));
-        }
-      }
-
       for (auto &IN : BB) {
         CmpInst *selectcmpInst = nullptr;
         if ((selectcmpInst = dyn_cast<CmpInst>(&IN))) {

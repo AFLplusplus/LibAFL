@@ -17,6 +17,31 @@
 extern CmpLogMap         *libafl_cmplog_map_ptr;
 extern CmpLogMapExtended *libafl_cmplog_map_extended_ptr;
 
+// no static inline because we expose this to libafl_targets
+void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
+                                          uint64_t arg1, uint64_t arg2) {
+  if (!libafl_cmplog_enabled) { return; }
+  libafl_cmplog_enabled = false;
+
+  uint16_t hits;
+  if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
+    libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_INS;
+    libafl_cmplog_map_ptr->headers[k].hits = 1;
+    libafl_cmplog_map_ptr->headers[k].shape = shape;
+    hits = 0;
+  } else {
+    hits = libafl_cmplog_map_ptr->headers[k].hits++;
+    if (libafl_cmplog_map_ptr->headers[k].shape < shape) {
+      libafl_cmplog_map_ptr->headers[k].shape = shape;
+    }
+  }
+
+  hits &= CMPLOG_MAP_H - 1;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v0 = arg1;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_enabled = true;
+}
+
 static inline void cmplog_instructions_inlined(uintptr_t k, uint8_t shape,
                                                uint64_t arg1, uint64_t arg2) {
   uint16_t hits;
