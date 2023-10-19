@@ -212,7 +212,8 @@ fn main() {
             )
             .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
             .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-            .file(src_dir.join("cmplog.c"))
+            .file(src_dir.join("cmplog_insts_callbacks.c"))
+            .file(src_dir.join("cmplog_routines_callbacks.c"))
             .compile("cmplog");
     }
 
