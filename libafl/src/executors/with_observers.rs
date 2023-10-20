@@ -51,7 +51,7 @@ where
 
 impl<E, OT> HasObservers for WithObservers<E, OT>
 where
-    E: HasObservers + Debug,
+    E: UsesState + Debug,
     OT: ObserversTuple<E::State> + Debug,
 {
     fn observers(&self) -> &OT {
