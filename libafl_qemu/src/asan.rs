@@ -490,7 +490,7 @@ impl AsanGiovese {
         F: FnMut(&Interval<GuestAddr>, &AllocTreeItem),
     {
         if let Some(entry) = self.alloc_tree.lock().unwrap().query(query..=query).next() {
-            func(entry.interval, entry.value)
+            func(entry.interval, entry.value);
         }
     }
 
@@ -505,7 +505,7 @@ impl AsanGiovese {
             .query_mut(query..=query)
             .next()
         {
-            func(entry.interval, entry.value)
+            func(entry.interval, entry.value);
         }
     }
 
@@ -514,7 +514,7 @@ impl AsanGiovese {
         F: FnMut(&Interval<GuestAddr>, &AllocTreeItem),
     {
         if let Some(entry) = self.alloc_tree.lock().unwrap().query(query).next() {
-            func(entry.interval, entry.value)
+            func(entry.interval, entry.value);
         }
     }
 
@@ -523,7 +523,7 @@ impl AsanGiovese {
         F: FnMut(&Interval<GuestAddr>, &mut AllocTreeItem),
     {
         if let Some(entry) = self.alloc_tree.lock().unwrap().query_mut(query).next() {
-            func(entry.interval, entry.value)
+            func(entry.interval, entry.value);
         }
     }
 
@@ -1147,6 +1147,7 @@ fn load_file_section<'input, 'arena, Endian: addr2line::gimli::Endianity>(
 }
 
 #[allow(clippy::unnecessary_cast)]
+#[allow(clippy::too_many_lines)]
 pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanError) {
     let mut regions = std::collections::HashMap::new();
     for region in emu.mappings() {
@@ -1273,7 +1274,7 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
             v
         })
         .unwrap_or(vec![pc]);
-    eprintln!("AddressSanitizer Error: {}", err);
+    eprintln!("AddressSanitizer Error: {err}");
     for (i, addr) in backtrace.iter().rev().enumerate() {
         eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
     }
@@ -1281,7 +1282,7 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
         AsanError::Read(addr, _) | AsanError::Write(addr, _) | AsanError::BadFree(addr, _) => {
             Some(addr)
         }
-        _ => None,
+        AsanError::MemLeak(_) => None,
     };
     if let Some(addr) = addr {
         let print_bts = |item: &AllocTreeItem| {

@@ -773,7 +773,7 @@ impl CPU {
         let mut display = String::new();
         let mut maxl = 0;
         for r in Regs::iter() {
-            maxl = std::cmp::max(format!("{:#?}", r).len(), maxl);
+            maxl = std::cmp::max(format!("{r:#?}").len(), maxl);
         }
         for (i, r) in Regs::iter().enumerate() {
             let v: GuestAddr = self.read_reg(r).unwrap();
