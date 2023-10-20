@@ -125,6 +125,7 @@ impl<R: Read> MessageFileReader<R> {
             }
             SymExpr::Neg { op }
             | SymExpr::FloatAbs { op }
+            | SymExpr::FloatNeg { op }
             | SymExpr::Not { op }
             | SymExpr::Sext { op, .. }
             | SymExpr::Zext { op, .. }
@@ -204,6 +205,7 @@ impl<R: Read> MessageFileReader<R> {
                 }
             }
             SymExpr::Call { .. } | SymExpr::Return { .. } | SymExpr::BasicBlock { .. } => {}
+            SymExpr::Ite { .. } => todo!(), // I don't know what i should put here..
         }
         SymExprRef::new(ret).unwrap()
     }
@@ -291,6 +293,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             }
             SymExpr::Neg { op }
             | SymExpr::FloatAbs { op }
+            | SymExpr::FloatNeg { op }
             | SymExpr::Not { op }
             | SymExpr::Sext { op, .. }
             | SymExpr::Zext { op, .. }
@@ -370,6 +373,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                 }
             }
             SymExpr::Call { .. } | SymExpr::Return { .. } | SymExpr::BasicBlock { .. } => {}
+            SymExpr::Ite { .. } => todo!(), // i don't know what i should put here (again)
         }
         self.serialization_options
             .serialize_into(&mut self.writer, &message)?;
