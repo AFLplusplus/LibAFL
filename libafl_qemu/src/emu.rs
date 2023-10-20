@@ -768,6 +768,7 @@ impl CPU {
         }
     }
 
+    #[must_use]
     pub fn display_context(&self) -> String {
         let mut display = String::new();
         let mut maxl = 0;
@@ -776,13 +777,13 @@ impl CPU {
         }
         for (i, r) in Regs::iter().enumerate() {
             let v: GuestAddr = self.read_reg(r).unwrap();
-            let sr = format!("{:#?}", r);
-            display += &format!("{1:>0$}: {2:#016x} ", maxl, sr, v);
+            let sr = format!("{r:#?}");
+            display += &format!("{sr:>maxl$}: {v:#016x} ");
             if (i + 1) % 4 == 0 {
                 display += "\n";
             }
         }
-        if !display.is_empty() && display.chars().last().unwrap() != '\n' {
+        if !display.ends_with('\n') {
             display += "\n";
         }
         display

@@ -503,6 +503,12 @@ static mut CALLSTACKS: Option<ThreadLocal<UnsafeCell<Vec<GuestAddr>>>> = None;
 #[derive(Debug)]
 pub struct FullBacktraceCollector {}
 
+impl Default for FullBacktraceCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FullBacktraceCollector {
     pub fn new() -> Self {
         unsafe { CALLSTACKS = Some(ThreadLocal::new()) };

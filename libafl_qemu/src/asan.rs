@@ -104,19 +104,15 @@ pub enum AsanError {
 impl core::fmt::Display for AsanError {
     fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            AsanError::Read(addr, len) => write!(fmt, "Invalid {} bytes read at {:#x}", len, addr),
+            AsanError::Read(addr, len) => write!(fmt, "Invalid {len} bytes read at {addr:#x}"),
             AsanError::Write(addr, len) => {
-                write!(fmt, "Invalid {} bytes write at {:#x}", len, addr)
+                write!(fmt, "Invalid {len} bytes write at {addr:#x}")
             }
             AsanError::BadFree(addr, interval) => match interval {
-                Some(chunk) => write!(
-                    fmt,
-                    "Bad free at {:#x} in the allocated chunk {}",
-                    addr, chunk
-                ),
-                None => write!(fmt, "Bad free at {:#x} (wild pointer)", addr),
+                Some(chunk) => write!(fmt, "Bad free at {addr:#x} in the allocated chunk {chunk}",),
+                None => write!(fmt, "Bad free at {addr:#x} (wild pointer)"),
             },
-            AsanError::MemLeak(interval) => write!(fmt, "Memory leak of chunk {}", interval),
+            AsanError::MemLeak(interval) => write!(fmt, "Memory leak of chunk {interval}"),
         }
     }
 }
@@ -131,6 +127,7 @@ pub struct AllocTreeItem {
 }
 
 impl AllocTreeItem {
+    #[must_use]
     pub fn alloc(backtrace: Vec<GuestAddr>) -> Self {
         AllocTreeItem {
             backtrace,
@@ -423,7 +420,7 @@ impl AsanGiovese {
                 v.push(pc);
                 v
             })
-            .unwrap_or(vec![]);
+            .unwrap_or_default();
         self.alloc_tree
             .lock()
             .unwrap()
@@ -451,7 +448,7 @@ impl AsanGiovese {
                     v.push(pc);
                     v
                 })
-                .unwrap_or(vec![]);
+                .unwrap_or_default();
             item.free(backtrace);
         });
         if let Some(ck) = chunk {
@@ -492,48 +489,42 @@ impl AsanGiovese {
     where
         F: FnMut(&Interval<GuestAddr>, &AllocTreeItem),
     {
-        self.alloc_tree
-            .lock()
-            .unwrap()
-            .query(query..=query)
-            .next()
-            .map(|entry| func(entry.interval, entry.value));
+        if let Some(entry) = self.alloc_tree.lock().unwrap().query(query..=query).next() {
+            func(entry.interval, entry.value)
+        }
     }
 
     pub fn alloc_map_mut<F>(&mut self, query: GuestAddr, mut func: F)
     where
         F: FnMut(&Interval<GuestAddr>, &mut AllocTreeItem),
     {
-        self.alloc_tree
+        if let Some(entry) = self
+            .alloc_tree
             .lock()
             .unwrap()
             .query_mut(query..=query)
             .next()
-            .map(|entry| func(entry.interval, entry.value));
+        {
+            func(entry.interval, entry.value)
+        }
     }
 
     pub fn alloc_map_interval<F>(&self, query: Interval<GuestAddr>, mut func: F)
     where
         F: FnMut(&Interval<GuestAddr>, &AllocTreeItem),
     {
-        self.alloc_tree
-            .lock()
-            .unwrap()
-            .query(query)
-            .next()
-            .map(|entry| func(entry.interval, entry.value));
+        if let Some(entry) = self.alloc_tree.lock().unwrap().query(query).next() {
+            func(entry.interval, entry.value)
+        }
     }
 
     pub fn alloc_map_interval_mut<F>(&mut self, query: Interval<GuestAddr>, mut func: F)
     where
         F: FnMut(&Interval<GuestAddr>, &mut AllocTreeItem),
     {
-        self.alloc_tree
-            .lock()
-            .unwrap()
-            .query_mut(query)
-            .next()
-            .map(|entry| func(entry.interval, entry.value));
+        if let Some(entry) = self.alloc_tree.lock().unwrap().query_mut(query).next() {
+            func(entry.interval, entry.value)
+        }
     }
 
     pub fn snapshot(&mut self, emu: &Emulator) {
@@ -1140,11 +1131,11 @@ fn load_file_section<'input, 'arena, Endian: addr2line::gimli::Endianity>(
     file: &addr2line::object::File<'input>,
     endian: Endian,
     arena_data: &'arena typed_arena::Arena<Cow<'input, [u8]>>,
-) -> Result<addr2line::gimli::EndianSlice<'arena, Endian>, ()> {
+) -> Result<addr2line::gimli::EndianSlice<'arena, Endian>, addr2line::object::Error> {
     // TODO: Unify with dwarfdump.rs in gimli.
     let name = id.name();
     match file.section_by_name(name) {
-        Some(section) => match section.uncompressed_data().unwrap() {
+        Some(section) => match section.uncompressed_data()? {
             Cow::Borrowed(b) => Ok(addr2line::gimli::EndianSlice::new(b, endian)),
             Cow::Owned(b) => Ok(addr2line::gimli::EndianSlice::new(
                 arena_data.alloc(b.into()),
@@ -1155,6 +1146,7 @@ fn load_file_section<'input, 'arena, Endian: addr2line::gimli::Endianity>(
     }
 }
 
+#[allow(clippy::unnecessary_cast)]
 pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanError) {
     let mut regions = std::collections::HashMap::new();
     for region in emu.mappings() {
@@ -1188,8 +1180,8 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
 
     let arena_data = typed_arena::Arena::new();
 
-    for idx in 0..images.len() {
-        if let Ok(obj) = addr2line::object::read::File::parse(&*images[idx].1) {
+    for img in &images {
+        if let Ok(obj) = addr2line::object::read::File::parse(&*img.1) {
             let endian = if obj.is_little_endian() {
                 addr2line::gimli::RunTimeEndian::Little
             } else {
@@ -1264,11 +1256,11 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
                         info += &line.to_string();
                     }
                 } else {
-                    info += &format!(" ({}+{:#x})", images[*idx].0, raddr);
+                    info += &format!(" ({}+{raddr:#x})", images[*idx].0);
                 }
             }
             if info.is_empty() {
-                info += &format!(" ({}+{:#x})", images[*idx].0, raddr);
+                info += &format!(" ({}+{raddr:#x})", images[*idx].0);
             }
         }
         info
@@ -1283,12 +1275,12 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
         .unwrap_or(vec![pc]);
     eprintln!("AddressSanitizer Error: {}", err);
     for (i, addr) in backtrace.iter().rev().enumerate() {
-        eprintln!("\t#{} {:#x}{}", i, addr, resolve_addr(*addr));
+        eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
     }
     let addr = match err {
-        AsanError::Read(addr, _) => Some(addr),
-        AsanError::Write(addr, _) => Some(addr),
-        AsanError::BadFree(addr, _) => Some(addr),
+        AsanError::Read(addr, _) | AsanError::Write(addr, _) | AsanError::BadFree(addr, _) => {
+            Some(addr)
+        }
         _ => None,
     };
     if let Some(addr) = addr {
@@ -1298,20 +1290,19 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
             } else {
                 eprintln!("Freed at:");
                 for (i, addr) in item.free_backtrace.iter().rev().enumerate() {
-                    eprintln!("\t#{} {:#x}{}", i, addr, resolve_addr(*addr));
+                    eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
                 }
                 eprintln!("And previously allocated at:");
             }
 
             for (i, addr) in item.backtrace.iter().rev().enumerate() {
-                eprintln!("\t#{} {:#x}{}", i, addr, resolve_addr(*addr));
+                eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
             }
         };
 
         if let Some((chunk, item)) = rt.alloc_get_clone(addr) {
             eprintln!(
-                "Address {:#x} is {} bytes inside the chunk [{:#x},{:#x})",
-                addr,
+                "Address {addr:#x} is {} bytes inside the chunk [{:#x},{:#x})",
                 addr - chunk.start,
                 chunk.start,
                 chunk.end
@@ -1327,8 +1318,7 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
                     }
                     found = true;
                     eprintln!(
-                        "Address {:#x} is {} bytes to the left of the chunk [{:#x},{:#x})",
-                        addr,
+                        "Address {addr:#x} is {} bytes to the left of the chunk [{:#x},{:#x})",
                         chunk.start - addr,
                         chunk.start,
                         chunk.end
@@ -1345,8 +1335,7 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
                         }
                         found = true;
                         eprintln!(
-                            "Address {:#x} is {} bytes to the right of the chunk [{:#x},{:#x})",
-                            addr,
+                            "Address {addr:#x} is {} bytes to the right of the chunk [{:#x},{:#x})",
                             addr - chunk.end,
                             chunk.start,
                             chunk.end
