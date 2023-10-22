@@ -205,7 +205,12 @@ impl<R: Read> MessageFileReader<R> {
                 }
             }
             SymExpr::Call { .. } | SymExpr::Return { .. } | SymExpr::BasicBlock { .. } => {}
-            SymExpr::Ite { .. } => todo!(), // I don't know what i should put here..
+            SymExpr::Ite { cond, a, b } => {
+                *cond = self.make_absolute(*cond);
+                *a = self.make_absolute(*a);
+                *b = self.make_absolute(*b);
+                self.current_id += 1;
+            }
         }
         SymExprRef::new(ret).unwrap()
     }
@@ -373,7 +378,11 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                 }
             }
             SymExpr::Call { .. } | SymExpr::Return { .. } | SymExpr::BasicBlock { .. } => {}
-            SymExpr::Ite { .. } => todo!(), // i don't know what i should put here (again)
+            SymExpr::Ite { cond, a, b } => {
+                *cond = self.make_relative(*cond);
+                *a = self.make_relative(*a);
+                *b = self.make_relative(*b);
+            }
         }
         self.serialization_options
             .serialize_into(&mut self.writer, &message)?;
