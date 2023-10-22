@@ -60,7 +60,6 @@ struct Opt {
     concolic: bool,
 }
 
-
 use std::fs;
 pub fn main() {
     // Registry the metadata types used in this fuzzer
@@ -79,7 +78,7 @@ pub fn main() {
         1337,
         opt.concolic,
     )
-    .unwrap();
+    .expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
