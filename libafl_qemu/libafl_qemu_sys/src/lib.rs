@@ -36,3 +36,10 @@ pub fn memop_big_endian(op: MemOp) -> bool {
 pub fn make_plugin_meminfo(oi: MemOpIdx, rw: qemu_plugin_mem_rw) -> qemu_plugin_meminfo_t {
     oi | (rw.0 << 16)
 }
+
+// from include/hw/core/cpu.h
+
+#[cfg(target_os = "linux")]
+pub fn cpu_env(cpu: *mut CPUState) -> *mut CPUArchState {
+    unsafe { cpu.add(1) as *mut CPUArchState }
+}

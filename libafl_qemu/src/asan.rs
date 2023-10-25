@@ -99,6 +99,7 @@ pub enum AsanError {
     Write(GuestAddr, usize),
     BadFree(GuestAddr, Option<Interval<GuestAddr>>),
     MemLeak(Interval<GuestAddr>),
+    Signal(i32),
 }
 
 impl core::fmt::Display for AsanError {
@@ -113,6 +114,7 @@ impl core::fmt::Display for AsanError {
                 None => write!(fmt, "Bad free at {addr:#x} (wild pointer)"),
             },
             AsanError::MemLeak(interval) => write!(fmt, "Memory leak of chunk {interval}"),
+            AsanError::Signal(sig) => write!(fmt, "Signal {sig} received"),
         }
     }
 }
@@ -868,6 +870,10 @@ where
             Some(trace_write8_asan::<QT, S>),
             Some(trace_write_n_asan::<QT, S>),
         );
+
+        if self.rt.error_callback.is_some() {
+            hooks.crash(oncrash_asan::<QT, S>);
+        }
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
@@ -890,6 +896,17 @@ where
             *exit_kind = ExitKind::Crash;
         }
     }
+}
+
+pub fn oncrash_asan<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, target_sig: i32)
+where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    let emu = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let pc: GuestAddr = emu.read_reg(Regs::Pc).unwrap();
+    h.rt.report(&emu, pc, AsanError::Signal(target_sig));
 }
 
 pub fn gen_readwrite_asan<QT, S>(
@@ -1282,7 +1299,7 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
         AsanError::Read(addr, _) | AsanError::Write(addr, _) | AsanError::BadFree(addr, _) => {
             Some(addr)
         }
-        AsanError::MemLeak(_) => None,
+        AsanError::MemLeak(_) | AsanError::Signal(_) => None,
     };
     if let Some(addr) = addr {
         let print_bts = |item: &AllocTreeItem| {
@@ -1351,6 +1368,4 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
     // fix pc in case it is not synced (in hooks)
     emu.write_reg(Regs::Pc, pc).unwrap();
     eprint!("Context:\n{}", emu.current_cpu().unwrap().display_context());
-
-    std::process::abort();
 }

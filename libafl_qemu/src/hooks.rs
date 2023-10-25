@@ -687,6 +687,33 @@ where
     }
 }
 
+#[cfg(emulation_mode = "usermode")]
+static mut CRASH_HOOKS: Vec<Hook> = vec![];
+
+#[cfg(emulation_mode = "usermode")]
+extern "C" fn crash_hook_wrapper<QT, S>(target_sig: i32)
+where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    unsafe {
+        let hooks = get_qemu_hooks::<QT, S>();
+        for hook in &mut CRASH_HOOKS {
+            match hook {
+                Hook::Function(ptr) => {
+                    let func: fn(&mut QemuHooks<'_, QT, S>, i32) = transmute(*ptr);
+                    func(hooks, target_sig);
+                }
+                Hook::Closure(ptr) => {
+                    let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, i32)> = transmute(ptr);
+                    func(hooks, target_sig);
+                }
+                _ => (),
+            }
+        }
+    }
+}
+
 static mut HOOKS_IS_INITIALIZED: bool = false;
 
 pub struct QemuHooks<'a, QT, S>
@@ -1543,5 +1570,21 @@ where
         }
         self.emulator
             .set_post_syscall_hook(syscall_after_hooks_wrapper::<QT, S>);
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    pub fn crash_closure(&self, hook: Box<dyn FnMut(&mut Self, i32)>) {
+        unsafe {
+            self.emulator.set_crash_hook(crash_hook_wrapper::<QT, S>);
+            CRASH_HOOKS.push(Hook::Closure(transmute(hook)));
+        }
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    pub fn crash(&self, hook: fn(&mut Self, target_signal: i32)) {
+        unsafe {
+            self.emulator.set_crash_hook(crash_hook_wrapper::<QT, S>);
+            CRASH_HOOKS.push(Hook::Function(hook as *const libc::c_void));
+        }
     }
 }

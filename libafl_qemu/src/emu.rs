@@ -317,6 +317,8 @@ extern "C" {
         unsafe extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult;
     static mut libafl_post_syscall_hook:
         unsafe extern "C" fn(u64, i32, u64, u64, u64, u64, u64, u64, u64, u64) -> u64;
+
+    static mut libafl_dump_core_hook: unsafe extern "C" fn(i32);
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -730,14 +732,22 @@ impl CPU {
     pub fn save_state(&self) -> CPUArchState {
         unsafe {
             let mut saved = MaybeUninit::<CPUArchState>::uninit();
-            copy_nonoverlapping(self.ptr.as_mut().unwrap().env_ptr, saved.as_mut_ptr(), 1);
+            copy_nonoverlapping(
+                libafl_qemu_sys::cpu_env(self.ptr.as_mut().unwrap()),
+                saved.as_mut_ptr(),
+                1,
+            );
             saved.assume_init()
         }
     }
 
     pub fn restore_state(&self, saved: &CPUArchState) {
         unsafe {
-            copy_nonoverlapping(saved, self.ptr.as_mut().unwrap().env_ptr, 1);
+            copy_nonoverlapping(
+                saved,
+                libafl_qemu_sys::cpu_env(self.ptr.as_mut().unwrap()),
+                1,
+            );
         }
     }
 
@@ -1323,6 +1333,14 @@ impl Emulator {
 
     pub fn gdb_reply(&self, output: &str) {
         unsafe { libafl_qemu_gdb_reply(output.as_bytes().as_ptr(), output.len()) };
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    #[allow(clippy::type_complexity)]
+    pub fn set_crash_hook(&self, callback: extern "C" fn(i32)) {
+        unsafe {
+            libafl_dump_core_hook = callback;
+        }
     }
 }
 
