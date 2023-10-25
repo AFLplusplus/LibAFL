@@ -1,11 +1,13 @@
 #![allow(clippy::cast_possible_wrap)]
 
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     env, fs,
     sync::Mutex,
 };
 
+use addr2line::object::{Object, ObjectSection};
 use libafl::{
     executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, state::HasMetadata,
 };
@@ -14,12 +16,14 @@ use libc::{
 };
 use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use rangemap::RangeMap;
 
 use crate::{
+    calls::FullBacktraceCollector,
     emu::{EmuError, Emulator, MemAccessInfo, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
-    GuestAddr,
+    GuestAddr, Regs,
 };
 
 // TODO at some point, merge parts with libafl_frida
@@ -38,6 +42,8 @@ pub const QASAN_FAKESYS_NR: i32 = 0xa2a4;
 
 pub const SHADOW_PAGE_SIZE: usize = 4096;
 pub const SHADOW_PAGE_MASK: GuestAddr = !(SHADOW_PAGE_SIZE as GuestAddr - 1);
+
+pub const DEFAULT_REDZONE_SIZE: usize = 128;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
 #[repr(u64)]
@@ -93,13 +99,54 @@ pub enum AsanError {
     Write(GuestAddr, usize),
     BadFree(GuestAddr, Option<Interval<GuestAddr>>),
     MemLeak(Interval<GuestAddr>),
+    Signal(i32),
 }
 
-pub type AsanErrorCallback = Box<dyn FnMut(&Emulator, AsanError)>;
+impl core::fmt::Display for AsanError {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            AsanError::Read(addr, len) => write!(fmt, "Invalid {len} bytes read at {addr:#x}"),
+            AsanError::Write(addr, len) => {
+                write!(fmt, "Invalid {len} bytes write at {addr:#x}")
+            }
+            AsanError::BadFree(addr, interval) => match interval {
+                Some(chunk) => write!(fmt, "Bad free at {addr:#x} in the allocated chunk {chunk}",),
+                None => write!(fmt, "Bad free at {addr:#x} (wild pointer)"),
+            },
+            AsanError::MemLeak(interval) => write!(fmt, "Memory leak of chunk {interval}"),
+            AsanError::Signal(sig) => write!(fmt, "Signal {sig} received"),
+        }
+    }
+}
+
+pub type AsanErrorCallback = Box<dyn FnMut(&AsanGiovese, &Emulator, GuestAddr, AsanError)>;
+
+#[derive(Debug, Clone)]
+pub struct AllocTreeItem {
+    backtrace: Vec<GuestAddr>,
+    free_backtrace: Vec<GuestAddr>,
+    allocated: bool,
+}
+
+impl AllocTreeItem {
+    #[must_use]
+    pub fn alloc(backtrace: Vec<GuestAddr>) -> Self {
+        AllocTreeItem {
+            backtrace,
+            free_backtrace: vec![],
+            allocated: true,
+        }
+    }
+
+    pub fn free(&mut self, backtrace: Vec<GuestAddr>) {
+        self.free_backtrace = backtrace;
+        self.allocated = false;
+    }
+}
 
 pub struct AsanGiovese {
-    pub alloc_tree: Mutex<IntervalTree<GuestAddr, ()>>,
-    pub saved_tree: IntervalTree<GuestAddr, ()>,
+    pub alloc_tree: Mutex<IntervalTree<GuestAddr, AllocTreeItem>>,
+    pub saved_tree: IntervalTree<GuestAddr, AllocTreeItem>,
     pub error_callback: Option<AsanErrorCallback>,
     pub dirty_shadow: Mutex<HashSet<GuestAddr>>,
     pub saved_shadow: HashMap<GuestAddr, Vec<i8>>,
@@ -352,22 +399,34 @@ impl AsanGiovese {
         }
     }
 
-    pub fn report_or_crash(&mut self, emu: &Emulator, error: AsanError) {
-        if let Some(cb) = self.error_callback.as_mut() {
-            (cb)(emu, error);
+    pub fn report_or_crash(&mut self, emu: &Emulator, pc: GuestAddr, error: AsanError) {
+        if let Some(mut cb) = self.error_callback.take() {
+            (cb)(self, emu, pc, error);
+            self.error_callback = Some(cb);
         } else {
             std::process::abort();
         }
     }
 
-    pub fn report(&mut self, emu: &Emulator, error: AsanError) {
-        if let Some(cb) = self.error_callback.as_mut() {
-            (cb)(emu, error);
+    pub fn report(&mut self, emu: &Emulator, pc: GuestAddr, error: AsanError) {
+        if let Some(mut cb) = self.error_callback.take() {
+            (cb)(self, emu, pc, error);
+            self.error_callback = Some(cb);
         }
     }
 
-    pub fn alloc_insert(&mut self, start: GuestAddr, end: GuestAddr) {
-        self.alloc_tree.lock().unwrap().insert(start..end, ());
+    pub fn alloc_insert(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
+        let backtrace = FullBacktraceCollector::backtrace()
+            .map(|r| {
+                let mut v = r.to_vec();
+                v.push(pc);
+                v
+            })
+            .unwrap_or_default();
+        self.alloc_tree
+            .lock()
+            .unwrap()
+            .insert(start..end, AllocTreeItem::alloc(backtrace));
     }
 
     pub fn alloc_remove(&mut self, start: GuestAddr, end: GuestAddr) {
@@ -381,14 +440,93 @@ impl AsanGiovese {
         }
     }
 
+    pub fn alloc_free(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
+        let mut chunk = None;
+        self.alloc_map_mut(addr, |interval, item| {
+            chunk = Some(*interval);
+            let backtrace = FullBacktraceCollector::backtrace()
+                .map(|r| {
+                    let mut v = r.to_vec();
+                    v.push(pc);
+                    v
+                })
+                .unwrap_or_default();
+            item.free(backtrace);
+        });
+        if let Some(ck) = chunk {
+            if ck.start != addr {
+                // Free not the start of the chunk
+                self.report_or_crash(emulator, pc, AsanError::BadFree(addr, Some(ck)));
+            }
+        } else {
+            // Free of wild ptr
+            self.report_or_crash(emulator, pc, AsanError::BadFree(addr, None));
+        }
+    }
+
     #[must_use]
-    pub fn alloc_search(&mut self, query: GuestAddr) -> Option<Interval<GuestAddr>> {
+    pub fn alloc_get_clone(
+        &self,
+        query: GuestAddr,
+    ) -> Option<(Interval<GuestAddr>, AllocTreeItem)> {
+        self.alloc_tree
+            .lock()
+            .unwrap()
+            .query(query..=query)
+            .next()
+            .map(|entry| (*entry.interval, entry.value.clone()))
+    }
+
+    #[must_use]
+    pub fn alloc_get_interval(&self, query: GuestAddr) -> Option<Interval<GuestAddr>> {
         self.alloc_tree
             .lock()
             .unwrap()
             .query(query..=query)
             .next()
             .map(|entry| *entry.interval)
+    }
+
+    pub fn alloc_map<F>(&self, query: GuestAddr, mut func: F)
+    where
+        F: FnMut(&Interval<GuestAddr>, &AllocTreeItem),
+    {
+        if let Some(entry) = self.alloc_tree.lock().unwrap().query(query..=query).next() {
+            func(entry.interval, entry.value);
+        }
+    }
+
+    pub fn alloc_map_mut<F>(&mut self, query: GuestAddr, mut func: F)
+    where
+        F: FnMut(&Interval<GuestAddr>, &mut AllocTreeItem),
+    {
+        if let Some(entry) = self
+            .alloc_tree
+            .lock()
+            .unwrap()
+            .query_mut(query..=query)
+            .next()
+        {
+            func(entry.interval, entry.value);
+        }
+    }
+
+    pub fn alloc_map_interval<F>(&self, query: Interval<GuestAddr>, mut func: F)
+    where
+        F: FnMut(&Interval<GuestAddr>, &AllocTreeItem),
+    {
+        if let Some(entry) = self.alloc_tree.lock().unwrap().query(query).next() {
+            func(entry.interval, entry.value);
+        }
+    }
+
+    pub fn alloc_map_interval_mut<F>(&mut self, query: Interval<GuestAddr>, mut func: F)
+    where
+        F: FnMut(&Interval<GuestAddr>, &mut AllocTreeItem),
+    {
+        if let Some(entry) = self.alloc_tree.lock().unwrap().query_mut(query).next() {
+            func(entry.interval, entry.value);
+        }
     }
 
     pub fn snapshot(&mut self, emu: &Emulator) {
@@ -445,7 +583,11 @@ impl AsanGiovese {
         };
 
         for interval in leaks {
-            self.report(emu, AsanError::MemLeak(interval));
+            self.report(
+                emu,
+                emu.read_reg(Regs::Pc).unwrap(),
+                AsanError::MemLeak(interval),
+            );
         }
 
         ret
@@ -565,6 +707,11 @@ impl QemuAsanHelper {
     }
 
     #[must_use]
+    pub fn with_asan_report(filter: QemuInstrumentationFilter, options: QemuAsanOptions) -> Self {
+        Self::with_error_callback(filter, Box::new(asan_report), options)
+    }
+
+    #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
     }
@@ -578,23 +725,13 @@ impl QemuAsanHelper {
         self.enabled = enabled;
     }
 
-    pub fn alloc(&mut self, _emulator: &Emulator, start: GuestAddr, end: GuestAddr) {
-        self.rt.alloc_insert(start, end);
+    pub fn alloc(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
+        self.rt.alloc_remove(start, end);
+        self.rt.alloc_insert(pc, start, end);
     }
 
-    pub fn dealloc(&mut self, emulator: &Emulator, addr: GuestAddr) {
-        let chunk = self.rt.alloc_search(addr);
-        if let Some(ck) = chunk {
-            if ck.start != addr {
-                // Free not the start of the chunk
-                self.rt
-                    .report_or_crash(emulator, AsanError::BadFree(addr, Some(ck)));
-            }
-        } else {
-            // Free of wild ptr
-            self.rt
-                .report_or_crash(emulator, AsanError::BadFree(addr, None));
-        }
+    pub fn dealloc(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
+        self.rt.alloc_free(emulator, pc, addr);
     }
 
     #[allow(clippy::unused_self)]
@@ -603,65 +740,73 @@ impl QemuAsanHelper {
         AsanGiovese::is_invalid_access(emulator, addr, size)
     }
 
-    pub fn read_1(&mut self, emulator: &Emulator, addr: GuestAddr) {
+    pub fn read_1(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_1(emulator, addr) {
-            self.rt.report_or_crash(emulator, AsanError::Read(addr, 1));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Read(addr, 1));
         }
     }
 
-    pub fn read_2(&mut self, emulator: &Emulator, addr: GuestAddr) {
+    pub fn read_2(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_2(emulator, addr) {
-            self.rt.report_or_crash(emulator, AsanError::Read(addr, 2));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Read(addr, 2));
         }
     }
 
-    pub fn read_4(&mut self, emulator: &Emulator, addr: GuestAddr) {
+    pub fn read_4(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_4(emulator, addr) {
-            self.rt.report_or_crash(emulator, AsanError::Read(addr, 4));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Read(addr, 4));
         }
     }
 
-    pub fn read_8(&mut self, emulator: &Emulator, addr: GuestAddr) {
+    pub fn read_8(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_8(emulator, addr) {
-            self.rt.report_or_crash(emulator, AsanError::Read(addr, 8));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Read(addr, 8));
         }
     }
 
-    pub fn read_n(&mut self, emulator: &Emulator, addr: GuestAddr, size: usize) {
+    pub fn read_n(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr, size: usize) {
         if self.enabled() && AsanGiovese::is_invalid_access(emulator, addr, size) {
             self.rt
-                .report_or_crash(emulator, AsanError::Read(addr, size));
+                .report_or_crash(emulator, pc, AsanError::Read(addr, size));
         }
     }
 
-    pub fn write_1(&mut self, emulator: &Emulator, addr: GuestAddr) {
+    pub fn write_1(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_1(emulator, addr) {
-            self.rt.report_or_crash(emulator, AsanError::Write(addr, 1));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Write(addr, 1));
         }
     }
 
-    pub fn write_2(&mut self, emulator: &Emulator, addr: GuestAddr) {
+    pub fn write_2(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_2(emulator, addr) {
-            self.rt.report_or_crash(emulator, AsanError::Write(addr, 2));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Write(addr, 2));
         }
     }
 
-    pub fn write_4(&mut self, emulator: &Emulator, addr: GuestAddr) {
+    pub fn write_4(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_4(emulator, addr) {
-            self.rt.report_or_crash(emulator, AsanError::Write(addr, 4));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Write(addr, 4));
         }
     }
 
-    pub fn write_8(&mut self, emulator: &Emulator, addr: GuestAddr) {
+    pub fn write_8(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
         if self.enabled() && AsanGiovese::is_invalid_access_8(emulator, addr) {
-            self.rt.report_or_crash(emulator, AsanError::Write(addr, 8));
+            self.rt
+                .report_or_crash(emulator, pc, AsanError::Write(addr, 8));
         }
     }
 
-    pub fn write_n(&mut self, emulator: &Emulator, addr: GuestAddr, size: usize) {
+    pub fn write_n(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr, size: usize) {
         if self.enabled() && AsanGiovese::is_invalid_access(emulator, addr, size) {
             self.rt
-                .report_or_crash(emulator, AsanError::Write(addr, size));
+                .report_or_crash(emulator, pc, AsanError::Write(addr, size));
         }
     }
 
@@ -725,6 +870,10 @@ where
             Some(trace_write8_asan::<QT, S>),
             Some(trace_write_n_asan::<QT, S>),
         );
+
+        if self.rt.error_callback.is_some() {
+            hooks.crash(oncrash_asan::<QT, S>);
+        }
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
@@ -749,6 +898,17 @@ where
     }
 }
 
+pub fn oncrash_asan<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, target_sig: i32)
+where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    let emu = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    let pc: GuestAddr = emu.read_reg(Regs::Pc).unwrap();
+    h.rt.report(&emu, pc, AsanError::Signal(target_sig));
+}
+
 pub fn gen_readwrite_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
@@ -770,7 +930,7 @@ where
 pub fn trace_read1_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    _id: u64,
+    id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
@@ -778,13 +938,13 @@ pub fn trace_read1_asan<QT, S>(
 {
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_1(&emulator, addr);
+    h.read_1(&emulator, id as GuestAddr, addr);
 }
 
 pub fn trace_read2_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    _id: u64,
+    id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
@@ -792,13 +952,13 @@ pub fn trace_read2_asan<QT, S>(
 {
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_2(&emulator, addr);
+    h.read_2(&emulator, id as GuestAddr, addr);
 }
 
 pub fn trace_read4_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    _id: u64,
+    id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
@@ -806,13 +966,13 @@ pub fn trace_read4_asan<QT, S>(
 {
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_4(&emulator, addr);
+    h.read_4(&emulator, id as GuestAddr, addr);
 }
 
 pub fn trace_read8_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    _id: u64,
+    id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
@@ -820,13 +980,13 @@ pub fn trace_read8_asan<QT, S>(
 {
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_8(&emulator, addr);
+    h.read_8(&emulator, id as GuestAddr, addr);
 }
 
 pub fn trace_read_n_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    _id: u64,
+    id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
@@ -835,13 +995,13 @@ pub fn trace_read_n_asan<QT, S>(
 {
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(&emulator, addr, size);
+    h.read_n(&emulator, id as GuestAddr, addr, size);
 }
 
 pub fn trace_write1_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    _id: u64,
+    id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
@@ -849,13 +1009,13 @@ pub fn trace_write1_asan<QT, S>(
 {
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.write_1(&emulator, addr);
+    h.write_1(&emulator, id as GuestAddr, addr);
 }
 
 pub fn trace_write2_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    _id: u64,
+    id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
@@ -863,13 +1023,13 @@ pub fn trace_write2_asan<QT, S>(
 {
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.write_2(&emulator, addr);
+    h.write_2(&emulator, id as GuestAddr, addr);
 }
 
 pub fn trace_write4_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    _id: u64,
+    id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
@@ -877,13 +1037,13 @@ pub fn trace_write4_asan<QT, S>(
 {
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.write_4(&emulator, addr);
+    h.write_4(&emulator, id as GuestAddr, addr);
 }
 
 pub fn trace_write8_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    _id: u64,
+    id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
@@ -891,13 +1051,13 @@ pub fn trace_write8_asan<QT, S>(
 {
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.write_8(&emulator, addr);
+    h.write_8(&emulator, id as GuestAddr, addr);
 }
 
 pub fn trace_write_n_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    _id: u64,
+    id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
@@ -906,7 +1066,7 @@ pub fn trace_write_n_asan<QT, S>(
 {
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(&emulator, addr, size);
+    h.read_n(&emulator, id as GuestAddr, addr, size);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -933,10 +1093,12 @@ where
         let mut r = 0;
         match QasanAction::try_from(a0).expect("Invalid QASan action number") {
             QasanAction::CheckLoad => {
-                h.read_n(&emulator, a1 as GuestAddr, a2 as usize);
+                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
+                h.read_n(&emulator, pc, a1 as GuestAddr, a2 as usize);
             }
             QasanAction::CheckStore => {
-                h.write_n(&emulator, a1 as GuestAddr, a2 as usize);
+                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
+                h.write_n(&emulator, pc, a1 as GuestAddr, a2 as usize);
             }
             QasanAction::Poison => {
                 h.poison(
@@ -958,10 +1120,12 @@ where
                 }
             }
             QasanAction::Alloc => {
-                h.alloc(&emulator, a1 as GuestAddr, a2 as GuestAddr);
+                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
+                h.alloc(pc, a1 as GuestAddr, a2 as GuestAddr);
             }
             QasanAction::Dealloc => {
-                h.dealloc(&emulator, a1 as GuestAddr);
+                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
+                h.dealloc(&emulator, pc, a1 as GuestAddr);
             }
             QasanAction::Enable => {
                 h.set_enabled(true);
@@ -977,4 +1141,231 @@ where
     } else {
         SyscallHookResult::new(None)
     }
+}
+
+fn load_file_section<'input, 'arena, Endian: addr2line::gimli::Endianity>(
+    id: addr2line::gimli::SectionId,
+    file: &addr2line::object::File<'input>,
+    endian: Endian,
+    arena_data: &'arena typed_arena::Arena<Cow<'input, [u8]>>,
+) -> Result<addr2line::gimli::EndianSlice<'arena, Endian>, addr2line::object::Error> {
+    // TODO: Unify with dwarfdump.rs in gimli.
+    let name = id.name();
+    match file.section_by_name(name) {
+        Some(section) => match section.uncompressed_data()? {
+            Cow::Borrowed(b) => Ok(addr2line::gimli::EndianSlice::new(b, endian)),
+            Cow::Owned(b) => Ok(addr2line::gimli::EndianSlice::new(
+                arena_data.alloc(b.into()),
+                endian,
+            )),
+        },
+        None => Ok(addr2line::gimli::EndianSlice::new(&[][..], endian)),
+    }
+}
+
+#[allow(clippy::unnecessary_cast)]
+#[allow(clippy::too_many_lines)]
+pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanError) {
+    let mut regions = std::collections::HashMap::new();
+    for region in emu.mappings() {
+        if let Some(path) = region.path() {
+            let start = region.start();
+            let end = region.end();
+            let entry = regions.entry(path.to_owned()).or_insert(start..end);
+            if start < entry.start {
+                *entry = start..entry.end;
+            }
+            if end > entry.end {
+                *entry = entry.start..end;
+            }
+        }
+    }
+
+    let mut resolvers = vec![];
+    let mut images = vec![];
+    let mut ranges = RangeMap::new();
+
+    for (path, rng) in regions {
+        let data = std::fs::read(&path);
+        if data.is_err() {
+            continue;
+        }
+        let data = data.unwrap();
+        let idx = images.len();
+        images.push((path, data));
+        ranges.insert(rng, idx);
+    }
+
+    let arena_data = typed_arena::Arena::new();
+
+    for img in &images {
+        if let Ok(obj) = addr2line::object::read::File::parse(&*img.1) {
+            let endian = if obj.is_little_endian() {
+                addr2line::gimli::RunTimeEndian::Little
+            } else {
+                addr2line::gimli::RunTimeEndian::Big
+            };
+
+            let mut load_section = |id: addr2line::gimli::SectionId| -> Result<_, _> {
+                load_file_section(id, &obj, endian, &arena_data)
+            };
+
+            let dwarf = addr2line::gimli::Dwarf::load(&mut load_section).unwrap();
+            let ctx = addr2line::Context::from_dwarf(dwarf)
+                .expect("Failed to create an addr2line context");
+
+            //let ctx = addr2line::Context::new(&obj).expect("Failed to create an addr2line context");
+            resolvers.push(Some((obj, ctx)));
+        } else {
+            resolvers.push(None);
+        }
+    }
+
+    let resolve_addr = |addr: GuestAddr| -> String {
+        let mut info = String::new();
+        if let Some((rng, idx)) = ranges.get_key_value(&addr) {
+            let raddr = (addr - rng.start) as u64;
+            if let Some((obj, ctx)) = resolvers[*idx].as_ref() {
+                let symbols = obj.symbol_map();
+                let mut func = symbols.get(raddr).map(|x| x.name().to_string());
+
+                if func.is_none() {
+                    let pathname = std::path::PathBuf::from(images[*idx].0.clone());
+                    let mut split_dwarf_loader =
+                        addr2line::builtin_split_dwarf_loader::SplitDwarfLoader::new(
+                            |data, endian| {
+                                addr2line::gimli::EndianSlice::new(
+                                    arena_data.alloc(Cow::Owned(data.into_owned())),
+                                    endian,
+                                )
+                            },
+                            Some(pathname),
+                        );
+
+                    let frames = ctx.find_frames(raddr);
+                    if let Ok(mut frames) = split_dwarf_loader.run(frames) {
+                        if let Some(frame) = frames.next().unwrap_or(None) {
+                            if let Some(function) = frame.function {
+                                if let Ok(name) = function.raw_name() {
+                                    let demangled =
+                                        addr2line::demangle_auto(name, function.language);
+                                    func = Some(demangled.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let Some(name) = func {
+                    info += " in ";
+                    info += &name;
+                }
+
+                if let Some(loc) = ctx.find_location(raddr).unwrap_or(None) {
+                    if info.is_empty() {
+                        info += " in";
+                    }
+                    info += " ";
+                    if let Some(file) = loc.file {
+                        info += file;
+                    }
+                    if let Some(line) = loc.line {
+                        info += ":";
+                        info += &line.to_string();
+                    }
+                } else {
+                    info += &format!(" ({}+{raddr:#x})", images[*idx].0);
+                }
+            }
+            if info.is_empty() {
+                info += &format!(" ({}+{raddr:#x})", images[*idx].0);
+            }
+        }
+        info
+    };
+
+    let backtrace = FullBacktraceCollector::backtrace()
+        .map(|r| {
+            let mut v = r.to_vec();
+            v.push(pc);
+            v
+        })
+        .unwrap_or(vec![pc]);
+    eprintln!("AddressSanitizer Error: {err}");
+    for (i, addr) in backtrace.iter().rev().enumerate() {
+        eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
+    }
+    let addr = match err {
+        AsanError::Read(addr, _) | AsanError::Write(addr, _) | AsanError::BadFree(addr, _) => {
+            Some(addr)
+        }
+        AsanError::MemLeak(_) | AsanError::Signal(_) => None,
+    };
+    if let Some(addr) = addr {
+        let print_bts = |item: &AllocTreeItem| {
+            if item.allocated {
+                eprintln!("Allocated at:");
+            } else {
+                eprintln!("Freed at:");
+                for (i, addr) in item.free_backtrace.iter().rev().enumerate() {
+                    eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
+                }
+                eprintln!("And previously allocated at:");
+            }
+
+            for (i, addr) in item.backtrace.iter().rev().enumerate() {
+                eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
+            }
+        };
+
+        if let Some((chunk, item)) = rt.alloc_get_clone(addr) {
+            eprintln!(
+                "Address {addr:#x} is {} bytes inside the chunk [{:#x},{:#x})",
+                addr - chunk.start,
+                chunk.start,
+                chunk.end
+            );
+            print_bts(&item);
+        } else {
+            let mut found = false;
+            rt.alloc_map_interval(
+                (addr..=(addr + DEFAULT_REDZONE_SIZE as GuestAddr)).into(),
+                |chunk, item| {
+                    if found {
+                        return;
+                    }
+                    found = true;
+                    eprintln!(
+                        "Address {addr:#x} is {} bytes to the left of the chunk [{:#x},{:#x})",
+                        chunk.start - addr,
+                        chunk.start,
+                        chunk.end
+                    );
+                    print_bts(item);
+                },
+            );
+            if !found {
+                rt.alloc_map_interval(
+                    ((addr - DEFAULT_REDZONE_SIZE as GuestAddr)..addr).into(),
+                    |chunk, item| {
+                        if found {
+                            return;
+                        }
+                        found = true;
+                        eprintln!(
+                            "Address {addr:#x} is {} bytes to the right of the chunk [{:#x},{:#x})",
+                            addr - chunk.end,
+                            chunk.start,
+                            chunk.end
+                        );
+                        print_bts(item);
+                    },
+                );
+            }
+        }
+    }
+
+    // fix pc in case it is not synced (in hooks)
+    emu.write_reg(Regs::Pc, pc).unwrap();
+    eprint!("Context:\n{}", emu.current_cpu().unwrap().display_context());
 }
