@@ -14,10 +14,9 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use super::MutationId;
-pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
     corpus::{Corpus, CorpusId},
-    mutators::{MutationResult, Mutator, MutatorsTuple},
+    mutators::{mutations::*, token_mutations::*, MutationResult, Mutator, MutatorsTuple},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
