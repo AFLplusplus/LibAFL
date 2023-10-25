@@ -1,4 +1,4 @@
-use core::fmt::Debug;
+use core::{cell::UnsafeCell, fmt::Debug};
 
 use capstone::prelude::*;
 use libafl::{
@@ -7,6 +7,7 @@ use libafl::{
     observers::{stacktrace::BacktraceObserver, ObserversTuple},
 };
 use libafl_bolts::{tuples::MatchFirstType, Named};
+use thread_local::ThreadLocal;
 
 use crate::{
     capstone,
@@ -410,6 +411,7 @@ where
     }
 }
 
+// TODO support multiple threads with thread local callstack
 #[derive(Debug)]
 pub struct OnCrashBacktraceCollector {
     callstack_hash: u64,
@@ -493,5 +495,93 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
             .match_name_mut::<BacktraceObserver<'_>>(&self.observer_name)
             .expect("A OnCrashBacktraceCollector needs a BacktraceObserver");
         observer.fill_external(self.callstack_hash, exit_kind);
+    }
+}
+
+static mut CALLSTACKS: Option<ThreadLocal<UnsafeCell<Vec<GuestAddr>>>> = None;
+
+#[derive(Debug)]
+pub struct FullBacktraceCollector {}
+
+impl Default for FullBacktraceCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FullBacktraceCollector {
+    pub fn new() -> Self {
+        unsafe { CALLSTACKS = Some(ThreadLocal::new()) };
+        Self {}
+    }
+
+    pub fn reset(&mut self) {
+        unsafe {
+            for tls in CALLSTACKS.as_mut().unwrap().iter_mut() {
+                (*tls.get()).clear();
+            }
+        }
+    }
+
+    pub fn backtrace() -> Option<&'static [GuestAddr]> {
+        unsafe {
+            if let Some(c) = CALLSTACKS.as_mut() {
+                Some(&*c.get_or_default().get())
+            } else {
+                None
+            }
+        }
+    }
+}
+
+impl CallTraceCollector for FullBacktraceCollector {
+    #[allow(clippy::unnecessary_cast)]
+    fn on_call<QT, S>(
+        &mut self,
+        _hooks: &mut QemuHooks<'_, QT, S>,
+        _state: Option<&mut S>,
+        pc: GuestAddr,
+        call_len: usize,
+    ) where
+        S: UsesInput,
+        QT: QemuHelperTuple<S>,
+    {
+        // TODO handle Thumb
+        unsafe {
+            (*CALLSTACKS.as_mut().unwrap().get_or_default().get()).push(pc + call_len as GuestAddr);
+        }
+    }
+
+    #[allow(clippy::unnecessary_cast)]
+    fn on_ret<QT, S>(
+        &mut self,
+        _hooks: &mut QemuHooks<'_, QT, S>,
+        _state: Option<&mut S>,
+        _pc: GuestAddr,
+        ret_addr: GuestAddr,
+    ) where
+        S: UsesInput,
+        QT: QemuHelperTuple<S>,
+    {
+        unsafe {
+            let v = &mut *CALLSTACKS.as_mut().unwrap().get_or_default().get();
+            if !v.is_empty() {
+                // if *v.last().unwrap() == ret_addr {
+                //    v.pop();
+                // }
+                while let Some(p) = v.pop() {
+                    if p == ret_addr {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    fn pre_exec<I>(&mut self, _emulator: &Emulator, _input: &I)
+    where
+        I: Input,
+    {
+        self.reset();
     }
 }
