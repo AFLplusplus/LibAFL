@@ -13,10 +13,8 @@ use std::{
     vec::Vec,
 };
 
-#[cfg(test)]
-use libafl_bolts::rands::StdRand;
 use libafl_bolts::{
-    rands::Rand,
+    rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -881,7 +879,6 @@ impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
     }
 }
 
-#[cfg(test)]
 /// A very simple state without any bells or whistles, for testing.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct NopState<I> {
@@ -891,7 +888,6 @@ pub struct NopState<I> {
     phantom: PhantomData<I>,
 }
 
-#[cfg(test)]
 impl<I> NopState<I> {
     /// Create a new State that does nothing (for tests)
     #[must_use]
@@ -905,7 +901,6 @@ impl<I> NopState<I> {
     }
 }
 
-#[cfg(test)]
 impl<I> UsesInput for NopState<I>
 where
     I: Input,
@@ -913,7 +908,6 @@ where
     type Input = I;
 }
 
-#[cfg(test)]
 impl<I> HasExecutions for NopState<I> {
     fn executions(&self) -> &usize {
         &self.execution
@@ -924,7 +918,6 @@ impl<I> HasExecutions for NopState<I> {
     }
 }
 
-#[cfg(test)]
 impl<I> HasLastReportTime for NopState<I> {
     fn last_report_time(&self) -> &Option<Duration> {
         unimplemented!();
@@ -935,7 +928,6 @@ impl<I> HasLastReportTime for NopState<I> {
     }
 }
 
-#[cfg(test)]
 impl<I> HasMetadata for NopState<I> {
     fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
@@ -946,7 +938,6 @@ impl<I> HasMetadata for NopState<I> {
     }
 }
 
-#[cfg(test)]
 impl<I> HasRand for NopState<I> {
     type Rand = StdRand;
 
@@ -959,7 +950,6 @@ impl<I> HasRand for NopState<I> {
     }
 }
 
-#[cfg(test)]
 impl<I> HasClientPerfMonitor for NopState<I> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
         unimplemented!()
@@ -970,7 +960,6 @@ impl<I> HasClientPerfMonitor for NopState<I> {
     }
 }
 
-#[cfg(test)]
 impl<I> State for NopState<I> where I: Input {}
 
 #[cfg(feature = "python")]

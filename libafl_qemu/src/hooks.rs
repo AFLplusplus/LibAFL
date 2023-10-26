@@ -9,7 +9,11 @@ use core::{
     ptr::{self, addr_of},
 };
 
-use libafl::{executors::inprocess::inprocess_get_state, inputs::UsesInput};
+use libafl::{
+    executors::{inprocess::inprocess_get_state, ExitKind},
+    inputs::UsesInput,
+    state::NopState,
+};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
@@ -683,6 +687,33 @@ where
     }
 }
 
+#[cfg(emulation_mode = "usermode")]
+static mut CRASH_HOOKS: Vec<Hook> = vec![];
+
+#[cfg(emulation_mode = "usermode")]
+extern "C" fn crash_hook_wrapper<QT, S>(target_sig: i32)
+where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    unsafe {
+        let hooks = get_qemu_hooks::<QT, S>();
+        for hook in &mut CRASH_HOOKS {
+            match hook {
+                Hook::Function(ptr) => {
+                    let func: fn(&mut QemuHooks<'_, QT, S>, i32) = transmute(*ptr);
+                    func(hooks, target_sig);
+                }
+                Hook::Closure(ptr) => {
+                    let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, i32)> = transmute(ptr);
+                    func(hooks, target_sig);
+                }
+                _ => (),
+            }
+        }
+    }
+}
+
 static mut HOOKS_IS_INITIALIZED: bool = false;
 
 pub struct QemuHooks<'a, QT, S>
@@ -705,6 +736,31 @@ where
             .field("helpers", &self.helpers)
             .field("emulator", &self.emulator)
             .finish()
+    }
+}
+
+impl<'a, I, QT> QemuHooks<'a, QT, NopState<I>>
+where
+    QT: QemuHelperTuple<NopState<I>>,
+    NopState<I>: UsesInput<Input = I>,
+{
+    pub fn reproducer(emulator: &'a Emulator, helpers: QT) -> Box<Self> {
+        Self::new(emulator, helpers)
+    }
+
+    pub fn repro_run<H>(&mut self, harness: &mut H, input: &I) -> ExitKind
+    where
+        H: FnMut(&I) -> ExitKind,
+    {
+        self.helpers.first_exec_all(self);
+        self.helpers.pre_exec_all(self.emulator, input);
+
+        let mut exit_kind = harness(input);
+
+        self.helpers
+            .post_exec_all(self.emulator, input, &mut (), &mut exit_kind);
+
+        exit_kind
     }
 }
 
@@ -1514,5 +1570,21 @@ where
         }
         self.emulator
             .set_post_syscall_hook(syscall_after_hooks_wrapper::<QT, S>);
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    pub fn crash_closure(&self, hook: Box<dyn FnMut(&mut Self, i32)>) {
+        unsafe {
+            self.emulator.set_crash_hook(crash_hook_wrapper::<QT, S>);
+            CRASH_HOOKS.push(Hook::Closure(transmute(hook)));
+        }
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    pub fn crash(&self, hook: fn(&mut Self, target_signal: i32)) {
+        unsafe {
+            self.emulator.set_crash_hook(crash_hook_wrapper::<QT, S>);
+            CRASH_HOOKS.push(Hook::Function(hook as *const libc::c_void));
+        }
     }
 }

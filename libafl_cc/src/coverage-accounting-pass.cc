@@ -148,15 +148,17 @@ enum AccountingGranularity {
   UKNOWN_GRAN
 };
 
-static cl::opt<bool> Debug("debug", cl::desc("Debug prints"), cl::init(false),
-                           cl::NotHidden);
+static cl::opt<bool>        Debug("debug-coverage-accounting",
+                                  cl::desc("Debug prints"), cl::init(false),
+                                  cl::NotHidden);
 static cl::opt<std::string> GranularityStr(
     "granularity", cl::desc("Granularity of accounting (BB, FUNC)"),
     cl::init(std::string("BB")), cl::NotHidden);
 static cl::opt<uint32_t> InstRatio(
-    "inst_ratio", cl::desc("Instrumentation ratio in percentage"),
-    cl::init(100), cl::NotHidden);
-static cl::opt<bool> ThreadSafe("thread_safe",
+    "inst_ratio_coverage_accounting",
+    cl::desc("Instrumentation ratio in percentage"), cl::init(100),
+    cl::NotHidden);
+static cl::opt<bool> ThreadSafe("thread_safe_coverage_accounting",
                                 cl::desc("Use the thread safe instrumentation"),
                                 cl::init(false), cl::NotHidden);
 

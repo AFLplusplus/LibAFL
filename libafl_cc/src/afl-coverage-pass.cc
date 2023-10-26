@@ -81,10 +81,10 @@ typedef uint32_t prev_loc_t;
 
 using namespace llvm;
 
-static cl::opt<bool> Debug("debug", cl::desc("Debug prints"), cl::init(false),
-                           cl::NotHidden);
+static cl::opt<bool>     Debug("debug_afl_coverage", cl::desc("Debug prints"),
+                               cl::init(false), cl::NotHidden);
 static cl::opt<uint32_t> InstRatio(
-    "inst_ratio", cl::desc("Instrumentation ratio in percentage"),
+    "inst_ratio_afl_coverage", cl::desc("Instrumentation ratio in percentage"),
     cl::init(100), cl::NotHidden);
 static cl::opt<bool>     NotZero("not_zero",
                                  cl::desc("Never hit 0 again in the hitcount"),
@@ -100,7 +100,7 @@ static cl::opt<uint32_t> CtxK(
 static cl::opt<bool> Ctx("ctx",
                          cl::desc("Enable full context sensitive coverage"),
                          cl::init(false), cl::NotHidden);
-static cl::opt<bool> ThreadSafe("thread_safe",
+static cl::opt<bool> ThreadSafe("thread_safe_afl_coverage",
                                 cl::desc("Use the thread safe instrumentation"),
                                 cl::init(false), cl::NotHidden);
 static cl::opt<bool> DumpCFG(

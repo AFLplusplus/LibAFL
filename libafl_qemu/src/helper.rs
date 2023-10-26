@@ -1,7 +1,7 @@
 use core::{fmt::Debug, ops::Range};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
-use libafl_bolts::tuples::MatchFirstType;
+use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 
 use crate::{
     emu::{Emulator, GuestAddr},
@@ -42,7 +42,8 @@ where
     }
 }
 
-pub trait QemuHelperTuple<S>: MatchFirstType + Debug
+pub trait QemuHelperTuple<S>:
+    MatchFirstType + for<'a> SplitBorrowExtractFirstType<'a> + Debug
 where
     S: UsesInput,
 {

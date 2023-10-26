@@ -1,3 +1,4 @@
+use capstone::arch::BuildsCapstone;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -62,7 +63,9 @@ impl IntoPy<PyObject> for Regs {
 
 /// Return an ARM64 ArchCapstoneBuilder
 pub fn capstone() -> capstone::arch::arm64::ArchCapstoneBuilder {
-    capstone::Capstone::new().arm64()
+    capstone::Capstone::new()
+        .arm64()
+        .mode(capstone::arch::arm64::ArchMode::Arm)
 }
 
 pub type GuestReg = u64;

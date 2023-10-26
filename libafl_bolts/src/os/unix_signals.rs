@@ -378,7 +378,7 @@ impl Display for Signal {
 #[cfg(feature = "alloc")]
 pub trait Handler {
     /// Handle a signal
-    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, _context: &mut ucontext_t);
+    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, _context: Option<&mut ucontext_t>);
     /// Return a list of signals to handle
     fn signals(&self) -> Vec<Signal>;
 }
@@ -425,7 +425,7 @@ unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
     handler.handle(
         *signal,
         &mut ptr::read_unaligned(info),
-        &mut ptr::read_unaligned(void as *mut ucontext_t),
+        (void as *mut ucontext_t).as_mut(),
     );
 }
 

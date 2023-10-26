@@ -1,10 +1,9 @@
 //! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
-#[cfg(emulation_mode = "usermode")]
-use core::ffi::c_void;
-use core::fmt::{self, Debug, Formatter};
+use core::{
+    ffi::c_void,
+    fmt::{self, Debug, Formatter},
+};
 
-#[cfg(emulation_mode = "usermode")]
-use libafl::executors::inprocess::InProcessExecutorHandlerData;
 #[cfg(feature = "fork")]
 use libafl::{
     events::EventManager,
@@ -13,7 +12,10 @@ use libafl::{
 };
 use libafl::{
     events::{EventFirer, EventRestarter},
-    executors::{inprocess::InProcessExecutor, Executor, ExitKind, HasObservers},
+    executors::{
+        inprocess::{InProcessExecutor, InProcessExecutorHandlerData},
+        Executor, ExitKind, HasObservers,
+    },
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
@@ -21,7 +23,6 @@ use libafl::{
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
-#[cfg(emulation_mode = "usermode")]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal};
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
@@ -74,7 +75,7 @@ pub unsafe extern "C" fn libafl_executor_reinstall_handlers() {
 pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     signal: Signal,
     info: &mut siginfo_t,
-    context: &mut ucontext_t,
+    mut context: Option<&mut ucontext_t>,
     data: &mut InProcessExecutorHandlerData,
 ) where
     E: Executor<EM, Z> + HasObservers,
@@ -86,10 +87,44 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     let real_crash = if USE_LIBAFL_CRASH_HANDLER {
         true
     } else {
-        libafl_qemu_handle_crash(signal as i32, info, context as *mut _ as *mut c_void) != 0
+        let puc = match &mut context {
+            Some(v) => (*v) as *mut ucontext_t as *mut c_void,
+            None => core::ptr::null_mut(),
+        };
+        libafl_qemu_handle_crash(signal as i32, info, puc) != 0
     };
     if real_crash {
         libafl::executors::inprocess::unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z>(
+            signal, info, context, data,
+        );
+    }
+}
+
+#[cfg(emulation_mode = "systemmode")]
+static mut BREAK_ON_TMOUT: bool = false;
+
+#[cfg(emulation_mode = "systemmode")]
+extern "C" {
+    fn qemu_system_debug_request();
+}
+
+#[cfg(emulation_mode = "systemmode")]
+pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
+    signal: Signal,
+    info: &mut siginfo_t,
+    context: Option<&mut ucontext_t>,
+    data: &mut InProcessExecutorHandlerData,
+) where
+    E: Executor<EM, Z> + HasObservers,
+    EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+    OF: Feedback<E::State>,
+    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
+    Z: HasObjective<Objective = OF, State = E::State>,
+{
+    if BREAK_ON_TMOUT {
+        qemu_system_debug_request();
+    } else {
+        libafl::executors::inprocess::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
             signal, info, context, data,
         );
     }
@@ -116,29 +151,35 @@ where
         S: State + HasExecutions + HasCorpus + HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<Objective = OF, State = S>,
     {
+        let mut inner = InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?;
         #[cfg(emulation_mode = "usermode")]
         {
-            let mut inner =
-                InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?;
             inner.handlers_mut().crash_handler =
                 inproc_qemu_crash_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
                     as *const c_void;
-            Ok(Self {
-                first_exec: true,
-                hooks,
-                inner,
-            })
         }
-        #[cfg(not(emulation_mode = "usermode"))]
+        #[cfg(emulation_mode = "systemmode")]
+        {
+            inner.handlers_mut().timeout_handler =
+                inproc_qemu_timeout_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
+                    as *const c_void;
+        }
         Ok(Self {
             first_exec: true,
             hooks,
-            inner: InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?,
+            inner,
         })
     }
 
     pub fn inner(&self) -> &InProcessExecutor<'a, H, OT, S> {
         &self.inner
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    pub fn break_on_timeout(&mut self) {
+        unsafe {
+            BREAK_ON_TMOUT = true;
+        }
     }
 
     pub fn inner_mut(&mut self) -> &mut InProcessExecutor<'a, H, OT, S> {

@@ -556,6 +556,17 @@ pub unsafe extern "C" fn external_current_millis() -> u64 {
     1000
 }
 
+/// Trait to convert into an Owned type
+pub trait IntoOwned {
+    /// Returns if the current type is an owned type.
+    #[must_use]
+    fn is_owned(&self) -> bool;
+
+    /// Transfer the current type into an owned type.
+    #[must_use]
+    fn into_owned(self) -> Self;
+}
+
 /// Can be converted to a slice
 pub trait AsSlice {
     /// Type of the entries in this slice
@@ -726,7 +737,7 @@ pub static LIBAFL_STDERR_LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
 #[cfg(feature = "std")]
 pub static LIBAFL_STDOUT_LOGGER: SimpleStdoutLogger = SimpleStdoutLogger::new();
 
-/// A simple logger struct that logs to stderr when used with [`log::set_logger`].
+/// A simple logger struct that logs to stdout when used with [`log::set_logger`].
 #[derive(Debug)]
 #[cfg(feature = "std")]
 pub struct SimpleStdoutLogger {}
@@ -839,7 +850,7 @@ pub mod bolts_prelude {
     pub use super::staterestore::*;
     #[cfg(feature = "alloc")]
     pub use super::{anymap::*, llmp::*, ownedref::*, rands::*, serdeany::*, shmem::*, tuples::*};
-    pub use super::{cpu::*, os::*, rands::*};
+    pub use super::{cpu::*, os::*};
 }
 
 #[cfg(feature = "python")]

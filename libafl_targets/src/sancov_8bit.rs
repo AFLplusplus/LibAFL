@@ -340,6 +340,20 @@ mod observers {
         }
     }
 
+    impl<const DIFFERENTIAL: bool> CountersMultiMapObserver<DIFFERENTIAL> {
+        /// Returns an iterator over the map.
+        #[must_use]
+        pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+            <&Self as IntoIterator>::into_iter(self)
+        }
+
+        /// Returns a mutable iterator over the map.
+        #[must_use]
+        pub fn iter_mut(&mut self) -> <&mut Self as IntoIterator>::IntoIter {
+            <&mut Self as IntoIterator>::into_iter(self)
+        }
+    }
+
     impl<OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for CountersMultiMapObserver<true>
     where
         Self: MapObserver,
