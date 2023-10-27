@@ -31,7 +31,7 @@ You can choose the features by using `features = ["feature1", "feature2", ...]` 
 Out of this list, by default, `std`, `derive`, and `rand_trait` are already set.
 You can choose to disable them by setting `default-features = false` in your `Cargo.toml`.
 
-## [`libafl_bolts`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl)
+### [`libafl_bolts`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl)
 
 The `libafl_bolts` crate is a minimal tool shed filled with useful low-level rust features, not necessarily related to fuzzers.
 In it, you'll find highlights like:
