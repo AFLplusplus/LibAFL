@@ -51,6 +51,9 @@ clear = true
 script='''
 cd fuzzer 
 cargo clean
-cd ../runtime
+cd ..
+cd ./runtime
+cargo clean
+cd ..
 cargo clean
 '''

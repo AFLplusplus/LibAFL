@@ -110,6 +110,7 @@ impl<R: Read> MessageFileReader<R> {
 
     /// This transforms the given message from it's serialized form into its in-memory form, making relative references
     /// absolute and counting the `SymExprRef`s.
+    #[allow(clippy::too_many_lines)]
     fn transform_message(&mut self, message: &mut SymExpr) -> SymExprRef {
         let ret = self.current_id;
         match message {
@@ -125,6 +126,7 @@ impl<R: Read> MessageFileReader<R> {
             }
             SymExpr::Neg { op }
             | SymExpr::FloatAbs { op }
+            | SymExpr::FloatNeg { op }
             | SymExpr::Not { op }
             | SymExpr::Sext { op, .. }
             | SymExpr::Zext { op, .. }
@@ -204,6 +206,12 @@ impl<R: Read> MessageFileReader<R> {
                 }
             }
             SymExpr::Call { .. } | SymExpr::Return { .. } | SymExpr::BasicBlock { .. } => {}
+            SymExpr::Ite { cond, a, b } => {
+                *cond = self.make_absolute(*cond);
+                *a = self.make_absolute(*a);
+                *b = self.make_absolute(*b);
+                self.current_id += 1;
+            }
         }
         SymExprRef::new(ret).unwrap()
     }
@@ -291,6 +299,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             }
             SymExpr::Neg { op }
             | SymExpr::FloatAbs { op }
+            | SymExpr::FloatNeg { op }
             | SymExpr::Not { op }
             | SymExpr::Sext { op, .. }
             | SymExpr::Zext { op, .. }
@@ -370,6 +379,11 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                 }
             }
             SymExpr::Call { .. } | SymExpr::Return { .. } | SymExpr::BasicBlock { .. } => {}
+            SymExpr::Ite { cond, a, b } => {
+                *cond = self.make_relative(*cond);
+                *a = self.make_relative(*a);
+                *b = self.make_relative(*b);
+            }
         }
         self.serialization_options
             .serialize_into(&mut self.writer, &message)?;

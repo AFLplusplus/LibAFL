@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.2
-FROM rust:bullseye AS libafl
+FROM rust:1.73.0 AS libafl
 LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
 LABEL "about"="LibAFL Docker image"
 
@@ -17,6 +17,7 @@ RUN sh -c 'echo set encoding=utf-8 > /root/.vimrc' \
     echo "[build]\nrustc-wrapper = \"${RUSTC_WRAPPER}\"" >> ~/.cargo/config
 
 RUN rustup component add rustfmt clippy
+RUN rustup default nightly
 
 # Install clang 11, common build tools
 RUN apt update && apt install -y build-essential gdb git wget python3-venv ninja-build lsb-release software-properties-common gnupg

@@ -124,8 +124,8 @@ fn qemu_bindgen_clang_args(
         )
     } else {
         (
-            "/softmmu/main.c",
-            format!("qemu-system-{cpu_target}.p/softmmu_main.c.o"),
+            "/system/main.c",
+            format!("libqemu-system-{cpu_target}.so.p/system_main.c.o"),
         )
     };
 

@@ -850,7 +850,7 @@ pub mod bolts_prelude {
     pub use super::staterestore::*;
     #[cfg(feature = "alloc")]
     pub use super::{anymap::*, llmp::*, ownedref::*, rands::*, serdeany::*, shmem::*, tuples::*};
-    pub use super::{cpu::*, os::*, rands::*};
+    pub use super::{cpu::*, os::*};
 }
 
 #[cfg(feature = "python")]
