@@ -33,11 +33,8 @@ pub fn main() {
             .parse_args(&args)
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "fuzzbench")
-            .add_pass(LLVMPasses::CmpLogCtxLogging)
             .add_pass(LLVMPasses::CmpLogRtn)
-            .add_passes_arg("-cmplog_routines_ctx")
             .add_pass(LLVMPasses::CmpLogInstructions)
-            .add_passes_arg("-cmplog_instructions_ctx")
             .run()
             .expect("Failed to run the wrapped compiler")
         {
