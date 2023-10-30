@@ -1693,7 +1693,7 @@ where
 
                     self.observers
                         .pre_exec_child_all(state, input)
-                        .expect("Failed to run post_exec on observers");
+                        .expect("Failed to run pre_exec on observers");
 
                     (self.harness_fn)(input);
 
