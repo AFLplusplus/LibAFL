@@ -1,6 +1,5 @@
 use alloc::rc::Rc;
 use core::{cell::RefCell, fmt::Debug};
-use std::path::PathBuf;
 
 use libafl::{
     alloc,
@@ -77,12 +76,12 @@ impl LibfuzzerCrashCauseMetadata {
 
 #[derive(Debug)]
 pub struct LibfuzzerCrashCauseFeedback {
-    artifact_prefix: Option<ArtifactPrefix>,
+    artifact_prefix: ArtifactPrefix,
     exit_kind: ExitKind,
 }
 
 impl LibfuzzerCrashCauseFeedback {
-    pub fn new(artifact_prefix: Option<ArtifactPrefix>) -> Self {
+    pub fn new(artifact_prefix: ArtifactPrefix) -> Self {
         Self {
             artifact_prefix,
             exit_kind: ExitKind::Ok,
@@ -104,17 +103,10 @@ impl LibfuzzerCrashCauseFeedback {
             let name = testcase.input().as_ref().unwrap().generate_name(0);
             name
         };
-        let file_path = if let Some(artifact_prefix) = self.artifact_prefix.as_ref() {
-            if let Some(filename_prefix) = artifact_prefix.filename_prefix() {
-                artifact_prefix
-                    .dir()
-                    .join(format!("{filename_prefix}{prefix}-{base}"))
-            } else {
-                artifact_prefix.dir().join(format!("{prefix}-{base}"))
-            }
-        } else {
-            PathBuf::from(format!("{prefix}-{base}"))
-        };
+        let file_path = self.artifact_prefix.dir().join(format!(
+            "{}{prefix}-{base}",
+            self.artifact_prefix.filename_prefix()
+        ));
         *testcase.file_path_mut() = Some(file_path);
     }
 }

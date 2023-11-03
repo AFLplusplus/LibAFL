@@ -183,7 +183,7 @@ where
     /// Get the next id given a `CorpusId` (creation order)
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
-    fn next(&self, idx: CorpusId) -> Option<CorpusId> {
+    pub fn next(&self, idx: CorpusId) -> Option<CorpusId> {
         if let Some(item) = self.map.get(&idx) {
             item.next
         } else {
@@ -194,7 +194,7 @@ where
     /// Get the next id given a `CorpusId` (creation order)
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
-    fn next(&self, idx: CorpusId) -> Option<CorpusId> {
+    pub fn next(&self, idx: CorpusId) -> Option<CorpusId> {
         // TODO see if using self.keys is faster
         let mut range = self
             .map
@@ -214,7 +214,7 @@ where
     /// Get the previous id given a `CorpusId` (creation order)
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
-    fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
+    pub fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
         if let Some(item) = self.map.get(&idx) {
             item.prev
         } else {
@@ -225,7 +225,7 @@ where
     /// Get the previous id given a `CorpusId` (creation order)
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
-    fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
+    pub fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
         // TODO see if using self.keys is faster
         let mut range = self
             .map
@@ -245,28 +245,28 @@ where
     /// Get the first created id
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
-    fn first(&self) -> Option<CorpusId> {
+    pub fn first(&self) -> Option<CorpusId> {
         self.first_idx
     }
 
     /// Get the first created id
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
-    fn first(&self) -> Option<CorpusId> {
+    pub fn first(&self) -> Option<CorpusId> {
         self.map.iter().next().map(|x| *x.0)
     }
 
     /// Get the last created id
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
-    fn last(&self) -> Option<CorpusId> {
+    pub fn last(&self) -> Option<CorpusId> {
         self.last_idx
     }
 
     /// Get the last created id
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
-    fn last(&self) -> Option<CorpusId> {
+    pub fn last(&self) -> Option<CorpusId> {
         self.map.iter().next_back().map(|x| *x.0)
     }
 

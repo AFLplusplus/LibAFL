@@ -21,7 +21,7 @@ use core::{fmt, fmt::Write, time::Duration};
 #[cfg(feature = "std")]
 pub use disk::{OnDiskJSONMonitor, OnDiskTOMLMonitor};
 use hashbrown::HashMap;
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
+use libafl_bolts::{current_time, format_duration_hms, ClientId, Error};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "afl_exec_sec")]
@@ -210,6 +210,7 @@ impl ClientStats {
 
     /// Update the user-defined stat with name and value
     pub fn update_user_stats(&mut self, name: String, value: UserStats) {
+        log::info!("{}", Error::unknown("dumping backtrace for monitoring"));
         self.user_monitor.insert(name, value);
     }
 

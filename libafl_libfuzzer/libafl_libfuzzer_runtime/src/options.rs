@@ -2,6 +2,7 @@ use core::fmt::{Display, Formatter};
 use std::{path::PathBuf, time::Duration};
 
 use libafl::mutators::Tokens;
+use serde::{Deserialize, Serialize};
 
 use crate::options::RawOption::{Directory, Flag};
 
@@ -52,10 +53,10 @@ impl<'a> Display for OptionsParseError<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtifactPrefix {
     dir: PathBuf,
-    filename_prefix: Option<String>,
+    filename_prefix: String,
 }
 
 impl ArtifactPrefix {
@@ -64,10 +65,10 @@ impl ArtifactPrefix {
         if path.ends_with(std::path::MAIN_SEPARATOR) {
             Self {
                 dir,
-                filename_prefix: None,
+                filename_prefix: String::new(),
             }
         } else {
-            let filename_prefix = dir.file_name().map(|s| {
+            let filename_prefix = dir.file_name().map_or_else(String::new, |s| {
                 s.to_os_string()
                     .into_string()
                     .expect("Provided artifact prefix is not usable")
@@ -84,8 +85,17 @@ impl ArtifactPrefix {
         &self.dir
     }
 
-    pub fn filename_prefix(&self) -> &Option<String> {
+    pub fn filename_prefix(&self) -> &str {
         &self.filename_prefix
+    }
+}
+
+impl Default for ArtifactPrefix {
+    fn default() -> Self {
+        Self {
+            dir: std::env::current_dir().expect("Must be able to get the current directory!"),
+            filename_prefix: String::new(),
+        }
     }
 }
 
@@ -94,7 +104,7 @@ impl ArtifactPrefix {
 pub struct LibfuzzerOptions {
     fuzzer_name: String,
     mode: LibfuzzerMode,
-    artifact_prefix: Option<ArtifactPrefix>,
+    artifact_prefix: ArtifactPrefix,
     timeout: Duration,
     grimoire: Option<bool>,
     forks: Option<usize>,
@@ -140,8 +150,8 @@ impl LibfuzzerOptions {
         &self.mode
     }
 
-    pub fn artifact_prefix(&self) -> Option<&ArtifactPrefix> {
-        self.artifact_prefix.as_ref()
+    pub fn artifact_prefix(&self) -> &ArtifactPrefix {
+        &self.artifact_prefix
     }
 
     pub fn timeout(&self) -> Duration {
@@ -333,7 +343,10 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
         LibfuzzerOptions {
             fuzzer_name,
             mode: self.mode.unwrap_or(LibfuzzerMode::Fuzz),
-            artifact_prefix: self.artifact_prefix.map(ArtifactPrefix::new),
+            artifact_prefix: self
+                .artifact_prefix
+                .map(ArtifactPrefix::new)
+                .unwrap_or_default(),
             timeout: self.timeout.unwrap_or(Duration::from_secs(1200)),
             grimoire: self.grimoire,
             forks: self.forks,

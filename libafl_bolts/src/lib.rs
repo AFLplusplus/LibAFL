@@ -140,7 +140,6 @@ use alloc::vec::Vec;
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::Hasher;
-use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -175,18 +174,23 @@ pub mod launcher {}
 #[allow(unused_imports)]
 #[macro_use]
 extern crate libafl_derive;
-#[cfg(feature = "alloc")]
-use alloc::string::{FromUtf8Error, String};
 use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
+    iter::Iterator,
     num::{ParseIntError, TryFromIntError},
+    time,
 };
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
 
 #[cfg(feature = "libafl_derive")]
 pub use libafl_derive::SerdeAny;
+#[cfg(feature = "alloc")]
+use {
+    alloc::string::{FromUtf8Error, String},
+    core::cell::{BorrowError, BorrowMutError},
+};
 
 /// We need fixed names for many parts of this lib.
 pub trait Named {
@@ -441,6 +445,24 @@ impl Display for Error {
                 display_error_backtrace(f, b)
             }
         }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl From<BorrowError> for Error {
+    fn from(err: BorrowError) -> Self {
+        Self::illegal_state(format!(
+            "Couldn't borrow from a RefCell as immutable: {err:?}"
+        ))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl From<BorrowMutError> for Error {
+    fn from(err: BorrowMutError) -> Self {
+        Self::illegal_state(format!(
+            "Couldn't borrow from a RefCell as mutable: {err:?}"
+        ))
     }
 }
 
