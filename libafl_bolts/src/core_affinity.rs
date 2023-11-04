@@ -350,12 +350,14 @@ mod linux {
 // FIXME: no sense of cpu granularity (yet ?)
 
 #[cfg(target_os = "haiku")]
+#[allow(clippy::unnecessary_wraps)]
 #[inline]
 fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
     Ok(Vec::new())
 }
 
 #[cfg(target_os = "haiku")]
+#[allow(clippy::unnecessary_wraps)]
 #[inline]
 fn set_for_current_helper(_core_id: CoreId) -> Result<(), Error> {
     Ok(())
