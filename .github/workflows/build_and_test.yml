@@ -439,7 +439,7 @@ jobs:
       with:
         ### valid inputs are ['run', 'operating_system', 'architecture', 'version', 'shell', 'environment_variables', 'memory', 'cpu_count', 'hypervisor', 'image_url', 'sync_files']
         #memory: 2048
-        shell: sh
+        #shell: sh
         operating_system: freebsd
         version: '13.2'
         run: |
