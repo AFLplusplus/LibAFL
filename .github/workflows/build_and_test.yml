@@ -443,7 +443,7 @@ jobs:
         operating_system: freebsd
         version: '13.2'
         run: |
-          pkg install -y curl bash sudo llvm16
+          sudo pkg install -y curl bash sudo llvm16
           curl https://sh.rustup.rs -sSf | sh -s -- -y
           freebsd-version
           . "$HOME/.cargo/env"
