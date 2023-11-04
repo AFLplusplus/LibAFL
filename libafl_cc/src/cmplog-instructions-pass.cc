@@ -142,7 +142,7 @@ class CmpLogInstructions : public ModulePass {
 #if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 #else
-  bool        runOnModule(Module &M) override;
+  bool runOnModule(Module &M) override;
 
   #if LLVM_VERSION_MAJOR < 4
   const char *getPassName() const override {

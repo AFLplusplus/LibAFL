@@ -438,7 +438,7 @@ jobs:
       uses: cross-platform-actions/action@v0.21.0
       with:
         ### valid inputs are ['run', 'operating_system', 'architecture', 'version', 'shell', 'environment_variables', 'memory', 'cpu_count', 'hypervisor', 'image_url', 'sync_files']
-        memory: 2048
+        #memory: 2048
         shell: sh
         operating_system: freebsd
         version: '13.2'
