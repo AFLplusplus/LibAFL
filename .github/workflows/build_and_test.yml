@@ -68,7 +68,7 @@ jobs:
     - name: Install and cache deps
       uses: awalsh128/cache-apt-pkgs-action@v1.1.0
       with:
-        packages: llvm-15 llvm-15-dev clang-15 ninja-build clang-format-16 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+        packages: llvm-15 llvm-15-dev clang-15 ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: get clang version
       run: command -v llvm-config-15 && clang-15 -v
     - name: Add nightly rustfmt and clippy
@@ -85,7 +85,7 @@ jobs:
     - name: Cleanup
       run: cargo clean
     - name: Run clang-format style check for C/C++ programs.
-      run: clang-format-16 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
+      run: clang-format-13 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
     - name: run shellcheck
       run: shellcheck ./scripts/*.sh
     - name: Run clippy
@@ -129,7 +129,7 @@ jobs:
     - name: Install and cache deps
       uses: awalsh128/cache-apt-pkgs-action@v1.1.0
       with:
-        packages: llvm-15 llvm-15-dev clang-15 ninja-build clang-format-16 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+        packages: llvm-15 llvm-15-dev clang-15 ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: get clang version
       run: command -v llvm-config-15 && clang-15 -v
     - name: Install cargo-hack
