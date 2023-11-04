@@ -653,7 +653,7 @@ fn write_crash<W: Write>(
     _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     // TODO add fault addr for other platforms.
-    writeln!(writer, "Received signal {}", signal,)?;
+    writeln!(writer, "Received signal {signal}")?;
 
     Ok(())
 }
@@ -848,15 +848,16 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 
 #[cfg(target_os = "haiku")]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
-    let mut info: libc::image_info = unsafe { std::mem::zeroed() };
+    let p = std::mem::MaybeUninit::<libc::image_info>::uninit();
+    let mut info = unsafe { p.assume_init() };
     let mut c: i32 = 0;
 
     loop {
         if unsafe { libc::get_next_image_info(0, &mut c, &mut info) } == libc::B_OK {
             let i = format!(
                 "{}-{} {:?}\n",
-                info.text as u64,
-                info.text as u64 + info.text_size as u64,
+                info.text as i64,
+                info.text as i64 + i64::from(info.text_size),
                 info.name
             );
             writer.write_all(&i.into_bytes())?;
