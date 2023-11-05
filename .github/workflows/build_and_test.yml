@@ -446,7 +446,7 @@ jobs:
           sudo pkg install -y curl bash sudo llvm16
           curl https://sh.rustup.rs -sSf | sh -s -- -y
           freebsd-version
-          . "$HOME/.cargo/env"
+          source "$HOME/.cargo/env"
           rustup toolchain install nightly
           export LLVM_CONFIG=/usr/local/bin/llvm-config16
           pwd
