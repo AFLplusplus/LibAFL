@@ -43,9 +43,9 @@
   #include "llvm/IR/PassManager.h"
 #else
   #include "llvm/IR/LegacyPassManager.h"
+  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #endif
 
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DebugInfo.h"
@@ -53,7 +53,6 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
