@@ -439,22 +439,8 @@ jobs:
       with:
         ### valid inputs are ['run', 'operating_system', 'architecture', 'version', 'shell', 'environment_variables', 'memory', 'cpu_count', 'hypervisor', 'image_url', 'sync_files']
         #memory: 2048
-        shell: bash
         operating_system: freebsd
         version: '13.2'
         run: |
           sudo pkg install -y curl bash sudo llvm16
-          curl https://sh.rustup.rs -sSf | sh -s -- -y
-          freebsd-version
-          source "$HOME/.cargo/env"
-          rustup toolchain install nightly
-          export LLVM_CONFIG=/usr/local/bin/llvm-config16
-          pwd
-          ls -lah
-          echo "local/bin"
-          ls -lah /usr/local/bin/
-          which llvm-config
-          chmod +x ./scripts/clippy.sh
-          bash ./scripts/shmem_limits_fbsd.sh
-          bash ./scripts/clippy.sh
-          cargo test
+          bash ./scripts/ci_freebsd.sh
