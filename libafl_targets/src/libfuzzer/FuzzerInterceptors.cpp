@@ -94,28 +94,6 @@ static int internal_memcmp(const void *s1, const void *s2, size_t n) {
   return 0;
 }
 
-static size_t internal_strlen(const char *s) {
-  size_t i = 0;
-  while (s[i])
-    i++;
-  return i;
-}
-
-/*
-static char *internal_strstr(const char *haystack, const char *needle) {
-  // This is O(N^2), but we are not using it in hot places.
-  size_t len1 = internal_strlen(haystack);
-  size_t len2 = internal_strlen(needle);
-  if (len1 < len2)
-    return nullptr;
-  for (size_t pos = 0; pos <= len1 - len2; pos++) {
-    if (internal_memcmp(haystack + pos, needle, len2) == 0)
-      return const_cast<char *>(haystack) + pos;
-  }
-  return nullptr;
-}
-*/
-
 extern "C" {
 
 // Weak hooks forward-declared to avoid dependency on

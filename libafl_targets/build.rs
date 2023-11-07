@@ -228,7 +228,7 @@ fn main() {
     {
         cmplog
             .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
-            .flag("-Wno-sign-compare")
+            .flag("-Wno-sign-compare");
     }
 
     cmplog
