@@ -18,7 +18,7 @@ debug = true
 [dependencies]
 libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer", "libfuzzer_no_link_main"] }
 mimalloc = { version = "*", default-features = false }
 
 [build-dependencies]
