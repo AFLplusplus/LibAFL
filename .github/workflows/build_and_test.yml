@@ -365,6 +365,8 @@ jobs:
     - uses: ilammy/msvc-dev-cmd@v1
     - name: install cxx bridge
       run: cargo install cxxbridge-cmd
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
     - name: Build fuzzers/frida_libpng
       run: cd fuzzers/frida_libpng/ && cargo make test
     - name: Build fuzzers/frida_gdiplus
