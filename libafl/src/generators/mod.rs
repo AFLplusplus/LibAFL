@@ -170,6 +170,7 @@ where
 /// `Generator` Python bindings
 #[allow(missing_docs)]
 #[cfg(feature = "python")]
+#[allow(clippy::unnecessary_fallible_conversions)]
 pub mod pybind {
     use alloc::vec::Vec;
 
