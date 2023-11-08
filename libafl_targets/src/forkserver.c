@@ -1,5 +1,6 @@
 #include "common.h"
 
+#include "android-ashmem.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
