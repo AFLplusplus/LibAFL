@@ -398,7 +398,7 @@ where
         Self {
             base,
             skip_non_favored_prob,
-            remove_metadata: false,
+            remove_metadata: true,
             phantom: PhantomData,
         }
     }
