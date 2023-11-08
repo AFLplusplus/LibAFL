@@ -365,6 +365,7 @@ where
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
+#[allow(clippy::unnecessary_fallible_conversions)]
 /// `StdMutationalStage` Python bindings
 pub mod pybind {
     use pyo3::prelude::*;

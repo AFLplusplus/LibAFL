@@ -435,6 +435,7 @@ mod tests {
 }
 
 #[cfg(feature = "python")]
+#[allow(clippy::unnecessary_fallible_conversions)]
 #[allow(missing_docs)]
 /// `Rand` Python bindings
 pub mod pybind {
