@@ -369,8 +369,8 @@ where
 
     /// Creates a new [`MinimizerScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
-    /// This will remove the metadata `M` when it is no longer needed, after consumption. This might 
-    /// for example be a MapIndexesMetadata.
+    /// This will remove the metadata `M` when it is no longer needed, after consumption. This might
+    /// for example be a `MapIndexesMetadata`.
     pub fn new(base: CS) -> Self {
         Self {
             base,
