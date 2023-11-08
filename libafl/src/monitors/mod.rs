@@ -210,7 +210,6 @@ impl ClientStats {
 
     /// Update the user-defined stat with name and value
     pub fn update_user_stats(&mut self, name: String, value: UserStats) {
-        log::info!("{}", Error::unknown("dumping backtrace for monitoring"));
         self.user_monitor.insert(name, value);
     }
 
