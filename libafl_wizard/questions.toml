@@ -1,444 +1,316 @@
 [[question]]
 id = "intro"
-title = "Introduction"
+title = "libafl_wizard: a tool to generate Libafl-based fuzzers."
 content = """
-Description
-New line
+Before starting, make sure that you know your target very well. Choosing the right components to build a fuzzer depends on the details of the
+implementation of your target.
+
+Knowing what you want before building a fuzzer can be extremely helpful when selecting the components that best fit your options and the
+restrictions of the environment.
+
+Details such as:
+    *Having the source code of the target.
+    *Implementing a harness function to fuzz your target.
+    *Knowing the expected input by the target.
+    *Providing an initial set of inputs.
+    *The size of the target and the availability of memory.
+    *The possibility of memory corruption.
+
+Can be helpful during this process.
 """
 answers = [ "Next" ]
 next = [ "source code" ]
 code = []
-previous = 0
-skip = false
+skip = []
+skipped_by = ""
+previous = "intro"
 
 [[question]]
 id = "source code"
 title = "Do you have the target's source code?"
-content = "Description"
+content = """
+Having the target's source code is interesting for performance. With the source code in hands, we can instrument the target, that is,
+place coverage information to help our fuzzer identify new points of execution.
+
+Without instrumentation on the source, we have to rely on third-party applications to provide this infromation for our fuzzer,
+such as QEMU, FRIDA or Tiny Inst. Note that QEMU only supports Linux.
+"""
 answers = [ "Yes", "No" ]
-next = [ "harness", "observers" ]
-code = [ "",
-"""let mut shmem_provider = UnixShMemProvider::new().unwrap();\n
-let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
-shmem.write_to_env("__AFL_SHM_ID").unwrap();
-let shmem_buf = shmem.as_mut_slice();""" ]
-previous = 0
-skip = false
+next = [ "harness", "END" ]
+code = []
+skip = []
+skipped_by = ""
+previous = ""
 
 [[question]]
 id = "harness"
 title = "Can you provide a harness function?"
-content = "Description"
+content = """
+Providing a harness also has an impact on performance, for it allows in-process fuzzing.
+"""
 answers = [ "Yes", "No" ]
-next = [ "observers", "observers" ]
-code = [ "",
-"""let mut shmem_provider = UnixShMemProvider::new().unwrap();\n
+next = [ "special algorithm" ]
+code = [ 
+"""
+""",
+"""
+const MAP_SIZE: usize = 65536;
+
 let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
 shmem.write_to_env("__AFL_SHM_ID").unwrap();
-let shmem_buf = shmem.as_mut_slice();""" ]
-previous = 0
-skip = false
+let shmem_buf = shmem.as_mut_slice();
+""" ]
+skip = []
+skipped_by = ""
+previous = ""
 
 [[question]]
-id = "observers"
-title = "Observers"
-content = "Description"
-answers = [ "Next" ]
-next = [ "map size" ]
-code = []
-previous = 0
-skip = false
+id = "special algorithm"
+title = "Do you want to use some special algorithm to select and update testcases from the corpus?"
+content = """
+Usually, a testcase that reaches a new execution point or achieves the desired objective, e.g. a crash on the target, are deemed interesting,
+stored for later use and then selected using a determined policy. However, we can select which testcases to use based on variable aspects: for
+instance, we can prioritize testacases that are smaller in size and take less time to execute (following a minimization policy).
 
-[[question]]
-id = "map size"
-title = "Do you know the size of the map at compile time?"
-content = "Description"
+There are many algorithms supported by Libafl to choose, for more information, please read the libafl documentation on Schedulers and Stages.
+"""
 answers = [ "Yes", "No" ]
-next = [ "hit counts", "hit counts" ]
-code = [ "let observer = ConstMapObserver::<>::new()", "let observer = StdMapObserver::new()" ]
-previous = 0
-skip = false
+next = [ "algorithm options", "special input" ]
+code = [ 
+"""
+""",
+"""
+let scheduler = QueueScheduler::new();
+
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+""" ]
+skip = []
+skipped_by = ""
+previous = ""
 
 [[question]]
-id = "hit counts"
-title = "Do you want to improve input selection by adding a hit counts map?"
-content = "Description"
+id = "algorithm options"
+title = "Which of the following options would you like to use?"
+content = """
+(maybe give a quick explanation about each?)
+"""
+answers = [ "Accounting", "Ecofuzz", "Minimizer", "Power Scheduling", "Probabilistic Sampling", "Weighted" ]
+next = [ "special input" ]
+code = [ 
+"""
+let scheduler = CoverageAccountingScheduler::new(&mut state, QueueScheduler::new(), unsafe {
+    &ACCOUNTING_MEMOP_MAP
+    });
+
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+""",
+"""
+let scheduler = EcoScheduler:new(&mut state, &observer);
+
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+""",
+"""
+let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+""",
+"""
+let scheduler = PowerQueueScheduler::new(
+    &mut state,
+    &observer,
+    PowerSchedule::FAST,
+);
+
+let mut stages = tuple_list!(PowerMutationalStage::new(mutator));
+""",
+"""
+let scheduler = ProbabilitySamplingScheduler::new();
+
+let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+""",
+"""
+let time_observer = TimeObserver::new("time");
+
+let scheduler = StdWeightedScheduler::with_schedule(
+    &mut state,
+    &observer,
+    Some(PowerSchedule::FAST),
+);
+
+let calibration = CalibrationStage::new(&map_feedback);
+
+let power = StdPowerMutationalStage::new(mutator);
+
+let mut stages = tuple_list!(calibration, power);
+""" ]
+skip = []
+skipped_by = ""
+previous = ""
+
+[[question]]
+id = "special input"
+title = "Does your target require some special type of input?"
+content = """
+Usually, libafl uses a map of bytes (BytesInput) to represent the input sent to the target for execution. (maybe cite some examples of data that can be represented as a map of bytes?)
+
+More abstract or complex inputs, such as Grammar-Based have their own type in libafl. There are many input representations supported by Libafl
+to choose, for more information about each, please read the libafl documentation on Inputs.
+"""
 answers = [ "Yes", "No" ]
-next = [ "feedback", "feedback" ]
-code = [ "let observer = HitcountsMapObserver::new($)", "" ]
-previous = 0
-skip = false
+next = [ "input options", "crash/timeout" ]
+code = [ 
+"""
+""",
+"""
+let mutator = StdScheduledMutator::new(havoc_mutations());
+""" ]
+skip = []
+skipped_by = ""
+previous = ""
 
 [[question]]
-id = "feedback"
-title = "Feedback"
-content = "Description"
-answers = [ "Next" ]
-next = [ "runtime" ]
-code = []
-previous = 0
-skip = false
+id = "input options"
+title = "How can your input be represented?"
+content = """
+(again, maybe give a quick explanation about each?)
+"""
+answers = [ "Encoded", "Grimoire", "Gramatron", "Nautilus" ]
+next = [ "crash/timeout" ]
+code = [ 
+"""
+let mutator = StdScheduledMutator::with_max_stack_pow(encoded_mutations(), 2);
+""",
+"""
+let generalization = GeneralizationStage::new(&observer);
+
+let mutator = StdScheduledMutator::with_max_stack_pow(havoc_mutations(), 2);
+
+let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
+    tuple_list!(
+      GrimoireExtensionMutator::new(),
+      GrimoireRecursiveReplacementMutator::new(),
+      GrimoireStringReplacementMutator::new(),
+      GrimoireRandomDeleteMutator::new(),
+      GrimoireRandomDeleteMutator::new(),
+    ),
+    3,
+);
+
+let mut stages = tuple_list!(
+    generalization,
+    StdMutationalStage::new(mutator),
+    StdMutationalStage::transforming(grimoire_mutator)
+);
+""",
+"""
+let mutator = StdScheduledMutator::with_max_stack_pow(
+    tuple_list!(
+      GramatronRandomMutator::new(&generator),
+      GramatronRandomMutator::new(&generator),
+      GramatronRandomMutator::new(&generator),
+      GramatronSpliceMutator::new(),
+      GramatronSpliceMutator::new(),
+      GramatronRecursionMutator::new()
+    ),
+    2,
+);
+""",
+"""
+let mutator = StdScheduledMutator::with_max_stack_pow(
+        tuple_list!(
+            GramatronRandomMutator::new(&generator),
+            GramatronRandomMutator::new(&generator),
+            GramatronRandomMutator::new(&generator),
+            GramatronSpliceMutator::new(),
+            GramatronSpliceMutator::new(),
+            GramatronRecursionMutator::new()
+        ),
+        2,
+    );
+""" ]
+skip = []
+skipped_by = ""
+previous = ""
 
 [[question]]
-id = "runtime"
-title = "Do you want to keep track of the testcase's runtime?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "crash", "crash" ]
-code = [ """let mut feedback =  feedback_or!(
-\tMaxMapFeedback::new(&observer),
-\tTimeObserver::new()
-)""",
-"let mut feedback =  MaxMapFeedback::new(&observer)" ]
-previous = 0
-skip = false
+id = "crash/timeout"
+title = "Do you expect to cause a crash and/or a timeout on the target?"
+content = """
+Determining the objective of the fuzzing campaign is essential to identify input that triggered critical errors on the target.
+
+Telling the fuzzer that we are looking for a crash means that a testcase, which causes a crash on the target, fullfills the objective and, differently from the ones
+that e.g. reach a new execution point, this testcase is saved in a separate folder for you to check the input that trigerred the crash.
+
+A timeout follows the same idea: a testcase that takes longer to execute than the defined timeout.
+
+It's even possible to join these two ideas to instruct the fuzzzer that any testcase, which causes a crash or takes long enough to execute, is stored.
+
+(I think that by crash, the fuzzer can catch the signal that finished the program and by timeout we are able to catch infinite recursion?)
+"""
+answers = [ "Crash or Timeout", "Crash", "Timeout" ]
+next = [ "corrupt" ]
+code = [ 
+"""
+let mut objective = feedback_or_fast!(
+    CrashFeedback::new(),
+    TimeoutFeedback::new()
+);
+""",
+"""
+let mut objective = CrashFeedback::new();
+""",
+"""
+let mut objective = TimeoutFeedback::new();
+""" ]
+skip = []
+skipped_by = ""
+previous = ""
 
 [[question]]
-id = "crash"
-title = "Do you want to consider a crash as a solution?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "timeout", "state" ]
-code = [ "let mut objective = CrashFeedback::new()", "let mut objective = TimeoutFeedback::new()" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "timeout"
-title = "Do you want to consider a timeout as a solution?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "state", "state" ]
-code = [ "let mut objective = feedback_and!($, TimeoutFeedback::new())", "" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "state"
-title = "State/Corpus"
-content = "Description"
-answers = [ "Next" ]
-next = [ "manage testcases" ]
-code = []
-previous = 0
-skip = false
-
-[[question]]
-id = "manage testcases"
-title = "Do you want to manage the testcases in memory, on disk or both?"
-content = "Description"
-answers = [ "On disk", "In memory", "Both" ]
-next = [ "via cache", "load state", "load state" ]
-code = [ "", "InMemoryCorpus::new()", "InMemoryOnDiskCorpus::new().unwrap()" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "via cache"
-title = "Do you want to load testcases from disk to memory using a cache?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "load state", "load state" ]
-code = [ "CachedOnDiskCorpus::new().unwrap()", "OnDiskCorpus::new().unwrap()" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "load state"
-title = ""
-content = ""
-answers = [ "" ]
-next = [ "monitors" ]
-code = [ """let mut state = StdState::new(
-\tStdRand::with_seed(current_nanos()),
-\t$,
-\tOnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-\t&mut feedback,
-\t&mut objective,
-)
-.unwrap()""" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "monitors"
-title = "Monitors"
-content = "Description"
-answers = [ "Next" ]
-next = [ "stats" ]
-code = []
-previous = 0
-skip = false
-
-[[question]]
-id = "stats"
-title = "Do you want to see stats about the fuzzing campaign?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "stats in ui", "stats to file" ]
-code = [ "", "let mon = NopMonitor::new()" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "stats in ui"
-title = "Do you want to see the stats in a UI style?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "stats to file", "stats to file" ]
-code = [ "let mon = (WIP)", """let mon = SimpleMonitor::new(|s| println!("{s}")""" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "stats to file"
-title = "Do you want to store the stats to a file too?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "file extensions", "events" ]
-code = [ "", "" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "file extensions"
-title = "Do you want to store them to a TOML or JSON file?"
-content = "Description"
-answers = [ "TOML", "JSON" ]
-next = [ "events", "events" ]
-code = [ "let mon = OnDiskTOMLMonitor::new($)", "let mon = OnDiskJSONMonitor::new($)" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "events"
-title = "Events"
-content = "Description"
-answers = [ "Next" ]
-next = [ "restart fuzzer" ]
-code = []
-previous = 0
-skip = false
-
-[[question]]
-id = "restart fuzzer"
-title = "Do you want to restart your fuzzer every time a solution is achieved?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "restart fuzzer llmp", "restart fuzzer llmp" ]
-code = [ "let mut mgr = SimpleRestartingEventManager::launch(mon)", "let mut mgr = SimpleEventManager::new(mon)" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "restart fuzzer llmp"
-title = "Do you want to restart your fuzzer every time a solution is achieved (LLMP)?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "schedulers", "schedulers" ]
-code = [ "let mut mgr = LlmpRestartingEventManager::new(mon)", "let mut mgr = LlmpEventManager::new(mon).unwrap()" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "schedulers"
-title = "Schedulers"
-content = "Description"
-answers = [ "Next" ]
-next = [ "queue policy" ]
-code = []
-previous = 0
-skip = false
-
-[[question]]
-id = "queue policy"
-title = "Do you want to load testcases from the corpus using a queue policy?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "smaller and faster", "fuzzer" ]
-code = [ "let scheduler = QueueScheduler::new()", "let scheduler = RandScheduler::new()" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "smaller and faster"
-title = "Do you want to prioritize smaller and faster testcases?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "fuzzer", "fuzzer" ]
-code = [ "let scheduler = IndexesLenTimeMinimizerScheduler::new($)", "" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "fuzzer"
-title = "Fuzzer"
-content = "Description"
-answers = [ "Next" ]
-next = [ "load fuzzer" ]
-code = []
-previous = 0
-skip = false
-
-[[question]]
-id = "load fuzzer"
-title = ""
-content = ""
-answers = [ "" ]
-next = [ "executors" ]
-code = ["let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective)" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "executors"
-title = "Executors"
-content = "Description"
-answers = [ "Next" ]
-next = [ "corrupt memory" ]
-code = []
-previous = 0
-skip = false
-
-
-[[question]]
-id = "corrupt memory"
+id = "corrupt"
 title = "Can your target corrupt memory used by the fuzzer?"
-content = "Description"
+content = """
+Under some circumstances, you may find your harness pretty unstable or your harness wreaks havoc on the global states.
+In this case, you want to fork it before executing the harness runs in the child process so that it doesn't break things.
+(from the book for now hahahaha)
+"""
 answers = [ "Yes", "No" ]
-next = [ "in process timeout", "in process timeout" ]
-code = [ """let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();\n
+next = [ "END", "END" ]
+code = [ 
+"""
 let mut executor = InProcessForkExecutor::new(
-\t&mut harness,
-\ttuple_list!(observer),
-\t&mut fuzzer,
-\t&mut state,
-\t&mut mgr,
-\tshmem_provider
-)
-.expect("Failed to create the Executor")""",
-"""let mut executor = InProcessExecutor::new(
-\t&mut harness,
-\ttuple_list!(observer),
-\t&mut fuzzer,
-\t&mut state,
-\t&mut mgr,
-)\
-.expect("Failed to create the Executor")""" 
-]
-previous = 0
-skip = false
+        &mut harness,
+        tuple_list!(observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+        shmem_provider,
+    )
+    .expect("Failed to create the Executor");
+""",
+"""
+let mut executor = InProcessExecutor::new(
+        &mut harness,
+        tuple_list!(observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+    )
+    .expect("Failed to create the Executor");
+""" ]
+skip = []
+skipped_by = ""
+previous = ""
 
 [[question]]
-id = "in process timeout"
-title = "Do you want to set a timeout before each run?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "forkserver timeout", "forkserver timeout" ]
-code = [ """let mut executor = TimeoutExecutor::new(
-$,
-Duration::from_secs()
-)""",
-"" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "forkserver timeout"
-title = "Do you want to set a timeout before each run (forkserver)?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "generators", "generators" ]
-code = [ """let mut executor = TimeoutForkserverExecutor::new(
-\t$,
-\tDuration::from_secs()
-)""",
-"let mut executor = ForkserverExecutor::new()" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "generators"
-title = "Generators"
-content = "Description"
-answers = [ "Next" ]
-next = [ "initial inputs" ]
-code = []
-previous = 0
-skip = false
-
-[[question]]
-id = "initial inputs"
-title = "Do you want to generate an initial set of inputs?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "mutators", "mutators" ]
-code = [ """let mut generator = RandBytesGenerator::new(32);\n
-state
-\t.generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
-\t.expect("Failed to generate the initial corpus")"""
-, "" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "mutators"
-title = "Mutators"
-content = "Description"
-answers = [ "Next" ]
-next = [ "schedule mutations" ]
-code = []
-previous = 0
-skip = false
-
-[[question]]
-id = "schedule mutations"
-title = "Do you want to schedule mutations?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "stages", "stages" ]
-code = [ "let mutator = StdScheduledMutator::new(havoc_mutations())", "" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "stages"
-title = "Stages"
-content = "Description"
-answers = [ "Next" ]
-next = [ "StdMutationalStage" ]
-code = []
-previous = 0
-skip = false
-
-[[question]]
-id = "StdMutationalStage"
-title = "Do you want to use the StdMutationalStage?"
-content = "Description"
-answers = [ "Yes", "No" ]
-next = [ "fuzz loop", "fuzz loop" ]
-code = [ "let mut stages = tuple_list!(StdMutationalStage::new())", "" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "fuzz loop"
-title = ""
-content = ""
-answers = [ "" ]
-next = [ "end" ]
-code = [ """fuzzer
-\t.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
-\t.expect("Error in the fuzzing loop")""" ]
-previous = 0
-skip = false
-
-[[question]]
-id = "end"
-title = ""
-content = ""
+id = "END"
+title = "All questions answered!"
+content = """
+YOU CAN CLOSE THIS WINDOW NOW
+"""
 answers = []
-next = []
+next = [ ]
 code = []
-previous = 0
-skip = false
+skip = []
+skipped_by = ""
+previous = ""

@@ -2,12 +2,14 @@ struct SlintData {
     title: string,
     content: string,
     answers: [string],
+    next: [string],
+    previous: string,
 }
 
 component AnswerButton inherits Rectangle {
     in-out property text <=> answer.text;
 
-    callback clicked <=> touch.clicked;
+    callback clicked;
 
     border-radius: 10px;
     border-width: 2px;
@@ -20,41 +22,69 @@ component AnswerButton inherits Rectangle {
         x: ((parent.width - self.width) / 2) + (touch.pressed ? 2px : 0);
         y: ((parent.height - self.height) / 2) + (touch.pressed ? 1px : 0);
         color: touch.pressed ? #fff : #eee;
+        font-size: 16px;
     }
 
-    touch := TouchArea { }
+    touch := TouchArea { 
+        clicked => {
+            root.clicked();
+        }
+    }
 }
 
 export component MainWindow inherits Window {
     in-out property <SlintData> question;
 
+    callback user_answer(string);
+
     background: #0f0f0f;
     title: "libafl_wizard";
     icon: @image-url("../icons/libafl_wizard.png");
     default-font-size: 20px;
+    width: 1100px;
+    height: 700px;
 
     VerticalLayout {
-        Text {
-            text: root.question.title;
-            color: white;
-            font-family: "Terminal";
+        Rectangle {
+            Text {
+                text: root.question.title;
+                color: white;
+                font-family: "Consolas";
+                font-weight: 900;
+                font-size: 20px;
+            }
         }
 
-        Text {
-            text: root.question.content;
-            color: white;
-            font-family: "Terminal";
+        Rectangle {
+            Text {
+                text: root.question.content;
+                color: white;
+                font-family: "Ebrima";
+                font-size: 16px;
+            }    
         }
 
+        Rectangle {
+
+        }
+    
         HorizontalLayout {
             spacing: 10px;
 
             for ans[i] in question.answers: AnswerButton {
                 text: ans;
+
+                clicked => {
+                    root.user_answer(self.text);
+                }
             }
 
-            undo := AnswerButton{
+            undo := AnswerButton {
                 text: "Undo";
+
+                clicked => {
+                    root.user_answer(self.text);
+                }
             }
         }
     }
