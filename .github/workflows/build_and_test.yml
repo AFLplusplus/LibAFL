@@ -365,6 +365,8 @@ jobs:
     - uses: ilammy/msvc-dev-cmd@v1
     - name: install cxx bridge
       run: cargo install cxxbridge-cmd
+    - name: Build fuzzers/libfuzzer_stb_image 
+      run: cd fuzzers/libfuzzer_stb_image && cargo build --release
     - name: Build fuzzers/frida_libpng
       run: cd fuzzers/frida_libpng/ && cargo make test
     - name: Build fuzzers/frida_gdiplus

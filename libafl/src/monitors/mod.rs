@@ -210,7 +210,6 @@ impl ClientStats {
 
     /// Update the user-defined stat with name and value
     pub fn update_user_stats(&mut self, name: String, value: UserStats) {
-        log::info!("{}", Error::unknown("dumping backtrace for monitoring"));
         self.user_monitor.insert(name, value);
     }
 
@@ -847,10 +846,10 @@ impl ClientPerfMonitor {
     /// Update the given [`PerfFeature`] with the given `time`
     pub fn update_feature(&mut self, feature: PerfFeature, time: u64) {
         // Get the current stage index as `usize`
-        let stage_index: usize = self.curr_stage.try_into().unwrap();
+        let stage_index: usize = self.curr_stage.into();
 
         // Get the index of the given feature
-        let feature_index: usize = feature.try_into().unwrap();
+        let feature_index: usize = feature.into();
 
         if stage_index >= self.stages.len() {
             self.stages
@@ -984,6 +983,7 @@ impl Default for ClientPerfMonitor {
 }
 /// `Monitor` Python bindings
 #[cfg(feature = "python")]
+#[allow(clippy::unnecessary_fallible_conversions)]
 #[allow(missing_docs)]
 pub mod pybind {
     use alloc::{boxed::Box, string::String, vec::Vec};

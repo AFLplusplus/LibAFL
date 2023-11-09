@@ -1095,6 +1095,7 @@ impl From<bool> for ConstFeedback {
 
 /// `Feedback` Python bindings
 #[cfg(feature = "python")]
+#[allow(clippy::unnecessary_fallible_conversions)]
 #[allow(missing_docs)]
 pub mod pybind {
     use std::cell::UnsafeCell;
