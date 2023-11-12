@@ -133,9 +133,6 @@ fn main() {
         libfuzzer.compile("libfuzzer");
     }
 
-    println!("cargo:rerun-if-changed=src/common.h");
-    println!("cargo:rerun-if-changed=src/common.c");
-
     #[cfg(feature = "sanitizer_interfaces")]
     {
         println!("cargo:rerun-if-changed=src/sanitizer_interfaces.h");
@@ -153,80 +150,97 @@ fn main() {
             .expect("Couldn't write the sanitizer headers!");
     }
 
-    let mut common = cc::Build::new();
-
-    #[cfg(feature = "sanitizers_flags")]
+    #[cfg(feature = "common")]
     {
-        common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
-    }
+        println!("cargo:rerun-if-changed=src/common.h");
+        println!("cargo:rerun-if-changed=src/common.c");
 
-    common.file(src_dir.join("common.c")).compile("common");
+        let mut common = cc::Build::new();
 
-    println!("cargo:rerun-if-changed=src/coverage.c");
+        #[cfg(feature = "sanitizers_flags")]
+        {
+            common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
+        }
 
-    cc::Build::new()
-        .file(src_dir.join("coverage.c"))
-        .define("EDGES_MAP_SIZE", Some(&*format!("{edges_map_size}")))
-        .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
-        .compile("coverage");
+        common.file(src_dir.join("common.c")).compile("common");
 
-    println!("cargo:rerun-if-changed=src/cmplog.h");
-    println!("cargo:rerun-if-changed=src/cmplog.c");
+        #[cfg(feature = "coverage")]
+        {
+            println!("cargo:rerun-if-changed=src/coverage.c");
+            cc::Build::new()
+                .file(src_dir.join("coverage.c"))
+                .define("EDGES_MAP_SIZE", Some(&*format!("{edges_map_size}")))
+                .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
+                .compile("coverage");
+        }
 
-    #[cfg(unix)]
-    {
-        cc::Build::new()
-            .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
-            .flag("-Wno-sign-compare")
-            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-            .define(
-                "AFLPP_CMPLOG_MAP_W",
-                Some(&*format!("{aflpp_cmplog_map_w}")),
-            )
-            .define(
-                "AFLPP_CMPLOG_MAP_H",
-                Some(&*format!("{aflpp_cmplog_map_h}")),
-            )
-            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-            .file(src_dir.join("cmplog.c"))
-            .compile("cmplog");
-    }
+        #[cfg(feature = "cmplog")]
+        {
+            println!("cargo:rerun-if-changed=src/cmplog.h");
+            println!("cargo:rerun-if-changed=src/cmplog.c");
 
-    #[cfg(not(unix))]
-    {
-        cc::Build::new()
-            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-            .define(
-                "AFLPP_CMPLOG_MAP_W",
-                Some(&*format!("{aflpp_cmplog_map_w}")),
-            )
-            .define(
-                "AFLPP_CMPLOG_MAP_H",
-                Some(&*format!("{aflpp_cmplog_map_h}")),
-            )
-            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-            .file(src_dir.join("cmplog.c"))
-            .compile("cmplog");
-    }
+            #[cfg(unix)]
+            {
+                cc::Build::new()
+                    .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
+                    .flag("-Wno-sign-compare")
+                    .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+                    .define(
+                        "AFLPP_CMPLOG_MAP_W",
+                        Some(&*format!("{aflpp_cmplog_map_w}")),
+                    )
+                    .define(
+                        "AFLPP_CMPLOG_MAP_H",
+                        Some(&*format!("{aflpp_cmplog_map_h}")),
+                    )
+                    .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+                    .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+                    .file(src_dir.join("cmplog.c"))
+                    .compile("cmplog");
+            }
 
-    #[cfg(unix)]
-    {
-        println!("cargo:rerun-if-changed=src/forkserver.c");
+            #[cfg(not(unix))]
+            {
+                cc::Build::new()
+                    .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+                    .define(
+                        "AFLPP_CMPLOG_MAP_W",
+                        Some(&*format!("{aflpp_cmplog_map_w}")),
+                    )
+                    .define(
+                        "AFLPP_CMPLOG_MAP_H",
+                        Some(&*format!("{aflpp_cmplog_map_h}")),
+                    )
+                    .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+                    .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+                    .file(src_dir.join("cmplog.c"))
+                    .compile("cmplog");
+            }
+        }
 
-        cc::Build::new()
-            .file(src_dir.join("forkserver.c"))
-            .compile("forkserver");
-    }
+        #[cfg(feature = "forkserver")]
+        {
+            #[cfg(unix)]
+            {
+                println!("cargo:rerun-if-changed=src/forkserver.c");
 
-    #[cfg(windows)]
-    {
-        println!("cargo:rerun-if-changed=src/windows_asan.c");
+                cc::Build::new()
+                    .file(src_dir.join("forkserver.c"))
+                    .compile("forkserver");
+            }
+        }
 
-        cc::Build::new()
-            .file(src_dir.join("windows_asan.c"))
-            .compile("windows_asan");
+        #[cfg(feature = "windows_asan")]
+        {
+            #[cfg(windows)]
+            {
+                println!("cargo:rerun-if-changed=src/windows_asan.c");
+
+                cc::Build::new()
+                    .file(src_dir.join("windows_asan.c"))
+                    .compile("windows_asan");
+            }
+        }
     }
 
     println!("cargo:rustc-link-search=native={}", &out_dir);

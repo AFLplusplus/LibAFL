@@ -102,7 +102,9 @@ pub mod sancov_8bit;
 #[cfg(feature = "sancov_8bit")]
 pub use sancov_8bit::*;
 
+#[cfg(feature = "coverage")]
 pub mod coverage;
+#[cfg(feature = "coverage")]
 pub use coverage::*;
 
 pub mod value_profile;
@@ -115,12 +117,14 @@ pub use cmps::*;
 #[cfg(feature = "std")]
 pub mod drcov;
 
-#[cfg(all(windows, feature = "std"))]
+#[cfg(all(windows, feature = "std", feture = "windows_asan"))]
 pub mod windows_asan;
-#[cfg(all(windows, feature = "std"))]
+#[cfg(all(windows, feature = "std", feture = "windows_asan"))]
 pub use windows_asan::*;
 
+#[cfg(feature = "forkserver")]
 #[cfg(unix)]
 pub mod forkserver;
+#[cfg(feature = "forkserver")]
 #[cfg(unix)]
 pub use forkserver::*;

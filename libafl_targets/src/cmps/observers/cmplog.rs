@@ -14,8 +14,9 @@ use libafl::{
 };
 use libafl_bolts::{ownedref::OwnedMutPtr, Named};
 
-use crate::cmps::{libafl_cmplog_map_ptr, CmpLogMap, CMPLOG_ENABLED};
-
+#[cfg(feature = "cmplog")]
+use crate::cmps::libafl_cmplog_map_ptr;
+use crate::cmps::{CmpLogMap, CMPLOG_ENABLED};
 /// A [`CmpObserver`] observer for `CmpLog`
 #[derive(Debug)]
 pub struct CmpLogObserver {
@@ -98,6 +99,7 @@ impl CmpLogObserver {
         }
     }
 
+    #[cfg(feature = "cmplog")]
     /// Creates a new [`CmpLogObserver`] with the given name from the default cmplog map
     #[must_use]
     pub fn new(name: &'static str, add_meta: bool) -> Self {
