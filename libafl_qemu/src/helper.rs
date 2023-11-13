@@ -144,7 +144,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum QemuInstrumentationFilter {
     AllowList(Vec<Range<GuestAddr>>),
     DenyList(Vec<Range<GuestAddr>>),
@@ -173,6 +173,17 @@ impl QemuInstrumentationFilter {
             }
             QemuInstrumentationFilter::None => true,
         }
+    }
+}
+
+pub trait HasInstrumentationFilter {
+    fn filter(&self) -> &QemuInstrumentationFilter;
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter;
+
+    fn update_filter(&mut self, filter: QemuInstrumentationFilter, emu: &Emulator) {
+        *self.filter_mut() = filter;
+        emu.flush_jit();
     }
 }
 

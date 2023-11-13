@@ -21,7 +21,7 @@ use rangemap::RangeMap;
 use crate::{
     calls::FullBacktraceCollector,
     emu::{EmuError, Emulator, MemAccessInfo, SyscallHookResult},
-    helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
     GuestAddr, Regs,
 };
@@ -836,6 +836,16 @@ impl Default for QemuAsanHelper {
     }
 }
 
+impl HasInstrumentationFilter for QemuAsanHelper {
+    fn filter(&self) -> &QemuInstrumentationFilter {
+        &self.filter
+    }
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+        &mut self.filter
+    }
+}
+
 impl<S> QemuHelper<S> for QemuAsanHelper
 where
     S: UsesInput + HasMetadata,
@@ -847,6 +857,10 @@ where
         QT: QemuHelperTuple<S>,
     {
         hooks.syscalls(qasan_fake_syscall::<QT, S>);
+
+        if self.rt.error_callback.is_some() {
+            hooks.crash(oncrash_asan::<QT, S>);
+        }
     }
 
     fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
@@ -870,10 +884,6 @@ where
             Some(trace_write8_asan::<QT, S>),
             Some(trace_write_n_asan::<QT, S>),
         );
-
-        if self.rt.error_callback.is_some() {
-            hooks.crash(oncrash_asan::<QT, S>);
-        }
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
@@ -1284,6 +1294,7 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
         info
     };
 
+    eprintln!("=================================================================");
     let backtrace = FullBacktraceCollector::backtrace()
         .map(|r| {
             let mut v = r.to_vec();
@@ -1320,8 +1331,9 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
 
         if let Some((chunk, item)) = rt.alloc_get_clone(addr) {
             eprintln!(
-                "Address {addr:#x} is {} bytes inside the chunk [{:#x},{:#x})",
+                "Address {addr:#x} is {} bytes inside the {}-byte chunk [{:#x},{:#x})",
                 addr - chunk.start,
+                chunk.end - chunk.start,
                 chunk.start,
                 chunk.end
             );
@@ -1336,32 +1348,33 @@ pub fn asan_report(rt: &AsanGiovese, emu: &Emulator, pc: GuestAddr, err: AsanErr
                     }
                     found = true;
                     eprintln!(
-                        "Address {addr:#x} is {} bytes to the left of the chunk [{:#x},{:#x})",
+                        "Address {addr:#x} is {} bytes to the left of the {}-byte chunk [{:#x},{:#x})",
                         chunk.start - addr,
+                        chunk.end - chunk.start,
                         chunk.start,
                         chunk.end
                     );
                     print_bts(item);
                 },
             );
-            if !found {
-                rt.alloc_map_interval(
-                    ((addr - DEFAULT_REDZONE_SIZE as GuestAddr)..addr).into(),
-                    |chunk, item| {
-                        if found {
-                            return;
-                        }
-                        found = true;
-                        eprintln!(
-                            "Address {addr:#x} is {} bytes to the right of the chunk [{:#x},{:#x})",
-                            addr - chunk.end,
-                            chunk.start,
-                            chunk.end
-                        );
-                        print_bts(item);
-                    },
-                );
-            }
+            found = false;
+            rt.alloc_map_interval(
+                ((addr - DEFAULT_REDZONE_SIZE as GuestAddr)..addr).into(),
+                |chunk, item| {
+                    if found {
+                        return;
+                    }
+                    found = true;
+                    eprintln!(
+                        "Address {addr:#x} is {} bytes to the right of the {}-byte chunk [{:#x},{:#x})",
+                        addr - chunk.end,
+                        chunk.end - chunk.start,
+                        chunk.start,
+                        chunk.end
+                    );
+                    print_bts(item);
+                },
+            );
         }
     }
 

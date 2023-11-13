@@ -79,6 +79,21 @@ impl crate::ArchExtras for crate::CPU {
         Ok(())
     }
 
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        if conv != CallingConvention::Cdecl {
+            return Err(format!("Unsupported calling convention: {conv:#?}"));
+        }
+
+        match idx {
+            0 => Ok(self.read_reg(Regs::Rdi)),
+            1 => Ok(self.read_reg(Regs::Rsi)),
+            _ => Err(format!("Unsupported argument: {idx:}")),
+        }
+    }
+
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,

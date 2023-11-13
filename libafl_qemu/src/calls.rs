@@ -12,7 +12,7 @@ use thread_local::ThreadLocal;
 use crate::{
     capstone,
     emu::{ArchExtras, Emulator},
-    helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
     GuestAddr,
 };
@@ -376,12 +376,25 @@ where
     }
 }
 
+impl<T> HasInstrumentationFilter for QemuCallTracerHelper<T>
+where
+    T: CallTraceCollectorTuple,
+{
+    fn filter(&self) -> &QemuInstrumentationFilter {
+        &self.filter
+    }
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+        &mut self.filter
+    }
+}
+
 impl<S, T> QemuHelper<S> for QemuCallTracerHelper<T>
 where
     S: UsesInput,
     T: CallTraceCollectorTuple,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
