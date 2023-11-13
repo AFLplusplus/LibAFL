@@ -35,4 +35,8 @@ libafl_targets = { path = "../../libafl_targets", features = ["sancov_cmplog"] }
 libloading = "0.7"
 mimalloc = { version = "*", default-features = false }
 color-backtrace = "0.5"
+<<<<<<< Updated upstream
+=======
+log = "0.4.20"
+>>>>>>> Stashed changes
 env_logger = "0.10.0"

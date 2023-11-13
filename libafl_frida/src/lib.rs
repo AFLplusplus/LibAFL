@@ -75,6 +75,9 @@ pub mod windows_hooks;
 
 pub mod coverage_rt;
 
+/// The frida hook runtime
+pub mod hook_rt;
+
 /// Hooking thread lifecycle events. Seems like this is apple-only for now.
 #[cfg(target_vendor = "apple")]
 pub mod pthread_hook;

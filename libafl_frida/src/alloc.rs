@@ -13,6 +13,7 @@ use backtrace::Backtrace;
 use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
+use mmap_rs::Protection;
 #[cfg(any(
     windows,
     target_os = "linux",
@@ -437,42 +438,44 @@ impl Allocator {
     /// TODO: check edge cases
     #[inline]
     #[must_use]
-    pub fn check_shadow(&self, address: *const c_void, size: usize) -> bool {
+    pub fn check_shadow(&mut self, address: *const c_void, size: usize) -> bool {
         if size == 0 {
             return true;
         }
         let address = address as usize;
-        let mut shadow_size = size / 8 + 1;
+        let shadow_size = (size + 8)/ 8 ;
 
-        let mut shadow_addr = map_to_shadow!(self, address);
+        let shadow_addr = map_to_shadow!(self, address);
 
+        // self.map_shadow_for_region(address, address + size, false);
+        
+        log::info!("check_shadow: {:x}, {:x}, {:x}, {:x}", address, shadow_size, shadow_addr, size);
         if address & 0x7 > 0 {
-            if unsafe { (shadow_addr as *mut u8).read() } & (address & 7) as u8
-                != (address & 7) as u8
+            let mask = !((1 << (address & 7)) - 1) as u8;
+            if unsafe { (shadow_addr as *mut u8).read() } & mask != mask
             {
                 return false;
-            }
-            shadow_addr += 1;
-            if shadow_size > 0 {
-                shadow_size -= 1;
             }
         }
 
         if shadow_size > 0 {
             let buf =
-                unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
+                unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size  - 1) };
 
             let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
 
+            log::info!("prefix: {:?}, aligned: {:?}, suffix: {:?}", prefix.len(), aligned.len(), suffix.len());
+            // return true;
             if prefix.iter().all(|&x| x == 0xff)
                 && suffix.iter().all(|&x| x == 0xff)
                 && aligned
                     .iter()
                     .all(|&x| x == 0xffffffffffffffffffffffffffffffffu128)
             {
-                let shadow_remainder = (size % 8) as u8;
+                let shadow_remainder = (size + 8) % 8;
                 if shadow_remainder > 0 {
-                    let remainder = unsafe { ((shadow_addr + shadow_size) as *mut u8).read() };
+                    let remainder = unsafe { ((shadow_addr + shadow_size - 1) as *mut u8).read() };
+                    log::info!("remainder: {:x}", remainder);
                     let mask = !((1 << (8 - shadow_remainder)) - 1) as u8;
 
                     remainder & mask == mask
@@ -483,7 +486,16 @@ impl Allocator {
                 false
             }
         } else {
-            true
+                let shadow_remainder = (size + 8) % 8;
+                if shadow_remainder > 0 {
+                    let remainder = unsafe { ((shadow_addr + shadow_size -1) as *mut u8).read() };
+                    log::info!("remainder 2: {:x}", remainder);
+                    let mask = !((1 << (8 - shadow_remainder)) - 1) as u8;
+
+                    remainder & mask == mask
+                } else {
+                    true
+                }
         }
     }
     /// Maps the address to a shadow address
@@ -512,17 +524,15 @@ impl Allocator {
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     pub fn unpoison_all_existing_memory(&mut self) {
-        RangeDetails::enumerate_with_prot(PageProtection::NoAccess, &mut |range: &RangeDetails| {
-            if range.protection() as u32 & PageProtection::ReadWrite as u32 != 0 {
-                let start = range.memory_range().base_address().0 as usize;
-                let end = start + range.memory_range().size();
-                if !self.using_pre_allocated_shadow_mapping && start == 1 << self.shadow_bit {
-                    return true;
+        for area in MemoryAreas::open(None).unwrap() {
+            let area = area.unwrap();
+            if area.protection().intersects(Protection::READ | Protection::WRITE) && !self.is_managed(area.start() as *mut c_void){
+                if !self.using_pre_allocated_shadow_mapping && area.start() == 1 << self.shadow_bit {
+                    continue;
                 }
-                self.map_shadow_for_region(start, end, true);
+                self.map_shadow_for_region(area.start(), area.end(), true);
             }
-            true
-        });
+        }
     }
 
     /// Initialize the allocator, making sure a valid shadow bit is selected.

@@ -385,8 +385,8 @@ impl InProcessHandlers {
     {
         unsafe {
             let data = &mut GLOBAL_STATE;
-            #[cfg(feature = "std")]
-            windows_exception_handler::setup_panic_hook::<E, EM, OF, Z>();
+            //#[cfg(feature = "std")]
+            //windows_exception_handler::setup_panic_hook::<E, EM, OF, Z>();
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
 

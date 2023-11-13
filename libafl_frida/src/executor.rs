@@ -202,6 +202,7 @@ where
             }
         }
 
+        log::info!("disable_excludes: {:}", helper.disable_excludes );
         if !helper.disable_excludes {
             for range in ranges.gaps(&(0..usize::MAX)) {
                 log::info!("excluding range: {:x}-{:x}", range.start, range.end);

@@ -28,7 +28,7 @@ use rangemap::RangeMap;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
-use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
+use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime, hook_rt::HookRuntime};
 
 #[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
@@ -271,6 +271,11 @@ impl FridaInstrumentationHelperBuilder {
 
         if stalker_enabled {
             for (i, module) in module_map.values().iter().enumerate() {
+                log::trace!(
+                    "module: {:?} {:x}",
+                    module.name(),
+                    module.range().base_address().0 as usize
+                );
                 let range = module.range();
                 let start = range.base_address().0 as usize;
                 ranges
@@ -292,6 +297,17 @@ impl FridaInstrumentationHelperBuilder {
             runtimes
                 .borrow_mut()
                 .init_all(gum, &ranges.borrow(), &module_map);
+            
+
+            let mut borrowed_runtimes = runtimes.borrow_mut();
+
+            if let Some(_asan_rt) = borrowed_runtimes.match_first_type::<AsanRuntime>() {
+                if let Some(hook_rt) = borrowed_runtimes.match_first_type_mut::<HookRuntime>() {
+                    AsanRuntime::register_hooks(hook_rt);
+                } else {
+                    panic!("AsanRuntime requires that HookRuntime also be provided");
+                }
+            }
         }
 
         let transformer = FridaInstrumentationHelper::build_transformer(gum, &ranges, &runtimes);
@@ -326,7 +342,7 @@ impl Default for FridaInstrumentationHelperBuilder {
     fn default() -> Self {
         Self {
             stalker_enabled: true,
-            disable_excludes: true,
+            disable_excludes: false,
             instrument_module_predicate: None,
             skip_module_predicate: Box::new(|module| {
                 // Skip the instrumentation module to avoid recursion.
@@ -477,6 +493,7 @@ where
         let mut basic_block_start = 0;
         let mut basic_block_size = 0;
         for instruction in basic_block {
+            let mut keep_instr = true;
             let instr = instruction.instr();
             let instr_size = instr.bytes().len();
             let address = instr.address();
@@ -486,16 +503,24 @@ where
                 let mut runtimes = (*runtimes).borrow_mut();
                 if first {
                     first = false;
-                    // log::info!(
-                    //     "block @ {:x} transformed to {:x}",
-                    //     address,
-                    //     output.writer().pc()
-                    // );
+                    log::info!(
+                        "block @ {:x} transformed to {:x}",
+                        address,
+                        output.writer().pc()
+                    );
                     if let Some(rt) = runtimes.match_first_type_mut::<CoverageRuntime>() {
                         rt.emit_coverage_mapping(address, output);
                     }
                     if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
                         basic_block_start = address;
+                    }
+                }
+
+
+                if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
+                    if let Some(call_target) = rt.is_interesting(capstone, instr) {
+                        rt.emit_callout(call_target, &instruction);
+                        keep_instr = false;
                     }
                 }
 
@@ -557,8 +582,11 @@ where
                 if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
                     basic_block_size += instr_size;
                 }
+
             }
+            if keep_instr {
             instruction.keep();
+            }
         }
         if basic_block_size != 0 {
             if let Some(rt) = runtimes.borrow_mut().match_first_type_mut::<DrCovRuntime>() {

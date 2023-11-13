@@ -61,7 +61,7 @@ use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::{FridaRuntime, SkipRange},
-    utils::writer_register,
+    utils::writer_register, hook_rt::HookRuntime,
 };
 
 extern "C" {
@@ -147,7 +147,7 @@ pub struct AsanRuntime {
     skip_ranges: Vec<SkipRange>,
     continue_on_error: bool,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
-    hooks_enabled: bool,
+    pub(crate) hooks_enabled: bool,
 
     #[cfg(target_arch = "aarch64")]
     eh_frame: [u32; ASAN_EH_FRAME_DWORD_COUNT],
@@ -388,16 +388,16 @@ impl AsanRuntime {
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
     #[allow(clippy::unused_self)]
-    fn unpoison_all_existing_memory(&mut self) {
+    pub fn unpoison_all_existing_memory(&mut self) {
         self.allocator.unpoison_all_existing_memory();
     }
 
     /// Enable all function hooks
-    fn enable_hooks(&mut self) {
+    pub fn enable_hooks(&mut self) {
         self.hooks_enabled = true;
     }
     /// Disable all function hooks
-    fn disable_hooks(&mut self) {
+    pub fn disable_hooks(&mut self) {
         self.hooks_enabled = false;
     }
 
@@ -539,6 +539,24 @@ impl AsanRuntime {
         Interceptor::current_invocation().cpu_context().rip() as usize
     }
 
+    pub fn register_hooks(hook_rt: &mut HookRuntime) {
+
+
+        let malloc_address = Module::find_export_by_name(Some("ucrtbased.dll"), "malloc").unwrap().0;
+        log::error!("malloc_address: {:?}", malloc_address);
+        winsafe::OutputDebugString(&format!("malloc_address: {:?}", malloc_address));
+        hook_rt.register_hook(malloc_address as usize, |address, context| {
+            log::error!("in malloc!");
+        });
+
+        let free_address = Module::find_export_by_name(Some("ucrtbased.dll"), "free").unwrap().0;
+        log::error!("free: {:?}", free_address);
+        winsafe::OutputDebugString(&format!("free_address: {:?}", free_address));
+        hook_rt.register_hook(free_address as usize, |address, context| {
+            log::error!("in free!");
+        });
+
+    }
     /// Hook all functions required for ASAN to function, replacing them with our own
     /// implementations.
     #[allow(clippy::items_after_statements)]
@@ -569,7 +587,37 @@ impl AsanRuntime {
                         Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
                         NativePointer([<replacement_ $name>] as *mut c_void),
                         NativePointer(self as *mut _ as *mut c_void)
-                    ).ok();
+                    ).unwrap();
+                }
+            }
+        }
+
+        macro_rules! hook_priv_func {
+            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+                paste::paste! {
+                    
+                    #[allow(non_snake_case)]
+                    unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        let mut invocation = Interceptor::current_invocation();
+                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+                        let real_address = this.real_address_for_stalked(invocation.return_addr());
+                        if this.hooks_enabled && !this.suppressed_addresses.contains(&real_address) /*&& this.module_map.as_ref().unwrap().find(real_address as u64).is_some()*/ {
+                            this.hooks_enabled = false;
+                            let result = this.[<hook_ $name>]($($param),*);
+                            this.hooks_enabled = true;
+                            result
+                        } else {
+                        let [<hooked_ $name>] = Module::find_symbol_by_name($lib, stringify!($name)).expect("Failed to find function");
+                        let [<original_ $name>]: extern "system" fn($($param_type),*) -> $return_type = unsafe { std::mem::transmute([<hooked_ $name>].0) };
+                            ([<original_ $name>])($($param),*)
+                        }
+                    }
+                    let [<hooked_ $name>] = Module::find_symbol_by_name($lib, stringify!($name)).expect("Failed to find function");
+                    interceptor.replace(
+                        [<hooked_ $name>],
+                        NativePointer([<replacement_ $name>] as *mut c_void),
+                        NativePointer(self as *mut _ as *mut c_void)
+                    ).unwrap();
                 }
             }
         }
@@ -585,7 +633,10 @@ impl AsanRuntime {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         if this.[<hook_check_ $name>]($($param),*) {
-                            this.[<hook_ $name>]($($param),*)
+                            this.hooks_enabled = false;
+                            let result = this.[<hook_ $name>]($($param),*);
+                            this.hooks_enabled = true;
+                            result
                         } else {
                             $name($($param),*)
                         }
@@ -598,6 +649,9 @@ impl AsanRuntime {
                 }
             }
         }
+
+        self.disable_hooks();
+        interceptor.begin_transaction();
 
         // Hook the memory allocator functions
         #[cfg(unix)]
@@ -619,10 +673,45 @@ impl AsanRuntime {
         );
         #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
+        // // #[cfg(windows)]
+        // hook_priv_func!(
+        //     "c:\\windows\\system32\\ntdll.dll",
+        //     LdrpCallInitRoutine,
+        //     (base_address: *const c_void, reason: usize, context: usize, entry_point: usize),
+        //     usize
+        // );
         #[cfg(windows)]
         hook_func!(
-            Some("kernel32"),
-            HeapAlloc,
+            None,
+            LdrLoadDll,
+            (path: *const c_void, file: usize, flags: usize, x: usize),
+            usize
+        );
+        // #[cfg(windows)]
+        // hook_func!(
+        //     None,
+        //     LoadLibraryExW,
+        //     (path: *const c_void, file: usize, flags: i32),
+        //     usize
+        // );
+        #[cfg(windows)]
+        hook_func!(
+            None,
+            CreateThread,
+            (thread_attributes: *const c_void, stack_size: usize, start_address: *const c_void, parameter: *const c_void, creation_flags: i32, thread_id: *mut i32),
+            usize
+        );
+        #[cfg(windows)]
+        hook_func!(
+            None,
+            CreateFileMappingW,
+            (file: usize, file_mapping_attributes: *const c_void, protect: i32, maximum_size_high: u32, maximum_size_low: u32, name: *const c_void),
+            usize
+        );
+        #[cfg(windows)]
+        hook_func!(
+            Some("ntdll"),
+            RtlAllocateHeap,
             (handle: *mut c_void, flags: u32, size: usize),
             *mut c_void
         );
@@ -639,16 +728,16 @@ impl AsanRuntime {
             *mut c_void
         );
         #[cfg(windows)]
-        hook_func!(
-            Some("kernel32"),
-            HeapFree,
+        hook_func_with_check!(
+            Some("ntdll"),
+            RtlFreeHeap,
             (handle: *mut c_void, flags: u32, ptr: *mut c_void),
             bool
         );
         #[cfg(windows)]
         hook_func_with_check!(
-            Some("kernel32"),
-            HeapSize,
+            Some("ntdll"),
+            RtlSizeHeap,
             (handle: *mut c_void, flags: u32, ptr: *mut c_void),
             usize
         );
@@ -800,7 +889,6 @@ impl AsanRuntime {
                 }
             }
         }
-
         #[cfg(not(windows))]
         hook_func!(
             None,
@@ -862,6 +950,7 @@ impl AsanRuntime {
             (dest: *mut c_void, src: *const c_void, n: usize),
             *mut c_void
         );
+        #[cfg(not(windows))]
         hook_func!(
             None,
             memmove,
@@ -1009,6 +1098,8 @@ impl AsanRuntime {
             (s: *mut c_void, c: *const c_void, n: usize),
             ()
         );
+
+        interceptor.end_transaction();
     }
 
     #[cfg(target_arch = "x86_64")]

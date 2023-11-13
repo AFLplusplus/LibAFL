@@ -17,7 +17,64 @@ impl AsanRuntime {
     #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
-    pub fn hook_HeapAlloc(&mut self, _handle: *mut c_void, flags: u32, size: usize) -> *mut c_void {
+    pub fn hook_CreateThread(&mut self, thread_attributes: *const c_void, stack_size: usize, start_address: *const c_void, parameter: *const c_void, creation_flags: i32, thread_id: *mut i32) -> usize {
+
+        extern "system" {
+            fn CreateThread(thread_attributes: *const c_void, stack_size: usize, start_address: *const c_void, parameter: *const c_void, creation_flags: i32, thread_id: *mut i32) -> usize;
+        }
+        unsafe {CreateThread(thread_attributes, stack_size, start_address, parameter, creation_flags, thread_id)}
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_CreateFileMappingW(&mut self, file: usize, file_mapping_attributes: *const c_void, protect: i32, maximum_size_high: u32, maximum_size_low: u32, name: *const c_void) -> usize {
+        extern "system" {
+            fn CreateFileMappingW(file: usize, file_mapping_attributes: *const c_void, protect: i32, maximum_size_high: u32, maximum_size_low: u32, name: *const c_void) -> usize;
+        }
+        winsafe::OutputDebugString("In CreateFileMapping\n");
+        unsafe {CreateFileMappingW(file, file_mapping_attributes, protect, maximum_size_high, maximum_size_low, name)}
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_LdrLoadDll(&mut self, path: *const c_void, file: usize, flags: usize, x: usize) -> usize {
+
+        extern "system" {
+        fn LdrLoadDll(path: *const c_void, file: usize, flags: usize, x: usize)-> usize;
+        }
+        winsafe::OutputDebugString("LdrLoadDll");
+        let result = unsafe { LdrLoadDll(path, file, flags,x )};
+        self.allocator_mut().unpoison_all_existing_memory();
+        result
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_LdrpCallInitRoutine(&mut self, base_address: *const c_void, reason: usize, context: usize, entry_point: usize) -> usize {
+        winsafe::OutputDebugString("LdrpCallInitRoutine");
+        // let result = unsafe { LdrLoadDll(path, file, flags,x )};
+        // self.allocator_mut().unpoison_all_existing_memory();
+        // result
+        0
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_LoadLibraryExW(&mut self, path: *const c_void, file: usize, flags: i32) -> usize {
+
+        extern "system" {
+        fn LoadLibraryExW(path: *const c_void, file: usize, flags: i32)-> usize;
+        }
+        log::warn!("LoadLibraryW");
+        let result = unsafe { LoadLibraryExW(path, file, flags)};
+        self.allocator_mut().unpoison_all_existing_memory();
+        result
+    }
+    
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_RtlAllocateHeap(&mut self, _handle: *mut c_void, flags: u32, size: usize) -> *mut c_void {
         // log::trace!("{:?}: HeapAlloc({:?}, {:}, {:x})", std::thread::current().id(),_handle, flags, size);
         let ret = unsafe { self.allocator_mut().alloc(size, 8) };
         if flags & 8 == 8 {
@@ -85,23 +142,26 @@ impl AsanRuntime {
     #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
-    pub fn hook_HeapFree(&mut self, handle: *mut c_void, flags: u32, ptr: *mut c_void) -> bool {
-        // log::trace!("{:?}: HeapFree({:?}, {:}, {:?})",std::thread::current().id(), handle, flags, ptr);
-        let allocator = self.allocator_mut();
-        if allocator.is_managed(ptr) {
-            unsafe { self.allocator_mut().release(ptr) };
-            true
-        } else {
-            extern "system" {
-                fn HeapFree(handle: *mut c_void, flags: u32, ptr: *mut c_void) -> bool;
-            }
-            unsafe { HeapFree(handle, flags, ptr) }
-        }
+    pub fn hook_check_RtlFreeHeap(
+        &mut self,
+        _handle: *mut c_void,
+        _flags: u32,
+        ptr: *mut c_void,
+    ) -> bool {
+        self.allocator_mut().is_managed(ptr)
     }
     #[inline]
     #[allow(non_snake_case)]
     #[cfg(windows)]
-    pub fn hook_check_HeapSize(
+    pub fn hook_RtlFreeHeap(&mut self, _handle: *mut c_void, _flags: u32, ptr: *mut c_void) -> bool {
+        // log::trace!("{:?}: HeapFree({:?}, {:}, {:?})",std::thread::current().id(), handle, flags, ptr);
+            unsafe { self.allocator_mut().release(ptr) };
+            true
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    #[cfg(windows)]
+    pub fn hook_check_RtlSizeHeap(
         &mut self,
         _handle: *mut c_void,
         _flags: u32,
@@ -112,7 +172,7 @@ impl AsanRuntime {
 
     #[allow(non_snake_case)]
     #[cfg(windows)]
-    pub fn hook_HeapSize(&mut self, _handle: *mut c_void, _flags: u32, ptr: *mut c_void) -> usize {
+    pub fn hook_RtlSizeHeap(&mut self, _handle: *mut c_void, _flags: u32, ptr: *mut c_void) -> usize {
         self.allocator().get_usable_size(ptr)
     }
     #[inline]
@@ -559,7 +619,7 @@ impl AsanRuntime {
         }
         if !self.allocator_mut().check_shadow(dest, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "memcpy".to_string(),
+                "memcpy dest".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
                 dest as usize,
                 n,
@@ -568,7 +628,7 @@ impl AsanRuntime {
         }
         if !self.allocator_mut().check_shadow(src, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "memcpy".to_string(),
+                "memcpy src".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
                 src as usize,
                 n,
