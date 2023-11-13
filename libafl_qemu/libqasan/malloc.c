@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pthread.h>
 
 #ifdef __GLIBC__
-#define USE_LIBC_ALLOC
+  #define USE_LIBC_ALLOC
 #endif
 
 #define REDZONE_SIZE 128
