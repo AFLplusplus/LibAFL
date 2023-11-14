@@ -431,13 +431,13 @@ jobs:
     #  run: C:\Rust\.cargo\bin\cargo.exe test --verbose
 
   freebsd:
-    runs-on: macos-12
+    runs-on: ubuntu-22.04
     name: Simple build in FreeBSD
     steps:
     - uses: actions/checkout@v3
     - name: Test in FreeBSD
       id: test
-      uses: vmactions/freebsd-vm@v0
+      uses: vmactions/freebsd-vm@v1
       with:
         usesh: true
         sync: rsync
