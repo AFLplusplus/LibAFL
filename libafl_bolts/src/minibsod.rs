@@ -885,7 +885,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 }
 
 /// Generates a mini-BSOD given a signal and context.
-#[cfg(unix)]
+#[cfg(all(unix, target_pointer_width = "64"))]
 #[allow(clippy::non_ascii_literal, clippy::too_many_lines)]
 pub fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
@@ -907,6 +907,27 @@ pub fn generate_minibsod<W: Write>(
     write_minibsod(writer)
 }
 
+#[cfg(all(unix, target_pointer_width = "32"))]
+#[allow(clippy::non_ascii_literal, clippy::too_many_lines)]
+pub fn generate_minibsod<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    _siginfo: &siginfo_t,
+    ucontext: Option<&ucontext_t>,
+) -> Result<(), std::io::Error> {
+    writeln!(writer, "{:━^100}", " CRASH ")?;
+    if let Some(uctx) = ucontext {
+        // write_crash(writer, signal, uctx)?;
+        // writeln!(writer, "{:━^100}", " REGISTERS ")?;
+        // dump_registers(writer, uctx)?;
+    } else {
+        writeln!(writer, "Received signal {signal}")?;
+    }
+    writeln!(writer, "{:━^100}", " BACKTRACE ")?;
+    writeln!(writer, "{:?}", backtrace::Backtrace::new())?;
+    writeln!(writer, "{:━^100}", " MAPS ")?;
+    write_minibsod(writer)
+}
 #[cfg(test)]
 mod tests {
 

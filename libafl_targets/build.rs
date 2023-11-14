@@ -137,6 +137,7 @@ fn main() {
     println!("cargo:rerun-if-changed=src/common.c");
 
     #[cfg(feature = "sanitizer_interfaces")]
+    if env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap() == "64"
     {
         println!("cargo:rerun-if-changed=src/sanitizer_interfaces.h");
 
@@ -151,6 +152,9 @@ fn main() {
         build
             .write_to_file(Path::new(&out_dir).join("sanitizer_interfaces.rs"))
             .expect("Couldn't write the sanitizer headers!");
+    } else {
+       let mut file = File::create(Path::new(&out_dir).join("sanitizer_interfaces.rs")).expect("Could not create file"); 
+       write!(file, "").unwrap();
     }
 
     let mut common = cc::Build::new();
