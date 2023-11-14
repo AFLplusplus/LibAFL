@@ -49,7 +49,7 @@ impl<S> Named for ConcolicFeedback<S> {
 
 impl<S> Feedback<S> for ConcolicFeedback<S>
 where
-    S: UsesInput + Debug + HasClientPerfMonitor,
+    S: UsesInput + HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(

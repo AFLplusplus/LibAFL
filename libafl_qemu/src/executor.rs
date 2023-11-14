@@ -45,8 +45,8 @@ impl<'a, H, OT, QT, S> Debug for QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S: UsesInput,
-    OT: ObserversTuple<S>,
-    QT: QemuHelperTuple<S>,
+    OT: ObserversTuple<S> + Debug,
+    QT: QemuHelperTuple<S> + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuExecutor")
@@ -289,8 +289,8 @@ impl<'a, H, OT, QT, S, SP> Debug for QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S: UsesInput,
-    OT: ObserversTuple<S>,
-    QT: QemuHelperTuple<S>,
+    OT: ObserversTuple<S> + Debug,
+    QT: QemuHelperTuple<S> + Debug,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

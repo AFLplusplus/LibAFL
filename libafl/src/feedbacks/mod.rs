@@ -47,7 +47,7 @@ use crate::{
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<S>: Named + Debug
+pub trait Feedback<S>: Named
 where
     S: UsesInput + HasClientPerfMonitor,
 {
@@ -186,7 +186,7 @@ where
     A: Feedback<S>,
     B: Feedback<S>,
     FL: FeedbackLogic<A, B, S>,
-    S: UsesInput + HasClientPerfMonitor + Debug,
+    S: UsesInput + HasClientPerfMonitor,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         self.first.init_state(state)?;
@@ -265,7 +265,7 @@ where
 }
 
 /// Logical combination of two feedbacks
-pub trait FeedbackLogic<A, B, S>: 'static + Debug
+pub trait FeedbackLogic<A, B, S>: 'static
 where
     A: Feedback<S>,
     B: Feedback<S>,
@@ -619,7 +619,7 @@ where
 
 impl<A, S> Debug for NotFeedback<A, S>
 where
-    A: Feedback<S>,
+    A: Feedback<S> + Debug,
     S: UsesInput + HasClientPerfMonitor,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
