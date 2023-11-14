@@ -1,0 +1,70 @@
+[[question]]
+id = "intro"
+title = "libafl_wizard: a tool to generate Libafl-based fuzzers."
+content = """
+Before starting, make sure that you know your target very well. Choosing the right components to build a fuzzer depends on the details of the
+implementation of your target.
+
+Knowing what you want before building a fuzzer can be extremely helpful when selecting the components that best fit your options and the
+restrictions of the environment.
+
+Details such as:
+    *Having the source code of the target.
+    *Implementing a harness function to fuzz your target.
+    *Knowing the expected input by the target.
+    *Providing an initial set of inputs.
+    *The size of the target and the availability of memory.
+    *The possibility of memory corruption.
+
+Can be helpful during this process.
+"""
+skipped_by = ""
+previous = ""
+
+    [[question.answers]]
+    was_chosen = false
+    answer = "Next"
+    next = "source code"
+    code = ""
+    skip = []
+
+[[question]]
+id = "source code"
+title = "Do you have the target's source code?"
+content = """
+Having the target's source code is interesting for performance. With the source code in hands, we can instrument the target, that is,
+place coverage information to help our fuzzer identify new points of execution.
+
+Without instrumentation on the source, we have to rely on third-party applications to provide this infromation for our fuzzer,
+such as QEMU, FRIDA or Tiny Inst. Note that QEMU only supports Linux.
+"""
+skipped_by = ""
+previous = ""
+
+    [[question.answers]]
+    was_chosen = false
+    answer = "Yes"
+    next = "END"
+    code = ""
+    skip = []
+
+    [[question.answers]]
+    was_chosen = false
+    answer = "No"
+    next = "END"
+    code = ""
+    skip = []
+
+[[question]]
+id = "END"
+title = "All questions answered!"
+content = ""
+skipped_by = ""
+previous = ""
+
+[[question.answers]]
+    was_chosen = false
+    answer = ""
+    next = ""
+    code = ""
+    skip = []

@@ -20,15 +20,21 @@ pub struct QuestionList {
 
 #[derive(Clone, Deserialize, PartialEq, Debug)]
 pub struct Question {
-    pub id: String, // ID is resolved to local indexes.
-    pub title: String,
-    pub content: String, // Description related to the question, to help the user.
-    pub answers: Vec<String>, // A vector containing all the possible answers for this question.
-    pub next: Vec<String>, // The next question for all the possible answers (for answer[0] the next question is next[0]...).
-    pub code: Vec<String>, // Same for the code: for answer[0] the code associated to it is code[0]...
-    pub skip: Vec<Vec<String>>, // The questions to skip if e.g. answer[0] is chosen.
+    pub id: String,         // The id is resolved to local indexes.
+    pub title: String,      // The question itself.
+    pub content: String,    // Description related to the question, to help the user.
     pub skipped_by: String, // The question that skipped the current one.
-    pub previous: String,  // The question that led to the current one.
+    pub previous: String,   // The question that led to the current one.
+    pub answers: Vec<Answer>,
+}
+
+#[derive(Clone, Deserialize, PartialEq, Debug)]
+pub struct Answer {
+    pub was_chosen: bool, // Used when undoing
+    pub answer: String,
+    pub next: String,      // The next question if this answer is chosen.
+    pub code: String,      // The code added to the file.
+    pub skip: Vec<String>, // The questions to skip.
 }
 
 impl Question {
@@ -36,7 +42,7 @@ impl Question {
     // The diagram is a vector of Questions (vector of nodes): each Question, depending on the answer, will have the index of the next
     // Question that should be asked.
     pub fn new() -> Vec<Question> {
-        let contents = read_to_string("questions.toml").expect("Failed to read questions file.");
+        let contents = read_to_string("new.toml").expect("Failed to read questions file.");
 
         let q_list: QuestionList = from_str(&contents).expect("Failed to parse toml questions.");
 
@@ -54,47 +60,67 @@ impl Question {
     pub fn print_question(&self) {
         let mut output = String::new();
 
-        clear_terminal_screen();
-
         // Construct the output string
         output.push_str(&format!(
-            "=========================\nFuzzer Template Generator\n=========================\n"
+            "+=====================+\n|    libafl wizard    |\n+=====================+\n"
         ));
         output.push_str(&format!("{}\n\n", self.title));
-        output.push_str(&format!("{}\n\n", self.content));
+        output.push_str(&format!("{}\n\n\t", self.content));
 
         for ans in &self.answers {
-            output.push_str(&format!("\t\t{}", ans));
+            output.push_str(&format!("{}{}", ans.answer, " ".repeat(8)));
         }
 
-        output.push_str("\tUndo\n");
+        output.push_str("Undo\n");
 
         print!("{}", output);
     }
 
-    pub fn resolve_answer(&self, questions: &Vec<Question>, input: &String) -> (usize, usize) {
-        // The "Undo" option makes the generator go back to the previous answered question, so if the user do something by mistake,
-        // they can correct it.
-        if validate_input(&input, &String::from("Undo")) {
-            let prev_i = self.find_question(questions, &self.previous);
-
-            return (prev_i, 0);
+    // Checks if the user typed one of the acceptable answers or is undoing.
+    pub fn is_answer(&self, input: &String) -> bool {
+        if input.is_empty() {
+            return false;
+        }
+        
+        for ans in &self.answers {
+            if validate_input(&input, &ans.answer) {
+                return true;
+            }
         }
 
-        // Checks if the user typed one of the acceptable answers. If so, returns the index of the next question associated to it.
-        for (mut i, ans) in self.answers.iter().enumerate() {
-            if validate_input(&input, &ans) {
-                // If this question has more than one answer, but all lead to the same next question.
-                if self.next.len() == 1 {
-                    i = 0;
-                }
+        if validate_input(&input, &String::from("Undo")) {
+            return true;
+        }
 
-                let mut next_q = self.find_question(questions, &self.next[i]);
+        false
+    }
+
+    pub fn chosen_ans(&self) -> usize {
+        for (i, ans) in self.answers.iter().enumerate() {
+            if ans.was_chosen {
+                return i;
+            }
+        }
+
+        0
+    }
+
+    pub fn resolve_answer(&self, questions: &Vec<Question>, input: &String) -> (usize, usize) {
+        // Checks which of the acceptable answers the user typed. If so, returns the index of the next question associated to it.
+        for (i, ans) in self.answers.iter().enumerate() {
+            if validate_input(&input, &ans.answer) {
+                // // If this question has more than one answer, but all lead to the same next question.
+                // if ans.next.len() == 1 {
+                //     i = 0;
+                // }
+
+                let mut next_q = find_question(questions, &ans.next);
 
                 // If the question should be skipped, then the generator goes to next question.
-                // These types of questions should always have only one possibility for next question (this is the approach for now).
+                // These types of questions should always have only one possibility for next question.
                 while !questions[next_q].skipped_by.is_empty() {
-                    next_q = questions[next_q].find_question(questions, &self.next[0]);
+                    next_q = find_question(questions, &ans.next);
+                    //&self.next[0]
                 }
 
                 return (next_q, i);
@@ -104,14 +130,50 @@ impl Question {
         (0, 0)
     }
 
-    // Resolves the index in the vector for the specific question.
-    pub fn find_question(&self, questions: &Vec<Question>, q: &String) -> usize {
-        questions
-            .iter()
-            .position(|question| &question.id == q)
-            .unwrap()
+    pub fn skip_questions(&self, questions: &mut Vec<Question>, ans_i: usize) {
+        for q_id in &self.answers[ans_i].skip {
+            let i = questions
+                .iter()
+                .position(|question| &question.id == q_id)
+                .unwrap();
+
+            questions[i].skipped_by = self.id.clone();
+        }
     }
 
+    // Since we dont save which answer was chosen, we skip everything.
+    pub fn unskip_questions(&self, questions: &mut Vec<Question>, ans_i: usize) {
+        for q_id in &self.answers[ans_i].skip {
+            let i = questions
+                .iter()
+                .position(|question| &question.id == q_id)
+                .unwrap();
+
+            questions[i].skipped_by.clear();
+        }
+    }
+
+    pub fn update_previous(&mut self, q_id: String) -> () {
+        // Saves the current questions as the previous for the next one.
+        self.previous = q_id;
+    }
+
+    pub fn diff_next_questions(&self) -> bool {
+        for (i, ans1) in self.answers.iter().enumerate() {
+            for (j, ans2) in self.answers.iter().enumerate() {
+                if i != j {
+                    if ans1.next != ans2.next {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
+    }
+}
+
+impl Answer {
     pub fn has_code(&self) -> bool {
         if !self.code.is_empty() {
             return true;
@@ -120,33 +182,10 @@ impl Question {
         false
     }
 
-    pub fn add_code(&self, code_content: &mut Vec<String>, ans_i: usize) {
-        if self.code[ans_i] != "" {
-            println!("ADDING for ANSWER {}:\n{}", ans_i, self.code[ans_i]);
-            code_content.push(self.code[ans_i].to_string());
+    pub fn add_code(&self, code_content: &mut Vec<String>) {
+        if !self.code.is_empty() {
+            code_content.push(self.code.to_string());
         }
-    }
-
-    pub fn check_skip(&self, questions: &mut Vec<Question>, ans_i: usize, undo: bool) {
-        for q_id in &self.skip[ans_i] {
-            let i = questions
-                .iter()
-                .position(|question| &question.id == q_id)
-                .unwrap();
-
-            if undo {
-                // If the user is undoing a question, we clear the ones that were skipped when this question was answered.
-                questions[i].skipped_by.clear();
-            } else {
-                // If the user chooses an answer, we skip the questions associated to that answer.
-                questions[i].skipped_by = self.id.clone();
-            }
-        }
-    }
-
-    pub fn update_previous(&mut self, q_id: String) -> () {
-        // Saves the current questions as the previous for the next one.
-        self.previous = q_id;
     }
 }
 
@@ -155,44 +194,48 @@ pub fn flowchart_image(questions: &Vec<Question>) {
     let mut dot_string = String::from("digraph t {\n");
 
     for q in questions {
-        dot_string.push_str(&format!("\t\"{}\"[color=black]\n", q.title));
+        if !q.end() {
+            dot_string.push_str(&format!("\t\"{}\"[color=black]\n", q.title));
 
-        if q.next.len() == 1 {
-            let j = questions
-                .iter()
-                .position(|question| &question.id == &q.next[0])
-                .unwrap();
+            // CHANGE HERE
+            if !q.diff_next_questions() {
+                let j = questions
+                    .iter()
+                    .position(|question| &question.id == &q.answers[0].next)
+                    .unwrap();
 
-            // Yes or No questions that lead to the same next.
-            if q.answers.len() <= 2 {
-                for ans in &q.answers {
+                // Yes or No questions that lead to the same next.
+                if q.answers.len() <= 2 {
+                    for ans in &q.answers {
+                        dot_string.push_str(&format!(
+                            "\t\"{}\" -> \"{}\"\n[label=\"{}\"]",
+                            q.title, questions[j].title, ans.answer,
+                        ));
+                    }
+                } else {
+                    // Multiple answers that lead to the same next.
                     dot_string.push_str(&format!(
-                        "\t\"{}\" -> \"{}\"\n[label=\"{}\"]",
-                        q.title, questions[j].title, ans,
+                        "\t\"{}\" -> \"{}\"\n[label=\"{}...\"]",
+                        q.title, questions[j].title, q.answers[0].answer,
                     ));
                 }
             }
-            // Multiple answers that lead to the same next.
+            // Multiple answers that lead to distinct next questions.
             else {
-                dot_string.push_str(&format!(
-                    "\t\"{}\" -> \"{}\"\n[label=\"{}...\"]",
-                    q.title, questions[j].title, q.answers[0],
-                ));
-            }
-        }
-        // Multiple answers that lead to distinct next questions.
-        else {
-            for (i, next_q) in q.next.iter().enumerate() {
-                let j = questions
-                    .iter()
-                    .position(|question| &question.id == next_q)
-                    .unwrap();
+                for ans in &q.answers {
+                    let j = questions
+                        .iter()
+                        .position(|question| question.id == ans.next)
+                        .unwrap();
 
-                dot_string.push_str(&format!(
-                    "\t\"{}\" -> \"{}\"\n[label=\"{}\"]",
-                    q.title, questions[j].title, q.answers[i],
-                ));
+                    dot_string.push_str(&format!(
+                        "\t\"{}\" -> \"{}\"\n[label=\"{}\"]",
+                        q.title, questions[j].title, ans.answer,
+                    ));
+                }
             }
+        } else {
+            break;
         }
     }
 
@@ -411,4 +454,12 @@ pub fn clear_terminal_screen() {
             .wait()
             .expect("failed to wait");
     };
+}
+
+// Resolves the index in the vector for the specific question.
+pub fn find_question(questions: &Vec<Question>, q: &String) -> usize {
+    questions
+        .iter()
+        .position(|question| &question.id == q)
+        .unwrap()
 }

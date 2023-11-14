@@ -1,10 +1,8 @@
 use libafl_wizard::{
-    arrange_code, flowchart_image, separate_code, validate_input, write_code, Question,
+    arrange_code, clear_terminal_screen, find_question, flowchart_image, separate_code,
+    validate_input, write_code, Question,
 };
-
-slint::slint! {
-    import { MainWindow } from "./src/ui.slint";
-}
+use std::{io, io::Write};
 
 fn main() {
     // The question diagram is a vector containing all the questions.
@@ -22,42 +20,44 @@ fn main() {
 
     // Index of the current question.
     let mut curr_q = 0;
+    // Index of the next question.
+    // Note that, when undoing, the next question is the previous one (that led to the current one).
+    let mut next_q;
+    // Index of the chosen answer.
+    let mut ans_i;
 
-    let handle = MainWindow::new().unwrap();
+    let mut input = String::new();
 
-    let handle_weak = handle.as_weak();
+    // Basically, a question is shown, answered by the use and so on, until the last question.
+    while !questions[curr_q].end() {
+        clear_terminal_screen();
 
-    let question_copy = questions[curr_q].clone();
+        questions[curr_q].print_question();
 
-    // Initial display.
-    handle.set_question(SlintData {
-        title: question_copy.title.into(),
-        content: question_copy.content.into(),
-        answers: slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(
-            question_copy
-                .answers
-                .into_iter()
-                .map(|s| s.into())
-                .collect::<Vec<slint::SharedString>>(),
-        ))),
-        next: slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(
-            question_copy
-                .next
-                .into_iter()
-                .map(|s| s.into())
-                .collect::<Vec<slint::SharedString>>(),
-        ))),
-        previous: question_copy.previous.into(),
-    });
+        print!("\nYour answer: ");
 
-    // This only gets executed when a button is pressed (answer is chosen).
-    handle.on_user_answer(move |answer| {
-        // User answer
-        let input: String = answer.parse::<String>().unwrap().trim().to_string();
-        // Index of the next question and the chosen answer.
-        let (next_q, ans_i) = questions[curr_q].resolve_answer(&questions, &input);
+        io::stdout().flush().unwrap();
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to get input from stdin.");
+        input = input.trim().to_string();
+
+        while !questions[curr_q].is_answer(&input) {
+            print!("Please, type a valid answer: ");
+
+            io::stdout().flush().unwrap();
+            input.clear();
+            io::stdin()
+                .read_line(&mut input)
+                .expect("Failed to get input from stdin.");
+            input = input.trim().to_string();
+        }
 
         if validate_input(&input, &String::from("Undo")) {
+            // The "Undo" option makes the generator go back to the previous answered question, so if the user do something by
+            // mistake they can correct it.
+            next_q = find_question(&questions, &questions[curr_q].previous);
+
             // If the user chooses to undo a question that produced code, the associated code is removed.
             // Since the Undo option goes backwards, we can simply pop the last piece of code.
             if prod_code[next_q] {
@@ -66,65 +66,46 @@ fn main() {
             }
 
             // Also, if we are undoing this question and it skipped others, we undo this too.
-            if !questions[next_q].skip.is_empty() {
+            ans_i = questions[curr_q].chosen_ans();
+            if !questions[next_q].answers[ans_i].skip.is_empty() {
                 questions[next_q]
                     .clone()
-                    .check_skip(&mut questions, ans_i, true);
+                    .unskip_questions(&mut questions, ans_i);
             }
+
+            questions[curr_q].answers[ans_i].was_chosen = false;
         } else {
+            (next_q, ans_i) = questions[curr_q].resolve_answer(&questions, &input);
+
+            questions[curr_q].answers[ans_i].was_chosen = true;
+
             // Adds the code associated to the user choice.
-            if questions[curr_q].has_code() {
-                questions[curr_q].add_code(&mut code_content, ans_i);
+            if questions[curr_q].answers[ans_i].has_code() {
+                questions[curr_q].answers[ans_i].add_code(&mut code_content);
                 prod_code[curr_q] = true;
             }
 
             // If there are any questions that should be skipped because of that answer.
-            if !questions[curr_q].skip.is_empty() {
+            if !questions[curr_q].answers[ans_i].skip.is_empty() {
                 questions[curr_q]
                     .clone()
-                    .check_skip(&mut questions, ans_i, false);
+                    .skip_questions(&mut questions, ans_i);
             }
 
             // Only updates the 'previous' field when going forward (not undoing) in the questions diagram.
             let q_id = questions[curr_q].id.clone();
             questions[next_q].update_previous(q_id);
         }
+        input.clear();
 
         curr_q = next_q;
+    }
 
-        let question_copy = questions[curr_q].clone();
+    // Separate by instances of components, arrange them in the correct order and write to the file.
+    let file_name = write_code(arrange_code(separate_code(code_content)));
 
-        handle_weak.unwrap().set_question(SlintData {
-            title: question_copy.title.into(),
-            content: question_copy.content.into(),
-            answers: slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(
-                question_copy
-                    .answers
-                    .into_iter()
-                    .map(|s| s.into())
-                    .collect::<Vec<slint::SharedString>>(),
-            ))),
-            next: slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(
-                question_copy
-                    .next
-                    .into_iter()
-                    .map(|s| s.into())
-                    .collect::<Vec<slint::SharedString>>(),
-            ))),
-            previous: question_copy.previous.into(),
-        });
-
-        if questions[curr_q].end() {
-            // Separate by instances of components, arrange them in the correct order and write to the file.
-            let file_name = write_code(arrange_code(separate_code(code_content.clone())));
-
-            println!(
-                "File {} successfully created at the ./fuzzers directory.\n\nAll questions answered, you can close the window now!",
-                file_name
-            );
-        }
-    });
-
-    // GUI event loop.
-    handle.run().unwrap();
+    println!(
+        "File {} successfully created under the ./fuzzers directory.\nAll questions answered!",
+        file_name
+    );
 }
