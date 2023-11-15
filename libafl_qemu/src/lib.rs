@@ -99,6 +99,8 @@ pub use executor::QemuForkExecutor;
 pub mod emu;
 pub use emu::*;
 
+pub mod sync_backdoor;
+
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
     let mut args = vec![env::args().next().unwrap()];

@@ -9,6 +9,10 @@ pub use syscall_numbers::x86_64::*;
 
 use crate::CallingConvention;
 
+use enum_map::{EnumMap, enum_map};
+use lazy_static::lazy_static;
+use crate::sync_backdoor::SyncBackdoorArgs;
+
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Regs {
@@ -30,6 +34,18 @@ pub enum Regs {
     R15 = 15,
     Rip = 16,
     Rflags = 17,
+}
+
+lazy_static! {
+    pub static ref SYNC_BACKDOOR_ARCH_REGS: EnumMap<SyncBackdoorArgs, Regs> = enum_map! {
+        SyncBackdoorArgs::Ret  => Regs::Rax,
+        SyncBackdoorArgs::Cmd  => Regs::Rax,
+        SyncBackdoorArgs::Arg1 => Regs::Rdi,
+        SyncBackdoorArgs::Arg2 => Regs::Rdx,
+        SyncBackdoorArgs::Arg3 => Regs::Rcx,
+        SyncBackdoorArgs::Arg4 => Regs::R8,
+        SyncBackdoorArgs::Arg5 => Regs::R9,
+    };
 }
 
 /// alias registers

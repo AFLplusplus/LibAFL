@@ -5,6 +5,7 @@ use core::{
     ffi::c_void,
     fmt,
     mem::MaybeUninit,
+    mem::transmute,
     ptr::{addr_of, copy_nonoverlapping, null},
 };
 #[cfg(emulation_mode = "usermode")]
@@ -31,10 +32,25 @@ use lazy_static::lazy_static;
 pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
 pub type GuestIsize = libafl_qemu_sys::target_long;
-pub type GuestVirtAddr = libafl_qemu_sys::hwaddr;
+pub type GuestVirtAddr = libafl_qemu_sys::vaddr;
 pub type GuestPhysAddr = libafl_qemu_sys::hwaddr;
 
 pub type GuestHwAddrInfo = libafl_qemu_sys::qemu_plugin_hwaddr;
+
+#[derive(Debug, Clone)]
+pub enum GuestAddrKind {
+    Physical(GuestPhysAddr),
+    Virtual(GuestVirtAddr)
+}
+
+impl fmt::Display for GuestAddrKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GuestAddrKind::Physical(phys_addr) => write!(f, "hwaddr {:x}", phys_addr),
+            GuestAddrKind::Virtual(virt_addr) => write!(f, "vaddr {:x}", virt_addr)
+        }
+    }
+}
 
 #[cfg(emulation_mode = "systemmode")]
 pub type FastSnapshot = *mut libafl_qemu_sys::syx_snapshot_t;
@@ -138,9 +154,12 @@ use pyo3::prelude::*;
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
 pub use libafl_qemu_sys::{CPUArchState, CPUState};
+use crate::sync_backdoor::{SyncBackdoor, SyncBackdoorError};
 
 pub type CPUStatePtr = *mut libafl_qemu_sys::CPUState;
 pub type CPUArchStatePtr = *mut libafl_qemu_sys::CPUArchState;
+
+pub type ExitReasonPtr = *mut libafl_qemu_sys::libafl_exit_reason;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(i32)]
@@ -362,6 +381,9 @@ extern "C" {
     fn libafl_qemu_num_cpus() -> i32;
     // CPUState* libafl_qemu_current_cpu(void);
     fn libafl_qemu_current_cpu() -> CPUStatePtr;
+
+    // struct libafl_exit_reason* libafl_get_exit_reason(void);
+    fn libafl_get_exit_reason() -> ExitReasonPtr;
 
     fn libafl_qemu_cpu_index(cpu: CPUStatePtr) -> i32;
 
@@ -840,6 +862,53 @@ pub enum EmuError {
     TooManyArgs(usize),
 }
 
+#[derive(Debug, Clone)]
+pub enum EmuExitReason {
+    End, // QEMU ended for some reason.
+    Breakpoint(GuestVirtAddr), // Breakpoint triggered. Contains the virtual address of the trigger.
+    SyncBackdoor(SyncBackdoor), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+}
+
+impl fmt::Display for EmuExitReason {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            EmuExitReason::End => write!(f, "End"),
+            EmuExitReason::Breakpoint(vaddr) => write!(f, "Breakpoint @vaddr 0x{:x}", vaddr),
+            EmuExitReason::SyncBackdoor(sync_backdoor) => write!(f, "Sync backdoor exit: {}", sync_backdoor),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum EmuExitReasonError {
+    UnknownKind(),
+    UnexpectedExit,
+    SyncBackdoorError(SyncBackdoorError)
+}
+
+impl From<SyncBackdoorError> for EmuExitReasonError {
+    fn from(sync_backdoor_error: SyncBackdoorError) -> Self {
+        EmuExitReasonError::SyncBackdoorError(sync_backdoor_error)
+    }
+}
+
+impl TryFrom<&Emulator> for EmuExitReason {
+    type Error = EmuExitReasonError;
+    fn try_from(emu: &Emulator) -> Result<Self, Self::Error> {
+        let exit_reason = unsafe { libafl_get_exit_reason() };
+        if exit_reason.is_null() {
+            Err(EmuExitReasonError::UnexpectedExit)
+        } else {
+            let exit_reason: &mut libafl_qemu_sys::libafl_exit_reason = unsafe { transmute(exit_reason) };
+            Ok(match exit_reason.kind {
+                libafl_qemu_sys::libafl_exit_reason_kind_BREAKPOINT => unsafe { EmuExitReason::Breakpoint(exit_reason.data.breakpoint.addr) },
+                libafl_qemu_sys::libafl_exit_reason_kind_SYNC_BACKDOOR => EmuExitReason::SyncBackdoor(emu.try_into()?),
+                _ => return Err(EmuExitReasonError::UnknownKind())
+            })
+        }
+    }
+}
+
 impl std::error::Error for EmuError {}
 
 impl fmt::Display for EmuError {
@@ -1085,13 +1154,14 @@ impl Emulator {
     ///
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run(&self) {
+    pub unsafe fn run(&self) -> Result<EmuExitReason, EmuExitReasonError> {
         #[cfg(emulation_mode = "usermode")]
         libafl_qemu_run();
         #[cfg(emulation_mode = "systemmode")]
         {
             vm_start();
             qemu_main_loop();
+            EmuExitReason::try_from(self)
         }
     }
 
