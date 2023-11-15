@@ -467,10 +467,7 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
-#[cfg(all(
-    any(target_os = "linux", target_os = "android"),
-    target_arch = "x86"
-))]
+#[cfg(all(any(target_os = "linux", target_os = "android"), target_arch = "x86"))]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
