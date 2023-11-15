@@ -91,8 +91,8 @@ impl crate::ArchExtras for crate::CPU {
         }
 
         match idx {
-            0 => Ok(self.read_reg(Regs::R0)),
-            1 => Ok(self.read_reg(Regs::R1)),
+            0 => self.read_reg(Regs::R0),
+            1 => self.read_reg(Regs::R1),
             _ => Err(format!("Unsupported argument: {idx:}")),
         }
     }

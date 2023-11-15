@@ -96,12 +96,6 @@ impl crate::ArchExtras for crate::CPU {
             }
             _ => Err(format!("Unsupported argument: {idx:}")),
         }
-
-        match idx {
-            0 => Ok(self.read_reg(Regs::X0)),
-            1 => Ok(self.read_reg(Regs::X1)),
-            _ => Err(format!("Unsupported argument: {idx:}")),
-        }
     }
 
     fn write_function_argument<T>(
