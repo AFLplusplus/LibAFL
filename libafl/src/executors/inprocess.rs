@@ -90,7 +90,7 @@ impl<H, HB, OT, S> Debug for GenericInProcessExecutor<H, HB, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Debug,
     S: UsesInput,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1599,7 +1599,7 @@ where
 impl<'a, H, OT, S, SP> Debug for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
 {
@@ -1615,7 +1615,7 @@ where
 impl<'a, H, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
 {

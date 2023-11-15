@@ -83,7 +83,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
-pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug
+pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {

@@ -331,8 +331,8 @@ impl<M, S> HasObserverName for MapEqualityFeedback<M, S> {
 
 impl<M, S> Feedback<S> for MapEqualityFeedback<M, S>
 where
-    M: MapObserver + Debug,
-    S: UsesInput + HasClientPerfMonitor + Debug,
+    M: MapObserver,
+    S: UsesInput + HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,

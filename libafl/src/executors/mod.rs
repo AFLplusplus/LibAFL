@@ -118,7 +118,7 @@ pub trait HasObservers: UsesObservers {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, Z>: UsesState + Debug
+pub trait Executor<EM, Z>: UsesState
 where
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
@@ -166,7 +166,7 @@ where
 impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
 where
     EM: UsesState<State = S>,
-    S: UsesInput + Debug + HasExecutions,
+    S: UsesInput + HasExecutions,
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
 {

@@ -49,7 +49,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: UsesInput,
     S::Input: HasTargetBytes,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S> + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("FridaInProcessExecutor")

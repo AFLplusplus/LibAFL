@@ -522,7 +522,7 @@ impl<E> TimeoutForkserverExecutor<E> {
 
 impl<E, EM, Z> Executor<EM, Z> for TimeoutForkserverExecutor<E>
 where
-    E: Executor<EM, Z> + HasForkserver + HasObservers + Debug,
+    E: Executor<EM, Z> + HasForkserver + HasObservers,
     E::Input: HasTargetBytes,
     E::State: HasExecutions,
     EM: UsesState<State = E::State>,
