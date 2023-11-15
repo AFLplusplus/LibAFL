@@ -13,6 +13,7 @@ use std::cell::OnceCell;
 use std::{
     ffi::{CStr, CString},
     ptr::null_mut,
+    sync::Mutex
 };
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
@@ -24,6 +25,8 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::{GuestReg, Regs};
+
+use lazy_static::lazy_static;
 
 pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
@@ -821,7 +824,9 @@ impl CPU {
     }
 }
 
-static mut EMULATOR_IS_INITIALIZED: bool = false;
+lazy_static! {
+    static ref EMULATOR_IS_INITIALIZED: Mutex<bool> = Mutex::new(false);
+}
 
 #[derive(Clone, Debug)]
 pub struct Emulator {
@@ -866,11 +871,12 @@ impl From<EmuError> for libafl::Error {
 impl Emulator {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(args: &[String], env: &[(String, String)]) -> Result<Emulator, EmuError> {
-        unsafe {
-            if EMULATOR_IS_INITIALIZED {
-                return Err(EmuError::MultipleInstances);
-            }
+        let mut is_initialized = EMULATOR_IS_INITIALIZED.lock().unwrap();
+
+        if *is_initialized {
+            return Err(EmuError::MultipleInstances);
         }
+
         if args.is_empty() {
             return Err(EmuError::EmptyArgs);
         }
@@ -903,7 +909,7 @@ impl Emulator {
                 libc::atexit(qemu_cleanup_atexit);
                 libafl_qemu_sys::syx_snapshot_init();
             }
-            EMULATOR_IS_INITIALIZED = true;
+            *is_initialized = true;
         }
         Ok(Emulator { _private: () })
     }

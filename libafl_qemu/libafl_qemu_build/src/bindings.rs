@@ -57,6 +57,7 @@ const WRAPPER_HEADER: &str = r#"
 
 #include "libafl_extras/syx-snapshot/device-save.h"
 #include "libafl_extras/syx-snapshot/syx-snapshot.h"
+#include "libafl_extras/exit.h"
 
 #endif
 
@@ -108,6 +109,10 @@ pub fn generate(
         .allowlist_type("MemOpIdx")
         .allowlist_type("MemOp")
         .allowlist_type("device_snapshot_kind_t")
+        .allowlist_type("libafl_exit_reason")
+        .allowlist_type("libafl_exit_reason_kind")
+        .allowlist_type("libafl_exit_reason_sync_backdoor")
+        .allowlist_type("libafl_exit_reason_breakpoint")
         .allowlist_function("qemu_user_init")
         .allowlist_function("target_mmap")
         .allowlist_function("target_mprotect")
@@ -127,6 +132,7 @@ pub fn generate(
         .allowlist_function("syx_snapshot_root_restore")
         .allowlist_function("syx_snapshot_dirty_list_add")
         .allowlist_function("device_list_all")
+        .allowlist_function("libafl_get_exit_reason")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
         .parse_callbacks(Box::new(bindgen::CargoCallbacks));
 
