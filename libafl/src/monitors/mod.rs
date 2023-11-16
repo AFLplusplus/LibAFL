@@ -235,7 +235,10 @@ pub trait Monitor {
     fn client_stats(&self) -> &[ClientStats];
 
     /// Creation time
-    fn start_time(&mut self) -> Duration;
+    fn start_time(&self) -> Duration;
+
+    /// Set creation time
+    fn set_start_time(&mut self, time: Duration);
 
     /// Show the monitor to the user
     fn display(&mut self, event_msg: String, sender_id: ClientId);
@@ -454,6 +457,11 @@ where
     /// Time this fuzzing run stated
     fn start_time(&mut self) -> Duration {
         self.start_time
+    }
+
+    /// Set creation time
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
     }
 
     fn display(&mut self, event_msg: String, sender_id: ClientId) {

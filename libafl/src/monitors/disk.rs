@@ -43,6 +43,11 @@ where
         self.base.start_time()
     }
 
+    /// Set creation time
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
+    }
+
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
         let cur_time = current_time();
 
@@ -186,6 +191,10 @@ where
 
     fn start_time(&mut self) -> Duration {
         self.base.start_time()
+    }
+
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
     }
 
     fn display(&mut self, event_msg: String, sender_id: ClientId) {

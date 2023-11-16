@@ -49,6 +49,11 @@ where
         &self.client_stats
     }
 
+    /// Set creation time
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
+    }
+
     /// Time this fuzzing run stated
     fn start_time(&mut self) -> Duration {
         self.start_time

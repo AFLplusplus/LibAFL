@@ -350,7 +350,7 @@ where
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
-        self.staterestorer.save(state)
+        self.staterestorer.save((state, self.monitor.start_time(), self.monitor.client_stats()))
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
@@ -539,7 +539,7 @@ where
         };
 
         // If we're restarting, deserialize the old state.
-        let (state, mgr) = match staterestorer.restore::<S>()? {
+        let ((state, start_time, clients_stats), mgr) = match staterestorer.restore::<S>()? {
             None => {
                 log::info!("First run. Let's set it all up");
                 // Mgr to send and receive msgs from/to all other fuzzer instances
@@ -555,9 +555,12 @@ where
                 staterestorer.reset();
 
                 // load the corpus size into monitor to still display the correct numbers after restart.
-                let client_stats = monitor.client_stats_mut_for(ClientId(0));
-                client_stats.update_corpus_size(state.corpus().count().try_into()?);
-                client_stats.update_objective_size(state.solutions().count().try_into()?);
+                // let client_stats = monitor.client_stats_mut_for(ClientId(0));
+                // client_stats.update_corpus_size(state.corpus().count().try_into()?);
+                // client_stats.update_objective_size(state.solutions().count().try_into()?);
+
+                monitor.set_start_time(start_time);
+                *monitor.client_stats_mut() = clients_stats;
 
                 (
                     Some(state),

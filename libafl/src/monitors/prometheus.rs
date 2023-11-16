@@ -92,6 +92,11 @@ where
         self.start_time
     }
 
+    /// Set creation time
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
+    }
+
     #[allow(clippy::cast_sign_loss)]
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
         // Update the prometheus metrics
