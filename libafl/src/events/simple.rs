@@ -350,7 +350,11 @@ where
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
-        self.staterestorer.save((state, self.monitor.start_time(), self.monitor.client_stats()))
+        self.staterestorer.save((
+            state,
+            self.monitor.start_time(),
+            self.monitor.client_stats(),
+        ))
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {

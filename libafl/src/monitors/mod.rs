@@ -314,8 +314,13 @@ impl Monitor for NopMonitor {
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.start_time
+    }
+
+    /// Time this fuzzing run stated
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
     }
 
     fn display(&mut self, _event_msg: String, _sender_id: ClientId) {}
@@ -378,8 +383,13 @@ impl Monitor for SimplePrintingMonitor {
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.start_time
+    }
+
+    /// Time this fuzzing run stated
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
     }
 
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
@@ -455,7 +465,7 @@ where
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.start_time
     }
 
@@ -1121,7 +1131,7 @@ pub mod pybind {
         }
 
         /// Time this fuzzing run stated
-        fn start_time(&mut self) -> Duration {
+        fn start_time(&self) -> Duration {
             unwrap_me_mut!(self.wrapper, m, { m.start_time() })
         }
 

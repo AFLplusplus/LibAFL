@@ -39,13 +39,13 @@ where
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.base.start_time()
     }
 
     /// Set creation time
     fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
+        self.base.set_start_time(time);
     }
 
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
@@ -189,12 +189,12 @@ where
         self.base.client_stats()
     }
 
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.base.start_time()
     }
 
     fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
+        self.base.set_start_time(time);
     }
 
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
