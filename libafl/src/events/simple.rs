@@ -34,8 +34,7 @@ use crate::{
         EventRestarter, HasEventManagerId,
     },
     inputs::UsesInput,
-    monitors::Monitor,
-    prelude::ClientStats,
+    monitors::{ClientStats, Monitor},
     state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
@@ -559,11 +558,7 @@ where
                 // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
                 staterestorer.reset();
 
-                // load the corpus size into monitor to still display the correct numbers after restart.
-                // let client_stats = monitor.client_stats_mut_for(ClientId(0));
-                // client_stats.update_corpus_size(state.corpus().count().try_into()?);
-                // client_stats.update_objective_size(state.solutions().count().try_into()?);
-
+                // reload the state of the monitor to display the correct stats after restarts
                 monitor.set_start_time(start_time);
                 *monitor.client_stats_mut() = clients_stats;
 
