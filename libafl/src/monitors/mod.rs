@@ -82,7 +82,7 @@ fn prettify_float(value: f64) -> String {
 }
 
 /// A simple struct to keep track of client monitor
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ClientStats {
     // monitor (maybe we need a separated struct?)
     /// The corpus size for this client
@@ -235,7 +235,10 @@ pub trait Monitor {
     fn client_stats(&self) -> &[ClientStats];
 
     /// Creation time
-    fn start_time(&mut self) -> Duration;
+    fn start_time(&self) -> Duration;
+
+    /// Set creation time
+    fn set_start_time(&mut self, time: Duration);
 
     /// Show the monitor to the user
     fn display(&mut self, event_msg: String, sender_id: ClientId);
@@ -311,8 +314,13 @@ impl Monitor for NopMonitor {
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.start_time
+    }
+
+    /// Time this fuzzing run stated
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
     }
 
     fn display(&mut self, _event_msg: String, _sender_id: ClientId) {}
@@ -375,8 +383,13 @@ impl Monitor for SimplePrintingMonitor {
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.start_time
+    }
+
+    /// Time this fuzzing run stated
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
     }
 
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
@@ -452,8 +465,13 @@ where
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.start_time
+    }
+
+    /// Set creation time
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
     }
 
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
@@ -1113,8 +1131,13 @@ pub mod pybind {
         }
 
         /// Time this fuzzing run stated
-        fn start_time(&mut self) -> Duration {
-            unwrap_me_mut!(self.wrapper, m, { m.start_time() })
+        fn start_time(&self) -> Duration {
+            unwrap_me!(self.wrapper, m, { m.start_time() })
+        }
+
+        /// set start time
+        fn set_start_time(&mut self, time: Duration) {
+            unwrap_me_mut!(self.wrapper, m, { m.set_start_time(time) });
         }
 
         fn display(&mut self, event_msg: String, sender_id: ClientId) {
