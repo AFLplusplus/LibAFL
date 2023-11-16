@@ -721,7 +721,7 @@ struct is_unique<T0, T1, Rest...>
 
   #ifdef CATCH_CONFIG_TRADITIONAL_MSVC_PREPROCESSOR
     #define INTERNAL_CATCH_EXPAND_VARGS(...) __VA_ARGS__
-    // MSVC needs more evaluations
+   // MSVC needs more evaluations
     #define CATCH_RECURSION_LEVEL6(...) \
       CATCH_RECURSION_LEVEL5(           \
           CATCH_RECURSION_LEVEL5(CATCH_RECURSION_LEVEL5(__VA_ARGS__)))
@@ -787,7 +787,7 @@ struct is_unique<T0, T1, Rest...>
     #define INTERNAL_CATCH_STRINGIZE_WITHOUT_PARENS(param) \
       INTERNAL_CATCH_STRINGIZE(INTERNAL_CATCH_REMOVE_PARENS(param))
   #else
-    // MSVC is adding extra space and needs another indirection to expand
+   // MSVC is adding extra space and needs another indirection to expand
     // INTERNAL_CATCH_NOINTERNAL_CATCH_DEF
     #define INTERNAL_CATCH_STRINGIZE2(...) \
       INTERNAL_CATCH_STRINGIZE3(__VA_ARGS__)
@@ -808,7 +808,7 @@ struct is_unique<T0, T1, Rest...>
       INTERNAL_CATCH_TEMPLATE_UNIQUE_NAME2(                \
           Name, INTERNAL_CATCH_REMOVE_PARENS(__VA_ARGS__))
   #else
-    // MSVC is adding extra space and needs more calls to properly remove ()
+   // MSVC is adding extra space and needs more calls to properly remove ()
     #define INTERNAL_CATCH_TEMPLATE_UNIQUE_NAME3(Name, ...) \
       Name " -" #__VA_ARGS__
     #define INTERNAL_CATCH_TEMPLATE_UNIQUE_NAME1(Name, ...) \
@@ -1331,7 +1331,7 @@ struct AssertionInfo {
   #include <cstddef>
   #include <type_traits>
   #include <string>
-  // start catch_stream.h
+   // start catch_stream.h
 
   #include <iosfwd>
   #include <cstddef>
@@ -1380,7 +1380,7 @@ class ReusableStringStream {
   #endif
 
   #ifdef __OBJC__
-    // start catch_objc_arc.hpp
+   // start catch_objc_arc.hpp
 
     #import <Foundation/Foundation.h>
 
@@ -3180,7 +3180,7 @@ struct pluralise {
 
   // end catch_string_manip.h
   #ifndef CATCH_CONFIG_DISABLE_MATCHERS
-    // start catch_capture_matchers.h
+   // start catch_capture_matchers.h
 
     // start catch_matchers.h
 
@@ -3748,7 +3748,7 @@ auto makeMatchExpr(ArgT const &arg, MatcherT const &matcher,
 
   // end catch_capture_matchers.h
   #endif
-  // start catch_generators.hpp
+   // start catch_generators.hpp
 
   // start catch_interfaces_generatortracker.h
 
@@ -4556,7 +4556,7 @@ struct IRunner {
   // end catch_interfaces_runner.h
 
   #ifdef __OBJC__
-    // start catch_objc.hpp
+   // start catch_objc.hpp
 
     #import <objc/runtime.h>
 
@@ -4775,7 +4775,7 @@ using namespace Matchers;
   #endif
 
   #ifdef CATCH_CONFIG_EXTERNAL_INTERFACES
-    // start catch_external_interfaces.h
+   // start catch_external_interfaces.h
 
     // start catch_reporter_bases.hpp
 
@@ -6089,7 +6089,7 @@ class XmlReporter : public StreamingReporterBase<XmlReporter> {
 #endif  // ! CATCH_CONFIG_IMPL_ONLY
 
 #ifdef CATCH_IMPL
-  // start catch_impl.hpp
+   // start catch_impl.hpp
 
   #ifdef __clang__
     #pragma clang diagnostic push
@@ -8889,7 +8889,7 @@ void writeToDebugConsole(std::string const &text) {
 }  // namespace Catch
 
   #endif  // Platform
-  // end catch_debug_console.cpp
+// end catch_debug_console.cpp
   // start catch_debugger.cpp
 
   #ifdef CATCH_PLATFORM_MAC
@@ -9302,7 +9302,7 @@ void FatalConditionHandler::reset() {
   #if defined(__GNUC__)
     #pragma GCC diagnostic pop
   #endif
-  // end catch_fatal_condition.cpp
+   // end catch_fatal_condition.cpp
   // start catch_generators.cpp
 
   // start catch_random_number_generator.h
@@ -10306,7 +10306,7 @@ class OutputRedirect {
 }  // end namespace Catch
 
   #endif  // TWOBLUECUBES_CATCH_OUTPUT_REDIRECT_H
-  // end catch_output_redirect.h
+   // end catch_output_redirect.h
   #include <cstdio>
   #include <cstring>
   #include <fstream>
@@ -10446,7 +10446,7 @@ OutputRedirect::~OutputRedirect() {
       #undef fileno
     #endif
   #endif
-  // end catch_output_redirect.cpp
+   // end catch_output_redirect.cpp
   // start catch_polyfills.cpp
 
   #include <cmath>
@@ -14567,7 +14567,7 @@ CATCH_REGISTER_REPORTER("console", ConsoleReporter)
   #if defined(_MSC_VER)
     #pragma warning(pop)
   #endif
-  // end catch_reporter_console.cpp
+   // end catch_reporter_console.cpp
   // start catch_reporter_junit.cpp
 
   #include <cassert>
