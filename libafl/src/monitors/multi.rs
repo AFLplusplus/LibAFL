@@ -9,8 +9,10 @@ use core::{
 };
 
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
+use hashbrown::HashMap;
+use crate::monitors::{ClientStats, Monitor, UserStats};
 
-use crate::monitors::{ClientStats, Monitor};
+use super::Aggregator;
 
 /// Tracking monitor during fuzzing and display both per-client and cumulative info.
 #[derive(Clone)]
@@ -21,6 +23,7 @@ where
     print_fn: F,
     start_time: Duration,
     client_stats: Vec<ClientStats>,
+    user_stats_cache: HashMap<String, HashMap<u32, UserStats>>
 }
 
 impl<F> Debug for MultiMonitor<F>
@@ -90,8 +93,36 @@ where
         );
         for (key, val) in &client.user_monitor {
             write!(fmt, ", {key}: {val}").unwrap();
+            
+            // todo; fix it when unwrap() is nothing
+            let map = self.user_stats_cache.get_mut(key).unwrap();
+            map.insert(sender_id.0 , val.clone());
+
+            if let Some(aggregator) = val.aggregator() {
+                match aggregator {
+                    Aggregator::Sum => {
+                        for (_, stats) in map.iter() {
+                            // todo
+                        }
+                    }
+                    Aggregator::Avg => {
+                        // do the same
+                    }
+                    Aggregator::Max => {
+
+                    }
+                    Aggregator::Min => {
+
+                    }
+                }
+            }
+
         }
         (self.print_fn)(fmt);
+
+        for clients in self.client_stats() {
+
+        }
 
         // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]

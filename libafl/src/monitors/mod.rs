@@ -27,27 +27,49 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Aggregator {
+    /// Add stats up
+    Sum,
+    /// Average stats out
+    Avg,
+    /// Get the min
+    Min,
+    /// Get the max
+    Max,
+}
 /// User-defined stat types
 /// TODO define aggregation function (avg, median, max, ...)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
     /// A numerical value
-    Number(u64),
+    Number(u64, Aggregator),
     /// A Float value
-    Float(f64),
+    Float(f64, Aggregator),
     /// A `String`
     String(String),
     /// A ratio of two values
-    Ratio(u64, u64),
+    Ratio(u64, u64, Aggregator),
+}
+
+impl UserStats {
+    pub fn aggregator(&self) -> Option<Aggregator> {
+        match &self {
+            Self::Number(_, x) => Some(x.clone()),
+            Self::Float(_, x) => Some(x.clone()),
+            Self::String(_) => None,
+            Self::Ratio(_, _, x) => Some(x.clone()),
+        }
+    }
 }
 
 impl fmt::Display for UserStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UserStats::Number(n) => write!(f, "{n}"),
-            UserStats::Float(n) => write!(f, "{n}"),
+            UserStats::Number(n, _) => write!(f, "{n}"),
+            UserStats::Float(n, _) => write!(f, "{n}"),
             UserStats::String(s) => write!(f, "{s}"),
-            UserStats::Ratio(a, b) => {
+            UserStats::Ratio(a, b, _) => {
                 if *b == 0 {
                     write!(f, "{a}/{b}")
                 } else {
