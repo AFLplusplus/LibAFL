@@ -82,7 +82,7 @@ fn prettify_float(value: f64) -> String {
 }
 
 /// A simple struct to keep track of client monitor
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ClientStats {
     // monitor (maybe we need a separated struct?)
     /// The corpus size for this client

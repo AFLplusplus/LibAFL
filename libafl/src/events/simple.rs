@@ -11,7 +11,7 @@ use core::ffi::c_void;
 use core::ptr::write_volatile;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
-use core::{fmt::Debug, marker::PhantomData};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
@@ -28,12 +28,6 @@ use serde::{de::DeserializeOwned, Serialize};
 use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
 #[cfg(all(unix, feature = "std"))]
 use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
-#[cfg(feature = "std")]
-use crate::{
-    corpus::Corpus,
-    monitors::SimplePrintingMonitor,
-    state::{HasCorpus, HasSolutions},
-};
 use crate::{
     events::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
@@ -41,8 +35,14 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
+    prelude::ClientStats,
     state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
+};
+#[cfg(feature = "std")]
+use crate::{
+    monitors::SimplePrintingMonitor,
+    state::{HasCorpus, HasSolutions},
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it
@@ -343,6 +343,7 @@ where
 #[cfg(feature = "std")]
 impl<MT, S, SP> EventRestarter for SimpleRestartingEventManager<MT, S, SP>
 where
+    MT: Monitor,
     S: UsesInput + Serialize,
     SP: ShMemProvider,
 {
@@ -350,10 +351,10 @@ where
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
-        self.staterestorer.save((
+        self.staterestorer.save(&(
             state,
-            self.monitor.start_time(),
-            self.monitor.client_stats(),
+            self.simple_event_mgr.monitor.start_time(),
+            self.simple_event_mgr.monitor.client_stats(),
         ))
     }
 
@@ -543,7 +544,7 @@ where
         };
 
         // If we're restarting, deserialize the old state.
-        let ((state, start_time, clients_stats), mgr) = match staterestorer.restore::<S>()? {
+        let (state, mgr) = match staterestorer.restore::<(S, Duration, Vec<ClientStats>)>()? {
             None => {
                 log::info!("First run. Let's set it all up");
                 // Mgr to send and receive msgs from/to all other fuzzer instances
@@ -553,7 +554,7 @@ where
                 )
             }
             // Restoring from a previous run, deserialize state and corpus.
-            Some(state) => {
+            Some((state, start_time, clients_stats)) => {
                 log::info!("Subsequent run. Loaded previous state.");
                 // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
                 staterestorer.reset();
