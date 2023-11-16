@@ -1135,6 +1135,11 @@ pub mod pybind {
             unwrap_me_mut!(self.wrapper, m, { m.start_time() })
         }
 
+        /// set start time
+        fn set_start_time(&self, time: Duration) {
+            unwrap_me_mut!(self.wrapper, m, { m.set_start_time(time) })
+        }
+
         fn display(&mut self, event_msg: String, sender_id: ClientId) {
             unwrap_me_mut!(self.wrapper, m, { m.display(event_msg, sender_id) });
         }
