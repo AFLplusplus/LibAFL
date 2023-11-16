@@ -1,4 +1,5 @@
+/// oom observer
 #[cfg(feature = "libfuzzer_oom")]
-mod oom;
+pub mod oom;
 #[cfg(feature = "libfuzzer_oom")]
 pub use oom::*;
