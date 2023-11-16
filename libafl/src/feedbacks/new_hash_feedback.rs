@@ -87,8 +87,8 @@ pub struct NewHashFeedback<O, S> {
 
 impl<O, S> Feedback<S> for NewHashFeedback<O, S>
 where
-    O: ObserverWithHashField + Named + Debug,
-    S: UsesInput + Debug + HasNamedMetadata + HasClientPerfMonitor,
+    O: ObserverWithHashField + Named,
+    S: UsesInput + HasNamedMetadata + HasClientPerfMonitor,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_named_metadata(
@@ -157,7 +157,7 @@ const DEFAULT_CAPACITY: usize = 4096;
 
 impl<O, S> NewHashFeedback<O, S>
 where
-    O: ObserverWithHashField + Named + Debug,
+    O: ObserverWithHashField + Named,
 {
     /// Returns a new [`NewHashFeedback`].
     /// Setting an observer name that doesn't exist would eventually trigger a panic.

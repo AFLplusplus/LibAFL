@@ -159,6 +159,7 @@ fn build_pass(
     let r = if cfg!(unix) {
         let r = Command::new(bindir_path.join("clang++"))
             .arg("-v")
+            .arg(format!("--target={}", env::var("HOST").unwrap()))
             .args(cxxflags)
             .arg(src_dir.join(src_file))
             .args(additionals)
@@ -171,6 +172,7 @@ fn build_pass(
     } else if cfg!(windows) {
         let r = Command::new(bindir_path.join("clang-cl.exe"))
             .arg("-v")
+            .arg(format!("--target={}", env::var("HOST").unwrap()))
             .args(cxxflags)
             .arg(src_dir.join(src_file))
             .args(additionals)

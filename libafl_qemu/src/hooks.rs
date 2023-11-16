@@ -729,7 +729,7 @@ where
 impl<'a, QT, S> Debug for QemuHooks<'a, QT, S>
 where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S> + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuHooks")

@@ -42,8 +42,7 @@ where
     }
 }
 
-pub trait QemuHelperTuple<S>:
-    MatchFirstType + for<'a> SplitBorrowExtractFirstType<'a> + Debug
+pub trait QemuHelperTuple<S>: MatchFirstType + for<'a> SplitBorrowExtractFirstType<'a>
 where
     S: UsesInput,
 {

@@ -17,10 +17,11 @@ pub trait SerdeAny: Any + erased_serde::Serialize + Debug {
 
 /// Wrap a type for serialization
 #[derive(Debug)]
-pub struct Wrap<'a, T: ?Sized + Debug>(pub &'a T);
+pub struct Wrap<'a, T: ?Sized>(pub &'a T);
+
 impl<'a, T> Serialize for Wrap<'a, T>
 where
-    T: ?Sized + erased_serde::Serialize + 'a + Debug,
+    T: ?Sized + erased_serde::Serialize + 'a,
 {
     /// Serialize the type
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

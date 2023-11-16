@@ -215,7 +215,7 @@ where
 
 impl<OT, S> CommandExecutor<OT, S, StdCommandConfigurator>
 where
-    OT: MatchName + Debug + ObserversTuple<S>,
+    OT: MatchName + ObserversTuple<S>,
     S: UsesInput,
 {
     /// Creates a new `CommandExecutor`.
@@ -315,7 +315,7 @@ where
     EM: UsesState<State = S>,
     S: UsesInput + HasExecutions,
     S::Input: HasTargetBytes,
-    T: CommandConfigurator + Debug,
+    T: CommandConfigurator,
     OT: Debug + MatchName + ObserversTuple<S>,
     Z: UsesState<State = S>,
 {
@@ -565,7 +565,7 @@ impl CommandExecutorBuilder {
         observers: OT,
     ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
     where
-        OT: Debug + MatchName + ObserversTuple<S>,
+        OT: MatchName + ObserversTuple<S>,
         S: UsesInput,
     {
         let Some(program) = &self.program else {
@@ -660,7 +660,7 @@ impl CommandExecutorBuilder {
 /// ```
 
 #[cfg(all(feature = "std", any(unix, doc)))]
-pub trait CommandConfigurator: Sized + Debug {
+pub trait CommandConfigurator: Sized {
     /// Spawns a new process with the given configuration.
     fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
     where
@@ -672,7 +672,7 @@ pub trait CommandConfigurator: Sized + Debug {
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
     where
-        OT: Debug + MatchName,
+        OT: MatchName,
     {
         CommandExecutor {
             observers,
