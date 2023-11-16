@@ -8,7 +8,7 @@ mod mutators;
 pub use mutators::*;
 
 mod observers;
-pub use observers::*;
+// pub use observers::*;
 
 extern "C" {
     // int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)

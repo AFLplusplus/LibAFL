@@ -9,9 +9,12 @@ use alloc::{
 use core::ffi::c_void;
 #[cfg(all(unix, feature = "std"))]
 use core::ptr::write_volatile;
+use core::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
-use core::sync::atomic::{compiler_fence, Ordering};
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use core::{
+    sync::atomic::{compiler_fence, Ordering},
+    time::Duration,
+};
 
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
@@ -34,13 +37,13 @@ use crate::{
         EventRestarter, HasEventManagerId,
     },
     inputs::UsesInput,
-    monitors::{ClientStats, Monitor},
+    monitors::Monitor,
     state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
 #[cfg(feature = "std")]
 use crate::{
-    monitors::SimplePrintingMonitor,
+    monitors::{ClientStats, SimplePrintingMonitor},
     state::{HasCorpus, HasSolutions},
 };
 
