@@ -1132,7 +1132,7 @@ pub mod pybind {
 
         /// Time this fuzzing run stated
         fn start_time(&self) -> Duration {
-            unwrap_me_mut!(self.wrapper, m, { m.start_time() })
+            unwrap_me!(self.wrapper, m, { m.start_time() })
         }
 
         /// set start time
