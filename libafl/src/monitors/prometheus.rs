@@ -164,6 +164,7 @@ where
         );
         (self.print_fn)(fmt);
 
+        self.client_stats_insert(sender_id);
         let cur_client = self.client_stats_mut_for(sender_id);
         let cur_client_clone = cur_client.clone();
 

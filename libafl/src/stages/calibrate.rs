@@ -18,7 +18,7 @@ use crate::{
     feedbacks::{map::MapFeedbackMetadata, HasObserverName},
     fuzzer::Evaluator,
     inputs::UsesInput,
-    monitors::UserStats,
+    monitors::{Aggregator, UserStats},
     observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
@@ -310,6 +310,7 @@ where
                         value: UserStats::Ratio(
                             (map_len - unstable_entries) as u64,
                             map_len as u64,
+                            Aggregator::Avg,
                         ),
                         phantom: PhantomData,
                     },

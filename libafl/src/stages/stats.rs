@@ -11,6 +11,7 @@ use serde_json::json;
 use crate::{
     corpus::{Corpus, CorpusId},
     events::EventFirer,
+    monitors::Aggregator,
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,
     state::{HasCorpus, HasImported, HasMetadata, UsesState},
@@ -102,7 +103,7 @@ where
                     state,
                     Event::UpdateUserStats {
                         name: "AflStats".to_string(),
-                        value: UserStats::String(json.to_string()),
+                        value: UserStats::String(json.to_string(), Aggregator::None),
                         phantom: PhantomData,
                     },
                 )?;

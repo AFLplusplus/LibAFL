@@ -29,6 +29,8 @@ const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Aggregator {
+    /// Do nothing
+    None,
     /// Add stats up
     Sum,
     /// Average stats out
@@ -47,18 +49,18 @@ pub enum UserStats {
     /// A Float value
     Float(f64, Aggregator),
     /// A `String`
-    String(String),
+    String(String, Aggregator),
     /// A ratio of two values
     Ratio(u64, u64, Aggregator),
 }
 
 impl UserStats {
-    pub fn aggregator(&self) -> Option<Aggregator> {
+    pub fn aggregator(&self) -> Aggregator {
         match &self {
-            Self::Number(_, x) => Some(x.clone()),
-            Self::Float(_, x) => Some(x.clone()),
-            Self::String(_) => None,
-            Self::Ratio(_, _, x) => Some(x.clone()),
+            Self::Number(_, x) => x.clone(),
+            Self::Float(_, x) => x.clone(),
+            Self::String(_, x) => x.clone(),
+            Self::Ratio(_, _, x) => x.clone(),
         }
     }
 }
@@ -68,7 +70,7 @@ impl fmt::Display for UserStats {
         match self {
             UserStats::Number(n, _) => write!(f, "{n}"),
             UserStats::Float(n, _) => write!(f, "{n}"),
-            UserStats::String(s) => write!(f, "{s}"),
+            UserStats::String(s, _) => write!(f, "{s}"),
             UserStats::Ratio(a, b, _) => {
                 if *b == 0 {
                     write!(f, "{a}/{b}")
@@ -179,7 +181,7 @@ impl ClientStats {
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
     #[cfg(feature = "afl_exec_sec")]
-    pub fn execs_per_sec(&mut self, cur_time: Duration) -> f64 {
+    pub fn execs_per_sec(&self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
             return 0.0;
         }
@@ -210,7 +212,7 @@ impl ClientStats {
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
     #[cfg(not(feature = "afl_exec_sec"))]
-    pub fn execs_per_sec(&mut self, cur_time: Duration) -> f64 {
+    pub fn execs_per_sec(&self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
             return 0.0;
         }
@@ -226,7 +228,7 @@ impl ClientStats {
     }
 
     /// Executions per second
-    fn execs_per_sec_pretty(&mut self, cur_time: Duration) -> String {
+    fn execs_per_sec_pretty(&self, cur_time: Duration) -> String {
         prettify_float(self.execs_per_sec(cur_time))
     }
 
@@ -281,7 +283,7 @@ pub trait Monitor {
 
     /// Total executions
     #[inline]
-    fn total_execs(&mut self) -> u64 {
+    fn total_execs(&self) -> u64 {
         self.client_stats()
             .iter()
             .fold(0_u64, |acc, x| acc + x.executions)
@@ -290,20 +292,20 @@ pub trait Monitor {
     /// Executions per second
     #[allow(clippy::cast_sign_loss)]
     #[inline]
-    fn execs_per_sec(&mut self) -> f64 {
+    fn execs_per_sec(&self) -> f64 {
         let cur_time = current_time();
-        self.client_stats_mut()
-            .iter_mut()
+        self.client_stats()
+            .iter()
             .fold(0.0, |acc, x| acc + x.execs_per_sec(cur_time))
     }
 
     /// Executions per second
-    fn execs_per_sec_pretty(&mut self) -> String {
+    fn execs_per_sec_pretty(&self) -> String {
         prettify_float(self.execs_per_sec())
     }
 
     /// The client monitor for a specific id, creating new if it doesn't exist
-    fn client_stats_mut_for(&mut self, client_id: ClientId) -> &mut ClientStats {
+    fn client_stats_insert(&mut self, client_id: ClientId) {
         let client_stat_count = self.client_stats().len();
         for _ in client_stat_count..(client_id.0 + 1) as usize {
             self.client_stats_mut().push(ClientStats {
@@ -312,7 +314,16 @@ pub trait Monitor {
                 ..ClientStats::default()
             });
         }
+    }
+
+    /// Get mutable reference to client stats
+    fn client_stats_mut_for(&mut self, client_id: ClientId) -> &mut ClientStats {
         &mut self.client_stats_mut()[client_id.0 as usize]
+    }
+
+    /// Get immutable reference to client stats
+    fn client_stats_for(&self, client_id: ClientId) -> &ClientStats {
+        &self.client_stats()[client_id.0 as usize]
     }
 }
 
@@ -510,6 +521,7 @@ where
         );
 
         if self.print_user_monitor {
+            self.client_stats_insert(sender_id);
             let client = self.client_stats_mut_for(sender_id);
             for (key, val) in &client.user_monitor {
                 write!(fmt, ", {key}: {val}").unwrap();

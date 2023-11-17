@@ -9,10 +9,11 @@ use core::{
 };
 
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
-use hashbrown::HashMap;
-use crate::monitors::{ClientStats, Monitor, UserStats};
 
-use super::Aggregator;
+use crate::{
+    monitors::{ClientStats, Monitor},
+    Error,
+};
 
 /// Tracking monitor during fuzzing and display both per-client and cumulative info.
 #[derive(Clone)]
@@ -23,7 +24,6 @@ where
     print_fn: F,
     start_time: Duration,
     client_stats: Vec<ClientStats>,
-    user_stats_cache: HashMap<String, HashMap<u32, UserStats>>
 }
 
 impl<F> Debug for MultiMonitor<F>
@@ -82,7 +82,8 @@ where
         );
         (self.print_fn)(global_fmt);
 
-        let client = self.client_stats_mut_for(sender_id);
+        self.client_stats_insert(sender_id);
+        let client = self.client_stats_for(sender_id);
         let cur_time = current_time();
         let exec_sec = client.execs_per_sec_pretty(cur_time);
 
@@ -92,37 +93,11 @@ where
             pad, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {
+            for client in self.client_stats() {}
+
             write!(fmt, ", {key}: {val}").unwrap();
-            
-            // todo; fix it when unwrap() is nothing
-            let map = self.user_stats_cache.get_mut(key).unwrap();
-            map.insert(sender_id.0 , val.clone());
-
-            if let Some(aggregator) = val.aggregator() {
-                match aggregator {
-                    Aggregator::Sum => {
-                        for (_, stats) in map.iter() {
-                            // todo
-                        }
-                    }
-                    Aggregator::Avg => {
-                        // do the same
-                    }
-                    Aggregator::Max => {
-
-                    }
-                    Aggregator::Min => {
-
-                    }
-                }
-            }
-
         }
         (self.print_fn)(fmt);
-
-        for clients in self.client_stats() {
-
-        }
 
         // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]
