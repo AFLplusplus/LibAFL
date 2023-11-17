@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
+/// Definition of how we aggreate this across multiple clients
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Aggregator {
     /// Do nothing
@@ -55,12 +56,112 @@ pub enum UserStats {
 }
 
 impl UserStats {
+    /// Get the aggregator
     pub fn aggregator(&self) -> Aggregator {
         match &self {
             Self::Number(_, x) => x.clone(),
             Self::Float(_, x) => x.clone(),
             Self::String(_, x) => x.clone(),
             Self::Ratio(_, _, x) => x.clone(),
+        }
+    }
+
+    /// Check if this guy is numeric
+    pub fn is_numeric(&self) -> bool {
+        match &self {
+            Self::Number(_, _) => true,
+            Self::Float(_, _) => true,
+            Self::String(_, _) => false,
+            Self::Ratio(_, _, _) => true,
+        }
+    }
+
+    /// Divide by the number of elements
+    pub fn stats_div(&mut self, divisor: usize) -> Option<()> {
+        match self {
+            Self::Number(x, _) => {
+                *x /= divisor as u64;
+                Some(())
+            }
+            Self::Float(x, _) => {
+                *x /= divisor as f64;
+
+                Some(())
+            }
+            Self::Ratio(x, _, _) => {
+                *x /= divisor as u64;
+                Some(())
+            }
+            _ => None,
+        }
+    }
+
+    /// min user stats with the other
+    pub fn stats_max(&mut self, other: &Self) -> Option<()> {
+        match (self, other) {
+            (Self::Number(x, _), Self::Number(y, _)) => {
+                if y > x {
+                    *x = *y;
+                }
+                Some(())
+            }
+            (Self::Float(x, _), Self::Float(y, _)) => {
+                if y > x {
+                    *x = *y;
+                }
+                Some(())
+            }
+            (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
+                if y > x {
+                    *x = *y;
+                }
+                Some(())
+            }
+            _ => None,
+        }
+    }
+
+    /// min user stats with the other
+    pub fn stats_min(&mut self, other: &Self) -> Option<()> {
+        match (self, other) {
+            (Self::Number(x, _), Self::Number(y, _)) => {
+                if y < x {
+                    *x = *y;
+                }
+                Some(())
+            }
+            (Self::Float(x, _), Self::Float(y, _)) => {
+                if y < x {
+                    *x = *y;
+                }
+                Some(())
+            }
+            (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
+                if y < x {
+                    *x = *y;
+                }
+                Some(())
+            }
+            _ => None,
+        }
+    }
+
+    /// add user stats with the other
+    pub fn stats_add(&mut self, other: &Self) -> Option<()> {
+        match (self, other) {
+            (Self::Number(x, _), Self::Number(y, _)) => {
+                *x += *y;
+                Some(())
+            }
+            (Self::Float(x, _), Self::Float(y, _)) => {
+                *x += *y;
+                Some(())
+            }
+            (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
+                *x += *y;
+                Some(())
+            }
+            _ => None,
         }
     }
 }
@@ -233,8 +334,8 @@ impl ClientStats {
     }
 
     /// Update the user-defined stat with name and value
-    pub fn update_user_stats(&mut self, name: String, value: UserStats) {
-        self.user_monitor.insert(name, value);
+    pub fn update_user_stats(&mut self, name: String, value: UserStats) -> Option<UserStats> {
+        return self.user_monitor.insert(name, value);
     }
 
     #[must_use]
@@ -325,6 +426,9 @@ pub trait Monitor {
     fn client_stats_for(&self, client_id: ClientId) -> &ClientStats {
         &self.client_stats()[client_id.0 as usize]
     }
+
+    /// Aggregate the results in case there're multiple clients
+    fn aggregate(&mut self, _name: &String) {}
 }
 
 /// Monitor that print exactly nothing.
