@@ -739,6 +739,8 @@ where
     }
 }
 
+static mut FIRST_EXEC: bool = true;
+
 impl<'a, I, QT> QemuHooks<'a, QT, NopState<I>>
 where
     QT: QemuHelperTuple<NopState<I>>,
@@ -752,7 +754,12 @@ where
     where
         H: FnMut(&I) -> ExitKind,
     {
-        self.helpers.first_exec_all(self);
+        unsafe {
+            if FIRST_EXEC {
+                self.helpers.first_exec_all(self);
+                FIRST_EXEC = false;
+            }
+        }
         self.helpers.pre_exec_all(self.emulator, input);
 
         let mut exit_kind = harness(input);

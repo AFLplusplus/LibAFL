@@ -195,6 +195,14 @@ impl IntoPy<PyObject> for MmapPerms {
     }
 }
 
+#[cfg(emulation_mode = "usermode")]
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
+#[repr(i32)]
+pub enum VerifyAccess {
+    Read = libc::PROT_READ,
+    Write = libc::PROT_READ | libc::PROT_WRITE,
+}
+
 #[repr(C)]
 #[cfg_attr(feature = "python", pyclass)]
 #[cfg_attr(feature = "python", derive(FromPyObject))]
@@ -319,6 +327,7 @@ extern "C" {
         unsafe extern "C" fn(u64, i32, u64, u64, u64, u64, u64, u64, u64, u64) -> u64;
 
     static mut libafl_dump_core_hook: unsafe extern "C" fn(i32);
+    static mut libafl_force_dfl: i32;
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -544,6 +553,9 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), String>
     where
         T: Into<GuestReg>;
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    where
+        T: From<GuestReg>;
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
@@ -583,6 +595,15 @@ impl CPU {
     #[must_use]
     pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
         unsafe { (addr as usize - guest_base) as GuestAddr }
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    #[must_use]
+    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
+        unsafe {
+            // TODO add support for tagged GuestAddr
+            libafl_qemu_sys::page_check_range(addr, size as GuestAddr, kind.into())
+        }
     }
 
     #[cfg(emulation_mode = "systemmode")]
@@ -948,6 +969,14 @@ impl Emulator {
         unsafe { (addr as usize - guest_base) as GuestAddr }
     }
 
+    #[cfg(emulation_mode = "usermode")]
+    #[must_use]
+    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
+        self.current_cpu()
+            .unwrap_or_else(|| self.cpu_from_index(0))
+            .access_ok(kind, addr, size)
+    }
+
     pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
@@ -1021,6 +1050,13 @@ impl Emulator {
             self.run();
         }
         self.remove_breakpoint(addr);
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    pub fn force_dfl(&self) {
+        unsafe {
+            libafl_force_dfl = 1;
+        }
     }
 
     pub fn set_hook(
@@ -1361,6 +1397,15 @@ impl ArchExtras for Emulator {
         self.current_cpu()
             .ok_or("Failed to get current CPU")?
             .write_return_address::<T>(val)
+    }
+
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        self.current_cpu()
+            .ok_or("Failed to get current CPU")?
+            .read_function_argument::<T>(conv, idx)
     }
 
     fn write_function_argument<T>(

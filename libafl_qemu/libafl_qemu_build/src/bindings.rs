@@ -61,6 +61,7 @@ const WRAPPER_HEADER: &str = r#"
 #endif
 
 #include "exec/cpu-common.h"
+#include "exec/cpu-all.h"
 #include "exec/exec-all.h"
 #include "exec/translate-all.h"
 #include "exec/log.h"
@@ -111,6 +112,7 @@ pub fn generate(
         .allowlist_function("target_mmap")
         .allowlist_function("target_mprotect")
         .allowlist_function("target_munmap")
+        .allowlist_function("page_check_range")
         .allowlist_function("cpu_memory_rw_debug")
         .allowlist_function("cpu_physical_memory_rw")
         .allowlist_function("cpu_reset")

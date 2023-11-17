@@ -231,7 +231,7 @@ impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHandlers
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: UsesInput + HasClientPerfMonitor + HasSolutions + HasCorpus,
+    S: UsesInput + HasClientPerfMonitor + HasSolutions + HasCorpus + HasExecutions,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,

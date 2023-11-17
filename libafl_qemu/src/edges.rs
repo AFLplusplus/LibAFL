@@ -3,14 +3,16 @@ use std::{cell::UnsafeCell, cmp::max};
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{inputs::UsesInput, state::HasMetadata};
 pub use libafl_targets::{
-    edges_map_mut_slice, edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_NUM,
-    EDGES_MAP_SIZE, MAX_EDGES_NUM,
+    edges_map_mut_ptr, edges_map_mut_slice, edges_max_num, std_edges_map_observer, EDGES_MAP,
+    EDGES_MAP_PTR, EDGES_MAP_PTR_NUM, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
     emu::GuestAddr,
-    helper::{hash_me, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{
+        hash_me, HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter,
+    },
     hooks::QemuHooks,
 };
 
@@ -71,6 +73,16 @@ impl Default for QemuEdgeCoverageHelper {
     }
 }
 
+impl HasInstrumentationFilter for QemuEdgeCoverageHelper {
+    fn filter(&self) -> &QemuInstrumentationFilter {
+        &self.filter
+    }
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+        &mut self.filter
+    }
+}
+
 impl<S> QemuHelper<S> for QemuEdgeCoverageHelper
 where
     S: UsesInput + HasMetadata,
@@ -127,6 +139,16 @@ impl Default for QemuEdgeCoverageChildHelper {
     }
 }
 
+impl HasInstrumentationFilter for QemuEdgeCoverageChildHelper {
+    fn filter(&self) -> &QemuInstrumentationFilter {
+        &self.filter
+    }
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+        &mut self.filter
+    }
+}
+
 impl<S> QemuHelper<S> for QemuEdgeCoverageChildHelper
 where
     S: UsesInput,
@@ -147,6 +169,78 @@ where
             hooks.edges_raw(
                 Some(gen_hashed_edge_ids::<QT, S>),
                 Some(trace_edge_single_ptr),
+            );
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct QemuEdgeCoverageClassicHelper {
+    filter: QemuInstrumentationFilter,
+    use_hitcounts: bool,
+}
+
+impl QemuEdgeCoverageClassicHelper {
+    #[must_use]
+    pub fn new(filter: QemuInstrumentationFilter) -> Self {
+        Self {
+            filter,
+            use_hitcounts: true,
+        }
+    }
+
+    #[must_use]
+    pub fn without_hitcounts(filter: QemuInstrumentationFilter) -> Self {
+        Self {
+            filter,
+            use_hitcounts: false,
+        }
+    }
+
+    #[must_use]
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
+        self.filter.allowed(addr)
+    }
+}
+
+impl Default for QemuEdgeCoverageClassicHelper {
+    fn default() -> Self {
+        Self::new(QemuInstrumentationFilter::None)
+    }
+}
+
+impl HasInstrumentationFilter for QemuEdgeCoverageClassicHelper {
+    fn filter(&self) -> &QemuInstrumentationFilter {
+        &self.filter
+    }
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+        &mut self.filter
+    }
+}
+
+impl<S> QemuHelper<S> for QemuEdgeCoverageClassicHelper
+where
+    S: UsesInput,
+    S: HasMetadata,
+{
+    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    where
+        QT: QemuHelperTuple<S>,
+    {
+        if self.use_hitcounts {
+            hooks.blocks_raw(
+                Some(gen_hashed_block_ids::<QT, S>),
+                None,
+                Some(trace_block_transition_hitcount),
+            );
+        } else {
+            hooks.blocks_raw(
+                Some(gen_hashed_block_ids::<QT, S>),
+                None,
+                Some(trace_block_transition_single),
             );
         }
     }
@@ -251,6 +345,7 @@ pub extern "C" fn trace_edge_single_ptr(id: u64, _data: u64) {
     }
 }
 
+/*
 pub fn gen_addr_block_ids<QT, S>(
     _hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
@@ -264,9 +359,10 @@ where
     #[allow(clippy::unnecessary_cast)]
     Some(pc as u64)
 }
+*/
 
 pub fn gen_hashed_block_ids<QT, S>(
-    _hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
@@ -274,6 +370,14 @@ where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
+    if let Some(h) = hooks
+        .helpers()
+        .match_first_type::<QemuEdgeCoverageClassicHelper>()
+    {
+        if !h.must_instrument(pc) {
+            return None;
+        }
+    }
     // GuestAddress is u32 for 32 bit guests
     #[allow(clippy::unnecessary_cast)]
     Some(hash_me(pc as u64))

@@ -94,7 +94,17 @@ impl<'a> EasyElf<'a> {
         None
     }
 
-    fn is_pic(&self) -> bool {
+    #[must_use]
+    pub fn entry_point(&self, load_addr: GuestAddr) -> Option<GuestAddr> {
+        if self.elf.entry == 0 {
+            None
+        } else {
+            Some(load_addr + self.elf.entry as GuestAddr)
+        }
+    }
+
+    #[must_use]
+    pub fn is_pic(&self) -> bool {
         self.elf.header.e_type == ET_DYN
     }
 }
