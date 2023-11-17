@@ -1052,6 +1052,7 @@ impl Emulator {
         self.remove_breakpoint(addr);
     }
 
+    #[cfg(emulation_mode = "usermode")]
     pub fn force_dfl(&self) {
         unsafe {
             libafl_force_dfl = 1;

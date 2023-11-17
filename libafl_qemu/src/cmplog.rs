@@ -211,12 +211,14 @@ pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64, _data: u64) {
     }
 }
 
+#[cfg(emulation_mode = "usermode")]
 #[derive(Debug)]
 pub struct QemuCmpLogRoutinesHelper {
     filter: QemuInstrumentationFilter,
     cs: Capstone,
 }
 
+#[cfg(emulation_mode = "usermode")]
 impl QemuCmpLogRoutinesHelper {
     #[must_use]
     pub fn new(filter: QemuInstrumentationFilter) -> Self {
@@ -274,9 +276,9 @@ impl QemuCmpLogRoutinesHelper {
 
             #[cfg(cpu_target = "arm")]
             h.cs.set_mode(if pc & 1 == 1 {
-                arch::arm::ArchMode::Thumb.into()
+                capstone::arch::arm::ArchMode::Thumb.into()
             } else {
-                arch::arm::ArchMode::Arm.into()
+                capstone::arch::arm::ArchMode::Arm.into()
             })
             .unwrap();
         }
@@ -340,6 +342,7 @@ impl QemuCmpLogRoutinesHelper {
     }
 }
 
+#[cfg(emulation_mode = "usermode")]
 impl HasInstrumentationFilter for QemuCmpLogRoutinesHelper {
     fn filter(&self) -> &QemuInstrumentationFilter {
         &self.filter
@@ -350,6 +353,7 @@ impl HasInstrumentationFilter for QemuCmpLogRoutinesHelper {
     }
 }
 
+#[cfg(emulation_mode = "usermode")]
 impl<S> QemuHelper<S> for QemuCmpLogRoutinesHelper
 where
     S: UsesInput,
