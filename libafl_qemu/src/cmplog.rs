@@ -1,3 +1,4 @@
+#[cfg(emulation_mode = "usermode")]
 use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, state::HasMetadata};
@@ -9,14 +10,18 @@ pub use libafl_targets::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(emulation_mode = "usermode")]
 use crate::{
     capstone,
     emu::{ArchExtras, Emulator},
+    CallingConvention,
+};
+use crate::{
     helper::{
         hash_me, HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter,
     },
     hooks::QemuHooks,
-    CallingConvention, GuestAddr,
+    GuestAddr,
 };
 
 #[cfg_attr(
