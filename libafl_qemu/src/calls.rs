@@ -252,6 +252,9 @@ where
         } else {
             return;
         };
+        if collectors.is_none() {
+            return; // TODO fix this, it can be None on races ret
+        }
         collectors
             .as_mut()
             .unwrap()
@@ -327,6 +330,9 @@ where
                                 } else {
                                     return;
                                 };
+                                if collectors.is_none() {
+                                    return; // TODO fix this, it can be None on races ret
+                                }
                                 collectors
                                     .as_mut()
                                     .unwrap()
