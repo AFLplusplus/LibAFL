@@ -37,7 +37,7 @@ void __libqasan_print_maps(void) {
   read(fd, buf, 4095);
   close(fd);
 
-  size_t len = strlen(buf);
+  size_t len = __libqasan_strlen(buf);
 
   QASAN_LOG("Guest process maps:\n");
   int   i;
