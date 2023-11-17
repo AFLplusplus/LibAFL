@@ -8,7 +8,7 @@ use frida_gum::{
 #[cfg(windows)]
 use libafl::{
     executors::inprocess::{HasInProcessHandlers, InProcessHandlers},
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasSolutions},
 };
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
