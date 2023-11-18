@@ -19,8 +19,6 @@ use libafl_bolts::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-#[cfg(feature = "scalability_introspection")]
-use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
@@ -28,7 +26,7 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
-    monitors::ClientPerfMonitor,
+    monitors::{ClientPerfMonitor, ScalabilityMonitor},
     Error,
 };
 
@@ -911,7 +909,7 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
         unimplemented!()
     }
 
-    fn scalability_monitor_mut(&mut self) -> &ScalabilityMonitor {
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
         unimplemented!()
     }
 }
