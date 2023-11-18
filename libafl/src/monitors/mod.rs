@@ -611,7 +611,6 @@ pub struct ClientPerfMonitor {
     timer_start: Option<u64>,
 }
 
-#[cfg(feature = "scalability_introspection")]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 /// Count the imported testcase from other nodes that came with observers
 pub struct ScalabilityMonitor {
@@ -621,9 +620,9 @@ pub struct ScalabilityMonitor {
     pub testcase_without_observers: usize,
 }
 
-#[cfg(feature = "scalability_introspection")]
 impl ScalabilityMonitor {
     /// Constructor
+    #[must_use]
     pub fn new() -> Self {
         Self {
             testcase_with_observers: 0,
