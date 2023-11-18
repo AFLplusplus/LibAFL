@@ -49,8 +49,10 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
-    prelude::HasScalabilityMonitor,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
+    state::{
+        HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, HasScalabilityMonitor,
+        UsesState,
+    },
     Error,
 };
 
