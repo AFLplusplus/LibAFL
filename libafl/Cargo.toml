@@ -29,6 +29,9 @@ std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-time
 ## Collects performance statistics of the fuzzing pipeline and displays it on `Monitor` components
 introspection = []
 
+## Collects stats about scalability
+scalability_introspecition
+
 ## Will build the `pyo3` bindings
 python = ["pyo3", "concat-idents", "libafl_bolts/python"]
 
