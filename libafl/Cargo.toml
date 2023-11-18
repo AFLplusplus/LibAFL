@@ -17,7 +17,7 @@ all-features = true
 rustc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["tcp_manager", "scalability_introspection", "std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor", "libafl_bolts/xxh3"]
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor", "libafl_bolts/xxh3"]
 document-features = ["dep:document-features"]
 
 #! # Feature Flags
@@ -28,9 +28,6 @@ std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-time
 
 ## Collects performance statistics of the fuzzing pipeline and displays it on `Monitor` components
 introspection = []
-
-## Count how many of the new testcases from other nodes are passed with observers.
-scalability_introspection = []
 
 ## Will build the `pyo3` bindings
 python = ["pyo3", "concat-idents", "libafl_bolts/python"]
