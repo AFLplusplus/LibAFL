@@ -19,6 +19,8 @@ use libafl_bolts::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+#[cfg(feature = "scalability_introspection")]
+use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
@@ -99,6 +101,15 @@ pub trait HasClientPerfMonitor {
 
     /// Mutatable ref to [`ClientPerfMonitor`]
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
+}
+
+/// Trait for offering a [`ScalabilityMonitor`]
+pub trait HasScalabilityMonitor {
+    /// Ref to [`ScalabilityMonitor`]
+    fn scalability_monitor(&self) -> &ScalabilityMonitor;
+
+    /// Mutable ref to [`ScalabilityMonitor`]
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor;
 }
 
 /// Trait for elements offering metadata
@@ -266,6 +277,8 @@ pub struct StdState<I, C, R, SC> {
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
+    #[cfg(feature = "scalability_introspection")]
+    scalability_monitor: ScalabilityMonitor,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
@@ -844,6 +857,8 @@ where
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
+            #[cfg(feature = "scalability_introspection")]
+            scalability_monitor: ScalabilityMonitor::new(),
             #[cfg(feature = "std")]
             remaining_initial_files: None,
             #[cfg(feature = "std")]
@@ -875,6 +890,28 @@ impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
     }
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
+        unimplemented!()
+    }
+}
+
+#[cfg(feature = "scalability_introspection")]
+impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
+    fn scalability_monitor(&self) -> &ScalabilityMonitor {
+        &self.scalability_monitor
+    }
+
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
+        &mut self.scalability_monitor
+    }
+}
+
+#[cfg(not(feature = "scalability_introspection"))]
+impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
+    fn scalability_monitor(&self) -> &ScalabilityMonitor {
+        unimplemented!()
+    }
+
+    fn scalability_monitor_mut(&mut self) -> &ScalabilityMonitor {
         unimplemented!()
     }
 }

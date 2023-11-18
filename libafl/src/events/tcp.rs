@@ -49,6 +49,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
+    prelude::HasScalabilityMonitor,
     state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
@@ -538,6 +539,7 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
+        S: HasScalabilityMonitor,
         E: Executor<Self, Z> + HasObservers<State = S>,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
@@ -560,8 +562,16 @@ where
                 {
                     let observers: E::Observers =
                         postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_with_observers += 1;
+                    }
                     fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
                 } else {
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_without_observers += 1;
+                    }
                     fuzzer.evaluate_input_with_observers::<E, Self>(
                         state, executor, self, input, false,
                     )?
@@ -669,7 +679,7 @@ where
 
 impl<E, S, Z> EventProcessor<E, Z> for TcpEventManager<S>
 where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasScalabilityMonitor,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
@@ -732,7 +742,12 @@ impl<E, S, Z> EventManager<E, Z> for TcpEventManager<S>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: UsesInput
+        + HasExecutions
+        + HasClientPerfMonitor
+        + HasMetadata
+        + HasLastReportTime
+        + HasScalabilityMonitor,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
 }
@@ -864,7 +879,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasScalabilityMonitor,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -881,6 +896,7 @@ where
     S: UsesInput
         + HasExecutions
         + HasClientPerfMonitor
+        + HasScalabilityMonitor
         + HasMetadata
         + HasLastReportTime
         + Serialize,

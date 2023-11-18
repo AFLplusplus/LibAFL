@@ -52,6 +52,7 @@ use crate::{
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
     observers::ObserversTuple,
+    prelude::HasScalabilityMonitor,
     state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
@@ -564,6 +565,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<Self, Z> + HasObservers<State = S>,
+        S: HasScalabilityMonitor,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
     {
@@ -591,9 +593,16 @@ where
                     {
                         self.deserialization_time = current_time() - start;
                     }
-
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_with_observers += 1;
+                    }
                     fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
                 } else {
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_without_observers += 1;
+                    }
                     fuzzer.evaluate_input_with_observers::<E, Self>(
                         state, executor, self, input, false,
                     )?
@@ -745,7 +754,7 @@ where
 
 impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<S, SP>
 where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata + HasScalabilityMonitor,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -792,7 +801,12 @@ impl<E, S, SP, Z> EventManager<E, Z> for LlmpEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: UsesInput
+        + HasExecutions
+        + HasClientPerfMonitor
+        + HasMetadata
+        + HasLastReportTime
+        + HasScalabilityMonitor,
     SP: ShMemProvider,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
@@ -978,7 +992,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasScalabilityMonitor,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -995,6 +1009,7 @@ where
     S: UsesInput
         + HasExecutions
         + HasClientPerfMonitor
+        + HasScalabilityMonitor
         + HasMetadata
         + HasLastReportTime
         + Serialize,
