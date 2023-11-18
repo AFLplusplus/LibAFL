@@ -26,7 +26,7 @@ use serde_json::{self, Value};
 
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
-use crate::monitors::{Aggregator, ClientStats, Monitor, UserStats};
+use crate::monitors::{Aggregator, AggregatorOps, ClientStats, Monitor, UserStats};
 
 pub mod ui;
 use ui::TuiUI;
@@ -332,6 +332,7 @@ pub struct TuiMonitor {
 
     start_time: Duration,
     client_stats: Vec<ClientStats>,
+    aggregator: Aggregator,
 }
 
 impl Monitor for TuiMonitor {
@@ -399,6 +400,10 @@ impl Monitor for TuiMonitor {
         for (key, val) in &client.user_monitor {
             write!(fmt, ", {key}: {val}").unwrap();
         }
+        write!(fmt, ", (Aggregated):").unwrap();
+        for (key, val) in &self.aggregator.aggregated {
+            write!(fmt, ", {key}: {val}").unwrap();
+        }
 
         {
             let client = &self.client_stats()[sender_id.0 as usize];
@@ -426,6 +431,10 @@ impl Monitor for TuiMonitor {
                     .grab_data(&client.introspection_monitor);
             }
         }
+    }
+
+    fn aggregate(&mut self, name: &str) {
+        self.aggregator.aggregate(name, &self.client_stats);
     }
 }
 
@@ -471,6 +480,7 @@ impl TuiMonitor {
             context,
             start_time,
             client_stats: vec![],
+            aggregator: Aggregator::new(),
         }
     }
 
@@ -509,7 +519,7 @@ impl TuiMonitor {
                 .map_or("None".to_string(), ToString::to_string);
             let stability = client
                 .get_user_stats("stability")
-                .map_or(&UserStats::Ratio(0, 100, Aggregator::Avg), |x| x);
+                .map_or(&UserStats::Ratio(0, 100, AggregatorOps::Avg), |x| x);
 
             if afl_stats != "None" {
                 let default_json = serde_json::json!({

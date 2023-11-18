@@ -174,10 +174,10 @@ where
             log::info!("{key}: {val}");
             #[allow(clippy::cast_precision_loss)]
             let value: f64 = match val {
-                UserStats::Number(n) => n as f64,
-                UserStats::Float(f) => f,
-                UserStats::String(_s) => 0.0,
-                UserStats::Ratio(a, b) => (a as f64 / b as f64) * 100.0,
+                UserStats::Number(n, _) => n as f64,
+                UserStats::Float(f, _) => f,
+                UserStats::String(_s, _) => 0.0,
+                UserStats::Ratio(a, b, _) => (a as f64 / b as f64) * 100.0,
             };
             self.custom_stat
                 .get_or_create(&Labels {

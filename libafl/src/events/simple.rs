@@ -249,7 +249,7 @@ where
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_user_stats(name.clone(), value.clone());
-                monitor.aggregate(&name);
+                monitor.aggregate(name);
                 monitor.display(event.name().to_string(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }

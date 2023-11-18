@@ -1,7 +1,5 @@
 //! Monitor to display both cumulative and per-client monitor
 
-#[cfg(feature = "introspection")]
-use alloc::string::ToString;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -11,10 +9,10 @@ use core::{
     time::Duration,
 };
 
-use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 
-use crate::monitors::{Aggregator, ClientStats, Monitor, UserStats};
+use super::Aggregator;
+use crate::monitors::{ClientStats, Monitor};
 
 /// Tracking monitor during fuzzing and display both per-client and cumulative info.
 #[derive(Clone)]
@@ -25,7 +23,7 @@ where
     print_fn: F,
     start_time: Duration,
     client_stats: Vec<ClientStats>,
-    aggregated: HashMap<String, UserStats>,
+    aggregator: Aggregator,
 }
 
 impl<F> Debug for MultiMonitor<F>
@@ -64,57 +62,8 @@ where
         self.start_time
     }
 
-    fn aggregate(&mut self, name: &String) {
-        let mut gather = vec![];
-        // gather can't be empty as we update before the call to aggregate()
-        for stats in self.client_stats.iter() {
-            if let Some(x) = stats.user_monitor.get(name) {
-                gather.push(x);
-            }
-        }
-
-        if let Some((&init, rest)) = gather.split_first() {
-            if !init.is_numeric() {
-                return;
-            }
-            let mut ret = init.clone();
-            match init.aggregator() {
-                Aggregator::None => {
-                    // Nothing
-                    return;
-                }
-                Aggregator::Avg => {
-                    for item in rest {
-                        if ret.stats_add(item).is_none() {
-                            return;
-                        }
-                    }
-                    ret.stats_div(gather.len());
-                }
-                Aggregator::Sum => {
-                    for item in rest {
-                        if ret.stats_add(item).is_none() {
-                            return;
-                        }
-                    }
-                }
-                Aggregator::Min => {
-                    for item in rest {
-                        if ret.stats_min(item).is_none() {
-                            return;
-                        }
-                    }
-                }
-                Aggregator::Max => {
-                    for item in rest {
-                        if ret.stats_max(item).is_none() {
-                            return;
-                        }
-                    }
-                }
-            }
-            self.aggregated.insert(name.clone(), ret);
-        }
+    fn aggregate(&mut self, name: &str) {
+        self.aggregator.aggregate(name, &self.client_stats);
     }
 
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
@@ -138,7 +87,7 @@ where
         (self.print_fn)(global_fmt);
 
         self.client_stats_insert(sender_id);
-        let client = self.client_stats_for(sender_id);
+        let client = self.client_stats_mut_for(sender_id);
         let cur_time = current_time();
         let exec_sec = client.execs_per_sec_pretty(cur_time);
 
@@ -153,7 +102,7 @@ where
         (self.print_fn)(fmt);
 
         let mut aggregated_fmt = "(Aggregated): ".to_string();
-        for (key, val) in &self.aggregated {
+        for (key, val) in &self.aggregator.aggregated {
             write!(aggregated_fmt, "{key}: {val}").unwrap();
         }
         (self.print_fn)(aggregated_fmt);
@@ -183,7 +132,7 @@ where
             print_fn,
             start_time: current_time(),
             client_stats: vec![],
-            aggregated: HashMap::new(),
+            aggregator: Aggregator::new(),
         }
     }
 
@@ -193,7 +142,7 @@ where
             print_fn,
             start_time,
             client_stats: vec![],
-            aggregated: HashMap::new(),
+            aggregator: Aggregator::new(),
         }
     }
 }

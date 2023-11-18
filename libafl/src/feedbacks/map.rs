@@ -22,7 +22,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverName},
     inputs::UsesInput,
-    monitors::{Aggregator, UserStats},
+    monitors::{AggregatorOps, UserStats},
     observers::{MapObserver, Observer, ObserversTuple, UsesObserver},
     state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
     Error,
@@ -621,7 +621,7 @@ where
                             .map_or(filled, |novelties| filled + novelties.len())
                             as u64,
                         len as u64,
-                        Aggregator::Avg,
+                        AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,
                 },
@@ -830,7 +830,7 @@ where
                             .map_or(filled, |novelties| filled + novelties.len())
                             as u64,
                         len as u64,
-                        Aggregator::Avg,
+                        AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,
                 },

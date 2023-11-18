@@ -11,14 +11,13 @@ use serde_json::json;
 use crate::{
     corpus::{Corpus, CorpusId},
     events::EventFirer,
-    monitors::Aggregator,
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,
     state::{HasCorpus, HasImported, HasMetadata, UsesState},
     Error,
 };
 #[cfg(feature = "std")]
-use crate::{events::Event, monitors::UserStats};
+use crate::{events::Event, monitors::AggregatorOps, monitors::UserStats};
 
 /// The [`AflStatsStage`] is a simple stage that computes and reports some stats.
 #[derive(Debug, Clone)]
@@ -103,7 +102,7 @@ where
                     state,
                     Event::UpdateUserStats {
                         name: "AflStats".to_string(),
-                        value: UserStats::String(json.to_string(), Aggregator::None),
+                        value: UserStats::String(json.to_string(), AggregatorOps::None),
                         phantom: PhantomData,
                     },
                 )?;

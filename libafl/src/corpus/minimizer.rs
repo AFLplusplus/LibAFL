@@ -16,7 +16,7 @@ use crate::{
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
-    monitors::UserStats,
+    monitors::{AggregatorOps, UserStats},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasExecutions, HasMetadata, UsesState},
@@ -150,7 +150,7 @@ where
                 state,
                 Event::UpdateUserStats {
                     name: "minimisation exec pass".to_string(),
-                    value: UserStats::Ratio(curr, total),
+                    value: UserStats::Ratio(curr, total, AggregatorOps::None),
                     phantom: PhantomData,
                 },
             )?;

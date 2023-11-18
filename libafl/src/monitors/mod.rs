@@ -10,9 +10,10 @@ pub mod tui;
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 #[allow(missing_docs)]
 pub mod prometheus;
+use alloc::string::ToString;
+
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub use prometheus::PrometheusMonitor;
-
 #[cfg(feature = "std")]
 pub mod disk;
 use alloc::{fmt::Debug, string::String, vec::Vec};
@@ -29,7 +30,7 @@ const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
 /// Definition of how we aggreate this across multiple clients
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum Aggregator {
+pub enum AggregatorOps {
     /// Do nothing
     None,
     /// Add stats up
@@ -41,77 +42,139 @@ pub enum Aggregator {
     /// Get the max
     Max,
 }
-/// User-defined stat types
-/// TODO define aggregation function (avg, median, max, ...)
+
+/// The standard aggregator, plug this into the monitor to use
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct Aggregator {
+    // this struct could also have hashmap or vec for caching but for now i'll just keep it simple
+    // for example to calculate the sum you don't have to iterate over all clients (obviously)
+    aggregated: HashMap<String, UserStats>,
+}
+
+impl Aggregator {
+    /// constructor for this aggregator
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            aggregated: HashMap::new(),
+        }
+    }
+
+    /// takes the key and the ref to clients stats then aggregate them all.
+    fn aggregate(&mut self, name: &str, client_stats: &[ClientStats]) {
+        let mut gather = vec![];
+        // gather can't be empty as we update before the call to aggregate()
+        for stats in client_stats {
+            if let Some(x) = stats.user_monitor.get(name) {
+                gather.push(x);
+            }
+        }
+
+        if let Some((&init, rest)) = gather.split_first() {
+            if !init.is_numeric() {
+                return;
+            }
+            let mut ret = init.clone();
+            match init.aggregator_ops() {
+                AggregatorOps::None => {
+                    // Nothing
+                    return;
+                }
+                AggregatorOps::Avg => {
+                    for item in rest {
+                        if ret.stats_add(item).is_none() {
+                            return;
+                        }
+                    }
+                    ret.stats_div(gather.len());
+                }
+                AggregatorOps::Sum => {
+                    for item in rest {
+                        if ret.stats_add(item).is_none() {
+                            return;
+                        }
+                    }
+                }
+                AggregatorOps::Min => {
+                    for item in rest {
+                        if ret.stats_min(item).is_none() {
+                            return;
+                        }
+                    }
+                }
+                AggregatorOps::Max => {
+                    for item in rest {
+                        if ret.stats_max(item).is_none() {
+                            return;
+                        }
+                    }
+                }
+            }
+            self.aggregated.insert(name.to_string(), ret);
+        }
+    }
+}
+
+/// user defined stats enum
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
     /// A numerical value
-    Number(u64, Aggregator),
+    Number(u64, AggregatorOps),
     /// A Float value
-    Float(f64, Aggregator),
+    Float(f64, AggregatorOps),
     /// A `String`
-    String(String, Aggregator),
+    String(String, AggregatorOps),
     /// A ratio of two values
-    Ratio(u64, u64, Aggregator),
+    Ratio(u64, u64, AggregatorOps),
 }
 
 impl UserStats {
-    /// Get the aggregator
-    pub fn aggregator(&self) -> Aggregator {
+    /// Get the `AggregatorOps`
+    #[must_use]
+    pub fn aggregator_ops(&self) -> AggregatorOps {
         match &self {
-            Self::Number(_, x) => x.clone(),
-            Self::Float(_, x) => x.clone(),
-            Self::String(_, x) => x.clone(),
-            Self::Ratio(_, _, x) => x.clone(),
+            Self::Number(_, x) | Self::Float(_, x) | Self::String(_, x) | Self::Ratio(_, _, x) => {
+                x.clone()
+            }
         }
     }
 
     /// Check if this guy is numeric
+    #[must_use]
     pub fn is_numeric(&self) -> bool {
         match &self {
-            Self::Number(_, _) => true,
-            Self::Float(_, _) => true,
+            Self::Number(_, _) | Self::Float(_, _) | Self::Ratio(_, _, _) => true,
             Self::String(_, _) => false,
-            Self::Ratio(_, _, _) => true,
         }
     }
 
     /// Divide by the number of elements
+    #[allow(clippy::cast_precision_loss)]
     pub fn stats_div(&mut self, divisor: usize) -> Option<()> {
         match self {
-            Self::Number(x, _) => {
+            Self::Number(x, _) | Self::Ratio(x, _, _) => {
                 *x /= divisor as u64;
                 Some(())
             }
             Self::Float(x, _) => {
                 *x /= divisor as f64;
-
                 Some(())
             }
-            Self::Ratio(x, _, _) => {
-                *x /= divisor as u64;
-                Some(())
-            }
-            _ => None,
+            Self::String(_, _) => None,
         }
     }
 
     /// min user stats with the other
     pub fn stats_max(&mut self, other: &Self) -> Option<()> {
         match (self, other) {
-            (Self::Number(x, _), Self::Number(y, _)) => {
+            (Self::Number(x, _), Self::Number(y, _))
+            | (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
                 if y > x {
                     *x = *y;
                 }
                 Some(())
             }
             (Self::Float(x, _), Self::Float(y, _)) => {
-                if y > x {
-                    *x = *y;
-                }
-                Some(())
-            }
-            (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
                 if y > x {
                     *x = *y;
                 }
@@ -124,19 +187,14 @@ impl UserStats {
     /// min user stats with the other
     pub fn stats_min(&mut self, other: &Self) -> Option<()> {
         match (self, other) {
-            (Self::Number(x, _), Self::Number(y, _)) => {
+            (Self::Number(x, _), Self::Number(y, _))
+            | (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
                 if y < x {
                     *x = *y;
                 }
                 Some(())
             }
             (Self::Float(x, _), Self::Float(y, _)) => {
-                if y < x {
-                    *x = *y;
-                }
-                Some(())
-            }
-            (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
                 if y < x {
                     *x = *y;
                 }
@@ -149,15 +207,12 @@ impl UserStats {
     /// add user stats with the other
     pub fn stats_add(&mut self, other: &Self) -> Option<()> {
         match (self, other) {
-            (Self::Number(x, _), Self::Number(y, _)) => {
+            (Self::Number(x, _), Self::Number(y, _))
+            | (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
                 *x += *y;
                 Some(())
             }
             (Self::Float(x, _), Self::Float(y, _)) => {
-                *x += *y;
-                Some(())
-            }
-            (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
                 *x += *y;
                 Some(())
             }
@@ -282,7 +337,7 @@ impl ClientStats {
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
     #[cfg(feature = "afl_exec_sec")]
-    pub fn execs_per_sec(&self, cur_time: Duration) -> f64 {
+    pub fn execs_per_sec(&mut self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
             return 0.0;
         }
@@ -313,7 +368,7 @@ impl ClientStats {
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
     #[cfg(not(feature = "afl_exec_sec"))]
-    pub fn execs_per_sec(&self, cur_time: Duration) -> f64 {
+    pub fn execs_per_sec(&mut self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
             return 0.0;
         }
@@ -329,13 +384,13 @@ impl ClientStats {
     }
 
     /// Executions per second
-    fn execs_per_sec_pretty(&self, cur_time: Duration) -> String {
+    fn execs_per_sec_pretty(&mut self, cur_time: Duration) -> String {
         prettify_float(self.execs_per_sec(cur_time))
     }
 
     /// Update the user-defined stat with name and value
     pub fn update_user_stats(&mut self, name: String, value: UserStats) -> Option<UserStats> {
-        return self.user_monitor.insert(name, value);
+        self.user_monitor.insert(name, value)
     }
 
     #[must_use]
@@ -393,15 +448,15 @@ pub trait Monitor {
     /// Executions per second
     #[allow(clippy::cast_sign_loss)]
     #[inline]
-    fn execs_per_sec(&self) -> f64 {
+    fn execs_per_sec(&mut self) -> f64 {
         let cur_time = current_time();
-        self.client_stats()
-            .iter()
+        self.client_stats_mut()
+            .iter_mut()
             .fold(0.0, |acc, x| acc + x.execs_per_sec(cur_time))
     }
 
     /// Executions per second
-    fn execs_per_sec_pretty(&self) -> String {
+    fn execs_per_sec_pretty(&mut self) -> String {
         prettify_float(self.execs_per_sec())
     }
 
@@ -428,7 +483,7 @@ pub trait Monitor {
     }
 
     /// Aggregate the results in case there're multiple clients
-    fn aggregate(&mut self, _name: &String) {}
+    fn aggregate(&mut self, _name: &str) {}
 }
 
 /// Monitor that print exactly nothing.
