@@ -44,6 +44,8 @@ use typed_builder::TypedBuilder;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
+#[cfg(all(feature = "std", not(feature = "tcp_manager")))]
+use crate::events::{LlmpRestartingEventManager, ManagerKind, RestartingMgr};
 use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
@@ -53,15 +55,11 @@ use crate::{
     Error,
 };
 #[cfg(all(feature = "std", not(feature = "tcp_manager")))]
-use crate::events::{LlmpRestartingEventManager, ManagerKind, RestartingMgr};
-#[cfg(all(feature = "std", not(feature = "tcp_manager")))]
 type RestartingEventManager<S, SP> = LlmpRestartingEventManager<S, SP>;
 #[cfg(all(feature = "std", feature = "tcp_manager"))]
-use crate::events::tcp::{TcpRestartingEventManager, ManagerKind, RestartingMgr};
+use crate::events::tcp::{ManagerKind, RestartingMgr, TcpRestartingEventManager};
 #[cfg(all(feature = "std", feature = "tcp_manager"))]
 type RestartingEventManager<S, SP> = TcpRestartingEventManager<S, SP>;
-
-
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
