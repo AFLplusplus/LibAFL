@@ -3,37 +3,37 @@ This shows how llmp can be used directly, without libafl abstractions
 */
 extern crate alloc;
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 use core::time::Duration;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 use std::{num::NonZeroUsize, thread, time};
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 use libafl_bolts::{
     llmp::{self, Tag},
     shmem::{ShMemProvider, StdShMemProvider},
     ClientId, Error, SimpleStderrLogger,
 };
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 const _TAG_SIMPLE_U32_V1: Tag = Tag(0x5130_0321);
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 const _TAG_MATH_RESULT_V1: Tag = Tag(0x7747_4331);
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 const _TAG_1MEG_V1: Tag = Tag(0xB111_1161);
 
 /// The time the broker will wait for things to happen before printing a message
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 const BROKER_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// How long the broker may sleep between forwarding a new chunk of sent messages
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 const SLEEP_BETWEEN_FORWARDS: Duration = Duration::from_millis(5);
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 static LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let shmem_provider = StdShMemProvider::new()?;
     let mut client = llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
@@ -71,7 +71,7 @@ fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 fn large_msg_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let mut client = llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
 
@@ -91,7 +91,7 @@ fn large_msg_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[allow(clippy::unnecessary_wraps)]
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 fn broker_message_hook(
     msg_or_timeout: Option<(ClientId, llmp::Tag, llmp::Flags, &[u8])>,
 ) -> Result<llmp::LlmpMsgHookResult, Error> {
@@ -126,12 +126,12 @@ fn broker_message_hook(
     }
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(target_os = "haiku")]
 fn main() {
     eprintln!("LLMP example is currently not supported on no_std. Implement ShMem for no_std.");
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(not(target_os = "haiku"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     /* The main node has a broker, and a few worker threads */
 
