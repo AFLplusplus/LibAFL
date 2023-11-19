@@ -4,7 +4,7 @@ use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{launcher::Launcher, EventConfig, EventRestarter},
     executors::{forkserver::ForkserverExecutorBuilder, TimeoutForkserverExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -118,7 +118,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _>,
+                              mut mgr,
                               _core_id| {
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
