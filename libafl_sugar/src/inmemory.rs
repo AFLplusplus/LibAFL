@@ -6,7 +6,7 @@ use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter}.
+    events::{launcher::Launcher, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -138,9 +138,7 @@ where
 
         let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-        let mut run_client = |state: Option<_>,
-                              mut mgr,
-                              _core_id| {
+        let mut run_client = |state: Option<_>, mut mgr, _core_id| {
             // Create an observation channel using the coverage map
             let edges_observer =
                 HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });

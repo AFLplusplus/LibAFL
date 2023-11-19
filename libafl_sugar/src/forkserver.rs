@@ -117,9 +117,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
 
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
-        let mut run_client = |state: Option<_>,
-                              mut mgr,
-                              _core_id| {
+        let mut run_client = |state: Option<_>, mut mgr, _core_id| {
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
             shmem.write_to_env("__AFL_SHM_ID").unwrap();
