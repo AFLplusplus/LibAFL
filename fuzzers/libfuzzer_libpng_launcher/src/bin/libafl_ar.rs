@@ -16,10 +16,14 @@ pub fn main() {
                 Configuration::GenerateCoverageMap,
                 Configuration::CmpLog,
             ]))
-            .add_configuration(Configuration::UndefinedBehaviorSanitizer)
-            .add_configuration(Configuration::AddressSanitizer)
-            // .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
-            // .add_arg("-fsanitize=address")
+            .add_configuration(Configuration::Compound(vec![
+                Configuration::GenerateCoverageMap,
+                Configuration::AddressSanitizer,
+            ]))
+            .add_configuration(Configuration::Compound(vec![
+                Configuration::GenerateCoverageMap,
+                Configuration::UndefinedBehaviorSanitizer,
+            ]))
             .run()
             .expect("Failed to run the wrapped libtool")
         {
