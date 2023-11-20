@@ -548,7 +548,7 @@ unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow
     (*page).size_used = 0;
     (*(*page).messages.as_mut_ptr()).message_id = MessageId(0);
     (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
-    (*page).safe_to_unmap.store(0, Ordering::Release);
+    (*page).readers.store(0, Ordering::Release);
     (*page).sender_dead.store(0, Ordering::Relaxed);
     assert!((*page).size_total != 0);
 }
@@ -664,16 +664,10 @@ impl LlmpMsg {
     pub fn in_shmem<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
         let map_size = map.shmem.as_slice().len();
         let buf_ptr = self.buf.as_ptr();
+        let len = self.buf_len_padded as usize + size_of::<LlmpMsg>();
         unsafe {
-            if buf_ptr > (map.page_mut() as *const u8).add(size_of::<LlmpPage>())
-                && buf_ptr <= (map.page_mut() as *const u8).add(map_size - size_of::<LlmpMsg>())
-            {
-                // The message header is in the page. Continue with checking the body.
-                let len = self.buf_len_padded as usize + size_of::<LlmpMsg>();
-                buf_ptr <= (map.page_mut() as *const u8).add(map_size - len)
-            } else {
-                false
-            }
+            buf_ptr > (map.page_mut() as *const u8).add(size_of::<LlmpPage>())
+                && buf_ptr.add(len) <= (map.page_mut() as *const u8).add(map_size)
         }
     }
 }
@@ -788,7 +782,7 @@ pub struct LlmpPage {
     /// Set to != 1 by the receiver, once it got mapped.
     /// It's not safe for the sender to unmap this page before
     /// (The os may have tidied up the memory when the receiver starts to map)
-    pub safe_to_unmap: AtomicU16,
+    pub readers: AtomicU16,
     /// Not used at the moment (would indicate that the sender is no longer there)
     pub sender_dead: AtomicU16,
     #[cfg(target_pointer_width = "64")]
@@ -968,10 +962,7 @@ where
         let current_out_shmem = self.out_shmems.last().unwrap();
         unsafe {
             // log::info!("Reading safe_to_unmap from {:?}", current_out_shmem.page() as *const _);
-            (*current_out_shmem.page())
-                .safe_to_unmap
-                .load(Ordering::Relaxed)
-                != 0
+            (*current_out_shmem.page()).readers.load(Ordering::Relaxed) >= 1
         }
     }
 
@@ -980,8 +971,8 @@ where
     /// If this method is called, the page may be unmapped before it is read by any receiver.
     pub unsafe fn mark_safe_to_unmap(&mut self) {
         (*self.out_shmems.last_mut().unwrap().page_mut())
-            .safe_to_unmap
-            .store(1, Ordering::Relaxed);
+            .readers
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Reattach to a vacant `out_shmem`.
@@ -1017,7 +1008,7 @@ where
         // Exclude the current page by splitting of the last element for this iter
         let mut unmap_until_excl = 0;
         for map in self.out_shmems.split_last_mut().unwrap().1 {
-            if (*map.page()).safe_to_unmap.load(Ordering::Acquire) == 0 {
+            if (*map.page()).readers.load(Ordering::Acquire) > 0 {
                 // The broker didn't read this page yet, no more pages to unmap.
                 break;
             }
@@ -1046,7 +1037,7 @@ where
             (*page).magic = PAGE_DEINITIALIZED_MAGIC;
 
             #[cfg(feature = "llmp_debug")]
-            log::debug!("Moving unused map to cache: {map:?}");
+            log::debug!("Moving unused map to cache: {map:?} {:x?}", map.page());
             self.unused_shmem_cache
                 .insert(self.unused_shmem_cache.len(), map);
         }
@@ -1106,7 +1097,7 @@ where
             "Allocating {} bytes on page {:?} / map {:?} (last msg: {:?})",
             buf_len,
             page,
-            &map,
+            &map.shmem.id().as_str(),
             last_msg
         );
 
@@ -1213,18 +1204,25 @@ where
         sender_id: ClientId,
         next_min_shmem_size: usize,
     ) -> Result<LlmpSharedMap<<SP>::ShMem>, Error> {
-        if self.unused_shmem_cache.is_empty() {
-            // No cached maps that fit our need, let's allocate a new one.
-            Ok(LlmpSharedMap::new(
-                sender_id,
-                self.shmem_provider.new_shmem(next_min_shmem_size)?,
-            ))
-        } else {
-            // We got cached shmems laying around, hand it out, if they are large enough.
-            let mut cached_shmem = self
-                .unused_shmem_cache
-                .remove(self.unused_shmem_cache.len() - 1);
+        let mut index = None;
+        for (i, cached_shmem) in self.unused_shmem_cache.iter().enumerate() {
+            if (*shmem2page(&cached_shmem.shmem))
+                .readers
+                .load(Ordering::Relaxed)
+                == 0
+            {
+                index = Some(i);
+                break;
+            }
+        }
 
+        let mut cached_shmem = None;
+        if let Some(index) = index {
+            cached_shmem = Some(self.unused_shmem_cache.remove(index));
+        }
+
+        if let Some(mut cached_shmem) = cached_shmem {
+            // We got cached shmems laying around, hand it out, if they are large enough.
             if cached_shmem.shmem.len() < next_min_shmem_size {
                 // This map is too small, we will never need it again (llmp allocation sizes always increase). Drop it, then call this function again..
                 #[cfg(feature = "llmp_debug")]
@@ -1239,6 +1237,12 @@ where
                 }
                 Ok(cached_shmem)
             }
+        } else {
+            // No cached maps that fit our need, let's allocate a new one.
+            Ok(LlmpSharedMap::new(
+                sender_id,
+                self.shmem_provider.new_shmem(next_min_shmem_size)?,
+            ))
         }
     }
 
@@ -1626,7 +1630,7 @@ where
                     self.highest_msg_id = MessageId(0);
 
                     // Mark the old page save to unmap, in case we didn't do so earlier.
-                    (*page).safe_to_unmap.store(1, Ordering::Relaxed);
+                    (*page).readers.fetch_sub(1, Ordering::Relaxed);
 
                     // Map the new page. The old one should be unmapped by Drop
                     self.current_recv_shmem =
@@ -1636,7 +1640,7 @@ where
                         )?);
                     page = self.current_recv_shmem.page_mut();
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
-                    (*page).safe_to_unmap.store(1, Ordering::Relaxed);
+                    (*page).readers.fetch_sub(1, Ordering::Relaxed);
 
                     #[cfg(feature = "llmp_debug")]
                     log::info!(
@@ -1819,7 +1823,7 @@ where
     /// This indicates, that the page may safely be unmapped by the sender.
     pub fn mark_safe_to_unmap(&mut self) {
         unsafe {
-            (*self.page_mut()).safe_to_unmap.store(1, Ordering::Relaxed);
+            (*self.page_mut()).readers.fetch_add(1, Ordering::Relaxed);
         }
     }
 
@@ -2274,13 +2278,13 @@ where
             }
 
             if let Some(exit_after_count) = self.exit_cleanly_after {
-                log::trace!(
-                    "Clients connected: {} && > {} - {} >= {}",
-                    self.has_clients(),
-                    self.num_clients_total,
-                    self.listeners.len(),
-                    exit_after_count
-                );
+                // log::trace!(
+                //     "Clients connected: {} && > {} - {} >= {}",
+                //     self.has_clients(),
+                //     self.num_clients_total,
+                //     self.listeners.len(),
+                //     exit_after_count
+                // );
                 if !self.has_clients()
                     && (self.num_clients_total - self.listeners.len()) >= exit_after_count.into()
                 {
