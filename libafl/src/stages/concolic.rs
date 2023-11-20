@@ -8,11 +8,13 @@ use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
 use super::{Stage, TracingStage};
+#[cfg(feature = "introspection")]
+use crate::state::HasClientPerfMonitor;
 use crate::{
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    state::{HasCorpus, HasExecutions, HasMetadata},
+    state::{HasCorpus, HasExecutions, HasMetadata, State},
     Error,
 };
 
@@ -354,7 +356,7 @@ where
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
     Z::Input: HasBytesVec,
-    Z::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    Z::State: State + HasExecutions + HasCorpus,
 {
     #[inline]
     fn perform(

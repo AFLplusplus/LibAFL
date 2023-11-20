@@ -346,7 +346,7 @@ where
 impl<MT, S, SP> EventRestarter for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: State + Serialize,
+    S: State,
     SP: ShMemProvider,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
@@ -370,7 +370,7 @@ where
 impl<E, MT, S, SP, Z> EventProcessor<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: State + HasExecutions + Serialize,
+    S: State + HasExecutions,
     SP: ShMemProvider,
 {
     fn process(

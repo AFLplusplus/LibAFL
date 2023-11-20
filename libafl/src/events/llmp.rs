@@ -52,9 +52,7 @@ use crate::{
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
     observers::ObserversTuple,
-    state::{
-        HasExecutions, HasLastReportTime, HasMetadata, HasScalabilityMonitor, State, UsesState,
-    },
+    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
     Error,
 };
 
@@ -375,7 +373,7 @@ where
 impl<S, SP> EventStatsCollector for LlmpEventManager<S, SP>
 where
     SP: ShMemProvider + 'static,
-    S: UsesInput,
+    S: State,
 {
     fn serialization_time(&self) -> Duration {
         self.serialization_time
@@ -566,7 +564,6 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<Self, Z> + HasObservers<State = S>,
-        S: HasScalabilityMonitor,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
     {
@@ -755,7 +752,7 @@ where
 
 impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<S, SP>
 where
-    S: State + HasExecutions + HasMetadata + HasScalabilityMonitor,
+    S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -802,7 +799,7 @@ impl<E, S, SP, Z> EventManager<E, Z> for LlmpEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasScalabilityMonitor,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
@@ -860,7 +857,7 @@ where
 impl<S, SP> EventStatsCollector for LlmpRestartingEventManager<S, SP>
 where
     SP: ShMemProvider + 'static,
-    S: UsesInput,
+    S: State,
 {
     fn serialization_time(&self) -> Duration {
         self.llmp_mgr.serialization_time()
@@ -909,7 +906,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> ProgressReporter for LlmpRestartingEventManager<S, SP>
 where
-    S: State + HasExecutions + HasMetadata + HasLastReportTime + Serialize,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
 {
 }
@@ -945,7 +942,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> EventRestarter for LlmpRestartingEventManager<S, SP>
 where
-    S: State + HasExecutions + Serialize,
+    S: State + HasExecutions,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -983,7 +980,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: State + HasExecutions + HasMetadata + HasScalabilityMonitor,
+    S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -997,7 +994,7 @@ impl<E, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: State + HasExecutions + HasScalabilityMonitor + HasMetadata + HasLastReportTime + Serialize,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -1006,7 +1003,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> HasEventManagerId for LlmpRestartingEventManager<S, SP>
 where
-    S: State + Serialize,
+    S: State,
     SP: ShMemProvider + 'static,
 {
     fn mgr_id(&self) -> EventManagerId {

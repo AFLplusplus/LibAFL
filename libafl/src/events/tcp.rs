@@ -28,7 +28,7 @@ use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::{shmem::ShMemProvider, ClientId};
 #[cfg(feature = "std")]
 use libafl_bolts::{shmem::StdShMemProvider, staterestore::StateRestorer};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::{broadcast, broadcast::error::RecvError, mpsc},
@@ -49,10 +49,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
-    state::{
-        HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, HasScalabilityMonitor,
-        UsesState,
-    },
+    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
     Error,
 };
 
@@ -410,7 +407,7 @@ where
 /// An [`EventManager`] that forwards all events to other attached via tcp.
 pub struct TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     /// The TCP stream for inter process communication
     tcp: TcpStream,
@@ -429,7 +426,7 @@ where
 
 impl<S> core::fmt::Debug for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("TcpEventManager");
@@ -446,7 +443,7 @@ where
 
 impl<S> Drop for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     /// TCP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
@@ -456,7 +453,7 @@ where
 
 impl<S> TcpEventManager<S>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: State + HasExecutions,
 {
     /// Create a manager from a raw TCP client specifying the client id
     pub fn existing<A: ToSocketAddrs>(
@@ -541,7 +538,6 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        S: HasScalabilityMonitor,
         E: Executor<Self, Z> + HasObservers<State = S>,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
@@ -601,7 +597,7 @@ where
 
 impl<S> TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     /// Send information that this client is exiting.
     /// The other side may free up all allocated memory.
@@ -615,14 +611,14 @@ where
 
 impl<S> UsesState for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
 
 impl<S> EventFirer for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     #[cfg(feature = "tcp_compression")]
     fn fire(
@@ -669,7 +665,7 @@ where
 
 impl<S> EventRestarter for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     /// The TCP client needs to wait until a broker has mapped all pages before shutting down.
     /// Otherwise, the OS may already have removed the shared maps.
@@ -681,7 +677,7 @@ where
 
 impl<E, S, Z> EventProcessor<E, Z> for TcpEventManager<S>
 where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasScalabilityMonitor,
+    S: State + HasExecutions,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
@@ -744,19 +740,14 @@ impl<E, S, Z> EventManager<E, Z> for TcpEventManager<S>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + HasScalabilityMonitor,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
 }
 
 impl<S> HasCustomBufHandlers for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     fn add_custom_buf_handler(
         &mut self,
@@ -767,13 +758,13 @@ where
 }
 
 impl<S> ProgressReporter for TcpEventManager<S> where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime
+    S: State + HasExecutions + HasMetadata + HasLastReportTime
 {
 }
 
 impl<S> HasEventManagerId for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     /// Gets the id assigned to this staterestorer.
     fn mgr_id(&self) -> EventManagerId {
@@ -786,7 +777,7 @@ where
 #[derive(Debug)]
 pub struct TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -801,7 +792,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> UsesState for TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
 {
     type State = S;
@@ -810,12 +801,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> ProgressReporter for TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + Serialize,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
 {
 }
@@ -824,7 +810,7 @@ where
 impl<S, SP> EventFirer for TcpRestartingEventManager<S, SP>
 where
     SP: ShMemProvider,
-    S: UsesInput,
+    S: State,
     //CE: CustomEvent<I>,
 {
     fn fire(
@@ -844,7 +830,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> EventRestarter for TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + Serialize,
+    S: State + HasExecutions,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -881,7 +867,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasScalabilityMonitor,
+    S: State + HasExecutions,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -895,13 +881,7 @@ impl<E, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasScalabilityMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + Serialize,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -910,7 +890,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> HasEventManagerId for TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput + Serialize,
+    S: State,
     SP: ShMemProvider + 'static,
 {
     fn mgr_id(&self) -> EventManagerId {
@@ -927,7 +907,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 #[cfg(feature = "std")]
 impl<S, SP> TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -991,7 +971,7 @@ pub fn setup_restarting_mgr_tcp<MT, S>(
 ) -> Result<(Option<S>, TcpRestartingEventManager<S, StdShMemProvider>), Error>
 where
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasClientPerfMonitor + HasExecutions,
+    S: DeserializeOwned + State + HasExecutions,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -1052,7 +1032,7 @@ where
 impl<MT, S, SP> RestartingMgr<MT, S, SP>
 where
     SP: ShMemProvider,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + DeserializeOwned,
+    S: State + HasExecutions + DeserializeOwned,
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager
