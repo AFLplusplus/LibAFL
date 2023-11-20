@@ -81,7 +81,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
-    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
+    E::State: HasExecutions + HasSolutions + HasClientPerfMonitor + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
     let real_crash = if USE_LIBAFL_CRASH_HANDLER {
@@ -118,7 +118,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
-    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus,
+    E::State: HasSolutions + HasClientPerfMonitor + HasCorpus + HasExecutions,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
     if BREAK_ON_TMOUT {

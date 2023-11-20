@@ -3173,7 +3173,7 @@ where
 }
 
 #[cfg(test)]
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 mod tests {
 
     use std::{thread::sleep, time::Duration};

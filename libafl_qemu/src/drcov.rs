@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     emu::{GuestAddr, GuestUsize},
-    helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
     Emulator,
 };
@@ -72,6 +72,16 @@ impl QemuDrCovHelper {
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
+    }
+}
+
+impl HasInstrumentationFilter for QemuDrCovHelper {
+    fn filter(&self) -> &QemuInstrumentationFilter {
+        &self.filter
+    }
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+        &mut self.filter
     }
 }
 

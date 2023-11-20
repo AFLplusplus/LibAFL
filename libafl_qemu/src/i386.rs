@@ -70,6 +70,34 @@ impl crate::ArchExtras for crate::CPU {
         Ok(())
     }
 
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        if conv != CallingConvention::Cdecl {
+            return Err(format!("Unsupported calling convention: {conv:#?}"));
+        }
+
+        match idx {
+            0..=1 => {
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+                /*
+                 * Stack is full and descending. SP points to return address, arguments
+                 * are in reverse order above that.
+                 */
+                let size: GuestAddr = size_of::<GuestReg>() as GuestAddr;
+                let offset = size * (idx as GuestAddr + 1);
+
+                let mut val = [0u8; size_of::<GuestReg>()];
+                unsafe {
+                    self.read_mem(stack_ptr + offset, &mut val);
+                }
+                Ok(GuestReg::from_le_bytes(val).into())
+            }
+            _ => Err(format!("Unsupported argument: {idx:}")),
+        }
+    }
+
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
