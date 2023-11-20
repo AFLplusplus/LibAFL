@@ -1537,7 +1537,7 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 #[cfg(test)]
 mod tests {
     use serial_test::serial;

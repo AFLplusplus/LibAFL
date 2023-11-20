@@ -80,7 +80,6 @@ impl crate::ArchExtras for crate::CPU {
 
         match idx {
             0..=1 => {
-                let val: GuestReg = val.into();
                 let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
                 /*
                  * Stack is full and descending. SP points to return address, arguments
@@ -89,10 +88,11 @@ impl crate::ArchExtras for crate::CPU {
                 let size: GuestAddr = size_of::<GuestReg>() as GuestAddr;
                 let offset = size * (idx as GuestAddr + 1);
 
-                let val = unsafe {
-                    self.read_mem(stack_ptr + offset, size_of::<GuestReg>());
-                };
-                Ok(GuestReg::from_le_bytes(val))
+                let mut val = [0u8; size_of::<GuestReg>()];
+                unsafe {
+                    self.read_mem(stack_ptr + offset, &mut val);
+                }
+                Ok(GuestReg::from_le_bytes(val).into())
             }
             _ => Err(format!("Unsupported argument: {idx:}")),
         }
