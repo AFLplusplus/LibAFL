@@ -17,7 +17,7 @@ all-features = true
 rustc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["concolic_mutation", "std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor", "libafl_bolts/xxh3"]
+default = ["std", "derive", "llmp_compression", "llmp_small_maps", "llmp_broker_timeouts", "rand_trait", "fork", "prelude", "gzip", "regex", "serdeany_autoreg", "tui_monitor", "libafl_bolts/xxh3"]
 document-features = ["dep:document-features"]
 
 #! # Feature Flags
