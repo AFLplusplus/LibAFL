@@ -1084,7 +1084,7 @@ pub fn setup_restarting_mgr_std<MT, S>(
 ) -> Result<(Option<S>, LlmpRestartingEventManager<S, StdShMemProvider>), Error>
 where
     MT: Monitor + Clone,
-    S: DeserializeOwned + State + HasExecutions,
+    S: State + HasExecutions,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -1145,7 +1145,7 @@ where
 impl<MT, S, SP> RestartingMgr<MT, S, SP>
 where
     SP: ShMemProvider,
-    S: State + HasExecutions + DeserializeOwned,
+    S: State + HasExecutions,
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager
