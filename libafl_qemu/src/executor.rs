@@ -4,15 +4,14 @@ use core::{
     fmt::{self, Debug, Formatter},
 };
 
+#[cfg(feature = "introspection")]
+use libafl::state::HasClientPerfMonitor;
 #[cfg(feature = "fork")]
 use libafl::{
     events::EventManager,
     executors::InProcessForkExecutor,
     state::{HasLastReportTime, HasMetadata},
 };
-
-#[cfg(feature = "introspection")]
-use libafl::state::HasClientPerfMonitor;
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
