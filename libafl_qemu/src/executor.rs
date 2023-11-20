@@ -4,8 +4,6 @@ use core::{
     fmt::{self, Debug, Formatter},
 };
 
-#[cfg(feature = "introspection")]
-use libafl::state::HasClientPerfMonitor;
 #[cfg(feature = "fork")]
 use libafl::{
     events::EventManager,
