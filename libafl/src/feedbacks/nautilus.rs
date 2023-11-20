@@ -8,6 +8,9 @@ use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
+#[cfg(feature = "introspection")]
+use crate::state::HasClientPerfMonitor;
+
 use crate::{
     corpus::{Corpus, Testcase},
     events::EventFirer,
@@ -16,7 +19,7 @@ use crate::{
     generators::NautilusContext,
     inputs::NautilusInput,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, State},
+    state::{HasCorpus, HasMetadata, State},
     Error,
 };
 
@@ -83,7 +86,6 @@ impl<'a, S> Named for NautilusFeedback<'a, S> {
 impl<'a, S> Feedback<S> for NautilusFeedback<'a, S>
 where
     S: HasMetadata
-        + HasClientPerfMonitor
         + HasCorpus<Input = NautilusInput>
         + State<Input = NautilusInput>,
 {
