@@ -1,8 +1,7 @@
 //! Stages which analysis common to Unicode-style mutations
 
-use alloc::{rc::Rc, vec::Vec};
+use alloc::{collections::VecDeque, rc::Rc, vec::Vec};
 use core::marker::PhantomData;
-use std::collections::VecDeque;
 
 use bitvec::{bitvec, vec::BitVec};
 use libafl_bolts::{impl_serdeany, Error};
