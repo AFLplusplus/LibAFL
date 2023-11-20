@@ -45,7 +45,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, HasMetadata},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, State},
     Error,
 };
 
@@ -608,14 +608,14 @@ impl<S> NopEventManager<S> {
 
 impl<S> UsesState for NopEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
 
 impl<S> EventFirer for NopEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     fn fire(
         &mut self,
@@ -626,11 +626,11 @@ where
     }
 }
 
-impl<S> EventRestarter for NopEventManager<S> where S: UsesInput {}
+impl<S> EventRestarter for NopEventManager<S> where S: State {}
 
 impl<E, S, Z> EventProcessor<E, Z> for NopEventManager<S>
 where
-    S: UsesInput + HasExecutions,
+    S: State + HasExecutions,
 {
     fn process(
         &mut self,
@@ -643,13 +643,13 @@ where
 }
 
 impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
-    S: UsesInput + HasExecutions + HasLastReportTime + HasMetadata
+    S: State + HasExecutions + HasLastReportTime + HasMetadata
 {
 }
 
 impl<S> HasCustomBufHandlers for NopEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     fn add_custom_buf_handler(
         &mut self,
@@ -661,7 +661,7 @@ where
 }
 
 impl<S> ProgressReporter for NopEventManager<S> where
-    S: UsesInput + HasExecutions + HasLastReportTime + HasMetadata
+    S: State + HasExecutions + HasLastReportTime + HasMetadata
 {
 }
 

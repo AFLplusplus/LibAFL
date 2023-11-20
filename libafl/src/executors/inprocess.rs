@@ -53,7 +53,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
+    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
 
@@ -75,7 +75,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
 {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: HB,
@@ -91,7 +91,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S> + Debug,
-    S: UsesInput,
+    S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessExecutor")
@@ -106,7 +106,7 @@ where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -116,7 +116,7 @@ where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
 {
     type Observers = OT;
 }
@@ -127,7 +127,7 @@ where
     HB: BorrowMut<H>,
     EM: UsesState<State = S>,
     OT: ObserversTuple<S>,
-    S: UsesInput + HasExecutions,
+    S: State + HasExecutions,
     Z: UsesState<State = S>,
 {
     fn run_target(
@@ -153,7 +153,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -171,7 +171,7 @@ where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: HasExecutions + HasSolutions + HasCorpus,
+    S: HasExecutions + HasSolutions + HasCorpus + State,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -190,6 +190,7 @@ where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
+        S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
         let handlers = InProcessHandlers::new::<Self, EM, OF, Z>()?;
@@ -1645,7 +1646,7 @@ impl<'a, H, OT, S, SP> UsesState for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type State = S;
@@ -1656,7 +1657,7 @@ impl<'a, H, OT, S, SP> UsesState for TimeoutInProcessForkExecutor<'a, H, OT, S, 
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type State = S;
@@ -1668,7 +1669,7 @@ where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: UsesInput + HasExecutions,
+    S: State + HasExecutions,
     SP: ShMemProvider,
     Z: UsesState<State = S>,
 {
@@ -1737,7 +1738,7 @@ where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: UsesInput + HasExecutions,
+    S: State + HasExecutions,
     SP: ShMemProvider,
     Z: UsesState<State = S>,
 {
@@ -1841,7 +1842,7 @@ impl<'a, H, OT, S, SP> InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     /// Creates a new [`InProcessForkExecutor`]
@@ -1886,7 +1887,7 @@ where
 impl<'a, H, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    S: UsesInput,
+    S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
@@ -1992,7 +1993,7 @@ impl<'a, H, OT, S, SP> UsesObservers for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type Observers = OT;
@@ -2003,7 +2004,7 @@ impl<'a, H, OT, S, SP> UsesObservers for TimeoutInProcessForkExecutor<'a, H, OT,
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type Observers = OT;
@@ -2013,7 +2014,7 @@ where
 impl<'a, H, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    S: UsesInput,
+    S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
@@ -2032,7 +2033,7 @@ where
 impl<'a, H, OT, S, SP> HasObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    S: UsesInput,
+    S: State,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {

@@ -163,7 +163,7 @@ mod tests {
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
         inputs::{BytesInput, UsesInput},
         observers::Observer,
-        state::{NopState, UsesState},
+        state::{NopState, State, UsesState},
     };
 
     #[derive(Debug)]
@@ -196,13 +196,13 @@ mod tests {
     }
     impl<S> UsesState for NopEventFirer<S>
     where
-        S: UsesInput,
+        S: State,
     {
         type State = S;
     }
     impl<S> EventFirer for NopEventFirer<S>
     where
-        S: UsesInput,
+        S: State,
     {
         fn fire(
             &mut self,

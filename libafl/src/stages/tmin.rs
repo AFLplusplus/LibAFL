@@ -18,7 +18,7 @@ use crate::{
     schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasMaxSize, HasSolutions, UsesState},
+    state::{HasCorpus, HasExecutions, HasMaxSize, HasSolutions, State, UsesState},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
 #[cfg(feature = "introspection")]
@@ -330,7 +330,7 @@ impl<M, S> HasObserverName for MapEqualityFeedback<M, S> {
 impl<M, S> Feedback<S> for MapEqualityFeedback<M, S>
 where
     M: MapObserver,
-    S: UsesInput,
+    S: State,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -381,7 +381,7 @@ impl<M, OT, S> FeedbackFactory<MapEqualityFeedback<M, S>, S, OT> for MapEquality
 where
     M: MapObserver,
     OT: ObserversTuple<S>,
-    S: UsesInput + Debug,
+    S: State + Debug,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<M, S> {
         let obs = observers
