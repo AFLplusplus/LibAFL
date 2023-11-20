@@ -1051,7 +1051,7 @@ pub mod windows_exception_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasCorpus, HasExecutions, HasSolutions},
+        state::{HasCorpus, HasExecutions, HasSolutions, State},
     };
 
     pub(crate) type HandlerFuncPtr =
