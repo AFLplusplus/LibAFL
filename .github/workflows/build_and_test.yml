@@ -124,6 +124,7 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+        components: llvm-tools
     - name: Remove existing clang and LLVM
       run: sudo apt purge llvm* clang*
     - name: Install and cache deps

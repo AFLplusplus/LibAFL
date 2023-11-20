@@ -80,8 +80,11 @@ use libafl::{
 };
 use libafl_bolts::AsSlice;
 use libc::_exit;
+use mimalloc::MiMalloc;
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 mod corpus;
 mod feedbacks;
