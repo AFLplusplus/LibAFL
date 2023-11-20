@@ -5,7 +5,7 @@ use libafl::{
     feedbacks::{Feedback, MapIndexesMetadata},
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
-    state::{State, HasCorpus, HasMetadata},
+    state::{HasCorpus, HasMetadata, State},
     Error,
 };
 use libafl_bolts::{Named, SerdeAny};
