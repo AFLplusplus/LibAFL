@@ -10,7 +10,6 @@ use serde_json;
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
-
 use crate::{
     corpus::{Corpus, Testcase},
     events::EventFirer,
@@ -85,9 +84,7 @@ impl<'a, S> Named for NautilusFeedback<'a, S> {
 
 impl<'a, S> Feedback<S> for NautilusFeedback<'a, S>
 where
-    S: HasMetadata
-        + HasCorpus<Input = NautilusInput>
-        + State<Input = NautilusInput>,
+    S: HasMetadata + HasCorpus<Input = NautilusInput> + State<Input = NautilusInput>,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
