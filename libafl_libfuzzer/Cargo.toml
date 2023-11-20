@@ -35,6 +35,9 @@ introspection = []
 ## `-fsanitize=fuzzer-no-link -l:libafl_libfuzzer_runtime.a`
 embed-runtime = []
 
+## 🐇
+rabbit = []
+
 [dependencies]
 libfuzzer-sys = { version = "0.4.7", default-features = false }
 document-features = { version = "0.2" }
