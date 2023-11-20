@@ -1231,10 +1231,12 @@ where
                 debug_assert_ne!(receivers_joined_count, 0);
                 let receivers_left_count = page.receivers_left_count.load(Ordering::Relaxed);
                 debug_assert!(receivers_joined_count >= receivers_left_count);
-                let receivers_left_count = page.receivers_left_count.load(Ordering::Relaxed);
 
-                receivers_joined_count == receivers_left_count
-                // TODO: if we ever reintroduce refcounts, we will want to double check that receivers_joint_count didn't change.
+                let ret = receivers_joined_count == receivers_left_count
+                // For proper refcounts, we will need to double check that receivers_joint_count didn't change, so nobody joined in the meantime.
+                debug_assert_eq!(receivers_joined_count, page.receivers_joined_count.load(Ordering::Relaxed), "Oops, some receiver joined while re-using the page!");
+
+                ret
             })
             .map(|e| self.unused_shmem_cache.remove(e));
 
