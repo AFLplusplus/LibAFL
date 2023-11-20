@@ -82,7 +82,10 @@ impl<'a, S> Named for NautilusFeedback<'a, S> {
 
 impl<'a, S> Feedback<S> for NautilusFeedback<'a, S>
 where
-    S: HasMetadata + HasClientPerfMonitor + HasCorpus<Input = NautilusInput> + State,
+    S: HasMetadata
+        + HasClientPerfMonitor
+        + HasCorpus<Input = NautilusInput>
+        + State<Input = NautilusInput>,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(

@@ -7,7 +7,7 @@ use libafl::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, MinMapFeedback},
-    inputs::Input,
+    inputs::{BytesInput, Input},
     observers::ObserversTuple,
     state::{HasMetadata, State},
     Error,
@@ -113,7 +113,7 @@ impl LibfuzzerCrashCauseFeedback {
 
 impl<S> Feedback<S> for LibfuzzerCrashCauseFeedback
 where
-    S: State,
+    S: State<Input = BytesInput>,
 {
     fn is_interesting<EM, OT>(
         &mut self,
