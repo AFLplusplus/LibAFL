@@ -548,7 +548,7 @@ unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow
     (*page).size_used = 0;
     (*(*page).messages.as_mut_ptr()).message_id = MessageId(0);
     (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
-    (*page).readers.store(0, Ordering::Release);
+    (*page).readers_count.store(0, Ordering::Release);
     (*page).sender_dead.store(0, Ordering::Relaxed);
     assert!((*page).size_total != 0);
 }
@@ -782,7 +782,7 @@ pub struct LlmpPage {
     /// Set to != 1 by the receiver, once it got mapped.
     /// It's not safe for the sender to unmap this page before
     /// (The os may have tidied up the memory when the receiver starts to map)
-    pub readers: AtomicU16,
+    pub readers_count: AtomicU16,
     /// Not used at the moment (would indicate that the sender is no longer there)
     pub sender_dead: AtomicU16,
     #[cfg(target_pointer_width = "64")]
@@ -828,7 +828,7 @@ where
     /// A vec of page wrappers, each containing an initialized [`ShMem`]
     out_shmems: Vec<LlmpSharedMap<SP::ShMem>>,
     /// A vec of pages that we previously used, but that have served its purpose
-    /// (no potential readers are left).
+    /// (no potential readers_count are left).
     /// Instead of freeing them, we keep them around to potentially reuse them later,
     /// if they are still large enough.
     /// This way, the OS doesn't have to spend time zeroing pages, and getting rid of our old pages
@@ -962,7 +962,7 @@ where
         let current_out_shmem = self.out_shmems.last().unwrap();
         unsafe {
             // log::info!("Reading safe_to_unmap from {:?}", current_out_shmem.page() as *const _);
-            (*current_out_shmem.page()).readers.load(Ordering::Relaxed) >= 1
+            (*current_out_shmem.page()).readers_count.load(Ordering::Relaxed) >= 1
         }
     }
 
@@ -971,7 +971,7 @@ where
     /// If this method is called, the page may be unmapped before it is read by any receiver.
     pub unsafe fn mark_safe_to_unmap(&mut self) {
         (*self.out_shmems.last_mut().unwrap().page_mut())
-            .readers
+            .readers_count
             .fetch_add(1, Ordering::Relaxed);
     }
 
@@ -1008,7 +1008,7 @@ where
         // Exclude the current page by splitting of the last element for this iter
         let mut unmap_until_excl = 0;
         for map in self.out_shmems.split_last_mut().unwrap().1 {
-            if (*map.page()).readers.load(Ordering::Acquire) > 0 {
+            if (*map.page()).readers_count.load(Ordering::Acquire) > 0 {
                 // The broker didn't read this page yet, no more pages to unmap.
                 break;
             }
@@ -1207,7 +1207,7 @@ where
         let mut index = None;
         for (i, cached_shmem) in self.unused_shmem_cache.iter().enumerate() {
             if (*shmem2page(&cached_shmem.shmem))
-                .readers
+                .readers_count
                 .load(Ordering::Relaxed)
                 == 0
             {
@@ -1630,7 +1630,7 @@ where
                     self.highest_msg_id = MessageId(0);
 
                     // Mark the old page save to unmap, in case we didn't do so earlier.
-                    (*page).readers.fetch_sub(1, Ordering::Relaxed);
+                    (*page).readers_count.fetch_sub(1, Ordering::Relaxed);
 
                     // Map the new page. The old one should be unmapped by Drop
                     self.current_recv_shmem =
@@ -1640,7 +1640,7 @@ where
                         )?);
                     page = self.current_recv_shmem.page_mut();
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
-                    (*page).readers.fetch_sub(1, Ordering::Relaxed);
+                    (*page).readers_count.fetch_sub(1, Ordering::Relaxed);
 
                     #[cfg(feature = "llmp_debug")]
                     log::info!(
@@ -1823,7 +1823,7 @@ where
     /// This indicates, that the page may safely be unmapped by the sender.
     pub fn mark_safe_to_unmap(&mut self) {
         unsafe {
-            (*self.page_mut()).readers.fetch_add(1, Ordering::Relaxed);
+            (*self.page_mut()).readers_count.fetch_add(1, Ordering::Relaxed);
         }
     }
 
