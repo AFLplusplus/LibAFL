@@ -845,7 +845,7 @@ where
     /// A vec of page wrappers, each containing an initialized [`ShMem`]
     out_shmems: Vec<LlmpSharedMap<SP::ShMem>>,
     /// A vec of pages that we previously used, but that have served its purpose
-    /// (no potential receivers_joined_count are left).
+    /// (no potential receivers are left).
     /// Instead of freeing them, we keep them around to potentially reuse them later,
     /// if they are still large enough.
     /// This way, the OS doesn't have to spend time zeroing pages, and getting rid of our old pages
@@ -979,7 +979,10 @@ where
         let current_out_shmem = self.out_shmems.last().unwrap();
         unsafe {
             // log::info!("Reading safe_to_unmap from {:?}", current_out_shmem.page() as *const _);
-            (*current_out_shmem.page()).receivers_joined_count.load(Ordering::Relaxed) >= 1
+            (*current_out_shmem.page())
+                .receivers_joined_count
+                .load(Ordering::Relaxed)
+                >= 1
         }
     }
 
@@ -1219,19 +1222,21 @@ where
         sender_id: ClientId,
         next_min_shmem_size: usize,
     ) -> Result<LlmpSharedMap<<SP>::ShMem>, Error> {
+        let cached_shmem = self
+            .unused_shmem_cache
+            .iter()
+            .position(|cached_shmem| {
+                let page = &(*shmem2page(&cached_shmem.shmem));
+                let receivers_joined_count = page.receivers_joined_count.load(Ordering::Relaxed);
+                debug_assert_ne!(receivers_joined_count, 0);
+                let receivers_left_count = page.receivers_left_count.load(Ordering::Relaxed);
+                debug_assert!(receivers_joined_count >= receivers_left_count);
+                let receivers_left_count = page.receivers_left_count.load(Ordering::Relaxed);
 
-        let cached_shmem = self.unused_shmem_cache.iter()
-        .position(|cached_shmem| {
-            let page = &(*shmem2page(&cached_shmem.shmem));
-            let receivers_joined_count = page.receivers_joined_count
-                .load(Ordering::Relaxed);
-            debug_assert_ne!(receivers_joined_count, 0);
-            let receivers_left_count = page.receivers_left_count.load(Ordering::Relaxed);
-            debug_assert!(receivers_joined_count <= receivers_left_count);
-            let receivers_left_count = page.receivers_left_count.load(Ordering::Relaxed);
-
-            receivers_joined_count == receivers_left_count
-        }).map(|e| self.unused_shmem_cache.remove(e));
+                receivers_joined_count == receivers_left_count
+                // TODO: if we ever reintroduce refcounts, we will want to double check that receivers_joint_count didn't change.
+            })
+            .map(|e| self.unused_shmem_cache.remove(e));
 
         if let Some(mut cached_shmem) = cached_shmem {
             // We got cached shmems laying around, hand it out, if they are large enough.
@@ -1650,10 +1655,10 @@ where
                             ShMemId::from_array(&pageinfo_cpy.shm_str),
                             pageinfo_cpy.map_size,
                         )?);
-                    page = self.current_recv_shmem.page_mut();
+                    let new_page = self.current_recv_shmem.page_mut();
 
                     // Mark the old page as save to remap (it's mapped by us, the receiver, now)
-                    (*page).receiver_joined();
+                    (*new_page).receiver_joined();
 
                     #[cfg(feature = "llmp_debug")]
                     log::info!(
