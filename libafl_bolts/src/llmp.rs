@@ -1222,6 +1222,8 @@ where
         sender_id: ClientId,
         next_min_shmem_size: usize,
     ) -> Result<LlmpSharedMap<<SP>::ShMem>, Error> {
+
+        // Find a shared map that has been released to reuse, from which all receivers left / finished reading.
         let cached_shmem = self
             .unused_shmem_cache
             .iter()
@@ -1233,7 +1235,8 @@ where
                 debug_assert!(receivers_joined_count >= receivers_left_count);
 
                 let ret = receivers_joined_count == receivers_left_count;
-                // For proper refcounts, we will need to double check that receivers_joint_count didn't change, so nobody joined in the meantime.
+
+                // For proper refcounts, double check that nobody joined in the meantime.
                 debug_assert_eq!(receivers_joined_count, page.receivers_joined_count.load(Ordering::Relaxed), "Oops, some receiver joined while re-using the page!");
 
                 ret
