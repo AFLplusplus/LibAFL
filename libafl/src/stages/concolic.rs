@@ -10,11 +10,13 @@ use core::marker::PhantomData;
 use super::{Stage, TracingStage};
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
+#[cfg(feature = "concolic_mutation")]
+use crate::state::State;
 use crate::{
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    state::{HasCorpus, HasExecutions, HasMetadata, State},
+    state::{HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
 
