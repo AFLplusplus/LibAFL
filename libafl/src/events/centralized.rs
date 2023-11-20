@@ -29,7 +29,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, HasMetadata, HasScalabilityMonitor, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
 
@@ -391,7 +391,6 @@ where
 impl<E, EM, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
-    EM::State: HasScalabilityMonitor,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
@@ -418,7 +417,7 @@ where
 impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventManager<E, Z>,
-    EM::State: HasExecutions + HasMetadata + HasLastReportTime + HasScalabilityMonitor,
+    EM::State: HasExecutions + HasMetadata + HasLastReportTime,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
@@ -590,7 +589,7 @@ where
     ) -> Result<usize, Error>
     where
         E: Executor<Self, Z> + HasObservers<State = EM::State>,
-        EM::State: UsesInput + HasExecutions + HasMetadata + HasScalabilityMonitor,
+        EM::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
     {
@@ -636,7 +635,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<Self, Z> + HasObservers<State = EM::State>,
-        EM::State: UsesInput + HasExecutions + HasMetadata + HasScalabilityMonitor,
+        EM::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
     {
@@ -653,6 +652,7 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
+                #[cfg(feature = "scalability_introspection")]
                 println!(
                     "{} {}",
                     state.scalability_monitor().testcase_with_observers,

@@ -21,6 +21,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
+#[cfg(feature = "scalability_introspection")]
+use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
@@ -28,7 +30,6 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
-    monitors::ScalabilityMonitor,
     Error,
 };
 
@@ -38,7 +39,10 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// The [`State`] of the fuzzer.
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
-pub trait State: UsesInput + Serialize + DeserializeOwned + MaybeHasClientPerfMonitor {}
+pub trait State:
+    UsesInput + Serialize + DeserializeOwned + MaybeHasClientPerfMonitor + MaybeHasScalabilityMonitor
+{
+}
 
 /// Structs which implement this trait are aware of the state. This is used for type enforcement.
 pub trait UsesState: UsesInput<Input = <Self::State as UsesInput>::Input> {
@@ -104,7 +108,7 @@ pub trait HasClientPerfMonitor {
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
 }
 
-/// Intermediate trait for `HasClientPerfmonitor`
+/// Intermediate trait for `HasClientPerfMonitor`
 #[cfg(feature = "introspection")]
 pub trait MaybeHasClientPerfMonitor: HasClientPerfMonitor {}
 
@@ -118,7 +122,21 @@ impl<T> MaybeHasClientPerfMonitor for T {}
 #[cfg(feature = "introspection")]
 impl<T> MaybeHasClientPerfMonitor for T where T: HasClientPerfMonitor {}
 
+/// Intermediate trait for `HasScalabilityMonitor`
+#[cfg(feature = "scalability_monitor")]
+pub trait MaybeHasScalabilityMonitor: HasScalabilityMonitor {}
+/// Intermediate trait for `HasScalabilityMonitor`
+#[cfg(not(feature = "scalability_monitor"))]
+pub trait MaybeHasScalabilityMonitor {}
+
+#[cfg(not(feature = "scalability_monitor"))]
+impl<T> MaybeHasScalabilityMonitor for T {}
+
+#[cfg(feature = "scalability_monitor")]
+impl<T> MaybeHasScalabilityMonitor for T where T: HasScalabilityMonitor {}
+
 /// Trait for offering a [`ScalabilityMonitor`]
+#[cfg(feature = "scalability_monitor")]
 pub trait HasScalabilityMonitor {
     /// Ref to [`ScalabilityMonitor`]
     fn scalability_monitor(&self) -> &ScalabilityMonitor;
@@ -906,17 +924,6 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
 
     fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
         &mut self.scalability_monitor
-    }
-}
-
-#[cfg(not(feature = "scalability_introspection"))]
-impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
-    fn scalability_monitor(&self) -> &ScalabilityMonitor {
-        unimplemented!()
-    }
-
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
-        unimplemented!()
     }
 }
 
