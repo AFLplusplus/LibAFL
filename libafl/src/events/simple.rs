@@ -38,7 +38,7 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
 #[cfg(feature = "std")]
@@ -135,7 +135,7 @@ where
 impl<E, MT, S, Z> EventManager<E, Z> for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata,
+    S: UsesInput + HasExecutions + HasLastReportTime + HasMetadata,
 {
 }
 
@@ -158,7 +158,7 @@ where
 impl<MT, S> ProgressReporter for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: UsesInput + HasExecutions + HasMetadata + HasLastReportTime,
 {
 }
 
@@ -370,7 +370,7 @@ where
 impl<E, MT, S, SP, Z> EventProcessor<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + Serialize,
+    S: UsesInput + HasExecutions + Serialize,
     SP: ShMemProvider,
 {
     fn process(
@@ -387,12 +387,7 @@ where
 impl<E, MT, S, SP, Z> EventManager<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + Serialize,
+    S: UsesInput + HasExecutions + HasMetadata + HasLastReportTime + Serialize,
     SP: ShMemProvider,
 {
 }
@@ -416,7 +411,7 @@ where
 impl<MT, S, SP> ProgressReporter for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: UsesInput + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
 {
 }

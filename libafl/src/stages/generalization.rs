@@ -8,8 +8,6 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::AsSlice;
 
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
@@ -19,9 +17,11 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, UsesState},
     Error,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 const MAX_GENERALIZED_LEN: usize = 8192;
 
@@ -60,11 +60,7 @@ where
     O: MapObserver,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
-    E::State: UsesInput<Input = BytesInput>
-        + HasClientPerfMonitor
-        + HasExecutions
-        + HasMetadata
-        + HasCorpus,
+    E::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
@@ -316,11 +312,7 @@ where
     EM: UsesState,
     O: MapObserver,
     OT: ObserversTuple<EM::State>,
-    EM::State: UsesInput<Input = BytesInput>
-        + HasClientPerfMonitor
-        + HasExecutions
-        + HasMetadata
-        + HasCorpus,
+    EM::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]

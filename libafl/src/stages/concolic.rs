@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
+    state::{HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
 
@@ -35,7 +35,7 @@ where
     E: UsesState<State = TE::State>,
     EM: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    TE::State: HasExecutions + HasCorpus,
     Z: UsesState<State = TE::State>,
 {
     #[inline]

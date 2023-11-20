@@ -29,10 +29,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     observers::ObserversTuple,
-    state::{
-        HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, HasScalabilityMonitor,
-        UsesState,
-    },
+    state::{HasExecutions, HasLastReportTime, HasMetadata, HasScalabilityMonitor, UsesState},
     Error,
 };
 
@@ -421,11 +418,7 @@ where
 impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventManager<E, Z>,
-    EM::State: HasClientPerfMonitor
-        + HasExecutions
-        + HasMetadata
-        + HasLastReportTime
-        + HasScalabilityMonitor,
+    EM::State: HasExecutions + HasMetadata + HasLastReportTime + HasScalabilityMonitor,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
@@ -453,7 +446,7 @@ where
 impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + ProgressReporter + HasEventManagerId,
-    EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
+    EM::State: HasMetadata + HasExecutions + HasLastReportTime,
     SP: ShMemProvider + 'static,
 {
 }

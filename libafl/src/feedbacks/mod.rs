@@ -34,13 +34,14 @@ use libafl_bolts::Named;
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::state::HasClientPerfMonitor;
 use crate::{
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
     inputs::UsesInput,
     observers::{ListObserver, ObserversTuple, TimeObserver},
-    state::HasClientPerfMonitor,
     Error,
 };
 
@@ -49,7 +50,7 @@ use crate::{
 /// indicating the "interestingness" of the last run.
 pub trait Feedback<S>: Named
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     /// Initializes the feedback state.
     /// This method is called after that the `State` is created.
@@ -140,7 +141,7 @@ where
     A: Feedback<S>,
     B: Feedback<S>,
     FL: FeedbackLogic<A, B, S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     /// First [`Feedback`]
     pub first: A,
@@ -155,7 +156,7 @@ where
     A: Feedback<S>,
     B: Feedback<S>,
     FL: FeedbackLogic<A, B, S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     fn name(&self) -> &str {
         self.name.as_ref()
@@ -167,7 +168,7 @@ where
     A: Feedback<S>,
     B: Feedback<S>,
     FL: FeedbackLogic<A, B, S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     /// Create a new combined feedback
     pub fn new(first: A, second: B) -> Self {
@@ -186,7 +187,7 @@ where
     A: Feedback<S>,
     B: Feedback<S>,
     FL: FeedbackLogic<A, B, S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         self.first.init_state(state)?;
@@ -269,7 +270,7 @@ pub trait FeedbackLogic<A, B, S>: 'static
 where
     A: Feedback<S>,
     B: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     /// The name of this combination
     fn name() -> &'static str;
@@ -310,7 +311,7 @@ where
 pub trait FeedbackFactory<F, S, T>
 where
     F: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     /// Create the feedback from the provided context
     fn create_feedback(&self, ctx: &T) -> F;
@@ -320,7 +321,7 @@ impl<FE, FU, S, T> FeedbackFactory<FE, S, T> for FU
 where
     FU: Fn(&T) -> FE,
     FE: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     fn create_feedback(&self, ctx: &T) -> FE {
         self(ctx)
@@ -350,7 +351,7 @@ where
 impl<F, S, T> FeedbackFactory<F, S, T> for DefaultFeedbackFactory<F>
 where
     F: Feedback<S> + Default,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     fn create_feedback(&self, _ctx: &T) -> F {
         F::default()
@@ -377,7 +378,7 @@ impl<A, B, S> FeedbackLogic<A, B, S> for LogicEagerOr
 where
     A: Feedback<S>,
     B: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     fn name() -> &'static str {
         "Eager OR"
@@ -427,7 +428,7 @@ impl<A, B, S> FeedbackLogic<A, B, S> for LogicFastOr
 where
     A: Feedback<S>,
     B: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     fn name() -> &'static str {
         "Fast OR"
@@ -483,7 +484,7 @@ impl<A, B, S> FeedbackLogic<A, B, S> for LogicEagerAnd
 where
     A: Feedback<S>,
     B: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     fn name() -> &'static str {
         "Eager AND"
@@ -533,7 +534,7 @@ impl<A, B, S> FeedbackLogic<A, B, S> for LogicFastAnd
 where
     A: Feedback<S>,
     B: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     fn name() -> &'static str {
         "Fast AND"
@@ -608,7 +609,7 @@ pub type FastOrFeedback<A, B, S> = CombinedFeedback<A, B, LogicFastOr, S>;
 pub struct NotFeedback<A, S>
 where
     A: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     /// The feedback to invert
     pub first: A,
@@ -620,7 +621,7 @@ where
 impl<A, S> Debug for NotFeedback<A, S>
 where
     A: Feedback<S> + Debug,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("NotFeedback")
@@ -633,7 +634,7 @@ where
 impl<A, S> Feedback<S> for NotFeedback<A, S>
 where
     A: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         self.first.init_state(state)
@@ -679,7 +680,7 @@ where
 impl<A, S> Named for NotFeedback<A, S>
 where
     A: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -690,7 +691,7 @@ where
 impl<A, S> NotFeedback<A, S>
 where
     A: Feedback<S>,
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
@@ -758,7 +759,7 @@ macro_rules! feedback_not {
 /// Hack to use () as empty Feedback
 impl<S> Feedback<S> for ()
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -783,7 +784,7 @@ pub struct CrashFeedback {}
 
 impl<S> Feedback<S> for CrashFeedback
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -836,7 +837,7 @@ pub struct TimeoutFeedback {}
 
 impl<S> Feedback<S> for TimeoutFeedback
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -893,7 +894,7 @@ pub struct TimeFeedback {
 
 impl<S> Feedback<S> for TimeFeedback
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -973,7 +974,7 @@ where
 
 impl<S, T> Feedback<S> for ListFeedback<T>
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     #[allow(clippy::wrong_self_convention)]
@@ -1045,7 +1046,7 @@ pub enum ConstFeedback {
 
 impl<S> Feedback<S> for ConstFeedback
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: UsesInput,
 {
     #[inline]
     #[allow(clippy::wrong_self_convention)]

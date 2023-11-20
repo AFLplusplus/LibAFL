@@ -52,10 +52,7 @@ use crate::{
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
     observers::ObserversTuple,
-    state::{
-        HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, HasScalabilityMonitor,
-        UsesState,
-    },
+    state::{HasExecutions, HasLastReportTime, HasMetadata, HasScalabilityMonitor, UsesState},
     Error,
 };
 
@@ -552,7 +549,7 @@ where
 
 impl<S, SP> LlmpEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: UsesInput + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
 {
     // Handle arriving events in the client
@@ -756,7 +753,7 @@ where
 
 impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<S, SP>
 where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata + HasScalabilityMonitor,
+    S: UsesInput + HasExecutions + HasMetadata + HasScalabilityMonitor,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -803,12 +800,7 @@ impl<E, S, SP, Z> EventManager<E, Z> for LlmpEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + HasScalabilityMonitor,
+    S: UsesInput + HasExecutions + HasMetadata + HasLastReportTime + HasScalabilityMonitor,
     SP: ShMemProvider,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
@@ -829,7 +821,7 @@ where
 
 impl<S, SP> ProgressReporter for LlmpEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: UsesInput + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
 {
 }
@@ -915,12 +907,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> ProgressReporter for LlmpRestartingEventManager<S, SP>
 where
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + Serialize,
+    S: UsesInput + HasExecutions + HasMetadata + HasLastReportTime + Serialize,
     SP: ShMemProvider,
 {
 }
@@ -956,7 +943,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> EventRestarter for LlmpRestartingEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + Serialize,
+    S: UsesInput + HasExecutions + Serialize,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -994,7 +981,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasScalabilityMonitor,
+    S: UsesInput + HasExecutions + HasMetadata + HasScalabilityMonitor,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -1010,7 +997,6 @@ where
     for<'a> E::Observers: Deserialize<'a>,
     S: UsesInput
         + HasExecutions
-        + HasClientPerfMonitor
         + HasScalabilityMonitor
         + HasMetadata
         + HasLastReportTime
@@ -1104,7 +1090,7 @@ pub fn setup_restarting_mgr_std<MT, S>(
 ) -> Result<(Option<S>, LlmpRestartingEventManager<S, StdShMemProvider>), Error>
 where
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasClientPerfMonitor + HasExecutions,
+    S: DeserializeOwned + UsesInput + HasExecutions,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -1165,7 +1151,7 @@ where
 impl<MT, S, SP> RestartingMgr<MT, S, SP>
 where
     SP: ShMemProvider,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + DeserializeOwned,
+    S: UsesInput + HasExecutions + DeserializeOwned,
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager
@@ -1429,7 +1415,7 @@ where
 
 impl<IC, ICB, DI, S, SP> LlmpEventConverter<IC, ICB, DI, S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: UsesInput + HasExecutions,
     SP: ShMemProvider + 'static,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,

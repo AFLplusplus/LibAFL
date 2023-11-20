@@ -16,7 +16,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::Input,
     observers::{Observer, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata, State},
+    state::{HasMetadata, State},
     Error,
 };
 
@@ -119,7 +119,7 @@ impl<F, I, O1, O2, S> Feedback<S> for DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     I: Input,
-    S: HasMetadata + HasClientPerfMonitor + State<Input = I>,
+    S: HasMetadata + State<Input = I>,
     O1: Observer<S> + PartialEq<O2>,
     O2: Observer<S>,
 {

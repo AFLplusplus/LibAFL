@@ -6,8 +6,6 @@ use core::{marker::PhantomData, time::Duration};
 use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId},
     mark_feature_time,
@@ -17,9 +15,11 @@ use crate::{
         MutationalStage, Stage,
     },
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasMetadata, HasNamedMetadata, HasRand, UsesState},
     Error, Evaluator,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
@@ -161,7 +161,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// Runs this (mutational) stage for the given `testcase`
@@ -254,7 +254,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     type State = Z::State;
@@ -266,7 +266,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     #[inline]
@@ -294,7 +294,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// Creates a new default tuneable mutational stage
@@ -462,7 +462,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata,
 {
     /// Creates a new tranforming mutational stage
     #[must_use]
