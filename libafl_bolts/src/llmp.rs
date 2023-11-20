@@ -1569,7 +1569,7 @@ where
     #[inline(never)]
     unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, Error> {
         /* DBG("recv %p %p\n", page, last_msg); */
-        let mut page = self.current_recv_shmem.page_mut();
+        let page = self.current_recv_shmem.page_mut();
         let last_msg = self.last_msg_recvd;
 
         let (current_msg_id, loaded) =
