@@ -1232,7 +1232,7 @@ where
                 let receivers_left_count = page.receivers_left_count.load(Ordering::Relaxed);
                 debug_assert!(receivers_joined_count >= receivers_left_count);
 
-                let ret = receivers_joined_count == receivers_left_count
+                let ret = receivers_joined_count == receivers_left_count;
                 // For proper refcounts, we will need to double check that receivers_joint_count didn't change, so nobody joined in the meantime.
                 debug_assert_eq!(receivers_joined_count, page.receivers_joined_count.load(Ordering::Relaxed), "Oops, some receiver joined while re-using the page!");
 
