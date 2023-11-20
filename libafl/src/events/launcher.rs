@@ -49,7 +49,7 @@ use crate::inputs::UsesInput;
 use crate::{
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     monitors::Monitor,
-    state::{HasClientPerfMonitor, HasExecutions},
+    state::HasExecutions,
     Error,
 };
 
@@ -141,7 +141,7 @@ impl<'a, CF, MT, S, SP> Launcher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: DeserializeOwned + UsesInput + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
@@ -478,7 +478,7 @@ where
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: DeserializeOwned + UsesInput + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz

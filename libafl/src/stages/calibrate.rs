@@ -22,9 +22,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
-    },
+    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState},
     Error,
 };
 
@@ -92,7 +90,7 @@ where
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<E::State>,
-    E::State: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata + HasExecutions,
+    E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
     Z: Evaluator<E, EM, State = E::State>,
 {
     #[inline]

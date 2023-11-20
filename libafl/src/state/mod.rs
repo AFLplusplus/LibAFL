@@ -19,6 +19,8 @@ use libafl_bolts::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::monitors::ClientPerfMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
@@ -26,7 +28,7 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
-    monitors::{ClientPerfMonitor, ScalabilityMonitor},
+    monitors::ScalabilityMonitor,
     Error,
 };
 
@@ -92,6 +94,7 @@ pub trait HasRand {
     fn rand_mut(&mut self) -> &mut Self::Rand;
 }
 
+#[cfg(feature = "introspection")]
 /// Trait for offering a [`ClientPerfMonitor`]
 pub trait HasClientPerfMonitor {
     /// [`ClientPerfMonitor`] itself
@@ -100,6 +103,20 @@ pub trait HasClientPerfMonitor {
     /// Mutatable ref to [`ClientPerfMonitor`]
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
 }
+
+/// Intermediate trait for `HasClientPerfmonitor`
+#[cfg(feature = "introspection")]
+pub trait MaybeHasClientPerfMonitor: HasClientPerfMonitor {}
+
+/// Intermediate trait for `HasClientPerfmonitor`
+#[cfg(not(feature = "introspection"))]
+pub trait MaybeHasClientPerfMonitor {}
+
+#[cfg(not(feature = "introspection"))]
+impl<T> MaybeHasClientPerfMonitor for T {}
+
+#[cfg(feature = "introspection")]
+impl<T> MaybeHasClientPerfMonitor for T where T: HasClientPerfMonitor {}
 
 /// Trait for offering a [`ScalabilityMonitor`]
 pub trait HasScalabilityMonitor {
@@ -881,17 +898,6 @@ impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
     }
 }
 
-#[cfg(not(feature = "introspection"))]
-impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
-    fn introspection_monitor(&self) -> &ClientPerfMonitor {
-        unimplemented!()
-    }
-
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!()
-    }
-}
-
 #[cfg(feature = "scalability_introspection")]
 impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
     fn scalability_monitor(&self) -> &ScalabilityMonitor {
@@ -985,17 +991,18 @@ impl<I> HasRand for NopState<I> {
     }
 }
 
+impl<I> State for NopState<I> where I: Input {}
+
+#[cfg(feature = "introspection")]
 impl<I> HasClientPerfMonitor for NopState<I> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
-        unimplemented!()
+        unimplemented!();
     }
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!()
+        unimplemented!();
     }
 }
-
-impl<I> State for NopState<I> where I: Input {}
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
