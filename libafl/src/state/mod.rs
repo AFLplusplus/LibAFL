@@ -38,12 +38,12 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// The [`State`] of the fuzzer.
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
-pub trait State: UsesInput + Serialize + DeserializeOwned {}
+pub trait State: UsesInput + Serialize + DeserializeOwned + MaybeHasClientPerfMonitor {}
 
 /// Structs which implement this trait are aware of the state. This is used for type enforcement.
 pub trait UsesState: UsesInput<Input = <Self::State as UsesInput>::Input> {
     /// The state known by this type.
-    type State: UsesInput;
+    type State: State;
 }
 
 // blanket impl which automatically defines UsesInput for anything that implements UsesState
