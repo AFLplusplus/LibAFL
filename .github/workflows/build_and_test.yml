@@ -73,6 +73,8 @@ jobs:
       run: command -v llvm-config-15 && clang-15 -v
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --component miri --allow-downgrade
+    - name: Install ucd-generate
+      run: cargo install -f ucd-generate
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
 
@@ -135,6 +137,8 @@ jobs:
       run: command -v llvm-config-15 && clang-15 -v
     - name: Install cargo-hack
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
+    - name: Install ucd-generate
+      run: cargo install -f ucd-generate
     - name: Add nightly
       run: rustup toolchain install nightly --allow-downgrade
     - uses: actions/checkout@v3
@@ -222,6 +226,8 @@ jobs:
     - name: Install cxxbridge
       if: runner.os == 'macOS'
       run: cargo install cxxbridge-cmd
+    - name: Install ucd-generate
+      run: cargo install -f ucd-generate
     - name: Install python (macOS)
       # Removing macOS things already installed in CI against failed linking
       if: runner.os == 'macOS'
@@ -384,6 +390,8 @@ jobs:
         toolchain: stable
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+    - name: Install ucd-generate
+      run: cargo install -f ucd-generate
     - name: Install deps
       run: brew install z3 gtk+3
     - name: Install cxxbridge
@@ -453,6 +461,7 @@ jobs:
           freebsd-version
           . "$HOME/.cargo/env"
           rustup toolchain install nightly
+          cargo install -f ucd-generate
           export LLVM_CONFIG=/usr/local/bin/llvm-config16
           pwd
           ls -lah
