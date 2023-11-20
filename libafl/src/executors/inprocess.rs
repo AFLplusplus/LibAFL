@@ -256,7 +256,7 @@ where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: HasExecutions + HasSolutions + HasClientPerfMonitor + HasCorpus,
+    S: HasExecutions + HasSolutions + HasCorpus,
 {
     /// the timeout handler
     #[inline]
