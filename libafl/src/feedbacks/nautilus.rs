@@ -8,8 +8,6 @@ use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 use serde_json;
 
-#[cfg(feature = "introspection")]
-use crate::state::HasClientPerfMonitor;
 use crate::{
     corpus::{Corpus, Testcase},
     events::EventFirer,
