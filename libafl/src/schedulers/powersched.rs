@@ -13,7 +13,7 @@ use crate::{
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::{RemovableScheduler, Scheduler},
-    state::{HasCorpus, HasMetadata, UsesState},
+    state::{HasCorpus, HasMetadata, State, UsesState},
     Error,
 };
 
@@ -177,14 +177,14 @@ pub struct PowerQueueScheduler<O, S> {
 
 impl<O, S> UsesState for PowerQueueScheduler<O, S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
 
 impl<O, S> RemovableScheduler for PowerQueueScheduler<O, S>
 where
-    S: HasCorpus + HasMetadata + HasTestcase,
+    S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,
 {
     #[allow(clippy::cast_precision_loss)]
@@ -253,7 +253,7 @@ where
 
 impl<O, S> Scheduler for PowerQueueScheduler<O, S>
 where
-    S: HasCorpus + HasMetadata + HasTestcase,
+    S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,
 {
     /// Called when a [`Testcase`] is added to the corpus

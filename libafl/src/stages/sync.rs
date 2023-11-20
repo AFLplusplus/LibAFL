@@ -19,7 +19,7 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::Stage,
-    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, State, UsesState},
     Error,
 };
 
@@ -233,7 +233,7 @@ where
 impl<IC, ICB, DI, S, SP> UsesState for SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     SP: ShMemProvider + 'static,
-    S: UsesInput,
+    S: State,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
@@ -244,7 +244,7 @@ where
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     EM: UsesState<State = S> + EventFirer,
-    S: UsesInput + HasExecutions + HasCorpus + HasRand + HasMetadata + HasTestcase,
+    S: State + HasExecutions + HasCorpus + HasRand + HasMetadata + HasTestcase,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<EM, Z>,
     for<'a> E::Observers: Deserialize<'a>,

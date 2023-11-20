@@ -8,10 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::{powersched::SchedulerMetadata, testcase_score::TestcaseScore, Scheduler},
-    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, State, UsesState},
     Error,
 };
 
@@ -205,14 +204,14 @@ where
 
 impl<O, S> UsesState for EcoScheduler<O, S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
 
 impl<O, S> Scheduler for EcoScheduler<O, S>
 where
-    S: HasCorpus + HasMetadata + HasRand + HasExecutions + HasTestcase,
+    S: HasCorpus + HasMetadata + HasRand + HasExecutions + HasTestcase + State,
     O: MapObserver,
 {
     /// Called when a [`Testcase`] is added to the corpus

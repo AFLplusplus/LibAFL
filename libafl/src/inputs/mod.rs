@@ -30,8 +30,6 @@ use libafl_bolts::{ownedref::OwnedSlice, Error};
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
-use crate::prelude::MaybeHasClientPerfMonitor;
-
 /// An input for the target
 #[cfg(not(feature = "std"))]
 pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {

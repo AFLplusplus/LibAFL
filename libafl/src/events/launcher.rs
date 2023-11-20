@@ -44,12 +44,11 @@ use typed_builder::TypedBuilder;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
-use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     monitors::Monitor,
-    state::HasExecutions,
+    state::{HasExecutions, State},
     Error,
 };
 
@@ -76,7 +75,7 @@ where
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput + 'a,
+    S: DeserializeOwned + State + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -121,7 +120,7 @@ where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput,
+    S: DeserializeOwned + State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -141,7 +140,7 @@ impl<'a, CF, MT, S, SP> Launcher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasExecutions,
+    S: DeserializeOwned + State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
@@ -401,7 +400,7 @@ where
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput + 'a,
+    S: DeserializeOwned + State + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -454,7 +453,7 @@ where
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput,
+    S: DeserializeOwned + State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -478,7 +477,7 @@ where
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasExecutions,
+    S: DeserializeOwned + State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
