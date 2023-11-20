@@ -350,6 +350,8 @@ jobs:
         toolchain: stable
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
     - name: Windows Build
       run: cargo build --verbose
     - name: Run clippy
