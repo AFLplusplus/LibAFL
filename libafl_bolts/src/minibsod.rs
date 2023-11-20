@@ -654,6 +654,21 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
+#[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:#016x}",
+        signal, ucontext.uc_mcontext.rip
+    )?;
+
+    Ok(())
+}
+
 #[cfg(not(any(
     target_vendor = "apple",
     target_os = "linux",
@@ -662,6 +677,7 @@ fn write_crash<W: Write>(
     target_os = "dragonfly",
     target_os = "openbsd",
     target_os = "netbsd",
+    target_os = "haiku",
     any(target_os = "solaris", target_os = "illumos"),
 )))]
 fn write_crash<W: Write>(
