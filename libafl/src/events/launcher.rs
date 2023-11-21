@@ -579,7 +579,7 @@ where
                             mgr,
                             self.shmem_provider.clone(),
                             self.centralized_broker_port,
-                            id == 0,
+                            index == 1,
                         )?;
 
                         return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
