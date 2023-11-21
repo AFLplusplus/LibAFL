@@ -667,7 +667,8 @@ impl LlmpMsg {
         let len = self.buf_len_padded as usize + size_of::<LlmpMsg>();
         unsafe {
             buf_ptr > (map.page_mut() as *const u8).add(size_of::<LlmpPage>())
-                && buf_ptr.add(len) <= (map.page_mut() as *const u8).add(map_size)
+                && buf_ptr.add(len).sub(size_of::<LlmpPage>())
+                    <= (map.page_mut() as *const u8).add(map_size)
         }
     }
 }
