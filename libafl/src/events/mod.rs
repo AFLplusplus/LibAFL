@@ -47,7 +47,7 @@ use crate::state::HasScalabilityMonitor;
 use crate::{
     executors::ExitKind,
     inputs::Input,
-    monitors::{UserStats, UserStats::Number},
+    monitors::UserStats,
     observers::ObserversTuple,
     state::{HasExecutions, HasLastReportTime, HasMetadata, State},
     Error,
