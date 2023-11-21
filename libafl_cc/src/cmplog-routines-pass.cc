@@ -195,73 +195,73 @@ bool CmpLogRoutines::hookRtns(Module &M) {
   FunctionCallee cmplogHookFnStrN;
   FunctionCallee cmplogHookFnStr;
 
-    if (CmplogExtended) {
-      cmplogHookFn = M.getOrInsertFunction("__cmplog_rtn_hook_extended", VoidTy,
-                                           i8PtrTy, i8PtrTy);
-    } else {
-      cmplogHookFn =
-          M.getOrInsertFunction("__cmplog_rtn_hook", VoidTy, i8PtrTy, i8PtrTy);
-    }
+  if (CmplogExtended) {
+    cmplogHookFn = M.getOrInsertFunction("__cmplog_rtn_hook_extended", VoidTy,
+                                         i8PtrTy, i8PtrTy);
+  } else {
+    cmplogHookFn =
+        M.getOrInsertFunction("__cmplog_rtn_hook", VoidTy, i8PtrTy, i8PtrTy);
+  }
 
-    if (CmplogExtended) {
-      cmplogLlvmStdStd = M.getOrInsertFunction(
-          "__cmplog_rtn_llvm_stdstring_stdstring_extended", VoidTy, i8PtrTy,
-          i8PtrTy);
-    } else {
-      cmplogLlvmStdStd = M.getOrInsertFunction(
-          "__cmplog_rtn_llvm_stdstring_stdstring", VoidTy, i8PtrTy, i8PtrTy);
-    }
+  if (CmplogExtended) {
+    cmplogLlvmStdStd =
+        M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_stdstring_extended",
+                              VoidTy, i8PtrTy, i8PtrTy);
+  } else {
+    cmplogLlvmStdStd = M.getOrInsertFunction(
+        "__cmplog_rtn_llvm_stdstring_stdstring", VoidTy, i8PtrTy, i8PtrTy);
+  }
 
-    if (CmplogExtended) {
-      cmplogLlvmStdC =
-          M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_cstring_extended",
-                                VoidTy, i8PtrTy, i8PtrTy);
-    } else {
-      cmplogLlvmStdC = M.getOrInsertFunction(
-          "__cmplog_rtn_llvm_stdstring_cstring", VoidTy, i8PtrTy, i8PtrTy);
-    }
+  if (CmplogExtended) {
+    cmplogLlvmStdC =
+        M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_cstring_extended",
+                              VoidTy, i8PtrTy, i8PtrTy);
+  } else {
+    cmplogLlvmStdC = M.getOrInsertFunction(
+        "__cmplog_rtn_llvm_stdstring_cstring", VoidTy, i8PtrTy, i8PtrTy);
+  }
 
-    if (CmplogExtended) {
-      cmplogGccStdStd =
-          M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_stdstring_extended",
-                                VoidTy, i8PtrTy, i8PtrTy);
-    } else {
-      cmplogGccStdStd = M.getOrInsertFunction(
-          "__cmplog_rtn_gcc_stdstring_stdstring", VoidTy, i8PtrTy, i8PtrTy);
-    }
+  if (CmplogExtended) {
+    cmplogGccStdStd =
+        M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_stdstring_extended",
+                              VoidTy, i8PtrTy, i8PtrTy);
+  } else {
+    cmplogGccStdStd = M.getOrInsertFunction(
+        "__cmplog_rtn_gcc_stdstring_stdstring", VoidTy, i8PtrTy, i8PtrTy);
+  }
 
-    if (CmplogExtended) {
-      cmplogGccStdC =
-          M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_cstring_extended",
-                                VoidTy, i8PtrTy, i8PtrTy);
-    } else {
-      cmplogGccStdC = M.getOrInsertFunction(
-          "__cmplog_rtn_gcc_stdstring_cstring", VoidTy, i8PtrTy, i8PtrTy);
-    }
+  if (CmplogExtended) {
+    cmplogGccStdC =
+        M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_cstring_extended",
+                              VoidTy, i8PtrTy, i8PtrTy);
+  } else {
+    cmplogGccStdC = M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_cstring",
+                                          VoidTy, i8PtrTy, i8PtrTy);
+  }
 
-    if (CmplogExtended) {
-      cmplogHookFnN = M.getOrInsertFunction("__cmplog_rtn_hook_n_extended",
-                                            VoidTy, i8PtrTy, i8PtrTy, Int64Ty);
-    } else {
-      cmplogHookFnN = M.getOrInsertFunction("__cmplog_rtn_hook_n", VoidTy,
-                                            i8PtrTy, i8PtrTy, Int64Ty);
-    }
+  if (CmplogExtended) {
+    cmplogHookFnN = M.getOrInsertFunction("__cmplog_rtn_hook_n_extended",
+                                          VoidTy, i8PtrTy, i8PtrTy, Int64Ty);
+  } else {
+    cmplogHookFnN = M.getOrInsertFunction("__cmplog_rtn_hook_n", VoidTy,
+                                          i8PtrTy, i8PtrTy, Int64Ty);
+  }
 
-    if (CmplogExtended) {
-      cmplogHookFnStrN = M.getOrInsertFunction(
-          "__cmplog_rtn_hook_strn_extended", VoidTy, i8PtrTy, i8PtrTy, Int64Ty);
-    } else {
-      cmplogHookFnStrN = M.getOrInsertFunction("__cmplog_rtn_hook_strn", VoidTy,
-                                               i8PtrTy, i8PtrTy, Int64Ty);
-    }
+  if (CmplogExtended) {
+    cmplogHookFnStrN = M.getOrInsertFunction("__cmplog_rtn_hook_strn_extended",
+                                             VoidTy, i8PtrTy, i8PtrTy, Int64Ty);
+  } else {
+    cmplogHookFnStrN = M.getOrInsertFunction("__cmplog_rtn_hook_strn", VoidTy,
+                                             i8PtrTy, i8PtrTy, Int64Ty);
+  }
 
-    if (CmplogExtended) {
-      cmplogHookFnStr = M.getOrInsertFunction("__cmplog_rtn_hook_str_extended",
-                                              VoidTy, i8PtrTy, i8PtrTy);
-    } else {
-      cmplogHookFnStr = M.getOrInsertFunction("__cmplog_rtn_hook_str", VoidTy,
-                                              i8PtrTy, i8PtrTy);
-    }
+  if (CmplogExtended) {
+    cmplogHookFnStr = M.getOrInsertFunction("__cmplog_rtn_hook_str_extended",
+                                            VoidTy, i8PtrTy, i8PtrTy);
+  } else {
+    cmplogHookFnStr = M.getOrInsertFunction("__cmplog_rtn_hook_str", VoidTy,
+                                            i8PtrTy, i8PtrTy);
+  }
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {

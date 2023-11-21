@@ -162,8 +162,10 @@ void __libafl_targets_cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
 }
 
 // cmplog routines after area check
-void __libafl_targets_cmplog_routines_checked_extended(
-    uintptr_t k, const uint8_t *ptr1, const uint8_t *ptr2, size_t len) {
+void __libafl_targets_cmplog_routines_checked_extended(uintptr_t      k,
+                                                       const uint8_t *ptr1,
+                                                       const uint8_t *ptr2,
+                                                       size_t         len) {
   libafl_cmplog_enabled = false;
   uint32_t hits;
 

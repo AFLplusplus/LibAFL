@@ -195,7 +195,7 @@ Iterator Unique(Iterator first, Iterator last) {
 
 bool CmpLogInstructions::hookInstrs(Module &M) {
   std::vector<Instruction *> icomps;
-  std::vector<SwitchInst *> switches;
+  std::vector<SwitchInst *>  switches;
   LLVMContext               &C = M.getContext();
 
   Type        *VoidTy = Type::getVoidTy(C);
@@ -583,7 +583,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
     }
   }
 
-if (switches.size()) {
+  if (switches.size()) {
     for (auto &SI : switches) {
       Value        *Val = SI->getCondition();
       unsigned int  max_size = Val->getType()->getIntegerBitWidth();

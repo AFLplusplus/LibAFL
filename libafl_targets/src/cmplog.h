@@ -56,7 +56,6 @@ typedef struct CmpLogInstruction {
   uint64_t v1;
 } CmpLogInstruction;
 
-
 typedef struct CmpLogInstructionExtended {
   uint64_t v0;
   uint64_t v1;
