@@ -163,7 +163,7 @@ impl core::fmt::Debug for AsanGiovese {
 }
 
 impl AsanGiovese {
-    pub unsafe fn map_shadow() {
+    unsafe fn map_shadow() {
         assert!(
             libc::mmap(
                 HIGH_SHADOW_ADDR,
@@ -194,6 +194,26 @@ impl AsanGiovese {
                 0
             ) != MAP_FAILED
         );
+    }
+
+    #[must_use]
+    fn new() -> Self {
+        Self {
+            alloc_tree: Mutex::new(IntervalTree::new()),
+            saved_tree: IntervalTree::new(),
+            error_callback: None,
+            dirty_shadow: Mutex::new(HashSet::default()),
+            saved_shadow: HashMap::default(),
+            true, // By default, track the dirty shadow pages
+        }
+    }
+
+    fn set_error_callback(&mut self, error_callback: AsanErrorCallback) {
+        self.error_callback = Some(error_callback);
+    }
+
+    fn set_snapshot_shadow(&mut self, snapshot_shadow: bool) {
+        self.snapshot_shadow = snapshot_shadow;
     }
 
     #[inline]
@@ -357,7 +377,7 @@ impl AsanGiovese {
     }
 
     #[inline]
-    fn unpoison_page(emu: &Emulator, page: GuestAddr) {
+    pub fn unpoison_page(emu: &Emulator, page: GuestAddr) {
         unsafe {
             let h = emu.g2h::<*const c_void>(page) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
@@ -372,30 +392,6 @@ impl AsanGiovese {
             let h = emu.g2h::<*const c_void>(page) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
             std::slice::from_raw_parts_mut(shadow_addr, SHADOW_PAGE_SIZE)
-        }
-    }
-
-    #[must_use]
-    pub fn new(snapshot_shadow: bool) -> Self {
-        Self {
-            alloc_tree: Mutex::new(IntervalTree::new()),
-            saved_tree: IntervalTree::new(),
-            error_callback: None,
-            dirty_shadow: Mutex::new(HashSet::default()),
-            saved_shadow: HashMap::default(),
-            snapshot_shadow,
-        }
-    }
-
-    #[must_use]
-    pub fn with_error_callback(snapshot_shadow: bool, error_callback: AsanErrorCallback) -> Self {
-        Self {
-            alloc_tree: Mutex::new(IntervalTree::new()),
-            saved_tree: IntervalTree::new(),
-            error_callback: Some(error_callback),
-            dirty_shadow: Mutex::new(HashSet::default()),
-            saved_shadow: HashMap::default(),
-            snapshot_shadow,
         }
     }
 
@@ -599,7 +595,7 @@ static mut ASAN_INITED: bool = false;
 pub fn init_with_asan(
     args: &mut Vec<String>,
     env: &mut [(String, String)],
-) -> Result<Emulator, EmuError> {
+) -> Result<(Emulator, AsanGiovese), EmuError> {
     let current = env::current_exe().unwrap();
     let asan_lib = fs::canonicalize(current)
         .unwrap()
@@ -644,7 +640,7 @@ pub fn init_with_asan(
         AsanGiovese::map_shadow();
         ASAN_INITED = true;
     }
-    Emulator::new(args, env)
+    Emulator::new(args, env).map(|e| (e, AsanGiovese::new()))
 }
 
 pub enum QemuAsanOptions {
@@ -667,7 +663,7 @@ pub struct QemuAsanHelper {
 
 impl QemuAsanHelper {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter, options: QemuAsanOptions) -> Self {
+    pub fn new(rt: AsanGiovese, filter: QemuInstrumentationFilter, options: QemuAsanOptions) -> Self {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
         let (snapshot, detect_leaks) = match options {
             QemuAsanOptions::None => (false, false),
@@ -675,17 +671,19 @@ impl QemuAsanHelper {
             QemuAsanOptions::DetectLeaks => (false, true),
             QemuAsanOptions::SnapshotDetectLeaks => (true, true),
         };
+        rt.set_snapshot_shadow(snapshot);
         Self {
             enabled: true,
             detect_leaks,
             empty: true,
-            rt: AsanGiovese::new(snapshot),
+            rt,
             filter,
         }
     }
 
     #[must_use]
     pub fn with_error_callback(
+        rt: AsanGiovese, 
         filter: QemuInstrumentationFilter,
         error_callback: AsanErrorCallback,
         options: QemuAsanOptions,
@@ -697,11 +695,13 @@ impl QemuAsanHelper {
             QemuAsanOptions::DetectLeaks => (false, true),
             QemuAsanOptions::SnapshotDetectLeaks => (true, true),
         };
+        rt.set_snapshot_shadow(snapshot);
+        rt.set_error_callback(error_callback);
         Self {
             enabled: true,
             detect_leaks,
             empty: true,
-            rt: AsanGiovese::with_error_callback(snapshot, error_callback),
+            rt,
             filter,
         }
     }
