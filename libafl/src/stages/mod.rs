@@ -49,6 +49,11 @@ pub use concolic::ConcolicTracingStage;
 #[cfg(feature = "std")]
 pub use concolic::SimpleConcolicMutationalStage;
 
+#[cfg(feature = "unicode")]
+pub mod string;
+#[cfg(feature = "unicode")]
+pub use string::*;
+
 #[cfg(feature = "std")]
 pub mod sync;
 #[cfg(feature = "std")]
@@ -56,6 +61,7 @@ pub use sync::*;
 
 #[cfg(feature = "std")]
 pub mod dump;
+
 use core::{convert::From, marker::PhantomData};
 
 #[cfg(feature = "std")]

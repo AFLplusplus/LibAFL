@@ -169,11 +169,6 @@ use log::{Metadata, Record};
 /// out of `libafl_bolts` into `libafl::events::launcher`.
 pub mod launcher {}
 
-// Re-export derive(SerdeAny)
-#[cfg(feature = "libafl_derive")]
-#[allow(unused_imports)]
-#[macro_use]
-extern crate libafl_derive;
 use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
@@ -190,6 +185,7 @@ pub use libafl_derive::SerdeAny;
 use {
     alloc::string::{FromUtf8Error, String},
     core::cell::{BorrowError, BorrowMutError},
+    core::str::Utf8Error,
 };
 
 /// We need fixed names for many parts of this lib.
@@ -501,6 +497,14 @@ impl From<io::Error> for Error {
 impl From<FromUtf8Error> for Error {
     #[allow(unused_variables)]
     fn from(err: FromUtf8Error) -> Self {
+        Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl From<Utf8Error> for Error {
+    #[allow(unused_variables)]
+    fn from(err: Utf8Error) -> Self {
         Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
     }
 }
