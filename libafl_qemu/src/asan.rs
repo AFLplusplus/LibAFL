@@ -197,7 +197,8 @@ impl AsanGiovese {
     }
 
     #[must_use]
-    fn new() -> Self {
+    fn new(emu: &Emulator) -> Self {
+        emu.set_pre_syscall_hook
         Self {
             alloc_tree: Mutex::new(IntervalTree::new()),
             saved_tree: IntervalTree::new(),
@@ -206,6 +207,51 @@ impl AsanGiovese {
             saved_shadow: HashMap::default(),
             true, // By default, track the dirty shadow pages
         }
+    }
+
+    extern "C" fn fake_syscall(sys_num: i32,
+    a0: u64,
+    a1: u64,
+    a2: u64,
+    a3: u64,
+    _a4: u64,
+    _a5: u64,
+    _a6: u64,
+    _a7: u64) -> SyscallHookResult {
+        if sys_num == QASAN_FAKESYS_NR {
+        match QasanAction::try_from(a0).expect("Invalid QASan action number") {
+            QasanAction::Poison => {
+                h.poison(
+                    &emulator,
+                    a1 as GuestAddr,
+                    a2 as usize,
+                    PoisonKind::try_from(a3 as i8).unwrap(),
+                );
+            }
+            QasanAction::UserPoison => {
+                h.poison(&emulator, a1 as GuestAddr, a2 as usize, PoisonKind::User);
+            }
+            QasanAction::UnPoison => {
+                h.unpoison(&emulator, a1 as GuestAddr, a2 as usize);
+            }
+            QasanAction::IsPoison => {
+                if h.is_poisoned(&emulator, a1 as GuestAddr, a2 as usize) {
+                    r = 1;
+                }
+            }
+            QasanAction::Alloc => {
+                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
+                h.alloc(pc, a1 as GuestAddr, a2 as GuestAddr);
+            }
+            QasanAction::Dealloc => {
+                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
+                h.dealloc(&emulator, pc, a1 as GuestAddr);
+            }
+        }
+        SyscallHookResult::new(Some(r))
+    } else {
+        SyscallHookResult::new(None)
+    }
     }
 
     fn set_error_callback(&mut self, error_callback: AsanErrorCallback) {
@@ -640,7 +686,11 @@ pub fn init_with_asan(
         AsanGiovese::map_shadow();
         ASAN_INITED = true;
     }
-    Emulator::new(args, env).map(|e| (e, AsanGiovese::new()))
+    
+    let emu = Emulator::new(args, env)?;
+    let rt = AsanGiovese::new(&emu);
+    
+    Ok((emu, rt))
 }
 
 pub enum QemuAsanOptions {
@@ -707,8 +757,8 @@ impl QemuAsanHelper {
     }
 
     #[must_use]
-    pub fn with_asan_report(filter: QemuInstrumentationFilter, options: QemuAsanOptions) -> Self {
-        Self::with_error_callback(filter, Box::new(asan_report), options)
+    pub fn with_asan_report(rt: AsanGiovese, filter: QemuInstrumentationFilter, options: QemuAsanOptions) -> Self {
+        Self::with_error_callback(rt, filter, Box::new(asan_report), options)
     }
 
     #[must_use]
