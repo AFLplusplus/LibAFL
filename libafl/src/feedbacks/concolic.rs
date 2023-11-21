@@ -15,7 +15,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::UsesInput,
     observers::{concolic::ConcolicObserver, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata},
+    state::{HasMetadata, State},
     Error,
 };
 
@@ -49,7 +49,7 @@ impl<S> Named for ConcolicFeedback<S> {
 
 impl<S> Feedback<S> for ConcolicFeedback<S>
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: State,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(

@@ -38,7 +38,7 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
     Error,
 };
 #[cfg(feature = "std")]
@@ -83,7 +83,7 @@ where
 
 impl<MT, S> UsesState for SimpleEventManager<MT, S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -91,7 +91,7 @@ where
 impl<MT, S> EventFirer for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: State,
 {
     fn fire(
         &mut self,
@@ -109,14 +109,14 @@ where
 impl<MT, S> EventRestarter for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: State,
 {
 }
 
 impl<E, MT, S, Z> EventProcessor<E, Z> for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: State,
 {
     fn process(
         &mut self,
@@ -135,14 +135,14 @@ where
 impl<E, MT, S, Z> EventManager<E, Z> for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata,
+    S: State + HasExecutions + HasLastReportTime + HasMetadata,
 {
 }
 
 impl<MT, S> HasCustomBufHandlers for SimpleEventManager<MT, S>
 where
     MT: Monitor, //CE: CustomEvent<I, OT>,
-    S: UsesInput,
+    S: State,
 {
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
     fn add_custom_buf_handler(
@@ -158,7 +158,7 @@ where
 impl<MT, S> ProgressReporter for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
 {
 }
 
@@ -326,7 +326,7 @@ where
 #[cfg(feature = "std")]
 impl<MT, S, SP> UsesState for SimpleRestartingEventManager<MT, S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type State = S;
@@ -336,7 +336,7 @@ where
 impl<MT, S, SP> EventFirer for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     fn fire(
@@ -352,7 +352,7 @@ where
 impl<MT, S, SP> EventRestarter for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + Serialize,
+    S: State,
     SP: ShMemProvider,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
@@ -376,7 +376,7 @@ where
 impl<E, MT, S, SP, Z> EventProcessor<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + Serialize,
+    S: State + HasExecutions,
     SP: ShMemProvider,
 {
     fn process(
@@ -393,12 +393,7 @@ where
 impl<E, MT, S, SP, Z> EventManager<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + Serialize,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime + Serialize,
     SP: ShMemProvider,
 {
 }
@@ -407,7 +402,7 @@ where
 impl<MT, S, SP> HasCustomBufHandlers for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     fn add_custom_buf_handler(
@@ -422,7 +417,7 @@ where
 impl<MT, S, SP> ProgressReporter for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
 {
 }

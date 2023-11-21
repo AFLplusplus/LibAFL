@@ -29,7 +29,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
 
@@ -417,7 +417,7 @@ where
 impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventManager<E, Z>,
-    EM::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasLastReportTime,
+    EM::State: HasExecutions + HasMetadata + HasLastReportTime,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
@@ -445,7 +445,7 @@ where
 impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + ProgressReporter + HasEventManagerId,
-    EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
+    EM::State: HasMetadata + HasExecutions + HasLastReportTime,
     SP: ShMemProvider + 'static,
 {
 }
@@ -652,13 +652,27 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
+                #[cfg(feature = "scalability_introspection")]
+                println!(
+                    "{} {}",
+                    state.scalability_monitor().testcase_with_observers,
+                    state.scalability_monitor().testcase_without_observers
+                );
                 let res = if client_config.match_with(&self.configuration())
                     && observers_buf.is_some()
                 {
                     let observers: E::Observers =
                         postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_with_observers += 1;
+                    }
                     fuzzer.process_execution(state, self, input, &observers, &exit_kind, true)?
                 } else {
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_without_observers += 1;
+                    }
                     let res = fuzzer.evaluate_input_with_observers::<E, Self>(
                         state,
                         executor,

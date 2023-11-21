@@ -1,8 +1,16 @@
 #!/bin/bash
 
+set -e
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 cd "${SCRIPT_DIR}" || exit 1
+
+if [ -z ${1+x} ]; then
+  profile=release
+else
+  profile="$1"
+fi
 
 if ! cargo +nightly --version >& /dev/null; then
   echo -e "You must install a recent Rust nightly to build the libafl_libfuzzer runtime!"
@@ -18,7 +26,7 @@ if ! [ -f "${RUST_LLD}" ] && [ -f "${RUST_AR}" ]; then
   exit 1
 fi
 
-cargo +nightly build --release
+cargo +nightly build --profile "$profile"
 
 tmpdir=""
 
