@@ -652,12 +652,6 @@ where
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                #[cfg(feature = "scalability_introspection")]
-                log::trace!(
-                    "{} {}",
-                    state.scalability_monitor().testcase_with_observers,
-                    state.scalability_monitor().testcase_without_observers
-                );
                 let res = if client_config.match_with(&self.configuration())
                     && observers_buf.is_some()
                 {
