@@ -1,13 +1,15 @@
 use alloc::string::{String, ToString};
 use core::marker::PhantomData;
 
+#[cfg(feature = "introspection")]
+use libafl::state::HasClientPerfMonitor;
 use libafl::{
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
     stages::{colorization::TaintMetadata, Stage},
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, UsesState},
     Error,
 };
 use libafl_bolts::tuples::MatchName;
@@ -34,11 +36,7 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasClientPerfMonitor
-        + HasExecutions
-        + HasCorpus
-        + HasMetadata
-        + UsesInput<Input = BytesInput>,
+    TE::State: HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput>,
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
