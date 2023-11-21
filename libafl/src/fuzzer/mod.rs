@@ -508,20 +508,6 @@ where
         // Always consider this to be "interesting"
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
 
-        #[cfg(feature = "scalability_introspection")]
-        {
-            let imported = state.scalability_monitor().testcase_with_observers
-                + state.scalability_monitor().testcase_without_observers;
-            manager.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: "imported testcases",
-                    value: Number(imported),
-                    phantom: PhantomData,
-                },
-            );
-        }
-
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
         let is_solution = self

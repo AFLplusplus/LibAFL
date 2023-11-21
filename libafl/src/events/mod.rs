@@ -15,6 +15,8 @@ pub mod llmp;
 #[cfg(feature = "tcp_manager")]
 #[allow(clippy::ignored_unit_patterns)]
 pub mod tcp;
+#[cfg(feature = "scalability_introspection")]
+use alloc::string::ToString;
 use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::c_void;
@@ -40,10 +42,12 @@ use uuid::Uuid;
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
+#[cfg(feature = "scalability_introspection")]
+use crate::state::HasScalabilityMonitor;
 use crate::{
     executors::ExitKind,
     inputs::Input,
-    monitors::UserStats,
+    monitors::{UserStats, UserStats::Number},
     observers::ObserversTuple,
     state::{HasExecutions, HasLastReportTime, HasMetadata, State},
     Error,
@@ -520,6 +524,22 @@ where
                     executions,
                     time: cur,
                     introspection_monitor: Box::new(state.introspection_monitor().clone()),
+                    phantom: PhantomData,
+                },
+            )?;
+        }
+
+        // If we are measuring scalability stuff..
+        #[cfg(feature = "scalability_introspection")]
+        {
+            let imported_with_observer = state.scalability_monitor().testcase_with_observers;
+            let imported_without_observer = state.scalability_monitor().testcase_without_observers;
+
+            self.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: "total imported".to_string(),
+                    value: Number((imported_with_observer + imported_without_observer) as u64),
                     phantom: PhantomData,
                 },
             )?;

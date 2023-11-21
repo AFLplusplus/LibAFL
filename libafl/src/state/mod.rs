@@ -1011,6 +1011,17 @@ impl<I> HasClientPerfMonitor for NopState<I> {
     }
 }
 
+#[cfg(feature = "scalability_introspection")]
+impl<I> HasScalabilityMonitor for NopState<I> {
+    fn scalability_monitor(&self) -> &ScalabilityMonitor {
+        unimplemented!();
+    }
+
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
+        unimplemented!();
+    }
+}
+
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 /// `State` Python bindings
