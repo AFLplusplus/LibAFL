@@ -41,7 +41,7 @@ use prometheus_client::{
 // using tide for the HTTP server library (fast, async, simple)
 use tide::Request;
 
-use crate::monitors::{ClientStats, Monitor, UserStats};
+use crate::monitors::{ClientStats, Monitor, UserStatsValue};
 
 /// Tracking monitor during fuzzing.
 #[derive(Clone)]
@@ -173,11 +173,11 @@ where
             // You can filter for each custom stat in promQL via labels of both the stat name and client id
             log::info!("{key}: {val}");
             #[allow(clippy::cast_precision_loss)]
-            let value: f64 = match val {
-                UserStats::Number(n, _) => n as f64,
-                UserStats::Float(f, _) => f,
-                UserStats::String(_s, _) => 0.0,
-                UserStats::Ratio(a, b, _) => (a as f64 / b as f64) * 100.0,
+            let value: f64 = match val.value() {
+                UserStatsValue::Number(n) => *n as f64,
+                UserStatsValue::Float(f) => *f,
+                UserStatsValue::String(_s) => 0.0,
+                UserStatsValue::Ratio(a, b) => (*a as f64 / *b as f64) * 100.0,
             };
             self.custom_stat
                 .get_or_create(&Labels {

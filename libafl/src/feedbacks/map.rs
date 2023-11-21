@@ -22,7 +22,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverName},
     inputs::UsesInput,
-    monitors::{AggregatorOps, UserStats},
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, Observer, ObserversTuple, UsesObserver},
     state::{HasMetadata, HasNamedMetadata, State},
     Error,
@@ -615,12 +615,14 @@ where
                 state,
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
-                    value: UserStats::Ratio(
-                        self.novelties
-                            .as_ref()
-                            .map_or(filled, |novelties| filled + novelties.len())
-                            as u64,
-                        len as u64,
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(
+                            self.novelties
+                                .as_ref()
+                                .map_or(filled, |novelties| filled + novelties.len())
+                                as u64,
+                            len as u64,
+                        ),
                         AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,
@@ -824,12 +826,14 @@ where
                 state,
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
-                    value: UserStats::Ratio(
-                        self.novelties
-                            .as_ref()
-                            .map_or(filled, |novelties| filled + novelties.len())
-                            as u64,
-                        len as u64,
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(
+                            self.novelties
+                                .as_ref()
+                                .map_or(filled, |novelties| filled + novelties.len())
+                                as u64,
+                            len as u64,
+                        ),
                         AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,

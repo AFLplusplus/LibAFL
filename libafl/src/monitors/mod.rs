@@ -48,7 +48,7 @@ pub enum AggregatorOps {
 pub struct Aggregator {
     // this struct could also have hashmap or vec for caching but for now i'll just keep it simple
     // for example to calculate the sum you don't have to iterate over all clients (obviously)
-    aggregated: HashMap<String, UserStats>,
+    aggregated: HashMap<String, UserStatsValue>,
 }
 
 impl Aggregator {
@@ -62,159 +62,203 @@ impl Aggregator {
 
     /// takes the key and the ref to clients stats then aggregate them all.
     fn aggregate(&mut self, name: &str, client_stats: &[ClientStats]) {
+        let (mut init, op) = match client_stats.first() {
+            Some(cl) => match cl.user_monitor.get(name) {
+                Some(x) => (x.value().clone(), x.aggregator_op()),
+                _ => {
+                    return;
+                }
+            },
+            _ => {
+                return;
+            }
+        };
+
         let mut gather = vec![];
-        // gather can't be empty as we update before the call to aggregate()
-        for stats in client_stats {
+        for stats in client_stats.iter().skip(1) {
             if let Some(x) = stats.user_monitor.get(name) {
-                gather.push(x);
+                gather.push(x.value());
             }
         }
 
-        if let Some((&init, rest)) = gather.split_first() {
-            if !init.is_numeric() {
-                return;
-            }
-            let mut ret = init.clone();
-            match init.aggregator_ops() {
+        for item in &gather {
+            match op {
                 AggregatorOps::None => {
                     // Nothing
                     return;
                 }
-                AggregatorOps::Avg => {
-                    for item in rest {
-                        if ret.stats_add(item).is_none() {
+                AggregatorOps::Avg | AggregatorOps::Sum => {
+                    init = match init.stats_add(item) {
+                        Some(x) => x,
+                        _ => {
                             return;
                         }
-                    }
-                    ret.stats_div(gather.len());
-                }
-                AggregatorOps::Sum => {
-                    for item in rest {
-                        if ret.stats_add(item).is_none() {
-                            return;
-                        }
-                    }
+                    };
                 }
                 AggregatorOps::Min => {
-                    for item in rest {
-                        if ret.stats_min(item).is_none() {
+                    init = match init.stats_min(item) {
+                        Some(x) => x,
+                        _ => {
                             return;
                         }
-                    }
+                    };
                 }
                 AggregatorOps::Max => {
-                    for item in rest {
-                        if ret.stats_max(item).is_none() {
+                    init = match init.stats_max(item) {
+                        Some(x) => x,
+                        _ => {
                             return;
                         }
-                    }
+                    };
                 }
             }
-            self.aggregated.insert(name.to_string(), ret);
         }
+
+        if let AggregatorOps::Avg = op {
+            // if avg then divide last.
+            init.stats_div(gather.len());
+        } else {
+            // do nothing
+        }
+
+        self.aggregated.insert(name.to_string(), init);
     }
 }
 
 /// user defined stats enum
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum UserStats {
-    /// A numerical value
-    Number(u64, AggregatorOps),
-    /// A Float value
-    Float(f64, AggregatorOps),
-    /// A `String`
-    String(String, AggregatorOps),
-    /// A ratio of two values
-    Ratio(u64, u64, AggregatorOps),
+pub struct UserStats {
+    value: UserStatsValue,
+    aggregator_op: AggregatorOps,
 }
 
 impl UserStats {
     /// Get the `AggregatorOps`
     #[must_use]
-    pub fn aggregator_ops(&self) -> AggregatorOps {
-        match &self {
-            Self::Number(_, x) | Self::Float(_, x) | Self::String(_, x) | Self::Ratio(_, _, x) => {
-                x.clone()
-            }
+    pub fn aggregator_op(&self) -> &AggregatorOps {
+        &self.aggregator_op
+    }
+    /// Get the actual value for the stats
+    #[must_use]
+    pub fn value(&self) -> &UserStatsValue {
+        &self.value
+    }
+    /// Constructor
+    #[must_use]
+    pub fn new(value: UserStatsValue, aggregator_op: AggregatorOps) -> Self {
+        Self {
+            value,
+            aggregator_op,
         }
     }
+}
 
+/// The actual value for the userstats
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum UserStatsValue {
+    /// A numerical value
+    Number(u64),
+    /// A Float value
+    Float(f64),
+    /// A `String`
+    String(String),
+    /// A ratio of two values
+    Ratio(u64, u64),
+}
+
+impl UserStatsValue {
     /// Check if this guy is numeric
     #[must_use]
     pub fn is_numeric(&self) -> bool {
         match &self {
-            Self::Number(_, _) | Self::Float(_, _) | Self::Ratio(_, _, _) => true,
-            Self::String(_, _) => false,
+            Self::Number(_) | Self::Float(_) | Self::Ratio(_, _) => true,
+            Self::String(_) => false,
         }
     }
 
     /// Divide by the number of elements
     #[allow(clippy::cast_precision_loss)]
-    pub fn stats_div(&mut self, divisor: usize) -> Option<()> {
+    pub fn stats_div(&mut self, divisor: usize) -> Option<Self> {
         match self {
-            Self::Number(x, _) | Self::Ratio(x, _, _) => {
-                *x /= divisor as u64;
-                Some(())
-            }
-            Self::Float(x, _) => {
-                *x /= divisor as f64;
-                Some(())
-            }
-            Self::String(_, _) => None,
+            Self::Number(x) => Some(Self::Float(*x as f64 / divisor as f64)),
+            Self::Float(x) => Some(Self::Float(*x / divisor as f64)),
+            Self::Ratio(x, y) => Some(Self::Float((*x as f64 / divisor as f64) / *y as f64)),
+            Self::String(_) => None,
         }
     }
 
     /// min user stats with the other
-    pub fn stats_max(&mut self, other: &Self) -> Option<()> {
+    #[allow(clippy::cast_precision_loss)]
+    pub fn stats_max(&mut self, other: &Self) -> Option<Self> {
         match (self, other) {
-            (Self::Number(x, _), Self::Number(y, _))
-            | (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
+            (Self::Number(x), Self::Number(y)) => {
                 if y > x {
-                    *x = *y;
+                    Some(Self::Number(*y))
+                } else {
+                    Some(Self::Number(*x))
                 }
-                Some(())
             }
-            (Self::Float(x, _), Self::Float(y, _)) => {
+            (Self::Float(x), Self::Float(y)) => {
                 if y > x {
-                    *x = *y;
+                    Some(Self::Float(*y))
+                } else {
+                    Some(Self::Float(*x))
                 }
-                Some(())
+            }
+            (Self::Ratio(x, a), Self::Ratio(y, b)) => {
+                let first = *x as f64 / *a as f64;
+                let second = *y as f64 / *b as f64;
+                if first > second {
+                    Some(Self::Float(first))
+                } else {
+                    Some(Self::Float(second))
+                }
             }
             _ => None,
         }
     }
 
     /// min user stats with the other
-    pub fn stats_min(&mut self, other: &Self) -> Option<()> {
+    #[allow(clippy::cast_precision_loss)]
+    pub fn stats_min(&mut self, other: &Self) -> Option<Self> {
         match (self, other) {
-            (Self::Number(x, _), Self::Number(y, _))
-            | (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
-                if y < x {
-                    *x = *y;
+            (Self::Number(x), Self::Number(y)) => {
+                if y > x {
+                    Some(Self::Number(*x))
+                } else {
+                    Some(Self::Number(*y))
                 }
-                Some(())
             }
-            (Self::Float(x, _), Self::Float(y, _)) => {
-                if y < x {
-                    *x = *y;
+            (Self::Float(x), Self::Float(y)) => {
+                if y > x {
+                    Some(Self::Float(*x))
+                } else {
+                    Some(Self::Float(*y))
                 }
-                Some(())
+            }
+            (Self::Ratio(x, a), Self::Ratio(y, b)) => {
+                let first = *x as f64 / *a as f64;
+                let second = *y as f64 / *b as f64;
+                if first > second {
+                    Some(Self::Float(second))
+                } else {
+                    Some(Self::Float(first))
+                }
             }
             _ => None,
         }
     }
 
     /// add user stats with the other
-    pub fn stats_add(&mut self, other: &Self) -> Option<()> {
+    #[allow(clippy::cast_precision_loss)]
+    pub fn stats_add(&mut self, other: &Self) -> Option<Self> {
         match (self, other) {
-            (Self::Number(x, _), Self::Number(y, _))
-            | (Self::Ratio(x, _, _), Self::Ratio(y, _, _)) => {
-                *x += *y;
-                Some(())
-            }
-            (Self::Float(x, _), Self::Float(y, _)) => {
-                *x += *y;
-                Some(())
+            (Self::Number(x), Self::Number(y)) => Some(Self::Number(*x + *y)),
+            (Self::Float(x), Self::Float(y)) => Some(Self::Float(*x + *y)),
+            (Self::Ratio(x, a), Self::Ratio(y, b)) => {
+                let first = *x as f64 / *a as f64;
+                let second = *y as f64 / *b as f64;
+                Some(Self::Float(first + second))
             }
             _ => None,
         }
@@ -223,11 +267,17 @@ impl UserStats {
 
 impl fmt::Display for UserStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            UserStats::Number(n, _) => write!(f, "{n}"),
-            UserStats::Float(n, _) => write!(f, "{n}"),
-            UserStats::String(s, _) => write!(f, "{s}"),
-            UserStats::Ratio(a, b, _) => {
+        write!(f, "{}", self.value())
+    }
+}
+
+impl fmt::Display for UserStatsValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            UserStatsValue::Number(n) => write!(f, "{n}"),
+            UserStatsValue::Float(n) => write!(f, "{n}"),
+            UserStatsValue::String(s) => write!(f, "{s}"),
+            UserStatsValue::Ratio(a, b) => {
                 if *b == 0 {
                     write!(f, "{a}/{b}")
                 } else {

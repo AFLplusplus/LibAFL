@@ -26,7 +26,7 @@ use serde_json::{self, Value};
 
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
-use crate::monitors::{Aggregator, AggregatorOps, ClientStats, Monitor, UserStats};
+use crate::monitors::{Aggregator, AggregatorOps, ClientStats, Monitor, UserStats, UserStatsValue};
 
 pub mod ui;
 use ui::TuiUI;
@@ -517,9 +517,10 @@ impl TuiMonitor {
             let afl_stats = client
                 .get_user_stats("AflStats")
                 .map_or("None".to_string(), ToString::to_string);
-            let stability = client
-                .get_user_stats("stability")
-                .map_or(&UserStats::Ratio(0, 100, AggregatorOps::Avg), |x| x);
+            let stability = client.get_user_stats("stability").map_or(
+                UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
+                core::clone::Clone::clone,
+            );
 
             if afl_stats != "None" {
                 let default_json = serde_json::json!({
@@ -540,7 +541,7 @@ impl TuiMonitor {
                     afl_stats_json["imported"].as_u64().unwrap_or_default();
             }
 
-            if let UserStats::Ratio(a, b, _) = stability {
+            if let UserStatsValue::Ratio(a, b) = stability.value() {
                 ratio_a += a;
                 ratio_b += b;
             }

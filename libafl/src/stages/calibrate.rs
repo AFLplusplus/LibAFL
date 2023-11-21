@@ -17,7 +17,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverName},
     fuzzer::Evaluator,
-    monitors::{AggregatorOps, UserStats},
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
@@ -304,9 +304,11 @@ where
                     state,
                     Event::UpdateUserStats {
                         name: "stability".to_string(),
-                        value: UserStats::Ratio(
-                            (map_len - unstable_entries) as u64,
-                            map_len as u64,
+                        value: UserStats::new(
+                            UserStatsValue::Ratio(
+                                (map_len - unstable_entries) as u64,
+                                map_len as u64,
+                            ),
                             AggregatorOps::Avg,
                         ),
                         phantom: PhantomData,
