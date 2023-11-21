@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{CorpusId, HasTestcase},
-    inputs::{BytesInput, HasBytesVec, UsesInput},
+    inputs::{BytesInput, HasBytesVec},
     stages::Stage,
-    state::{HasCorpus, HasMetadata, UsesState},
+    state::{HasCorpus, HasMetadata, State, UsesState},
 };
 
 /// Metadata which stores the list of pre-computed string-like ranges in the input
@@ -92,14 +92,14 @@ impl<S> StringIdentificationStage<S> {
 
 impl<S> UsesState for StringIdentificationStage<S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
 
 impl<S, E, EM, Z> Stage<E, EM, Z> for StringIdentificationStage<S>
 where
-    S: HasTestcase<Input = BytesInput> + HasCorpus,
+    S: HasTestcase<Input = BytesInput> + HasCorpus + State,
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,

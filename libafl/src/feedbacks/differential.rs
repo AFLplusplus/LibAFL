@@ -16,7 +16,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::Input,
     observers::{Observer, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata, State},
+    state::{HasMetadata, State},
     Error,
 };
 
@@ -119,7 +119,7 @@ impl<F, I, O1, O2, S> Feedback<S> for DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     I: Input,
-    S: HasMetadata + HasClientPerfMonitor + State<Input = I>,
+    S: HasMetadata + State<Input = I>,
     O1: Observer<S> + PartialEq<O2>,
     O2: Observer<S>,
 {
@@ -163,7 +163,7 @@ mod tests {
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
         inputs::{BytesInput, UsesInput},
         observers::Observer,
-        state::{NopState, UsesState},
+        state::{NopState, State, UsesState},
     };
 
     #[derive(Debug)]
@@ -196,13 +196,13 @@ mod tests {
     }
     impl<S> UsesState for NopEventFirer<S>
     where
-        S: UsesInput,
+        S: State,
     {
         type State = S;
     }
     impl<S> EventFirer for NopEventFirer<S>
     where
-        S: UsesInput,
+        S: State,
     {
         fn fire(
             &mut self,

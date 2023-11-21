@@ -24,7 +24,7 @@ use crate::{
     inputs::UsesInput,
     monitors::UserStats,
     observers::{MapObserver, Observer, ObserversTuple, UsesObserver},
-    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
+    state::{HasMetadata, HasNamedMetadata, State},
     Error,
 };
 
@@ -395,7 +395,7 @@ where
     N: IsNovel<T>,
     O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
     R: Reducer<T>,
-    S: UsesInput + HasClientPerfMonitor + HasNamedMetadata,
+    S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
@@ -496,7 +496,7 @@ impl<O, S> Feedback<S> for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
-    S: UsesInput + HasNamedMetadata + HasClientPerfMonitor,
+    S: State + HasNamedMetadata,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -664,7 +664,7 @@ where
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    S: UsesInput + HasNamedMetadata + HasClientPerfMonitor,
+    S: UsesInput + HasNamedMetadata,
 {
     /// Create new `MapFeedback`
     #[must_use]
@@ -875,7 +875,7 @@ where
 
 impl<O, S> Feedback<S> for ReachabilityFeedback<O, S>
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: State,
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {

@@ -11,7 +11,7 @@ use crate::{
         ecofuzz::EcoTestcaseScore, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
     },
     stages::{mutational::MutatedTransform, MutationalStage, Stage},
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -36,7 +36,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
@@ -69,7 +69,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
@@ -94,7 +94,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::Input, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
@@ -109,7 +109,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new transforming [`PowerMutationalStage`]

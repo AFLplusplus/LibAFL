@@ -10,6 +10,8 @@ use std::{
 use libafl_bolts::{current_time, shmem::ShMemProvider};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::state::HasClientPerfMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
@@ -17,7 +19,7 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, HasRand, State, UsesState},
     Error,
 };
 
@@ -63,7 +65,7 @@ where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasMetadata,
 {
     #[inline]
     fn perform(
@@ -108,7 +110,7 @@ where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
@@ -174,7 +176,7 @@ where
     E: UsesState<State = Z::State>,
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
@@ -231,7 +233,7 @@ where
 impl<IC, ICB, DI, S, SP> UsesState for SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     SP: ShMemProvider + 'static,
-    S: UsesInput,
+    S: State,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
@@ -242,13 +244,7 @@ where
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<IC, ICB, DI, S, SP>
 where
     EM: UsesState<State = S> + EventFirer,
-    S: UsesInput
-        + HasClientPerfMonitor
-        + HasExecutions
-        + HasCorpus
-        + HasRand
-        + HasMetadata
-        + HasTestcase,
+    S: State + HasExecutions + HasCorpus + HasRand + HasMetadata + HasTestcase,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<EM, Z>,
     for<'a> E::Observers: Deserialize<'a>,

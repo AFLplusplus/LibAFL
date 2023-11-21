@@ -5,9 +5,8 @@ use core::marker::PhantomData;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
-    inputs::UsesInput,
     schedulers::{RemovableScheduler, Scheduler},
-    state::{HasCorpus, UsesState},
+    state::{HasCorpus, State, UsesState},
     Error,
 };
 
@@ -19,16 +18,16 @@ pub struct QueueScheduler<S> {
 
 impl<S> UsesState for QueueScheduler<S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
 
-impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus + HasTestcase {}
+impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus + HasTestcase + State {}
 
 impl<S> Scheduler for QueueScheduler<S>
 where
-    S: HasCorpus + HasTestcase,
+    S: HasCorpus + HasTestcase + State,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         // Set parent id
