@@ -510,11 +510,15 @@ where
 
         #[cfg(feature = "scalability_introspection")]
         {
-            let imported = state.scalability_monitor().testcase_with_observers + 
-                            state.scalability_monitor().testcase_without_observers;
+            let imported = state.scalability_monitor().testcase_with_observers
+                + state.scalability_monitor().testcase_without_observers;
             manager.fire(
                 state,
-                Event::UpdateUserStats { name: "imported testcases", value: Number(imported), phantom: PhantomData }
+                Event::UpdateUserStats {
+                    name: "imported testcases",
+                    value: Number(imported),
+                    phantom: PhantomData,
+                },
             );
         }
 
