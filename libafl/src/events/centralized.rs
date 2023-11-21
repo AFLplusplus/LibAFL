@@ -653,7 +653,7 @@ where
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
                 #[cfg(feature = "scalability_introspection")]
-                println!(
+                log::trace!(
                     "{} {}",
                     state.scalability_monitor().testcase_with_observers,
                     state.scalability_monitor().testcase_without_observers
