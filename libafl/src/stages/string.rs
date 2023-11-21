@@ -99,7 +99,7 @@ where
 
 impl<S, E, EM, Z> Stage<E, EM, Z> for StringIdentificationStage<S>
 where
-    S: HasTestcase<Input = BytesInput> + HasCorpus,
+    S: HasTestcase<Input = BytesInput> + HasCorpus + State,
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
