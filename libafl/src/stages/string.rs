@@ -11,7 +11,7 @@ use crate::{
     corpus::{CorpusId, HasTestcase},
     inputs::{BytesInput, HasBytesVec, UsesInput},
     stages::Stage,
-    state::{HasCorpus, HasMetadata, UsesState},
+    state::{HasCorpus, HasMetadata, State, UsesState},
 };
 
 /// Metadata which stores the list of pre-computed string-like ranges in the input
@@ -92,7 +92,7 @@ impl<S> StringIdentificationStage<S> {
 
 impl<S> UsesState for StringIdentificationStage<S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
