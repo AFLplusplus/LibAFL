@@ -1,17 +1,15 @@
 use std::mem::size_of;
 
 use capstone::arch::BuildsCapstone;
+use enum_map::{enum_map, EnumMap};
+use lazy_static::lazy_static;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86_64::*;
 
-use crate::CallingConvention;
-
-use enum_map::{EnumMap, enum_map};
-use lazy_static::lazy_static;
-use crate::sync_backdoor::SyncBackdoorArgs;
+use crate::{sync_backdoor::SyncBackdoorArgs, CallingConvention};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -41,10 +39,11 @@ lazy_static! {
         SyncBackdoorArgs::Ret  => Regs::Rax,
         SyncBackdoorArgs::Cmd  => Regs::Rax,
         SyncBackdoorArgs::Arg1 => Regs::Rdi,
-        SyncBackdoorArgs::Arg2 => Regs::Rdx,
-        SyncBackdoorArgs::Arg3 => Regs::Rcx,
-        SyncBackdoorArgs::Arg4 => Regs::R8,
-        SyncBackdoorArgs::Arg5 => Regs::R9,
+        SyncBackdoorArgs::Arg2 => Regs::Rsi,
+        SyncBackdoorArgs::Arg3 => Regs::Rdx,
+        SyncBackdoorArgs::Arg4 => Regs::R10,
+        SyncBackdoorArgs::Arg5 => Regs::R8,
+        SyncBackdoorArgs::Arg6 => Regs::R9,
     };
 }
 
