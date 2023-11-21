@@ -57,7 +57,6 @@ const WRAPPER_HEADER: &str = r#"
 
 #include "libafl_extras/syx-snapshot/device-save.h"
 #include "libafl_extras/syx-snapshot/syx-snapshot.h"
-#include "libafl_extras/exit.h"
 
 #endif
 
@@ -76,6 +75,8 @@ const WRAPPER_HEADER: &str = r#"
 #include "exec/helper-head.h"
 
 #include "qemu/plugin-memory.h"
+
+#include "libafl_extras/exit.h"
 
 "#;
 

@@ -13,9 +13,8 @@ use std::cell::OnceCell;
 use std::{
     ffi::{CStr, CString},
     ptr::null_mut,
-    sync::Mutex,
 };
-use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{    sync::Mutex, slice::from_raw_parts, str::from_utf8_unchecked};
 
 use lazy_static::lazy_static;
 #[cfg(emulation_mode = "usermode")]
