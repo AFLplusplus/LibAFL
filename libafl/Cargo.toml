@@ -30,7 +30,7 @@ std = ["serde_json", "serde_json/std", "nix", "serde/std", "bincode", "wait-time
 introspection = []
 
 ## Collects stats about scalability
-scalability_introspecition = []
+scalability_introspection = []
 
 ## Will build the `pyo3` bindings
 python = ["pyo3", "concat-idents", "libafl_bolts/python"]

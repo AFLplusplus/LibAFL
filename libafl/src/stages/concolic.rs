@@ -8,7 +8,7 @@ use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
 use super::{Stage, TracingStage};
-#[cfg(feature = "introspection")]
+#[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
 use crate::state::HasClientPerfMonitor;
 #[cfg(feature = "concolic_mutation")]
 use crate::state::State;

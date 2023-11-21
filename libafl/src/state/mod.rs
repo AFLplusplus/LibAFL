@@ -123,20 +123,20 @@ impl<T> MaybeHasClientPerfMonitor for T {}
 impl<T> MaybeHasClientPerfMonitor for T where T: HasClientPerfMonitor {}
 
 /// Intermediate trait for `HasScalabilityMonitor`
-#[cfg(feature = "scalability_monitor")]
+#[cfg(feature = "scalability_introspection")]
 pub trait MaybeHasScalabilityMonitor: HasScalabilityMonitor {}
 /// Intermediate trait for `HasScalabilityMonitor`
-#[cfg(not(feature = "scalability_monitor"))]
+#[cfg(not(feature = "scalability_introspection"))]
 pub trait MaybeHasScalabilityMonitor {}
 
-#[cfg(not(feature = "scalability_monitor"))]
+#[cfg(not(feature = "scalability_introspection"))]
 impl<T> MaybeHasScalabilityMonitor for T {}
 
-#[cfg(feature = "scalability_monitor")]
+#[cfg(feature = "scalability_introspection")]
 impl<T> MaybeHasScalabilityMonitor for T where T: HasScalabilityMonitor {}
 
 /// Trait for offering a [`ScalabilityMonitor`]
-#[cfg(feature = "scalability_monitor")]
+#[cfg(feature = "scalability_introspection")]
 pub trait HasScalabilityMonitor {
     /// Ref to [`ScalabilityMonitor`]
     fn scalability_monitor(&self) -> &ScalabilityMonitor;
@@ -1007,6 +1007,17 @@ impl<I> HasClientPerfMonitor for NopState<I> {
     }
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
+        unimplemented!();
+    }
+}
+
+#[cfg(feature = "scalability_introspection")]
+impl<I> HasScalabilityMonitor for NopState<I> {
+    fn scalability_monitor(&self) -> &ScalabilityMonitor {
+        unimplemented!();
+    }
+
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
         unimplemented!();
     }
 }
