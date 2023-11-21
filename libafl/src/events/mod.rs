@@ -42,8 +42,6 @@ use uuid::Uuid;
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
-#[cfg(feature = "scalability_introspection")]
-use crate::state::HasScalabilityMonitor;
 use crate::{
     executors::ExitKind,
     inputs::Input,
@@ -52,6 +50,8 @@ use crate::{
     state::{HasExecutions, HasLastReportTime, HasMetadata, State},
     Error,
 };
+#[cfg(feature = "scalability_introspection")]
+use crate::{monitors::UserStats::Number, state::HasScalabilityMonitor};
 
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
