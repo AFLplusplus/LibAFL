@@ -40,6 +40,7 @@ jobs:
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
           commit-message: Add report file
           title: '[Example] Add report file'
+          base: main
           branch: update_from_ci
           assignees: tokatoka
           body: >
