@@ -62,33 +62,29 @@ impl Aggregator {
 
     /// takes the key and the ref to clients stats then aggregate them all.
     fn aggregate(&mut self, name: &str, client_stats: &[ClientStats]) {
-        let (mut init, op) = match client_stats.first() {
-            Some(cl) => match cl.user_monitor.get(name) {
-                Some(x) => (x.value().clone(), x.aggregator_op()),
-                _ => {
-                    return;
-                }
-            },
+        let mut gather = vec![];
+
+        for client in client_stats {
+            if let Some(x) = client.user_monitor.get(name) {
+                gather.push(x);
+            }
+        }
+
+        let (mut init, op) = match gather.first() {
+            Some(x) => (x.value().clone(), x.aggregator_op().clone()),
             _ => {
                 return;
             }
         };
 
-        let mut gather = vec![];
-        for stats in client_stats.iter().skip(1) {
-            if let Some(x) = stats.user_monitor.get(name) {
-                gather.push(x.value());
-            }
-        }
-
-        for item in &gather {
+        for item in gather.iter().skip(1) {
             match op {
                 AggregatorOps::None => {
                     // Nothing
                     return;
                 }
                 AggregatorOps::Avg | AggregatorOps::Sum => {
-                    init = match init.stats_add(item) {
+                    init = match init.stats_add(item.value()) {
                         Some(x) => x,
                         _ => {
                             return;
@@ -96,7 +92,7 @@ impl Aggregator {
                     };
                 }
                 AggregatorOps::Min => {
-                    init = match init.stats_min(item) {
+                    init = match init.stats_min(item.value()) {
                         Some(x) => x,
                         _ => {
                             return;
@@ -104,7 +100,7 @@ impl Aggregator {
                     };
                 }
                 AggregatorOps::Max => {
-                    init = match init.stats_max(item) {
+                    init = match init.stats_max(item.value()) {
                         Some(x) => x,
                         _ => {
                             return;
@@ -116,9 +112,13 @@ impl Aggregator {
 
         if let AggregatorOps::Avg = op {
             // if avg then divide last.
-            init.stats_div(gather.len());
-        } else {
-            // do nothing
+            println!("Dividing");
+            init = match init.stats_div(gather.len()) {
+                Some(x) => x,
+                _ => {
+                    return;
+                }
+            }
         }
 
         self.aggregated.insert(name.to_string(), init);

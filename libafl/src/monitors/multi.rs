@@ -103,7 +103,7 @@ where
 
         let mut aggregated_fmt = "(Aggregated): ".to_string();
         for (key, val) in &self.aggregator.aggregated {
-            write!(aggregated_fmt, "{key}: {val}").unwrap();
+            write!(aggregated_fmt, " {key}: {val}").unwrap();
         }
         (self.print_fn)(aggregated_fmt);
 
