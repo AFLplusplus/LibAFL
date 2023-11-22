@@ -1,8 +1,8 @@
 name: Update Rust toolchain
 
 on:
-  schedule:
-    - cron: '0 * * * *'  # Debug
+  # schedule:
+  #   - cron: '0 * * * *'  # Debug
   pull_request:
     branches: [ main ]
 
