@@ -22,7 +22,7 @@ jobs:
 
       - name: Commit & push data
         run: |
-          sed -i 's/rustup toolchain install nightly[0-9a-ZA-Z\-]*/\`date +"rustup toolchain install nightly-%Y-%m-%d"\`/' ./.github/workflows/build_and_test.yml
+          sed -i 's/rustup toolchain install nightly[0-9a-zA-Z\-]*/\`date +"rustup toolchain install nightly-%Y-%m-%d"\`/' ./.github/workflows/build_and_test.yml
           git add -u
           git commit -m "Update rust toolchain & time [$(date +'%Y-%m-%d %H:%M')]"
           git push
