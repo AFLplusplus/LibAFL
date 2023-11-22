@@ -20,7 +20,7 @@ use crate::{
     helper::{
         hash_me, HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter,
     },
-    hooks::QemuHooks,
+    hooks::{Hook, QemuHooks},
     GuestAddr,
 };
 
@@ -87,12 +87,12 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.cmps_raw(
-            Some(gen_unique_cmp_ids::<QT, S>),
-            Some(trace_cmp1_cmplog),
-            Some(trace_cmp2_cmplog),
-            Some(trace_cmp4_cmplog),
-            Some(trace_cmp8_cmplog),
+        hooks.cmps(
+            Hook::Function(gen_unique_cmp_ids::<QT, S>),
+            Hook::Raw(trace_cmp1_cmplog),
+            Hook::Raw(trace_cmp2_cmplog),
+            Hook::Raw(trace_cmp4_cmplog),
+            Hook::Raw(trace_cmp8_cmplog),
         );
     }
 }
@@ -131,12 +131,12 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.cmps_raw(
-            Some(gen_hashed_cmp_ids::<QT, S>),
-            Some(trace_cmp1_cmplog),
-            Some(trace_cmp2_cmplog),
-            Some(trace_cmp4_cmplog),
-            Some(trace_cmp8_cmplog),
+        hooks.cmps(
+            Hook::Function(gen_hashed_cmp_ids::<QT, S>),
+            Hook::Raw(trace_cmp1_cmplog),
+            Hook::Raw(trace_cmp2_cmplog),
+            Hook::Raw(trace_cmp4_cmplog),
+            Hook::Raw(trace_cmp8_cmplog),
         );
     }
 }

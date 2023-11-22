@@ -63,14 +63,19 @@ impl<F, C, R: Clone> Hook<F, C, R> {
             _ => false,
         }
     }
+}
 
-    pub fn get_raw_hook(&self, replacement: R) -> Option<R> {
-        match self {
-            Hook::Function(_) | Hook::Closure(_) => Some(replacement),
-            Hook::Raw(r) => Some(r.clone()),
+macro_rules! get_raw_hook {
+    ($h:expr, $replacement:expr, $fntype:ty) => {
+        match $h {
+            Hook::Function(_) | Hook::Closure(_) => Some($replacement as $fntype),
+            Hook::Raw(r) => {
+                let v: $fntype = transmute(r);
+                Some(v)
+            }
             Hook::Empty => None,
         }
-    }
+    };
 }
 
 macro_rules! hook_to_repr {
@@ -475,17 +480,25 @@ where
             &mut Box<
                 dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, GuestAddr) -> Option<u64>,
             >,
-            extern "C" fn(&mut HookState<1>, src: GuestAddr, dest: GuestAddr) -> u64,
+            extern "C" fn(&mut (), src: GuestAddr, dest: GuestAddr) -> u64,
         >,
         execution_hook: Hook<
             fn(&mut Self, Option<&mut S>, id: u64),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>,
-            extern "C" fn(&mut HookState<1>, id: u64),
+            extern "C" fn(&mut (), id: u64),
         >,
     ) -> HookId {
         unsafe {
-            let gen = generation_hook.get_raw_hook(edge_gen_hook_wrapper::<QT, S>);
-            let exec = execution_hook.get_raw_hook(edge_0_exec_hook_wrapper::<QT, S>);
+            let gen = get_raw_hook!(
+                generation_hook,
+                edge_gen_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<1>, src: GuestAddr, dest: GuestAddr) -> u64
+            );
+            let exec = get_raw_hook!(
+                execution_hook,
+                edge_0_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<1>, id: u64)
+            );
             EDGE_HOOKS.push(HookState {
                 id: HookId(0),
                 gen: hook_to_repr!(generation_hook),
@@ -505,23 +518,35 @@ where
         generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr) -> Option<u64>,
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr) -> Option<u64>>,
-            extern "C" fn(&mut HookState<1>, pc: GuestAddr) -> u64,
+            extern "C" fn(&mut (), pc: GuestAddr) -> u64,
         >,
         post_generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr, block_length: GuestUsize),
             &mut Box<dyn FnMut(&'a mut Self, Option<&mut S>, GuestAddr, GuestUsize)>,
-            extern "C" fn(&mut HookState<1>, pc: GuestAddr, block_length: GuestUsize),
+            extern "C" fn(&mut (), pc: GuestAddr, block_length: GuestUsize),
         >,
         execution_hook: Hook<
             fn(&mut Self, Option<&mut S>, id: u64),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>,
-            extern "C" fn(&mut HookState<1>, id: u64),
+            extern "C" fn(&mut (), id: u64),
         >,
     ) -> HookId {
         unsafe {
-            let gen = generation_hook.get_raw_hook(block_gen_hook_wrapper::<QT, S>);
-            let postgen = post_generation_hook.get_raw_hook(block_post_gen_hook_wrapper::<QT, S>);
-            let exec = execution_hook.get_raw_hook(block_0_exec_hook_wrapper::<QT, S>);
+            let gen = get_raw_hook!(
+                generation_hook,
+                block_gen_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<1>, pc: GuestAddr) -> u64
+            );
+            let postgen = get_raw_hook!(
+                post_generation_hook,
+                block_post_gen_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<1>, pc: GuestAddr, block_length: GuestUsize)
+            );
+            let exec = get_raw_hook!(
+                execution_hook,
+                block_0_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<1>, id: u64)
+            );
             BLOCK_HOOKS.push(HookState {
                 id: HookId(0),
                 gen: hook_to_repr!(generation_hook),
@@ -543,41 +568,65 @@ where
             &mut Box<
                 dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, MemAccessInfo) -> Option<u64>,
             >,
-            extern "C" fn(&mut HookState<5>, pc: GuestAddr, info: MemAccessInfo) -> u64,
+            extern "C" fn(&mut (), pc: GuestAddr, info: MemAccessInfo) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
         >,
         execution_hook_2: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
         >,
         execution_hook_4: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
         >,
         execution_hook_8: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
         >,
         execution_hook_n: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr, size: usize),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
-            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr, size: usize),
+            extern "C" fn(&mut (), id: u64, addr: GuestAddr, size: usize),
         >,
     ) -> HookId {
         unsafe {
-            let gen = generation_hook.get_raw_hook(read_gen_hook_wrapper::<QT, S>);
-            let exec1 = execution_hook_1.get_raw_hook(read_0_exec_hook_wrapper::<QT, S>);
-            let exec2 = execution_hook_2.get_raw_hook(read_1_exec_hook_wrapper::<QT, S>);
-            let exec4 = execution_hook_4.get_raw_hook(read_2_exec_hook_wrapper::<QT, S>);
-            let exec8 = execution_hook_8.get_raw_hook(read_3_exec_hook_wrapper::<QT, S>);
-            let execn = execution_hook_n.get_raw_hook(read_4_exec_hook_wrapper::<QT, S>);
+            let gen = get_raw_hook!(
+                generation_hook,
+                read_gen_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, pc: GuestAddr, info: MemAccessInfo) -> u64
+            );
+            let exec1 = get_raw_hook!(
+                execution_hook_1,
+                read_0_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr)
+            );
+            let exec2 = get_raw_hook!(
+                execution_hook_2,
+                read_1_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr)
+            );
+            let exec4 = get_raw_hook!(
+                execution_hook_4,
+                read_2_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr)
+            );
+            let exec8 = get_raw_hook!(
+                execution_hook_8,
+                read_3_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr)
+            );
+            let execn = get_raw_hook!(
+                execution_hook_n,
+                read_4_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr, size: usize)
+            );
             READ_HOOKS.push(HookState {
                 id: HookId(0),
                 gen: hook_to_repr!(generation_hook),
@@ -611,41 +660,65 @@ where
             &mut Box<
                 dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, MemAccessInfo) -> Option<u64>,
             >,
-            extern "C" fn(&mut HookState<5>, pc: GuestAddr, info: MemAccessInfo) -> u64,
+            extern "C" fn(&mut (), pc: GuestAddr, info: MemAccessInfo) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
         >,
         execution_hook_2: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
         >,
         execution_hook_4: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
         >,
         execution_hook_8: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
         >,
         execution_hook_n: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr, size: usize),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
-            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr, size: usize),
+            extern "C" fn(&mut (), id: u64, addr: GuestAddr, size: usize),
         >,
     ) -> HookId {
         unsafe {
-            let gen = generation_hook.get_raw_hook(write_gen_hook_wrapper::<QT, S>);
-            let exec1 = execution_hook_1.get_raw_hook(write_0_exec_hook_wrapper::<QT, S>);
-            let exec2 = execution_hook_2.get_raw_hook(write_1_exec_hook_wrapper::<QT, S>);
-            let exec4 = execution_hook_4.get_raw_hook(write_2_exec_hook_wrapper::<QT, S>);
-            let exec8 = execution_hook_8.get_raw_hook(write_3_exec_hook_wrapper::<QT, S>);
-            let execn = execution_hook_n.get_raw_hook(write_4_exec_hook_wrapper::<QT, S>);
+            let gen = get_raw_hook!(
+                generation_hook,
+                write_gen_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, pc: GuestAddr, info: MemAccessInfo) -> u64
+            );
+            let exec1 = get_raw_hook!(
+                execution_hook_1,
+                write_0_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr)
+            );
+            let exec2 = get_raw_hook!(
+                execution_hook_2,
+                write_1_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr)
+            );
+            let exec4 = get_raw_hook!(
+                execution_hook_4,
+                write_2_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr)
+            );
+            let exec8 = get_raw_hook!(
+                execution_hook_8,
+                write_3_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr)
+            );
+            let execn = get_raw_hook!(
+                execution_hook_n,
+                write_4_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr, size: usize)
+            );
             WRITE_HOOKS.push(HookState {
                 id: HookId(0),
                 gen: hook_to_repr!(generation_hook),
@@ -677,35 +750,55 @@ where
         generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
-            extern "C" fn(&mut HookState<4>, pc: GuestAddr, size: usize) -> u64,
+            extern "C" fn(&mut (), pc: GuestAddr, size: usize) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u8, v1: u8),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u8, u8)>,
-            extern "C" fn(&mut HookState<4>, id: u64, v0: u8, v1: u8),
+            extern "C" fn(&mut (), id: u64, v0: u8, v1: u8),
         >,
         execution_hook_2: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u16, v1: u16),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u16, u16)>,
-            extern "C" fn(&mut HookState<4>, id: u64, v0: u16, v1: u16),
+            extern "C" fn(&mut (), id: u64, v0: u16, v1: u16),
         >,
         execution_hook_4: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u32, v1: u32),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u32, u32)>,
-            extern "C" fn(&mut HookState<4>, id: u64, v0: u32, v1: u32),
+            extern "C" fn(&mut (), id: u64, v0: u32, v1: u32),
         >,
         execution_hook_8: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u64, v1: u64),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u64, u64)>,
-            extern "C" fn(&mut HookState<4>, id: u64, v0: u64, v1: u64),
+            extern "C" fn(&mut (), id: u64, v0: u64, v1: u64),
         >,
     ) -> HookId {
         unsafe {
-            let gen = generation_hook.get_raw_hook(cmp_gen_hook_wrapper::<QT, S>);
-            let exec1 = execution_hook_1.get_raw_hook(cmp_0_exec_hook_wrapper::<QT, S>);
-            let exec2 = execution_hook_2.get_raw_hook(cmp_1_exec_hook_wrapper::<QT, S>);
-            let exec4 = execution_hook_4.get_raw_hook(cmp_2_exec_hook_wrapper::<QT, S>);
-            let exec8 = execution_hook_8.get_raw_hook(cmp_3_exec_hook_wrapper::<QT, S>);
+            let gen = get_raw_hook!(
+                generation_hook,
+                cmp_gen_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<4>, pc: GuestAddr, size: usize) -> u64
+            );
+            let exec1 = get_raw_hook!(
+                execution_hook_1,
+                cmp_0_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<4>, id: u64, v0: u8, v1: u8)
+            );
+            let exec2 = get_raw_hook!(
+                execution_hook_2,
+                cmp_1_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<4>, id: u64, v0: u16, v1: u16)
+            );
+            let exec4 = get_raw_hook!(
+                execution_hook_4,
+                cmp_2_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<4>, id: u64, v0: u32, v1: u32)
+            );
+            let exec8 = get_raw_hook!(
+                execution_hook_8,
+                cmp_3_exec_hook_wrapper::<QT, S>,
+                extern "C" fn(&mut HookState<4>, id: u64, v0: u64, v1: u64)
+            );
             CMP_HOOKS.push(HookState {
                 id: HookId(0),
                 gen: hook_to_repr!(generation_hook),
