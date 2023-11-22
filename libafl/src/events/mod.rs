@@ -51,7 +51,10 @@ use crate::{
     Error,
 };
 #[cfg(feature = "scalability_introspection")]
-use crate::{monitors::UserStats::Number, state::HasScalabilityMonitor};
+use crate::{
+    monitors::{AggregatorOps, UserStatsValue},
+    state::HasScalabilityMonitor,
+};
 
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
@@ -539,7 +542,12 @@ where
                 state,
                 Event::UpdateUserStats {
                     name: "total imported".to_string(),
-                    value: Number((imported_with_observer + imported_without_observer) as u64),
+                    value: UserStats::new(
+                        UserStatsValue::Number(
+                            (imported_with_observer + imported_without_observer) as u64,
+                        ),
+                        AggregatorOps::Avg,
+                    ),
                     phantom: PhantomData,
                 },
             )?;
