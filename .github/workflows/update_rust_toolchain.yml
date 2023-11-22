@@ -32,6 +32,7 @@ jobs:
           git add -u
           git commit -m "Update rust toolchain & time [$(date +'%Y-%m-%d %H:%M')]"
           git push origin update_from_ci
+          git log
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
