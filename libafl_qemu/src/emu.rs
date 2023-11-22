@@ -1129,7 +1129,8 @@ impl Emulator {
     pub fn entry_break(&self, addr: GuestAddr) {
         self.set_breakpoint(addr);
         unsafe {
-            self.run();
+            // TODO: decide what to do with sync exit here: ignore or check for bp exit?
+            let _ = self.run();
         }
         self.remove_breakpoint(addr);
     }

@@ -5,7 +5,7 @@ use std::{
 
 use enum_map::{enum_map, Enum, EnumMap};
 use libafl::executors::ExitKind;
-use num_enum::{FromPrimitive, TryFromPrimitive, TryFromPrimitiveError};
+use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
 
 use crate::{
     get_sync_backdoor_arch_regs, Emulator, GuestAddrKind, GuestPhysAddr, GuestReg, GuestVirtAddr,
