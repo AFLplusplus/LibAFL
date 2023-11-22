@@ -1,35 +1,30 @@
-use libafl_wizard::{
-    arrange_code, clear_terminal_screen, find_question, flowchart_image, separate_code,
-    validate_input, write_code, Question,
-};
 use std::{io, io::Write};
+
+mod answer;
+mod question;
+mod utils;
+
+use question::{find_question, flowchart_image, Question};
+use utils::{arrange_code, clear_terminal_screen, separate_code, validate_input, write_code};
 
 fn main() {
     // The question diagram is a vector containing all the questions.
     let mut questions = Question::new();
+    // Each element is a String, which contains the Rust code associated to a question. This will be used to write to the file.
+    let mut code_content: Vec<String> = Vec::new();
+    // Index of the current question.
+    let mut curr_q = 0;
+    // Index of the next question. Note that, when undoing, the next question is the previous one (that led to the current one).
+    let mut next_q;
+    // Index of the chosen answer.
+    let mut ans_i;
+    let mut input = String::new();
 
     // Generate a flowchat image to help guide the user.
     flowchart_image(&questions);
 
-    // Each element is a String, which contains the Rust code associated to a question. This will be used to write to the file.
-    let mut code_content: Vec<String> = Vec::new();
-
-    // Marks the questions that produced code that will be written. This has the same index as the questions in their vector.
-    // Undo option.
-    let mut prod_code: Vec<bool> = vec![false; questions.len()];
-
-    // Index of the current question.
-    let mut curr_q = 0;
-    // Index of the next question.
-    // Note that, when undoing, the next question is the previous one (that led to the current one).
-    let mut next_q;
-    // Index of the chosen answer.
-    let mut ans_i;
-
-    let mut input = String::new();
-
     // Basically, a question is shown, answered by the use and so on, until the last question.
-    while !questions[curr_q].end() {
+    while questions[curr_q].id != "END" {
         clear_terminal_screen();
 
         questions[curr_q].print_question();
@@ -60,13 +55,14 @@ fn main() {
 
             // If the user chooses to undo a question that produced code, the associated code is removed.
             // Since the Undo option goes backwards, we can simply pop the last piece of code.
-            if prod_code[next_q] {
-                code_content.pop();
-                prod_code[next_q] = false;
+            for ans in &questions[next_q].answers {
+                if ans.was_chosen && !ans.code.is_empty() {
+                    code_content.pop();
+                }
             }
 
             // Also, if we are undoing this question and it skipped others, we undo this too.
-            ans_i = questions[curr_q].chosen_ans();
+            ans_i = questions[curr_q].chosen_answer();
             if !questions[next_q].answers[ans_i].skip.is_empty() {
                 questions[next_q]
                     .clone()
@@ -82,7 +78,6 @@ fn main() {
             // Adds the code associated to the user choice.
             if questions[curr_q].answers[ans_i].has_code() {
                 questions[curr_q].answers[ans_i].add_code(&mut code_content);
-                prod_code[curr_q] = true;
             }
 
             // If there are any questions that should be skipped because of that answer.
@@ -105,7 +100,7 @@ fn main() {
     let file_name = write_code(arrange_code(separate_code(code_content)));
 
     println!(
-        "File {} successfully created under the ./fuzzers directory.\nAll questions answered!",
+        "\nFile {} successfully created under the ./fuzzers directory.\nAll questions answered!",
         file_name
     );
 }
