@@ -30,7 +30,7 @@ jobs:
           sed -i 's/rustup toolchain install nightly[0-9a-zA-Z\-]*/\`date +"rustup toolchain install nightly-%Y-%m-%d"\`/' ./.github/workflows/build_and_test.yml
           git add -u
           git commit -m "Update rust toolchain & time [$(date +'%Y-%m-%d %H:%M')]"
-          git push
+          git push origin update_from_ci
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
