@@ -27,14 +27,36 @@ jobs:
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
 
-      - name: Commit & push data
+      - name: Edit
         run: |
-          git remote -v
           sed -i 's/rustup toolchain install nightly[0-9a-zA-Z\-]*/\`date +"rustup toolchain install nightly-%Y-%m-%d"\`/' ./.github/workflows/build_and_test.yml
-          git add -u
-          git commit -m "Update rust toolchain & time [$(date +'%Y-%m-%d %H:%M')]"
-          git push origin update_from_ci
-          git log
+
+      - name: Add & Commit & Push
+      - uses: EndBug/add-and-commit@v9 # You can change this to use a specific version.
+        with:
+          # The arguments for the `git add` command (see the paragraph below for more info)
+          # Default: '.'
+          add: '.'
+
+          # The name of the user that will be displayed as the author of the commit.
+          # Default: depends on the default_author input
+          author_name: Github Actions
+
+          # The email of the user that will be displayed as the author of the commit.
+          # Default: depends on the default_author input
+          author_email: mail@example.com
+
+          # The message for the commit.
+          # Default: 'Commit from GitHub Actions (name of the workflow)'
+          message: 'Update rust deps'
+
+          # If this input is set, the action will push the commit to a new branch with this name.
+          # Default: ''
+          new_branch: update_from_ci
+
+          # Whether to push the commit and, if any, its tags to the repo. It can also be used to set the git push arguments (see the paragraph below for more info)
+          # Default: true
+          push: true
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
