@@ -33,19 +33,6 @@ pub enum Regs {
     R25 = 25,
 }
 
-/// alias registers
-#[allow(non_upper_case_globals)]
-impl Regs {
-    pub const Sp: Regs = Regs::R13;
-    pub const Lr: Regs = Regs::R14;
-    pub const Pc: Regs = Regs::R15;
-    pub const Sb: Regs = Regs::R9;
-    pub const Sl: Regs = Regs::R10;
-    pub const Fp: Regs = Regs::R11;
-    pub const Ip: Regs = Regs::R12;
-    pub const Cpsr: Regs = Regs::R25;
-}
-
 static SYNC_BACKDOOR_ARCH_REGS: OnceLock<EnumMap<SyncBackdoorArgs, Regs>> = OnceLock::new();
 
 pub fn get_sync_backdoor_arch_regs() -> &'static EnumMap<SyncBackdoorArgs, Regs> {
@@ -61,6 +48,19 @@ pub fn get_sync_backdoor_arch_regs() -> &'static EnumMap<SyncBackdoorArgs, Regs>
             SyncBackdoorArgs::Arg6 => Regs::R6,
         }
     })
+}
+
+/// alias registers
+#[allow(non_upper_case_globals)]
+impl Regs {
+    pub const Sp: Regs = Regs::R13;
+    pub const Lr: Regs = Regs::R14;
+    pub const Pc: Regs = Regs::R15;
+    pub const Sb: Regs = Regs::R9;
+    pub const Sl: Regs = Regs::R10;
+    pub const Fp: Regs = Regs::R11;
+    pub const Ip: Regs = Regs::R12;
+    pub const Cpsr: Regs = Regs::R25;
 }
 
 #[cfg(feature = "python")]

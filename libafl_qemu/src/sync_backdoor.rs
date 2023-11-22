@@ -78,7 +78,8 @@ impl CommandInput {
             GuestAddrKind::Physical(hwaddr) => unsafe {
                 #[cfg(emulation_mode = "usermode")]
                 {
-                    emu.write_mem(hwaddr, input)
+                    // For now the default behaviour is to fall back to virtual addresses
+                    emu.write_mem(hwaddr.try_into().unwrap(), input)
                 }
                 #[cfg(emulation_mode = "systemmode")]
                 {
