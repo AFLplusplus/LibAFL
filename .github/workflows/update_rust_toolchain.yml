@@ -14,22 +14,13 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: update_from_ci
-          token: ${{ secrets.LIBAFL_UPDATER }}
-      - uses: actions/setup-python@v3
-        with:
-          python-version: '3.10' 
-
-      - name: Setup Git
-        run: |
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Actions"
-
       - name: Edit
         run: |
           sed -i 's/rustup toolchain install nightly[0-9a-zA-Z\-]*/\`date +"rustup toolchain install nightly-%Y-%m-%d"\`/' ./.github/workflows/build_and_test.yml
+
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.LIBAFL_UPDATER }}
 
       - uses: EndBug/add-and-commit@v9 # You can change this to use a specific version.
         with:
