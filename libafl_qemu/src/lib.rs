@@ -67,10 +67,10 @@ pub mod helper;
 pub use helper::*;
 pub mod hooks;
 pub use hooks::*;
-/*
+
 pub mod edges;
 pub use edges::QemuEdgeCoverageHelper;
-
+/*
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]

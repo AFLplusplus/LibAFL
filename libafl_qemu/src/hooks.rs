@@ -42,7 +42,7 @@ pub(crate) enum HookRepr {
     Empty,
 }
 
-pub struct GenExecHookKeep<const N: usize> {
+pub struct HookState<const N: usize> {
     id: HookId,
     gen: HookRepr,
     post_gen: HookRepr,
@@ -83,17 +83,6 @@ macro_rules! hook_to_repr {
         }
     };
 }
-
-/*
-// function signature for Read or Write hook functions with known length (1, 2, 4, 8)
-type FixedLenHookFn<QT, S> = fn(&Emulator, &mut QT, Option<&mut S>, u64, GuestAddr);
-type FixedLenHookCl<QT, S> = Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, GuestAddr)>;
-
-// function signature for Read or Write hook functions with runtime length n
-type DynamicLenHookFn<QT, S> = fn(&Emulator, &mut QT, Option<&mut S>, u64, GuestAddr, usize);
-type DynamicLenHookCl<QT, S> =
-    Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, GuestAddr, usize)>;
-*/
 
 static mut QEMU_HOOKS_PTR: *const c_void = ptr::null();
 unsafe fn get_qemu_hooks<'a, QT, S>() -> &'a mut QemuHooks<'a, QT, S>
@@ -166,7 +155,7 @@ macro_rules! create_wrapper {
 macro_rules! create_gen_wrapper {
     ($name:ident, ($($param:ident : $param_type:ty),*), $ret_type:ty, $execs:literal) => {
         paste::paste! {
-            extern "C" fn [<$name _gen_hook_wrapper>]<QT, S>(hook: &mut GenExecHookKeep<{ $execs }>, $($param: $param_type),*) -> $ret_type
+            extern "C" fn [<$name _gen_hook_wrapper>]<QT, S>(hook: &mut HookState<{ $execs }>, $($param: $param_type),*) -> $ret_type
             where
                 S: UsesInput,
                 QT: QemuHelperTuple<S>,
@@ -196,7 +185,7 @@ macro_rules! create_gen_wrapper {
 macro_rules! create_post_gen_wrapper {
     ($name:ident, ($($param:ident : $param_type:ty),*), $execs:literal) => {
         paste::paste! {
-            extern "C" fn [<$name _post_gen_hook_wrapper>]<QT, S>(hook: &mut GenExecHookKeep<{ $execs }>, $($param: $param_type),*)
+            extern "C" fn [<$name _post_gen_hook_wrapper>]<QT, S>(hook: &mut HookState<{ $execs }>, $($param: $param_type),*)
             where
                 S: UsesInput,
                 QT: QemuHelperTuple<S>,
@@ -226,7 +215,7 @@ macro_rules! create_post_gen_wrapper {
 macro_rules! create_exec_wrapper {
     ($name:ident, ($($param:ident : $param_type:ty),*), $execidx:literal, $execs:literal) => {
         paste::paste! {
-            extern "C" fn [<$name _ $execidx _exec_hook_wrapper>]<QT, S>(hook: &mut GenExecHookKeep<{ $execs }>, $($param: $param_type),*)
+            extern "C" fn [<$name _ $execidx _exec_hook_wrapper>]<QT, S>(hook: &mut HookState<{ $execs }>, $($param: $param_type),*)
             where
                 S: UsesInput,
                 QT: QemuHelperTuple<S>,
@@ -276,16 +265,16 @@ create_wrapper!(post_syscall, (res: GuestAddr, sys_num: i32,
 #[cfg(emulation_mode = "usermode")]
 create_wrapper!(new_thread, (tid: u32), bool);
 
-static mut EDGE_HOOKS: Vec<GenExecHookKeep<1>> = vec![];
+static mut EDGE_HOOKS: Vec<HookState<1>> = vec![];
 create_gen_wrapper!(edge, (src: GuestAddr, dest: GuestAddr), u64, 1);
 create_exec_wrapper!(edge, (id: u64), 0, 1);
 
-static mut BLOCK_HOOKS: Vec<GenExecHookKeep<1>> = vec![];
+static mut BLOCK_HOOKS: Vec<HookState<1>> = vec![];
 create_gen_wrapper!(block, (addr: GuestAddr), u64, 1);
 create_post_gen_wrapper!(block, (addr: GuestAddr, len: GuestUsize), 1);
 create_exec_wrapper!(block, (id: u64), 0, 1);
 
-static mut READ_HOOKS: Vec<GenExecHookKeep<5>> = vec![];
+static mut READ_HOOKS: Vec<HookState<5>> = vec![];
 create_gen_wrapper!(read, (pc: GuestAddr, info: MemAccessInfo), u64, 5);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 0, 5);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 1, 5);
@@ -293,7 +282,7 @@ create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 2, 5);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 3, 5);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr, size: usize), 4, 5);
 
-static mut WRITE_HOOKS: Vec<GenExecHookKeep<5>> = vec![];
+static mut WRITE_HOOKS: Vec<HookState<5>> = vec![];
 create_gen_wrapper!(write, (pc: GuestAddr, info: MemAccessInfo), u64, 5);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 0, 5);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 1, 5);
@@ -301,7 +290,7 @@ create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 2, 5);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 3, 5);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr, size: usize), 4, 5);
 
-static mut CMP_HOOKS: Vec<GenExecHookKeep<4>> = vec![];
+static mut CMP_HOOKS: Vec<HookState<4>> = vec![];
 create_gen_wrapper!(cmp, (pc: GuestAddr, size: usize), u64, 4);
 create_exec_wrapper!(cmp, (id: u64, v0: u8, v1: u8), 0, 4);
 create_exec_wrapper!(cmp, (id: u64, v0: u16, v1: u16), 1, 4);
@@ -486,18 +475,18 @@ where
             &mut Box<
                 dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, GuestAddr) -> Option<u64>,
             >,
-            extern "C" fn(&mut GenExecHookKeep<1>, src: GuestAddr, dest: GuestAddr) -> u64,
+            extern "C" fn(&mut HookState<1>, src: GuestAddr, dest: GuestAddr) -> u64,
         >,
         execution_hook: Hook<
             fn(&mut Self, Option<&mut S>, id: u64),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>,
-            extern "C" fn(&mut GenExecHookKeep<1>, id: u64),
+            extern "C" fn(&mut HookState<1>, id: u64),
         >,
     ) -> HookId {
         unsafe {
             let gen = generation_hook.get_raw_hook(edge_gen_hook_wrapper::<QT, S>);
             let exec = execution_hook.get_raw_hook(edge_0_exec_hook_wrapper::<QT, S>);
-            EDGE_HOOKS.push(GenExecHookKeep {
+            EDGE_HOOKS.push(HookState {
                 id: HookId(0),
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
@@ -516,24 +505,24 @@ where
         generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr) -> Option<u64>,
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr) -> Option<u64>>,
-            extern "C" fn(&mut GenExecHookKeep<1>, pc: GuestAddr) -> u64,
+            extern "C" fn(&mut HookState<1>, pc: GuestAddr) -> u64,
         >,
         post_generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr, block_length: GuestUsize),
             &mut Box<dyn FnMut(&'a mut Self, Option<&mut S>, GuestAddr, GuestUsize)>,
-            extern "C" fn(&mut GenExecHookKeep<1>, pc: GuestAddr, block_length: GuestUsize),
+            extern "C" fn(&mut HookState<1>, pc: GuestAddr, block_length: GuestUsize),
         >,
         execution_hook: Hook<
             fn(&mut Self, Option<&mut S>, id: u64),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>,
-            extern "C" fn(&mut GenExecHookKeep<1>, id: u64),
+            extern "C" fn(&mut HookState<1>, id: u64),
         >,
     ) -> HookId {
         unsafe {
             let gen = generation_hook.get_raw_hook(block_gen_hook_wrapper::<QT, S>);
             let postgen = post_generation_hook.get_raw_hook(block_post_gen_hook_wrapper::<QT, S>);
             let exec = execution_hook.get_raw_hook(block_0_exec_hook_wrapper::<QT, S>);
-            BLOCK_HOOKS.push(GenExecHookKeep {
+            BLOCK_HOOKS.push(HookState {
                 id: HookId(0),
                 gen: hook_to_repr!(generation_hook),
                 post_gen: hook_to_repr!(post_generation_hook),
@@ -554,32 +543,32 @@ where
             &mut Box<
                 dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, MemAccessInfo) -> Option<u64>,
             >,
-            extern "C" fn(&mut GenExecHookKeep<5>, pc: GuestAddr, info: MemAccessInfo) -> u64,
+            extern "C" fn(&mut HookState<5>, pc: GuestAddr, info: MemAccessInfo) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut GenExecHookKeep<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
         >,
         execution_hook_2: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut GenExecHookKeep<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
         >,
         execution_hook_4: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut GenExecHookKeep<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
         >,
         execution_hook_8: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut GenExecHookKeep<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
         >,
         execution_hook_n: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr, size: usize),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
-            extern "C" fn(&mut GenExecHookKeep<5>, id: u64, addr: GuestAddr, size: usize),
+            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr, size: usize),
         >,
     ) -> HookId {
         unsafe {
@@ -589,7 +578,7 @@ where
             let exec4 = execution_hook_4.get_raw_hook(read_2_exec_hook_wrapper::<QT, S>);
             let exec8 = execution_hook_8.get_raw_hook(read_3_exec_hook_wrapper::<QT, S>);
             let execn = execution_hook_n.get_raw_hook(read_4_exec_hook_wrapper::<QT, S>);
-            READ_HOOKS.push(GenExecHookKeep {
+            READ_HOOKS.push(HookState {
                 id: HookId(0),
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
@@ -622,32 +611,32 @@ where
             &mut Box<
                 dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, MemAccessInfo) -> Option<u64>,
             >,
-            extern "C" fn(&mut GenExecHookKeep<5>, pc: GuestAddr, info: MemAccessInfo) -> u64,
+            extern "C" fn(&mut HookState<5>, pc: GuestAddr, info: MemAccessInfo) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut GenExecHookKeep<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
         >,
         execution_hook_2: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut GenExecHookKeep<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
         >,
         execution_hook_4: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut GenExecHookKeep<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
         >,
         execution_hook_8: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut GenExecHookKeep<5>, id: u64, addr: GuestAddr),
+            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr),
         >,
         execution_hook_n: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr, size: usize),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
-            extern "C" fn(&mut GenExecHookKeep<5>, id: u64, addr: GuestAddr, size: usize),
+            extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr, size: usize),
         >,
     ) -> HookId {
         unsafe {
@@ -657,7 +646,7 @@ where
             let exec4 = execution_hook_4.get_raw_hook(write_2_exec_hook_wrapper::<QT, S>);
             let exec8 = execution_hook_8.get_raw_hook(write_3_exec_hook_wrapper::<QT, S>);
             let execn = execution_hook_n.get_raw_hook(write_4_exec_hook_wrapper::<QT, S>);
-            WRITE_HOOKS.push(GenExecHookKeep {
+            WRITE_HOOKS.push(HookState {
                 id: HookId(0),
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
@@ -688,27 +677,27 @@ where
         generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
-            extern "C" fn(&mut GenExecHookKeep<4>, pc: GuestAddr, size: usize) -> u64,
+            extern "C" fn(&mut HookState<4>, pc: GuestAddr, size: usize) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u8, v1: u8),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u8, u8)>,
-            extern "C" fn(&mut GenExecHookKeep<4>, id: u64, v0: u8, v1: u8),
+            extern "C" fn(&mut HookState<4>, id: u64, v0: u8, v1: u8),
         >,
         execution_hook_2: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u16, v1: u16),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u16, u16)>,
-            extern "C" fn(&mut GenExecHookKeep<4>, id: u64, v0: u16, v1: u16),
+            extern "C" fn(&mut HookState<4>, id: u64, v0: u16, v1: u16),
         >,
         execution_hook_4: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u32, v1: u32),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u32, u32)>,
-            extern "C" fn(&mut GenExecHookKeep<4>, id: u64, v0: u32, v1: u32),
+            extern "C" fn(&mut HookState<4>, id: u64, v0: u32, v1: u32),
         >,
         execution_hook_8: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u64, v1: u64),
             &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u64, u64)>,
-            extern "C" fn(&mut GenExecHookKeep<4>, id: u64, v0: u64, v1: u64),
+            extern "C" fn(&mut HookState<4>, id: u64, v0: u64, v1: u64),
         >,
     ) -> HookId {
         unsafe {
@@ -717,7 +706,7 @@ where
             let exec2 = execution_hook_2.get_raw_hook(cmp_1_exec_hook_wrapper::<QT, S>);
             let exec4 = execution_hook_4.get_raw_hook(cmp_2_exec_hook_wrapper::<QT, S>);
             let exec8 = execution_hook_8.get_raw_hook(cmp_3_exec_hook_wrapper::<QT, S>);
-            CMP_HOOKS.push(GenExecHookKeep {
+            CMP_HOOKS.push(HookState {
                 id: HookId(0),
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
