@@ -198,18 +198,18 @@ impl AsanGiovese {
 
     #[must_use]
     fn new(emu: &Emulator) -> Self {
-        emu.set_pre_syscall_hook
+        //emu.set_pre_syscall_hook
         Self {
             alloc_tree: Mutex::new(IntervalTree::new()),
             saved_tree: IntervalTree::new(),
             error_callback: None,
             dirty_shadow: Mutex::new(HashSet::default()),
             saved_shadow: HashMap::default(),
-            true, // By default, track the dirty shadow pages
+            snapshot_shadow: true, // By default, track the dirty shadow pages
         }
     }
 
-    extern "C" fn fake_syscall(sys_num: i32,
+    /*extern "C" fn fake_syscall(sys_num: i32,
     a0: u64,
     a1: u64,
     a2: u64,
@@ -252,7 +252,7 @@ impl AsanGiovese {
     } else {
         SyscallHookResult::new(None)
     }
-    }
+    }*/
 
     fn set_error_callback(&mut self, error_callback: AsanErrorCallback) {
         self.error_callback = Some(error_callback);
@@ -713,7 +713,7 @@ pub struct QemuAsanHelper {
 
 impl QemuAsanHelper {
     #[must_use]
-    pub fn new(rt: AsanGiovese, filter: QemuInstrumentationFilter, options: QemuAsanOptions) -> Self {
+    pub fn new(mut rt: AsanGiovese, filter: QemuInstrumentationFilter, options: QemuAsanOptions) -> Self {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
         let (snapshot, detect_leaks) = match options {
             QemuAsanOptions::None => (false, false),
@@ -733,7 +733,7 @@ impl QemuAsanHelper {
 
     #[must_use]
     pub fn with_error_callback(
-        rt: AsanGiovese, 
+        mut rt: AsanGiovese, 
         filter: QemuInstrumentationFilter,
         error_callback: AsanErrorCallback,
         options: QemuAsanOptions,
@@ -880,11 +880,11 @@ impl QemuAsanHelper {
     }
 }
 
-impl Default for QemuAsanHelper {
+/*impl Default for QemuAsanHelper {
     fn default() -> Self {
         Self::new(QemuInstrumentationFilter::None, QemuAsanOptions::Snapshot)
     }
-}
+}*/
 
 impl HasInstrumentationFilter for QemuAsanHelper {
     fn filter(&self) -> &QemuInstrumentationFilter {
