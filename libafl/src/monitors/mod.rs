@@ -112,7 +112,6 @@ impl Aggregator {
 
         if let AggregatorOps::Avg = op {
             // if avg then divide last.
-            println!("Dividing");
             init = match init.stats_div(gather.len()) {
                 Some(x) => x,
                 _ => {
