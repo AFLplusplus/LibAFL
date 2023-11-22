@@ -39,9 +39,9 @@ use libafl_bolts::AsSlice;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasExecutions, UsesState},
+    state::{HasExecutions, State, UsesState},
     Error,
 };
 
@@ -158,7 +158,7 @@ struct NopExecutor<S> {
 
 impl<S> UsesState for NopExecutor<S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -166,7 +166,7 @@ where
 impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
 where
     EM: UsesState<State = S>,
-    S: UsesInput + HasExecutions,
+    S: State + HasExecutions,
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
 {

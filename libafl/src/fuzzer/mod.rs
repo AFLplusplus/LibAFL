@@ -8,8 +8,6 @@ use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(test)]
 use crate::inputs::Input;
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 #[cfg(test)]
 use crate::state::NopState;
 use crate::{
@@ -24,11 +22,13 @@ use crate::{
     stages::StagesTuple,
     start_timer,
     state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasImported, HasLastReportTime,
-        HasMetadata, HasSolutions, UsesState,
+        HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasMetadata, HasSolutions,
+        UsesState,
     },
     Error,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
@@ -49,10 +49,7 @@ where
 }
 
 /// Holds an feedback
-pub trait HasFeedback: UsesState
-where
-    Self::State: HasClientPerfMonitor,
-{
+pub trait HasFeedback: UsesState {
     /// The feedback type
     type Feedback: Feedback<Self::State>;
 
@@ -64,10 +61,7 @@ where
 }
 
 /// Holds an objective feedback
-pub trait HasObjective: UsesState
-where
-    Self::State: HasClientPerfMonitor,
-{
+pub trait HasObjective: UsesState {
     /// The type of the [`Feedback`] used to find objectives for this fuzzer
     type Objective: Feedback<Self::State>;
 
@@ -158,7 +152,7 @@ where
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,
@@ -255,7 +249,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus,
 {
     scheduler: CS,
     feedback: F,
@@ -268,7 +262,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus,
 {
     type State = CS::State;
 }
@@ -278,7 +272,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus,
 {
     type Scheduler = CS;
 
@@ -296,7 +290,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus,
 {
     type Feedback = F;
 
@@ -314,7 +308,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus,
 {
     type Objective = OF;
 
@@ -333,8 +327,7 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State:
-        HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasCorpus + HasImported,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasCorpus + HasImported,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -454,7 +447,7 @@ where
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasImported,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasImported,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -487,7 +480,7 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasImported,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasImported,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -590,13 +583,8 @@ where
     EM: ProgressReporter + EventProcessor<E, Self, State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor
-        + HasExecutions
-        + HasMetadata
-        + HasCorpus
-        + HasTestcase
-        + HasImported
-        + HasLastReportTime,
+    CS::State:
+        HasExecutions + HasMetadata + HasCorpus + HasTestcase + HasImported + HasLastReportTime,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
     fn fuzz_one(
@@ -650,7 +638,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: UsesInput + HasExecutions + HasClientPerfMonitor + HasCorpus,
+    CS::State: UsesInput + HasExecutions + HasCorpus,
 {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
@@ -716,7 +704,7 @@ where
     OF: Feedback<CS::State>,
     E: Executor<EM, Self> + HasObservers<State = CS::State>,
     EM: UsesState<State = CS::State>,
-    CS::State: UsesInput + HasExecutions + HasClientPerfMonitor + HasCorpus,
+    CS::State: UsesInput + HasExecutions + HasCorpus,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input(

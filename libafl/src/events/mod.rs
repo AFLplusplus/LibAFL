@@ -15,6 +15,8 @@ pub mod llmp;
 #[cfg(feature = "tcp_manager")]
 #[allow(clippy::ignored_unit_patterns)]
 pub mod tcp;
+#[cfg(feature = "scalability_introspection")]
+use alloc::string::ToString;
 use alloc::{boxed::Box, string::String, vec::Vec};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::c_void;
@@ -38,14 +40,18 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
+#[cfg(feature = "introspection")]
+use crate::state::HasClientPerfMonitor;
 use crate::{
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, State},
     Error,
 };
+#[cfg(feature = "scalability_introspection")]
+use crate::{monitors::UserStats::Number, state::HasScalabilityMonitor};
 
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
@@ -462,7 +468,7 @@ pub trait EventFirer: UsesState {
 /// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter: EventFirer
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
 {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
@@ -523,6 +529,22 @@ where
             )?;
         }
 
+        // If we are measuring scalability stuff..
+        #[cfg(feature = "scalability_introspection")]
+        {
+            let imported_with_observer = state.scalability_monitor().testcase_with_observers;
+            let imported_without_observer = state.scalability_monitor().testcase_without_observers;
+
+            self.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: "total imported".to_string(),
+                    value: Number((imported_with_observer + imported_without_observer) as u64),
+                    phantom: PhantomData,
+                },
+            )?;
+        }
+
         *state.last_report_time_mut() = Some(cur);
 
         Ok(())
@@ -574,7 +596,7 @@ pub trait HasEventManagerId {
 pub trait EventManager<E, Z>:
     EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
 {
 }
 
@@ -606,14 +628,14 @@ impl<S> NopEventManager<S> {
 
 impl<S> UsesState for NopEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
 
 impl<S> EventFirer for NopEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     fn fire(
         &mut self,
@@ -624,11 +646,11 @@ where
     }
 }
 
-impl<S> EventRestarter for NopEventManager<S> where S: UsesInput {}
+impl<S> EventRestarter for NopEventManager<S> where S: State {}
 
 impl<E, S, Z> EventProcessor<E, Z> for NopEventManager<S>
 where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions,
+    S: State + HasExecutions,
 {
     fn process(
         &mut self,
@@ -641,13 +663,13 @@ where
 }
 
 impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata
+    S: State + HasExecutions + HasLastReportTime + HasMetadata
 {
 }
 
 impl<S> HasCustomBufHandlers for NopEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     fn add_custom_buf_handler(
         &mut self,
@@ -659,7 +681,7 @@ where
 }
 
 impl<S> ProgressReporter for NopEventManager<S> where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata
+    S: State + HasExecutions + HasLastReportTime + HasMetadata
 {
 }
 

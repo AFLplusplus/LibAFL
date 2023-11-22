@@ -39,7 +39,7 @@ use crate::{
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple, UsesObservers},
-    state::{HasExecutions, UsesState},
+    state::{HasExecutions, State, UsesState},
     Error,
 };
 
@@ -1213,7 +1213,7 @@ impl<EM, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
-    S: UsesInput + HasExecutions,
+    S: State + HasExecutions,
     S::Input: HasTargetBytes,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
@@ -1321,7 +1321,7 @@ where
 
 impl<OT, S, SP> UsesState for ForkserverExecutor<OT, S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type State = S;
@@ -1330,7 +1330,7 @@ where
 impl<OT, S, SP> UsesObservers for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type Observers = OT;
@@ -1339,7 +1339,7 @@ where
 impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     #[inline]

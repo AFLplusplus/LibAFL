@@ -14,7 +14,7 @@ use libafl::{
     feedbacks::Feedback,
     inputs::{HasTargetBytes, UsesInput},
     observers::{Observer, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata},
+    state::{HasMetadata, State},
     Error,
 };
 use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
@@ -611,7 +611,7 @@ pub struct AsanErrorsFeedback<S> {
 
 impl<S> Feedback<S> for AsanErrorsFeedback<S>
 where
-    S: UsesInput + Debug + HasClientPerfMonitor,
+    S: State + Debug,
     S::Input: HasTargetBytes,
 {
     #[allow(clippy::wrong_self_convention)]

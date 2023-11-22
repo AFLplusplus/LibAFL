@@ -38,7 +38,7 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     random_corpus_id,
-    state::{HasCorpus, HasRand, UsesState},
+    state::{HasCorpus, HasRand, State, UsesState},
     Error,
 };
 
@@ -114,14 +114,14 @@ pub struct RandScheduler<S> {
 
 impl<S> UsesState for RandScheduler<S>
 where
-    S: UsesInput + HasTestcase,
+    S: State + HasTestcase,
 {
     type State = S;
 }
 
 impl<S> Scheduler for RandScheduler<S>
 where
-    S: HasCorpus + HasRand + HasTestcase,
+    S: HasCorpus + HasRand + HasTestcase + State,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         // Set parent id

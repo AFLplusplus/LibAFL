@@ -23,7 +23,7 @@ use libafl::{
     },
     stages::StagesTuple,
     state::{
-        HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, HasSolutions,
+        HasExecutions, HasLastReportTime, HasMetadata, HasSolutions,
         UsesState,
     },
     Error, Fuzzer,
@@ -70,8 +70,7 @@ fn do_fuzz<F, ST, E, S, EM>(
 ) -> Result<(), Error>
 where
     F: Fuzzer<E, EM, ST, State = S>,
-    S: HasClientPerfMonitor
-        + HasMetadata
+    S: HasMetadata
         + HasExecutions
         + UsesInput
         + HasSolutions

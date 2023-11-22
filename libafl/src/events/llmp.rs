@@ -52,7 +52,7 @@ use crate::{
     inputs::{Input, InputConverter, UsesInput},
     monitors::Monitor,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
     Error,
 };
 
@@ -345,7 +345,7 @@ pub trait EventStatsCollector {}
 /// using low-level message passing, [`libafl_bolts::llmp`].
 pub struct LlmpEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
 {
     /// The LLMP client for inter process communication
@@ -373,7 +373,7 @@ where
 impl<S, SP> EventStatsCollector for LlmpEventManager<S, SP>
 where
     SP: ShMemProvider + 'static,
-    S: UsesInput,
+    S: State,
 {
     fn serialization_time(&self) -> Duration {
         self.serialization_time
@@ -405,7 +405,7 @@ where
 impl<S, SP> core::fmt::Debug for LlmpEventManager<S, SP>
 where
     SP: ShMemProvider + 'static,
-    S: UsesInput,
+    S: State,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("LlmpEventManager");
@@ -423,7 +423,7 @@ where
 impl<S, SP> Drop for LlmpEventManager<S, SP>
 where
     SP: ShMemProvider + 'static,
-    S: UsesInput,
+    S: State,
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
@@ -433,7 +433,7 @@ where
 
 impl<S, SP> LlmpEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
 {
     /// Create a manager from a raw LLMP client
@@ -549,7 +549,7 @@ where
 
 impl<S, SP> LlmpEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
 {
     // Handle arriving events in the client
@@ -591,9 +591,16 @@ where
                     {
                         self.deserialization_time = current_time() - start;
                     }
-
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_with_observers += 1;
+                    }
                     fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
                 } else {
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_without_observers += 1;
+                    }
                     fuzzer.evaluate_input_with_observers::<E, Self>(
                         state, executor, self, input, false,
                     )?
@@ -619,7 +626,7 @@ where
     }
 }
 
-impl<S: UsesInput, SP: ShMemProvider> LlmpEventManager<S, SP> {
+impl<S: State, SP: ShMemProvider> LlmpEventManager<S, SP> {
     /// Send information that this client is exiting.
     /// The other side may free up all allocated memory.
     /// We are no longer allowed to send anything afterwards.
@@ -630,7 +637,7 @@ impl<S: UsesInput, SP: ShMemProvider> LlmpEventManager<S, SP> {
 
 impl<S, SP> UsesState for LlmpEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type State = S;
@@ -638,7 +645,7 @@ where
 
 impl<S, SP> EventFirer for LlmpEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     #[cfg(feature = "llmp_compression")]
@@ -732,7 +739,7 @@ where
 
 impl<S, SP> EventRestarter for LlmpEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     /// The LLMP client needs to wait until a broker has mapped all pages before shutting down.
@@ -745,7 +752,7 @@ where
 
 impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<S, SP>
 where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -792,7 +799,7 @@ impl<E, S, SP, Z> EventManager<E, Z> for LlmpEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
@@ -800,7 +807,7 @@ where
 
 impl<S, SP> HasCustomBufHandlers for LlmpEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     fn add_custom_buf_handler(
@@ -813,14 +820,14 @@ where
 
 impl<S, SP> ProgressReporter for LlmpEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
 {
 }
 
 impl<S, SP> HasEventManagerId for LlmpEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     /// Gets the id assigned to this staterestorer.
@@ -834,7 +841,7 @@ where
 #[derive(Debug)]
 pub struct LlmpRestartingEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -850,7 +857,7 @@ where
 impl<S, SP> EventStatsCollector for LlmpRestartingEventManager<S, SP>
 where
     SP: ShMemProvider + 'static,
-    S: UsesInput,
+    S: State,
 {
     fn serialization_time(&self) -> Duration {
         self.llmp_mgr.serialization_time()
@@ -883,14 +890,14 @@ where
 impl<S, SP> EventStatsCollector for LlmpRestartingEventManager<S, SP>
 where
     SP: ShMemProvider + 'static,
-    S: UsesInput,
+    S: State,
 {
 }
 
 #[cfg(feature = "std")]
 impl<S, SP> UsesState for LlmpRestartingEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
 {
     type State = S;
@@ -899,12 +906,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> ProgressReporter for LlmpRestartingEventManager<S, SP>
 where
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + Serialize,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
 {
 }
@@ -913,7 +915,7 @@ where
 impl<S, SP> EventFirer for LlmpRestartingEventManager<S, SP>
 where
     SP: ShMemProvider,
-    S: UsesInput,
+    S: State,
     //CE: CustomEvent<I>,
 {
     fn fire(
@@ -940,7 +942,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> EventRestarter for LlmpRestartingEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + Serialize,
+    S: State + HasExecutions,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -978,7 +980,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: State + HasExecutions + HasMetadata,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -992,12 +994,7 @@ impl<E, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + Serialize,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -1006,7 +1003,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> HasEventManagerId for LlmpRestartingEventManager<S, SP>
 where
-    S: UsesInput + Serialize,
+    S: State,
     SP: ShMemProvider + 'static,
 {
     fn mgr_id(&self) -> EventManagerId {
@@ -1023,7 +1020,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 #[cfg(feature = "std")]
 impl<S, SP> LlmpRestartingEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -1087,7 +1084,7 @@ pub fn setup_restarting_mgr_std<MT, S>(
 ) -> Result<(Option<S>, LlmpRestartingEventManager<S, StdShMemProvider>), Error>
 where
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasClientPerfMonitor + HasExecutions,
+    S: State + HasExecutions,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -1148,7 +1145,7 @@ where
 impl<MT, S, SP> RestartingMgr<MT, S, SP>
 where
     SP: ShMemProvider,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + DeserializeOwned,
+    S: State + HasExecutions,
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager
@@ -1412,7 +1409,7 @@ where
 
 impl<IC, ICB, DI, S, SP> LlmpEventConverter<IC, ICB, DI, S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: UsesInput + HasExecutions,
     SP: ShMemProvider + 'static,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
@@ -1605,7 +1602,7 @@ where
 
 impl<IC, ICB, DI, S, SP> UsesState for LlmpEventConverter<IC, ICB, DI, S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
@@ -1616,7 +1613,7 @@ where
 
 impl<IC, ICB, DI, S, SP> EventFirer for LlmpEventConverter<IC, ICB, DI, S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,

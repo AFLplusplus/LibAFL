@@ -26,7 +26,7 @@ fn dll_extension<'a>() -> &'a str {
             return "dylib";
         }
     }
-    let family = env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+    let family = env::var("CARGO_CFG_TARGET_FAMILY").unwrap_or_else(|_| "unknown".into());
     match family.as_str() {
         "windows" => "dll",
         "unix" => "so",
