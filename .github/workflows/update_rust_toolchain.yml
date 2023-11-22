@@ -32,6 +32,7 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
+          token: ${{ secrets.LIBAFL_UPDATER }}
           committer: GitHub <noreply@github.com>
           author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
           commit-message: Add report file
