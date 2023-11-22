@@ -14,13 +14,13 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - name: Edit
-        run: |
-          sed -i 's/rustup toolchain install nightly[0-9a-zA-Z\-]*/\`date +"rustup toolchain install nightly-%Y-%m-%d"\`/' ./.github/workflows/build_and_test.yml
-
       - uses: actions/checkout@v3
         with:
           token: ${{ secrets.LIBAFL_UPDATER }}
+
+      - name: Edit
+        run: |
+          sed -i 's/rustup toolchain install nightly[0-9a-zA-Z\-]*/\`date +"rustup toolchain install nightly-%Y-%m-%d"\`/' ./.github/workflows/build_and_test.yml
 
       - uses: EndBug/add-and-commit@v9 # You can change this to use a specific version.
         with:
