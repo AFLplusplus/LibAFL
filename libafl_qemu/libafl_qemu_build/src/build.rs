@@ -290,7 +290,8 @@ pub fn build(
                 .arg("--disable-xen")
                 .arg("--disable-xen-pci-passthrough")
                 .arg("--disable-xkbcommon")
-                .arg("--disable-zstd");
+                .arg("--disable-zstd")
+                .arg("--disable-tests");
             if cfg!(feature = "debug_assertions") {
                 cmd.arg("--enable-debug");
             }

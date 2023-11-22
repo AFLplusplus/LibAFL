@@ -14,9 +14,12 @@ use std::{
     ffi::{CStr, CString},
     ptr::null_mut,
 };
-use std::{    sync::Mutex, slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{
+    slice::from_raw_parts,
+    str::from_utf8_unchecked,
+    sync::{Mutex, OnceLock},
+};
 
-use lazy_static::lazy_static;
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -842,9 +845,7 @@ impl CPU {
     }
 }
 
-lazy_static! {
-    static ref EMULATOR_IS_INITIALIZED: Mutex<bool> = Mutex::new(false);
-}
+static EMULATOR_IS_INITIALIZED: OnceLock<Mutex<bool>> = OnceLock::new();
 
 #[derive(Clone, Debug)]
 pub struct Emulator {
@@ -901,7 +902,7 @@ impl TryFrom<&Emulator> for EmuExitReason {
                 unsafe { transmute(exit_reason) };
             Ok(match exit_reason.kind {
                 libafl_qemu_sys::libafl_exit_reason_kind_BREAKPOINT => unsafe {
-                    EmuExitReason::Breakpoint(exit_reason.data.breakpoint.addr)
+                    EmuExitReason::Breakpoint(exit_reason.data.breakpoint.addr.into())
                 },
                 libafl_qemu_sys::libafl_exit_reason_kind_SYNC_BACKDOOR => {
                     EmuExitReason::SyncBackdoor(emu.try_into()?)
@@ -943,7 +944,10 @@ impl From<EmuError> for libafl::Error {
 impl Emulator {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(args: &[String], env: &[(String, String)]) -> Result<Emulator, EmuError> {
-        let mut is_initialized = EMULATOR_IS_INITIALIZED.lock().unwrap();
+        let mut is_initialized = EMULATOR_IS_INITIALIZED
+            .get_or_init(|| Mutex::new(false))
+            .lock()
+            .unwrap();
 
         if *is_initialized {
             return Err(EmuError::MultipleInstances);
@@ -1164,8 +1168,8 @@ impl Emulator {
         {
             vm_start();
             qemu_main_loop();
-            EmuExitReason::try_from(self)
         }
+        EmuExitReason::try_from(self)
     }
 
     #[cfg(emulation_mode = "usermode")]

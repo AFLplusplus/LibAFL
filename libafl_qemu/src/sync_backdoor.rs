@@ -1,12 +1,15 @@
-use std::fmt::{Display, Formatter};
+use std::{
+    fmt::{Display, Formatter},
+    sync::OnceLock,
+};
 
 use enum_map::{enum_map, Enum, EnumMap};
-use lazy_static::lazy_static;
 use libafl::executors::ExitKind;
 use num_enum::{FromPrimitive, TryFromPrimitive, TryFromPrimitiveError};
 
 use crate::{
-    Emulator, GuestAddrKind, GuestPhysAddr, GuestReg, GuestVirtAddr, Regs, SYNC_BACKDOOR_ARCH_REGS,
+    get_sync_backdoor_arch_regs, Emulator, GuestAddrKind, GuestPhysAddr, GuestReg, GuestVirtAddr,
+    Regs,
 };
 
 #[derive(Debug, Clone)]
@@ -55,17 +58,11 @@ pub enum NativeExitKind {
     Crash = 2,   // Crash reported in the VM
 }
 
-lazy_static! {
-    static ref EMU_EXIT_KIND_MAP: EnumMap<NativeExitKind, Option<ExitKind>> = enum_map! {
-        NativeExitKind::Unknown    => None,
-        NativeExitKind::Ok         => Some(ExitKind::Ok),
-        NativeExitKind::Crash      => Some(ExitKind::Crash)
-    };
-}
+static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
 impl From<TryFromPrimitiveError<NativeSyncBackdoorCommand>> for SyncBackdoorError {
     fn from(error: TryFromPrimitiveError<NativeSyncBackdoorCommand>) -> Self {
-        SyncBackdoorError::UnknownCommand(error.number)
+        SyncBackdoorError::UnknownCommand(error.number.try_into().unwrap())
     }
 }
 
@@ -78,8 +75,19 @@ pub struct CommandInput {
 impl CommandInput {
     pub fn exec(&self, emu: &Emulator, backdoor: &SyncBackdoor, input: &[u8]) {
         match self.addr {
-            GuestAddrKind::Physical(hwaddr) => unsafe { emu.write_phys_mem(hwaddr, input) },
-            GuestAddrKind::Virtual(vaddr) => unsafe { emu.write_mem(vaddr, input) },
+            GuestAddrKind::Physical(hwaddr) => unsafe {
+                #[cfg(emulation_mode = "usermode")]
+                {
+                    emu.write_mem(hwaddr, input)
+                }
+                #[cfg(emulation_mode = "systemmode")]
+                {
+                    emu.write_phys_mem(hwaddr, input)
+                }
+            },
+            GuestAddrKind::Virtual(vaddr) => unsafe {
+                emu.write_mem(vaddr.try_into().unwrap(), input)
+            },
         };
 
         backdoor.ret(&emu, input.len().try_into().unwrap()).unwrap()
@@ -141,11 +149,11 @@ impl TryFrom<&Emulator> for SyncBackdoor {
     type Error = SyncBackdoorError;
 
     fn try_from(emu: &Emulator) -> Result<Self, Self::Error> {
-        let arch_regs_map: &'static EnumMap<SyncBackdoorArgs, Regs> = &SYNC_BACKDOOR_ARCH_REGS;
+        let arch_regs_map: &'static EnumMap<SyncBackdoorArgs, Regs> = get_sync_backdoor_arch_regs();
         let cmd_id: GuestReg =
             emu.read_reg::<Regs, GuestReg>(arch_regs_map[SyncBackdoorArgs::Cmd])?;
 
-        Ok(match cmd_id.try_into()? {
+        Ok(match u64::from(cmd_id).try_into()? {
             NativeSyncBackdoorCommand::Save => SyncBackdoor {
                 command: Command::Save,
                 arch_regs_map,
@@ -185,11 +193,20 @@ impl TryFrom<&Emulator> for SyncBackdoor {
             NativeSyncBackdoorCommand::End => {
                 let native_exit_kind: GuestReg =
                     emu.read_reg(arch_regs_map[SyncBackdoorArgs::Arg1])?;
-                let native_exit_kind: Result<NativeExitKind, _> = native_exit_kind.try_into();
+                let native_exit_kind: Result<NativeExitKind, _> =
+                    u64::from(native_exit_kind).try_into();
 
                 let exit_kind = native_exit_kind
                     .ok()
-                    .map(|k| EMU_EXIT_KIND_MAP[k])
+                    .map(|k| {
+                        EMU_EXIT_KIND_MAP.get_or_init(|| {
+                            enum_map! {
+                                NativeExitKind::Unknown => None,
+                                NativeExitKind::Ok      => Some(ExitKind::Ok),
+                                NativeExitKind::Crash   => Some(ExitKind::Crash)
+                            }
+                        })[k]
+                    })
                     .flatten();
 
                 SyncBackdoor {

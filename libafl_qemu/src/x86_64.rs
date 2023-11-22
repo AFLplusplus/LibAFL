@@ -1,8 +1,7 @@
-use std::mem::size_of;
+use std::{mem::size_of, sync::OnceLock};
 
 use capstone::arch::BuildsCapstone;
 use enum_map::{enum_map, EnumMap};
-use lazy_static::lazy_static;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -34,17 +33,21 @@ pub enum Regs {
     Rflags = 17,
 }
 
-lazy_static! {
-    pub static ref SYNC_BACKDOOR_ARCH_REGS: EnumMap<SyncBackdoorArgs, Regs> = enum_map! {
-        SyncBackdoorArgs::Ret  => Regs::Rax,
-        SyncBackdoorArgs::Cmd  => Regs::Rax,
-        SyncBackdoorArgs::Arg1 => Regs::Rdi,
-        SyncBackdoorArgs::Arg2 => Regs::Rsi,
-        SyncBackdoorArgs::Arg3 => Regs::Rdx,
-        SyncBackdoorArgs::Arg4 => Regs::R10,
-        SyncBackdoorArgs::Arg5 => Regs::R8,
-        SyncBackdoorArgs::Arg6 => Regs::R9,
-    };
+static SYNC_BACKDOOR_ARCH_REGS: OnceLock<EnumMap<SyncBackdoorArgs, Regs>> = OnceLock::new();
+
+pub fn get_sync_backdoor_arch_regs() -> &'static EnumMap<SyncBackdoorArgs, Regs> {
+    SYNC_BACKDOOR_ARCH_REGS.get_or_init(|| {
+        enum_map! {
+            SyncBackdoorArgs::Ret  => Regs::Rax,
+            SyncBackdoorArgs::Cmd  => Regs::Rax,
+            SyncBackdoorArgs::Arg1 => Regs::Rdi,
+            SyncBackdoorArgs::Arg2 => Regs::Rsi,
+            SyncBackdoorArgs::Arg3 => Regs::Rdx,
+            SyncBackdoorArgs::Arg4 => Regs::R10,
+            SyncBackdoorArgs::Arg5 => Regs::R8,
+            SyncBackdoorArgs::Arg6 => Regs::R9,
+        }
+    })
 }
 
 /// alias registers
