@@ -735,6 +735,15 @@ pub struct QemuAsanHelper {
 
 impl QemuAsanHelper {
     #[must_use]
+    pub fn default(rt: Pin<Box<AsanGiovese>>) -> Self {
+        Self::new(
+            rt,
+            QemuInstrumentationFilter::None,
+            QemuAsanOptions::Snapshot,
+        )
+    }
+
+    #[must_use]
     pub fn new(
         mut rt: Pin<Box<AsanGiovese>>,
         filter: QemuInstrumentationFilter,
@@ -908,12 +917,6 @@ impl QemuAsanHelper {
         self.rt.rollback(emulator, self.detect_leaks)
     }
 }
-
-/*impl Default for QemuAsanHelper {
-    fn default() -> Self {
-        Self::new(QemuInstrumentationFilter::None, QemuAsanOptions::Snapshot)
-    }
-}*/
 
 impl HasInstrumentationFilter for QemuAsanHelper {
     fn filter(&self) -> &QemuInstrumentationFilter {
@@ -1166,7 +1169,7 @@ pub fn qasan_fake_syscall<QT, S>(
     a0: u64,
     a1: u64,
     a2: u64,
-    a3: u64,
+    _a3: u64,
     _a4: u64,
     _a5: u64,
     _a6: u64,
@@ -1179,7 +1182,6 @@ where
     if sys_num == QASAN_FAKESYS_NR {
         let emulator = hooks.emulator().clone();
         let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-        let mut r = 0;
         match QasanAction::try_from(a0).expect("Invalid QASan action number") {
             QasanAction::CheckLoad => {
                 let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
@@ -1188,33 +1190,6 @@ where
             QasanAction::CheckStore => {
                 let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
                 h.write_n(&emulator, pc, a1 as GuestAddr, a2 as usize);
-            }
-            QasanAction::Poison => {
-                h.poison(
-                    &emulator,
-                    a1 as GuestAddr,
-                    a2 as usize,
-                    PoisonKind::try_from(a3 as i8).unwrap(),
-                );
-            }
-            QasanAction::UserPoison => {
-                h.poison(&emulator, a1 as GuestAddr, a2 as usize, PoisonKind::User);
-            }
-            QasanAction::UnPoison => {
-                h.unpoison(&emulator, a1 as GuestAddr, a2 as usize);
-            }
-            QasanAction::IsPoison => {
-                if h.is_poisoned(&emulator, a1 as GuestAddr, a2 as usize) {
-                    r = 1;
-                }
-            }
-            QasanAction::Alloc => {
-                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
-                h.alloc(pc, a1 as GuestAddr, a2 as GuestAddr);
-            }
-            QasanAction::Dealloc => {
-                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
-                h.dealloc(&emulator, pc, a1 as GuestAddr);
             }
             QasanAction::Enable => {
                 h.set_enabled(true);
@@ -1225,8 +1200,9 @@ where
             QasanAction::SwapState => {
                 h.set_enabled(!h.enabled());
             }
+            _ => (),
         }
-        SyscallHookResult::new(Some(r))
+        SyscallHookResult::new(Some(0))
     } else {
         SyscallHookResult::new(None)
     }

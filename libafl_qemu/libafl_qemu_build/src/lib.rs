@@ -5,8 +5,8 @@ use std::{
     process::Command,
 };
 
-use which::which;
 use regex::Regex;
+use which::which;
 
 mod bindings;
 mod build;
@@ -29,10 +29,10 @@ pub fn build_with_bindings(
         .expect("Failed to generate the bindings");
     bind.write_to_file(bindings_file)
         .expect("Faield to write to the bindings file");
-    
+
     // """Fix""" the bindings here
-    let contents = fs::read_to_string(bindings_file)
-        .expect("Should have been able to read the file");
+    let contents =
+        fs::read_to_string(bindings_file).expect("Should have been able to read the file");
     let re = Regex::new("(Option<\\s*)unsafe( extern \"C\" fn\\(data: u64)").unwrap();
     let replaced = re.replace_all(&contents, "$1$2");
     fs::write(bindings_file, replaced.as_bytes()).expect("Unable to write file");
