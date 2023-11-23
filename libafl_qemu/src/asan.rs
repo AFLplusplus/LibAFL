@@ -46,7 +46,7 @@ pub const SHADOW_PAGE_MASK: GuestAddr = !(SHADOW_PAGE_SIZE as GuestAddr - 1);
 pub const DEFAULT_REDZONE_SIZE: usize = 128;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
-#[repr(u32)]
+#[repr(u64)]
 pub enum QasanAction {
     CheckLoad,
     CheckStore,
@@ -59,6 +59,14 @@ pub enum QasanAction {
     Enable,
     Disable,
     SwapState,
+}
+
+impl TryFrom<u32> for QasanAction {
+    type Error = num_enum::TryFromPrimitiveError<QasanAction>;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        QasanAction::try_from(value as u64)
+    }
 }
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, PartialEq)]
