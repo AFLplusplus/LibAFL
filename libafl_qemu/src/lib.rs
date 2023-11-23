@@ -70,7 +70,7 @@ pub use hooks::*;
 
 pub mod edges;
 pub use edges::QemuEdgeCoverageHelper;
-/*
+
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
@@ -90,7 +90,7 @@ pub use asan::{init_with_asan, QemuAsanHelper};
 pub mod calls;
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod drcov;
-*/
+
 pub mod executor;
 pub use executor::QemuExecutor;
 #[cfg(feature = "fork")]

@@ -299,13 +299,13 @@ where
     }
 }
 
-pub extern "C" fn trace_edge_hitcount(_: &mut (), id: u64) {
+pub extern "C" fn trace_edge_hitcount(_: *const (), id: u64) {
     unsafe {
         EDGES_MAP[id as usize] = EDGES_MAP[id as usize].wrapping_add(1);
     }
 }
 
-pub extern "C" fn trace_edge_single(_: &mut (), id: u64) {
+pub extern "C" fn trace_edge_single(_: *const (), id: u64) {
     unsafe {
         EDGES_MAP[id as usize] = 1;
     }
@@ -334,14 +334,14 @@ where
     Some((hash_me(src as u64) ^ hash_me(dest as u64)) & (unsafe { EDGES_MAP_PTR_NUM } as u64 - 1))
 }
 
-pub extern "C" fn trace_edge_hitcount_ptr(_: &mut (), id: u64) {
+pub extern "C" fn trace_edge_hitcount_ptr(_: *const (), id: u64) {
     unsafe {
         let ptr = EDGES_MAP_PTR.add(id as usize);
         *ptr = (*ptr).wrapping_add(1);
     }
 }
 
-pub extern "C" fn trace_edge_single_ptr(_: &mut (), id: u64) {
+pub extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
     unsafe {
         let ptr = EDGES_MAP_PTR.add(id as usize);
         *ptr = 1;
@@ -386,7 +386,7 @@ where
     Some(hash_me(pc as u64))
 }
 
-pub extern "C" fn trace_block_transition_hitcount(_: &mut (), id: u64) {
+pub extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
             let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_NUM - 1);
@@ -397,7 +397,7 @@ pub extern "C" fn trace_block_transition_hitcount(_: &mut (), id: u64) {
     }
 }
 
-pub extern "C" fn trace_block_transition_single(_: &mut (), id: u64) {
+pub extern "C" fn trace_block_transition_single(_: *const (), id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
             let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_NUM - 1);

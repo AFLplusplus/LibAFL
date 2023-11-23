@@ -38,7 +38,7 @@ pub(crate) enum Hook {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum HookRepr {
     Function(*const c_void),
-    Closure(*const c_void),
+    Closure(FatPtr),
     Empty,
 }
 
@@ -167,10 +167,10 @@ macro_rules! create_gen_wrapper {
             {
                 unsafe {
                     let hooks = get_qemu_hooks::<QT, S>();
-                    match hook.gen {
+                    match &mut hook.gen {
                         HookRepr::Function(ptr) => {
                             let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, $($param_type),*) -> Option<$ret_type> =
-                                transmute(ptr);
+                                transmute(*ptr);
                             func(hooks, inprocess_get_state::<S>(), $($param),*).map_or(SKIP_EXEC_HOOK, |id| id)
                         }
                         HookRepr::Closure(ptr) => {
@@ -197,10 +197,10 @@ macro_rules! create_post_gen_wrapper {
             {
                 unsafe {
                     let hooks = get_qemu_hooks::<QT, S>();
-                    match hook.post_gen {
+                    match &mut hook.post_gen {
                         HookRepr::Function(ptr) => {
                             let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, $($param_type),*) =
-                                transmute(ptr);
+                                transmute(*ptr);
                             func(hooks, inprocess_get_state::<S>(), $($param),*);
                         }
                         HookRepr::Closure(ptr) => {
@@ -227,9 +227,9 @@ macro_rules! create_exec_wrapper {
             {
                 unsafe {
                     let hooks = get_qemu_hooks::<QT, S>();
-                    match hook.execs[$execidx] {
+                    match &mut hook.execs[$execidx] {
                         HookRepr::Function(ptr) => {
-                            let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, $($param_type),*) = transmute(ptr);
+                            let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, $($param_type),*) = transmute(*ptr);
                             func(hooks, inprocess_get_state::<S>(), $($param),*);
                         }
                         HookRepr::Closure(ptr) => {
@@ -245,8 +245,13 @@ macro_rules! create_exec_wrapper {
     }
 }
 
+static mut GENERIC_HOOKS: Vec<(HookId, FatPtr)> = vec![];
 create_wrapper!(generic, (pc: GuestAddr));
+static mut BACKDOOR_HOOKS: Vec<(HookId, FatPtr)> = vec![];
 create_wrapper!(backdoor, (pc: GuestAddr));
+
+#[cfg(emulation_mode = "usermode")]
+static mut PRE_SYSCALL_HOOKS: Vec<(HookId, FatPtr)> = vec![];
 #[cfg(emulation_mode = "usermode")]
 create_wrapper!(pre_syscall, (sys_num: i32,
     a0: GuestAddr,
@@ -258,6 +263,8 @@ create_wrapper!(pre_syscall, (sys_num: i32,
     a6: GuestAddr,
     a7: GuestAddr), SyscallHookResult);
 #[cfg(emulation_mode = "usermode")]
+static mut POST_SYSCALL_HOOKS: Vec<(HookId, FatPtr)> = vec![];
+#[cfg(emulation_mode = "usermode")]
 create_wrapper!(post_syscall, (res: GuestAddr, sys_num: i32,
     a0: GuestAddr,
     a1: GuestAddr,
@@ -267,6 +274,8 @@ create_wrapper!(post_syscall, (res: GuestAddr, sys_num: i32,
     a5: GuestAddr,
     a6: GuestAddr,
     a7: GuestAddr), GuestAddr);
+#[cfg(emulation_mode = "usermode")]
+static mut NEW_THREAD_HOOKS: Vec<(HookId, FatPtr)> = vec![];
 #[cfg(emulation_mode = "usermode")]
 create_wrapper!(new_thread, (tid: u32), bool);
 
@@ -302,9 +311,8 @@ create_exec_wrapper!(cmp, (id: u64, v0: u16, v1: u16), 1, 4);
 create_exec_wrapper!(cmp, (id: u64, v0: u32, v1: u32), 2, 4);
 create_exec_wrapper!(cmp, (id: u64, v0: u64, v1: u64), 3, 4);
 
-/*
 #[cfg(emulation_mode = "usermode")]
-static mut CRASH_HOOKS: Vec<Hook> = vec![];
+static mut CRASH_HOOKS: Vec<HookRepr> = vec![];
 
 #[cfg(emulation_mode = "usermode")]
 extern "C" fn crash_hook_wrapper<QT, S>(target_sig: i32)
@@ -316,11 +324,11 @@ where
         let hooks = get_qemu_hooks::<QT, S>();
         for hook in &mut CRASH_HOOKS {
             match hook {
-                Hook::Function(ptr) => {
+                HookRepr::Function(ptr) => {
                     let func: fn(&mut QemuHooks<'_, QT, S>, i32) = transmute(*ptr);
                     func(hooks, target_sig);
                 }
-                Hook::Closure(ptr) => {
+                HookRepr::Closure(ptr) => {
                     let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, i32)> = transmute(ptr);
                     func(hooks, target_sig);
                 }
@@ -329,7 +337,7 @@ where
         }
     }
 }
-*/
+
 static mut HOOKS_IS_INITIALIZED: bool = false;
 
 pub struct QemuHooks<'a, QT, S>
@@ -445,6 +453,29 @@ where
     pub fn instruction(
         &self,
         addr: GuestAddr,
+        hook: Hook<
+            fn(&mut Self, Option<&mut S>, GuestAddr),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr)>,
+            extern "C" fn(*const (), pc: GuestAddr),
+        >,
+        invalidate_block: bool,
+    ) -> HookId {
+        unsafe {
+            match hook {
+                Hook::Function(f) => self.instruction_function(addr, f, invalidate_block),
+                Hook::Closure(c) => self.instruction_closure(addr, c, invalidate_block),
+                Hook::Raw(r) => {
+                    let z: *const () = transmute(0u64);
+                    self.emulator.set_hook(z, addr, r, invalidate_block)
+                }
+                Hook::Empty => HookId(0), // TODO error type
+            }
+        }
+    }
+
+    pub fn instruction_function(
+        &self,
+        addr: GuestAddr,
         hook: fn(&mut Self, Option<&mut S>, GuestAddr),
         invalidate_block: bool,
     ) -> HookId {
@@ -458,34 +489,37 @@ where
         }
     }
 
-    pub unsafe fn instruction_closure(
+    pub fn instruction_closure(
         &self,
         addr: GuestAddr,
-        hook: &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr)>,
+        hook: Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr)>,
         invalidate_block: bool,
     ) -> HookId {
-        let fat: &mut FatPtr = transmute(hook);
-        self.emulator.set_hook(
-            fat,
-            addr,
-            closure_generic_hook_wrapper::<QT, S>,
-            invalidate_block,
-        )
+        unsafe {
+            let fat: FatPtr = transmute(hook);
+            GENERIC_HOOKS.push((HookId(0), fat));
+            let id = self.emulator.set_hook(
+                &mut GENERIC_HOOKS.last_mut().unwrap().1,
+                addr,
+                closure_generic_hook_wrapper::<QT, S>,
+                invalidate_block,
+            );
+            GENERIC_HOOKS.last_mut().unwrap().0 = id;
+            id
+        }
     }
 
     pub fn edges(
         &self,
         generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, src: GuestAddr, dest: GuestAddr) -> Option<u64>,
-            &mut Box<
-                dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, GuestAddr) -> Option<u64>,
-            >,
-            extern "C" fn(&mut (), src: GuestAddr, dest: GuestAddr) -> u64,
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, GuestAddr) -> Option<u64>>,
+            extern "C" fn(*const (), src: GuestAddr, dest: GuestAddr) -> u64,
         >,
         execution_hook: Hook<
             fn(&mut Self, Option<&mut S>, id: u64),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>,
-            extern "C" fn(&mut (), id: u64),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>,
+            extern "C" fn(*const (), id: u64),
         >,
     ) -> HookId {
         unsafe {
@@ -517,18 +551,18 @@ where
         &self,
         generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr) -> Option<u64>,
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr) -> Option<u64>>,
-            extern "C" fn(&mut (), pc: GuestAddr) -> u64,
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr) -> Option<u64>>,
+            extern "C" fn(*const (), pc: GuestAddr) -> u64,
         >,
         post_generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr, block_length: GuestUsize),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&mut S>, GuestAddr, GuestUsize)>,
-            extern "C" fn(&mut (), pc: GuestAddr, block_length: GuestUsize),
+            Box<dyn FnMut(&'a mut Self, Option<&mut S>, GuestAddr, GuestUsize)>,
+            extern "C" fn(*const (), pc: GuestAddr, block_length: GuestUsize),
         >,
         execution_hook: Hook<
             fn(&mut Self, Option<&mut S>, id: u64),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>,
-            extern "C" fn(&mut (), id: u64),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>,
+            extern "C" fn(*const (), id: u64),
         >,
     ) -> HookId {
         unsafe {
@@ -565,35 +599,35 @@ where
         &self,
         generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr, info: MemAccessInfo) -> Option<u64>,
-            &mut Box<
+            Box<
                 dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, MemAccessInfo) -> Option<u64>,
             >,
-            extern "C" fn(&mut (), pc: GuestAddr, info: MemAccessInfo) -> u64,
+            extern "C" fn(*const (), pc: GuestAddr, info: MemAccessInfo) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
+            extern "C" fn(*const (), id: u64, addr: GuestAddr),
         >,
         execution_hook_2: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
+            extern "C" fn(*const (), id: u64, addr: GuestAddr),
         >,
         execution_hook_4: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
+            extern "C" fn(*const (), id: u64, addr: GuestAddr),
         >,
         execution_hook_8: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
+            extern "C" fn(*const (), id: u64, addr: GuestAddr),
         >,
         execution_hook_n: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr, size: usize),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
-            extern "C" fn(&mut (), id: u64, addr: GuestAddr, size: usize),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
+            extern "C" fn(*const (), id: u64, addr: GuestAddr, size: usize),
         >,
     ) -> HookId {
         unsafe {
@@ -657,35 +691,35 @@ where
         &self,
         generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr, info: MemAccessInfo) -> Option<u64>,
-            &mut Box<
+            Box<
                 dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, MemAccessInfo) -> Option<u64>,
             >,
-            extern "C" fn(&mut (), pc: GuestAddr, info: MemAccessInfo) -> u64,
+            extern "C" fn(*const (), pc: GuestAddr, info: MemAccessInfo) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
+            extern "C" fn(*const (), id: u64, addr: GuestAddr),
         >,
         execution_hook_2: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
+            extern "C" fn(*const (), id: u64, addr: GuestAddr),
         >,
         execution_hook_4: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
+            extern "C" fn(*const (), id: u64, addr: GuestAddr),
         >,
         execution_hook_8: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
-            extern "C" fn(&mut (), id: u64, addr: GuestAddr),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>,
+            extern "C" fn(*const (), id: u64, addr: GuestAddr),
         >,
         execution_hook_n: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr, size: usize),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
-            extern "C" fn(&mut (), id: u64, addr: GuestAddr, size: usize),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
+            extern "C" fn(*const (), id: u64, addr: GuestAddr, size: usize),
         >,
     ) -> HookId {
         unsafe {
@@ -749,28 +783,28 @@ where
         &self,
         generation_hook: Hook<
             fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
-            extern "C" fn(&mut (), pc: GuestAddr, size: usize) -> u64,
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
+            extern "C" fn(*const (), pc: GuestAddr, size: usize) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u8, v1: u8),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u8, u8)>,
-            extern "C" fn(&mut (), id: u64, v0: u8, v1: u8),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u8, u8)>,
+            extern "C" fn(*const (), id: u64, v0: u8, v1: u8),
         >,
         execution_hook_2: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u16, v1: u16),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u16, u16)>,
-            extern "C" fn(&mut (), id: u64, v0: u16, v1: u16),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u16, u16)>,
+            extern "C" fn(*const (), id: u64, v0: u16, v1: u16),
         >,
         execution_hook_4: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u32, v1: u32),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u32, u32)>,
-            extern "C" fn(&mut (), id: u64, v0: u32, v1: u32),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u32, u32)>,
+            extern "C" fn(*const (), id: u64, v0: u32, v1: u32),
         >,
         execution_hook_8: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, v0: u64, v1: u64),
-            &mut Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u64, u64)>,
-            extern "C" fn(&mut (), id: u64, v0: u64, v1: u64),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u64, u64)>,
+            extern "C" fn(*const (), id: u64, v0: u64, v1: u64),
         >,
     ) -> HookId {
         unsafe {
@@ -823,7 +857,28 @@ where
         }
     }
 
-    pub fn backdoor(&self, hook: fn(&mut Self, Option<&mut S>, pc: GuestAddr)) -> HookId {
+    pub fn backdoor(
+        &self,
+        hook: Hook<
+            fn(&mut Self, Option<&mut S>, GuestAddr),
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr)>,
+            extern "C" fn(*const (), pc: GuestAddr),
+        >,
+    ) -> HookId {
+        unsafe {
+            match hook {
+                Hook::Function(f) => self.backdoor_function(f),
+                Hook::Closure(c) => self.backdoor_closure(c),
+                Hook::Raw(r) => {
+                    let z: *const () = transmute(0u64);
+                    self.emulator.add_backdoor_hook(z, r)
+                }
+                Hook::Empty => HookId(0), // TODO error type
+            }
+        }
+    }
+
+    pub fn backdoor_function(&self, hook: fn(&mut Self, Option<&mut S>, pc: GuestAddr)) -> HookId {
         unsafe {
             self.emulator
                 .add_backdoor_hook(transmute(hook), func_backdoor_hook_wrapper::<QT, S>)
@@ -832,18 +887,83 @@ where
 
     pub fn backdoor_closure(
         &self,
-        hook: &mut Box<dyn FnMut(&'a mut Self, Option<&mut S>, GuestAddr)>,
+        hook: Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr)>,
     ) -> HookId {
         unsafe {
-            let fat: &mut FatPtr = transmute(hook);
-            self.emulator
-                .add_backdoor_hook(fat, closure_backdoor_hook_wrapper::<QT, S>)
+            let fat: FatPtr = transmute(hook);
+            BACKDOOR_HOOKS.push((HookId(0), fat));
+            let id = self.emulator.add_backdoor_hook(
+                &mut BACKDOOR_HOOKS.last_mut().unwrap().1,
+                closure_backdoor_hook_wrapper::<QT, S>,
+            );
+            BACKDOOR_HOOKS.last_mut().unwrap().0 = id;
+            id
         }
     }
 
     #[cfg(emulation_mode = "usermode")]
     #[allow(clippy::type_complexity)]
     pub fn syscalls(
+        &self,
+        hook: Hook<
+            fn(
+                &mut Self,
+                Option<&mut S>,
+                sys_num: i32,
+                a0: GuestAddr,
+                a1: GuestAddr,
+                a2: GuestAddr,
+                a3: GuestAddr,
+                a4: GuestAddr,
+                a5: GuestAddr,
+                a6: GuestAddr,
+                a7: GuestAddr,
+            ) -> SyscallHookResult,
+            Box<
+                dyn FnMut(
+                    &'a mut Self,
+                    Option<&'a mut S>,
+                    i32,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                ) -> SyscallHookResult,
+            >,
+            extern "C" fn(
+                *const (),
+                i32,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+            ) -> SyscallHookResult,
+        >,
+    ) -> HookId {
+        unsafe {
+            match hook {
+                Hook::Function(f) => self.syscalls_function(f),
+                Hook::Closure(c) => self.syscalls_closure(c),
+                Hook::Raw(r) => {
+                    let z: *const () = transmute(0u64);
+                    self.emulator.add_pre_syscall_hook(z, r)
+                }
+                Hook::Empty => HookId(0), // TODO error type
+            }
+        }
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    #[allow(clippy::type_complexity)]
+    pub fn syscalls_function(
         &self,
         hook: fn(
             &mut Self,
@@ -869,10 +989,10 @@ where
     #[allow(clippy::type_complexity)]
     pub fn syscalls_closure(
         &self,
-        hook: &mut Box<
+        hook: Box<
             dyn FnMut(
                 &'a mut Self,
-                Option<&mut S>,
+                Option<&'a mut S>,
                 i32,
                 GuestAddr,
                 GuestAddr,
@@ -886,15 +1006,83 @@ where
         >,
     ) -> HookId {
         unsafe {
-            let fat: &mut FatPtr = transmute(hook);
-            self.emulator
-                .add_pre_syscall_hook(fat, closure_pre_syscall_hook_wrapper::<QT, S>)
+            let fat: FatPtr = transmute(hook);
+            PRE_SYSCALL_HOOKS.push((HookId(0), fat));
+            let id = self.emulator.add_pre_syscall_hook(
+                &mut PRE_SYSCALL_HOOKS.last_mut().unwrap().1,
+                closure_pre_syscall_hook_wrapper::<QT, S>,
+            );
+            PRE_SYSCALL_HOOKS.last_mut().unwrap().0 = id;
+            id
         }
     }
 
     #[cfg(emulation_mode = "usermode")]
     #[allow(clippy::type_complexity)]
     pub fn after_syscalls(
+        &self,
+        hook: Hook<
+            fn(
+                &mut Self,
+                Option<&mut S>,
+                res: GuestAddr,
+                sys_num: i32,
+                a0: GuestAddr,
+                a1: GuestAddr,
+                a2: GuestAddr,
+                a3: GuestAddr,
+                a4: GuestAddr,
+                a5: GuestAddr,
+                a6: GuestAddr,
+                a7: GuestAddr,
+            ) -> GuestAddr,
+            Box<
+                dyn FnMut(
+                    &'a mut Self,
+                    Option<&mut S>,
+                    GuestAddr,
+                    i32,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                    GuestAddr,
+                ) -> GuestAddr,
+            >,
+            extern "C" fn(
+                *const (),
+                GuestAddr,
+                i32,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+                GuestAddr,
+            ) -> GuestAddr,
+        >,
+    ) -> HookId {
+        unsafe {
+            match hook {
+                Hook::Function(f) => self.after_syscalls_function(f),
+                Hook::Closure(c) => self.after_syscalls_closure(c),
+                Hook::Raw(r) => {
+                    let z: *const () = transmute(0u64);
+                    self.emulator.add_post_syscall_hook(z, r)
+                }
+                Hook::Empty => HookId(0), // TODO error type
+            }
+        }
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    #[allow(clippy::type_complexity)]
+    pub fn after_syscalls_function(
         &self,
         hook: fn(
             &mut Self,
@@ -921,7 +1109,7 @@ where
     #[allow(clippy::type_complexity)]
     pub fn after_syscalls_closure(
         &self,
-        hook: &mut Box<
+        hook: Box<
             dyn FnMut(
                 &'a mut Self,
                 Option<&mut S>,
@@ -939,14 +1127,43 @@ where
         >,
     ) -> HookId {
         unsafe {
-            let fat: &mut FatPtr = transmute(hook);
-            self.emulator
-                .add_post_syscall_hook(fat, closure_post_syscall_hook_wrapper::<QT, S>)
+            let fat: FatPtr = transmute(hook);
+            POST_SYSCALL_HOOKS.push((HookId(0), fat));
+            let id = self.emulator.add_post_syscall_hook(
+                &mut POST_SYSCALL_HOOKS.last_mut().unwrap().1,
+                closure_post_syscall_hook_wrapper::<QT, S>,
+            );
+            POST_SYSCALL_HOOKS.last_mut().unwrap().0 = id;
+            id
+        }
+    }
+
+    pub fn thread_creation(
+        &self,
+        hook: Hook<
+            fn(&mut Self, Option<&mut S>, tid: u32) -> bool,
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u32) -> bool>,
+            extern "C" fn(*const (), tid: u32) -> bool,
+        >,
+    ) -> HookId {
+        unsafe {
+            match hook {
+                Hook::Function(f) => self.thread_creation_function(f),
+                Hook::Closure(c) => self.thread_creation_closure(c),
+                Hook::Raw(r) => {
+                    let z: *const () = transmute(0u64);
+                    self.emulator.add_new_thread_hook(z, r)
+                }
+                Hook::Empty => HookId(0), // TODO error type
+            }
         }
     }
 
     #[cfg(emulation_mode = "usermode")]
-    pub fn thread_creation(&self, hook: fn(&mut Self, Option<&mut S>, tid: u32) -> bool) -> HookId {
+    pub fn thread_creation_function(
+        &self,
+        hook: fn(&mut Self, Option<&mut S>, tid: u32) -> bool,
+    ) -> HookId {
         unsafe {
             self.emulator
                 .add_new_thread_hook(transmute(hook), func_new_thread_hook_wrapper::<QT, S>)
@@ -956,12 +1173,33 @@ where
     #[cfg(emulation_mode = "usermode")]
     pub fn thread_creation_closure(
         &self,
-        hook: &mut Box<dyn FnMut(&'a mut Self, Option<&mut S>, u32) -> bool>,
+        hook: Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u32) -> bool>,
     ) -> HookId {
         unsafe {
-            let fat: &mut FatPtr = transmute(hook);
-            self.emulator
-                .add_new_thread_hook(fat, closure_new_thread_hook_wrapper::<QT, S>)
+            let fat: FatPtr = transmute(hook);
+            NEW_THREAD_HOOKS.push((HookId(0), fat));
+            let id = self.emulator.add_new_thread_hook(
+                &mut NEW_THREAD_HOOKS.last_mut().unwrap().1,
+                closure_new_thread_hook_wrapper::<QT, S>,
+            );
+            NEW_THREAD_HOOKS.last_mut().unwrap().0 = id;
+            id
+        }
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    pub fn crash_function(&self, hook: fn(&mut Self, target_signal: i32)) {
+        unsafe {
+            self.emulator.set_crash_hook(crash_hook_wrapper::<QT, S>);
+            CRASH_HOOKS.push(HookRepr::Function(hook as *const libc::c_void));
+        }
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    pub fn crash_closure(&self, hook: Box<dyn FnMut(&mut Self, i32)>) {
+        unsafe {
+            self.emulator.set_crash_hook(crash_hook_wrapper::<QT, S>);
+            CRASH_HOOKS.push(HookRepr::Closure(transmute(hook)));
         }
     }
 }

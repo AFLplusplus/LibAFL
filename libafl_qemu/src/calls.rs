@@ -13,7 +13,7 @@ use crate::{
     capstone,
     emu::{ArchExtras, Emulator},
     helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
-    hooks::QemuHooks,
+    hooks::{Hook, QemuHooks},
     GuestAddr,
 };
 
@@ -319,40 +319,40 @@ where
                         capstone::InsnGroupType::CS_GRP_CALL => {
                             let call_len = insn.bytes().len();
                             // TODO do not use a closure, find a more efficient way to pass call_len
-                            let call_cb = move |hooks: &mut QemuHooks<'_, QT, S>,
-                                                state: Option<&mut S>,
-                                                pc| {
-                                // eprintln!("CALL @ 0x{:#x}", pc + call_len);
-                                let mut collectors = if let Some(h) =
-                                    hooks.helpers_mut().match_first_type_mut::<Self>()
-                                {
-                                    h.collectors.take()
-                                } else {
-                                    return;
-                                };
-                                if collectors.is_none() {
-                                    return; // TODO fix this, it can be None on races ret
-                                }
-                                collectors
-                                    .as_mut()
-                                    .unwrap()
-                                    .on_call_all(hooks, state, pc, call_len);
-                                hooks
-                                    .helpers_mut()
-                                    .match_first_type_mut::<Self>()
-                                    .unwrap()
-                                    .collectors = collectors;
-                            };
-                            unsafe {
-                                hooks.instruction_closure(
-                                    insn.address() as GuestAddr,
-                                    Box::new(call_cb),
-                                    false,
-                                );
-                            }
+                            let call_cb = Box::new(
+                                move |hooks: &mut QemuHooks<'_, QT, S>,
+                                      state: Option<&mut S>,
+                                      pc| {
+                                    // eprintln!("CALL @ 0x{:#x}", pc + call_len);
+                                    let mut collectors = if let Some(h) =
+                                        hooks.helpers_mut().match_first_type_mut::<Self>()
+                                    {
+                                        h.collectors.take()
+                                    } else {
+                                        return;
+                                    };
+                                    if collectors.is_none() {
+                                        return; // TODO fix this, it can be None on races ret
+                                    }
+                                    collectors
+                                        .as_mut()
+                                        .unwrap()
+                                        .on_call_all(hooks, state, pc, call_len);
+                                    hooks
+                                        .helpers_mut()
+                                        .match_first_type_mut::<Self>()
+                                        .unwrap()
+                                        .collectors = collectors;
+                                },
+                            );
+                            hooks.instruction_closure(insn.address() as GuestAddr, call_cb, false);
                         }
                         capstone::InsnGroupType::CS_GRP_RET => {
-                            hooks.instruction(insn.address() as GuestAddr, Self::on_ret, false);
+                            hooks.instruction_function(
+                                insn.address() as GuestAddr,
+                                Self::on_ret,
+                                false,
+                            );
                             break 'disasm;
                         }
                         capstone::InsnGroupType::CS_GRP_INVALID
@@ -404,7 +404,11 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.blocks(Some(Self::gen_blocks_calls::<QT, S>), None, None);
+        hooks.blocks(
+            Hook::Function(Self::gen_blocks_calls::<QT, S>),
+            Hook::Empty,
+            Hook::Empty,
+        );
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, input: &S::Input) {

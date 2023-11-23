@@ -24,7 +24,7 @@ use crate::SYS_newfstatat;
 use crate::{
     emu::{Emulator, MmapPerms, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple},
-    hooks::QemuHooks,
+    hooks::{Hook, QemuHooks},
     GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
     SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
@@ -492,18 +492,18 @@ where
         QT: QemuHelperTuple<S>,
     {
         hooks.writes(
-            None,
-            Some(trace_write1_snapshot::<QT, S>),
-            Some(trace_write2_snapshot::<QT, S>),
-            Some(trace_write4_snapshot::<QT, S>),
-            Some(trace_write8_snapshot::<QT, S>),
-            Some(trace_write_n_snapshot::<QT, S>),
+            Hook::Empty,
+            Hook::Function(trace_write1_snapshot::<QT, S>),
+            Hook::Function(trace_write2_snapshot::<QT, S>),
+            Hook::Function(trace_write4_snapshot::<QT, S>),
+            Hook::Function(trace_write8_snapshot::<QT, S>),
+            Hook::Function(trace_write_n_snapshot::<QT, S>),
         );
 
         if !self.accurate_unmap {
-            hooks.syscalls(filter_mmap_snapshot::<QT, S>);
+            hooks.syscalls(Hook::Function(filter_mmap_snapshot::<QT, S>));
         }
-        hooks.after_syscalls(trace_mmap_snapshot::<QT, S>);
+        hooks.after_syscalls(Hook::Function(trace_mmap_snapshot::<QT, S>));
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, _input: &S::Input) {

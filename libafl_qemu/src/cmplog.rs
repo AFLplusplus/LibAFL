@@ -192,25 +192,25 @@ where
     Some(hash_me(pc.into()) & (CMPLOG_MAP_W as u64 - 1))
 }
 
-pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8, _data: u64) {
+pub extern "C" fn trace_cmp1_cmplog(_: *const (), id: u64, v0: u8, v1: u8) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 1, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp2_cmplog(id: u64, v0: u16, v1: u16, _data: u64) {
+pub extern "C" fn trace_cmp2_cmplog(_: *const (), id: u64, v0: u16, v1: u16) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 2, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp4_cmplog(id: u64, v0: u32, v1: u32, _data: u64) {
+pub extern "C" fn trace_cmp4_cmplog(_: *const (), id: u64, v0: u32, v1: u32) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 4, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64, _data: u64) {
+pub extern "C" fn trace_cmp8_cmplog(_: *const (), id: u64, v0: u64, v1: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 8, v0, v1);
     }
@@ -238,7 +238,7 @@ impl QemuCmpLogRoutinesHelper {
         self.filter.allowed(addr)
     }
 
-    extern "C" fn on_call(_pc: GuestAddr, k: u64) {
+    extern "C" fn on_call(k: u64, _pc: GuestAddr) {
         unsafe {
             if CMPLOG_ENABLED == 0 {
                 return;
@@ -317,7 +317,7 @@ impl QemuCmpLogRoutinesHelper {
                     match u32::from(detail.0) {
                         capstone::InsnGroupType::CS_GRP_CALL => {
                             let k = (hash_me(pc.into())) & (CMPLOG_MAP_W as u64 - 1);
-                            emu.set_hook(insn.address() as GuestAddr, Self::on_call, k, false);
+                            emu.set_hook(k, insn.address() as GuestAddr, Self::on_call, false);
                         }
                         capstone::InsnGroupType::CS_GRP_RET
                         | capstone::InsnGroupType::CS_GRP_INVALID
@@ -367,6 +367,10 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.blocks(Some(Self::gen_blocks_calls::<QT, S>), None, None);
+        hooks.blocks(
+            Hook::Function(Self::gen_blocks_calls::<QT, S>),
+            Hook::Empty,
+            Hook::Empty,
+        );
     }
 }

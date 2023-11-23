@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     emu::{GuestAddr, GuestUsize},
     helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
-    hooks::QemuHooks,
+    hooks::{Hook, QemuHooks},
     Emulator,
 };
 
@@ -94,9 +94,9 @@ where
         QT: QemuHelperTuple<S>,
     {
         hooks.blocks(
-            Some(gen_unique_block_ids::<QT, S>),
-            Some(gen_block_lengths::<QT, S>),
-            Some(exec_trace_block::<QT, S>),
+            Hook::Function(gen_unique_block_ids::<QT, S>),
+            Hook::Function(gen_block_lengths::<QT, S>),
+            Hook::Function(exec_trace_block::<QT, S>),
         );
     }
 

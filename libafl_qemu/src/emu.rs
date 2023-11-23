@@ -742,11 +742,69 @@ impl CPU {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct HookId(pub(crate) usize);
 
-static mut EMULATOR_IS_INITIALIZED: bool = false;
+use std::pin::Pin;
 
-#[derive(Clone, Debug)]
-pub struct Emulator {
-    _private: (),
+#[derive(Debug)]
+pub struct HookData(u64);
+
+impl<T> From<Pin<&mut T>> for HookData {
+    fn from(value: Pin<&mut T>) -> Self {
+        unsafe { HookData(core::mem::transmute(value)) }
+    }
+}
+
+impl<T> From<Pin<&T>> for HookData {
+    fn from(value: Pin<&T>) -> Self {
+        unsafe { HookData(core::mem::transmute(value)) }
+    }
+}
+
+impl<T> From<&'static mut T> for HookData {
+    fn from(value: &'static mut T) -> Self {
+        unsafe { HookData(core::mem::transmute(value)) }
+    }
+}
+
+impl<T> From<&'static T> for HookData {
+    fn from(value: &'static T) -> Self {
+        unsafe { HookData(core::mem::transmute(value)) }
+    }
+}
+
+impl<T> From<*mut T> for HookData {
+    fn from(value: *mut T) -> Self {
+        unsafe { HookData(core::mem::transmute(value)) }
+    }
+}
+
+impl<T> From<*const T> for HookData {
+    fn from(value: *const T) -> Self {
+        unsafe { HookData(core::mem::transmute(value)) }
+    }
+}
+
+impl From<u64> for HookData {
+    fn from(value: u64) -> Self {
+        HookData(value)
+    }
+}
+
+impl From<u32> for HookData {
+    fn from(value: u32) -> Self {
+        HookData(value as u64)
+    }
+}
+
+impl From<u16> for HookData {
+    fn from(value: u16) -> Self {
+        HookData(value as u64)
+    }
+}
+
+impl From<u8> for HookData {
+    fn from(value: u8) -> Self {
+        HookData(value as u64)
+    }
 }
 
 #[derive(Debug)]
@@ -781,6 +839,13 @@ impl From<EmuError> for libafl::Error {
     fn from(err: EmuError) -> Self {
         libafl::Error::unknown(format!("{err}"))
     }
+}
+
+static mut EMULATOR_IS_INITIALIZED: bool = false;
+
+#[derive(Clone, Debug)]
+pub struct Emulator {
+    _private: (),
 }
 
 #[allow(clippy::unused_self)]
@@ -827,6 +892,17 @@ impl Emulator {
             EMULATOR_IS_INITIALIZED = true;
         }
         Ok(Emulator { _private: () })
+    }
+
+    #[must_use]
+    pub fn get() -> Option<Self> {
+        unsafe {
+            if EMULATOR_IS_INITIALIZED {
+                Some(Self::new_empty())
+            } else {
+                None
+            }
+        }
     }
 
     #[must_use]
@@ -1104,15 +1180,15 @@ impl Emulator {
     }
 
     // TODO set T lifetime to be like Emulator
-    pub fn set_hook<T>(
+    pub fn set_hook<T: Into<HookData>>(
         &self,
-        ptr: &mut T,
+        data: T,
         addr: GuestAddr,
-        callback: extern "C" fn(&mut T, GuestAddr),
+        callback: extern "C" fn(T, GuestAddr),
         invalidate_block: bool,
     ) -> HookId {
         unsafe {
-            let data: u64 = core::mem::transmute(ptr as *mut _);
+            let data: u64 = data.into().0;
             let callback: extern "C" fn(GuestAddr, u64) = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_qemu_set_hook(
                 addr.into(),
@@ -1136,14 +1212,14 @@ impl Emulator {
         }
     }
 
-    pub fn add_edge_hooks<T>(
+    pub fn add_edge_hooks<T: Into<HookData>>(
         &self,
-        ptr: &mut T,
-        gen: Option<extern "C" fn(&mut T, GuestAddr, GuestAddr) -> u64>,
-        exec: Option<extern "C" fn(&mut T, u64)>,
+        data: T,
+        gen: Option<extern "C" fn(T, GuestAddr, GuestAddr) -> u64>,
+        exec: Option<extern "C" fn(T, u64)>,
     ) -> HookId {
         unsafe {
-            let data: u64 = core::mem::transmute(ptr as *mut _);
+            let data: u64 = data.into().0;
             let gen: Option<extern "C" fn(u64, GuestAddr, GuestAddr) -> u64> =
                 core::mem::transmute(gen);
             let exec: Option<extern "C" fn(u64, u64)> = core::mem::transmute(exec);
@@ -1152,15 +1228,15 @@ impl Emulator {
         }
     }
 
-    pub fn add_block_hooks<T>(
+    pub fn add_block_hooks<T: Into<HookData>>(
         &self,
-        ptr: &mut T,
-        gen: Option<extern "C" fn(&mut T, GuestAddr) -> u64>,
-        post_gen: Option<extern "C" fn(&mut T, GuestAddr, GuestUsize)>,
-        exec: Option<extern "C" fn(&mut T, u64)>,
+        data: T,
+        gen: Option<extern "C" fn(T, GuestAddr) -> u64>,
+        post_gen: Option<extern "C" fn(T, GuestAddr, GuestUsize)>,
+        exec: Option<extern "C" fn(T, u64)>,
     ) -> HookId {
         unsafe {
-            let data: u64 = core::mem::transmute(ptr as *mut _);
+            let data: u64 = data.into().0;
             let gen: Option<extern "C" fn(u64, GuestAddr) -> u64> = core::mem::transmute(gen);
             let post_gen: Option<extern "C" fn(u64, GuestAddr, GuestUsize)> =
                 core::mem::transmute(post_gen);
@@ -1170,18 +1246,18 @@ impl Emulator {
         }
     }
 
-    pub fn add_read_hooks<T>(
+    pub fn add_read_hooks<T: Into<HookData>>(
         &self,
-        ptr: &mut T,
-        gen: Option<extern "C" fn(&mut T, GuestAddr, MemAccessInfo) -> u64>,
-        exec1: Option<extern "C" fn(&mut T, u64, GuestAddr)>,
-        exec2: Option<extern "C" fn(&mut T, u64, GuestAddr)>,
-        exec4: Option<extern "C" fn(&mut T, u64, GuestAddr)>,
-        exec8: Option<extern "C" fn(&mut T, u64, GuestAddr)>,
-        exec_n: Option<extern "C" fn(&mut T, u64, GuestAddr, usize)>,
+        data: T,
+        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec8: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec_n: Option<extern "C" fn(T, u64, GuestAddr, usize)>,
     ) -> HookId {
         unsafe {
-            let data: u64 = core::mem::transmute(ptr as *mut _);
+            let data: u64 = data.into().0;
             let gen: Option<extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64> =
                 core::mem::transmute(gen);
             let exec1: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec1);
@@ -1198,18 +1274,18 @@ impl Emulator {
     }
 
     // TODO add MemOp info
-    pub fn add_write_hooks<T>(
+    pub fn add_write_hooks<T: Into<HookData>>(
         &self,
-        ptr: &mut T,
-        gen: Option<extern "C" fn(&mut T, GuestAddr, MemAccessInfo) -> u64>,
-        exec1: Option<extern "C" fn(&mut T, u64, GuestAddr)>,
-        exec2: Option<extern "C" fn(&mut T, u64, GuestAddr)>,
-        exec4: Option<extern "C" fn(&mut T, u64, GuestAddr)>,
-        exec8: Option<extern "C" fn(&mut T, u64, GuestAddr)>,
-        exec_n: Option<extern "C" fn(&mut T, u64, GuestAddr, usize)>,
+        data: T,
+        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec8: Option<extern "C" fn(T, u64, GuestAddr)>,
+        exec_n: Option<extern "C" fn(T, u64, GuestAddr, usize)>,
     ) -> HookId {
         unsafe {
-            let data: u64 = core::mem::transmute(ptr as *mut _);
+            let data: u64 = data.into().0;
             let gen: Option<extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64> =
                 core::mem::transmute(gen);
             let exec1: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec1);
@@ -1225,17 +1301,17 @@ impl Emulator {
         }
     }
 
-    pub fn add_cmp_hooks<T>(
+    pub fn add_cmp_hooks<T: Into<HookData>>(
         &self,
-        ptr: &mut T,
-        gen: Option<extern "C" fn(&mut T, GuestAddr, usize) -> u64>,
-        exec1: Option<extern "C" fn(&mut T, u64, u8, u8)>,
-        exec2: Option<extern "C" fn(&mut T, u64, u16, u16)>,
-        exec4: Option<extern "C" fn(&mut T, u64, u32, u32)>,
-        exec8: Option<extern "C" fn(&mut T, u64, u64, u64)>,
+        data: T,
+        gen: Option<extern "C" fn(T, GuestAddr, usize) -> u64>,
+        exec1: Option<extern "C" fn(T, u64, u8, u8)>,
+        exec2: Option<extern "C" fn(T, u64, u16, u16)>,
+        exec4: Option<extern "C" fn(T, u64, u32, u32)>,
+        exec8: Option<extern "C" fn(T, u64, u64, u64)>,
     ) -> HookId {
         unsafe {
-            let data: u64 = core::mem::transmute(ptr as *mut _);
+            let data: u64 = data.into().0;
             let gen: Option<extern "C" fn(u64, GuestAddr, usize) -> u64> =
                 core::mem::transmute(gen);
             let exec1: Option<extern "C" fn(u64, u64, u8, u8)> = core::mem::transmute(exec1);
@@ -1247,13 +1323,13 @@ impl Emulator {
         }
     }
 
-    pub fn add_backdoor_hook<T>(
+    pub fn add_backdoor_hook<T: Into<HookData>>(
         &self,
-        ptr: &mut T,
-        callback: extern "C" fn(&mut T, GuestAddr),
+        data: T,
+        callback: extern "C" fn(T, GuestAddr),
     ) -> HookId {
         unsafe {
-            let data: u64 = core::mem::transmute(ptr as *mut _);
+            let data: u64 = data.into().0;
             let callback: extern "C" fn(u64, GuestAddr) = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_backdoor_hook(Some(callback), data);
             HookId(num)
@@ -1262,11 +1338,11 @@ impl Emulator {
 
     #[cfg(emulation_mode = "usermode")]
     #[allow(clippy::type_complexity)]
-    pub fn add_pre_syscall_hook<T>(
+    pub fn add_pre_syscall_hook<T: Into<HookData>>(
         &self,
-        ptr: &mut T,
+        data: T,
         callback: extern "C" fn(
-            &mut T,
+            T,
             i32,
             GuestAddr,
             GuestAddr,
@@ -1279,7 +1355,7 @@ impl Emulator {
         ) -> SyscallHookResult,
     ) -> HookId {
         unsafe {
-            let data: u64 = core::mem::transmute(ptr as *mut _);
+            let data: u64 = data.into().0;
             let callback: extern "C" fn(
                 u64,
                 i32,
@@ -1299,11 +1375,11 @@ impl Emulator {
 
     #[cfg(emulation_mode = "usermode")]
     #[allow(clippy::type_complexity)]
-    pub fn add_post_syscall_hook<T>(
+    pub fn add_post_syscall_hook<T: Into<HookData>>(
         &self,
-        ptr: &mut T,
+        data: T,
         callback: extern "C" fn(
-            &mut T,
+            T,
             GuestAddr,
             i32,
             GuestAddr,
@@ -1317,7 +1393,7 @@ impl Emulator {
         ) -> GuestAddr,
     ) -> HookId {
         unsafe {
-            let data: u64 = core::mem::transmute(ptr as *mut _);
+            let data: u64 = data.into().0;
             let callback: extern "C" fn(
                 u64,
                 GuestAddr,
@@ -1337,13 +1413,13 @@ impl Emulator {
     }
 
     #[cfg(emulation_mode = "usermode")]
-    pub fn add_new_thread_hook<T>(
+    pub fn add_new_thread_hook<T: Into<HookData>>(
         &self,
-        ptr: &mut T,
-        callback: extern "C" fn(&mut T, tid: u32) -> bool,
+        data: T,
+        callback: extern "C" fn(T, tid: u32) -> bool,
     ) -> HookId {
         unsafe {
-            let data: u64 = core::mem::transmute(ptr as *mut _);
+            let data: u64 = data.into().0;
             let callback: extern "C" fn(u64, u32) -> bool = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_new_thread_hook(Some(callback), data);
             HookId(num)
