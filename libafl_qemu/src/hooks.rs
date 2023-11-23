@@ -58,10 +58,7 @@ pub enum Hook<F, C, R: Clone> {
 
 impl<F, C, R: Clone> Hook<F, C, R> {
     pub fn is_empty(&self) -> bool {
-        match self {
-            Hook::Empty => true,
-            _ => false,
-        }
+        matches!(self, Hook::Empty)
     }
 }
 
@@ -81,7 +78,7 @@ macro_rules! get_raw_hook {
 macro_rules! hook_to_repr {
     ($h:expr) => {
         match $h {
-            Hook::Function(f) => HookRepr::Function(transmute(f)),
+            Hook::Function(f) => HookRepr::Function(transmute(f as *const libc::c_void)),
             Hook::Closure(c) => HookRepr::Closure(transmute(c)),
             Hook::Raw(_) => HookRepr::Empty, // managed by emu
             Hook::Empty => HookRepr::Empty,
@@ -332,7 +329,7 @@ where
                     let func: &mut Box<dyn FnMut(&mut QemuHooks<QT, S>, i32)> = transmute(ptr);
                     func(hooks, target_sig);
                 }
-                _ => (),
+                HookRepr::Empty => (),
             }
         }
     }
@@ -888,7 +885,7 @@ where
                 Hook::Function(f) => self.backdoor_function(f),
                 Hook::Closure(c) => self.backdoor_closure(c),
                 Hook::Raw(r) => {
-                    let z: *const () = transmute(0u64);
+                    let z: *const () = transmute(ptr::null::<()>());
                     self.emulator.add_backdoor_hook(z, r)
                 }
                 Hook::Empty => HookId(0), // TODO error type
@@ -971,7 +968,7 @@ where
                 Hook::Function(f) => self.syscalls_function(f),
                 Hook::Closure(c) => self.syscalls_closure(c),
                 Hook::Raw(r) => {
-                    let z: *const () = transmute(0u64);
+                    let z: *const () = transmute(0u64 as *const ());
                     self.emulator.add_pre_syscall_hook(z, r)
                 }
                 Hook::Empty => HookId(0), // TODO error type
@@ -1090,7 +1087,7 @@ where
                 Hook::Function(f) => self.after_syscalls_function(f),
                 Hook::Closure(c) => self.after_syscalls_closure(c),
                 Hook::Raw(r) => {
-                    let z: *const () = transmute(0u64);
+                    let z: *const () = transmute(0u64 as *const ());
                     self.emulator.add_post_syscall_hook(z, r)
                 }
                 Hook::Empty => HookId(0), // TODO error type
@@ -1170,7 +1167,7 @@ where
                 Hook::Function(f) => self.thread_creation_function(f),
                 Hook::Closure(c) => self.thread_creation_closure(c),
                 Hook::Raw(r) => {
-                    let z: *const () = transmute(0u64);
+                    let z: *const () = transmute(0u64 as *const ());
                     self.emulator.add_new_thread_hook(z, r)
                 }
                 Hook::Empty => HookId(0), // TODO error type
