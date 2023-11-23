@@ -42,9 +42,6 @@ num-traits = "0.2.15"
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] } # serialization lib
 
-# clippy-suggested optimised byte counter
-bytecount = "0.6.3"
-
 # for identifying if we can grimoire-ify
 utf8-chars = "3.0.1"
 

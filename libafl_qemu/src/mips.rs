@@ -1,10 +1,13 @@
+use std::sync::OnceLock;
+
+use enum_map::{enum_map, EnumMap};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::mips::*;
 
-use crate::CallingConvention;
+use crate::{sync_backdoor::SyncBackdoorArgs, CallingConvention};
 
 /// Registers for the MIPS instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
@@ -44,6 +47,23 @@ pub enum Regs {
     Ra = 31,
 
     Pc = 37,
+}
+
+static SYNC_BACKDOOR_ARCH_REGS: OnceLock<EnumMap<SyncBackdoorArgs, Regs>> = OnceLock::new();
+
+pub fn get_sync_backdoor_arch_regs() -> &'static EnumMap<SyncBackdoorArgs, Regs> {
+    SYNC_BACKDOOR_ARCH_REGS.get_or_init(|| {
+        enum_map! {
+            SyncBackdoorArgs::Ret  => Regs::V0,
+            SyncBackdoorArgs::Cmd  => Regs::V0,
+            SyncBackdoorArgs::Arg1 => Regs::A0,
+            SyncBackdoorArgs::Arg2 => Regs::A1,
+            SyncBackdoorArgs::Arg3 => Regs::A2,
+            SyncBackdoorArgs::Arg4 => Regs::A3,
+            SyncBackdoorArgs::Arg5 => Regs::T0,
+            SyncBackdoorArgs::Arg6 => Regs::T1,
+        }
+    })
 }
 
 /// alias registers

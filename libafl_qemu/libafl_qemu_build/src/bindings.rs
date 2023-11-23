@@ -78,6 +78,7 @@ const WRAPPER_HEADER: &str = r#"
 
 #include "libafl_extras/exit.h"
 #include "libafl_extras/hook.h"
+
 "#;
 
 pub fn generate(
@@ -109,7 +110,11 @@ pub fn generate(
         .allowlist_type("qemu_plugin_mem_rw")
         .allowlist_type("MemOpIdx")
         .allowlist_type("MemOp")
-        .allowlist_type("device_snapshot_kind_t")
+        .allowlist_type("DeviceSnapshotKind")
+        .allowlist_type("libafl_exit_reason")
+        .allowlist_type("libafl_exit_reason_kind")
+        .allowlist_type("libafl_exit_reason_sync_backdoor")
+        .allowlist_type("libafl_exit_reason_breakpoint")
         .allowlist_function("qemu_user_init")
         .allowlist_function("target_mmap")
         .allowlist_function("target_mprotect")

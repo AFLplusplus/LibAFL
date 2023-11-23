@@ -4,7 +4,7 @@ use core::{
     convert::Into,
     ffi::c_void,
     fmt,
-    mem::MaybeUninit,
+    mem::{transmute, MaybeUninit},
     ptr::{addr_of, copy_nonoverlapping, null},
 };
 #[cfg(emulation_mode = "usermode")]
@@ -14,7 +14,11 @@ use std::{
     ffi::{CStr, CString},
     ptr::null_mut,
 };
-use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{
+    slice::from_raw_parts,
+    str::from_utf8_unchecked,
+    sync::{Mutex, OnceLock},
+};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
@@ -28,13 +32,28 @@ use crate::{GuestReg, Regs};
 pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
 pub type GuestIsize = libafl_qemu_sys::target_long;
-pub type GuestVirtAddr = libafl_qemu_sys::hwaddr;
+pub type GuestVirtAddr = libafl_qemu_sys::vaddr;
 pub type GuestPhysAddr = libafl_qemu_sys::hwaddr;
 
 pub type GuestHwAddrInfo = libafl_qemu_sys::qemu_plugin_hwaddr;
 
+#[derive(Debug, Clone)]
+pub enum GuestAddrKind {
+    Physical(GuestPhysAddr),
+    Virtual(GuestVirtAddr),
+}
+
+impl fmt::Display for GuestAddrKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GuestAddrKind::Physical(phys_addr) => write!(f, "hwaddr 0x{:x}", phys_addr),
+            GuestAddrKind::Virtual(virt_addr) => write!(f, "vaddr 0x{:x}", virt_addr),
+        }
+    }
+}
+
 #[cfg(emulation_mode = "systemmode")]
-pub type FastSnapshot = *mut libafl_qemu_sys::syx_snapshot_t;
+pub type FastSnapshot = *mut libafl_qemu_sys::SyxSnapshot;
 
 #[cfg(emulation_mode = "systemmode")]
 pub enum DeviceSnapshotFilter {
@@ -45,16 +64,14 @@ pub enum DeviceSnapshotFilter {
 
 #[cfg(emulation_mode = "systemmode")]
 impl DeviceSnapshotFilter {
-    fn enum_id(&self) -> libafl_qemu_sys::device_snapshot_kind_t {
+    fn enum_id(&self) -> libafl_qemu_sys::DeviceSnapshotKind {
         match self {
-            DeviceSnapshotFilter::All => {
-                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_ALL
-            }
+            DeviceSnapshotFilter::All => libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_ALL,
             DeviceSnapshotFilter::AllowList(_) => {
-                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_ALLOWLIST
+                libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_ALLOWLIST
             }
             DeviceSnapshotFilter::DenyList(_) => {
-                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_DENYLIST
+                libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_DENYLIST
             }
         }
     }
@@ -136,8 +153,12 @@ pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
 pub use libafl_qemu_sys::{CPUArchState, CPUState};
 
+use crate::sync_backdoor::{SyncBackdoor, SyncBackdoorError};
+
 pub type CPUStatePtr = *mut libafl_qemu_sys::CPUState;
 pub type CPUArchStatePtr = *mut libafl_qemu_sys::CPUArchState;
+
+pub type ExitReasonPtr = *mut libafl_qemu_sys::libafl_exit_reason;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(i32)]
@@ -354,6 +375,9 @@ extern "C" {
     fn libafl_qemu_num_cpus() -> i32;
     // CPUState* libafl_qemu_current_cpu(void);
     fn libafl_qemu_current_cpu() -> CPUStatePtr;
+
+    // struct libafl_exit_reason* libafl_get_exit_reason(void);
+    fn libafl_get_exit_reason() -> ExitReasonPtr;
 
     fn libafl_qemu_cpu_index(cpu: CPUStatePtr) -> i32;
 
@@ -814,6 +838,60 @@ pub enum EmuError {
     TooManyArgs(usize),
 }
 
+#[derive(Debug, Clone)]
+pub enum EmuExitReason {
+    End,                        // QEMU ended for some reason.
+    Breakpoint(GuestVirtAddr), // Breakpoint triggered. Contains the virtual address of the trigger.
+    SyncBackdoor(SyncBackdoor), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+}
+
+impl fmt::Display for EmuExitReason {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            EmuExitReason::End => write!(f, "End"),
+            EmuExitReason::Breakpoint(vaddr) => write!(f, "Breakpoint @vaddr 0x{:x}", vaddr),
+            EmuExitReason::SyncBackdoor(sync_backdoor) => {
+                write!(f, "Sync backdoor exit: {}", sync_backdoor)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum EmuExitReasonError {
+    UnknownKind(),
+    UnexpectedExit,
+    SyncBackdoorError(SyncBackdoorError),
+}
+
+impl From<SyncBackdoorError> for EmuExitReasonError {
+    fn from(sync_backdoor_error: SyncBackdoorError) -> Self {
+        EmuExitReasonError::SyncBackdoorError(sync_backdoor_error)
+    }
+}
+
+impl TryFrom<&Emulator> for EmuExitReason {
+    type Error = EmuExitReasonError;
+    fn try_from(emu: &Emulator) -> Result<Self, Self::Error> {
+        let exit_reason = unsafe { libafl_get_exit_reason() };
+        if exit_reason.is_null() {
+            Err(EmuExitReasonError::UnexpectedExit)
+        } else {
+            let exit_reason: &mut libafl_qemu_sys::libafl_exit_reason =
+                unsafe { transmute(exit_reason) };
+            Ok(match exit_reason.kind {
+                libafl_qemu_sys::libafl_exit_reason_kind_BREAKPOINT => unsafe {
+                    EmuExitReason::Breakpoint(exit_reason.data.breakpoint.addr.into())
+                },
+                libafl_qemu_sys::libafl_exit_reason_kind_SYNC_BACKDOOR => {
+                    EmuExitReason::SyncBackdoor(emu.try_into()?)
+                }
+                _ => return Err(EmuExitReasonError::UnknownKind()),
+            })
+        }
+    }
+}
+
 impl std::error::Error for EmuError {}
 
 impl fmt::Display for EmuError {
@@ -841,7 +919,7 @@ impl From<EmuError> for libafl::Error {
     }
 }
 
-static mut EMULATOR_IS_INITIALIZED: bool = false;
+static EMULATOR_IS_INITIALIZED: OnceLock<Mutex<bool>> = OnceLock::new();
 
 #[derive(Clone, Debug)]
 pub struct Emulator {
@@ -852,11 +930,15 @@ pub struct Emulator {
 impl Emulator {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(args: &[String], env: &[(String, String)]) -> Result<Emulator, EmuError> {
-        unsafe {
-            if EMULATOR_IS_INITIALIZED {
-                return Err(EmuError::MultipleInstances);
-            }
+        let mut is_initialized = EMULATOR_IS_INITIALIZED
+            .get_or_init(|| Mutex::new(false))
+            .lock()
+            .unwrap();
+
+        if *is_initialized {
+            return Err(EmuError::MultipleInstances);
         }
+
         if args.is_empty() {
             return Err(EmuError::EmptyArgs);
         }
@@ -889,7 +971,7 @@ impl Emulator {
                 libc::atexit(qemu_cleanup_atexit);
                 libafl_qemu_sys::syx_snapshot_init();
             }
-            EMULATOR_IS_INITIALIZED = true;
+            *is_initialized = true;
         }
         Ok(Emulator { _private: () })
     }
@@ -1044,7 +1126,8 @@ impl Emulator {
     pub fn entry_break(&self, addr: GuestAddr) {
         self.set_breakpoint(addr);
         unsafe {
-            self.run();
+            // TODO: decide what to do with sync exit here: ignore or check for bp exit?
+            let _ = self.run();
         }
         self.remove_breakpoint(addr);
     }
@@ -1060,7 +1143,7 @@ impl Emulator {
     ///
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run(&self) {
+    pub unsafe fn run(&self) -> Result<EmuExitReason, EmuExitReasonError> {
         #[cfg(emulation_mode = "usermode")]
         libafl_qemu_run();
         #[cfg(emulation_mode = "systemmode")]
@@ -1068,6 +1151,7 @@ impl Emulator {
             vm_start();
             qemu_main_loop();
         }
+        EmuExitReason::try_from(self)
     }
 
     #[cfg(emulation_mode = "usermode")]
@@ -1442,9 +1526,9 @@ impl Emulator {
     #[must_use]
     pub fn create_fast_snapshot(&self, track: bool) -> FastSnapshot {
         unsafe {
-            libafl_qemu_sys::syx_snapshot_create(
+            libafl_qemu_sys::syx_snapshot_new(
                 track,
-                libafl_qemu_sys::device_snapshot_kind_e_DEVICE_SNAPSHOT_ALL,
+                libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_ALL,
                 null_mut(),
             )
         }
@@ -1459,7 +1543,7 @@ impl Emulator {
     ) -> FastSnapshot {
         let mut v = vec![];
         unsafe {
-            libafl_qemu_sys::syx_snapshot_create(
+            libafl_qemu_sys::syx_snapshot_new(
                 track,
                 device_filter.enum_id(),
                 device_filter.devices(&mut v),
