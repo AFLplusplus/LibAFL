@@ -215,7 +215,10 @@ pub fn fuzz() -> Result<(), Error> {
         ExitKind::Ok
     };
 
-    let mut hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageChildHelper::default(),));
+    let mut hooks = QemuHooks::new(
+        emu.clone(),
+        tuple_list!(QemuEdgeCoverageChildHelper::default(),),
+    );
 
     let mut executor = QemuForkExecutor::new(
         &mut hooks,
