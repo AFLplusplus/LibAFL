@@ -7,7 +7,9 @@ use alloc::{string::String, vec::Vec};
 mod mutators;
 pub use mutators::*;
 
+#[cfg(feature = "libfuzzer_oom")]
 mod observers;
+#[cfg(feature = "libfuzzer_oom")]
 pub use observers::*;
 
 extern "C" {

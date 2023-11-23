@@ -331,6 +331,7 @@ where
                 } else {
                     client_id
                 };
+                monitor.client_stats_insert(id);
                 let client = monitor.client_stats_mut_for(id);
                 client.update_corpus_size(*corpus_size as u64);
                 client.update_executions(*executions as u64, *time);
@@ -343,6 +344,7 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_executions(*executions as u64, *time);
                 monitor.display(event.name().to_string(), client_id);
@@ -353,8 +355,10 @@ where
                 value,
                 phantom: _,
             } => {
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_user_stats(name.clone(), value.clone());
+                monitor.aggregate(name);
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -368,6 +372,7 @@ where
                 // TODO: The monitor buffer should be added on client add.
 
                 // Get the client for the staterestorer ID
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
 
                 // Update the normal monitor for this client
@@ -383,6 +388,7 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
                 monitor.display(event.name().to_string(), client_id);
