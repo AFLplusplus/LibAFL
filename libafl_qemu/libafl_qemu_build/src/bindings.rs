@@ -125,6 +125,7 @@ pub fn generate(
         .allowlist_function("qemu_plugin_get_hwaddr")
         .allowlist_function("qemu_target_page_size")
         .allowlist_function("syx_.*")
+        .allowlist_function("Syx.*")
         .allowlist_function("device_list_all")
         .allowlist_function("libafl_.*")
         .blocklist_function("main_loop_wait") // bindgen issue #1313

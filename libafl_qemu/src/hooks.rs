@@ -1156,6 +1156,7 @@ where
         }
     }
 
+    #[cfg(emulation_mode = "usermode")]
     pub fn thread_creation(
         &self,
         hook: Hook<
