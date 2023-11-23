@@ -217,7 +217,7 @@ pub struct SyscallHookResult {
 impl SyscallHookResult {
     #[new]
     #[must_use]
-    pub fn new(value: Option<u64>) -> Self {
+    pub fn new(value: Option<GuestAddr>) -> Self {
         value.map_or(
             Self {
                 retval: 0,
@@ -234,7 +234,7 @@ impl SyscallHookResult {
 #[cfg(not(feature = "python"))]
 impl SyscallHookResult {
     #[must_use]
-    pub fn new(value: Option<u64>) -> Self {
+    pub fn new(value: Option<GuestAddr>) -> Self {
         value.map_or(
             Self {
                 retval: 0,
@@ -1189,7 +1189,7 @@ impl Emulator {
     ) -> HookId {
         unsafe {
             let data: u64 = data.into().0;
-            let callback: extern "C" fn(GuestAddr, u64) = core::mem::transmute(callback);
+            let callback: extern "C" fn(u64, GuestAddr) = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_qemu_set_hook(
                 addr.into(),
                 Some(callback),
@@ -1574,6 +1574,7 @@ pub mod pybind {
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
 
     extern "C" fn py_syscall_hook_wrapper(
+        data: u64,
         sys_num: i32,
         a0: u64,
         a1: u64,
@@ -1609,7 +1610,7 @@ pub mod pybind {
         )
     }
 
-    extern "C" fn py_generic_hook_wrapper(_pc: GuestAddr, idx: u64) {
+    extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
         let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
         Python::with_gil(|py| {
             obj.call0(py).expect("Error in the hook");
@@ -1733,7 +1734,7 @@ pub mod pybind {
             unsafe {
                 PY_SYSCALL_HOOK = Some(hook);
             }
-            self.emu.set_pre_syscall_hook(py_syscall_hook_wrapper);
+            self.emu.add_pre_syscall_hook(0u64, py_syscall_hook_wrapper);
         }
 
         fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
@@ -1741,15 +1742,15 @@ pub mod pybind {
                 let idx = PY_GENERIC_HOOKS.len();
                 PY_GENERIC_HOOKS.push((addr, hook));
                 self.emu
-                    .set_hook(addr, py_generic_hook_wrapper, idx as u64, true);
+                    .set_hook(idx as u64, addr, py_generic_hook_wrapper, true);
             }
         }
 
-        fn remove_hook(&self, addr: GuestAddr) -> usize {
+        fn remove_hook_at(&self, addr: GuestAddr) -> usize {
             unsafe {
                 PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
             }
-            self.emu.remove_hook(addr, true)
+            self.emu.remove_hook_at(addr, true)
         }
     }
 }

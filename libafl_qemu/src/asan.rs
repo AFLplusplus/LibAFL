@@ -46,7 +46,7 @@ pub const SHADOW_PAGE_MASK: GuestAddr = !(SHADOW_PAGE_SIZE as GuestAddr - 1);
 pub const DEFAULT_REDZONE_SIZE: usize = 128;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
-#[repr(u64)]
+#[repr(u32)]
 pub enum QasanAction {
     CheckLoad,
     CheckStore,
@@ -214,14 +214,14 @@ impl AsanGiovese {
     extern "C" fn fake_syscall(
         mut self: Pin<&mut Self>,
         sys_num: i32,
-        a0: u64,
-        a1: u64,
-        a2: u64,
-        a3: u64,
-        _a4: u64,
-        _a5: u64,
-        _a6: u64,
-        _a7: u64,
+        a0: GuestAddr,
+        a1: GuestAddr,
+        a2: GuestAddr,
+        a3: GuestAddr,
+        _a4: GuestAddr,
+        _a5: GuestAddr,
+        _a6: GuestAddr,
+        _a7: GuestAddr,
     ) -> SyscallHookResult {
         if sys_num == QASAN_FAKESYS_NR {
             let mut r = 0;
@@ -230,34 +230,29 @@ impl AsanGiovese {
                 QasanAction::Poison => {
                     self.poison(
                         &emulator,
-                        a1 as GuestAddr,
+                        a1,
                         a2 as usize,
                         PoisonKind::try_from(a3 as i8).unwrap().into(),
                     );
                 }
                 QasanAction::UserPoison => {
-                    self.poison(
-                        &emulator,
-                        a1 as GuestAddr,
-                        a2 as usize,
-                        PoisonKind::User.into(),
-                    );
+                    self.poison(&emulator, a1, a2 as usize, PoisonKind::User.into());
                 }
                 QasanAction::UnPoison => {
-                    Self::unpoison(&emulator, a1 as GuestAddr, a2 as usize);
+                    Self::unpoison(&emulator, a1, a2 as usize);
                 }
                 QasanAction::IsPoison => {
-                    if Self::is_invalid_access(&emulator, a1 as GuestAddr, a2 as usize) {
+                    if Self::is_invalid_access(&emulator, a1, a2 as usize) {
                         r = 1;
                     }
                 }
                 QasanAction::Alloc => {
                     let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
-                    self.allocation(pc, a1 as GuestAddr, a2 as GuestAddr);
+                    self.allocation(pc, a1, a2);
                 }
                 QasanAction::Dealloc => {
                     let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
-                    self.deallocation(&emulator, pc, a1 as GuestAddr);
+                    self.deallocation(&emulator, pc, a1);
                 }
                 _ => (),
             }
@@ -1166,14 +1161,14 @@ pub fn qasan_fake_syscall<QT, S>(
     hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     sys_num: i32,
-    a0: u64,
-    a1: u64,
-    a2: u64,
-    _a3: u64,
-    _a4: u64,
-    _a5: u64,
-    _a6: u64,
-    _a7: u64,
+    a0: GuestAddr,
+    a1: GuestAddr,
+    a2: GuestAddr,
+    _a3: GuestAddr,
+    _a4: GuestAddr,
+    _a5: GuestAddr,
+    _a6: GuestAddr,
+    _a7: GuestAddr,
 ) -> SyscallHookResult
 where
     S: UsesInput,
@@ -1185,11 +1180,11 @@ where
         match QasanAction::try_from(a0).expect("Invalid QASan action number") {
             QasanAction::CheckLoad => {
                 let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
-                h.read_n(&emulator, pc, a1 as GuestAddr, a2 as usize);
+                h.read_n(&emulator, pc, a1, a2 as usize);
             }
             QasanAction::CheckStore => {
                 let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
-                h.write_n(&emulator, pc, a1 as GuestAddr, a2 as usize);
+                h.write_n(&emulator, pc, a1, a2 as usize);
             }
             QasanAction::Enable => {
                 h.set_enabled(true);
