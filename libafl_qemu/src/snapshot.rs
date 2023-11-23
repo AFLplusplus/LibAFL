@@ -487,7 +487,7 @@ impl<S> QemuHelper<S> for QemuSnapshotHelper
 where
     S: UsesInput + HasMetadata,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -516,7 +516,7 @@ where
 }
 
 pub fn trace_write1_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -529,7 +529,7 @@ pub fn trace_write1_snapshot<QT, S>(
 }
 
 pub fn trace_write2_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -542,7 +542,7 @@ pub fn trace_write2_snapshot<QT, S>(
 }
 
 pub fn trace_write4_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -555,7 +555,7 @@ pub fn trace_write4_snapshot<QT, S>(
 }
 
 pub fn trace_write8_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -568,7 +568,7 @@ pub fn trace_write8_snapshot<QT, S>(
 }
 
 pub fn trace_write_n_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -584,7 +584,7 @@ pub fn trace_write_n_snapshot<QT, S>(
 #[allow(clippy::too_many_arguments)]
 #[allow(non_upper_case_globals)]
 pub fn filter_mmap_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     sys_num: i32,
     a0: u64,
@@ -612,7 +612,7 @@ where
 #[allow(clippy::too_many_arguments)]
 #[allow(non_upper_case_globals)]
 pub fn trace_mmap_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     result: u64,
     sys_num: i32,

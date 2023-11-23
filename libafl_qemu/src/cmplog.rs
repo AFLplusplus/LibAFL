@@ -83,7 +83,7 @@ impl<S> QemuHelper<S> for QemuCmpLogHelper
 where
     S: UsesInput + HasMetadata,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -127,7 +127,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -142,7 +142,7 @@ where
 }
 
 pub fn gen_unique_cmp_ids<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
@@ -174,7 +174,7 @@ where
 }
 
 pub fn gen_hashed_cmp_ids<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
@@ -266,7 +266,7 @@ impl QemuCmpLogRoutinesHelper {
     }
 
     fn gen_blocks_calls<QT, S>(
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
@@ -363,7 +363,7 @@ impl<S> QemuHelper<S> for QemuCmpLogRoutinesHelper
 where
     S: UsesInput,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {

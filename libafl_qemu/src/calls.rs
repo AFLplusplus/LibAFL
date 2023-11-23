@@ -20,7 +20,7 @@ use crate::{
 pub trait CallTraceCollector: 'static + Debug {
     fn on_call<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
@@ -30,7 +30,7 @@ pub trait CallTraceCollector: 'static + Debug {
 
     fn on_ret<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         state: Option<&mut S>,
         pc: GuestAddr,
         ret_addr: GuestAddr,
@@ -61,7 +61,7 @@ pub trait CallTraceCollector: 'static + Debug {
 pub trait CallTraceCollectorTuple: 'static + MatchFirstType + Debug {
     fn on_call_all<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
@@ -71,7 +71,7 @@ pub trait CallTraceCollectorTuple: 'static + MatchFirstType + Debug {
 
     fn on_ret_all<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,
@@ -97,7 +97,7 @@ pub trait CallTraceCollectorTuple: 'static + MatchFirstType + Debug {
 impl CallTraceCollectorTuple for () {
     fn on_call_all<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         _call_len: usize,
@@ -109,7 +109,7 @@ impl CallTraceCollectorTuple for () {
 
     fn on_ret_all<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         _ret_addr: GuestAddr,
@@ -145,7 +145,7 @@ where
 {
     fn on_call_all<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         mut state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
@@ -167,7 +167,7 @@ where
 
     fn on_ret_all<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         mut state: Option<&mut S>,
         pc: GuestAddr,
         ret_addr: GuestAddr,
@@ -238,7 +238,7 @@ where
         self.filter.allowed(addr)
     }
 
-    fn on_ret<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, state: Option<&mut S>, pc: GuestAddr)
+    fn on_ret<QT, S>(hooks: &mut QemuHooks<QT, S>, state: Option<&mut S>, pc: GuestAddr)
     where
         S: UsesInput,
         QT: QemuHelperTuple<S>,
@@ -267,7 +267,7 @@ where
     }
 
     fn gen_blocks_calls<QT, S>(
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
@@ -320,9 +320,7 @@ where
                             let call_len = insn.bytes().len();
                             // TODO do not use a closure, find a more efficient way to pass call_len
                             let call_cb = Box::new(
-                                move |hooks: &mut QemuHooks<'_, QT, S>,
-                                      state: Option<&mut S>,
-                                      pc| {
+                                move |hooks: &mut QemuHooks<QT, S>, state: Option<&mut S>, pc| {
                                     // eprintln!("CALL @ 0x{:#x}", pc + call_len);
                                     let mut collectors = if let Some(h) =
                                         hooks.helpers_mut().match_first_type_mut::<Self>()
@@ -400,7 +398,7 @@ where
     S: UsesInput,
     T: CallTraceCollectorTuple,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -472,7 +470,7 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
     fn on_call<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
@@ -486,7 +484,7 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
     fn on_ret<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,
@@ -561,7 +559,7 @@ impl CallTraceCollector for FullBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
     fn on_call<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
@@ -578,7 +576,7 @@ impl CallTraceCollector for FullBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
     fn on_ret<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,

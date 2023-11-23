@@ -87,7 +87,7 @@ impl<S> QemuHelper<S> for QemuEdgeCoverageHelper
 where
     S: UsesInput + HasMetadata,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -159,7 +159,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -229,7 +229,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -252,7 +252,7 @@ where
 thread_local!(static PREV_LOC : UnsafeCell<u64> = UnsafeCell::new(0));
 
 pub fn gen_unique_edge_ids<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
@@ -312,7 +312,7 @@ pub extern "C" fn trace_edge_single(_: *const (), id: u64) {
 }
 
 pub fn gen_hashed_edge_ids<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
@@ -350,7 +350,7 @@ pub extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
 
 /*
 pub fn gen_addr_block_ids<QT, S>(
-    _hooks: &mut QemuHooks<'_, QT, S>,
+    _hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
@@ -365,7 +365,7 @@ where
 */
 
 pub fn gen_hashed_block_ids<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>

@@ -931,7 +931,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -942,7 +942,7 @@ where
         }
     }
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -987,7 +987,7 @@ where
     }
 }
 
-pub fn oncrash_asan<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, target_sig: i32)
+pub fn oncrash_asan<QT, S>(hooks: &mut QemuHooks<QT, S>, target_sig: i32)
 where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
@@ -999,7 +999,7 @@ where
 }
 
 pub fn gen_readwrite_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _info: MemAccessInfo,
@@ -1017,7 +1017,7 @@ where
 }
 
 pub fn trace_read1_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1031,7 +1031,7 @@ pub fn trace_read1_asan<QT, S>(
 }
 
 pub fn trace_read2_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1045,7 +1045,7 @@ pub fn trace_read2_asan<QT, S>(
 }
 
 pub fn trace_read4_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1059,7 +1059,7 @@ pub fn trace_read4_asan<QT, S>(
 }
 
 pub fn trace_read8_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1073,7 +1073,7 @@ pub fn trace_read8_asan<QT, S>(
 }
 
 pub fn trace_read_n_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1088,7 +1088,7 @@ pub fn trace_read_n_asan<QT, S>(
 }
 
 pub fn trace_write1_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1102,7 +1102,7 @@ pub fn trace_write1_asan<QT, S>(
 }
 
 pub fn trace_write2_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1116,7 +1116,7 @@ pub fn trace_write2_asan<QT, S>(
 }
 
 pub fn trace_write4_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1130,7 +1130,7 @@ pub fn trace_write4_asan<QT, S>(
 }
 
 pub fn trace_write8_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1144,7 +1144,7 @@ pub fn trace_write8_asan<QT, S>(
 }
 
 pub fn trace_write_n_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1160,7 +1160,7 @@ pub fn trace_write_n_asan<QT, S>(
 
 #[allow(clippy::too_many_arguments)]
 pub fn qasan_fake_syscall<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     sys_num: i32,
     a0: u64,
