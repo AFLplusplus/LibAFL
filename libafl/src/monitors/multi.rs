@@ -74,7 +74,7 @@ where
             String::new()
         };
         let head = format!("{event_msg}{pad} {sender}");
-        let global_fmt = format!(
+        let mut global_fmt = format!(
             "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
             format_duration_hms(&(current_time() - self.start_time)),
@@ -84,6 +84,12 @@ where
             self.total_execs(),
             self.execs_per_sec_pretty()
         );
+        let mut aggregated_fmt = " (Aggregated):".to_string();
+        for (key, val) in &self.aggregator.aggregated {
+            write!(aggregated_fmt, " {key}: {val}").unwrap();
+        }
+        write!(global_fmt, "{}", aggregated_fmt).unwrap();
+
         (self.print_fn)(global_fmt);
 
         self.client_stats_insert(sender_id);
@@ -100,12 +106,6 @@ where
             write!(fmt, ", {key}: {val}").unwrap();
         }
         (self.print_fn)(fmt);
-
-        let mut aggregated_fmt = "(Aggregated): ".to_string();
-        for (key, val) in &self.aggregator.aggregated {
-            write!(aggregated_fmt, " {key}: {val}").unwrap();
-        }
-        (self.print_fn)(aggregated_fmt);
 
         // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]
