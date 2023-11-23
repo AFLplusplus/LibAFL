@@ -14,11 +14,7 @@ use std::{
     ffi::{CStr, CString},
     ptr::null_mut,
 };
-use std::{
-    slice::from_raw_parts,
-    str::from_utf8_unchecked,
-    sync::{Mutex, OnceLock},
-};
+use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
@@ -919,7 +915,7 @@ impl From<EmuError> for libafl::Error {
     }
 }
 
-static EMULATOR_IS_INITIALIZED: OnceLock<Mutex<bool>> = OnceLock::new();
+static mut EMULATOR_IS_INITIALIZED: bool = false;
 
 #[derive(Clone, Debug)]
 pub struct Emulator {
@@ -930,15 +926,6 @@ pub struct Emulator {
 impl Emulator {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(args: &[String], env: &[(String, String)]) -> Result<Emulator, EmuError> {
-        let mut is_initialized = EMULATOR_IS_INITIALIZED
-            .get_or_init(|| Mutex::new(false))
-            .lock()
-            .unwrap();
-
-        if *is_initialized {
-            return Err(EmuError::MultipleInstances);
-        }
-
         if args.is_empty() {
             return Err(EmuError::EmptyArgs);
         }
@@ -947,6 +934,14 @@ impl Emulator {
         if i32::try_from(argc).is_err() {
             return Err(EmuError::TooManyArgs(argc));
         }
+
+        unsafe {
+            if EMULATOR_IS_INITIALIZED {
+                return Err(EmuError::MultipleInstances);
+            }
+            EMULATOR_IS_INITIALIZED = true;
+        }
+
         #[allow(clippy::cast_possible_wrap)]
         let argc = argc as i32;
 
@@ -971,7 +966,6 @@ impl Emulator {
                 libc::atexit(qemu_cleanup_atexit);
                 libafl_qemu_sys::syx_snapshot_init();
             }
-            *is_initialized = true;
         }
         Ok(Emulator { _private: () })
     }
