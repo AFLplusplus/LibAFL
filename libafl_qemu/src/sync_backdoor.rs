@@ -198,17 +198,15 @@ impl TryFrom<&Emulator> for SyncBackdoor {
                 let native_exit_kind: Result<NativeExitKind, _> =
                     u64::from(native_exit_kind).try_into();
 
-                let exit_kind = native_exit_kind
-                    .ok()
-                    .and_then(|k| {
-                        EMU_EXIT_KIND_MAP.get_or_init(|| {
-                            enum_map! {
-                                NativeExitKind::Unknown => None,
-                                NativeExitKind::Ok      => Some(ExitKind::Ok),
-                                NativeExitKind::Crash   => Some(ExitKind::Crash)
-                            }
-                        })[k]
-                    });
+                let exit_kind = native_exit_kind.ok().and_then(|k| {
+                    EMU_EXIT_KIND_MAP.get_or_init(|| {
+                        enum_map! {
+                            NativeExitKind::Unknown => None,
+                            NativeExitKind::Ok      => Some(ExitKind::Ok),
+                            NativeExitKind::Crash   => Some(ExitKind::Crash)
+                        }
+                    })[k]
+                });
 
                 SyncBackdoor {
                     command: Command::Exit(exit_kind),
