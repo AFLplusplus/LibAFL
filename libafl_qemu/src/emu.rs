@@ -42,8 +42,8 @@ pub enum GuestAddrKind {
 impl fmt::Display for GuestAddrKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GuestAddrKind::Physical(phys_addr) => write!(f, "hwaddr 0x{:x}", phys_addr),
-            GuestAddrKind::Virtual(virt_addr) => write!(f, "vaddr 0x{:x}", virt_addr),
+            GuestAddrKind::Physical(phys_addr) => write!(f, "hwaddr 0x{phys_addr:x}"),
+            GuestAddrKind::Virtual(virt_addr) => write!(f, "vaddr 0x{virt_addr:x}"),
         }
     }
 }
@@ -793,13 +793,13 @@ impl<T> From<&'static T> for HookData {
 
 impl<T> From<*mut T> for HookData {
     fn from(value: *mut T) -> Self {
-        unsafe { HookData(core::mem::transmute(value)) }
+        HookData(value as u64)
     }
 }
 
 impl<T> From<*const T> for HookData {
     fn from(value: *const T) -> Self {
-        unsafe { HookData(core::mem::transmute(value)) }
+        HookData(value as u64)
     }
 }
 
@@ -811,19 +811,19 @@ impl From<u64> for HookData {
 
 impl From<u32> for HookData {
     fn from(value: u32) -> Self {
-        HookData(value as u64)
+        HookData(u64::from(value))
     }
 }
 
 impl From<u16> for HookData {
     fn from(value: u16) -> Self {
-        HookData(value as u64)
+        HookData(u64::from(value))
     }
 }
 
 impl From<u8> for HookData {
     fn from(value: u8) -> Self {
-        HookData(value as u64)
+        HookData(u64::from(value))
     }
 }
 
@@ -845,9 +845,9 @@ impl fmt::Display for EmuExitReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             EmuExitReason::End => write!(f, "End"),
-            EmuExitReason::Breakpoint(vaddr) => write!(f, "Breakpoint @vaddr 0x{:x}", vaddr),
+            EmuExitReason::Breakpoint(vaddr) => write!(f, "Breakpoint @vaddr 0x{vaddr:x}"),
             EmuExitReason::SyncBackdoor(sync_backdoor) => {
-                write!(f, "Sync backdoor exit: {}", sync_backdoor)
+                write!(f, "Sync backdoor exit: {sync_backdoor}")
             }
         }
     }
@@ -874,7 +874,7 @@ impl TryFrom<&Emulator> for EmuExitReason {
             Err(EmuExitReasonError::UnexpectedExit)
         } else {
             let exit_reason: &mut libafl_qemu_sys::libafl_exit_reason =
-                unsafe { transmute(exit_reason) };
+                unsafe { transmute(&mut *exit_reason) };
             Ok(match exit_reason.kind {
                 libafl_qemu_sys::libafl_exit_reason_kind_BREAKPOINT => unsafe {
                     EmuExitReason::Breakpoint(exit_reason.data.breakpoint.addr.into())

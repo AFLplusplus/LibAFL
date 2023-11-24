@@ -65,7 +65,7 @@ impl TryFrom<u32> for QasanAction {
     type Error = num_enum::TryFromPrimitiveError<QasanAction>;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
-        QasanAction::try_from(value as u64)
+        QasanAction::try_from(u64::from(value))
     }
 }
 
