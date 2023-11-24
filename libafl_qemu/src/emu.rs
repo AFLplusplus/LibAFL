@@ -793,13 +793,13 @@ impl<T> From<&'static T> for HookData {
 
 impl<T> From<*mut T> for HookData {
     fn from(value: *mut T) -> Self {
-        unsafe { HookData(core::mem::transmute(value as u64)) }
+        HookData(value as u64)
     }
 }
 
 impl<T> From<*const T> for HookData {
     fn from(value: *const T) -> Self {
-        unsafe { HookData(core::mem::transmute(value as u64)) }
+        HookData(value as u64)
     }
 }
 
