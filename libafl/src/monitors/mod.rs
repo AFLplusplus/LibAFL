@@ -202,9 +202,9 @@ impl UserStatsValue {
             }
             (Self::Float(x), Self::Float(y)) => {
                 if y > x {
-                    Some(Self::Percent(*y))
+                    Some(Self::Float(*y))
                 } else {
-                    Some(Self::Percent(*x))
+                    Some(Self::Float(*x))
                 }
             }
             (Self::Ratio(x, a), Self::Ratio(y, b)) => {

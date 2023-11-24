@@ -88,7 +88,7 @@ where
         for (key, val) in &self.aggregator.aggregated {
             write!(aggregated_fmt, " {key}: {val}").unwrap();
         }
-        write!(global_fmt, "{}", aggregated_fmt).unwrap();
+        write!(global_fmt, "{aggregated_fmt}").unwrap();
 
         (self.print_fn)(global_fmt);
 

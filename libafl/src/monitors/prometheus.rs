@@ -178,6 +178,7 @@ where
                 UserStatsValue::Float(f) => *f,
                 UserStatsValue::String(_s) => 0.0,
                 UserStatsValue::Ratio(a, b) => (*a as f64 / *b as f64) * 100.0,
+                UserStatsValue::Percent(p) => *p * 100.0,
             };
             self.custom_stat
                 .get_or_create(&Labels {
