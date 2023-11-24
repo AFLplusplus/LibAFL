@@ -58,10 +58,7 @@ pub enum Hook<F, C, R: Clone> {
 
 impl<F, C, R: Clone> Hook<F, C, R> {
     pub fn is_empty(&self) -> bool {
-        match self {
-            Hook::Empty => true,
-            _ => false,
-        }
+        matches!(self, Hook::Empty)
     }
 }
 
@@ -81,7 +78,7 @@ macro_rules! get_raw_hook {
 macro_rules! hook_to_repr {
     ($h:expr) => {
         match $h {
-            Hook::Function(f) => HookRepr::Function(transmute(f)),
+            Hook::Function(f) => HookRepr::Function(f as *const libc::c_void),
             Hook::Closure(c) => HookRepr::Closure(transmute(c)),
             Hook::Raw(_) => HookRepr::Empty, // managed by emu
             Hook::Empty => HookRepr::Empty,
@@ -332,7 +329,7 @@ where
                     let func: &mut Box<dyn FnMut(&mut QemuHooks<QT, S>, i32)> = transmute(ptr);
                     func(hooks, target_sig);
                 }
-                _ => (),
+                HookRepr::Empty => (),
             }
         }
     }
@@ -459,16 +456,14 @@ where
         >,
         invalidate_block: bool,
     ) -> HookId {
-        unsafe {
-            match hook {
-                Hook::Function(f) => self.instruction_function(addr, f, invalidate_block),
-                Hook::Closure(c) => self.instruction_closure(addr, c, invalidate_block),
-                Hook::Raw(r) => {
-                    let z: *const () = transmute(0u64);
-                    self.emulator.set_hook(z, addr, r, invalidate_block)
-                }
-                Hook::Empty => HookId(0), // TODO error type
+        match hook {
+            Hook::Function(f) => self.instruction_function(addr, f, invalidate_block),
+            Hook::Closure(c) => self.instruction_closure(addr, c, invalidate_block),
+            Hook::Raw(r) => {
+                let z: *const () = ptr::null::<()>();
+                self.emulator.set_hook(z, addr, r, invalidate_block)
             }
+            Hook::Empty => HookId(0), // TODO error type
         }
     }
 
@@ -883,16 +878,14 @@ where
             extern "C" fn(*const (), pc: GuestAddr),
         >,
     ) -> HookId {
-        unsafe {
-            match hook {
-                Hook::Function(f) => self.backdoor_function(f),
-                Hook::Closure(c) => self.backdoor_closure(c),
-                Hook::Raw(r) => {
-                    let z: *const () = transmute(0u64);
-                    self.emulator.add_backdoor_hook(z, r)
-                }
-                Hook::Empty => HookId(0), // TODO error type
+        match hook {
+            Hook::Function(f) => self.backdoor_function(f),
+            Hook::Closure(c) => self.backdoor_closure(c),
+            Hook::Raw(r) => {
+                let z: *const () = ptr::null::<()>();
+                self.emulator.add_backdoor_hook(z, r)
             }
+            Hook::Empty => HookId(0), // TODO error type
         }
     }
 
@@ -966,16 +959,14 @@ where
             ) -> SyscallHookResult,
         >,
     ) -> HookId {
-        unsafe {
-            match hook {
-                Hook::Function(f) => self.syscalls_function(f),
-                Hook::Closure(c) => self.syscalls_closure(c),
-                Hook::Raw(r) => {
-                    let z: *const () = transmute(0u64);
-                    self.emulator.add_pre_syscall_hook(z, r)
-                }
-                Hook::Empty => HookId(0), // TODO error type
+        match hook {
+            Hook::Function(f) => self.syscalls_function(f),
+            Hook::Closure(c) => self.syscalls_closure(c),
+            Hook::Raw(r) => {
+                let z: *const () = ptr::null::<()>();
+                self.emulator.add_pre_syscall_hook(z, r)
             }
+            Hook::Empty => HookId(0), // TODO error type
         }
     }
 
@@ -1085,16 +1076,14 @@ where
             ) -> GuestAddr,
         >,
     ) -> HookId {
-        unsafe {
-            match hook {
-                Hook::Function(f) => self.after_syscalls_function(f),
-                Hook::Closure(c) => self.after_syscalls_closure(c),
-                Hook::Raw(r) => {
-                    let z: *const () = transmute(0u64);
-                    self.emulator.add_post_syscall_hook(z, r)
-                }
-                Hook::Empty => HookId(0), // TODO error type
+        match hook {
+            Hook::Function(f) => self.after_syscalls_function(f),
+            Hook::Closure(c) => self.after_syscalls_closure(c),
+            Hook::Raw(r) => {
+                let z: *const () = ptr::null::<()>();
+                self.emulator.add_post_syscall_hook(z, r)
             }
+            Hook::Empty => HookId(0), // TODO error type
         }
     }
 
@@ -1165,16 +1154,14 @@ where
             extern "C" fn(*const (), tid: u32) -> bool,
         >,
     ) -> HookId {
-        unsafe {
-            match hook {
-                Hook::Function(f) => self.thread_creation_function(f),
-                Hook::Closure(c) => self.thread_creation_closure(c),
-                Hook::Raw(r) => {
-                    let z: *const () = transmute(0u64);
-                    self.emulator.add_new_thread_hook(z, r)
-                }
-                Hook::Empty => HookId(0), // TODO error type
+        match hook {
+            Hook::Function(f) => self.thread_creation_function(f),
+            Hook::Closure(c) => self.thread_creation_closure(c),
+            Hook::Raw(r) => {
+                let z: *const () = ptr::null::<()>();
+                self.emulator.add_new_thread_hook(z, r)
             }
+            Hook::Empty => HookId(0), // TODO error type
         }
     }
 
