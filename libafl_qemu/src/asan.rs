@@ -22,7 +22,7 @@ use crate::{
     calls::FullBacktraceCollector,
     emu::{EmuError, Emulator, MemAccessInfo, SyscallHookResult},
     helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
-    hooks::QemuHooks,
+    hooks::{Hook, QemuHooks},
     GuestAddr, Regs,
 };
 
@@ -59,6 +59,14 @@ pub enum QasanAction {
     Enable,
     Disable,
     SwapState,
+}
+
+impl TryFrom<u32> for QasanAction {
+    type Error = num_enum::TryFromPrimitiveError<QasanAction>;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        QasanAction::try_from(value as u64)
+    }
 }
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, PartialEq)]
@@ -143,7 +151,7 @@ impl AllocTreeItem {
         self.allocated = false;
     }
 }
-
+use std::pin::Pin;
 pub struct AsanGiovese {
     pub alloc_tree: Mutex<IntervalTree<GuestAddr, AllocTreeItem>>,
     pub saved_tree: IntervalTree<GuestAddr, AllocTreeItem>,
@@ -163,7 +171,7 @@ impl core::fmt::Debug for AsanGiovese {
 }
 
 impl AsanGiovese {
-    pub unsafe fn map_shadow() {
+    unsafe fn map_shadow() {
         assert!(
             libc::mmap(
                 HIGH_SHADOW_ADDR,
@@ -194,6 +202,80 @@ impl AsanGiovese {
                 0
             ) != MAP_FAILED
         );
+    }
+
+    #[must_use]
+    fn new(emu: &Emulator) -> Pin<Box<Self>> {
+        let res = Self {
+            alloc_tree: Mutex::new(IntervalTree::new()),
+            saved_tree: IntervalTree::new(),
+            error_callback: None,
+            dirty_shadow: Mutex::new(HashSet::default()),
+            saved_shadow: HashMap::default(),
+            snapshot_shadow: true, // By default, track the dirty shadow pages
+        };
+        let mut boxed = Box::pin(res);
+        emu.add_pre_syscall_hook(boxed.as_mut(), Self::fake_syscall);
+        boxed
+    }
+
+    extern "C" fn fake_syscall(
+        mut self: Pin<&mut Self>,
+        sys_num: i32,
+        a0: GuestAddr,
+        a1: GuestAddr,
+        a2: GuestAddr,
+        a3: GuestAddr,
+        _a4: GuestAddr,
+        _a5: GuestAddr,
+        _a6: GuestAddr,
+        _a7: GuestAddr,
+    ) -> SyscallHookResult {
+        if sys_num == QASAN_FAKESYS_NR {
+            let mut r = 0;
+            let emulator = Emulator::get().unwrap();
+            match QasanAction::try_from(a0).expect("Invalid QASan action number") {
+                QasanAction::Poison => {
+                    self.poison(
+                        &emulator,
+                        a1,
+                        a2 as usize,
+                        PoisonKind::try_from(a3 as i8).unwrap().into(),
+                    );
+                }
+                QasanAction::UserPoison => {
+                    self.poison(&emulator, a1, a2 as usize, PoisonKind::User.into());
+                }
+                QasanAction::UnPoison => {
+                    Self::unpoison(&emulator, a1, a2 as usize);
+                }
+                QasanAction::IsPoison => {
+                    if Self::is_invalid_access(&emulator, a1, a2 as usize) {
+                        r = 1;
+                    }
+                }
+                QasanAction::Alloc => {
+                    let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
+                    self.allocation(pc, a1, a2);
+                }
+                QasanAction::Dealloc => {
+                    let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
+                    self.deallocation(&emulator, pc, a1);
+                }
+                _ => (),
+            }
+            SyscallHookResult::new(Some(r))
+        } else {
+            SyscallHookResult::new(None)
+        }
+    }
+
+    fn set_error_callback(&mut self, error_callback: AsanErrorCallback) {
+        self.error_callback = Some(error_callback);
+    }
+
+    fn set_snapshot_shadow(&mut self, snapshot_shadow: bool) {
+        self.snapshot_shadow = snapshot_shadow;
     }
 
     #[inline]
@@ -357,7 +439,7 @@ impl AsanGiovese {
     }
 
     #[inline]
-    fn unpoison_page(emu: &Emulator, page: GuestAddr) {
+    pub fn unpoison_page(emu: &Emulator, page: GuestAddr) {
         unsafe {
             let h = emu.g2h::<*const c_void>(page) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
@@ -372,30 +454,6 @@ impl AsanGiovese {
             let h = emu.g2h::<*const c_void>(page) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
             std::slice::from_raw_parts_mut(shadow_addr, SHADOW_PAGE_SIZE)
-        }
-    }
-
-    #[must_use]
-    pub fn new(snapshot_shadow: bool) -> Self {
-        Self {
-            alloc_tree: Mutex::new(IntervalTree::new()),
-            saved_tree: IntervalTree::new(),
-            error_callback: None,
-            dirty_shadow: Mutex::new(HashSet::default()),
-            saved_shadow: HashMap::default(),
-            snapshot_shadow,
-        }
-    }
-
-    #[must_use]
-    pub fn with_error_callback(snapshot_shadow: bool, error_callback: AsanErrorCallback) -> Self {
-        Self {
-            alloc_tree: Mutex::new(IntervalTree::new()),
-            saved_tree: IntervalTree::new(),
-            error_callback: Some(error_callback),
-            dirty_shadow: Mutex::new(HashSet::default()),
-            saved_shadow: HashMap::default(),
-            snapshot_shadow,
         }
     }
 
@@ -529,6 +587,15 @@ impl AsanGiovese {
         }
     }
 
+    pub fn allocation(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
+        self.alloc_remove(start, end);
+        self.alloc_insert(pc, start, end);
+    }
+
+    pub fn deallocation(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
+        self.alloc_free(emulator, pc, addr);
+    }
+
     pub fn snapshot(&mut self, emu: &Emulator) {
         if self.snapshot_shadow {
             let set = self.dirty_shadow.lock().unwrap();
@@ -599,7 +666,7 @@ static mut ASAN_INITED: bool = false;
 pub fn init_with_asan(
     args: &mut Vec<String>,
     env: &mut [(String, String)],
-) -> Result<Emulator, EmuError> {
+) -> Result<(Emulator, Pin<Box<AsanGiovese>>), EmuError> {
     let current = env::current_exe().unwrap();
     let asan_lib = fs::canonicalize(current)
         .unwrap()
@@ -644,7 +711,11 @@ pub fn init_with_asan(
         AsanGiovese::map_shadow();
         ASAN_INITED = true;
     }
-    Emulator::new(args, env)
+
+    let emu = Emulator::new(args, env)?;
+    let rt = AsanGiovese::new(&emu);
+
+    Ok((emu, rt))
 }
 
 pub enum QemuAsanOptions {
@@ -661,13 +732,26 @@ pub struct QemuAsanHelper {
     enabled: bool,
     detect_leaks: bool,
     empty: bool,
-    rt: AsanGiovese,
+    rt: Pin<Box<AsanGiovese>>,
     filter: QemuInstrumentationFilter,
 }
 
 impl QemuAsanHelper {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter, options: QemuAsanOptions) -> Self {
+    pub fn default(rt: Pin<Box<AsanGiovese>>) -> Self {
+        Self::new(
+            rt,
+            QemuInstrumentationFilter::None,
+            QemuAsanOptions::Snapshot,
+        )
+    }
+
+    #[must_use]
+    pub fn new(
+        mut rt: Pin<Box<AsanGiovese>>,
+        filter: QemuInstrumentationFilter,
+        options: QemuAsanOptions,
+    ) -> Self {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
         let (snapshot, detect_leaks) = match options {
             QemuAsanOptions::None => (false, false),
@@ -675,17 +759,19 @@ impl QemuAsanHelper {
             QemuAsanOptions::DetectLeaks => (false, true),
             QemuAsanOptions::SnapshotDetectLeaks => (true, true),
         };
+        rt.set_snapshot_shadow(snapshot);
         Self {
             enabled: true,
             detect_leaks,
             empty: true,
-            rt: AsanGiovese::new(snapshot),
+            rt,
             filter,
         }
     }
 
     #[must_use]
     pub fn with_error_callback(
+        mut rt: Pin<Box<AsanGiovese>>,
         filter: QemuInstrumentationFilter,
         error_callback: AsanErrorCallback,
         options: QemuAsanOptions,
@@ -697,18 +783,24 @@ impl QemuAsanHelper {
             QemuAsanOptions::DetectLeaks => (false, true),
             QemuAsanOptions::SnapshotDetectLeaks => (true, true),
         };
+        rt.set_snapshot_shadow(snapshot);
+        rt.set_error_callback(error_callback);
         Self {
             enabled: true,
             detect_leaks,
             empty: true,
-            rt: AsanGiovese::with_error_callback(snapshot, error_callback),
+            rt,
             filter,
         }
     }
 
     #[must_use]
-    pub fn with_asan_report(filter: QemuInstrumentationFilter, options: QemuAsanOptions) -> Self {
-        Self::with_error_callback(filter, Box::new(asan_report), options)
+    pub fn with_asan_report(
+        rt: Pin<Box<AsanGiovese>>,
+        filter: QemuInstrumentationFilter,
+        options: QemuAsanOptions,
+    ) -> Self {
+        Self::with_error_callback(rt, filter, Box::new(asan_report), options)
     }
 
     #[must_use]
@@ -726,12 +818,11 @@ impl QemuAsanHelper {
     }
 
     pub fn alloc(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
-        self.rt.alloc_remove(start, end);
-        self.rt.alloc_insert(pc, start, end);
+        self.rt.allocation(pc, start, end);
     }
 
     pub fn dealloc(&mut self, emulator: &Emulator, pc: GuestAddr, addr: GuestAddr) {
-        self.rt.alloc_free(emulator, pc, addr);
+        self.rt.deallocation(emulator, pc, addr);
     }
 
     #[allow(clippy::unused_self)]
@@ -830,12 +921,6 @@ impl QemuAsanHelper {
     }
 }
 
-impl Default for QemuAsanHelper {
-    fn default() -> Self {
-        Self::new(QemuInstrumentationFilter::None, QemuAsanOptions::Snapshot)
-    }
-}
-
 impl HasInstrumentationFilter for QemuAsanHelper {
     fn filter(&self) -> &QemuInstrumentationFilter {
         &self.filter
@@ -852,37 +937,37 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.syscalls(qasan_fake_syscall::<QT, S>);
+        hooks.syscalls(Hook::Function(qasan_fake_syscall::<QT, S>));
 
         if self.rt.error_callback.is_some() {
-            hooks.crash(oncrash_asan::<QT, S>);
+            hooks.crash_function(oncrash_asan::<QT, S>);
         }
     }
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
         hooks.reads(
-            Some(gen_readwrite_asan::<QT, S>),
-            Some(trace_read1_asan::<QT, S>),
-            Some(trace_read2_asan::<QT, S>),
-            Some(trace_read4_asan::<QT, S>),
-            Some(trace_read8_asan::<QT, S>),
-            Some(trace_read_n_asan::<QT, S>),
+            Hook::Function(gen_readwrite_asan::<QT, S>),
+            Hook::Function(trace_read1_asan::<QT, S>),
+            Hook::Function(trace_read2_asan::<QT, S>),
+            Hook::Function(trace_read4_asan::<QT, S>),
+            Hook::Function(trace_read8_asan::<QT, S>),
+            Hook::Function(trace_read_n_asan::<QT, S>),
         );
 
         hooks.writes(
-            Some(gen_readwrite_asan::<QT, S>),
-            Some(trace_write1_asan::<QT, S>),
-            Some(trace_write2_asan::<QT, S>),
-            Some(trace_write4_asan::<QT, S>),
-            Some(trace_write8_asan::<QT, S>),
-            Some(trace_write_n_asan::<QT, S>),
+            Hook::Function(gen_readwrite_asan::<QT, S>),
+            Hook::Function(trace_write1_asan::<QT, S>),
+            Hook::Function(trace_write2_asan::<QT, S>),
+            Hook::Function(trace_write4_asan::<QT, S>),
+            Hook::Function(trace_write8_asan::<QT, S>),
+            Hook::Function(trace_write_n_asan::<QT, S>),
         );
     }
 
@@ -908,7 +993,7 @@ where
     }
 }
 
-pub fn oncrash_asan<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, target_sig: i32)
+pub fn oncrash_asan<QT, S>(hooks: &mut QemuHooks<QT, S>, target_sig: i32)
 where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
@@ -920,7 +1005,7 @@ where
 }
 
 pub fn gen_readwrite_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _info: MemAccessInfo,
@@ -938,7 +1023,7 @@ where
 }
 
 pub fn trace_read1_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -952,7 +1037,7 @@ pub fn trace_read1_asan<QT, S>(
 }
 
 pub fn trace_read2_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -966,7 +1051,7 @@ pub fn trace_read2_asan<QT, S>(
 }
 
 pub fn trace_read4_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -980,7 +1065,7 @@ pub fn trace_read4_asan<QT, S>(
 }
 
 pub fn trace_read8_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -994,7 +1079,7 @@ pub fn trace_read8_asan<QT, S>(
 }
 
 pub fn trace_read_n_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1009,7 +1094,7 @@ pub fn trace_read_n_asan<QT, S>(
 }
 
 pub fn trace_write1_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1023,7 +1108,7 @@ pub fn trace_write1_asan<QT, S>(
 }
 
 pub fn trace_write2_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1037,7 +1122,7 @@ pub fn trace_write2_asan<QT, S>(
 }
 
 pub fn trace_write4_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1051,7 +1136,7 @@ pub fn trace_write4_asan<QT, S>(
 }
 
 pub fn trace_write8_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1065,7 +1150,7 @@ pub fn trace_write8_asan<QT, S>(
 }
 
 pub fn trace_write_n_asan<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
@@ -1081,17 +1166,17 @@ pub fn trace_write_n_asan<QT, S>(
 
 #[allow(clippy::too_many_arguments)]
 pub fn qasan_fake_syscall<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     sys_num: i32,
-    a0: u64,
-    a1: u64,
-    a2: u64,
-    a3: u64,
-    _a4: u64,
-    _a5: u64,
-    _a6: u64,
-    _a7: u64,
+    a0: GuestAddr,
+    a1: GuestAddr,
+    a2: GuestAddr,
+    _a3: GuestAddr,
+    _a4: GuestAddr,
+    _a5: GuestAddr,
+    _a6: GuestAddr,
+    _a7: GuestAddr,
 ) -> SyscallHookResult
 where
     S: UsesInput,
@@ -1100,42 +1185,14 @@ where
     if sys_num == QASAN_FAKESYS_NR {
         let emulator = hooks.emulator().clone();
         let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-        let mut r = 0;
         match QasanAction::try_from(a0).expect("Invalid QASan action number") {
             QasanAction::CheckLoad => {
                 let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
-                h.read_n(&emulator, pc, a1 as GuestAddr, a2 as usize);
+                h.read_n(&emulator, pc, a1, a2 as usize);
             }
             QasanAction::CheckStore => {
                 let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
-                h.write_n(&emulator, pc, a1 as GuestAddr, a2 as usize);
-            }
-            QasanAction::Poison => {
-                h.poison(
-                    &emulator,
-                    a1 as GuestAddr,
-                    a2 as usize,
-                    PoisonKind::try_from(a3 as i8).unwrap(),
-                );
-            }
-            QasanAction::UserPoison => {
-                h.poison(&emulator, a1 as GuestAddr, a2 as usize, PoisonKind::User);
-            }
-            QasanAction::UnPoison => {
-                h.unpoison(&emulator, a1 as GuestAddr, a2 as usize);
-            }
-            QasanAction::IsPoison => {
-                if h.is_poisoned(&emulator, a1 as GuestAddr, a2 as usize) {
-                    r = 1;
-                }
-            }
-            QasanAction::Alloc => {
-                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
-                h.alloc(pc, a1 as GuestAddr, a2 as GuestAddr);
-            }
-            QasanAction::Dealloc => {
-                let pc: GuestAddr = emulator.read_reg(Regs::Pc).unwrap();
-                h.dealloc(&emulator, pc, a1 as GuestAddr);
+                h.write_n(&emulator, pc, a1, a2 as usize);
             }
             QasanAction::Enable => {
                 h.set_enabled(true);
@@ -1146,8 +1203,9 @@ where
             QasanAction::SwapState => {
                 h.set_enabled(!h.enabled());
             }
+            _ => (),
         }
-        SyscallHookResult::new(Some(r))
+        SyscallHookResult::new(Some(0))
     } else {
         SyscallHookResult::new(None)
     }
