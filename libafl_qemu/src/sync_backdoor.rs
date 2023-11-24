@@ -79,19 +79,19 @@ impl CommandInput {
                 #[cfg(emulation_mode = "usermode")]
                 {
                     // For now the default behaviour is to fall back to virtual addresses
-                    emu.write_mem(hwaddr.try_into().unwrap(), input)
+                    emu.write_mem(hwaddr.try_into().unwrap(), input);
                 }
                 #[cfg(emulation_mode = "systemmode")]
                 {
-                    emu.write_phys_mem(hwaddr, input)
+                    emu.write_phys_mem(hwaddr, input);
                 }
             },
             GuestAddrKind::Virtual(vaddr) => unsafe {
-                emu.write_mem(vaddr.try_into().unwrap(), input)
+                emu.write_mem(vaddr.try_into().unwrap(), input);
             },
         };
 
-        backdoor.ret(&emu, input.len().try_into().unwrap()).unwrap()
+        backdoor.ret(emu, input.len().try_into().unwrap()).unwrap();
     }
 }
 
@@ -115,11 +115,11 @@ impl Display for Command {
         match self {
             Command::Save => write!(f, "Save VM"),
             Command::Load => write!(f, "Reload VM"),
-            Command::Input(command_input) => write!(f, "Set fuzzing input @{}", command_input),
+            Command::Input(command_input) => write!(f, "Set fuzzing input @{command_input}"),
             Command::Start(command_input) => {
-                write!(f, "Start fuzzing with input @{}", command_input)
+                write!(f, "Start fuzzing with input @{command_input}")
             }
-            Command::Exit(exit_kind) => write!(f, "Exit of kind {:?}", exit_kind),
+            Command::Exit(exit_kind) => write!(f, "Exit of kind {exit_kind:?}"),
         }
     }
 }
@@ -131,6 +131,7 @@ pub struct SyncBackdoor {
 }
 
 impl SyncBackdoor {
+    #[must_use]
     pub fn command(&self) -> &Command {
         &self.command
     }
@@ -197,18 +198,15 @@ impl TryFrom<&Emulator> for SyncBackdoor {
                 let native_exit_kind: Result<NativeExitKind, _> =
                     u64::from(native_exit_kind).try_into();
 
-                let exit_kind = native_exit_kind
-                    .ok()
-                    .map(|k| {
-                        EMU_EXIT_KIND_MAP.get_or_init(|| {
-                            enum_map! {
-                                NativeExitKind::Unknown => None,
-                                NativeExitKind::Ok      => Some(ExitKind::Ok),
-                                NativeExitKind::Crash   => Some(ExitKind::Crash)
-                            }
-                        })[k]
-                    })
-                    .flatten();
+                let exit_kind = native_exit_kind.ok().and_then(|k| {
+                    EMU_EXIT_KIND_MAP.get_or_init(|| {
+                        enum_map! {
+                            NativeExitKind::Unknown => None,
+                            NativeExitKind::Ok      => Some(ExitKind::Ok),
+                            NativeExitKind::Crash   => Some(ExitKind::Crash)
+                        }
+                    })[k]
+                });
 
                 SyncBackdoor {
                     command: Command::Exit(exit_kind),
