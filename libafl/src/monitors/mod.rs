@@ -163,6 +163,8 @@ pub enum UserStatsValue {
     String(String),
     /// A ratio of two values
     Ratio(u64, u64),
+    /// Percent
+    Percent(f64),
 }
 
 impl UserStatsValue {
@@ -170,7 +172,7 @@ impl UserStatsValue {
     #[must_use]
     pub fn is_numeric(&self) -> bool {
         match &self {
-            Self::Number(_) | Self::Float(_) | Self::Ratio(_, _) => true,
+            Self::Number(_) | Self::Float(_) | Self::Ratio(_, _) | Self::Percent(_) => true,
             Self::String(_) => false,
         }
     }
@@ -181,7 +183,8 @@ impl UserStatsValue {
         match self {
             Self::Number(x) => Some(Self::Float(*x as f64 / divisor as f64)),
             Self::Float(x) => Some(Self::Float(*x / divisor as f64)),
-            Self::Ratio(x, y) => Some(Self::Float((*x as f64 / divisor as f64) / *y as f64)),
+            Self::Percent(x) => Some(Self::Percent(*x / divisor as f64)),
+            Self::Ratio(x, y) => Some(Self::Percent((*x as f64 / divisor as f64) / *y as f64)),
             Self::String(_) => None,
         }
     }
@@ -208,9 +211,16 @@ impl UserStatsValue {
                 let first = *x as f64 / *a as f64;
                 let second = *y as f64 / *b as f64;
                 if first > second {
-                    Some(Self::Float(first))
+                    Some(Self::Percent(first))
                 } else {
-                    Some(Self::Float(second))
+                    Some(Self::Percent(second))
+                }
+            }
+            (Self::Percent(x), Self::Percent(y)) => {
+                if y > x {
+                    Some(Self::Percent(*y))
+                } else {
+                    Some(Self::Percent(*x))
                 }
             }
             _ => None,
@@ -239,9 +249,16 @@ impl UserStatsValue {
                 let first = *x as f64 / *a as f64;
                 let second = *y as f64 / *b as f64;
                 if first > second {
-                    Some(Self::Float(second))
+                    Some(Self::Percent(second))
                 } else {
-                    Some(Self::Float(first))
+                    Some(Self::Percent(first))
+                }
+            }
+            (Self::Percent(x), Self::Percent(y)) => {
+                if y > x {
+                    Some(Self::Percent(*x))
+                } else {
+                    Some(Self::Percent(*y))
                 }
             }
             _ => None,
@@ -254,10 +271,11 @@ impl UserStatsValue {
         match (self, other) {
             (Self::Number(x), Self::Number(y)) => Some(Self::Number(*x + *y)),
             (Self::Float(x), Self::Float(y)) => Some(Self::Float(*x + *y)),
+            (Self::Percent(x), Self::Percent(y)) => Some(Self::Percent(*x + *y)),
             (Self::Ratio(x, a), Self::Ratio(y, b)) => {
                 let first = *x as f64 / *a as f64;
                 let second = *y as f64 / *b as f64;
-                Some(Self::Float(first + second))
+                Some(Self::Percent(first + second))
             }
             _ => None,
         }
@@ -274,7 +292,8 @@ impl fmt::Display for UserStatsValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
             UserStatsValue::Number(n) => write!(f, "{n}"),
-            UserStatsValue::Float(n) => write!(f, "{n}"),
+            UserStatsValue::Float(n) => write!(f, "{}", prettify_float(*n)),
+            UserStatsValue::Percent(n) => write!(f, "{:.3}%", n * 100.0),
             UserStatsValue::String(s) => write!(f, "{s}"),
             UserStatsValue::Ratio(a, b) => {
                 if *b == 0 {

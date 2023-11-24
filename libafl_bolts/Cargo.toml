@@ -84,10 +84,6 @@ llmp_small_maps = ["alloc"]
 [build-dependencies]
 rustversion = "1.0"
 
-[dev-dependencies]
-# clippy-suggested optimised byte counter
-bytecount = "0.6.3"
-
 [dependencies]
 libafl_derive = { version = "0.11.1", optional = true, path = "../libafl_derive" }
 
