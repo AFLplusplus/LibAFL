@@ -505,7 +505,7 @@ fn write_crash<W: Write>(
         "Received signal {} at {:#08x}, fault address: {:#08x}",
         signal,
         ucontext.uc_mcontext.gregs[libc::REG_EIP as usize],
-        ucontext.uc_mcontext.gregs[libc::REG_ERR as usize]
+        ucontext.uc_mcontext.cr2
     )?;
 
     Ok(())
