@@ -16,13 +16,13 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
-    fn init_hooks<QT>(&self, _hooks: &QemuHooks<'_, QT, S>)
+    fn init_hooks<QT>(&self, _hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
     }
 
-    fn first_exec<QT>(&self, _hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, _hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -48,11 +48,11 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool;
 
-    fn init_hooks_all<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn init_hooks_all<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>;
 
-    fn first_exec_all<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec_all<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>;
 
@@ -74,13 +74,13 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks_all<QT>(&self, _hooks: &QemuHooks<'_, QT, S>)
+    fn init_hooks_all<QT>(&self, _hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
     }
 
-    fn first_exec_all<QT>(&self, _hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec_all<QT>(&self, _hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -108,7 +108,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
 
-    fn init_hooks_all<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn init_hooks_all<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -116,7 +116,7 @@ where
         self.1.init_hooks_all(hooks);
     }
 
-    fn first_exec_all<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec_all<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {

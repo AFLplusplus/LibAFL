@@ -11633,6 +11633,382 @@ impl ::std::ops::BitAndAssign for MemOp {
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct MemOp(pub ::std::os::raw::c_uint);
 pub type MemOpIdx = u32;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct RBNode {
+    pub rb_parent_color: usize,
+    pub rb_right: *mut RBNode,
+    pub rb_left: *mut RBNode,
+}
+#[test]
+fn bindgen_test_layout_RBNode() {
+    const UNINIT: ::std::mem::MaybeUninit<RBNode> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<RBNode>(),
+        24usize,
+        concat!("Size of: ", stringify!(RBNode))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<RBNode>(),
+        8usize,
+        concat!("Alignment of ", stringify!(RBNode))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).rb_parent_color) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(RBNode),
+            "::",
+            stringify!(rb_parent_color)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).rb_right) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(RBNode),
+            "::",
+            stringify!(rb_right)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).rb_left) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(RBNode),
+            "::",
+            stringify!(rb_left)
+        )
+    );
+}
+impl Default for RBNode {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct IntervalTreeNode {
+    pub rb: RBNode,
+    pub start: u64,
+    pub last: u64,
+    pub subtree_last: u64,
+}
+#[test]
+fn bindgen_test_layout_IntervalTreeNode() {
+    const UNINIT: ::std::mem::MaybeUninit<IntervalTreeNode> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<IntervalTreeNode>(),
+        48usize,
+        concat!("Size of: ", stringify!(IntervalTreeNode))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<IntervalTreeNode>(),
+        8usize,
+        concat!("Alignment of ", stringify!(IntervalTreeNode))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).rb) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(IntervalTreeNode),
+            "::",
+            stringify!(rb)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).start) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(IntervalTreeNode),
+            "::",
+            stringify!(start)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).last) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(IntervalTreeNode),
+            "::",
+            stringify!(last)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).subtree_last) as usize - ptr as usize },
+        40usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(IntervalTreeNode),
+            "::",
+            stringify!(subtree_last)
+        )
+    );
+}
+impl Default for IntervalTreeNode {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct tb_tc {
+    pub ptr: *const ::std::os::raw::c_void,
+    pub size: usize,
+}
+#[test]
+fn bindgen_test_layout_tb_tc() {
+    const UNINIT: ::std::mem::MaybeUninit<tb_tc> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<tb_tc>(),
+        16usize,
+        concat!("Size of: ", stringify!(tb_tc))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<tb_tc>(),
+        8usize,
+        concat!("Alignment of ", stringify!(tb_tc))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).ptr) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(tb_tc),
+            "::",
+            stringify!(ptr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).size) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(tb_tc),
+            "::",
+            stringify!(size)
+        )
+    );
+}
+impl Default for tb_tc {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct TranslationBlock {
+    pub pc: vaddr,
+    pub cs_base: u64,
+    pub flags: u32,
+    pub cflags: u32,
+    pub size: u16,
+    pub icount: u16,
+    pub tc: tb_tc,
+    pub itree: IntervalTreeNode,
+    pub jmp_lock: QemuSpin,
+    pub jmp_reset_offset: [u16; 2usize],
+    pub jmp_insn_offset: [u16; 2usize],
+    pub jmp_target_addr: [usize; 2usize],
+    pub jmp_list_head: usize,
+    pub jmp_list_next: [usize; 2usize],
+    pub jmp_dest: [usize; 2usize],
+}
+#[test]
+fn bindgen_test_layout_TranslationBlock() {
+    const UNINIT: ::std::mem::MaybeUninit<TranslationBlock> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<TranslationBlock>(),
+        168usize,
+        concat!("Size of: ", stringify!(TranslationBlock))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<TranslationBlock>(),
+        8usize,
+        concat!("Alignment of ", stringify!(TranslationBlock))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).pc) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(pc)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cs_base) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(cs_base)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).flags) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(flags)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cflags) as usize - ptr as usize },
+        20usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(cflags)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).size) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(size)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).icount) as usize - ptr as usize },
+        26usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(icount)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).tc) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(tc)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).itree) as usize - ptr as usize },
+        48usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(itree)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).jmp_lock) as usize - ptr as usize },
+        96usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(jmp_lock)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).jmp_reset_offset) as usize - ptr as usize },
+        100usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(jmp_reset_offset)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).jmp_insn_offset) as usize - ptr as usize },
+        104usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(jmp_insn_offset)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).jmp_target_addr) as usize - ptr as usize },
+        112usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(jmp_target_addr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).jmp_list_head) as usize - ptr as usize },
+        128usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(jmp_list_head)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).jmp_list_next) as usize - ptr as usize },
+        136usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(jmp_list_next)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).jmp_dest) as usize - ptr as usize },
+        152usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TranslationBlock),
+            "::",
+            stringify!(jmp_dest)
+        )
+    );
+}
+impl Default for TranslationBlock {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
 extern "C" {
     pub fn target_mprotect(
         start: abi_ulong,
@@ -11652,6 +12028,258 @@ extern "C" {
 }
 extern "C" {
     pub fn target_munmap(start: abi_ulong, len: abi_ulong) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_breakpoint_invalidate(cpu: *mut CPUState, pc: target_ulong);
+}
+extern "C" {
+    pub fn libafl_qemu_set_breakpoint(pc: target_ulong) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_breakpoint(pc: target_ulong) -> ::std::os::raw::c_int;
+}
+pub const libafl_exit_reason_kind_BREAKPOINT: libafl_exit_reason_kind = libafl_exit_reason_kind(0);
+pub const libafl_exit_reason_kind_SYNC_BACKDOOR: libafl_exit_reason_kind =
+    libafl_exit_reason_kind(1);
+impl ::std::ops::BitOr<libafl_exit_reason_kind> for libafl_exit_reason_kind {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        libafl_exit_reason_kind(self.0 | other.0)
+    }
+}
+impl ::std::ops::BitOrAssign for libafl_exit_reason_kind {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: libafl_exit_reason_kind) {
+        self.0 |= rhs.0;
+    }
+}
+impl ::std::ops::BitAnd<libafl_exit_reason_kind> for libafl_exit_reason_kind {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, other: Self) -> Self {
+        libafl_exit_reason_kind(self.0 & other.0)
+    }
+}
+impl ::std::ops::BitAndAssign for libafl_exit_reason_kind {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: libafl_exit_reason_kind) {
+        self.0 &= rhs.0;
+    }
+}
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct libafl_exit_reason_kind(pub ::std::os::raw::c_uint);
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct libafl_exit_reason_breakpoint {
+    pub addr: target_ulong,
+}
+#[test]
+fn bindgen_test_layout_libafl_exit_reason_breakpoint() {
+    const UNINIT: ::std::mem::MaybeUninit<libafl_exit_reason_breakpoint> =
+        ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<libafl_exit_reason_breakpoint>(),
+        8usize,
+        concat!("Size of: ", stringify!(libafl_exit_reason_breakpoint))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<libafl_exit_reason_breakpoint>(),
+        8usize,
+        concat!("Alignment of ", stringify!(libafl_exit_reason_breakpoint))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).addr) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_exit_reason_breakpoint),
+            "::",
+            stringify!(addr)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct libafl_exit_reason_sync_backdoor {}
+#[test]
+fn bindgen_test_layout_libafl_exit_reason_sync_backdoor() {
+    assert_eq!(
+        ::std::mem::size_of::<libafl_exit_reason_sync_backdoor>(),
+        0usize,
+        concat!("Size of: ", stringify!(libafl_exit_reason_sync_backdoor))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<libafl_exit_reason_sync_backdoor>(),
+        1usize,
+        concat!(
+            "Alignment of ",
+            stringify!(libafl_exit_reason_sync_backdoor)
+        )
+    );
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct libafl_exit_reason {
+    pub kind: libafl_exit_reason_kind,
+    pub cpu: *mut CPUState,
+    pub next_pc: vaddr,
+    pub data: libafl_exit_reason__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union libafl_exit_reason__bindgen_ty_1 {
+    pub breakpoint: libafl_exit_reason_breakpoint,
+    pub backdoor: libafl_exit_reason_sync_backdoor,
+}
+#[test]
+fn bindgen_test_layout_libafl_exit_reason__bindgen_ty_1() {
+    const UNINIT: ::std::mem::MaybeUninit<libafl_exit_reason__bindgen_ty_1> =
+        ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<libafl_exit_reason__bindgen_ty_1>(),
+        8usize,
+        concat!("Size of: ", stringify!(libafl_exit_reason__bindgen_ty_1))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<libafl_exit_reason__bindgen_ty_1>(),
+        8usize,
+        concat!(
+            "Alignment of ",
+            stringify!(libafl_exit_reason__bindgen_ty_1)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).breakpoint) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_exit_reason__bindgen_ty_1),
+            "::",
+            stringify!(breakpoint)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).backdoor) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_exit_reason__bindgen_ty_1),
+            "::",
+            stringify!(backdoor)
+        )
+    );
+}
+impl Default for libafl_exit_reason__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ::std::fmt::Debug for libafl_exit_reason__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "libafl_exit_reason__bindgen_ty_1 {{ union }}")
+    }
+}
+#[test]
+fn bindgen_test_layout_libafl_exit_reason() {
+    const UNINIT: ::std::mem::MaybeUninit<libafl_exit_reason> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<libafl_exit_reason>(),
+        32usize,
+        concat!("Size of: ", stringify!(libafl_exit_reason))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<libafl_exit_reason>(),
+        8usize,
+        concat!("Alignment of ", stringify!(libafl_exit_reason))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).kind) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_exit_reason),
+            "::",
+            stringify!(kind)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).cpu) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_exit_reason),
+            "::",
+            stringify!(cpu)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).next_pc) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_exit_reason),
+            "::",
+            stringify!(next_pc)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).data) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_exit_reason),
+            "::",
+            stringify!(data)
+        )
+    );
+}
+impl Default for libafl_exit_reason {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl ::std::fmt::Debug for libafl_exit_reason {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(
+            f,
+            "libafl_exit_reason {{ kind: {:?}, cpu: {:?}, data: {:?} }}",
+            self.kind, self.cpu, self.data
+        )
+    }
+}
+extern "C" {
+    pub fn libafl_last_exit_cpu() -> *mut CPUState;
+}
+extern "C" {
+    pub fn libafl_exit_signal_vm_start();
+}
+extern "C" {
+    pub fn libafl_exit_asap() -> bool;
+}
+extern "C" {
+    pub fn libafl_sync_exit_cpu();
+}
+extern "C" {
+    pub fn libafl_exit_request_sync_backdoor(cpu: *mut CPUState, pc: target_ulong);
+}
+extern "C" {
+    pub fn libafl_exit_request_breakpoint(cpu: *mut CPUState, pc: target_ulong);
+}
+extern "C" {
+    pub fn libafl_get_exit_reason() -> *mut libafl_exit_reason;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -11772,6 +12400,815 @@ extern "C" {
     #[doc = " qemu_plugin_hwaddr_phys_addr() - query physical address for memory operation\n @haddr: address handle from qemu_plugin_get_hwaddr()\n\n Returns the physical address associated with the memory operation\n\n Note that the returned physical address may not be unique if you are dealing\n with multiple address spaces."]
     pub fn qemu_plugin_hwaddr_phys_addr(haddr: *const qemu_plugin_hwaddr) -> u64;
 }
+pub const TCGReg_TCG_REG_EAX: TCGReg = TCGReg(0);
+pub const TCGReg_TCG_REG_ECX: TCGReg = TCGReg(1);
+pub const TCGReg_TCG_REG_EDX: TCGReg = TCGReg(2);
+pub const TCGReg_TCG_REG_EBX: TCGReg = TCGReg(3);
+pub const TCGReg_TCG_REG_ESP: TCGReg = TCGReg(4);
+pub const TCGReg_TCG_REG_EBP: TCGReg = TCGReg(5);
+pub const TCGReg_TCG_REG_ESI: TCGReg = TCGReg(6);
+pub const TCGReg_TCG_REG_EDI: TCGReg = TCGReg(7);
+pub const TCGReg_TCG_REG_R8: TCGReg = TCGReg(8);
+pub const TCGReg_TCG_REG_R9: TCGReg = TCGReg(9);
+pub const TCGReg_TCG_REG_R10: TCGReg = TCGReg(10);
+pub const TCGReg_TCG_REG_R11: TCGReg = TCGReg(11);
+pub const TCGReg_TCG_REG_R12: TCGReg = TCGReg(12);
+pub const TCGReg_TCG_REG_R13: TCGReg = TCGReg(13);
+pub const TCGReg_TCG_REG_R14: TCGReg = TCGReg(14);
+pub const TCGReg_TCG_REG_R15: TCGReg = TCGReg(15);
+pub const TCGReg_TCG_REG_XMM0: TCGReg = TCGReg(16);
+pub const TCGReg_TCG_REG_XMM1: TCGReg = TCGReg(17);
+pub const TCGReg_TCG_REG_XMM2: TCGReg = TCGReg(18);
+pub const TCGReg_TCG_REG_XMM3: TCGReg = TCGReg(19);
+pub const TCGReg_TCG_REG_XMM4: TCGReg = TCGReg(20);
+pub const TCGReg_TCG_REG_XMM5: TCGReg = TCGReg(21);
+pub const TCGReg_TCG_REG_XMM6: TCGReg = TCGReg(22);
+pub const TCGReg_TCG_REG_XMM7: TCGReg = TCGReg(23);
+pub const TCGReg_TCG_REG_XMM8: TCGReg = TCGReg(24);
+pub const TCGReg_TCG_REG_XMM9: TCGReg = TCGReg(25);
+pub const TCGReg_TCG_REG_XMM10: TCGReg = TCGReg(26);
+pub const TCGReg_TCG_REG_XMM11: TCGReg = TCGReg(27);
+pub const TCGReg_TCG_REG_XMM12: TCGReg = TCGReg(28);
+pub const TCGReg_TCG_REG_XMM13: TCGReg = TCGReg(29);
+pub const TCGReg_TCG_REG_XMM14: TCGReg = TCGReg(30);
+pub const TCGReg_TCG_REG_XMM15: TCGReg = TCGReg(31);
+pub const TCGReg_TCG_REG_RAX: TCGReg = TCGReg(0);
+pub const TCGReg_TCG_REG_RCX: TCGReg = TCGReg(1);
+pub const TCGReg_TCG_REG_RDX: TCGReg = TCGReg(2);
+pub const TCGReg_TCG_REG_RBX: TCGReg = TCGReg(3);
+pub const TCGReg_TCG_REG_RSP: TCGReg = TCGReg(4);
+pub const TCGReg_TCG_REG_RBP: TCGReg = TCGReg(5);
+pub const TCGReg_TCG_REG_RSI: TCGReg = TCGReg(6);
+pub const TCGReg_TCG_REG_RDI: TCGReg = TCGReg(7);
+pub const TCGReg_TCG_AREG0: TCGReg = TCGReg(5);
+pub const TCGReg_TCG_REG_CALL_STACK: TCGReg = TCGReg(4);
+impl ::std::ops::BitOr<TCGReg> for TCGReg {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        TCGReg(self.0 | other.0)
+    }
+}
+impl ::std::ops::BitOrAssign for TCGReg {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: TCGReg) {
+        self.0 |= rhs.0;
+    }
+}
+impl ::std::ops::BitAnd<TCGReg> for TCGReg {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, other: Self) -> Self {
+        TCGReg(self.0 & other.0)
+    }
+}
+impl ::std::ops::BitAndAssign for TCGReg {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: TCGReg) {
+        self.0 &= rhs.0;
+    }
+}
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct TCGReg(pub ::std::os::raw::c_uint);
+pub const TCGType_TCG_TYPE_I32: TCGType = TCGType(0);
+pub const TCGType_TCG_TYPE_I64: TCGType = TCGType(1);
+pub const TCGType_TCG_TYPE_I128: TCGType = TCGType(2);
+pub const TCGType_TCG_TYPE_V64: TCGType = TCGType(3);
+pub const TCGType_TCG_TYPE_V128: TCGType = TCGType(4);
+pub const TCGType_TCG_TYPE_V256: TCGType = TCGType(5);
+pub const TCGType_TCG_TYPE_REG: TCGType = TCGType(1);
+pub const TCGType_TCG_TYPE_PTR: TCGType = TCGType(1);
+impl ::std::ops::BitOr<TCGType> for TCGType {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        TCGType(self.0 | other.0)
+    }
+}
+impl ::std::ops::BitOrAssign for TCGType {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: TCGType) {
+        self.0 |= rhs.0;
+    }
+}
+impl ::std::ops::BitAnd<TCGType> for TCGType {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, other: Self) -> Self {
+        TCGType(self.0 & other.0)
+    }
+}
+impl ::std::ops::BitAndAssign for TCGType {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: TCGType) {
+        self.0 &= rhs.0;
+    }
+}
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct TCGType(pub ::std::os::raw::c_uint);
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct TCGv_i64_d {
+    _unused: [u8; 0],
+}
+pub type TCGv_i64 = *mut TCGv_i64_d;
+pub const TCGTempVal_TEMP_VAL_DEAD: TCGTempVal = TCGTempVal(0);
+pub const TCGTempVal_TEMP_VAL_REG: TCGTempVal = TCGTempVal(1);
+pub const TCGTempVal_TEMP_VAL_MEM: TCGTempVal = TCGTempVal(2);
+pub const TCGTempVal_TEMP_VAL_CONST: TCGTempVal = TCGTempVal(3);
+impl ::std::ops::BitOr<TCGTempVal> for TCGTempVal {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        TCGTempVal(self.0 | other.0)
+    }
+}
+impl ::std::ops::BitOrAssign for TCGTempVal {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: TCGTempVal) {
+        self.0 |= rhs.0;
+    }
+}
+impl ::std::ops::BitAnd<TCGTempVal> for TCGTempVal {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, other: Self) -> Self {
+        TCGTempVal(self.0 & other.0)
+    }
+}
+impl ::std::ops::BitAndAssign for TCGTempVal {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: TCGTempVal) {
+        self.0 &= rhs.0;
+    }
+}
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct TCGTempVal(pub ::std::os::raw::c_uint);
+pub const TCGTempKind_TEMP_EBB: TCGTempKind = TCGTempKind(0);
+pub const TCGTempKind_TEMP_TB: TCGTempKind = TCGTempKind(1);
+pub const TCGTempKind_TEMP_GLOBAL: TCGTempKind = TCGTempKind(2);
+pub const TCGTempKind_TEMP_FIXED: TCGTempKind = TCGTempKind(3);
+pub const TCGTempKind_TEMP_CONST: TCGTempKind = TCGTempKind(4);
+impl ::std::ops::BitOr<TCGTempKind> for TCGTempKind {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        TCGTempKind(self.0 | other.0)
+    }
+}
+impl ::std::ops::BitOrAssign for TCGTempKind {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: TCGTempKind) {
+        self.0 |= rhs.0;
+    }
+}
+impl ::std::ops::BitAnd<TCGTempKind> for TCGTempKind {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, other: Self) -> Self {
+        TCGTempKind(self.0 & other.0)
+    }
+}
+impl ::std::ops::BitAndAssign for TCGTempKind {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: TCGTempKind) {
+        self.0 &= rhs.0;
+    }
+}
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct TCGTempKind(pub ::std::os::raw::c_uint);
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct TCGTemp {
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 6usize]>,
+    pub val: i64,
+    pub mem_base: *mut TCGTemp,
+    pub mem_offset: isize,
+    pub name: *const ::std::os::raw::c_char,
+    pub state: usize,
+    pub state_ptr: *mut ::std::os::raw::c_void,
+}
+#[test]
+fn bindgen_test_layout_TCGTemp() {
+    const UNINIT: ::std::mem::MaybeUninit<TCGTemp> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<TCGTemp>(),
+        56usize,
+        concat!("Size of: ", stringify!(TCGTemp))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<TCGTemp>(),
+        8usize,
+        concat!("Alignment of ", stringify!(TCGTemp))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).val) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TCGTemp),
+            "::",
+            stringify!(val)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mem_base) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TCGTemp),
+            "::",
+            stringify!(mem_base)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).mem_offset) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TCGTemp),
+            "::",
+            stringify!(mem_offset)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TCGTemp),
+            "::",
+            stringify!(name)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).state) as usize - ptr as usize },
+        40usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TCGTemp),
+            "::",
+            stringify!(state)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).state_ptr) as usize - ptr as usize },
+        48usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TCGTemp),
+            "::",
+            stringify!(state_ptr)
+        )
+    );
+}
+impl Default for TCGTemp {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl TCGTemp {
+    #[inline]
+    pub fn reg(&self) -> TCGReg {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_reg(&mut self, val: TCGReg) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(0usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn val_type(&self) -> TCGTempVal {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(8usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_val_type(&mut self, val: TCGTempVal) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(8usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn base_type(&self) -> TCGType {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(16usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_base_type(&mut self, val: TCGType) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(16usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn type_(&self) -> TCGType {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(24usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_type(&mut self, val: TCGType) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(24usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn kind(&self) -> TCGTempKind {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(32usize, 3u8) as u32) }
+    }
+    #[inline]
+    pub fn set_kind(&mut self, val: TCGTempKind) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(32usize, 3u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn indirect_reg(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(35usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_indirect_reg(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(35usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn indirect_base(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(36usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_indirect_base(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(36usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn mem_coherent(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(37usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_mem_coherent(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(37usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn mem_allocated(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(38usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_mem_allocated(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(38usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn temp_allocated(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(39usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_temp_allocated(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(39usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn temp_subindex(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(40usize, 1u8) as u32) }
+    }
+    #[inline]
+    pub fn set_temp_subindex(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(40usize, 1u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(
+        reg: TCGReg,
+        val_type: TCGTempVal,
+        base_type: TCGType,
+        type_: TCGType,
+        kind: TCGTempKind,
+        indirect_reg: ::std::os::raw::c_uint,
+        indirect_base: ::std::os::raw::c_uint,
+        mem_coherent: ::std::os::raw::c_uint,
+        mem_allocated: ::std::os::raw::c_uint,
+        temp_allocated: ::std::os::raw::c_uint,
+        temp_subindex: ::std::os::raw::c_uint,
+    ) -> __BindgenBitfieldUnit<[u8; 6usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 6usize]> = Default::default();
+        __bindgen_bitfield_unit.set(0usize, 8u8, {
+            let reg: u32 = unsafe { ::std::mem::transmute(reg) };
+            reg as u64
+        });
+        __bindgen_bitfield_unit.set(8usize, 8u8, {
+            let val_type: u32 = unsafe { ::std::mem::transmute(val_type) };
+            val_type as u64
+        });
+        __bindgen_bitfield_unit.set(16usize, 8u8, {
+            let base_type: u32 = unsafe { ::std::mem::transmute(base_type) };
+            base_type as u64
+        });
+        __bindgen_bitfield_unit.set(24usize, 8u8, {
+            let type_: u32 = unsafe { ::std::mem::transmute(type_) };
+            type_ as u64
+        });
+        __bindgen_bitfield_unit.set(32usize, 3u8, {
+            let kind: u32 = unsafe { ::std::mem::transmute(kind) };
+            kind as u64
+        });
+        __bindgen_bitfield_unit.set(35usize, 1u8, {
+            let indirect_reg: u32 = unsafe { ::std::mem::transmute(indirect_reg) };
+            indirect_reg as u64
+        });
+        __bindgen_bitfield_unit.set(36usize, 1u8, {
+            let indirect_base: u32 = unsafe { ::std::mem::transmute(indirect_base) };
+            indirect_base as u64
+        });
+        __bindgen_bitfield_unit.set(37usize, 1u8, {
+            let mem_coherent: u32 = unsafe { ::std::mem::transmute(mem_coherent) };
+            mem_coherent as u64
+        });
+        __bindgen_bitfield_unit.set(38usize, 1u8, {
+            let mem_allocated: u32 = unsafe { ::std::mem::transmute(mem_allocated) };
+            mem_allocated as u64
+        });
+        __bindgen_bitfield_unit.set(39usize, 1u8, {
+            let temp_allocated: u32 = unsafe { ::std::mem::transmute(temp_allocated) };
+            temp_allocated as u64
+        });
+        __bindgen_bitfield_unit.set(40usize, 1u8, {
+            let temp_subindex: u32 = unsafe { ::std::mem::transmute(temp_subindex) };
+            temp_subindex as u64
+        });
+        __bindgen_bitfield_unit
+    }
+}
+pub const TCGCallReturnKind_TCG_CALL_RET_NORMAL: TCGCallReturnKind = TCGCallReturnKind(0);
+pub const TCGCallReturnKind_TCG_CALL_RET_BY_REF: TCGCallReturnKind = TCGCallReturnKind(1);
+pub const TCGCallReturnKind_TCG_CALL_RET_BY_VEC: TCGCallReturnKind = TCGCallReturnKind(2);
+impl ::std::ops::BitOr<TCGCallReturnKind> for TCGCallReturnKind {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        TCGCallReturnKind(self.0 | other.0)
+    }
+}
+impl ::std::ops::BitOrAssign for TCGCallReturnKind {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: TCGCallReturnKind) {
+        self.0 |= rhs.0;
+    }
+}
+impl ::std::ops::BitAnd<TCGCallReturnKind> for TCGCallReturnKind {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, other: Self) -> Self {
+        TCGCallReturnKind(self.0 & other.0)
+    }
+}
+impl ::std::ops::BitAndAssign for TCGCallReturnKind {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: TCGCallReturnKind) {
+        self.0 &= rhs.0;
+    }
+}
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct TCGCallReturnKind(pub ::std::os::raw::c_uint);
+pub const TCGCallArgumentKind_TCG_CALL_ARG_NORMAL: TCGCallArgumentKind = TCGCallArgumentKind(0);
+pub const TCGCallArgumentKind_TCG_CALL_ARG_EVEN: TCGCallArgumentKind = TCGCallArgumentKind(1);
+pub const TCGCallArgumentKind_TCG_CALL_ARG_EXTEND: TCGCallArgumentKind = TCGCallArgumentKind(2);
+pub const TCGCallArgumentKind_TCG_CALL_ARG_EXTEND_U: TCGCallArgumentKind = TCGCallArgumentKind(3);
+pub const TCGCallArgumentKind_TCG_CALL_ARG_EXTEND_S: TCGCallArgumentKind = TCGCallArgumentKind(4);
+pub const TCGCallArgumentKind_TCG_CALL_ARG_BY_REF: TCGCallArgumentKind = TCGCallArgumentKind(5);
+pub const TCGCallArgumentKind_TCG_CALL_ARG_BY_REF_N: TCGCallArgumentKind = TCGCallArgumentKind(6);
+impl ::std::ops::BitOr<TCGCallArgumentKind> for TCGCallArgumentKind {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        TCGCallArgumentKind(self.0 | other.0)
+    }
+}
+impl ::std::ops::BitOrAssign for TCGCallArgumentKind {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: TCGCallArgumentKind) {
+        self.0 |= rhs.0;
+    }
+}
+impl ::std::ops::BitAnd<TCGCallArgumentKind> for TCGCallArgumentKind {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, other: Self) -> Self {
+        TCGCallArgumentKind(self.0 & other.0)
+    }
+}
+impl ::std::ops::BitAndAssign for TCGCallArgumentKind {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: TCGCallArgumentKind) {
+        self.0 &= rhs.0;
+    }
+}
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct TCGCallArgumentKind(pub ::std::os::raw::c_uint);
+#[repr(C)]
+#[repr(align(4))]
+#[derive(Debug, Copy, Clone)]
+pub struct TCGCallArgumentLoc {
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
+}
+#[test]
+fn bindgen_test_layout_TCGCallArgumentLoc() {
+    assert_eq!(
+        ::std::mem::size_of::<TCGCallArgumentLoc>(),
+        4usize,
+        concat!("Size of: ", stringify!(TCGCallArgumentLoc))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<TCGCallArgumentLoc>(),
+        4usize,
+        concat!("Alignment of ", stringify!(TCGCallArgumentLoc))
+    );
+}
+impl Default for TCGCallArgumentLoc {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl TCGCallArgumentLoc {
+    #[inline]
+    pub fn kind(&self) -> TCGCallArgumentKind {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_kind(&mut self, val: TCGCallArgumentKind) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(0usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn arg_slot(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(8usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_arg_slot(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(8usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn ref_slot(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(16usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_ref_slot(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(16usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn arg_idx(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(24usize, 4u8) as u32) }
+    }
+    #[inline]
+    pub fn set_arg_idx(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(24usize, 4u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn tmp_subindex(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(28usize, 2u8) as u32) }
+    }
+    #[inline]
+    pub fn set_tmp_subindex(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(28usize, 2u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(
+        kind: TCGCallArgumentKind,
+        arg_slot: ::std::os::raw::c_uint,
+        ref_slot: ::std::os::raw::c_uint,
+        arg_idx: ::std::os::raw::c_uint,
+        tmp_subindex: ::std::os::raw::c_uint,
+    ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        __bindgen_bitfield_unit.set(0usize, 8u8, {
+            let kind: u32 = unsafe { ::std::mem::transmute(kind) };
+            kind as u64
+        });
+        __bindgen_bitfield_unit.set(8usize, 8u8, {
+            let arg_slot: u32 = unsafe { ::std::mem::transmute(arg_slot) };
+            arg_slot as u64
+        });
+        __bindgen_bitfield_unit.set(16usize, 8u8, {
+            let ref_slot: u32 = unsafe { ::std::mem::transmute(ref_slot) };
+            ref_slot as u64
+        });
+        __bindgen_bitfield_unit.set(24usize, 4u8, {
+            let arg_idx: u32 = unsafe { ::std::mem::transmute(arg_idx) };
+            arg_idx as u64
+        });
+        __bindgen_bitfield_unit.set(28usize, 2u8, {
+            let tmp_subindex: u32 = unsafe { ::std::mem::transmute(tmp_subindex) };
+            tmp_subindex as u64
+        });
+        __bindgen_bitfield_unit
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct TCGHelperInfo {
+    pub func: *mut ::std::os::raw::c_void,
+    pub name: *const ::std::os::raw::c_char,
+    pub init: usize,
+    pub _bitfield_align_1: [u32; 0],
+    pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
+    pub in_: [TCGCallArgumentLoc; 14usize],
+}
+#[test]
+fn bindgen_test_layout_TCGHelperInfo() {
+    const UNINIT: ::std::mem::MaybeUninit<TCGHelperInfo> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<TCGHelperInfo>(),
+        88usize,
+        concat!("Size of: ", stringify!(TCGHelperInfo))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<TCGHelperInfo>(),
+        8usize,
+        concat!("Alignment of ", stringify!(TCGHelperInfo))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).func) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TCGHelperInfo),
+            "::",
+            stringify!(func)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).name) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TCGHelperInfo),
+            "::",
+            stringify!(name)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).init) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TCGHelperInfo),
+            "::",
+            stringify!(init)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).in_) as usize - ptr as usize },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(TCGHelperInfo),
+            "::",
+            stringify!(in_)
+        )
+    );
+}
+impl Default for TCGHelperInfo {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl TCGHelperInfo {
+    #[inline]
+    pub fn typemask(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 32u8) as u32) }
+    }
+    #[inline]
+    pub fn set_typemask(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(0usize, 32u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn flags(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(32usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_flags(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(32usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn nr_in(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(40usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_nr_in(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(40usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn nr_out(&self) -> ::std::os::raw::c_uint {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(48usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_nr_out(&mut self, val: ::std::os::raw::c_uint) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(48usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn out_kind(&self) -> TCGCallReturnKind {
+        unsafe { ::std::mem::transmute(self._bitfield_1.get(56usize, 8u8) as u32) }
+    }
+    #[inline]
+    pub fn set_out_kind(&mut self, val: TCGCallReturnKind) {
+        unsafe {
+            let val: u32 = ::std::mem::transmute(val);
+            self._bitfield_1.set(56usize, 8u8, val as u64)
+        }
+    }
+    #[inline]
+    pub fn new_bitfield_1(
+        typemask: ::std::os::raw::c_uint,
+        flags: ::std::os::raw::c_uint,
+        nr_in: ::std::os::raw::c_uint,
+        nr_out: ::std::os::raw::c_uint,
+        out_kind: TCGCallReturnKind,
+    ) -> __BindgenBitfieldUnit<[u8; 8usize]> {
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 8usize]> = Default::default();
+        __bindgen_bitfield_unit.set(0usize, 32u8, {
+            let typemask: u32 = unsafe { ::std::mem::transmute(typemask) };
+            typemask as u64
+        });
+        __bindgen_bitfield_unit.set(32usize, 8u8, {
+            let flags: u32 = unsafe { ::std::mem::transmute(flags) };
+            flags as u64
+        });
+        __bindgen_bitfield_unit.set(40usize, 8u8, {
+            let nr_in: u32 = unsafe { ::std::mem::transmute(nr_in) };
+            nr_in as u64
+        });
+        __bindgen_bitfield_unit.set(48usize, 8u8, {
+            let nr_out: u32 = unsafe { ::std::mem::transmute(nr_out) };
+            nr_out as u64
+        });
+        __bindgen_bitfield_unit.set(56usize, 8u8, {
+            let out_kind: u32 = unsafe { ::std::mem::transmute(out_kind) };
+            out_kind as u64
+        });
+        __bindgen_bitfield_unit
+    }
+}
+pub type TCGv = TCGv_i64;
 #[doc = " struct qemu_plugin_hwaddr - opaque hw address handle"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -11854,6 +13291,327 @@ extern "C" {
         is_store: bool,
         data: *mut qemu_plugin_hwaddr,
     ) -> bool;
+}
+extern "C" {
+    pub fn libafl_gen_edge(
+        cpu: *mut CPUState,
+        src_block: target_ulong,
+        dst_block: target_ulong,
+        exit_n: ::std::os::raw::c_int,
+        cs_base: target_ulong,
+        flags: u32,
+        cflags: ::std::os::raw::c_int,
+    ) -> *mut TranslationBlock;
+}
+extern "C" {
+    pub fn libafl_gen_cmp(pc: target_ulong, op0: TCGv, op1: TCGv, ot: MemOp);
+}
+extern "C" {
+    pub fn libafl_gen_backdoor(pc: target_ulong);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct libafl_hook {
+    pub addr: target_ulong,
+    pub data: u64,
+    pub num: usize,
+    pub helper_info: TCGHelperInfo,
+    pub next: *mut libafl_hook,
+}
+#[test]
+fn bindgen_test_layout_libafl_hook() {
+    const UNINIT: ::std::mem::MaybeUninit<libafl_hook> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<libafl_hook>(),
+        120usize,
+        concat!("Size of: ", stringify!(libafl_hook))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<libafl_hook>(),
+        8usize,
+        concat!("Alignment of ", stringify!(libafl_hook))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).addr) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_hook),
+            "::",
+            stringify!(addr)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).data) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_hook),
+            "::",
+            stringify!(data)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).num) as usize - ptr as usize },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_hook),
+            "::",
+            stringify!(num)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).helper_info) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_hook),
+            "::",
+            stringify!(helper_info)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).next) as usize - ptr as usize },
+        112usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(libafl_hook),
+            "::",
+            stringify!(next)
+        )
+    );
+}
+impl Default for libafl_hook {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+extern "C" {
+    pub fn libafl_qemu_set_hook(
+        pc: target_ulong,
+        callback: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong)>,
+        data: u64,
+        invalidate: ::std::os::raw::c_int,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_hooks_at(
+        addr: target_ulong,
+        invalidate: ::std::os::raw::c_int,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_hook(
+        num: usize,
+        invalidate: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_search_hook(addr: target_ulong) -> *mut libafl_hook;
+}
+extern "C" {
+    pub fn libafl_add_backdoor_hook(
+        exec: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong)>,
+        data: u64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_backdoor_hook(
+        num: usize,
+        invalidate: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_add_edge_hook(
+        gen: ::std::option::Option<
+            extern "C" fn(data: u64, src: target_ulong, dst: target_ulong) -> u64,
+        >,
+        exec: ::std::option::Option<extern "C" fn(data: u64, id: u64)>,
+        data: u64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_edge_hook(
+        num: usize,
+        invalidate: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_add_block_hook(
+        gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong) -> u64>,
+        post_gen: ::std::option::Option<
+            extern "C" fn(data: u64, pc: target_ulong, block_length: target_ulong),
+        >,
+        exec: ::std::option::Option<extern "C" fn(data: u64, id: u64)>,
+        data: u64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_block_hook(
+        num: usize,
+        invalidate: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_add_read_hook(
+        gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong, oi: MemOpIdx) -> u64>,
+        exec1: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec2: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec4: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec8: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        execN: ::std::option::Option<
+            extern "C" fn(data: u64, id: u64, addr: target_ulong, size: usize),
+        >,
+        data: u64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_add_write_hook(
+        gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong, oi: MemOpIdx) -> u64>,
+        exec1: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec2: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec4: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec8: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        execN: ::std::option::Option<
+            extern "C" fn(data: u64, id: u64, addr: target_ulong, size: usize),
+        >,
+        data: u64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_read_hook(
+        num: usize,
+        invalidate: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_write_hook(
+        num: usize,
+        invalidate: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_gen_read(addr: *mut TCGTemp, oi: MemOpIdx);
+}
+extern "C" {
+    pub fn libafl_gen_write(addr: *mut TCGTemp, oi: MemOpIdx);
+}
+extern "C" {
+    pub fn libafl_add_cmp_hook(
+        gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong, size: usize) -> u64>,
+        exec1: ::std::option::Option<extern "C" fn(data: u64, id: u64, v0: u8, v1: u8)>,
+        exec2: ::std::option::Option<extern "C" fn(data: u64, id: u64, v0: u16, v1: u16)>,
+        exec4: ::std::option::Option<extern "C" fn(data: u64, id: u64, v0: u32, v1: u32)>,
+        exec8: ::std::option::Option<extern "C" fn(data: u64, id: u64, v0: u64, v1: u64)>,
+        data: u64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_cmp_hook(
+        num: usize,
+        invalidate: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct syshook_ret {
+    pub retval: target_ulong,
+    pub skip_syscall: bool,
+}
+#[test]
+fn bindgen_test_layout_syshook_ret() {
+    const UNINIT: ::std::mem::MaybeUninit<syshook_ret> = ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<syshook_ret>(),
+        16usize,
+        concat!("Size of: ", stringify!(syshook_ret))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<syshook_ret>(),
+        8usize,
+        concat!("Alignment of ", stringify!(syshook_ret))
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).retval) as usize - ptr as usize },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(syshook_ret),
+            "::",
+            stringify!(retval)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).skip_syscall) as usize - ptr as usize },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(syshook_ret),
+            "::",
+            stringify!(skip_syscall)
+        )
+    );
+}
+extern "C" {
+    pub fn libafl_add_pre_syscall_hook(
+        callback: ::std::option::Option<
+            unsafe extern "C" fn(
+                data: u64,
+                sys_num: ::std::os::raw::c_int,
+                arg0: target_ulong,
+                arg1: target_ulong,
+                arg2: target_ulong,
+                arg3: target_ulong,
+                arg4: target_ulong,
+                arg5: target_ulong,
+                arg6: target_ulong,
+                arg7: target_ulong,
+            ) -> syshook_ret,
+        >,
+        data: u64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_add_post_syscall_hook(
+        callback: ::std::option::Option<
+            unsafe extern "C" fn(
+                data: u64,
+                ret: target_ulong,
+                sys_num: ::std::os::raw::c_int,
+                arg0: target_ulong,
+                arg1: target_ulong,
+                arg2: target_ulong,
+                arg3: target_ulong,
+                arg4: target_ulong,
+                arg5: target_ulong,
+                arg6: target_ulong,
+                arg7: target_ulong,
+            ) -> target_ulong,
+        >,
+        data: u64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_pre_syscall_hook(num: usize) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_post_syscall_hook(num: usize) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn libafl_add_new_thread_hook(
+        callback: ::std::option::Option<extern "C" fn(data: u64, tid: u32) -> bool>,
+        data: u64,
+    ) -> usize;
+}
+extern "C" {
+    pub fn libafl_qemu_remove_new_thread_hook(num: usize) -> ::std::os::raw::c_int;
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
