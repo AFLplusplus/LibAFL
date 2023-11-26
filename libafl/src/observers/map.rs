@@ -83,7 +83,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
-pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug
+pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
@@ -1331,6 +1331,7 @@ where
             slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt)
         };
         // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
+        #[allow(clippy::unused_enumerate_index)]
         for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
             unsafe {
                 *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);

@@ -467,6 +467,23 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
+#[cfg(all(any(target_os = "linux", target_os = "android"), target_arch = "x86"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:#08x}, fault address: {:#08x}",
+        signal,
+        ucontext.uc_mcontext.gregs[libc::REG_EIP as usize],
+        ucontext.uc_mcontext.gregs[libc::REG_ERR as usize]
+    )?;
+
+    Ok(())
+}
+
 #[cfg(all(
     any(target_os = "linux", target_os = "android"),
     target_arch = "aarch64"
@@ -637,6 +654,21 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
+#[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:#016x}",
+        signal, ucontext.uc_mcontext.rip
+    )?;
+
+    Ok(())
+}
+
 #[cfg(not(any(
     target_vendor = "apple",
     target_os = "linux",
@@ -645,6 +677,7 @@ fn write_crash<W: Write>(
     target_os = "dragonfly",
     target_os = "openbsd",
     target_os = "netbsd",
+    target_os = "haiku",
     any(target_os = "solaris", target_os = "illumos"),
 )))]
 fn write_crash<W: Write>(
@@ -896,8 +929,12 @@ pub fn generate_minibsod<W: Write>(
     writeln!(writer, "{:━^100}", " CRASH ")?;
     if let Some(uctx) = ucontext {
         write_crash(writer, signal, uctx)?;
-        writeln!(writer, "{:━^100}", " REGISTERS ")?;
-        dump_registers(writer, uctx)?;
+
+        #[cfg(target_pointer_width = "64")]
+        {
+            writeln!(writer, "{:━^100}", " REGISTERS ")?;
+            dump_registers(writer, uctx)?;
+        }
     } else {
         writeln!(writer, "Received signal {signal}")?;
     }

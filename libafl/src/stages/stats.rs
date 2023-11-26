@@ -17,7 +17,10 @@ use crate::{
     Error,
 };
 #[cfg(feature = "std")]
-use crate::{events::Event, monitors::UserStats};
+use crate::{
+    events::Event,
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
+};
 
 /// The [`AflStatsStage`] is a simple stage that computes and reports some stats.
 #[derive(Debug, Clone)]
@@ -102,7 +105,10 @@ where
                     state,
                     Event::UpdateUserStats {
                         name: "AflStats".to_string(),
-                        value: UserStats::String(json.to_string()),
+                        value: UserStats::new(
+                            UserStatsValue::String(json.to_string()),
+                            AggregatorOps::None,
+                        ),
                         phantom: PhantomData,
                     },
                 )?;

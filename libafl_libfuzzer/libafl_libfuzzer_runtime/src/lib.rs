@@ -80,8 +80,11 @@ use libafl::{
 };
 use libafl_bolts::AsSlice;
 use libc::_exit;
+use mimalloc::MiMalloc;
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 mod corpus;
 mod feedbacks;
@@ -163,7 +166,8 @@ macro_rules! fuzz_with {
             mutators::{
                 GrimoireExtensionMutator, GrimoireRecursiveReplacementMutator, GrimoireRandomDeleteMutator,
                 GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
-                I2SRandReplace, StdScheduledMutator, Tokens, tokens_mutations
+                I2SRandReplace, StdScheduledMutator, StringCategoryRandMutator, StringSubcategoryRandMutator,
+                StringCategoryTokenReplaceMutator, StringSubcategoryTokenReplaceMutator, Tokens, tokens_mutations
             },
             observers::{stacktrace::BacktraceObserver, TimeObserver},
             schedulers::{
@@ -171,7 +175,7 @@ macro_rules! fuzz_with {
             },
             stages::{
                 CalibrationStage, GeneralizationStage, IfStage, StdMutationalStage,
-                StdPowerMutationalStage, TracingStage,
+                StdPowerMutationalStage, StringIdentificationStage, TracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
@@ -221,7 +225,7 @@ macro_rules! fuzz_with {
 
             // Set up a generalization stage for grimoire
             let generalization = GeneralizationStage::new(&edges_observer);
-            let generalization = IfStage::new(|_, _, _, _, _| Ok(grimoire.into()), (generalization, ()));
+            let generalization = IfStage::new(|_, _, _, _, _| Ok(grimoire.into()), tuple_list!(generalization));
 
             let calibration = CalibrationStage::new(&map_feedback);
 
@@ -292,6 +296,32 @@ macro_rules! fuzz_with {
                 .expect("Failed to create state")
             });
             state.metadata_map_mut().insert_boxed(grimoire_metadata);
+
+            // Set up a string category analysis stage for unicode mutations
+            let unicode_used = $options.unicode();
+            let string_mutator = StdScheduledMutator::new(
+                tuple_list!(
+                    StringCategoryRandMutator,
+                    StringSubcategoryRandMutator,
+                    StringSubcategoryRandMutator,
+                    StringSubcategoryRandMutator,
+                    StringSubcategoryRandMutator,
+                )
+            );
+            let string_replace_mutator = StdScheduledMutator::new(
+                tuple_list!(
+                    StringCategoryTokenReplaceMutator,
+                    StringSubcategoryTokenReplaceMutator,
+                    StringSubcategoryTokenReplaceMutator,
+                    StringSubcategoryTokenReplaceMutator,
+                    StringSubcategoryTokenReplaceMutator,
+                )
+            );
+            let string_power = StdMutationalStage::transforming(string_mutator);
+            let string_replace_power = StdMutationalStage::transforming(string_replace_mutator);
+
+            let string_analysis = StringIdentificationStage::new();
+            let string_analysis = IfStage::new(|_, _, _, _, _| Ok((unicode_used && mutator_status.std_mutational).into()), tuple_list!(string_analysis, string_power, string_replace_power));
 
             // Attempt to use tokens from libfuzzer dicts
             if !state.has_metadata::<Tokens>() {
@@ -463,6 +493,7 @@ macro_rules! fuzz_with {
                 calibration,
                 generalization,
                 tracing,
+                string_analysis,
                 i2s,
                 cm_i2s,
                 std_power,

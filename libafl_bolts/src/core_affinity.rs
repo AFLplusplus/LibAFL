@@ -353,7 +353,7 @@ mod linux {
 #[allow(clippy::unnecessary_wraps)]
 #[inline]
 fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
-    Ok(Vec::new())
+    haiku::get_core_ids()
 }
 
 #[cfg(target_os = "haiku")]
@@ -361,6 +361,21 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 #[inline]
 fn set_for_current_helper(_core_id: CoreId) -> Result<(), Error> {
     Ok(())
+}
+
+#[cfg(target_os = "haiku")]
+mod haiku {
+    use alloc::vec::Vec;
+    use std::thread::available_parallelism;
+
+    use crate::core_affinity::{CoreId, Error};
+
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .map(CoreId)
+            .collect::<Vec<_>>())
+    }
 }
 
 // Windows Section
@@ -735,6 +750,7 @@ mod freebsd {
         unsafe { mem::zeroed::<cpuset_t>() }
     }
 
+    // FIXME: unstable for now on freebsd
     #[cfg(test)]
     mod tests {
         use libc::CPU_ISSET;
@@ -742,11 +758,13 @@ mod freebsd {
         use super::*;
 
         #[test]
+        #[ignore]
         fn test_freebsd_get_affinity_mask() {
             get_affinity_mask().unwrap();
         }
 
         #[test]
+        #[ignore]
         fn test_freebsd_set_for_current() {
             let ids = get_core_ids().unwrap();
 

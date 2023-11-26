@@ -9,9 +9,12 @@ use alloc::{
 use core::ffi::c_void;
 #[cfg(all(unix, feature = "std"))]
 use core::ptr::write_volatile;
-#[cfg(feature = "std")]
-use core::sync::atomic::{compiler_fence, Ordering};
 use core::{fmt::Debug, marker::PhantomData};
+#[cfg(feature = "std")]
+use core::{
+    sync::atomic::{compiler_fence, Ordering},
+    time::Duration,
+};
 
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
@@ -28,12 +31,6 @@ use serde::{de::DeserializeOwned, Serialize};
 use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
 #[cfg(all(unix, feature = "std"))]
 use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
-#[cfg(feature = "std")]
-use crate::{
-    corpus::Corpus,
-    monitors::SimplePrintingMonitor,
-    state::{HasCorpus, HasSolutions},
-};
 use crate::{
     events::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
@@ -41,8 +38,13 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
     Error,
+};
+#[cfg(feature = "std")]
+use crate::{
+    monitors::{ClientStats, SimplePrintingMonitor},
+    state::{HasCorpus, HasSolutions},
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it
@@ -81,7 +83,7 @@ where
 
 impl<MT, S> UsesState for SimpleEventManager<MT, S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -89,7 +91,7 @@ where
 impl<MT, S> EventFirer for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: State,
 {
     fn fire(
         &mut self,
@@ -107,14 +109,14 @@ where
 impl<MT, S> EventRestarter for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: State,
 {
 }
 
 impl<E, MT, S, Z> EventProcessor<E, Z> for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: State,
 {
     fn process(
         &mut self,
@@ -133,14 +135,14 @@ where
 impl<E, MT, S, Z> EventManager<E, Z> for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasLastReportTime + HasMetadata,
+    S: State + HasExecutions + HasLastReportTime + HasMetadata,
 {
 }
 
 impl<MT, S> HasCustomBufHandlers for SimpleEventManager<MT, S>
 where
     MT: Monitor, //CE: CustomEvent<I, OT>,
-    S: UsesInput,
+    S: State,
 {
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
     fn add_custom_buf_handler(
@@ -156,7 +158,7 @@ where
 impl<MT, S> ProgressReporter for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
 {
 }
 
@@ -214,6 +216,7 @@ where
                 executions,
                 forward_id: _,
             } => {
+                monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_corpus_size(*corpus_size as u64);
@@ -229,6 +232,7 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
+                monitor.client_stats_insert(ClientId(0));
                 let client = monitor.client_stats_mut_for(ClientId(0));
 
                 client.update_executions(*executions as u64, *time);
@@ -241,9 +245,11 @@ where
                 value,
                 phantom: _,
             } => {
+                monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_user_stats(name.clone(), value.clone());
+                monitor.aggregate(name);
                 monitor.display(event.name().to_string(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
@@ -255,6 +261,7 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
+                monitor.client_stats_insert(ClientId(0));
                 let client = monitor.client_stats_mut_for(ClientId(0));
                 client.update_executions(*executions as u64, *time);
                 client.update_introspection_monitor((**introspection_monitor).clone());
@@ -262,6 +269,7 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
+                monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_objective_size(*objective_size as u64);
@@ -318,7 +326,7 @@ where
 #[cfg(feature = "std")]
 impl<MT, S, SP> UsesState for SimpleRestartingEventManager<MT, S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type State = S;
@@ -328,7 +336,7 @@ where
 impl<MT, S, SP> EventFirer for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     fn fire(
@@ -343,14 +351,19 @@ where
 #[cfg(feature = "std")]
 impl<MT, S, SP> EventRestarter for SimpleRestartingEventManager<MT, S, SP>
 where
-    S: UsesInput + Serialize,
+    MT: Monitor,
+    S: State,
     SP: ShMemProvider,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
-        self.staterestorer.save(state)
+        self.staterestorer.save(&(
+            state,
+            self.simple_event_mgr.monitor.start_time(),
+            self.simple_event_mgr.monitor.client_stats(),
+        ))
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
@@ -363,7 +376,7 @@ where
 impl<E, MT, S, SP, Z> EventProcessor<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + Serialize,
+    S: State + HasExecutions,
     SP: ShMemProvider,
 {
     fn process(
@@ -380,12 +393,7 @@ where
 impl<E, MT, S, SP, Z> EventManager<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + Serialize,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime + Serialize,
     SP: ShMemProvider,
 {
 }
@@ -394,7 +402,7 @@ where
 impl<MT, S, SP> HasCustomBufHandlers for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     fn add_custom_buf_handler(
@@ -409,7 +417,7 @@ where
 impl<MT, S, SP> ProgressReporter for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
 {
 }
@@ -539,7 +547,7 @@ where
         };
 
         // If we're restarting, deserialize the old state.
-        let (state, mgr) = match staterestorer.restore::<S>()? {
+        let (state, mgr) = match staterestorer.restore::<(S, Duration, Vec<ClientStats>)>()? {
             None => {
                 log::info!("First run. Let's set it all up");
                 // Mgr to send and receive msgs from/to all other fuzzer instances
@@ -549,15 +557,14 @@ where
                 )
             }
             // Restoring from a previous run, deserialize state and corpus.
-            Some(state) => {
+            Some((state, start_time, clients_stats)) => {
                 log::info!("Subsequent run. Loaded previous state.");
                 // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
                 staterestorer.reset();
 
-                // load the corpus size into monitor to still display the correct numbers after restart.
-                let client_stats = monitor.client_stats_mut_for(ClientId(0));
-                client_stats.update_corpus_size(state.corpus().count().try_into()?);
-                client_stats.update_objective_size(state.solutions().count().try_into()?);
+                // reload the state of the monitor to display the correct stats after restarts
+                monitor.set_start_time(start_time);
+                *monitor.client_stats_mut() = clients_stats;
 
                 (
                     Some(state),
@@ -579,6 +586,7 @@ where
 /// `SimpleEventManager` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
+#[allow(clippy::unnecessary_fallible_conversions)]
 pub mod pybind {
     use pyo3::prelude::*;
 

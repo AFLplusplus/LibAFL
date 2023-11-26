@@ -32,8 +32,8 @@ where
 
 impl<E, SOT> ShadowExecutor<E, SOT>
 where
-    E: HasObservers + Debug,
-    SOT: ObserversTuple<E::State> + Debug,
+    E: HasObservers,
+    SOT: ObserversTuple<E::State>,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
     pub fn new(executor: E, shadow_observers: SOT) -> Self {

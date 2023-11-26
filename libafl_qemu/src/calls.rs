@@ -12,15 +12,15 @@ use thread_local::ThreadLocal;
 use crate::{
     capstone,
     emu::{ArchExtras, Emulator},
-    helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
-    hooks::QemuHooks,
+    helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    hooks::{Hook, QemuHooks},
     GuestAddr,
 };
 
 pub trait CallTraceCollector: 'static + Debug {
     fn on_call<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
@@ -30,7 +30,7 @@ pub trait CallTraceCollector: 'static + Debug {
 
     fn on_ret<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         state: Option<&mut S>,
         pc: GuestAddr,
         ret_addr: GuestAddr,
@@ -61,7 +61,7 @@ pub trait CallTraceCollector: 'static + Debug {
 pub trait CallTraceCollectorTuple: 'static + MatchFirstType + Debug {
     fn on_call_all<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
@@ -71,7 +71,7 @@ pub trait CallTraceCollectorTuple: 'static + MatchFirstType + Debug {
 
     fn on_ret_all<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,
@@ -97,7 +97,7 @@ pub trait CallTraceCollectorTuple: 'static + MatchFirstType + Debug {
 impl CallTraceCollectorTuple for () {
     fn on_call_all<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         _call_len: usize,
@@ -109,7 +109,7 @@ impl CallTraceCollectorTuple for () {
 
     fn on_ret_all<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         _ret_addr: GuestAddr,
@@ -145,7 +145,7 @@ where
 {
     fn on_call_all<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         mut state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
@@ -167,7 +167,7 @@ where
 
     fn on_ret_all<QT, S>(
         &mut self,
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         mut state: Option<&mut S>,
         pc: GuestAddr,
         ret_addr: GuestAddr,
@@ -238,7 +238,7 @@ where
         self.filter.allowed(addr)
     }
 
-    fn on_ret<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, state: Option<&mut S>, pc: GuestAddr)
+    fn on_ret<QT, S>(hooks: &mut QemuHooks<QT, S>, state: Option<&mut S>, pc: GuestAddr)
     where
         S: UsesInput,
         QT: QemuHelperTuple<S>,
@@ -252,6 +252,9 @@ where
         } else {
             return;
         };
+        if collectors.is_none() {
+            return; // TODO fix this, it can be None on races ret
+        }
         collectors
             .as_mut()
             .unwrap()
@@ -264,7 +267,7 @@ where
     }
 
     fn gen_blocks_calls<QT, S>(
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
@@ -316,37 +319,38 @@ where
                         capstone::InsnGroupType::CS_GRP_CALL => {
                             let call_len = insn.bytes().len();
                             // TODO do not use a closure, find a more efficient way to pass call_len
-                            let call_cb = move |hooks: &mut QemuHooks<'_, QT, S>,
-                                                state: Option<&mut S>,
-                                                pc| {
-                                // eprintln!("CALL @ 0x{:#x}", pc + call_len);
-                                let mut collectors = if let Some(h) =
-                                    hooks.helpers_mut().match_first_type_mut::<Self>()
-                                {
-                                    h.collectors.take()
-                                } else {
-                                    return;
-                                };
-                                collectors
-                                    .as_mut()
-                                    .unwrap()
-                                    .on_call_all(hooks, state, pc, call_len);
-                                hooks
-                                    .helpers_mut()
-                                    .match_first_type_mut::<Self>()
-                                    .unwrap()
-                                    .collectors = collectors;
-                            };
-                            unsafe {
-                                hooks.instruction_closure(
-                                    insn.address() as GuestAddr,
-                                    Box::new(call_cb),
-                                    false,
-                                );
-                            }
+                            let call_cb = Box::new(
+                                move |hooks: &mut QemuHooks<QT, S>, state: Option<&mut S>, pc| {
+                                    // eprintln!("CALL @ 0x{:#x}", pc + call_len);
+                                    let mut collectors = if let Some(h) =
+                                        hooks.helpers_mut().match_first_type_mut::<Self>()
+                                    {
+                                        h.collectors.take()
+                                    } else {
+                                        return;
+                                    };
+                                    if collectors.is_none() {
+                                        return; // TODO fix this, it can be None on races ret
+                                    }
+                                    collectors
+                                        .as_mut()
+                                        .unwrap()
+                                        .on_call_all(hooks, state, pc, call_len);
+                                    hooks
+                                        .helpers_mut()
+                                        .match_first_type_mut::<Self>()
+                                        .unwrap()
+                                        .collectors = collectors;
+                                },
+                            );
+                            hooks.instruction_closure(insn.address() as GuestAddr, call_cb, false);
                         }
                         capstone::InsnGroupType::CS_GRP_RET => {
-                            hooks.instruction(insn.address() as GuestAddr, Self::on_ret, false);
+                            hooks.instruction_function(
+                                insn.address() as GuestAddr,
+                                Self::on_ret,
+                                false,
+                            );
                             break 'disasm;
                         }
                         capstone::InsnGroupType::CS_GRP_INVALID
@@ -376,16 +380,33 @@ where
     }
 }
 
+impl<T> HasInstrumentationFilter for QemuCallTracerHelper<T>
+where
+    T: CallTraceCollectorTuple,
+{
+    fn filter(&self) -> &QemuInstrumentationFilter {
+        &self.filter
+    }
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+        &mut self.filter
+    }
+}
+
 impl<S, T> QemuHelper<S> for QemuCallTracerHelper<T>
 where
     S: UsesInput,
     T: CallTraceCollectorTuple,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.blocks(Some(Self::gen_blocks_calls::<QT, S>), None, None);
+        hooks.blocks(
+            Hook::Function(Self::gen_blocks_calls::<QT, S>),
+            Hook::Empty,
+            Hook::Empty,
+        );
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, input: &S::Input) {
@@ -449,7 +470,7 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
     fn on_call<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
@@ -463,7 +484,7 @@ impl CallTraceCollector for OnCrashBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
     fn on_ret<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,
@@ -538,7 +559,7 @@ impl CallTraceCollector for FullBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
     fn on_call<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
@@ -555,7 +576,7 @@ impl CallTraceCollector for FullBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
     fn on_ret<QT, S>(
         &mut self,
-        _hooks: &mut QemuHooks<'_, QT, S>,
+        _hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,

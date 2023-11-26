@@ -15,11 +15,11 @@
 
 OUT_DIR     ?= .
 
-CFLAGS      += -Wno-int-to-void-pointer-cast -ggdb
-LDFLAGS     += -ldl -pthread
+override CFLAGS      += -Wno-int-to-void-pointer-cast -ggdb -O1 -fno-builtin
+override LDFLAGS     += -ldl -pthread
 
-SRC := libqasan.c hooks.c malloc.c string.c uninstrument.c patch.c dlmalloc.c
-HDR := libqasan.h
+SRC := libqasan.c hooks.c malloc.c string.c uninstrument.c patch.c dlmalloc.c printf/printf.c
+HDR := libqasan.h qasan.h map_macro.h printf/printf.h
 
 all: libqasan.so
 

@@ -1,6 +1,4 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
-//!
-//!
 #![no_std]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
@@ -122,9 +120,7 @@ pub mod windows_asan;
 #[cfg(all(windows, feature = "std", feture = "windows_asan"))]
 pub use windows_asan::*;
 
-#[cfg(feature = "forkserver")]
-#[cfg(unix)]
+#[cfg(all(unix, feature = "forkserver"))]
 pub mod forkserver;
-#[cfg(feature = "forkserver")]
-#[cfg(unix)]
+#[cfg(all(unix, feature = "forkserver"))]
 pub use forkserver::*;
