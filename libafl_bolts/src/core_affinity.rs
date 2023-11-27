@@ -916,7 +916,7 @@ mod solaris {
         let result = unsafe {
             libc::processor_bind(
                 libc::P_PID,
-                libc::PS_MYID,
+                libc::getpid(),
                 core_id.0.try_into().unwrap(),
                 std::ptr::null_mut(),
             )
