@@ -13443,6 +13443,12 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
+    pub fn libafl_qemu_edge_hook_set_jit(
+        num: usize,
+        jit: ::std::option::Option<unsafe extern "C" fn(arg1: u64, arg2: u64) -> usize>,
+    );
+}
+extern "C" {
     pub fn libafl_add_block_hook(
         gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong) -> u64>,
         post_gen: ::std::option::Option<
@@ -13614,7 +13620,10 @@ extern "C" {
     pub fn libafl_qemu_remove_new_thread_hook(num: usize) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn libafl_jit_trace_edge_hitcount(edges_map: *mut u8, id: u64);
+    pub fn libafl_jit_trace_edge_hitcount(data: u64, id: u64) -> usize;
+}
+extern "C" {
+    pub fn libafl_jit_trace_edge_single(data: u64, id: u64) -> usize;
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
