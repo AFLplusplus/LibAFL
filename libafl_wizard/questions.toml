@@ -119,8 +119,6 @@ previous = ""
     answer = "No"
     next = "crash/timeout"
     code = """
-    /* Your harness function */
-
     let mut executor = InProcessExecutor::new(
         &mut harness,
         tuple_list!(observer),

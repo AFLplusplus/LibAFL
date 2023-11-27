@@ -53,6 +53,7 @@ pub fn separate_code(code_content: Vec<String>) -> Vec<String> {
                 }
             }
 
+            // The end of the declaration of a component.
             if in_code_block && c == ';' {
                 in_code_block = false;
                 separated_code.push(current_line.trim().to_string());
@@ -60,7 +61,9 @@ pub fn separate_code(code_content: Vec<String>) -> Vec<String> {
             }
         }
 
-        separated_code.push(current_line.trim().to_string());
+        if !current_line.trim().to_string().is_empty() {
+            separated_code.push(current_line.trim().to_string());
+        }
     }
 
     separated_code
@@ -82,29 +85,27 @@ pub fn arrange_code(code_content: Vec<String>) -> Vec<String> {
         "Stage",
     ];
 
-    let mut ordered_code_content: Vec<String> = Vec::new();
-    let mut unmatched_lines: Vec<String> = Vec::new();
+    let mut ordered_code: Vec<String> = Vec::new();
+    let mut placed_code: Vec<bool> = vec![false; code_content.len()];
 
-    for code_line in code_content.iter() {
-        let mut matched = false;
-
-        for component in components.iter() {
-            if code_line.contains(component) {
-                ordered_code_content.push(code_line.to_string());
-                matched = true;
-                break;
+    for comp in components {
+        for (i, code_line) in code_content.iter().enumerate() {
+            if code_line.contains(comp) {
+                // Place in the correct order.
+                ordered_code.push(code_line.to_string());
+                placed_code[i] = true;
             }
-        }
-
-        if !matched {
-            unmatched_lines.push(code_line.to_string());
         }
     }
 
-    // Append unmatched lines at the end.
-    ordered_code_content.extend(unmatched_lines);
+    // Deals with cases where there is no definition of a component.
+    for (i, code_line) in code_content.iter().enumerate() {
+        if !placed_code[i] {
+            ordered_code.insert(i, code_line.to_string());
+        }
+    }
 
-    ordered_code_content
+    ordered_code
 }
 
 // Write Rust code in the file of the generated fuzzer.
@@ -136,24 +137,18 @@ pub fn write_code(code_content: Vec<String>) -> String {
         .write_all("use libafl::prelude::*;\n\nfn main() {".as_bytes())
         .expect("Failed to write to the fuzzer file.");
 
-    for (i, code) in code_content.iter().enumerate() {
+    for code in code_content.iter() {
         out_file
-            .write_all("\n".as_bytes())
+            .write_all("\n\n".as_bytes())
             .expect("Failed to write to the fuzzer file.");
 
         out_file
-            .write_all(code.as_bytes())
+            .write_all(&format!("{}{}", " ".repeat(4), code).as_bytes())
             .expect("Failed to write to the fuzzer file.");
-
-        if i < code_content.len() {
-            out_file
-                .write_all("\n\n".as_bytes())
-                .expect("Failed to write to the fuzzer file.");
-        }
     }
 
     out_file
-        .write_all("}".as_bytes())
+        .write_all("\n}".as_bytes())
         .expect("Failed to write to the fuzzer file.");
 
     file_name

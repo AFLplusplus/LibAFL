@@ -55,7 +55,7 @@ fn main() {
 
             // If the user chooses to undo a question that produced code, the associated code is removed.
             // Since the Undo option goes backwards, we can simply pop the last piece of code.
-            for ans in &questions[next_q].answers {
+            for ans in questions[next_q].answers.iter() {
                 if ans.was_chosen && !ans.code.is_empty() {
                     code_content.pop();
                 }

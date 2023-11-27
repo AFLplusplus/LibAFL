@@ -51,7 +51,7 @@ impl Question {
         output.push_str(&format!("{}\n\n", self.title));
         output.push_str(&format!("{}\n\n\t", self.content));
 
-        for ans in &self.answers {
+        for ans in self.answers.iter() {
             output.push_str(&format!("{}{}", ans.answer, " ".repeat(8)));
         }
 
@@ -66,7 +66,7 @@ impl Question {
             return false;
         }
 
-        for ans in &self.answers {
+        for ans in self.answers.iter() {
             if validate_input(&input, &ans.answer) {
                 return true;
             }
@@ -110,7 +110,7 @@ impl Question {
     }
 
     pub fn skip_questions(&self, questions: &mut Vec<Question>, ans_i: usize) {
-        for q_id in &self.answers[ans_i].skip {
+        for q_id in self.answers[ans_i].skip.iter() {
             let i = questions
                 .iter()
                 .position(|question| &question.id == q_id)
@@ -121,7 +121,7 @@ impl Question {
     }
 
     pub fn unskip_questions(&self, questions: &mut Vec<Question>, ans_i: usize) {
-        for q_id in &self.answers[ans_i].skip {
+        for q_id in self.answers[ans_i].skip.iter() {
             let i = questions
                 .iter()
                 .position(|question| &question.id == q_id)
@@ -197,7 +197,7 @@ pub fn flowchart_image(questions: &Vec<Question>) {
             }
             // Multiple answers that lead to distinct next questions.
             else {
-                for ans in &q.answers {
+                for ans in q.answers.iter() {
                     let j = questions
                         .iter()
                         .position(|question| question.id == ans.next)
