@@ -92,15 +92,29 @@ where
         QT: QemuHelperTuple<S>,
     {
         if self.use_hitcounts {
-            hooks.edges(
-                Hook::Function(gen_unique_edge_ids::<QT, S>),
-                Hook::Raw(trace_edge_hitcount),
-            );
+            // hooks.edges(
+            //     Hook::Function(gen_unique_edge_ids::<QT, S>),
+            //     Hook::Raw(trace_edge_hitcount),
+            // );
+            let hook_id = hooks.edges(Hook::Function(gen_unique_edge_ids::<QT, S>), Hook::Empty);
+            unsafe {
+                libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
+                    hook_id.0,
+                    Some(libafl_qemu_sys::libafl_jit_trace_edge_hitcount),
+                );
+            }
         } else {
-            hooks.edges(
-                Hook::Function(gen_unique_edge_ids::<QT, S>),
-                Hook::Raw(trace_edge_single),
-            );
+            // hooks.edges(
+            //     Hook::Function(gen_unique_edge_ids::<QT, S>),
+            //     Hook::Raw(trace_edge_single),
+            // );
+            let hook_id = hooks.edges(Hook::Function(gen_unique_edge_ids::<QT, S>), Hook::Empty);
+            unsafe {
+                libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
+                    hook_id.0,
+                    Some(libafl_qemu_sys::libafl_jit_trace_edge_single),
+                );
+            }
         }
     }
 }

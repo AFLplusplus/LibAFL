@@ -23,6 +23,7 @@ use crate::{
     emu::{EmuError, Emulator, MemAccessInfo, SyscallHookResult},
     helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::{Hook, QemuHooks},
+    snapshot::QemuSnapshotHelper,
     GuestAddr, Regs,
 };
 
@@ -961,14 +962,26 @@ where
             Hook::Function(trace_read_n_asan::<QT, S>),
         );
 
-        hooks.writes(
-            Hook::Function(gen_readwrite_asan::<QT, S>),
-            Hook::Function(trace_write1_asan::<QT, S>),
-            Hook::Function(trace_write2_asan::<QT, S>),
-            Hook::Function(trace_write4_asan::<QT, S>),
-            Hook::Function(trace_write8_asan::<QT, S>),
-            Hook::Function(trace_write_n_asan::<QT, S>),
-        );
+        if hooks.match_helper::<QemuSnapshotHelper>().is_none() {
+            hooks.writes(
+                Hook::Function(gen_readwrite_asan::<QT, S>),
+                Hook::Function(trace_write1_asan::<QT, S>),
+                Hook::Function(trace_write2_asan::<QT, S>),
+                Hook::Function(trace_write4_asan::<QT, S>),
+                Hook::Function(trace_write8_asan::<QT, S>),
+                Hook::Function(trace_write_n_asan::<QT, S>),
+            );
+        } else {
+            // track writes for both helpers as opt
+            hooks.writes(
+                Hook::Function(gen_write_asan_snapshot::<QT, S>),
+                Hook::Function(trace_write1_asan_snapshot::<QT, S>),
+                Hook::Function(trace_write2_asan_snapshot::<QT, S>),
+                Hook::Function(trace_write4_asan_snapshot::<QT, S>),
+                Hook::Function(trace_write8_asan_snapshot::<QT, S>),
+                Hook::Function(trace_write_n_asan_snapshot::<QT, S>),
+            );
+        }
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
@@ -1162,6 +1175,115 @@ pub fn trace_write_n_asan<QT, S>(
     let emulator = hooks.emulator().clone();
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
     h.read_n(&emulator, id as GuestAddr, addr, size);
+}
+
+pub fn gen_write_asan_snapshot<QT, S>(
+    hooks: &mut QemuHooks<QT, S>,
+    _state: Option<&mut S>,
+    pc: GuestAddr,
+    _info: MemAccessInfo,
+) -> Option<u64>
+where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    if h.must_instrument(pc) {
+        Some(pc.into())
+    } else {
+        Some(0)
+    }
+}
+
+pub fn trace_write1_asan_snapshot<QT, S>(
+    hooks: &mut QemuHooks<QT, S>,
+    _state: Option<&mut S>,
+    id: u64,
+    addr: GuestAddr,
+) where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    if id != 0 {
+        let emulator = hooks.emulator().clone();
+        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        h.write_1(&emulator, id as GuestAddr, addr);
+    }
+    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+    h.access(addr, 1);
+}
+
+pub fn trace_write2_asan_snapshot<QT, S>(
+    hooks: &mut QemuHooks<QT, S>,
+    _state: Option<&mut S>,
+    id: u64,
+    addr: GuestAddr,
+) where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    if id != 0 {
+        let emulator = hooks.emulator().clone();
+        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        h.write_2(&emulator, id as GuestAddr, addr);
+    }
+    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+    h.access(addr, 2);
+}
+
+pub fn trace_write4_asan_snapshot<QT, S>(
+    hooks: &mut QemuHooks<QT, S>,
+    _state: Option<&mut S>,
+    id: u64,
+    addr: GuestAddr,
+) where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    if id != 0 {
+        let emulator = hooks.emulator().clone();
+        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        h.write_4(&emulator, id as GuestAddr, addr);
+    }
+    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+    h.access(addr, 4);
+}
+
+pub fn trace_write8_asan_snapshot<QT, S>(
+    hooks: &mut QemuHooks<QT, S>,
+    _state: Option<&mut S>,
+    id: u64,
+    addr: GuestAddr,
+) where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    if id != 0 {
+        let emulator = hooks.emulator().clone();
+        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        h.write_8(&emulator, id as GuestAddr, addr);
+    }
+    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+    h.access(addr, 8);
+}
+
+pub fn trace_write_n_asan_snapshot<QT, S>(
+    hooks: &mut QemuHooks<QT, S>,
+    _state: Option<&mut S>,
+    id: u64,
+    addr: GuestAddr,
+    size: usize,
+) where
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    if id != 0 {
+        let emulator = hooks.emulator().clone();
+        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+        h.read_n(&emulator, id as GuestAddr, addr, size);
+    }
+    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+    h.access(addr, size);
 }
 
 #[allow(clippy::too_many_arguments)]

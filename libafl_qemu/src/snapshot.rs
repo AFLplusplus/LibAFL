@@ -22,6 +22,7 @@ use crate::SYS_mmap2;
 )))]
 use crate::SYS_newfstatat;
 use crate::{
+    asan::QemuAsanHelper,
     emu::{Emulator, MmapPerms, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple},
     hooks::{Hook, QemuHooks},
@@ -491,14 +492,17 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.writes(
-            Hook::Empty,
-            Hook::Function(trace_write1_snapshot::<QT, S>),
-            Hook::Function(trace_write2_snapshot::<QT, S>),
-            Hook::Function(trace_write4_snapshot::<QT, S>),
-            Hook::Function(trace_write8_snapshot::<QT, S>),
-            Hook::Function(trace_write_n_snapshot::<QT, S>),
-        );
+        if hooks.match_helper::<QemuAsanHelper>().is_none() {
+            // The ASan helper, if present, will call the tracer hook for the snpahsot helper as opt
+            hooks.writes(
+                Hook::Empty,
+                Hook::Function(trace_write1_snapshot::<QT, S>),
+                Hook::Function(trace_write2_snapshot::<QT, S>),
+                Hook::Function(trace_write4_snapshot::<QT, S>),
+                Hook::Function(trace_write8_snapshot::<QT, S>),
+                Hook::Function(trace_write_n_snapshot::<QT, S>),
+            );
+        }
 
         if !self.accurate_unmap {
             hooks.syscalls(Hook::Function(filter_mmap_snapshot::<QT, S>));
