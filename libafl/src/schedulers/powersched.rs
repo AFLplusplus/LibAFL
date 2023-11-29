@@ -169,6 +169,8 @@ pub enum PowerSchedule {
 }
 
 /// A corpus scheduler using power schedules
+/// Note that this corpus is merely holding the metadata necessary for the power calculation
+/// and here we DON'T actually calculate the power (we do it in the stage)
 #[derive(Clone, Debug)]
 pub struct PowerQueueScheduler<O, S> {
     strat: PowerSchedule,

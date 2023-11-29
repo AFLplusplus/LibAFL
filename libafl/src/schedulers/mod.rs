@@ -29,9 +29,6 @@ pub use accounting::CoverageAccountingScheduler;
 pub mod weighted;
 pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
-pub mod ecofuzz;
-pub use ecofuzz::{EcoMetadata, EcoScheduler, EcoState, EcoTestcaseMetadata, EcoTestcaseScore};
-
 pub mod tuneable;
 use libafl_bolts::rands::Rand;
 pub use tuneable::*;
@@ -40,9 +37,8 @@ use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
-    prelude::HasMetadata,
     random_corpus_id,
-    state::{HasCorpus, HasRand, State, UsesState},
+    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
     Error,
 };
 
