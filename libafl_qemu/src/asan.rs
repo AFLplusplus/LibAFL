@@ -21,7 +21,10 @@ use rangemap::RangeMap;
 use crate::{
     calls::FullBacktraceCollector,
     emu::{EmuError, Emulator, MemAccessInfo, SyscallHookResult},
-    helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{
+        HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
+        QemuInstrumentationAddressRangeFilter,
+    },
     hooks::{Hook, QemuHooks},
     snapshot::QemuSnapshotHelper,
     GuestAddr, Regs,
@@ -734,7 +737,7 @@ pub struct QemuAsanHelper {
     detect_leaks: bool,
     empty: bool,
     rt: Pin<Box<AsanGiovese>>,
-    filter: QemuInstrumentationFilter,
+    filter: QemuInstrumentationAddressRangeFilter,
 }
 
 impl QemuAsanHelper {
@@ -742,7 +745,7 @@ impl QemuAsanHelper {
     pub fn default(rt: Pin<Box<AsanGiovese>>) -> Self {
         Self::new(
             rt,
-            QemuInstrumentationFilter::None,
+            QemuInstrumentationAddressRangeFilter::None,
             QemuAsanOptions::Snapshot,
         )
     }
@@ -750,7 +753,7 @@ impl QemuAsanHelper {
     #[must_use]
     pub fn new(
         mut rt: Pin<Box<AsanGiovese>>,
-        filter: QemuInstrumentationFilter,
+        filter: QemuInstrumentationAddressRangeFilter,
         options: QemuAsanOptions,
     ) -> Self {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
@@ -773,7 +776,7 @@ impl QemuAsanHelper {
     #[must_use]
     pub fn with_error_callback(
         mut rt: Pin<Box<AsanGiovese>>,
-        filter: QemuInstrumentationFilter,
+        filter: QemuInstrumentationAddressRangeFilter,
         error_callback: AsanErrorCallback,
         options: QemuAsanOptions,
     ) -> Self {
@@ -798,7 +801,7 @@ impl QemuAsanHelper {
     #[must_use]
     pub fn with_asan_report(
         rt: Pin<Box<AsanGiovese>>,
-        filter: QemuInstrumentationFilter,
+        filter: QemuInstrumentationAddressRangeFilter,
         options: QemuAsanOptions,
     ) -> Self {
         Self::with_error_callback(rt, filter, Box::new(asan_report), options)
@@ -922,12 +925,12 @@ impl QemuAsanHelper {
     }
 }
 
-impl HasInstrumentationFilter for QemuAsanHelper {
-    fn filter(&self) -> &QemuInstrumentationFilter {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuAsanHelper {
+    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
 
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
         &mut self.filter
     }
 }

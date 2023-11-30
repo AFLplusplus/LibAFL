@@ -12,7 +12,10 @@ use thread_local::ThreadLocal;
 use crate::{
     capstone,
     emu::{ArchExtras, Emulator},
-    helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{
+        HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
+        QemuInstrumentationAddressRangeFilter,
+    },
     hooks::{Hook, QemuHooks},
     GuestAddr,
 };
@@ -215,7 +218,7 @@ pub struct QemuCallTracerHelper<T>
 where
     T: CallTraceCollectorTuple,
 {
-    filter: QemuInstrumentationFilter,
+    filter: QemuInstrumentationAddressRangeFilter,
     cs: Capstone,
     collectors: Option<T>,
 }
@@ -225,7 +228,7 @@ where
     T: CallTraceCollectorTuple,
 {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter, collectors: T) -> Self {
+    pub fn new(filter: QemuInstrumentationAddressRangeFilter, collectors: T) -> Self {
         Self {
             filter,
             cs: capstone().detail(true).build().unwrap(),
@@ -380,15 +383,15 @@ where
     }
 }
 
-impl<T> HasInstrumentationFilter for QemuCallTracerHelper<T>
+impl<T> HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCallTracerHelper<T>
 where
     T: CallTraceCollectorTuple,
 {
-    fn filter(&self) -> &QemuInstrumentationFilter {
+    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
 
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
         &mut self.filter
     }
 }

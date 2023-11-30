@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     emu::{GuestAddr, GuestUsize},
-    helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{
+        HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
+        QemuInstrumentationAddressRangeFilter,
+    },
     hooks::{Hook, QemuHooks},
     Emulator,
 };
@@ -39,7 +42,7 @@ libafl_bolts::impl_serdeany!(QemuDrCovMetadata);
 
 #[derive(Debug)]
 pub struct QemuDrCovHelper {
-    filter: QemuInstrumentationFilter,
+    filter: QemuInstrumentationAddressRangeFilter,
     module_mapping: RangeMap<usize, (u16, String)>,
     filename: PathBuf,
     full_trace: bool,
@@ -50,7 +53,7 @@ impl QemuDrCovHelper {
     #[must_use]
     #[allow(clippy::let_underscore_untyped)]
     pub fn new(
-        filter: QemuInstrumentationFilter,
+        filter: QemuInstrumentationAddressRangeFilter,
         module_mapping: RangeMap<usize, (u16, String)>,
         filename: PathBuf,
         full_trace: bool,
@@ -75,12 +78,12 @@ impl QemuDrCovHelper {
     }
 }
 
-impl HasInstrumentationFilter for QemuDrCovHelper {
-    fn filter(&self) -> &QemuInstrumentationFilter {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuDrCovHelper {
+    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
 
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
         &mut self.filter
     }
 }
