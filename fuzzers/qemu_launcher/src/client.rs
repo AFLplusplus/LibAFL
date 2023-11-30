@@ -98,9 +98,7 @@ impl<'a> Client<'a> {
             let range = elf
                 .get_section(".text", emu.load_addr())
                 .ok_or_else(|| Error::key_not_found("Failed to find .text section"))?;
-            Ok(QemuInstrumentationAddressRangeFilter::AllowList(vec![
-                range,
-            ]))
+            Ok(QemuInstrumentationAddressRangeFilter::AllowList(vec![range]))
         }
     }
 
