@@ -1,5 +1,5 @@
 use core::{fmt::Debug, ops::Range};
-use std::collections::HashSet;
+use std::{collections::HashSet, hash};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
@@ -169,7 +169,7 @@ where
 
 pub type QemuInstrumentationPagingFilter = QemuFilterList<HashSet<GuestPhysAddr>>;
 
-impl IsFilter for HashSet<GuestPhysAddr> {
+impl<H: hash::BuildHasher> IsFilter for HashSet<GuestPhysAddr, H> {
     type FilterParameter = Option<GuestPhysAddr>;
 
     fn allowed(&self, paging_id: Self::FilterParameter) -> bool {

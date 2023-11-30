@@ -59,7 +59,10 @@ impl<'a> Client<'a> {
         Ok(start_pc)
     }
 
-    fn coverage_filter(&self, emu: &Emulator) -> Result<QemuInstrumentationAddressRangeFilter, Error> {
+    fn coverage_filter(
+        &self,
+        emu: &Emulator,
+    ) -> Result<QemuInstrumentationAddressRangeFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
         if let Some(includes) = &self.options.include {
             #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
@@ -87,7 +90,9 @@ impl<'a> Client<'a> {
             let range = elf
                 .get_section(".text", emu.load_addr())
                 .ok_or_else(|| Error::key_not_found("Failed to find .text section"))?;
-            Ok(QemuInstrumentationAddressRangeFilter::AllowList(vec![range]))
+            Ok(QemuInstrumentationAddressRangeFilter::AllowList(vec![
+                range,
+            ]))
         }
     }
 
