@@ -636,6 +636,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
 // TODO remove this after executor refactor and libafl qemu new executor
 /// Expose a version of the crash handler that can be called from e.g. an emulator
+#[cfg(any(unix, feature = "std"))]
 pub fn generic_inproc_crash_handler<E, EM, OF, Z>()
 where
     E: Executor<EM, Z> + HasObservers,
