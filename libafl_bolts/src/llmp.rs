@@ -1965,7 +1965,9 @@ where
 }
 
 /// A signal handler for the [`LlmpBroker`].
-#[cfg(unix)]
+/// On unix, it handles signals
+/// On Windows - control signals (e.g., CTRL+C)
+#[cfg(any(unix, all(windows, feature = "std")))]
 #[derive(Debug, Clone)]
 pub struct LlmpShutdownSignalHandler {
     shutting_down: bool,
@@ -1987,13 +1989,6 @@ impl Handler for LlmpShutdownSignalHandler {
     fn signals(&self) -> Vec<Signal> {
         vec![Signal::SigTerm, Signal::SigInterrupt, Signal::SigQuit]
     }
-}
-
-/// A control signals (Ctrl+C) handler for the [`LlmpBroker`] on Windows.
-#[cfg(all(windows, feature = "std"))]
-#[derive(Debug, Clone)]
-pub struct LlmpShutdownSignalHandler {
-    shutting_down: bool,
 }
 
 #[cfg(all(windows, feature = "std"))]
