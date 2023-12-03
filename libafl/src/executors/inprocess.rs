@@ -634,6 +634,42 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     log::info!("Bye!");
 }
 
+// TODO remove this after executor refactor and libafl qemu new executor
+/// Expose a version of the crash handler that can be called from e.g. an emulator
+#[cfg(any(unix, feature = "std"))]
+pub fn generic_inproc_crash_handler<E, EM, OF, Z>()
+where
+    E: Executor<EM, Z> + HasObservers,
+    EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+    OF: Feedback<E::State>,
+    E::State: HasExecutions + HasSolutions + HasCorpus,
+    Z: HasObjective<Objective = OF, State = E::State>,
+{
+    let data = unsafe { &mut GLOBAL_STATE };
+    let in_handler = data.set_in_handler(true);
+
+    if data.is_valid() {
+        let executor = data.executor_mut::<E>();
+        // disarms timeout in case of TimeoutExecutor
+        executor.post_run_reset();
+        let state = data.state_mut::<E::State>();
+        let event_mgr = data.event_mgr_mut::<EM>();
+        let fuzzer = data.fuzzer_mut::<Z>();
+        let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+
+        run_observers_and_save_state::<E, EM, OF, Z>(
+            executor,
+            state,
+            input,
+            fuzzer,
+            event_mgr,
+            ExitKind::Crash,
+        );
+    }
+
+    data.set_in_handler(in_handler);
+}
+
 /// The inprocess executor singal handling code for unix
 #[cfg(unix)]
 pub mod unix_signal_handler {
