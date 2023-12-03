@@ -514,6 +514,7 @@ where
     {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
+        const LANES: usize = 16;
 
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
@@ -547,20 +548,20 @@ where
             }
         }*/
 
-        let steps = size / VectorType::lanes();
-        let left = size % VectorType::lanes();
+        let steps = size / LANES;
+        let left = size % LANES;
 
         if let Some(novelties) = self.novelties.as_mut() {
             novelties.clear();
             for step in 0..steps {
-                let i = step * VectorType::lanes();
+                let i = step * LANES;
                 let history = VectorType::from_slice(&history_map[i..]);
                 let items = VectorType::from_slice(&map[i..]);
 
                 if items.simd_max(history) != history {
                     interesting = true;
                     unsafe {
-                        for j in i..(i + VectorType::lanes()) {
+                        for j in i..(i + LANES) {
                             let item = *map.get_unchecked(j);
                             if item > *history_map.get_unchecked(j) {
                                 novelties.push(j);
@@ -581,7 +582,7 @@ where
             }
         } else {
             for step in 0..steps {
-                let i = step * VectorType::lanes();
+                let i = step * LANES;
                 let history = VectorType::from_slice(&history_map[i..]);
                 let items = VectorType::from_slice(&map[i..]);
 
