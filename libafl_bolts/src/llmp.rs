@@ -2272,7 +2272,7 @@ where
         unsafe { ptr::read_volatile(&LLMP_SIGHANDLER_STATE.shutting_down) }
     }
 
-    #[cfg(any(unix, all(windows, feature = "std")))]
+    #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
     fn setup_handlers() {
         #[cfg(all(unix, not(miri)))]
         if let Err(e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
@@ -2326,7 +2326,7 @@ where
     {
         use super::current_milliseconds;
 
-        #[cfg(any(unix, all(windows, feature = "std")))]
+        #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
         Self::setup_handlers();
 
         let timeout = timeout.as_millis() as u64;
@@ -2387,6 +2387,7 @@ where
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
+        #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
         Self::setup_handlers();
 
         while !self.is_shutting_down() {
