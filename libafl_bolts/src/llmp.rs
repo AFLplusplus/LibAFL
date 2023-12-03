@@ -75,8 +75,6 @@ use core::{
     sync::atomic::{fence, AtomicU16, Ordering},
     time::Duration,
 };
-#[cfg(feature = "std")]
-use log::info;
 #[cfg(all(unix, feature = "std"))]
 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use std::os::unix::io::AsRawFd;
@@ -2002,7 +2000,7 @@ pub struct LlmpShutdownSignalHandler {
 impl CtrlHandler for LlmpShutdownSignalHandler {
     #[allow(clippy::not_unsafe_ptr_arg_deref)]
     fn handle(&mut self, ctrl_type: u32) -> bool {
-        info!("LLMP: Received shutdown signal, ctrl_type {:?}", ctrl_type);
+        log::info!("LLMP: Received shutdown signal, ctrl_type {:?}", ctrl_type);
         unsafe {
             ptr::write_volatile(&mut self.shutting_down, true);
         }
