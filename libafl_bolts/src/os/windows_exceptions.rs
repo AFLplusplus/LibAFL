@@ -2,7 +2,6 @@
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-use log::info;
 use core::{
     cell::UnsafeCell,
     fmt::{self, Display, Formatter},
@@ -10,12 +9,13 @@ use core::{
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
+use log::info;
 use std::os::raw::{c_long, c_void};
 
 use num_enum::TryFromPrimitive;
 pub use windows::Win32::{
-    System::Console::{SetConsoleCtrlHandler, CTRL_C_EVENT, CTRL_BREAK_EVENT, PHANDLER_ROUTINE},
-    Foundation::{NTSTATUS, BOOL},
+    Foundation::{BOOL, NTSTATUS},
+    System::Console::{SetConsoleCtrlHandler, CTRL_BREAK_EVENT, CTRL_C_EVENT, PHANDLER_ROUTINE},
     System::{
         Diagnostics::Debug::{
             AddVectoredExceptionHandler, UnhandledExceptionFilter, EXCEPTION_POINTERS,
@@ -323,13 +323,21 @@ unsafe fn internal_handle_exception(
         .unwrap();
     match &EXCEPTION_HANDLERS[index] {
         Some(handler_holder) => {
-            info!("{:?}: Handling exception {}", std::process::id(), exception_code);
+            info!(
+                "{:?}: Handling exception {}",
+                std::process::id(),
+                exception_code
+            );
             let handler = &mut **handler_holder.handler.get();
             handler.handle(exception_code, exception_pointers);
             EXCEPTION_CONTINUE_EXECUTION
         }
         None => {
-            info!("{:?}: No handler for exception {}", std::process::id(), exception_code);
+            info!(
+                "{:?}: No handler for exception {}",
+                std::process::id(),
+                exception_code
+            );
             // Go to Default one
             let handler_holder = &EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]
                 .as_ref()
@@ -365,7 +373,7 @@ extern "C" {
 }
 
 unsafe extern "C" fn handle_signal(_signum: i32) {
-    log::info!("Received signal {}", _signum);
+    // log::info!("Received signal {}", _signum);
     internal_handle_exception(ExceptionCode::AssertionFailure, ptr::null_mut());
 }
 
@@ -411,16 +419,10 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     Ok(())
 }
 
-/// Set ConsoleCtrlHandler to catch Ctrl-C
-/// # Safety
-
 #[cfg(feature = "alloc")]
 pub trait CtrlHandler {
     /// Handle an exception
-    fn handle(
-        &mut self,
-        ctrl_type: u32
-    )->bool;
+    fn handle(&mut self, ctrl_type: u32) -> bool;
 }
 
 struct CtrlHandlerHolder {
@@ -430,6 +432,9 @@ struct CtrlHandlerHolder {
 /// Keep track of which handler is registered for which exception
 static mut CTRL_HANDLER: Option<CtrlHandlerHolder> = None;
 
+/// Set `ConsoleCtrlHandler` to catch Ctrl-C
+/// # Safety
+/// Same safety considerations as in `setup_exception_handler`
 pub unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(handler: &mut T) -> Result<(), Error> {
     write_volatile(
         &mut CTRL_HANDLER,
@@ -438,12 +443,18 @@ pub unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(handler: &mut T) -> R
         }),
     );
     compiler_fence(Ordering::SeqCst);
-    
+
     // Log the result of SetConsoleCtrlHandler
     let result = SetConsoleCtrlHandler(Some(ctrl_handler), true);
     match result {
-        Ok(_) => {info!("SetConsoleCtrlHandler succeeded"); Ok(())},
-        Err(err) => {info!("SetConsoleCtrlHandler failed"); Err(Error::from(err))},
+        Ok(()) => {
+            info!("SetConsoleCtrlHandler succeeded");
+            Ok(())
+        }
+        Err(err) => {
+            info!("SetConsoleCtrlHandler failed");
+            Err(Error::from(err))
+        }
     }
 }
 
