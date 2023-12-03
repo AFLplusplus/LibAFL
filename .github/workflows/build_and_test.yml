@@ -2,10 +2,10 @@ name: build and test
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'pr/**' ]
   pull_request:
     branches: [ main ]
-
+  workflow_dispatch:
 env:
   CARGO_TERM_COLOR: always
 
