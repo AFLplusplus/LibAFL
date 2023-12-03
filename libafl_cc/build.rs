@@ -82,7 +82,15 @@ fn find_llvm_config() -> Result<String, String> {
         }
     };
 
-    #[cfg(not(target_vendor = "apple"))]
+    #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+    for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
+        let llvm_config_name: String = format!("/usr/clang/{version}.0/bin/llvm-config");
+        if Path::new(&llvm_config_name).exists() {
+            return Ok(llvm_config_name);
+        }
+    }
+
+    #[cfg(not(any(target_vendor = "apple", target_os = "solaris", target_os = "illumos")))]
     for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
         let llvm_config_name: String = format!("llvm-config-{version}");
         if which(&llvm_config_name).is_ok() {
