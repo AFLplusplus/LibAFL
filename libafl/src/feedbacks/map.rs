@@ -5,7 +5,7 @@ use alloc::{
     vec::Vec,
 };
 #[rustversion::nightly]
-use core::simd::prelude::SimdOrd;
+use core::simd::cmp::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,
@@ -514,7 +514,6 @@ where
     {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
-        const LANES: usize = 16;
 
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
@@ -548,20 +547,21 @@ where
             }
         }*/
 
-        let steps = size / LANES;
-        let left = size % LANES;
+
+        let steps = size / VectorType::LEN;
+        let left = size % VectorType::LEN;
 
         if let Some(novelties) = self.novelties.as_mut() {
             novelties.clear();
             for step in 0..steps {
-                let i = step * LANES;
+                let i = step * VectorType::LEN;
                 let history = VectorType::from_slice(&history_map[i..]);
                 let items = VectorType::from_slice(&map[i..]);
 
                 if items.simd_max(history) != history {
                     interesting = true;
                     unsafe {
-                        for j in i..(i + LANES) {
+                        for j in i..(i + VectorType::LEN) {
                             let item = *map.get_unchecked(j);
                             if item > *history_map.get_unchecked(j) {
                                 novelties.push(j);
@@ -582,7 +582,7 @@ where
             }
         } else {
             for step in 0..steps {
-                let i = step * LANES;
+                let i = step * VectorType::LEN;
                 let history = VectorType::from_slice(&history_map[i..]);
                 let items = VectorType::from_slice(&map[i..]);
 
