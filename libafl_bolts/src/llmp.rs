@@ -2327,7 +2327,6 @@ where
         use super::current_milliseconds;
 
         #[cfg(any(unix, all(windows, feature = "std")))]
-        
         Self::setup_handlers();
 
         let timeout = timeout.as_millis() as u64;
