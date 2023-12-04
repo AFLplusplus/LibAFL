@@ -1740,7 +1740,7 @@ mod tests {
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
+        events::llmp::{LlmpEventManager, _ENV_FUZZER_SENDER},
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
         fuzzer::Fuzzer,
