@@ -547,7 +547,6 @@ where
             }
         }*/
 
-
         let steps = size / VectorType::LEN;
         let left = size % VectorType::LEN;
 
