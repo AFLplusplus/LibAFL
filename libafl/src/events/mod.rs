@@ -18,8 +18,6 @@ pub mod tcp;
 #[cfg(feature = "scalability_introspection")]
 use alloc::string::ToString;
 use alloc::{boxed::Box, string::String, vec::Vec};
-#[cfg(all(unix, feature = "std"))]
-use core::ffi::c_void;
 use core::{
     fmt,
     hash::{BuildHasher, Hasher},
@@ -33,8 +31,6 @@ pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use libafl_bolts::{current_time, ClientId};
-#[cfg(all(unix, feature = "std"))]
-use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -58,10 +54,8 @@ use crate::{
 
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
-pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData {
-    allocator_pid: 0,
-    staterestorer_ptr: core::ptr::null_mut(),
-    shutdown_handler: core::ptr::null(),
+pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {
+    shutting_down: false,
 };
 
 /// A signal handler for releasing `StateRestore` `ShMem`
@@ -69,60 +63,21 @@ pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData
 #[cfg(all(unix, feature = "std"))]
 #[derive(Debug, Clone)]
 pub struct ShutdownSignalData {
-    allocator_pid: usize,
-    staterestorer_ptr: *mut c_void,
-    shutdown_handler: *const c_void,
+    shutting_down: bool,
 }
-
-/// Type for shutdown handler
-#[cfg(all(unix, feature = "std"))]
-pub type ShutdownFuncPtr =
-    unsafe fn(Signal, &mut siginfo_t, Option<&mut ucontext_t>, data: &mut ShutdownSignalData);
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
-///
-/// # Safety
-///
-/// This will acceess `data` and write to the global `data.staterestorer_ptr` if it's not null.
-#[cfg(all(unix, feature = "std"))]
-#[allow(clippy::needless_pass_by_value)]
-pub unsafe fn shutdown_handler<SP>(
-    signal: Signal,
-    _info: &mut siginfo_t,
-    _context: Option<&mut ucontext_t>,
-    data: &ShutdownSignalData,
-) where
-    SP: ShMemProvider,
-{
-    log::info!(
-        "Fuzzer shutdown by Signal: {} Pid: {}",
-        signal,
-        std::process::id()
-    );
-
-    let ptr = data.staterestorer_ptr;
-    if ptr.is_null() || data.allocator_pid != std::process::id() as usize {
-        // Do nothing
-    } else {
-        // The process allocated the staterestorer map must take care of it
-        let sr = (ptr as *mut StateRestorer<SP>).as_mut().unwrap();
-        // log::trace!("{:#?}", sr);
-        std::ptr::drop_in_place(sr);
-    }
-    log::info!("Bye!");
-    libc::_exit(0);
-}
-
 #[cfg(all(unix, feature = "std"))]
 impl Handler for ShutdownSignalData {
-    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: Option<&mut ucontext_t>) {
+    fn handle(
+        &mut self,
+        _signal: Signal,
+        _info: &mut siginfo_t,
+        _context: Option<&mut ucontext_t>,
+    ) {
         unsafe {
-            let data = &mut SHUTDOWN_SIGHANDLER_DATA;
-            if !data.shutdown_handler.is_null() {
-                let func: ShutdownFuncPtr = std::mem::transmute(data.shutdown_handler);
-                (func)(signal, info, context, data);
-            }
+            core::ptr::write_volatile(core::ptr::addr_of_mut!(self.shutting_down), true);
         }
     }
 

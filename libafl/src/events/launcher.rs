@@ -44,7 +44,10 @@ use typed_builder::TypedBuilder;
 use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
 #[cfg(feature = "std")]
 use crate::{
-    events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+    events::{
+        llmp::{LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+        EventConfig,
+    },
     monitors::Monitor,
     state::{HasExecutions, State},
     Error,
