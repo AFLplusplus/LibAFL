@@ -953,7 +953,7 @@ where
 /// The kind of manager we're creating right now
 #[cfg(feature = "std")]
 #[derive(Debug, Clone, Copy)]
-pub enum ManagerKind {
+pub enum TcpManagerKind {
     /// Any kind will do
     Any,
     /// A client, getting messages from a local broker.
@@ -979,7 +979,7 @@ where
     MT: Monitor + Clone,
     S: State + HasExecutions,
 {
-    RestartingMgr::builder()
+    TcpRestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
         .monitor(Some(monitor))
         .broker_port(broker_port)
@@ -988,13 +988,13 @@ where
         .launch()
 }
 
-/// Provides a `builder` which can be used to build a [`RestartingMgr`], which is a combination of a
+/// Provides a `builder` which can be used to build a [`TcpRestartingMgr`], which is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access, clippy::ignored_unit_patterns)]
 #[derive(TypedBuilder, Debug)]
-pub struct RestartingMgr<MT, S, SP>
+pub struct TcpRestartingMgr<MT, S, SP>
 where
     S: UsesInput + DeserializeOwned,
     SP: ShMemProvider + 'static,
@@ -1016,8 +1016,8 @@ where
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
     /// The type of manager to build
-    #[builder(default = ManagerKind::Any)]
-    kind: ManagerKind,
+    #[builder(default = TcpManagerKind::Any)]
+    kind: TcpManagerKind,
     /// The amount of external clients that should have connected (not counting our own tcp client)
     /// before this broker quits _after the last client exited_.
     /// If `None`, the broker will never quit when the last client exits, but run forever.
@@ -1035,7 +1035,7 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<MT, S, SP> RestartingMgr<MT, S, SP>
+impl<MT, S, SP> TcpRestartingMgr<MT, S, SP>
 where
     SP: ShMemProvider,
     S: State + HasExecutions,
@@ -1066,7 +1066,7 @@ where
 
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
-                ManagerKind::Any => {
+                TcpManagerKind::Any => {
                     let connection = create_nonblocking_listener(("127.0.0.1", self.broker_port));
                     match connection {
                         Ok(listener) => {
@@ -1097,7 +1097,7 @@ where
                         }
                     }
                 }
-                ManagerKind::Broker => {
+                TcpManagerKind::Broker => {
                     let event_broker = TcpEventBroker::<S::Input, MT>::new(
                         format!("127.0.0.1:{}", self.broker_port),
                         self.monitor.take().unwrap(),
@@ -1106,7 +1106,7 @@ where
                     broker_things(event_broker, self.remote_broker_addr)?;
                     unreachable!("The broker may never return normally, only on errors or when shutting down.");
                 }
-                ManagerKind::Client { cpu_core } => {
+                TcpManagerKind::Client { cpu_core } => {
                     // We are a client
                     let mgr = TcpEventManager::<S>::on_port(self.broker_port, self.configuration)?;
 
