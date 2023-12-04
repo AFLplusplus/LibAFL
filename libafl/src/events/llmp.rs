@@ -1159,9 +1159,13 @@ where
     #[inline]
     #[allow(clippy::unused_self)]
     fn is_shutting_down() -> bool {
+        #[cfg(unix)]
         unsafe {
             core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
         }
+
+        #[cfg(windows)]
+        false
     }
 
     /// Launch the restarting manager
