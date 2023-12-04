@@ -78,7 +78,7 @@ impl Handler for ShutdownSignalData {
         _context: Option<&mut ucontext_t>,
     ) {
         unsafe {
-            core::ptr::write_volatile(&mut self.shutting_down, true);
+            core::ptr::write_volatile(core::ptr::addr_of_mut!(self.shutting_down), true);
         }
     }
 
