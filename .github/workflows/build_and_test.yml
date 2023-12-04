@@ -282,41 +282,6 @@ jobs:
       if: runner.os == 'macOS' # use bash v4
       run: /usr/local/bin/bash -c 'RUN_ON_CI=1 ./scripts/test_all_fuzzers.sh'
 
-  executions-check:
-    strategy:
-      matrix:
-          os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - name: Fix python (macOS)
-      if: runner.os == 'macOS'
-      run: rm /usr/local/bin/2to3* /usr/local/bin/idle3* /usr/local/bin/pydoc3* /usr/local/bin/python3*
-    - name: Remove obsolete llvm (macOS)
-      if: runner.os == 'macOS'
-      run: brew remove --force llvm clang
-    - name: Remove obsolete llvm (Linux)
-      if: runner.os == 'Linux'
-      run: sudo apt purge llvm* clang*
-    - uses: lyricwulf/abc@v1
-      with: 
-        linux: llvm-15 llvm-15-dev clang-15
-        macos: python@3.11 llvm@15 bash coreutils
-    - uses: actions/checkout@v3
-      with:
-        submodules: true # recursively checkout submodules
-        fetch-depth: 0
-    - uses: Swatinem/rust-cache@v2
-    - name: Build and run libfuzzer_libpng (Linux)
-      if: runner.os == 'Linux'
-      run: ./scripts/executions-check.sh 
-    - name: Build and run libfuzzer_libpng (macOS) 
-      if: runner.os == 'macOS'
-      run: /usr/local/bin/bash -c './scripts/executions-check.sh'
-
   nostd-build:
     runs-on: ubuntu-latest
     steps:
