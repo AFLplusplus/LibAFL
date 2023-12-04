@@ -111,14 +111,14 @@ fn main() {
 
         let mut redefinitions_file = BufWriter::new(File::create(&redefined_symbols).unwrap());
 
-        const ZN_PREFIX: &str = if cfg!(target_os = "macos") {
+        let zn_prefix = if cfg!(target_os = "macos") {
             // macOS symbols have an extra `_`
             "__ZN"
         } else {
             "_ZN"
         };
 
-        let replacement = format!("{ZN_PREFIX}{NAMESPACE_LEN}{NAMESPACE}");
+        let replacement = format!("{zn_prefix}{NAMESPACE_LEN}{NAMESPACE}");
 
         // redefine all the rust-mangled symbols we can
         // TODO this will break when v0 mangling is stabilised
@@ -126,17 +126,17 @@ fn main() {
             let line = line.unwrap();
 
             // Skip headers
-            if line.ends_with(":") || line.is_empty() {
+            if line.ends_with(':') || line.is_empty() {
                 continue;
             }
             let (_, symbol) = line.rsplit_once(' ').unwrap();
 
-            if symbol.starts_with(ZN_PREFIX) {
+            if symbol.starts_with(zn_prefix) {
                 writeln!(
                     redefinitions_file,
                     "{} {}",
                     symbol,
-                    symbol.replacen(ZN_PREFIX, &replacement, 1)
+                    symbol.replacen(zn_prefix, &replacement, 1)
                 )
                 .unwrap();
             }
