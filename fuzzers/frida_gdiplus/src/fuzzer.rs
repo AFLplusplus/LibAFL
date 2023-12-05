@@ -323,6 +323,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
 
+                println!("Cmplog observer is enabled");
                 // Create an observation channel using cmplog map
                 let cmplog_observer = CmpLogObserver::new("cmplog", true);
 

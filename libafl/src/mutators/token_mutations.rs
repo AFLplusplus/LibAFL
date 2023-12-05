@@ -452,6 +452,8 @@ where
 
         let cmps_len = {
             let meta = state.metadata_map().get::<CmpValuesMetadata>();
+            // uncomment to dump cmplog-extracted values
+            // println!("meta: {:x?}", meta);
             if meta.is_none() {
                 return Ok(MutationResult::Skipped);
             }
