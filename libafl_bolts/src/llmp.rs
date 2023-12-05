@@ -1982,7 +1982,7 @@ impl Handler for LlmpShutdownSignalHandler {
         _context: Option<&mut ucontext_t>,
     ) {
         unsafe {
-            ptr::write_volatile(&mut self.shutting_down, true);
+            ptr::write_volatile(ptr::addr_of_mut!(self.shutting_down), true);
         }
     }
 
@@ -2262,7 +2262,7 @@ where
     #[cfg(any(unix, all(windows, feature = "std")))]
     #[allow(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
-        unsafe { ptr::read_volatile(&LLMP_SIGHANDLER_STATE.shutting_down) }
+        unsafe { ptr::read_volatile(ptr::addr_of!(LLMP_SIGHANDLER_STATE.shutting_down)) }
     }
 
     #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
