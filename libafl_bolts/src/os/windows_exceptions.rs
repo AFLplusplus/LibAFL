@@ -9,14 +9,14 @@ use core::{
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
-use log::info;
 use std::os::raw::{c_long, c_void};
 
+use log::info;
 use num_enum::TryFromPrimitive;
 pub use windows::Win32::{
     Foundation::{BOOL, NTSTATUS},
-    System::Console::{SetConsoleCtrlHandler, CTRL_BREAK_EVENT, CTRL_C_EVENT, PHANDLER_ROUTINE},
     System::{
+        Console::{SetConsoleCtrlHandler, CTRL_BREAK_EVENT, CTRL_C_EVENT, PHANDLER_ROUTINE},
         Diagnostics::Debug::{
             AddVectoredExceptionHandler, UnhandledExceptionFilter, EXCEPTION_POINTERS,
         },

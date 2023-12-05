@@ -100,13 +100,12 @@ use crate::current_time;
 use crate::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
 use crate::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+#[cfg(all(windows, feature = "std"))]
+use crate::os::windows_exceptions::{setup_ctrl_handler, CtrlHandler};
 use crate::{
     shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     ClientId, Error,
 };
-
-#[cfg(all(windows, feature = "std"))]
-use crate::os::windows_exceptions::{setup_ctrl_handler, CtrlHandler};
 
 /// The timeout after which a client will be considered stale, and removed.
 #[cfg(feature = "std")]
