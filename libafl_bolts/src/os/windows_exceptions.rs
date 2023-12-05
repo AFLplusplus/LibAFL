@@ -420,7 +420,7 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
 }
 
 #[cfg(feature = "alloc")]
-pub trait CtrlHandler {
+pub(crate) trait CtrlHandler {
     /// Handle an exception
     fn handle(&mut self, ctrl_type: u32) -> bool;
 }
@@ -435,7 +435,9 @@ static mut CTRL_HANDLER: Option<CtrlHandlerHolder> = None;
 /// Set `ConsoleCtrlHandler` to catch Ctrl-C
 /// # Safety
 /// Same safety considerations as in `setup_exception_handler`
-pub unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(handler: &mut T) -> Result<(), Error> {
+pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
+    handler: &mut T,
+) -> Result<(), Error> {
     write_volatile(
         &mut CTRL_HANDLER,
         Some(CtrlHandlerHolder {
