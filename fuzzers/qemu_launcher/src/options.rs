@@ -18,10 +18,10 @@ use crate::version::Version;
     long_about = "Binary fuzzer using QEMU binary instrumentation"
 )]
 pub struct FuzzerOptions {
-    #[arg(long, help = "Input directory")]
+    #[arg(short, long, help = "Input directory")]
     pub input: String,
 
-    #[arg(long, help = "Output directory")]
+    #[arg(short, long, help = "Output directory")]
     pub output: String,
 
     #[arg(long, help = "Tokens file")]
@@ -39,10 +39,10 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Cpu cores to use", default_value = "all", value_parser = Cores::from_cmdline)]
     pub cores: Cores,
 
-    #[arg(long, help = "Cpu cores to use to use for ASAN", value_parser = Cores::from_cmdline)]
+    #[arg(long, help = "Cpu cores to use to use for ASAN", default_value = "1", value_parser = Cores::from_cmdline)]
     pub asan_cores: Option<Cores>,
 
-    #[arg(long, help = "Cpu cores to use to use for CmpLog", value_parser = Cores::from_cmdline)]
+    #[arg(long, help = "Cpu cores to use to use for CmpLog", default_value = "1", value_parser = Cores::from_cmdline)]
     pub cmplog_cores: Option<Cores>,
 
     #[clap(short, long, help = "Enable output from the fuzzer clients")]
