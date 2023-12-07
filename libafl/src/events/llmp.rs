@@ -41,7 +41,7 @@ use typed_builder::TypedBuilder;
 
 use super::{CustomBufEventResult, CustomBufHandlerFn};
 #[cfg(all(unix, feature = "std"))]
-use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
+use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
@@ -238,6 +238,8 @@ where
                 } else {
                     client_id
                 };
+
+                monitor.client_stats_insert(id);
                 let client = monitor.client_stats_mut_for(id);
                 client.update_corpus_size(*corpus_size as u64);
                 if id == client_id {
@@ -254,6 +256,7 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_executions(*executions as u64, *time);
                 monitor.display(event.name().to_string(), client_id);
@@ -264,8 +267,10 @@ where
                 value,
                 phantom: _,
             } => {
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_user_stats(name.clone(), value.clone());
+                monitor.aggregate(name);
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -279,6 +284,7 @@ where
                 // TODO: The monitor buffer should be added on client add.
 
                 // Get the client for the staterestorer ID
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
 
                 // Update the normal monitor for this client
@@ -294,6 +300,7 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
                 monitor.display(event.name().to_string(), client_id);
@@ -1148,6 +1155,19 @@ where
     S: State + HasExecutions,
     MT: Monitor + Clone,
 {
+    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
+    #[inline]
+    #[allow(clippy::unused_self)]
+    fn is_shutting_down() -> bool {
+        #[cfg(unix)]
+        unsafe {
+            core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
+        }
+
+        #[cfg(windows)]
+        false
+    }
+
     /// Launch the restarting manager
     pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<S, SP>), Error> {
         // We start ourself as child process to actually fuzz
@@ -1228,7 +1248,7 @@ where
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]
-            let mut staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             #[cfg(not(unix))]
@@ -1237,21 +1257,9 @@ where
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
-            #[cfg(unix)]
-            unsafe {
-                let data = &mut SHUTDOWN_SIGHANDLER_DATA;
-                // Write the pointer to staterestorer so we can release its shmem later
-                core::ptr::write_volatile(
-                    &mut data.staterestorer_ptr,
-                    &mut staterestorer as *mut _ as *mut std::ffi::c_void,
-                );
-                data.allocator_pid = std::process::id() as usize;
-                data.shutdown_handler = shutdown_handler::<SP> as *const std::ffi::c_void;
-            }
-
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
+            if let Err(_e) = unsafe { setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE) } {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }
@@ -1298,7 +1306,7 @@ where
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
 
-                if staterestorer.wants_to_exit() {
+                if staterestorer.wants_to_exit() || Self::is_shutting_down() {
                     return Err(Error::shutting_down());
                 }
 
@@ -1732,7 +1740,7 @@ mod tests {
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
+        events::llmp::{LlmpEventManager, _ENV_FUZZER_SENDER},
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
         fuzzer::Fuzzer,

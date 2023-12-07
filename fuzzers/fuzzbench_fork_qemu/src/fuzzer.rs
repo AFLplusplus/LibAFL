@@ -329,7 +329,7 @@ fn fuzz(
     };
 
     let mut hooks = QemuHooks::new(
-        &emu,
+        emu.clone(),
         tuple_list!(
             QemuEdgeCoverageChildHelper::default(),
             QemuCmpLogChildHelper::default(),

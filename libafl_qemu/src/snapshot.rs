@@ -22,9 +22,10 @@ use crate::SYS_mmap2;
 )))]
 use crate::SYS_newfstatat;
 use crate::{
+    asan::QemuAsanHelper,
     emu::{Emulator, MmapPerms, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple},
-    hooks::QemuHooks,
+    hooks::{Hook, QemuHooks},
     GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
     SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
@@ -487,23 +488,26 @@ impl<S> QemuHelper<S> for QemuSnapshotHelper
 where
     S: UsesInput + HasMetadata,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.writes(
-            None,
-            Some(trace_write1_snapshot::<QT, S>),
-            Some(trace_write2_snapshot::<QT, S>),
-            Some(trace_write4_snapshot::<QT, S>),
-            Some(trace_write8_snapshot::<QT, S>),
-            Some(trace_write_n_snapshot::<QT, S>),
-        );
+        if hooks.match_helper::<QemuAsanHelper>().is_none() {
+            // The ASan helper, if present, will call the tracer hook for the snpahsot helper as opt
+            hooks.writes(
+                Hook::Empty,
+                Hook::Function(trace_write1_snapshot::<QT, S>),
+                Hook::Function(trace_write2_snapshot::<QT, S>),
+                Hook::Function(trace_write4_snapshot::<QT, S>),
+                Hook::Function(trace_write8_snapshot::<QT, S>),
+                Hook::Function(trace_write_n_snapshot::<QT, S>),
+            );
+        }
 
         if !self.accurate_unmap {
-            hooks.syscalls(filter_mmap_snapshot::<QT, S>);
+            hooks.syscalls(Hook::Function(filter_mmap_snapshot::<QT, S>));
         }
-        hooks.after_syscalls(trace_mmap_snapshot::<QT, S>);
+        hooks.after_syscalls(Hook::Function(trace_mmap_snapshot::<QT, S>));
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
@@ -516,7 +520,7 @@ where
 }
 
 pub fn trace_write1_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -529,7 +533,7 @@ pub fn trace_write1_snapshot<QT, S>(
 }
 
 pub fn trace_write2_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -542,7 +546,7 @@ pub fn trace_write2_snapshot<QT, S>(
 }
 
 pub fn trace_write4_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -555,7 +559,7 @@ pub fn trace_write4_snapshot<QT, S>(
 }
 
 pub fn trace_write8_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -568,7 +572,7 @@ pub fn trace_write8_snapshot<QT, S>(
 }
 
 pub fn trace_write_n_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -584,17 +588,17 @@ pub fn trace_write_n_snapshot<QT, S>(
 #[allow(clippy::too_many_arguments)]
 #[allow(non_upper_case_globals)]
 pub fn filter_mmap_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     sys_num: i32,
-    a0: u64,
-    a1: u64,
-    _a2: u64,
-    _a3: u64,
-    _a4: u64,
-    _a5: u64,
-    _a6: u64,
-    _a7: u64,
+    a0: GuestAddr,
+    a1: GuestAddr,
+    _a2: GuestAddr,
+    _a3: GuestAddr,
+    _a4: GuestAddr,
+    _a5: GuestAddr,
+    _a6: GuestAddr,
+    _a7: GuestAddr,
 ) -> SyscallHookResult
 where
     S: UsesInput,
@@ -612,19 +616,19 @@ where
 #[allow(clippy::too_many_arguments)]
 #[allow(non_upper_case_globals)]
 pub fn trace_mmap_snapshot<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
-    result: u64,
+    result: GuestAddr,
     sys_num: i32,
-    a0: u64,
-    a1: u64,
-    a2: u64,
-    a3: u64,
-    _a4: u64,
-    _a5: u64,
-    _a6: u64,
-    _a7: u64,
-) -> u64
+    a0: GuestAddr,
+    a1: GuestAddr,
+    a2: GuestAddr,
+    a3: GuestAddr,
+    _a4: GuestAddr,
+    _a5: GuestAddr,
+    _a6: GuestAddr,
+    _a7: GuestAddr,
+) -> GuestAddr
 where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
@@ -633,15 +637,15 @@ where
     match i64::from(sys_num) {
         SYS_read | SYS_pread64 => {
             let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-            h.access(a1 as GuestAddr, a2 as usize);
+            h.access(a1, a2 as usize);
         }
         SYS_readlinkat => {
             let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-            h.access(a2 as GuestAddr, a3 as usize);
+            h.access(a2, a3 as usize);
         }
         SYS_futex => {
             let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-            h.access(a0 as GuestAddr, a3 as usize);
+            h.access(a0, a3 as usize);
         }
         #[cfg(not(any(
             cpu_target = "arm",
@@ -652,27 +656,27 @@ where
         SYS_newfstatat => {
             if a2 != 0 {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                h.access(a2 as GuestAddr, 4096); // stat is not greater than a page
+                h.access(a2, 4096); // stat is not greater than a page
             }
         }
         #[cfg(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "i386"))]
         SYS_fstatat64 => {
             if a2 != 0 {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                h.access(a2 as GuestAddr, 4096); // stat is not greater than a page
+                h.access(a2, 4096); // stat is not greater than a page
             }
         }
         SYS_statfs | SYS_fstatfs | SYS_fstat => {
             let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-            h.access(a1 as GuestAddr, 4096); // stat is not greater than a page
+            h.access(a1, 4096); // stat is not greater than a page
         }
         SYS_getrandom => {
             let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-            h.access(a0 as GuestAddr, a1 as usize);
+            h.access(a0, a1 as usize);
         }
         // mmap syscalls
         sys_const => {
-            if result as GuestAddr == GuestAddr::MAX
+            if result == GuestAddr::MAX
             /* -1 */
             {
                 return result;
@@ -684,7 +688,7 @@ where
             if sys_const == SYS_mmap2 {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                    h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
+                    h.add_mapped(result, a1 as usize, Some(prot));
                 }
             }
 
@@ -692,24 +696,24 @@ where
             if sys_const == SYS_mmap {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                    h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
+                    h.add_mapped(result, a1 as usize, Some(prot));
                 }
             }
 
             if sys_const == SYS_mremap {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
                 // TODO get the old permissions from the removed mapping
-                h.remove_mapped(a0 as GuestAddr, a1 as usize);
-                h.add_mapped(result as GuestAddr, a2 as usize, None);
+                h.remove_mapped(a0, a1 as usize);
+                h.add_mapped(result, a2 as usize, None);
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                    h.add_mapped(a0 as GuestAddr, a1 as usize, Some(prot));
+                    h.add_mapped(a0, a1 as usize, Some(prot));
                 }
             } else if sys_const == SYS_munmap {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
-                if !h.accurate_unmap && !h.is_unmap_allowed(a0 as GuestAddr, a1 as usize) {
-                    h.remove_mapped(a0 as GuestAddr, a1 as usize);
+                if !h.accurate_unmap && !h.is_unmap_allowed(a0, a1 as usize) {
+                    h.remove_mapped(a0, a1 as usize);
                 }
             }
         }

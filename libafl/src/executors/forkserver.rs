@@ -627,7 +627,9 @@ where
             exit_kind = ExitKind::Timeout;
         }
 
-        self.executor.forkserver_mut().reset_child_pid();
+        if !libc::WIFSTOPPED(self.executor.forkserver().status()) {
+            self.executor.forkserver_mut().reset_child_pid();
+        }
 
         Ok(exit_kind)
     }
@@ -1310,7 +1312,9 @@ where
             }
         }
 
-        self.forkserver.reset_child_pid();
+        if !libc::WIFSTOPPED(self.forkserver.status) {
+            self.forkserver.reset_child_pid();
+        }
 
         // Clear the observer map after the execution is finished
         compiler_fence(Ordering::SeqCst);

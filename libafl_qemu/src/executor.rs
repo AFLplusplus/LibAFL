@@ -37,7 +37,7 @@ where
     QT: QemuHelperTuple<S>,
 {
     inner: InProcessExecutor<'a, H, OT, S>,
-    hooks: &'a mut QemuHooks<'a, QT, S>,
+    hooks: &'a mut QemuHooks<QT, S>,
     first_exec: bool,
 }
 
@@ -59,16 +59,7 @@ where
 #[cfg(emulation_mode = "usermode")]
 extern "C" {
     // Original QEMU user signal handler
-    fn libafl_qemu_handle_crash(signal: i32, info: *mut siginfo_t, puc: *mut c_void) -> i32;
-}
-
-#[cfg(emulation_mode = "usermode")]
-static mut USE_LIBAFL_CRASH_HANDLER: bool = false;
-
-#[cfg(emulation_mode = "usermode")]
-#[no_mangle]
-pub unsafe extern "C" fn libafl_executor_reinstall_handlers() {
-    USE_LIBAFL_CRASH_HANDLER = true;
+    fn libafl_qemu_handle_crash(signal: i32, info: *mut siginfo_t, puc: *mut c_void);
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -76,7 +67,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     signal: Signal,
     info: &mut siginfo_t,
     mut context: Option<&mut ucontext_t>,
-    data: &mut InProcessExecutorHandlerData,
+    _data: &mut InProcessExecutorHandlerData,
 ) where
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -84,20 +75,11 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
-    let real_crash = if USE_LIBAFL_CRASH_HANDLER {
-        true
-    } else {
-        let puc = match &mut context {
-            Some(v) => (*v) as *mut ucontext_t as *mut c_void,
-            None => core::ptr::null_mut(),
-        };
-        libafl_qemu_handle_crash(signal as i32, info, puc) != 0
+    let puc = match &mut context {
+        Some(v) => (*v) as *mut ucontext_t as *mut c_void,
+        None => core::ptr::null_mut(),
     };
-    if real_crash {
-        libafl::executors::inprocess::unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z>(
-            signal, info, context, data,
-        );
-    }
+    libafl_qemu_handle_crash(signal as i32, info, puc);
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -138,7 +120,7 @@ where
     QT: QemuHelperTuple<S>,
 {
     pub fn new<EM, OF, Z>(
-        hooks: &'a mut QemuHooks<'a, QT, S>,
+        hooks: &'a mut QemuHooks<QT, S>,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -157,6 +139,21 @@ where
             inner.handlers_mut().crash_handler =
                 inproc_qemu_crash_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
                     as *const c_void;
+
+            let handler = |hooks: &mut QemuHooks<QT, S>, host_sig| {
+                eprintln!("Crashed with signal {host_sig}");
+                libafl::executors::inprocess::generic_inproc_crash_handler::<
+                    InProcessExecutor<'a, H, OT, S>,
+                    EM,
+                    OF,
+                    Z,
+                >();
+                if let Some(cpu) = hooks.emulator().current_cpu() {
+                    eprint!("Context:\n{}", cpu.display_context());
+                }
+            };
+
+            hooks.crash_closure(Box::new(handler));
         }
         #[cfg(emulation_mode = "systemmode")]
         {
@@ -186,11 +183,11 @@ where
         &mut self.inner
     }
 
-    pub fn hooks(&self) -> &QemuHooks<'a, QT, S> {
+    pub fn hooks(&self) -> &QemuHooks<QT, S> {
         self.hooks
     }
 
-    pub fn hooks_mut(&mut self) -> &mut QemuHooks<'a, QT, S> {
+    pub fn hooks_mut(&mut self) -> &mut QemuHooks<QT, S> {
         self.hooks
     }
 
@@ -280,7 +277,7 @@ where
     SP: ShMemProvider,
 {
     first_exec: bool,
-    hooks: &'a mut QemuHooks<'a, QT, S>,
+    hooks: &'a mut QemuHooks<QT, S>,
     inner: InProcessForkExecutor<'a, H, OT, S, SP>,
 }
 
@@ -311,7 +308,7 @@ where
     SP: ShMemProvider,
 {
     pub fn new<EM, OF, Z>(
-        hooks: &'a mut QemuHooks<'a, QT, S>,
+        hooks: &'a mut QemuHooks<QT, S>,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -349,11 +346,11 @@ where
         &mut self.inner
     }
 
-    pub fn hooks(&self) -> &QemuHooks<'a, QT, S> {
+    pub fn hooks(&self) -> &QemuHooks<QT, S> {
         self.hooks
     }
 
-    pub fn hooks_mut(&mut self) -> &mut QemuHooks<'a, QT, S> {
+    pub fn hooks_mut(&mut self) -> &mut QemuHooks<QT, S> {
         self.hooks
     }
 

@@ -5,10 +5,6 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-#[cfg(all(unix, feature = "std"))]
-use core::ffi::c_void;
-#[cfg(all(unix, feature = "std"))]
-use core::ptr::write_volatile;
 use core::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
 use core::{
@@ -30,7 +26,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
 #[cfg(all(unix, feature = "std"))]
-use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
+use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
@@ -216,6 +212,7 @@ where
                 executions,
                 forward_id: _,
             } => {
+                monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_corpus_size(*corpus_size as u64);
@@ -231,6 +228,7 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
+                monitor.client_stats_insert(ClientId(0));
                 let client = monitor.client_stats_mut_for(ClientId(0));
 
                 client.update_executions(*executions as u64, *time);
@@ -243,9 +241,11 @@ where
                 value,
                 phantom: _,
             } => {
+                monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_user_stats(name.clone(), value.clone());
+                monitor.aggregate(name);
                 monitor.display(event.name().to_string(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
@@ -257,6 +257,7 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
+                monitor.client_stats_insert(ClientId(0));
                 let client = monitor.client_stats_mut_for(ClientId(0));
                 client.update_executions(*executions as u64, *time);
                 client.update_introspection_monitor((**introspection_monitor).clone());
@@ -264,6 +265,7 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
+                monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_objective_size(*objective_size as u64);
@@ -444,6 +446,19 @@ where
         }
     }
 
+    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
+    #[inline]
+    #[allow(clippy::unused_self)]
+    fn is_shutting_down() -> bool {
+        #[cfg(unix)]
+        unsafe {
+            core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
+        }
+
+        #[cfg(windows)]
+        false
+    }
+
     /// Launch the simple restarting manager.
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
@@ -457,7 +472,7 @@ where
         let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
             // First, create a place to store state in, for restarts.
             #[cfg(unix)]
-            let mut staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SP> =
                 StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
             #[cfg(not(unix))]
             let staterestorer: StateRestorer<SP> =
@@ -466,21 +481,9 @@ where
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
-            #[cfg(unix)]
-            unsafe {
-                let data = &mut SHUTDOWN_SIGHANDLER_DATA;
-                // Write the pointer to staterestorer so we can release its shmem later
-                write_volatile(
-                    &mut data.staterestorer_ptr,
-                    &mut staterestorer as *mut _ as *mut c_void,
-                );
-                data.allocator_pid = std::process::id() as usize;
-                data.shutdown_handler = shutdown_handler::<SP> as *const c_void;
-            }
-
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
+            if let Err(_e) = unsafe { setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE) } {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }
@@ -514,7 +517,7 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
-                if staterestorer.wants_to_exit() {
+                if staterestorer.wants_to_exit() || Self::is_shutting_down() {
                     return Err(Error::shutting_down());
                 }
 

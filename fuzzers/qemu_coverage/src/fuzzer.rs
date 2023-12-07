@@ -236,7 +236,7 @@ pub fn fuzz() {
         coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
         let mut hooks = QemuHooks::new(
-            &emu,
+            emu.clone(),
             tuple_list!(QemuDrCovHelper::new(
                 QemuInstrumentationFilter::None,
                 rangemap,

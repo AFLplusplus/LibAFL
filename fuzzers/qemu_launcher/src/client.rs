@@ -103,11 +103,12 @@ impl<'a> Client<'a> {
         let mut env = self.env()?;
         log::debug!("ENV: {:#?}", env);
 
-        let emu = {
+        let (emu, mut asan) = {
             if self.options.is_asan_core(core_id) {
-                init_with_asan(&mut args, &mut env)?
+                let (emu, asan) = init_with_asan(&mut args, &mut env)?;
+                (emu, Some(asan))
             } else {
-                Emulator::new(&args, &env)?
+                (Emulator::new(&args, &env)?, None)
             }
         };
 
@@ -136,11 +137,14 @@ impl<'a> Client<'a> {
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuCmpLogHelper::default(),
-                QemuAsanHelper::default(),
+                QemuAsanHelper::default(asan.take().unwrap()),
             );
             instance.build().run(helpers, state)
         } else if is_asan {
-            let helpers = tuple_list!(edge_coverage_helper, QemuAsanHelper::default(),);
+            let helpers = tuple_list!(
+                edge_coverage_helper,
+                QemuAsanHelper::default(asan.take().unwrap()),
+            );
             instance.build().run(helpers, state)
         } else if is_cmplog {
             let helpers = tuple_list!(edge_coverage_helper, QemuCmpLogHelper::default(),);
