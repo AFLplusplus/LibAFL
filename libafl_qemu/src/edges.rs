@@ -1,5 +1,6 @@
 use std::{cell::UnsafeCell, cmp::max};
 
+use capstone::{Capstone, InsnDetail};
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{inputs::UsesInput, state::HasMetadata};
 pub use libafl_targets::{
@@ -39,9 +40,17 @@ impl QemuEdgesMapMetadata {
 libafl_bolts::impl_serdeany!(QemuEdgesMapMetadata);
 
 #[derive(Debug)]
+pub struct CustomCall {
+    pub guest_addr: GuestAddr,
+    pub value: u8,
+    //    function: Function,
+}
+
+#[derive(Debug)]
 pub struct QemuEdgeCoverageHelper {
     filter: QemuInstrumentationFilter,
     use_hitcounts: bool,
+    instrument_call_targets: Vec<CustomCall>,
 }
 
 impl QemuEdgeCoverageHelper {
@@ -50,6 +59,7 @@ impl QemuEdgeCoverageHelper {
         Self {
             filter,
             use_hitcounts: true,
+            instrument_call_targets: vec![],
         }
     }
 
@@ -58,12 +68,22 @@ impl QemuEdgeCoverageHelper {
         Self {
             filter,
             use_hitcounts: false,
+            instrument_call_targets: vec![],
         }
     }
 
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
+    }
+
+    #[must_use]
+    pub fn add_custom_call_target(&mut self, v: CustomCall) {
+        self.instrument_call_targets.push(v);
+    }
+
+    pub fn get_instrument_call_targets(&self) -> Vec<CustomCall> {
+        self.instrument_call_targets
     }
 }
 
@@ -116,6 +136,14 @@ where
                 );
             }
         }
+        #[cfg(emulation_mode = "usermode")]
+        if self.instrument_call_targets.len() > 0 {
+            hooks.blocks(
+                Hook::Function(QemuCustomCallHelper::gen_blocks_custom_calls::<QT, S>),
+                Hook::Empty,
+                Hook::Empty,
+            );
+        }
     }
 }
 
@@ -125,6 +153,7 @@ pub type QemuCollidingEdgeCoverageHelper = QemuEdgeCoverageChildHelper;
 pub struct QemuEdgeCoverageChildHelper {
     filter: QemuInstrumentationFilter,
     use_hitcounts: bool,
+    instrument_call_targets: Vec<CustomCall>,
 }
 
 impl QemuEdgeCoverageChildHelper {
@@ -133,6 +162,7 @@ impl QemuEdgeCoverageChildHelper {
         Self {
             filter,
             use_hitcounts: true,
+            instrument_call_targets: vec![],
         }
     }
 
@@ -141,12 +171,22 @@ impl QemuEdgeCoverageChildHelper {
         Self {
             filter,
             use_hitcounts: false,
+            instrument_call_targets: vec![],
         }
     }
 
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
+    }
+
+    #[must_use]
+    pub fn add_custom_call_target(&mut self, v: CustomCall) {
+        self.instrument_call_targets.push(v);
+    }
+
+    pub fn get_instrument_call_targets(&self) -> Vec<CustomCall> {
+        self.instrument_call_targets
     }
 }
 
@@ -195,6 +235,7 @@ where
 pub struct QemuEdgeCoverageClassicHelper {
     filter: QemuInstrumentationFilter,
     use_hitcounts: bool,
+    instrument_call_targets: Vec<CustomCall>,
 }
 
 impl QemuEdgeCoverageClassicHelper {
@@ -203,6 +244,7 @@ impl QemuEdgeCoverageClassicHelper {
         Self {
             filter,
             use_hitcounts: true,
+            instrument_call_targets: vec![],
         }
     }
 
@@ -211,12 +253,22 @@ impl QemuEdgeCoverageClassicHelper {
         Self {
             filter,
             use_hitcounts: false,
+            instrument_call_targets: vec![],
         }
     }
 
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.filter.allowed(addr)
+    }
+
+    #[must_use]
+    pub fn add_custom_call_target(&mut self, v: CustomCall) {
+        self.instrument_call_targets.push(v);
+    }
+
+    pub fn get_instrument_call_targets(&self) -> Vec<CustomCall> {
+        self.instrument_call_targets
     }
 }
 
@@ -258,6 +310,14 @@ where
                 Hook::Function(gen_hashed_block_ids::<QT, S>),
                 Hook::Empty,
                 Hook::Raw(trace_block_transition_single),
+            );
+        }
+        #[cfg(emulation_mode = "usermode")]
+        if self.instrument_call_targets.len() > 0 {
+            hooks.blocks(
+                Hook::Function(QemuCustomCallHelper::gen_blocks_custom_calls::<QT, S>),
+                Hook::Empty,
+                Hook::Empty,
             );
         }
     }
@@ -378,6 +438,91 @@ where
 }
 */
 
+#[derive(Debug)]
+pub struct QemuCustomCallHelper {
+    cs: Capstone,
+}
+
+#[cfg(emulation_mode = "usermode")]
+impl QemuCustomCallHelper {
+    fn gen_blocks_custom_calls<QT, S>(
+        hooks: &mut QemuHooks<QT, S>,
+        _state: Option<&mut S>,
+        pc: GuestAddr,
+    ) -> Option<u64>
+    where
+        S: UsesInput,
+        QT: QemuHelperTuple<S>,
+    {
+        println!("gen_blocks_custom_calls");
+
+        if let Some(_h) = hooks.helpers_mut().match_first_type_mut::<Self>() {
+            /*
+                        if !_h.must_instrument(pc) {
+                            return None;
+                        }
+            */
+
+            #[cfg(cpu_target = "arm")]
+            h.cs.set_mode(if pc & 1 == 1 {
+                capstone::arch::arm::ArchMode::Thumb.into()
+            } else {
+                capstone::arch::arm::ArchMode::Arm.into()
+            })
+            .unwrap();
+        }
+
+        let emu = hooks.emulator();
+
+        if let Some(h) = hooks.helpers().match_first_type::<Self>() {
+            #[allow(unused_mut)]
+            let mut code = { unsafe { std::slice::from_raw_parts(emu.g2h(pc), 512) } };
+
+            let mut iaddr = pc;
+
+            'disasm: while let Ok(insns) = h.cs.disasm_count(code, iaddr.into(), 1) {
+                if insns.is_empty() {
+                    break;
+                }
+                let insn = insns.first().unwrap();
+                let insn_detail: InsnDetail = h.cs.insn_detail(insn).unwrap();
+                for detail in insn_detail.groups() {
+                    match u32::from(detail.0) {
+                        capstone::InsnGroupType::CS_GRP_CALL => {
+                            //                           let addr = detail.1;
+                            let mut instrument_call = 0;
+                            let instrument_call_targets = h.get_instrument_call_targets();
+                            for targets in instrument_call_targets {
+                                //                              if targets.guest_addr == addr {
+                                println!("TODO!!");
+                                //emu.set_hook(k, insn.address() as GuestAddr, on_call, false);
+                                break;
+                                //                              }
+                            }
+                        }
+                        capstone::InsnGroupType::CS_GRP_RET
+                        | capstone::InsnGroupType::CS_GRP_INVALID
+                        | capstone::InsnGroupType::CS_GRP_JUMP
+                        | capstone::InsnGroupType::CS_GRP_IRET
+                        | capstone::InsnGroupType::CS_GRP_PRIVILEGE => {
+                            break 'disasm;
+                        }
+                        _ => {}
+                    }
+                }
+
+                iaddr += insn.bytes().len() as GuestAddr;
+
+                unsafe {
+                    code = std::slice::from_raw_parts(emu.g2h(iaddr), 512);
+                }
+            }
+        }
+
+        None
+    }
+}
+
 pub fn gen_hashed_block_ids<QT, S>(
     hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
@@ -421,3 +566,9 @@ pub extern "C" fn trace_block_transition_single(_: *const (), id: u64) {
         });
     }
 }
+
+/*
+#[cfg(emulation_mode = "usermode")]
+impl<S> QemuHelper<S> for QemuCmpLogRoutinesHelper
+pub fn
+*/
