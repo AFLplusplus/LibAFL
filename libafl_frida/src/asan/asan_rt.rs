@@ -61,6 +61,12 @@ use crate::{
     utils::writer_register,
 };
 
+use yaxpeax_arch::{ReaderBuilder, U8Reader, Decoder, Arch};
+use yaxpeax_arm::armv8::a64::{ARMv8, Instruction, Opcode, Operand, SizeCode, ShiftStyle};
+
+
+
+
 extern "C" {
     fn __register_frame(begin: *mut c_void);
 }
@@ -2188,59 +2194,116 @@ impl AsanRuntime {
         self.blob_check_mem_64bytes.as_ref().unwrap()
     }
 
+
+
+
+    
     /// Determine if the instruction is 'interesting' for the purposes of ASAN
     #[cfg(target_arch = "aarch64")]
     #[must_use]
     #[inline]
-    pub fn asan_is_interesting_instruction(
-        capstone: &Capstone,
-        _address: u64,
-        instr: &Insn,
-    ) -> Option<(
-        capstone::RegId,
-        capstone::RegId,
-        i32,
-        u32,
-        Arm64Shift,
-        Arm64Extender,
-    )> {
+    pub fn asan_is_interesting_instruction(address: u64) -> Option<
+        (
+            u16, //reg1
+            Option<(u16, SizeCode)>, //size of reg2. This needs to be an option in the case that we don't have one
+            i32, //displacement.
+            u32, //load/store size
+            Option<(ShiftStyle, u8)>, //(shift type, shift size)
+        )
+    > {
         // We need to re-decode frida-internal capstone values to upstream capstone
-        let cs_instr = frida_to_cs(capstone, instr);
-        let cs_instr = cs_instr.first().unwrap();
+        let instr_bytes = unsafe { std::slice::from_raw_parts(address as *const u8, 4) };
+        let mut reader = ReaderBuilder::<u64, u8>::read_from(instr_bytes);
+        let decoder = <ARMv8 as Arch>::Decoder::default();
+        let mut decode_res = decoder.decode(&mut reader);
 
-        // We have to ignore these instructions. Simulating them with their side effects is
-        // complex, to say the least.
-        match cs_instr.mnemonic().unwrap() {
-            "ldaxr" | "stlxr" | "ldxr" | "stxr" | "ldar" | "stlr" | "ldarb" | "ldarh" | "ldaxp"
-            | "ldaxrb" | "ldaxrh" | "stlrb" | "stlrh" | "stlxp" | "stlxrb" | "stlxrh" | "ldxrb"
-            | "ldxrh" | "stxrb" | "stxrh" => return None,
-            _ => (),
-        }
-
-        let operands = capstone
-            .insn_detail(cs_instr)
-            .unwrap()
-            .arch_detail()
-            .operands();
-        if operands.len() < 2 {
+        println!("{:?}", instr_bytes);
+        if let Err(e) = decode_res {
+            println!("{}", e);
+            //instruction is not supported by yaxpeax
             return None;
         }
 
-        if let Arm64Operand(arm64operand) = operands.last().unwrap() {
-            if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
-                return Some((
-                    opmem.base(),
-                    opmem.index(),
-                    opmem.disp(),
-                    instruction_width(cs_instr, &operands),
-                    arm64operand.shift,
-                    arm64operand.ext,
-                ));
+        let instr = decode_res.unwrap();
+        println!("{:?}", instr);
+        println!("{}", instr.to_string());
+
+        // We have to ignore these instructions. Simulating them with their side effects is
+        // complex, to say the least.
+        match instr.opcode {
+            | Opcode::LDAXR
+            | Opcode::STLXR
+            | Opcode::LDXR
+            | Opcode::LDAR
+            | Opcode::STLR
+            | Opcode::LDARB
+            | Opcode::LDAXP
+            | Opcode::LDAXRB
+            | Opcode::LDAXRH
+            | Opcode::STLRB
+            | Opcode::STLRH
+            | Opcode::STLXP
+            | Opcode::STLXRB
+            | Opcode::STLXRH
+            | Opcode::LDXRB
+            | Opcode::LDXRH
+            | Opcode::STXRB
+            | Opcode::STXRH => {
+                return None;
             }
+            _ => (),
+        }
+        //we need to do this convuluted operation because operands in yaxpeax are in a constant slice of size 4, 
+        //and any unused operands are Operand::Nothing
+        let operands_len = instr.operands
+            .iter()
+            .position(|item| *item == Operand::Nothing)
+            .unwrap_or_else(|| 4);
+        if operands_len < 2 {
+            return None;
         }
 
-        None
+        let memory_access_size = instruction_width(&instr);
+
+        /*if instr.opcode == Opcode::LDRSW || instr.opcode == Opcode::LDR {
+            //this is a special case for pc-relative loads. The only two opcodes capable of this are LDR and LDRSW
+            // For more information on this, look up "literal" loads in the ARM docs.
+            match instr.operands[1] {
+                //this is safe because an ldr is guranteed to have at least 3 operands
+                Operand::PCOffset(off) => {
+                    return Some((32, None, off, memory_access_size, None));
+                }
+                _ => (),
+            }
+        }*/
+
+        //abuse the fact that the last operand is always the mem operand
+        match instr.operands[operands_len - 1] {
+            Operand::RegRegOffset(reg1, reg2, size, shift, shift_size) => {
+                return Some((
+                    reg1,
+                    Some((reg2, size)),
+                    0,
+                    memory_access_size,
+                    Some((shift, shift_size)),
+                ));
+            }
+            Operand::RegPreIndex(reg, disp, _) => {
+                return Some((reg, None, disp as i32, memory_access_size, None));
+            }
+            Operand::RegPostIndex(reg, _) => {
+                //in post index the disp is applied after so it doesn't matter for this memory access
+                return Some((reg, None, 0, memory_access_size, None));
+            }
+            Operand::RegPostIndexReg(reg, _) => {
+                return Some((reg, None, 0, memory_access_size, None));
+            }
+            _ => {
+                panic!("Could not decode memory access");
+            }
+        }
     }
+
 
     /// Checks if the current instruction is interesting for address sanitization.
     #[cfg(all(target_arch = "x86_64", unix))]
@@ -2492,12 +2555,12 @@ impl AsanRuntime {
         &mut self,
         _address: u64,
         output: &StalkerOutput,
-        basereg: capstone::RegId,
-        indexreg: capstone::RegId,
+        basereg: u16,
+        indexreg: Option<(u16, SizeCode)>, 
         displacement: i32,
         width: u32,
-        shift: Arm64Shift,
-        extender: Arm64Extender,
+        shift: Option<(ShiftStyle, u8)>
+
     ) {
         debug_assert!(
             i32::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).is_ok(),
@@ -2507,11 +2570,11 @@ impl AsanRuntime {
         let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         let writer = output.writer();
 
-        let basereg = writer_register(basereg);
-        let indexreg = if indexreg.0 == 0 {
-            None
+        let basereg = writer_register(basereg, SizeCode::X, false); //the writer register can never be zr and is always 64 bit
+        let indexreg = if let Some((reg, sizecode)) = indexreg {
+            Some(writer_register(reg, sizecode, true)) //the index register can be zr
         } else {
-            Some(writer_register(indexreg))
+            None
         };
 
         if self.current_report_impl == 0
@@ -2520,8 +2583,6 @@ impl AsanRuntime {
         {
             let after_report_impl = writer.code_offset() + 2;
 
-            #[cfg(target_arch = "x86_64")]
-            writer.put_jmp_near_label(after_report_impl);
             #[cfg(target_arch = "aarch64")]
             writer.put_b_label(after_report_impl);
 
@@ -2576,28 +2637,22 @@ impl AsanRuntime {
                 }
             }
 
-            if let (Arm64Extender::ARM64_EXT_INVALID, Arm64Shift::Invalid) = (extender, shift) {
-                writer.put_add_reg_reg_reg(
-                    Aarch64Register::X0,
-                    Aarch64Register::X0,
-                    Aarch64Register::X1,
-                );
-            } else {
-                let extender_encoding: i32 = match extender {
-                    Arm64Extender::ARM64_EXT_UXTB => 0b000,
-                    Arm64Extender::ARM64_EXT_UXTH => 0b001,
-                    Arm64Extender::ARM64_EXT_UXTW => 0b010,
-                    Arm64Extender::ARM64_EXT_UXTX => 0b011,
-                    Arm64Extender::ARM64_EXT_SXTB => 0b100,
-                    Arm64Extender::ARM64_EXT_SXTH => 0b101,
-                    Arm64Extender::ARM64_EXT_SXTW => 0b110,
-                    Arm64Extender::ARM64_EXT_SXTX => 0b111,
-                    Arm64Extender::ARM64_EXT_INVALID => -1,
+            if let Some((shift_type, amount)) = shift {
+                let extender_encoding: i32 = match shift_type {
+                    ShiftStyle::UXTB => 0b000,
+                    ShiftStyle::UXTH => 0b001,
+                    ShiftStyle::UXTW => 0b010,
+                    ShiftStyle::UXTX => 0b011,
+                    ShiftStyle::SXTB => 0b100,
+                    ShiftStyle::SXTH => 0b101,
+                    ShiftStyle::SXTW => 0b110,
+                    ShiftStyle::SXTX => 0b111,
+                    _ => -1,
                 };
-                let (shift_encoding, shift_amount): (i32, u32) = match shift {
-                    Arm64Shift::Lsl(amount) => (0b00, amount),
-                    Arm64Shift::Lsr(amount) => (0b01, amount),
-                    Arm64Shift::Asr(amount) => (0b10, amount),
+                let (shift_encoding, shift_amount): (i32, u32) = match shift_type {
+                    ShiftStyle::LSL => (0b00, amount as u32),
+                    ShiftStyle::LSR => (0b01, amount as u32),
+                    ShiftStyle::ASR => (0b10, amount as u32),
                     _ => (-1, 0),
                 };
 
@@ -2615,8 +2670,15 @@ impl AsanRuntime {
                             .to_le_bytes(),
                     );
                 } else {
-                    panic!("extender: {extender:?}, shift: {shift:?}");
+                    panic!("shift_type: {shift_type:?}, shift: {shift:?}");
                 }
+            } else {
+
+                writer.put_add_reg_reg_reg(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    Aarch64Register::X1,
+                );
             };
         }
 

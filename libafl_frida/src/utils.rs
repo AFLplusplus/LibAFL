@@ -7,6 +7,8 @@ use capstone::{
 };
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::Aarch64Register;
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arm::armv8::a64::{Instruction, Operand, Opcode, SIMDSizeCode, SizeCode};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
@@ -14,79 +16,116 @@ use frida_gum_sys;
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 
+
+#[cfg(target_arch = "aarch64")]
+#[inline]
+#[must_use]
+pub fn get_simd_size(sizecode: SIMDSizeCode) -> u32 {
+    match sizecode{
+        SIMDSizeCode::B => {
+            1
+        },
+        SIMDSizeCode::H => {
+            2
+        },
+        SIMDSizeCode::S => {
+            4
+        },
+        SIMDSizeCode::D => {
+            8
+        },
+        SIMDSizeCode::Q => {
+            16
+        }
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[inline]
+#[must_use]
+pub fn get_reg_size(sizecode: SizeCode) -> u32 {
+    match sizecode{ 
+        SizeCode::W => { //this is guaranteed to be 4 because we deal with the strb/ldrb and strh/ldrh should be dealt with in instruction_width
+            4
+        },
+        SizeCode::X => {
+            8
+        },
+    }
+}
+
+
 /// Determine the width of the specified instruction
 #[cfg(target_arch = "aarch64")]
 #[inline]
 #[must_use]
-pub fn instruction_width(instr: &Insn, operands: &[arch::ArchOperand]) -> u32 {
-    use capstone::arch::arm64::{Arm64Insn as I, Arm64Reg as R, Arm64Vas as V};
+pub fn instruction_width(instr: &Instruction) -> u32 {
+    
 
-    let num_registers = match instr.id().0.into() {
-        I::ARM64_INS_STP
-        | I::ARM64_INS_STXP
-        | I::ARM64_INS_STNP
-        | I::ARM64_INS_STLXP
-        | I::ARM64_INS_LDP
-        | I::ARM64_INS_LDXP
-        | I::ARM64_INS_LDNP => 2,
+    let num_registers = match instr.opcode {
+        Opcode::STP
+        | Opcode::STXP
+        | Opcode::STNP
+        | Opcode::STLXP
+        | Opcode::LDP
+        | Opcode::LDXP
+        | Opcode::LDNP => 2,
         _ => 1,
     };
 
-    let mnemonic = instr.mnemonic().unwrap();
-    match mnemonic.as_bytes().last().unwrap() {
+   // let mnemonic = instr.opcode.to_string().as_bytes();
+    match instr.opcode.to_string().as_bytes().last().unwrap() {
         b'b' => return 1,
         b'h' => return 2,
         b'w' => return 4 * num_registers,
         _ => (),
     }
 
-    if let Arm64Operand(operand) = operands.first().unwrap() {
-        if operand.vas != V::ARM64_VAS_INVALID {
-            let count_byte: u32 = if mnemonic.starts_with("st") || mnemonic.starts_with("ld") {
-                mnemonic.chars().nth(2).unwrap().to_digit(10).unwrap()
-            } else {
-                1
-            };
 
-            return match operand.vas {
-                V::ARM64_VAS_1B => count_byte,
-                V::ARM64_VAS_1H => 2 * count_byte,
-                V::ARM64_VAS_4B | V::ARM64_VAS_1S | V::ARM64_VAS_1D | V::ARM64_VAS_2H => {
-                    4 * count_byte
-                }
-                V::ARM64_VAS_8B
-                | V::ARM64_VAS_4H
-                | V::ARM64_VAS_2S
-                | V::ARM64_VAS_2D
-                | V::ARM64_VAS_1Q => 8 * count_byte,
-                V::ARM64_VAS_8H | V::ARM64_VAS_4S | V::ARM64_VAS_16B => 16 * count_byte,
-                V::ARM64_VAS_INVALID => {
-                    panic!("should not be reached");
-                }
-            };
-        } else if let Arm64OperandType::Reg(operand) = operand.op_type {
-            match u32::from(operand.0) {
-                R::ARM64_REG_W0..=R::ARM64_REG_W30
-                | R::ARM64_REG_WZR
-                | R::ARM64_REG_WSP
-                | R::ARM64_REG_S0..=R::ARM64_REG_S31 => return 4 * num_registers,
-                R::ARM64_REG_D0..=R::ARM64_REG_D31 => return 8 * num_registers,
-                R::ARM64_REG_Q0..=R::ARM64_REG_Q31 => return 16,
-                _ => (),
-            }
-        };
+    let size = match instr.operands.first().unwrap() {
+        Operand::Register(sizecode, _) => { //this is used for standard loads/stores including ldr, ldp, etc.
+            get_reg_size(*sizecode)
+        },
+        Operand::RegisterPair(sizecode, _) => { //not sure where this is used, but it is possible in yaxpeax
+            get_reg_size(*sizecode)
+        }
+        Operand::SIMDRegister(sizecode, _) => { //this is used in cases like ldr q0, [sp]
+            get_simd_size(*sizecode)
+        },
+        Operand::SIMDRegisterGroup(sizecode, _, _, num) => { 
+            ////This is used for cases such as ld4 {v1.2s, v2.2s, v3.2s, v4.2s}, [x0]. 
+            //the sizecode is the size of each simd structure (This can only be D or Q), num is the number of them (i.e. ld4 would be 4)
+            get_simd_size(*sizecode) * *num as u32
+        },
+        Operand::SIMDRegisterGroupLane(_, sizecode, num, _) => {
+            //This is used for cases such as ld4 {v0.s, v1.s, v2.s, v3.s}[0], [x0]. In this case sizecode is the size of each lane, num is the number of them
+            get_simd_size(*sizecode) * *num as u32
+        },
+        _ => {
+            panic!("Failed to get size");
+        }
     };
-
-    8 * num_registers
+    num_registers * size
 }
 
-/// Convert from a capstone register id to a frida `InstructionWriter` register index
+
+/// Convert from a yaxpeax register to frida gum's register state
 #[cfg(target_arch = "aarch64")]
 #[must_use]
 #[inline]
-pub fn writer_register(reg: capstone::RegId) -> Aarch64Register {
-    let regint: u16 = reg.0;
-    Aarch64Register::from_u32(u32::from(regint)).unwrap()
+pub fn writer_register(reg: u16, sizecode: SizeCode, zr: bool) -> Aarch64Register {
+    //yaxpeax and arm both make it so that depending on the opcode reg=31 can be EITHER SP or XZR. 
+    match (reg, sizecode, zr) {
+        (0..=28, SizeCode::X, _) => Aarch64Register::from_u32(Aarch64Register::X0 as u32 + reg as u32).unwrap(),
+        (0..=30, SizeCode::W, _) => Aarch64Register::from_u32(Aarch64Register::W0 as u32 + reg as u32).unwrap(),
+        (29, SizeCode::X, _) => Aarch64Register::Fp,
+        (30, SizeCode::X, _) => Aarch64Register::Lr,
+        (31, SizeCode::X, false) => Aarch64Register::Sp,
+        (31, SizeCode::W, false) => Aarch64Register::Wsp,
+        (31, SizeCode::X, true) => Aarch64Register::Xzr,
+        (31, SizeCode::W, true) => Aarch64Register::Wzr,
+        _ => panic!("Failed to get writer register")
+    }
 }
 
 /// The writer registers

@@ -443,29 +443,12 @@ where
         let ranges = Rc::clone(ranges);
         let runtimes = Rc::clone(runtimes);
 
-        #[cfg(target_arch = "aarch64")]
-        let capstone = Capstone::new()
-            .arm64()
-            .mode(arch::arm64::ArchMode::Arm)
-            .detail(true)
-            .build()
-            .expect("Failed to create Capstone object");
-        #[cfg(all(target_arch = "x86_64", unix))]
-        let capstone = Capstone::new()
-            .x86()
-            .mode(arch::x86::ArchMode::Mode64)
-            .detail(true)
-            .build()
-            .expect("Failed to create Capstone object");
-
         Transformer::from_callback(gum, move |basic_block, output| {
             Self::transform(
                 basic_block,
                 &output,
                 &ranges,
                 &runtimes,
-                #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))]
-                &capstone,
             );
         })
     }
@@ -475,7 +458,6 @@ where
         output: &StalkerOutput,
         ranges: &Rc<RefCell<RangeMap<usize, (u16, String)>>>,
         runtimes: &Rc<RefCell<RT>>,
-        #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))] capstone: &Capstone,
     ) {
         let mut first = true;
         let mut basic_block_start = 0;
@@ -505,10 +487,10 @@ where
                         basic_block_start = address;
                     }
                 }
-
+                
                 #[cfg(unix)]
                 let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
-                    AsanRuntime::asan_is_interesting_instruction(capstone, address, instr)
+                    AsanRuntime::asan_is_interesting_instruction(address) //change this
                 } else {
                     None
                 };
@@ -530,7 +512,7 @@ where
                 }
 
                 #[cfg(target_arch = "aarch64")]
-                if let Some((basereg, indexreg, displacement, width, shift, extender)) = res {
+                if let Some((basereg, indexreg, displacement, width, shift)) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
                             address,
@@ -540,18 +522,17 @@ where
                             displacement,
                             width,
                             shift,
-                            extender,
                         );
                     }
                 }
 
                 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
                 if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>() {
-                    if let Some((op1, op2, special_case)) =
-                        CmpLogRuntime::cmplog_is_interesting_instruction(&capstone, address, instr)
+                    if let Some((op1, op2, shift, special_case)) =
+                        CmpLogRuntime::cmplog_is_interesting_instruction(address) //change this as well
                     {
                         //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                        rt.emit_comparison_handling(address, &output, &op1, &op2, special_case);
+                        rt.emit_comparison_handling(address, &output, &op1, &op2, shift, special_case);
                     }
                 }
 
