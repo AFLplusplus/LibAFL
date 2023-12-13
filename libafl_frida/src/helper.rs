@@ -6,7 +6,7 @@ use std::{
     rc::Rc,
 };
 
-#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))]
+#[cfg(all(target_arch = "x86_64", unix))]
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone,

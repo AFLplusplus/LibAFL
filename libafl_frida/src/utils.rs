@@ -1,22 +1,17 @@
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[cfg(any(target_arch = "x86_64"))]
 use capstone::Capstone;
-#[cfg(target_arch = "aarch64")]
-use capstone::{
-    arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand},
-    Insn,
-};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::Aarch64Register;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{Instruction, Operand, Opcode, SIMDSizeCode, SizeCode};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[cfg(any(target_arch = "x86_64"))]
 use frida_gum_sys;
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 
-
+/// Determine the size of an SIMD register
 #[cfg(target_arch = "aarch64")]
 #[inline]
 #[must_use]
@@ -40,6 +35,7 @@ pub fn get_simd_size(sizecode: SIMDSizeCode) -> u32 {
     }
 }
 
+/// Determine the size of a normal register
 #[cfg(target_arch = "aarch64")]
 #[inline]
 #[must_use]
@@ -178,7 +174,7 @@ pub fn writer_register(reg: capstone::RegId) -> X86Register {
 
 /// Translates a frida instruction to a capstone instruction.
 /// Returns a [`capstone::Instructions`] with a single [`capstone::Insn`] inside.
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[cfg(any(target_arch = "x86_64"))]
 pub(crate) fn frida_to_cs<'a>(
     capstone: &'a Capstone,
     frida_insn: &frida_gum_sys::Insn,

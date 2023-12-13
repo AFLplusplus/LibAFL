@@ -2,6 +2,7 @@
 use std::{fmt::Debug, io::Write, marker::PhantomData};
 
 use backtrace::Backtrace;
+#[cfg(target_arch = "x86_64")]
 use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
@@ -24,6 +25,11 @@ use termcolor::{Color, ColorSpec, WriteColor};
 #[cfg(target_arch = "x86_64")]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT};
+
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arm::armv8::a64::ARMv8;
+use yaxpeax_arch::{ReaderBuilder, Arch, Decoder, Reader, AddressBase, U8Reader};
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -234,11 +240,7 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
+                let decoder = <ARMv8 as Arch>::Decoder::default();
 
                 #[cfg(target_arch = "x86_64")]
                 let mut cs = Capstone::new()
@@ -248,18 +250,16 @@ impl AsanErrors {
                     .build()
                     .expect("Failed to create Capstone object");
 
+                #[cfg(target_arch = "x86_64")]
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
+                
                 let start_pc = error.pc - 4 * 5;
-                for insn in &*cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
+                let mut reader = ReaderBuilder::<u64, u8>::read_from(unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) });
+
+                while let Ok(insn) = decoder.decode(&mut reader)
                 {
-                    if insn.address() as usize == error.pc {
+                    if <U8Reader<'_> as Reader<u64, u8>>::total_offset(&mut reader).to_linear() == start_pc-error.pc { //error.pc < start_pc
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -489,11 +489,7 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
+                let decoder = <ARMv8 as Arch>::Decoder::default();
 
                 #[cfg(target_arch = "x86_64")]
                 let mut cs = Capstone::new()
@@ -503,18 +499,16 @@ impl AsanErrors {
                     .build()
                     .expect("Failed to create Capstone object");
 
+                #[cfg(target_arch = "x86_64")]
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
                 let start_pc = pc;
-                for insn in &*cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
-                {
-                    if insn.address() as usize == pc {
+                let mut reader = ReaderBuilder::<u64, u8>::read_from(unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) });
+                
+                //unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) }
+                
+                while let Ok(insn) = decoder.decode(&mut reader) {
+                    if <U8Reader<'_> as Reader<u64, u8>>::total_offset(&mut reader).to_linear() == pc - start_pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();

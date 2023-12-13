@@ -18,15 +18,6 @@ use capstone::{
     arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
     Capstone, RegAccessType, RegId,
 };
-#[cfg(target_arch = "aarch64")]
-use capstone::{
-    arch::{
-        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
-        ArchOperand::Arm64Operand,
-        BuildsCapstone,
-    },
-    Capstone,
-};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
@@ -36,8 +27,9 @@ use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
     Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails,
 };
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[cfg(any(target_arch = "x86_64"))]
 use frida_gum_sys::Insn;
+
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
 #[cfg(unix)]
@@ -50,7 +42,7 @@ use libc::{getrlimit64, rlimit64};
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[cfg(any(target_arch = "x86_64"))]
 use crate::utils::frida_to_cs;
 #[cfg(target_arch = "aarch64")]
 use crate::utils::instruction_width;
@@ -61,8 +53,9 @@ use crate::{
     utils::writer_register,
 };
 
-use yaxpeax_arch::{ReaderBuilder, U8Reader, Decoder, Arch};
-use yaxpeax_arm::armv8::a64::{ARMv8, Instruction, Opcode, Operand, SizeCode, ShiftStyle};
+use yaxpeax_arch::{ReaderBuilder, Decoder, Arch};
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arm::armv8::a64::{ARMv8, Opcode, Operand, SizeCode, ShiftStyle};
 
 
 
@@ -1080,114 +1073,71 @@ impl AsanRuntime {
     #[allow(clippy::too_many_lines)]
     extern "C" fn handle_trap(&mut self) {
         let mut actual_pc = self.regs[31];
-        actual_pc = match self.stalked_addresses.get(&actual_pc) {
+        actual_pc = match self.stalked_addresses.get(&actual_pc) { //get the pc associated with the trapped insn
             Some(addr) => *addr,
             None => actual_pc,
         };
 
-        let cs = Capstone::new()
-            .arm64()
-            .mode(capstone::arch::arm64::ArchMode::Arm)
-            .detail(true)
-            .build()
-            .unwrap();
+        let instr_bytes = unsafe { std::slice::from_raw_parts(actual_pc as *const u8, 4) };
+        let mut reader = ReaderBuilder::<u64, u8>::read_from(instr_bytes);
+        let decoder = <ARMv8 as Arch>::Decoder::default();
+        let decode_res = decoder.decode(&mut reader);
 
-        let instructions = cs
-            .disasm_count(
-                unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 24) },
-                actual_pc as u64,
-                3,
-            )
-            .unwrap();
-        let instructions = instructions.iter().collect::<Vec<&capstone::Insn>>();
-        let mut insn = instructions.first().unwrap();
-        if insn.mnemonic().unwrap() == "msr" && insn.op_str().unwrap() == "nzcv, x0" {
-            insn = instructions.get(2).unwrap();
-            actual_pc = insn.address() as usize;
+        if let Err(_) = decode_res {
+            //uhhh. How did we get here?
+            panic!("Failed to disassemble instruction");
         }
 
-        let detail = cs.insn_detail(insn).unwrap();
-        let arch_detail = detail.arch_detail();
-        let (mut base_reg, mut index_reg, displacement) =
-            if let Arm64Operand(arm64operand) = arch_detail.operands().last().unwrap() {
-                if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
-                    (opmem.base().0, opmem.index().0, opmem.disp())
-                } else {
-                    (0, 0, 0)
-                }
-            } else {
-                (0, 0, 0)
-            };
+        let insn = decode_res.unwrap();
+        
+        
+        if insn.opcode == Opcode::MSR && insn.operands[0] == Operand::SystemReg(23056) { //the first operand is nzcv 
 
-        if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= base_reg
-            && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
-        {
-            base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
-        } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
-            base_reg = 29u16;
-        } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
-            base_reg = 30u16;
-        } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16
-            || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16
-            || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16
-            || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16
-        {
-            base_reg = 31u16;
-        } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= base_reg
-            && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16
-        {
-            base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
-        } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= base_reg
-            && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16
-        {
-            base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
+            //What case is this for??
+
+            /*insn = instructions.get(2).unwrap();
+            actual_pc = insn.address() as usize;*/
         }
+
+
+        
+        let (base_reg, index_reg, displacement) = match *insn.operands.last().unwrap(){
+            Operand::RegRegOffset(reg1, reg2,_,_,_) => {
+                (reg1, Some(reg2), 0)
+            }
+            Operand::RegPreIndex(reg, disp, _) => {
+                (reg, None, disp)
+            }
+            Operand::RegPostIndex(reg, _) => {
+                //in post index the disp is applied after so it doesn't matter for this memory access
+                (reg, None, 0)
+            }
+            Operand::RegPostIndexReg(reg, _) => {
+                (reg, None, 0,)
+            }
+            _ => {
+                panic!("Could not decode memory access");
+            }
+        };
 
         #[allow(clippy::cast_possible_wrap)]
-        let mut fault_address =
+        let fault_address =
             (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
 
-        if index_reg == 0 {
-            index_reg = 0xffff;
-        } else {
-            if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
-                && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
-            {
-                index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
-            } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
-                index_reg = 29u16;
-            } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
-                index_reg = 30u16;
-            } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16
-                || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16
-                || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16
-                || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16
-            {
-                index_reg = 31u16;
-            } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= index_reg
-                && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16
-            {
-                index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
-            } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= index_reg
-                && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16
-            {
-                index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
-            }
-            fault_address += self.regs[index_reg as usize];
-        }
+        
 
         let backtrace = Backtrace::new();
 
         let (stack_start, stack_end) = Self::current_stack();
         #[allow(clippy::option_if_let_else)]
         let error = if fault_address >= stack_start && fault_address < stack_end {
-            if insn.mnemonic().unwrap().starts_with('l') {
+            if insn.opcode.to_string().starts_with('l') {
                 AsanError::StackOobRead((
                     self.regs,
                     actual_pc,
                     (
                         Some(base_reg),
-                        Some(index_reg),
+                        Some(index_reg.unwrap_or_else(|| 0xffff)),
                         displacement as usize,
                         fault_address,
                     ),
@@ -1199,7 +1149,7 @@ impl AsanRuntime {
                     actual_pc,
                     (
                         Some(base_reg),
-                        Some(index_reg),
+                        Some(index_reg.unwrap_or_else(|| 0xffff)),
                         displacement as usize,
                         fault_address,
                     ),
@@ -1215,14 +1165,14 @@ impl AsanRuntime {
                 pc: actual_pc,
                 fault: (
                     Some(base_reg),
-                    Some(index_reg),
+                    Some(index_reg.unwrap_or_else(|| 0xffff)),
                     displacement as usize,
                     fault_address,
                 ),
                 metadata: metadata.clone(),
                 backtrace,
             };
-            if insn.mnemonic().unwrap().starts_with('l') {
+            if insn.opcode.to_string().starts_with('l') {
                 if metadata.freed {
                     AsanError::ReadAfterFree(asan_readwrite_error)
                 } else {
@@ -1239,7 +1189,7 @@ impl AsanRuntime {
                 actual_pc,
                 (
                     Some(base_reg),
-                    Some(index_reg),
+                    Some(index_reg.unwrap_or_else(|| 0xffff)),
                     displacement as usize,
                     fault_address,
                 ),
@@ -2215,7 +2165,7 @@ impl AsanRuntime {
         let instr_bytes = unsafe { std::slice::from_raw_parts(address as *const u8, 4) };
         let mut reader = ReaderBuilder::<u64, u8>::read_from(instr_bytes);
         let decoder = <ARMv8 as Arch>::Decoder::default();
-        let mut decode_res = decoder.decode(&mut reader);
+        let decode_res = decoder.decode(&mut reader);
 
         println!("{:?}", instr_bytes);
         if let Err(e) = decode_res {
@@ -2278,7 +2228,7 @@ impl AsanRuntime {
         }*/
 
         //abuse the fact that the last operand is always the mem operand
-        match instr.operands[operands_len - 1] {
+        match *instr.operands.last().unwrap() {
             Operand::RegRegOffset(reg1, reg2, size, shift, shift_size) => {
                 return Some((
                     reg1,
@@ -2289,7 +2239,7 @@ impl AsanRuntime {
                 ));
             }
             Operand::RegPreIndex(reg, disp, _) => {
-                return Some((reg, None, disp as i32, memory_access_size, None));
+                return Some((reg, None, disp, memory_access_size, None));
             }
             Operand::RegPostIndex(reg, _) => {
                 //in post index the disp is applied after so it doesn't matter for this memory access
@@ -2662,13 +2612,13 @@ impl AsanRuntime {
                     writer.put_bytes(
                         &(0x8b210000 | ((extender_encoding as u32) << 13) | (shift_amount << 10))
                             .to_le_bytes(),
-                    );
+                    ); //add x0, x0, w1, [shift] #[amount]
                 } else if shift_encoding != -1 {
                     #[allow(clippy::cast_sign_loss)]
                     writer.put_bytes(
                         &(0x8b010000 | ((shift_encoding as u32) << 22) | (shift_amount << 10))
                             .to_le_bytes(),
-                    );
+                    ); //add x0, x0, x1, [shift] #[amount]
                 } else {
                     panic!("shift_type: {shift_type:?}, shift: {shift:?}");
                 }
@@ -2705,12 +2655,12 @@ impl AsanRuntime {
                 let displacement = displacement.unsigned_abs();
                 let displacement_hi = displacement / 4096;
                 let displacement_lo = displacement % 4096;
-                writer.put_bytes(&(0xd1400000u32 | (displacement_hi << 10)).to_le_bytes());
+                writer.put_bytes(&(0xd1400000u32 | (displacement_hi << 10)).to_le_bytes()); //sub x0, x0, #[displacement / 4096] LSL#12
                 writer.put_sub_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
                     u64::from(displacement_lo),
-                );
+                ); //sub x0, x0, #[displacement & 4095]
             }
         } else if displacement > 0 {
             #[allow(clippy::cast_sign_loss)]
@@ -2750,7 +2700,7 @@ impl AsanRuntime {
             64 => writer.put_bytes(self.blob_check_mem_64bytes()),
             _ => false,
         };
-
+        //Shouldn't there be some manipulation of the code_offset here?
         // Add the branch to report
         //writer.put_brk_imm(0x12);
         writer.put_branch_address(self.current_report_impl);

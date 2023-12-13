@@ -27,11 +27,9 @@ use frida_gum::{
     instruction_writer::{Aarch64Register, IndexMode, InstructionWriter},
     stalker::StalkerOutput,
 };
-#[cfg(target_arch = "aarch64")]
-use frida_gum_sys::Insn;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-use crate::utils::{frida_to_cs, instruction_width, writer_register};
+use crate::utils::writer_register;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 /// Speciial `CmpLog` Cases for `aarch64`
@@ -44,7 +42,7 @@ pub enum SpecialCmpLogCase {
 }
 
 #[cfg(target_arch = "aarch64")]
-use yaxpeax_arm::armv8::a64::{Instruction, Operand, Opcode, SizeCode, ShiftStyle, ARMv8};
+use yaxpeax_arm::armv8::a64::{Operand, Opcode, ShiftStyle, ARMv8};
 use yaxpeax_arch::{Arch, ReaderBuilder, Decoder};
 
 
@@ -375,11 +373,9 @@ impl CmpLogRuntime {
         let instr_bytes = unsafe { std::slice::from_raw_parts(address as *const u8, 4) };
         let mut reader = ReaderBuilder::<u64, u8>::read_from(instr_bytes);
         let decoder = <ARMv8 as Arch>::Decoder::default();
-        let mut decode_res = decoder.decode(&mut reader);
+        let decode_res = decoder.decode(&mut reader);
 
-        println!("{:?}", instr_bytes);
-        if let Err(e) = decode_res {
-            println!("{}", e);
+        if let Err(_) = decode_res {
             //instruction is not supported by yaxpeax
             return None;
         }
