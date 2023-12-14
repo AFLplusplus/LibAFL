@@ -5,10 +5,11 @@ authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenuk
 edition = "2021"
 
 [features]
-default = ["std"]
+default = ["std", "scoped_coverage"]
 std = []
 # Forces a crash
 crash = []
+scoped_coverage = ["libafl_targets/sancov_pcguard_scoped"]
 
 [profile.release]
 lto = true
@@ -24,7 +25,7 @@ which = "4.4"
 libafl = { path = "../../libafl/", features = ["default"] }
 # libafl = { path = "../../libafl/", features = ["default"] }
 libafl_bolts = { path = "../../libafl_bolts/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_scoped", "libfuzzer", "sancov_cmplog"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer", "sancov_cmplog"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 mimalloc = { version = "*", default-features = false }

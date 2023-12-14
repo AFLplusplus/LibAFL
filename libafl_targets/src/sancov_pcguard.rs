@@ -65,40 +65,43 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
                         *count = count.saturating_add(1);
                     }
                 };
-                COV_SCOPES.with_borrow_mut(|scopes| match scopes.last() {
-                    None => scopes.push((addr, pos, 1)),
-                    Some((old_addr, _, _)) => match old_addr.cmp(&addr) {
-                        Ordering::Less => {
-                            // if old addr is less, it is in a deeper stack frame
-                            // commit edges back until we get to our depth, then truncate
-                            let mut new_len = scopes.len();
-                            for (i, &(_, pos, count)) in scopes
-                                .iter()
-                                .enumerate()
-                                .rev()
-                                .take_while(|(_, (old_addr, _, _))| *old_addr < addr)
-                            {
-                                let addr = ptr.add(pos);
-                                let val = addr.read().max(count);
-                                addr.write(val);
-                                new_len = i;
-                            }
-                            scopes.truncate(new_len);
+                let _ = COV_SCOPES.try_with(|scopes| {
+                    let mut scopes = scopes.borrow_mut();
+                    match scopes.last() {
+                        None => scopes.push((addr, pos, 1)),
+                        Some((old_addr, _, _)) => match old_addr.cmp(&addr) {
+                            Ordering::Less => {
+                                // if old addr is less, it is in a deeper stack frame
+                                // commit edges back until we get to our depth, then truncate
+                                let mut new_len = scopes.len();
+                                for (i, &(_, pos, count)) in scopes
+                                    .iter()
+                                    .enumerate()
+                                    .rev()
+                                    .take_while(|(_, (old_addr, _, _))| *old_addr < addr)
+                                {
+                                    let addr = ptr.add(pos);
+                                    let val = addr.read().max(count);
+                                    addr.write(val);
+                                    new_len = i;
+                                }
+                                scopes.truncate(new_len);
 
-                            // we might be returning to an existing scope; commit to this
-                            update_scope(scopes, addr, pos);
-                        }
-                        Ordering::Equal => {
-                            // we are in the same stack frame
-                            // try to find an existing guard to increment, otherwise add our own
-                            update_scope(scopes, addr, pos);
-                        }
-                        Ordering::Greater => {
-                            // if old addr is greater, it is in a higher stack frame
-                            // we know there are no edges matching us here; push the new scope
-                            scopes.push((addr, pos, 1));
-                        }
-                    },
+                                // we might be returning to an existing scope; commit to this
+                                update_scope(scopes, addr, pos);
+                            }
+                            Ordering::Equal => {
+                                // we are in the same stack frame
+                                // try to find an existing guard to increment, otherwise add our own
+                                update_scope(scopes, addr, pos);
+                            }
+                            Ordering::Greater => {
+                                // if old addr is greater, it is in a higher stack frame
+                                // we know there are no edges matching us here; push the new scope
+                                scopes.push((addr, pos, 1));
+                            }
+                        },
+                    }
                 });
             }
         }
