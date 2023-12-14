@@ -39,7 +39,7 @@ use crate::{
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple, UsesObservers},
-    state::{HasExecutions, UsesState},
+    state::{HasExecutions, State, UsesState},
     Error,
 };
 
@@ -522,7 +522,7 @@ impl<E> TimeoutForkserverExecutor<E> {
 
 impl<E, EM, Z> Executor<EM, Z> for TimeoutForkserverExecutor<E>
 where
-    E: Executor<EM, Z> + HasForkserver + HasObservers + Debug,
+    E: Executor<EM, Z> + HasForkserver + HasObservers,
     E::Input: HasTargetBytes,
     E::State: HasExecutions,
     EM: UsesState<State = E::State>,
@@ -627,7 +627,9 @@ where
             exit_kind = ExitKind::Timeout;
         }
 
-        self.executor.forkserver_mut().reset_child_pid();
+        if !libc::WIFSTOPPED(self.executor.forkserver().status()) {
+            self.executor.forkserver_mut().reset_child_pid();
+        }
 
         Ok(exit_kind)
     }
@@ -1213,7 +1215,7 @@ impl<EM, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
-    S: UsesInput + HasExecutions,
+    S: State + HasExecutions,
     S::Input: HasTargetBytes,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
@@ -1310,7 +1312,9 @@ where
             }
         }
 
-        self.forkserver.reset_child_pid();
+        if !libc::WIFSTOPPED(self.forkserver.status) {
+            self.forkserver.reset_child_pid();
+        }
 
         // Clear the observer map after the execution is finished
         compiler_fence(Ordering::SeqCst);
@@ -1321,7 +1325,7 @@ where
 
 impl<OT, S, SP> UsesState for ForkserverExecutor<OT, S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type State = S;
@@ -1330,7 +1334,7 @@ where
 impl<OT, S, SP> UsesObservers for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     type Observers = OT;
@@ -1339,7 +1343,7 @@ where
 impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider,
 {
     #[inline]

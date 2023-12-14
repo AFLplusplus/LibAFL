@@ -49,6 +49,11 @@ pub use concolic::ConcolicTracingStage;
 #[cfg(feature = "std")]
 pub use concolic::SimpleConcolicMutationalStage;
 
+#[cfg(feature = "unicode")]
+pub mod string;
+#[cfg(feature = "unicode")]
+pub use string::*;
+
 #[cfg(feature = "std")]
 pub mod sync;
 #[cfg(feature = "std")]
@@ -56,6 +61,7 @@ pub use sync::*;
 
 #[cfg(feature = "std")]
 pub mod dump;
+
 use core::{convert::From, marker::PhantomData};
 
 #[cfg(feature = "std")]
@@ -69,10 +75,7 @@ use crate::{
     inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand,
-        UsesState,
-    },
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand, UsesState},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 
@@ -254,12 +257,7 @@ where
 impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
 where
     CS: Scheduler,
-    CS::State: HasClientPerfMonitor
-        + HasExecutions
-        + HasMetadata
-        + HasRand
-        + HasCorpus
-        + HasLastReportTime,
+    CS::State: HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>
         + EventRestarter

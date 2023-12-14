@@ -46,15 +46,20 @@ pub const AFL_CMP_TYPE_RTN: u32 = 2;
 
 // EXTERNS, GLOBALS
 
+#[cfg(feature = "cmplog")]
 // void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2)
 extern "C" {
     /// Logs an instruction for feedback during fuzzing
     pub fn __libafl_targets_cmplog_instructions(k: usize, shape: u8, arg1: u64, arg2: u64);
 
+    /// Logs a routine for feedback during fuzzing
+    pub fn __libafl_targets_cmplog_routines(k: usize, ptr1: *const u8, ptr2: *const u8);
+
     /// Pointer to the `CmpLog` map
     pub static mut libafl_cmplog_map_ptr: *mut CmpLogMap;
 }
 
+#[cfg(feature = "cmplog")]
 pub use libafl_cmplog_map_ptr as CMPLOG_MAP_PTR;
 
 /// Value indicating if cmplog is enabled.

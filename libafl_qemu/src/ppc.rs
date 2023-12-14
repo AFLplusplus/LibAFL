@@ -1,10 +1,13 @@
+use std::sync::OnceLock;
+
+use enum_map::{enum_map, EnumMap};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::powerpc::*;
 
-use crate::CallingConvention;
+use crate::{sync_backdoor::SyncBackdoorArgs, CallingConvention};
 
 /// Registers for the MIPS instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
@@ -85,6 +88,23 @@ pub enum Regs {
     Fpscr = 70,
 }
 
+static SYNC_BACKDOOR_ARCH_REGS: OnceLock<EnumMap<SyncBackdoorArgs, Regs>> = OnceLock::new();
+
+pub fn get_sync_backdoor_arch_regs() -> &'static EnumMap<SyncBackdoorArgs, Regs> {
+    SYNC_BACKDOOR_ARCH_REGS.get_or_init(|| {
+        enum_map! {
+            SyncBackdoorArgs::Ret  => Regs::R3,
+            SyncBackdoorArgs::Cmd  => Regs::R0,
+            SyncBackdoorArgs::Arg1 => Regs::R3,
+            SyncBackdoorArgs::Arg2 => Regs::R4,
+            SyncBackdoorArgs::Arg3 => Regs::R5,
+            SyncBackdoorArgs::Arg4 => Regs::R6,
+            SyncBackdoorArgs::Arg5 => Regs::R7,
+            SyncBackdoorArgs::Arg6 => Regs::R8,
+        }
+    })
+}
+
 /// alias registers
 #[allow(non_upper_case_globals)]
 impl Regs {
@@ -120,6 +140,21 @@ impl crate::ArchExtras for crate::CPU {
         T: Into<GuestReg>,
     {
         self.write_reg(Regs::Lr, val)
+    }
+
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        if conv != CallingConvention::Cdecl {
+            return Err(format!("Unsupported calling convention: {conv:#?}"));
+        }
+
+        match idx {
+            0 => self.read_reg(Regs::R3),
+            1 => self.read_reg(Regs::R4),
+            _ => Err(format!("Unsupported argument: {idx:}")),
+        }
     }
 
     fn write_function_argument<T>(

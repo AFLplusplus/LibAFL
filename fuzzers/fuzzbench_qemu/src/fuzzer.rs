@@ -45,15 +45,15 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
+    // asan::{init_with_asan, QemuAsanHelper},
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
-    //asan::{init_with_asan, QemuAsanHelper},
     edges::edges_map_mut_slice,
     edges::QemuEdgeCoverageHelper,
     edges::MAX_EDGES_NUM,
     elf::EasyElf,
-    emu::Emulator,
     filter_qemu_args,
     hooks::QemuHooks,
+    Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
@@ -173,7 +173,7 @@ fn fuzz(
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
     let emu = Emulator::new(&args, &env).unwrap();
-    //let emu = init_with_asan(&mut args, &mut env);
+    // let (emu, asan) = init_with_asan(&mut args, &mut env).unwrap();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
@@ -342,11 +342,11 @@ fn fuzz(
     };
 
     let mut hooks = QemuHooks::new(
-        &emu,
+        emu.clone(),
         tuple_list!(
             QemuEdgeCoverageHelper::default(),
             QemuCmpLogHelper::default(),
-            //QemuAsanHelper::default(),
+            // QemuAsanHelper::default(asan),
             //QemuSnapshotHelper::new()
         ),
     );

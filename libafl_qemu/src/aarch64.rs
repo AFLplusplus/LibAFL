@@ -1,11 +1,14 @@
+use std::sync::OnceLock;
+
 use capstone::arch::BuildsCapstone;
+use enum_map::{enum_map, EnumMap};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::aarch64::*;
 
-use crate::CallingConvention;
+use crate::{sync_backdoor::SyncBackdoorArgs, CallingConvention};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -46,6 +49,23 @@ pub enum Regs {
     Pstate = 33,
 }
 
+static SYNC_BACKDOOR_ARCH_REGS: OnceLock<EnumMap<SyncBackdoorArgs, Regs>> = OnceLock::new();
+
+pub fn get_sync_backdoor_arch_regs() -> &'static EnumMap<SyncBackdoorArgs, Regs> {
+    SYNC_BACKDOOR_ARCH_REGS.get_or_init(|| {
+        enum_map! {
+            SyncBackdoorArgs::Ret  => Regs::X0,
+            SyncBackdoorArgs::Cmd  => Regs::X0,
+            SyncBackdoorArgs::Arg1 => Regs::X1,
+            SyncBackdoorArgs::Arg2 => Regs::X2,
+            SyncBackdoorArgs::Arg3 => Regs::X3,
+            SyncBackdoorArgs::Arg4 => Regs::X4,
+            SyncBackdoorArgs::Arg5 => Regs::X5,
+            SyncBackdoorArgs::Arg6 => Regs::X6,
+        }
+    })
+}
+
 /// alias registers
 #[allow(non_upper_case_globals)]
 impl Regs {
@@ -83,6 +103,21 @@ impl crate::ArchExtras for crate::CPU {
         T: Into<GuestReg>,
     {
         self.write_reg(Regs::Lr, val)
+    }
+
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        if conv != CallingConvention::Cdecl {
+            return Err(format!("Unsupported calling convention: {conv:#?}"));
+        }
+
+        match idx {
+            0 => self.read_reg(Regs::X0),
+            1 => self.read_reg(Regs::X1),
+            _ => Err(format!("Unsupported argument: {idx:}")),
+        }
     }
 
     fn write_function_argument<T>(

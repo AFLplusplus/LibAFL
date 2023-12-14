@@ -55,6 +55,33 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
+#[cfg(all(any(target_os = "linux", target_os = "android"), target_arch = "x86"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    use libc::{
+        REG_EAX, REG_EBP, REG_EBX, REG_ECX, REG_EDI, REG_EDX, REG_EFL, REG_EIP, REG_ESI, REG_ESP,
+    };
+
+    let mcontext = &ucontext.uc_mcontext;
+
+    write!(writer, "eax: {:#016x}, ", mcontext.gregs[REG_EAX as usize])?;
+    write!(writer, "ebx: {:#016x}, ", mcontext.gregs[REG_EBX as usize])?;
+    write!(writer, "ecx: {:#016x}, ", mcontext.gregs[REG_ECX as usize])?;
+    writeln!(writer, "edx: {:#016x}, ", mcontext.gregs[REG_EDX as usize])?;
+    write!(writer, "edi: {:#016x}, ", mcontext.gregs[REG_EDI as usize])?;
+    write!(writer, "esi: {:#016x}, ", mcontext.gregs[REG_ESI as usize])?;
+    write!(writer, "esp: {:#016x}, ", mcontext.gregs[REG_ESP as usize])?;
+    writeln!(writer, "ebp: {:#016x}, ", mcontext.gregs[REG_EBP as usize])?;
+    write!(writer, "eip: {:#016x}, ", mcontext.gregs[REG_EIP as usize])?;
+    writeln!(writer, "efl: {:#016x}, ", mcontext.gregs[REG_EFL as usize])?;
+
+    Ok(())
+}
+
+/// Write the content of all important registers
 #[cfg(all(
     any(target_os = "linux", target_os = "android"),
     target_arch = "aarch64"
@@ -426,6 +453,34 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
+#[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    let mcontext = &ucontext.uc_mcontext;
+
+    write!(writer, "r8 : {:#016x}, ", mcontext.r8)?;
+    write!(writer, "r9 : {:#016x}, ", mcontext.r9)?;
+    write!(writer, "r10 : {:#016x}, ", mcontext.r10)?;
+    write!(writer, "r11 : {:#016x}, ", mcontext.r11)?;
+    write!(writer, "r12 : {:#016x}, ", mcontext.r12)?;
+    write!(writer, "r13 : {:#016x}, ", mcontext.r13)?;
+    write!(writer, "r14 : {:#016x}, ", mcontext.r14)?;
+    write!(writer, "r15 : {:#016x}, ", mcontext.r15)?;
+    write!(writer, "rdi : {:#016x}, ", mcontext.rdi)?;
+    write!(writer, "rsi : {:#016x}, ", mcontext.rsi)?;
+    write!(writer, "rbp : {:#016x}, ", mcontext.rbp)?;
+    write!(writer, "rbx : {:#016x}, ", mcontext.rbx)?;
+    write!(writer, "rdx : {:#016x}, ", mcontext.rdx)?;
+    write!(writer, "rax : {:#016x}, ", mcontext.rax)?;
+    write!(writer, "rcx : {:#016x}, ", mcontext.rcx)?;
+    write!(writer, "rsp : {:#016x}, ", mcontext.rsp)?;
+    write!(writer, "rflags : {:#016x}, ", mcontext.rflags)?;
+    Ok(())
+}
+
 #[allow(clippy::unnecessary_wraps)]
 #[cfg(not(any(
     target_vendor = "apple",
@@ -436,6 +491,7 @@ pub fn dump_registers<W: Write>(
     target_os = "netbsd",
     target_os = "openbsd",
     windows,
+    target_os = "haiku",
     any(target_os = "solaris", target_os = "illumos"),
 )))]
 fn dump_registers<W: Write>(
@@ -466,6 +522,23 @@ fn write_crash<W: Write>(
         signal,
         ucontext.uc_mcontext.gregs[libc::REG_RIP as usize],
         ucontext.uc_mcontext.gregs[libc::REG_CR2 as usize]
+    )?;
+
+    Ok(())
+}
+
+#[cfg(all(any(target_os = "linux", target_os = "android"), target_arch = "x86"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:#08x}, fault address: {:#08x}",
+        signal,
+        ucontext.uc_mcontext.gregs[libc::REG_EIP as usize],
+        ucontext.uc_mcontext.cr2
     )?;
 
     Ok(())
@@ -641,6 +714,21 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
+#[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:#016x}",
+        signal, ucontext.uc_mcontext.rip
+    )?;
+
+    Ok(())
+}
+
 #[cfg(not(any(
     target_vendor = "apple",
     target_os = "linux",
@@ -650,6 +738,7 @@ fn write_crash<W: Write>(
     target_os = "openbsd",
     target_os = "netbsd",
     windows,
+    target_os = "haiku",
     any(target_os = "solaris", target_os = "illumos"),
 )))]
 fn write_crash<W: Write>(
@@ -658,7 +747,7 @@ fn write_crash<W: Write>(
     _ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     // TODO add fault addr for other platforms.
-    writeln!(writer, "Received signal {}", signal,)?;
+    writeln!(writer, "Received signal {signal}")?;
 
     Ok(())
 }
@@ -878,10 +967,34 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     Ok(())
 }
 
+#[cfg(target_os = "haiku")]
+fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
+    let p = std::mem::MaybeUninit::<libc::image_info>::uninit();
+    let mut info = unsafe { p.assume_init() };
+    let mut c: i32 = 0;
+
+    loop {
+        if unsafe { libc::get_next_image_info(0, &mut c, &mut info) } == libc::B_OK {
+            let i = format!(
+                "{}-{} {:?}\n",
+                info.text as i64,
+                info.text as i64 + i64::from(info.text_size),
+                info.name
+            );
+            writer.write_all(&i.into_bytes())?;
+        } else {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(not(any(
     target_os = "freebsd",
     target_os = "openbsd",
     target_os = "netbsd",
+    target_os = "haiku",
     target_env = "apple",
     any(target_os = "linux", target_os = "android"),
     any(target_os = "solaris", target_os = "illumos"),
@@ -904,8 +1017,12 @@ pub fn generate_minibsod<W: Write>(
     writeln!(writer, "{:━^100}", " CRASH ")?;
     if let Some(uctx) = ucontext {
         write_crash(writer, signal, uctx)?;
-        writeln!(writer, "{:━^100}", " REGISTERS ")?;
-        dump_registers(writer, uctx)?;
+
+        #[cfg(target_pointer_width = "64")]
+        {
+            writeln!(writer, "{:━^100}", " REGISTERS ")?;
+            dump_registers(writer, uctx)?;
+        }
     } else {
         writeln!(writer, "Received signal {signal}")?;
     }

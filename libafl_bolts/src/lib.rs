@@ -140,7 +140,6 @@ use alloc::vec::Vec;
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::Hasher;
-use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -170,23 +169,24 @@ use log::{Metadata, Record};
 /// out of `libafl_bolts` into `libafl::events::launcher`.
 pub mod launcher {}
 
-// Re-export derive(SerdeAny)
-#[cfg(feature = "libafl_derive")]
-#[allow(unused_imports)]
-#[macro_use]
-extern crate libafl_derive;
-#[cfg(feature = "alloc")]
-use alloc::string::{FromUtf8Error, String};
 use core::{
     array::TryFromSliceError,
     fmt::{self, Display},
+    iter::Iterator,
     num::{ParseIntError, TryFromIntError},
+    time,
 };
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
 
 #[cfg(feature = "libafl_derive")]
 pub use libafl_derive::SerdeAny;
+#[cfg(feature = "alloc")]
+use {
+    alloc::string::{FromUtf8Error, String},
+    core::cell::{BorrowError, BorrowMutError},
+    core::str::Utf8Error,
+};
 
 /// We need fixed names for many parts of this lib.
 pub trait Named {
@@ -444,6 +444,24 @@ impl Display for Error {
     }
 }
 
+#[cfg(feature = "alloc")]
+impl From<BorrowError> for Error {
+    fn from(err: BorrowError) -> Self {
+        Self::illegal_state(format!(
+            "Couldn't borrow from a RefCell as immutable: {err:?}"
+        ))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl From<BorrowMutError> for Error {
+    fn from(err: BorrowMutError) -> Self {
+        Self::illegal_state(format!(
+            "Couldn't borrow from a RefCell as mutable: {err:?}"
+        ))
+    }
+}
+
 /// Stringify the postcard serializer error
 #[cfg(feature = "alloc")]
 impl From<postcard::Error> for Error {
@@ -479,6 +497,14 @@ impl From<io::Error> for Error {
 impl From<FromUtf8Error> for Error {
     #[allow(unused_variables)]
     fn from(err: FromUtf8Error) -> Self {
+        Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl From<Utf8Error> for Error {
+    #[allow(unused_variables)]
+    fn from(err: Utf8Error) -> Self {
         Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
     }
 }

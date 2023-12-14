@@ -440,7 +440,7 @@ bool AFLCoverage::runOnModule(Module &M) {
       fprintf(stderr, "FUNCTION: %s (%zu)\n", F.getName().str().c_str(),
               F.size());
 
-    // if (!isInInstrumentList(&F)) { continue; }
+    if (isIgnoreFunction(&F)) { continue; }
 
     if (F.size() < function_minimum_size) { continue; }
     if (DumpCFG) { entry_bb[F.getName()] = &F.getEntryBlock(); }

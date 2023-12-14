@@ -20,7 +20,7 @@ use crate::{
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         RemovableScheduler, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
     Error,
 };
 
@@ -224,7 +224,7 @@ where
 
 impl<F, O, S> UsesState for WeightedScheduler<F, O, S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -233,7 +233,7 @@ impl<F, O, S> RemovableScheduler for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
-    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
 {
     #[allow(clippy::cast_precision_loss)]
     fn on_remove(
@@ -305,7 +305,7 @@ impl<F, O, S> Scheduler for WeightedScheduler<F, O, S>
 where
     F: TestcaseScore<S>,
     O: MapObserver,
-    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, idx: CorpusId) -> Result<(), Error> {

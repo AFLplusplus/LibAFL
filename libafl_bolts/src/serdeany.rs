@@ -17,10 +17,11 @@ pub trait SerdeAny: Any + erased_serde::Serialize + Debug {
 
 /// Wrap a type for serialization
 #[derive(Debug)]
-pub struct Wrap<'a, T: ?Sized + Debug>(pub &'a T);
+pub struct Wrap<'a, T: ?Sized>(pub &'a T);
+
 impl<'a, T> Serialize for Wrap<'a, T>
 where
-    T: ?Sized + erased_serde::Serialize + 'a + Debug,
+    T: ?Sized + erased_serde::Serialize + 'a,
 {
     /// Serialize the type
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -84,7 +85,7 @@ macro_rules! create_serde_registry_for_trait {
                 Error,
             };
 
-            /// Visitor object used internally for the [`SerdeAny`] registry.
+            /// Visitor object used internally for the [`crate::serdeany::SerdeAny`] registry.
             #[derive(Debug)]
             pub struct BoxDynVisitor {}
             #[allow(unused_qualifications)]
@@ -318,7 +319,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
-            /// A serializable [`HashMap`] wrapper for [`SerdeAny`] types, addressable by name.
+            /// A serializable [`HashMap`] wrapper for [`crate::serdeany::SerdeAny`] types, addressable by name.
             #[allow(clippy::unsafe_derive_deserialize)]
             #[allow(unused_qualifications)]
             #[derive(Debug, Serialize, Deserialize)]

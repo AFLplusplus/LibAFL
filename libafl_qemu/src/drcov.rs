@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     emu::{GuestAddr, GuestUsize},
-    helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
-    hooks::QemuHooks,
+    helper::{HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    hooks::{Hook, QemuHooks},
     Emulator,
 };
 
@@ -75,18 +75,28 @@ impl QemuDrCovHelper {
     }
 }
 
+impl HasInstrumentationFilter for QemuDrCovHelper {
+    fn filter(&self) -> &QemuInstrumentationFilter {
+        &self.filter
+    }
+
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+        &mut self.filter
+    }
+}
+
 impl<S> QemuHelper<S> for QemuDrCovHelper
 where
     S: UsesInput + HasMetadata,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
         hooks.blocks(
-            Some(gen_unique_block_ids::<QT, S>),
-            Some(gen_block_lengths::<QT, S>),
-            Some(exec_trace_block::<QT, S>),
+            Hook::Function(gen_unique_block_ids::<QT, S>),
+            Hook::Function(gen_block_lengths::<QT, S>),
+            Hook::Function(exec_trace_block::<QT, S>),
         );
     }
 
@@ -182,7 +192,7 @@ where
 }
 
 pub fn gen_unique_block_ids<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
@@ -237,7 +247,7 @@ where
 }
 
 pub fn gen_block_lengths<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     block_length: GuestUsize,
@@ -261,7 +271,7 @@ pub fn gen_block_lengths<QT, S>(
         .insert(pc, block_length);
 }
 
-pub fn exec_trace_block<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, _state: Option<&mut S>, id: u64)
+pub fn exec_trace_block<QT, S>(hooks: &mut QemuHooks<QT, S>, _state: Option<&mut S>, id: u64)
 where
     S: HasMetadata,
     S: UsesInput,

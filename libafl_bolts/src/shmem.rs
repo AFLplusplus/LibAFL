@@ -10,22 +10,26 @@ use core::fmt::Display;
 use core::{cell::RefCell, fmt, mem::ManuallyDrop};
 #[cfg(feature = "std")]
 use std::env;
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 use std::io::Read;
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 use std::io::Write;
 
 use serde::{Deserialize, Serialize};
-#[cfg(all(feature = "std", unix, not(target_os = "android")))]
+#[cfg(all(
+    feature = "std",
+    unix,
+    not(any(target_os = "android", target_os = "haiku"))
+))]
 pub use unix_shmem::{MmapShMem, MmapShMemProvider};
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 use crate::os::pipes::Pipe;
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
 pub use crate::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
 use crate::{AsMutSlice, AsSlice, Error};
 
@@ -49,12 +53,12 @@ pub type StdShMemService = ShMemService<MmapShMemProvider>;
 #[cfg(all(
     feature = "std",
     unix,
-    not(any(target_os = "android", target_vendor = "apple"))
+    not(any(target_os = "android", target_vendor = "apple", target_os = "haiku"))
 ))]
 pub type StdShMemProvider = UnixShMemProvider;
 /// The standard sharedmem service
 #[cfg(any(
-    not(any(target_os = "android", target_vendor = "apple")),
+    not(any(target_os = "android", target_vendor = "apple", target_os = "haiku")),
     not(feature = "std")
 ))]
 pub type StdShMemService = DummyShMemService;
@@ -71,7 +75,7 @@ pub type StdServedShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemP
 #[cfg(all(
     feature = "std",
     unix,
-    not(any(target_os = "android", target_vendor = "apple"))
+    not(any(target_os = "android", target_vendor = "apple", target_os = "haiku"))
 ))]
 pub type StdServedShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
 
@@ -407,7 +411,7 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 pub struct RcShMemProvider<SP>
 where
     SP: ShMemProvider,
@@ -427,7 +431,7 @@ where
 //#[cfg(all(unix, feature = "std"))]
 //unsafe impl<SP: ShMemProvider> Send for RcShMemProvider<SP> {}
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 impl<SP> ShMemProvider for RcShMemProvider<SP>
 where
     SP: ShMemProvider + Debug,
@@ -501,7 +505,7 @@ where
     }
 }
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 impl<SP> RcShMemProvider<SP>
 where
     SP: ShMemProvider,
@@ -563,7 +567,7 @@ where
     }
 }
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 impl<SP> Default for RcShMemProvider<SP>
 where
     SP: ShMemProvider + Debug,
@@ -573,7 +577,7 @@ where
     }
 }
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 impl<SP> RcShMemProvider<ServedShMemProvider<SP>>
 where
     SP: ShMemProvider + Debug,
@@ -589,7 +593,7 @@ where
 /// On Android, this is partially reused to wrap [`unix_shmem::ashmem::AshmemShMem`],
 /// Although for an [`ServedShMemProvider`] using a unix domain socket
 /// Is needed on top.
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 pub mod unix_shmem {
     #[cfg(doc)]
     use crate::shmem::{ShMem, ShMemProvider};
@@ -1453,7 +1457,7 @@ pub struct ShMemCursor<T: ShMem> {
     pos: usize,
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 impl<T: ShMem> ShMemCursor<T> {
     /// Create a new [`ShMemCursor`] around [`ShMem`]
     pub fn new(shmem: T) -> Self {
@@ -1469,7 +1473,7 @@ impl<T: ShMem> ShMemCursor<T> {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 impl<T: ShMem> Write for ShMemCursor<T> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match self.empty_slice_mut().write(buf) {
@@ -1533,7 +1537,7 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
 #[cfg(test)]
 mod tests {
     use serial_test::serial;

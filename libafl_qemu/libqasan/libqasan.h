@@ -40,24 +40,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <wchar.h>
 
 #include "qasan.h"
+#include "printf/printf.h"
 
-#define QASAN_LOG(msg...)                   \
-  do {                                      \
-    if (__qasan_log) {                      \
-      fprintf(stderr, "==%d== ", getpid()); \
-      fprintf(stderr, msg);                 \
-    }                                       \
-                                            \
+#define QASAN_LOG(msg...)                     \
+  do {                                        \
+    if (__qasan_log) {                        \
+      __libqasan_printf("==%d== ", getpid()); \
+      __libqasan_printf(msg);                 \
+      __libqasan_flush();                     \
+    }                                         \
   } while (0)
 
 #ifdef DEBUG
-  #define QASAN_DEBUG(msg...)                 \
-    do {                                      \
-      if (__qasan_debug) {                    \
-        fprintf(stderr, "==%d== ", getpid()); \
-        fprintf(stderr, msg);                 \
-      }                                       \
-                                              \
+  #define QASAN_DEBUG(msg...)                   \
+    do {                                        \
+      if (__qasan_debug) {                      \
+        __libqasan_printf("==%d== ", getpid()); \
+        __libqasan_printf(msg);                 \
+        __libqasan_flush();                     \
+      }                                         \
     } while (0)
 
 #else

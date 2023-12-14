@@ -1,9 +1,12 @@
+use std::sync::OnceLock;
+
+use enum_map::{enum_map, EnumMap};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 
-use crate::CallingConvention;
+use crate::{sync_backdoor::SyncBackdoorArgs, CallingConvention};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -61,6 +64,23 @@ pub enum Regs {
     Pktcnthi = 51,
 }
 
+static SYNC_BACKDOOR_ARCH_REGS: OnceLock<EnumMap<SyncBackdoorArgs, Regs>> = OnceLock::new();
+
+pub fn get_sync_backdoor_arch_regs() -> &'static EnumMap<SyncBackdoorArgs, Regs> {
+    SYNC_BACKDOOR_ARCH_REGS.get_or_init(|| {
+        enum_map! {
+            SyncBackdoorArgs::Ret  => Regs::R0,
+            SyncBackdoorArgs::Cmd  => Regs::R0,
+            SyncBackdoorArgs::Arg1 => Regs::R1,
+            SyncBackdoorArgs::Arg2 => Regs::R2,
+            SyncBackdoorArgs::Arg3 => Regs::R3,
+            SyncBackdoorArgs::Arg4 => Regs::R4,
+            SyncBackdoorArgs::Arg5 => Regs::R5,
+            SyncBackdoorArgs::Arg6 => Regs::R6,
+        }
+    })
+}
+
 /// alias registers
 #[allow(non_upper_case_globals)]
 impl Regs {
@@ -86,6 +106,18 @@ impl crate::ArchExtras for crate::CPU {
         self.write_reg(Regs::Lr, val)
     }
 
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        if conv != CallingConvention::Cdecl {
+            return Err(format!("Unsupported calling convention: {conv:#?}"));
+        }
+
+        // TODO
+        Err(format!("Unsupported argument: {idx:}"))
+    }
+
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
@@ -99,6 +131,7 @@ impl crate::ArchExtras for crate::CPU {
             return Err(format!("Unsupported calling convention: {conv:#?}"));
         }
 
+        // TODO
         Err(format!("Unsupported argument: {idx:}"))
     }
 }

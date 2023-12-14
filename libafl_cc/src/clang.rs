@@ -345,7 +345,7 @@ impl ToolWrapper for ClangWrapper {
                         let extension = extension.to_str().unwrap();
                         let extension_lowercase = extension.to_lowercase();
                         match &extension_lowercase[..] {
-                            "a" | "la" => configuration.replace_extension(&arg_as_path),
+                            "a" | "la" | "pch" => configuration.replace_extension(&arg_as_path),
                             _ => arg_as_path,
                         }
                     } else {
