@@ -8,6 +8,7 @@ edition = "2021"
 default = ["std"]
 std = []
 no_link_main = ["libafl_targets/libfuzzer_no_link_main"]
+scoped_coverage = ["libafl_targets/sancov_pcguard_scoped"]
 
 [profile.release]
 lto = true
