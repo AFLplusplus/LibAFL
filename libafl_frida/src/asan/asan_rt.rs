@@ -39,8 +39,10 @@ use libc::{c_char, wchar_t};
 use libc::{getrlimit, rlimit};
 #[cfg(all(unix, not(target_vendor = "apple")))]
 use libc::{getrlimit64, rlimit64};
-use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+use nix::sys::mman::{mmap, mprotect, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+
+
 
 #[cfg(any(target_arch = "x86_64"))]
 use crate::utils::frida_to_cs;
@@ -193,15 +195,9 @@ impl FridaRuntime for AsanRuntime {
             }));
 
         self.hook_functions(gum);
-        /*
+        
         unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
-            mprotect(
-                (self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void,
-                0x1000,
-                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC,
-            )
-            .unwrap();
             log::info!("Test0");
             /*
             0x555555916ce9 <libafl_frida::asan_rt::AsanRuntime::init+13033>    je     libafl_frida::asan_rt::AsanRuntime::init+14852 <libafl_frida::asan_rt::AsanRuntime::init+14852>
@@ -266,7 +262,7 @@ impl FridaRuntime for AsanRuntime {
             }
             // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
         }
-        */
+        
         self.register_thread();
     }
     fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(

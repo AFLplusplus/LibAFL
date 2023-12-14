@@ -142,7 +142,7 @@ impl AsanErrors {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn report_error(&mut self, error: AsanError) {
         self.errors.push(error.clone());
-        log::error!("Reporting the error");
+
         let mut out_stream = default_output_stream();
         let output = out_stream.as_mut();
 
@@ -682,3 +682,5 @@ impl<S> Default for AsanErrorsFeedback<S> {
         Self::new()
     }
 }
+
+

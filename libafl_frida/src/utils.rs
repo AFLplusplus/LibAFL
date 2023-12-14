@@ -77,7 +77,7 @@ pub fn instruction_width(instr: &Instruction) -> u32 {
         _ => (),
     }
 
-   
+
     let size = match instr.operands.first().unwrap() {
         Operand::Register(sizecode, _) => { //this is used for standard loads/stores including ldr, ldp, etc.
             get_reg_size(*sizecode)
