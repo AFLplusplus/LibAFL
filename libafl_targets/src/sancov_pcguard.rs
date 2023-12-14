@@ -1,5 +1,7 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
+use std::ops::DerefMut;
+
 #[cfg(feature = "sancov_pcguard_scoped")]
 use {alloc::vec::Vec, core::cell::RefCell, core::cmp::Ordering};
 
@@ -88,12 +90,12 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
                                 scopes.truncate(new_len);
 
                                 // we might be returning to an existing scope; commit to this
-                                update_scope(scopes, addr, pos);
+                                update_scope(scopes.deref_mut(), addr, pos);
                             }
                             Ordering::Equal => {
                                 // we are in the same stack frame
                                 // try to find an existing guard to increment, otherwise add our own
-                                update_scope(scopes, addr, pos);
+                                update_scope(scopes.deref_mut(), addr, pos);
                             }
                             Ordering::Greater => {
                                 // if old addr is greater, it is in a higher stack frame
