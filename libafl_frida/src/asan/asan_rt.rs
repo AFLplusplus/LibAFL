@@ -61,7 +61,8 @@ use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::{FridaRuntime, SkipRange},
-    utils::writer_register, hook_rt::HookRuntime,
+    hook_rt::HookRuntime,
+    utils::writer_register,
 };
 
 extern "C" {
@@ -540,9 +541,9 @@ impl AsanRuntime {
     }
 
     pub fn register_hooks(hook_rt: &mut HookRuntime) {
-
-
-        let malloc_address = Module::find_export_by_name(Some("ucrtbased.dll"), "malloc").unwrap().0;
+        let malloc_address = Module::find_export_by_name(Some("ucrtbased.dll"), "malloc")
+            .unwrap()
+            .0;
         log::error!("malloc_address: {:?}", malloc_address);
         #[cfg(windows)]
         winsafe::OutputDebugString(&format!("malloc_address: {:?}", malloc_address));
@@ -550,14 +551,15 @@ impl AsanRuntime {
             log::error!("in malloc!");
         });
 
-        let free_address = Module::find_export_by_name(Some("ucrtbased.dll"), "free").unwrap().0;
+        let free_address = Module::find_export_by_name(Some("ucrtbased.dll"), "free")
+            .unwrap()
+            .0;
         log::error!("free: {:?}", free_address);
         #[cfg(windows)]
         winsafe::OutputDebugString(&format!("free_address: {:?}", free_address));
         hook_rt.register_hook(free_address as usize, |address, context| {
             log::error!("in free!");
         });
-
     }
     /// Hook all functions required for ASAN to function, replacing them with our own
     /// implementations.
@@ -597,7 +599,7 @@ impl AsanRuntime {
         macro_rules! hook_priv_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-                    
+
                     #[allow(non_snake_case)]
                     unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();

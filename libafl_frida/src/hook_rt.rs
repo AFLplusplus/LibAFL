@@ -96,8 +96,20 @@ impl HookRuntime {
                 match operand.op_type {
                     X86OperandType::Mem(opmem) => {
                         if X86Register::Rip == writer_register(opmem.base()) {
-                            let target_address = unsafe {((instruction.address() as usize + instruction.len() + opmem.disp() as usize) as *const usize).read()};
-                            log::trace!("{:x} -> {:x}", (instruction.address() as usize  + instruction.len() + opmem.disp() as usize), target_address);
+                            let target_address = unsafe {
+                                ((instruction.address() as usize
+                                    + instruction.len()
+                                    + opmem.disp() as usize)
+                                    as *const usize)
+                                    .read()
+                            };
+                            log::trace!(
+                                "{:x} -> {:x}",
+                                (instruction.address() as usize
+                                    + instruction.len()
+                                    + opmem.disp() as usize),
+                                target_address
+                            );
                             if self.hooks.contains_key(&target_address) {
                                 log::trace!("!!!!!!\n");
                                 return Some(target_address);

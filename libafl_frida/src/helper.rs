@@ -28,7 +28,10 @@ use rangemap::RangeMap;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
-use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime, hook_rt::HookRuntime};
+use crate::{
+    asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime,
+    hook_rt::HookRuntime,
+};
 
 #[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
@@ -297,7 +300,6 @@ impl FridaInstrumentationHelperBuilder {
             runtimes
                 .borrow_mut()
                 .init_all(gum, &ranges.borrow(), &module_map);
-            
 
             let mut borrowed_runtimes = runtimes.borrow_mut();
 
@@ -516,7 +518,6 @@ where
                     }
                 }
 
-
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
                     if let Some(call_target) = rt.is_interesting(capstone, instr) {
                         rt.emit_callout(call_target, &instruction);
@@ -582,10 +583,9 @@ where
                 if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
                     basic_block_size += instr_size;
                 }
-
             }
             if keep_instr {
-            instruction.keep();
+                instruction.keep();
             }
         }
         if basic_block_size != 0 {

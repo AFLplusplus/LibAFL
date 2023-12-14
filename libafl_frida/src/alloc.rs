@@ -443,28 +443,38 @@ impl Allocator {
             return true;
         }
         let address = address as usize;
-        let shadow_size = (size + 8)/ 8 ;
+        let shadow_size = (size + 8) / 8;
 
         let shadow_addr = map_to_shadow!(self, address);
 
         // self.map_shadow_for_region(address, address + size, false);
-        
-        log::info!("check_shadow: {:x}, {:x}, {:x}, {:x}", address, shadow_size, shadow_addr, size);
+
+        log::info!(
+            "check_shadow: {:x}, {:x}, {:x}, {:x}",
+            address,
+            shadow_size,
+            shadow_addr,
+            size
+        );
         if address & 0x7 > 0 {
             let mask = !((1 << (address & 7)) - 1) as u8;
-            if unsafe { (shadow_addr as *mut u8).read() } & mask != mask
-            {
+            if unsafe { (shadow_addr as *mut u8).read() } & mask != mask {
                 return false;
             }
         }
 
         if shadow_size > 0 {
             let buf =
-                unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size  - 1) };
+                unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size - 1) };
 
             let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
 
-            log::info!("prefix: {:?}, aligned: {:?}, suffix: {:?}", prefix.len(), aligned.len(), suffix.len());
+            log::info!(
+                "prefix: {:?}, aligned: {:?}, suffix: {:?}",
+                prefix.len(),
+                aligned.len(),
+                suffix.len()
+            );
             // return true;
             if prefix.iter().all(|&x| x == 0xff)
                 && suffix.iter().all(|&x| x == 0xff)
@@ -486,16 +496,16 @@ impl Allocator {
                 false
             }
         } else {
-                let shadow_remainder = (size + 8) % 8;
-                if shadow_remainder > 0 {
-                    let remainder = unsafe { ((shadow_addr + shadow_size -1) as *mut u8).read() };
-                    log::info!("remainder 2: {:x}", remainder);
-                    let mask = !((1 << (8 - shadow_remainder)) - 1) as u8;
+            let shadow_remainder = (size + 8) % 8;
+            if shadow_remainder > 0 {
+                let remainder = unsafe { ((shadow_addr + shadow_size - 1) as *mut u8).read() };
+                log::info!("remainder 2: {:x}", remainder);
+                let mask = !((1 << (8 - shadow_remainder)) - 1) as u8;
 
-                    remainder & mask == mask
-                } else {
-                    true
-                }
+                remainder & mask == mask
+            } else {
+                true
+            }
         }
     }
     /// Maps the address to a shadow address
@@ -526,8 +536,13 @@ impl Allocator {
     pub fn unpoison_all_existing_memory(&mut self) {
         for area in MemoryAreas::open(None).unwrap() {
             let area = area.unwrap();
-            if area.protection().intersects(Protection::READ | Protection::WRITE) && !self.is_managed(area.start() as *mut c_void){
-                if !self.using_pre_allocated_shadow_mapping && area.start() == 1 << self.shadow_bit {
+            if area
+                .protection()
+                .intersects(Protection::READ | Protection::WRITE)
+                && !self.is_managed(area.start() as *mut c_void)
+            {
+                if !self.using_pre_allocated_shadow_mapping && area.start() == 1 << self.shadow_bit
+                {
                     continue;
                 }
                 self.map_shadow_for_region(area.start(), area.end(), true);
