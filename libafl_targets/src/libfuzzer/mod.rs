@@ -42,6 +42,18 @@ pub fn libfuzzer_initialize(args: &[String]) -> i32 {
 /// # Note
 /// Calls the libfuzzer harness. We actually think the target is unsafe and crashes eventually, that's why we do all this fuzzing.
 #[allow(clippy::must_use_candidate)]
+#[cfg_attr(feature = "sancov_pcguard_scoped", inline(never))]
 pub fn libfuzzer_test_one_input(buf: &[u8]) -> i32 {
-    unsafe { LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len()) }
+    // we need to explicitly invoke the scoped guard here so that the LLVMFuzzerTestOneInput guards
+    // are actually committed back; this access to 0 is never committed
+    #[cfg(feature = "sancov_pcguard_scoped")]
+    unsafe {
+        crate::__sanitizer_cov_trace_pc_guard(&mut 0)
+    }
+    let result = unsafe { LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len()) };
+    #[cfg(feature = "sancov_pcguard_scoped")]
+    unsafe {
+        crate::__sanitizer_cov_trace_pc_guard(&mut 0)
+    }
+    result
 }

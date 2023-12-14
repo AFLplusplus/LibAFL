@@ -40,6 +40,7 @@ sanitizers_flags = []
 pointer_maps = []
 sancov_pcguard_edges = ["coverage"]
 sancov_pcguard_hitcounts = ["coverage"]
+sancov_pcguard_scoped = ["coverage", "pointer_maps", "sancov_pcguard_hitcounts", "backtrace"]
 sancov_value_profile = ["common"]
 sancov_8bit = []
 sancov_cmplog = ["common"] # Defines cmp and __sanitizer_weak_hook functions. Use libfuzzer_interceptors to define interceptors (only compatible with Linux)
@@ -70,3 +71,4 @@ serde = { version = "1.0", default-features = false, features = ["alloc"] } # se
 meminterval = { version = "0.4", features = ["serde"], optional = true }
 ahash = { version = "0.8.3", default-features = false, optional = true }
 # serde-big-array = "0.3.2"
+backtrace = { version = "0.3", default-features = false, optional = true } # Used to get the caller's caller in sancov_pcguard_scoped
