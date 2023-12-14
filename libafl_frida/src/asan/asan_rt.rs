@@ -544,6 +544,7 @@ impl AsanRuntime {
 
         let malloc_address = Module::find_export_by_name(Some("ucrtbased.dll"), "malloc").unwrap().0;
         log::error!("malloc_address: {:?}", malloc_address);
+        #[cfg(windows)]
         winsafe::OutputDebugString(&format!("malloc_address: {:?}", malloc_address));
         hook_rt.register_hook(malloc_address as usize, |address, context| {
             log::error!("in malloc!");
@@ -551,6 +552,7 @@ impl AsanRuntime {
 
         let free_address = Module::find_export_by_name(Some("ucrtbased.dll"), "free").unwrap().0;
         log::error!("free: {:?}", free_address);
+        #[cfg(windows)]
         winsafe::OutputDebugString(&format!("free_address: {:?}", free_address));
         hook_rt.register_hook(free_address as usize, |address, context| {
             log::error!("in free!");
