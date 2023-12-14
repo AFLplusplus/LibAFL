@@ -1078,6 +1078,7 @@ impl AsanRuntime {
             None => actual_pc,
         };
 
+        //log::error!("TRAPPED");
         let instr_bytes = unsafe { std::slice::from_raw_parts(actual_pc as *const u8, 4) };
         let mut reader = ReaderBuilder::<u64, u8>::read_from(instr_bytes);
         let decoder = <ARMv8 as Arch>::Decoder::default();
@@ -1099,9 +1100,14 @@ impl AsanRuntime {
             actual_pc = insn.address() as usize;*/
         }
 
+        let operands_len = insn.operands
+        .iter()
+        .position(|item| *item == Operand::Nothing)
+        .unwrap_or_else(|| 4);
 
-        
-        let (base_reg, index_reg, displacement) = match *insn.operands.last().unwrap(){
+
+        //the memory operand is always the last operand in aarch64
+        let (base_reg, index_reg, displacement) = match insn.operands[operands_len-1]{
             Operand::RegRegOffset(reg1, reg2,_,_,_) => {
                 (reg1, Some(reg2), 0)
             }
@@ -1116,7 +1122,7 @@ impl AsanRuntime {
                 (reg, None, 0,)
             }
             _ => {
-                panic!("Could not decode memory access");
+                return;
             }
         };
 
@@ -2167,7 +2173,6 @@ impl AsanRuntime {
         let decoder = <ARMv8 as Arch>::Decoder::default();
         let decode_res = decoder.decode(&mut reader);
 
-        println!("{:?}", instr_bytes);
         if let Err(e) = decode_res {
             println!("{}", e);
             //instruction is not supported by yaxpeax
@@ -2175,9 +2180,6 @@ impl AsanRuntime {
         }
 
         let instr = decode_res.unwrap();
-        println!("{:?}", instr);
-        println!("{}", instr.to_string());
-
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
         match instr.opcode {
@@ -2213,7 +2215,6 @@ impl AsanRuntime {
             return None;
         }
 
-        let memory_access_size = instruction_width(&instr);
 
         /*if instr.opcode == Opcode::LDRSW || instr.opcode == Opcode::LDR {
             //this is a special case for pc-relative loads. The only two opcodes capable of this are LDR and LDRSW
@@ -2226,30 +2227,40 @@ impl AsanRuntime {
                 _ => (),
             }
         }*/
-
+        
+       // println!("{:?} {}", instr, memory_access_size);
         //abuse the fact that the last operand is always the mem operand
-        match *instr.operands.last().unwrap() {
+        match instr.operands[operands_len-1]{
             Operand::RegRegOffset(reg1, reg2, size, shift, shift_size) => {
-                return Some((
+                let ret = Some((
                     reg1,
                     Some((reg2, size)),
                     0,
-                    memory_access_size,
+                    instruction_width(&instr),
                     Some((shift, shift_size)),
                 ));
+               // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
+                return ret;
             }
             Operand::RegPreIndex(reg, disp, _) => {
-                return Some((reg, None, disp, memory_access_size, None));
+                let ret = Some((reg, None, disp, instruction_width(&instr), None));
+              // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
+                return ret;
             }
             Operand::RegPostIndex(reg, _) => {
                 //in post index the disp is applied after so it doesn't matter for this memory access
-                return Some((reg, None, 0, memory_access_size, None));
+                let ret = Some((reg, None, 0, instruction_width(&instr), None));
+               // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
+                return ret;
+                
             }
             Operand::RegPostIndexReg(reg, _) => {
-                return Some((reg, None, 0, memory_access_size, None));
+                let ret = Some((reg, None, 0, instruction_width(&instr), None));
+              //  log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
+                return ret;
             }
             _ => {
-                panic!("Could not decode memory access");
+                return None;
             }
         }
     }

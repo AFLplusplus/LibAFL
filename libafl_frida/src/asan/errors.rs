@@ -142,7 +142,7 @@ impl AsanErrors {
     #[allow(clippy::too_many_lines)]
     pub(crate) fn report_error(&mut self, error: AsanError) {
         self.errors.push(error.clone());
-
+        log::error!("Reporting the error");
         let mut out_stream = default_output_stream();
         let output = out_stream.as_mut();
 
@@ -259,7 +259,7 @@ impl AsanErrors {
 
                 while let Ok(insn) = decoder.decode(&mut reader)
                 {
-                    if <U8Reader<'_> as Reader<u64, u8>>::total_offset(&mut reader).to_linear() == start_pc-error.pc { //error.pc < start_pc
+                    if <U8Reader<'_> as Reader<u64, u8>>::total_offset(&mut reader).to_linear() == error.pc-start_pc { //error.pc < start_pc
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
