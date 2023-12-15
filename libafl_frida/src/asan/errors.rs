@@ -19,7 +19,11 @@ use libafl::{
 use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
+
+#[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_arch::LengthedInstruction;
 
 #[cfg(target_arch = "x86_64")]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
@@ -246,14 +250,11 @@ impl AsanErrors {
                 let decoder = InstDecoder::minimal();
 
                 let start_pc = error.pc - 4 * 5;
-                let insns = disas_count(
-                    &decoder,
-                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                    11,
-                );
+                let insts = disas_count(&decoder,  unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) }, 11);
+                let mut inst_address = start_pc;
 
-                for insn in insns {
-                    if insn.address() as usize == error.pc {
+                for insn in insts {
+                    if inst_address == error.pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -262,6 +263,8 @@ impl AsanErrors {
                     } else {
                         writeln!(output, "\t    {insn}").unwrap();
                     }
+
+                    inst_address += insn.len().to_const() as usize;
                 }
                 backtrace_printer
                     .print_trace(&error.backtrace, output)
@@ -493,15 +496,12 @@ impl AsanErrors {
                 let decoder = InstDecoder::minimal();
 
                 let start_pc = pc;
-                for insn in &*cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
+                let insts = disas_count(&decoder,  unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) }, 11);
+
+                let mut inst_address = start_pc;
+                for insn in insts
                 {
-                    if insn.address() as usize == pc {
+                    if inst_address == pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -510,6 +510,8 @@ impl AsanErrors {
                     } else {
                         writeln!(output, "\t    {insn}").unwrap();
                     }
+
+                    inst_address += insn.len().to_const() as usize;
                 }
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
             }

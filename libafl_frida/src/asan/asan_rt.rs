@@ -938,13 +938,13 @@ impl AsanRuntime {
         for operand_idx in 0..operand_count {
             let operand = insn.operand(operand_idx);
             if operand.is_memory() {
-                let access_type = if operand_idx == 0 {
-                    access_type = Some(AccessType::Read)
+                access_type = if operand_idx == 0 {
+                    Some(AccessType::Read)
                 } else {
-                    access_type = Some(AccessType::Write)
+                    Some(AccessType::Write)
                 };
                 if let Some((basereg, indexreg, _, disp)) = operand_details(operand) {
-                    regs = Some((basereg, indexreg, disp))
+                    regs = Some((basereg, indexreg, disp));
                 }
             }
         }
@@ -953,23 +953,27 @@ impl AsanRuntime {
         let (stack_start, stack_end) = Self::current_stack();
 
         if let Some(r) = regs {
-            let (base_idx, size) = self.register_idx(r.0); // safe to unwrap
-            let (index_idx, _) = self.register_idx(r.1);
+            let base = self.register_idx(r.0); // safe to unwrap
+            let index = self.register_idx(r.1);
             let disp = r.2;
 
-            // from capstone register id to self.regs's index
-            let base_value = match base_idx {
-                Some(base) => match size {
-                    Some(sz) => {
-                        if sz == 64 {
-                            Some(self.regs[base as usize])
-                        } else {
-                            Some(self.regs[base as usize] & 0xffffffff)
-                        }
-                    }
-                    _ => None,
-                },
-                _ => None,
+            let (base_idx, base_value) = match base {
+                Some((idx, size)) => {
+                    let value = if size == 64 {
+                        Some(self.regs[idx as usize])
+                    } else {
+                        Some(self.regs[idx as usize] & 0xffffffff)
+                    };
+                    (Some(idx), value)
+                }
+                _ => (None, None),
+            };
+
+            let index_idx = match index {
+                Some((idx, _)) => {
+                    Some(idx)
+                }
+                _ => None
             };
 
             // log::trace!("{:x}", base_value);
@@ -1242,43 +1246,43 @@ impl AsanRuntime {
 
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::unused_self)]
-    fn register_idx(&self, reg: X86Register) -> (Option<u16>, Option<u16>) {
+    fn register_idx(&self, reg: X86Register) -> Option<(u16, u16)> {
         match reg {
-            X86Register::Eax => (Some(0), Some(32)),
-            X86Register::Ecx => (Some(2), Some(32)),
-            X86Register::Edx => (Some(3), Some(32)),
-            X86Register::Ebx => (Some(1), Some(32)),
-            X86Register::Esp => (Some(5), Some(32)),
-            X86Register::Ebp => (Some(4), Some(32)),
-            X86Register::Esi => (Some(6), Some(32)),
-            X86Register::Edi => (Some(7), Some(32)),
-            X86Register::R8d => (Some(8), Some(32)),
-            X86Register::R9d => (Some(9), Some(32)),
-            X86Register::R10d => (Some(10), Some(32)),
-            X86Register::R11d => (Some(11), Some(32)),
-            X86Register::R12d => (Some(12), Some(32)),
-            X86Register::R13d => (Some(13), Some(32)),
-            X86Register::R14d => (Some(14), Some(32)),
-            X86Register::R15d => (Some(15), Some(32)),
-            X86Register::Eip => (Some(18), Some(32)),
-            X86Register::Rax => (Some(0), Some(64)),
-            X86Register::Rcx => (Some(2), Some(64)),
-            X86Register::Rdx => (Some(3), Some(64)),
-            X86Register::Rbx => (Some(1), Some(64)),
-            X86Register::Rsp => (Some(5), Some(64)),
-            X86Register::Rbp => (Some(4), Some(64)),
-            X86Register::Rsi => (Some(6), Some(64)),
-            X86Register::Rdi => (Some(7), Some(64)),
-            X86Register::R8 => (Some(8), Some(64)),
-            X86Register::R9 => (Some(9), Some(64)),
-            X86Register::R10 => (Some(10), Some(64)),
-            X86Register::R11 => (Some(11), Some(64)),
-            X86Register::R12 => (Some(12), Some(64)),
-            X86Register::R13 => (Some(13), Some(64)),
-            X86Register::R14 => (Some(14), Some(64)),
-            X86Register::R15 => (Some(15), Some(64)),
-            X86Register::Rip => (Some(18), Some(64)),
-            _ => (None, None),
+            X86Register::Eax => Some((0, 32)),
+            X86Register::Ecx => Some((2, 32)),
+            X86Register::Edx => Some((3, 32)),
+            X86Register::Ebx => Some((1, 32)),
+            X86Register::Esp => Some((5, 32)),
+            X86Register::Ebp => Some((4, 32)),
+            X86Register::Esi => Some((6, 32)),
+            X86Register::Edi => Some((7, 32)),
+            X86Register::R8d => Some((8, 32)),
+            X86Register::R9d => Some((9, 32)),
+            X86Register::R10d => Some((10, 32)),
+            X86Register::R11d => Some((11, 32)),
+            X86Register::R12d => Some((12, 32)),
+            X86Register::R13d => Some((13, 32)),
+            X86Register::R14d => Some((14, 32)),
+            X86Register::R15d => Some((15, 32)),
+            X86Register::Eip => Some((18, 32)),
+            X86Register::Rax => Some((0, 4)),
+            X86Register::Rcx => Some((2, 4)),
+            X86Register::Rdx => Some((3, 4)),
+            X86Register::Rbx => Some((1, 4)),
+            X86Register::Rsp => Some((5, 4)),
+            X86Register::Rbp => Some((4, 4)),
+            X86Register::Rsi => Some((6, 4)),
+            X86Register::Rdi => Some((7, 4)),
+            X86Register::R8 => Some((8, 64)),
+            X86Register::R9 => Some((9, 64)),
+            X86Register::R10 => Some((10, 64)),
+            X86Register::R11 => Some((11, 64)),
+            X86Register::R12 => Some((12, 64)),
+            X86Register::R13 => Some((13, 64)),
+            X86Register::R14 => Some((14, 64)),
+            X86Register::R15 => Some((15, 64)),
+            X86Register::Rip => Some((18, 64)),
+            _ => None,
         }
     }
 

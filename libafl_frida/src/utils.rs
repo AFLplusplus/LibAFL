@@ -95,7 +95,7 @@ pub fn writer_register(reg: capstone::RegId) -> Aarch64Register {
 }
 
 /// Translate from `RegSpec` to `X86Register`
-const x86_64_regs: [(RegSpec, X86Register); 34] = [
+const X86_64_REGS: [(RegSpec, X86Register); 34] = [
     (RegSpec::eax(), X86Register::Eax),
     (RegSpec::ecx(), X86Register::Ecx),
     (RegSpec::edx(), X86Register::Edx),
@@ -140,7 +140,7 @@ const x86_64_regs: [(RegSpec, X86Register); 34] = [
 #[inline]
 #[allow(clippy::unused_self)]
 pub fn writer_register(reg: RegSpec) -> X86Register {
-    for (reg1, reg2) in x86_64_regs.iter() {
+    for (reg1, reg2) in X86_64_REGS.iter() {
         if *reg1 == reg {
             return reg2.clone();
         }
@@ -155,11 +155,11 @@ pub(crate) fn frida_to_cs<'a>(
     decoder: &'a InstDecoder,
     frida_insn: &frida_gum_sys::Insn,
 ) -> Instruction {
-    let bytes = frida_insn.bytes();
     decoder.decode_slice(frida_insn.bytes()).unwrap()
 }
 
 #[cfg(any(target_arch = "x86_64"))]
+/// Get the base, idx, scale, disp for each operand
 pub fn operand_details(operand: Operand) -> Option<(X86Register, X86Register, u8, i32)> {
     match operand {
         Operand::RegDeref(base) => {
@@ -202,26 +202,31 @@ pub fn operand_details(operand: Operand) -> Option<(X86Register, X86Register, u8
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 #[cfg(any(target_arch = "x86_64"))]
+/// What kind of memory access this instruction has
 pub enum AccessType {
+    /// Read-access
     Read,
+    /// Write-access
     Write,
 }
 
 #[cfg(target_arch = "x86_64")]
+/// Disassemble "count" number of instructions
 pub fn disas_count(decoder: &InstDecoder, data: &[u8], count: usize) -> Vec<Instruction> {
     let mut counter = count;
     let mut ret = vec![];
-    let mut len = 0;
+    let mut start = 0;
     loop {
         if counter <= 0 {
             break ret;
         }
-        let inst = match decoder.decode_slice(&data[len..]) {
+        let inst = match decoder.decode_slice(&data[start..]) {
             Ok(i) => i,
             Err(_) => break ret, // am i right here?
         };
-        len += inst.len().to_const() as usize;
+        start += inst.len().to_const() as usize;
 
         ret.push(inst);
         counter -= 1;
