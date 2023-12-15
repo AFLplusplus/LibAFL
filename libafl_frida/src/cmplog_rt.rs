@@ -12,6 +12,7 @@ use libafl::{
 };
 use libafl_targets::{self, CMPLOG_MAP_W};
 use rangemap::RangeMap;
+use frida_gum_sys::Insn;
 
 use crate::helper::FridaRuntime;
 extern "C" {
@@ -42,7 +43,7 @@ pub enum SpecialCmpLogCase {
 }
 
 #[cfg(target_arch = "aarch64")]
-use yaxpeax_arm::armv8::a64::{Operand, Opcode, ShiftStyle, ARMv8};
+use yaxpeax_arm::armv8::a64::{Operand, Opcode, ShiftStyle, InstDecoder};
 use yaxpeax_arch::{Arch, ReaderBuilder, Decoder};
 
 
@@ -361,7 +362,9 @@ impl CmpLogRuntime {
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
     #[must_use]
     pub fn cmplog_is_interesting_instruction(
-        address: u64,
+        decoder: InstDecoder,
+        _address: u64,
+        instr: &Insn,
     ) -> Option<(
         CmplogOperandType,
         CmplogOperandType,
@@ -370,9 +373,7 @@ impl CmpLogRuntime {
     )> {
         // We need to re-decode frida-internal capstone values to upstream capstone
         
-        let instr_bytes = unsafe { std::slice::from_raw_parts(address as *const u8, 4) };
-        let mut reader = ReaderBuilder::<u64, u8>::read_from(instr_bytes);
-        let decoder = <ARMv8 as Arch>::Decoder::default();
+        let mut reader = ReaderBuilder::<u64, u8>::read_from(instr.bytes());
         let decode_res = decoder.decode(&mut reader);
 
         if let Err(_) = decode_res {

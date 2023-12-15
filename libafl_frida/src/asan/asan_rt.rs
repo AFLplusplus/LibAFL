@@ -25,9 +25,8 @@ use frida_gum::instruction_writer::X86Register;
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
-    Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails,
+    Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails
 };
-#[cfg(any(target_arch = "x86_64"))]
 use frida_gum_sys::Insn;
 
 use hashbrown::HashMap;
@@ -57,7 +56,7 @@ use crate::{
 
 use yaxpeax_arch::{ReaderBuilder, Decoder, Arch};
 #[cfg(target_arch = "aarch64")]
-use yaxpeax_arm::armv8::a64::{ARMv8, Opcode, Operand, SizeCode, ShiftStyle};
+use yaxpeax_arm::armv8::a64::{ARMv8, Opcode, Operand, SizeCode, ShiftStyle, InstDecoder};
 
 
 
@@ -196,7 +195,7 @@ impl FridaRuntime for AsanRuntime {
 
         self.hook_functions(gum);
         
-        unsafe {
+       /* unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
             log::info!("Test0");
             /*
@@ -261,7 +260,7 @@ impl FridaRuntime for AsanRuntime {
                 ));
             }
             // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
-        }
+        }*/
         
         self.register_thread();
     }
@@ -2154,7 +2153,11 @@ impl AsanRuntime {
     #[cfg(target_arch = "aarch64")]
     #[must_use]
     #[inline]
-    pub fn asan_is_interesting_instruction(address: u64) -> Option<
+    pub fn asan_is_interesting_instruction(
+        decoder: InstDecoder,
+        _address: u64,
+        instr: &Insn,
+    ) -> Option<
         (
             u16, //reg1
             Option<(u16, SizeCode)>, //size of reg2. This needs to be an option in the case that we don't have one
@@ -2164,13 +2167,12 @@ impl AsanRuntime {
         )
     > {
         // We need to re-decode frida-internal capstone values to upstream capstone
-        let instr_bytes = unsafe { std::slice::from_raw_parts(address as *const u8, 4) };
-        let mut reader = ReaderBuilder::<u64, u8>::read_from(instr_bytes);
-        let decoder = <ARMv8 as Arch>::Decoder::default();
+        //let instr_bytes = unsafe { std::slice::from_raw_parts(address as *const u8, 4) };
+        let mut reader = ReaderBuilder::<u64, u8>::read_from(instr.bytes());
         let decode_res = decoder.decode(&mut reader);
 
         if let Err(e) = decode_res {
-            println!("{}", e);
+            //println!("{}", e);
             //instruction is not supported by yaxpeax
             return None;
         }

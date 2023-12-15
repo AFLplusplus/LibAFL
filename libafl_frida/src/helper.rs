@@ -11,12 +11,19 @@ use capstone::{
     arch::{self, BuildsCapstone},
     Capstone,
 };
+
+#[cfg(all(target_arch = "aarch64", unix))]
+use yaxpeax_arm::armv8::a64::{ARMv8,InstDecoder};
+
+use yaxpeax_arch::Arch;
+
 #[cfg(unix)]
 use frida_gum::instruction_writer::InstructionWriter;
 use frida_gum::{
     stalker::{StalkerIterator, StalkerOutput, Transformer},
     Gum, Module, ModuleDetails, ModuleMap, PageProtection,
 };
+use frida_gum_sys::Insn;
 use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
@@ -442,6 +449,9 @@ where
     ) -> Transformer<'a> {
         let ranges = Rc::clone(ranges);
         let runtimes = Rc::clone(runtimes);
+        
+        #[cfg(target_arch = "aarch64")]
+        let decoder = <ARMv8 as Arch>::Decoder::default();
 
         Transformer::from_callback(gum, move |basic_block, output| {
             Self::transform(
@@ -449,6 +459,7 @@ where
                 &output,
                 &ranges,
                 &runtimes,
+                decoder,
             );
         })
     }
@@ -458,6 +469,7 @@ where
         output: &StalkerOutput,
         ranges: &Rc<RefCell<RangeMap<usize, (u16, String)>>>,
         runtimes: &Rc<RefCell<RT>>,
+        decoder: InstDecoder,
     ) {
         let mut first = true;
         let mut basic_block_start = 0;
@@ -468,6 +480,8 @@ where
             let instr_size = instr.bytes().len();
             let address = instr.address();
             // log::trace!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+
+            
 
             if ranges.borrow().contains_key(&(address as usize)) {
                 let mut runtimes = (*runtimes).borrow_mut();
@@ -490,7 +504,7 @@ where
                 
                 #[cfg(unix)]
                 let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
-                    AsanRuntime::asan_is_interesting_instruction(address) //change this
+                    AsanRuntime::asan_is_interesting_instruction(decoder, address, instr) //change this
                 } else {
                     None
                 };
@@ -529,7 +543,7 @@ where
                 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
                 if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>() {
                     if let Some((op1, op2, shift, special_case)) =
-                        CmpLogRuntime::cmplog_is_interesting_instruction(address) //change this as well
+                        CmpLogRuntime::cmplog_is_interesting_instruction(decoder, address, instr) //change this as well
                     {
                         //emit code that saves the relevant data in runtime(passes it to x0, x1)
                         rt.emit_comparison_handling(address, &output, &op1, &op2, shift, special_case);
