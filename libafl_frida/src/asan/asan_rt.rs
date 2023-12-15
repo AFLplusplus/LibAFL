@@ -943,7 +943,7 @@ impl AsanRuntime {
                 } else {
                     Some(AccessType::Write)
                 };
-                if let Some((basereg, indexreg, _, disp)) = operand_details(operand) {
+                if let Some((basereg, indexreg, _, disp)) = operand_details(&operand) {
                     regs = Some((basereg, indexreg, disp));
                 }
             }
@@ -970,10 +970,8 @@ impl AsanRuntime {
             };
 
             let index_idx = match index {
-                Some((idx, _)) => {
-                    Some(idx)
-                }
-                _ => None
+                Some((idx, _)) => Some(idx),
+                _ => None,
             };
 
             // log::trace!("{:x}", base_value);
@@ -987,7 +985,7 @@ impl AsanRuntime {
                             (base_idx, index_idx, disp as usize, fault_address),
                             backtrace,
                         )),
-                        _ => AsanError::StackOobWrite((
+                        AccessType::Write => AsanError::StackOobWrite((
                             self.regs,
                             actual_pc,
                             (base_idx, index_idx, disp as usize, fault_address),
@@ -1023,7 +1021,7 @@ impl AsanRuntime {
                                         AsanError::OobRead(asan_readwrite_error)
                                     }
                                 }
-                                _ => {
+                                AccessType::Write => {
                                     if metadata.freed {
                                         AsanError::WriteAfterFree(asan_readwrite_error)
                                     } else {
@@ -2249,7 +2247,7 @@ impl AsanRuntime {
     #[must_use]
     #[allow(clippy::result_unit_err)]
     pub fn asan_is_interesting_instruction(
-        decoder: &InstDecoder,
+        decoder: InstDecoder,
         _address: u64,
         instr: &Insn,
     ) -> Option<(u8, X86Register, X86Register, u8, i32)> {
@@ -2281,8 +2279,12 @@ impl AsanRuntime {
                 // if we reach this point
                 // because in x64 there's no mem to mem inst, just return the first memory operand
 
-                if let Some((basereg, indexreg, scale, disp)) = operand_details(operand) {
+                if let Some((basereg, indexreg, scale, disp)) = operand_details(&operand) {
                     let memsz = cs_instr.mem_size().unwrap().bytes_size().unwrap(); // this won't fail if it is mem access inst
+
+                    // println!("{:#?} {:#?} {:#?}", cs_instr, cs_instr.to_string(), operand);
+                    // println!("{:#?}", (memsz, basereg, indexreg, scale, disp));
+
                     return Some((memsz, basereg, indexreg, scale, disp));
                 } // else {} // perhaps avx instructions?
             }

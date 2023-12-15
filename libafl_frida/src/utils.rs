@@ -140,70 +140,68 @@ const X86_64_REGS: [(RegSpec, X86Register); 34] = [
 #[inline]
 #[allow(clippy::unused_self)]
 pub fn writer_register(reg: RegSpec) -> X86Register {
-    for (reg1, reg2) in X86_64_REGS.iter() {
+    for (reg1, reg2) in &X86_64_REGS {
+        // println!("reg1:{:#?} reg2:{:#?}", reg1, reg);
         if *reg1 == reg {
-            return reg2.clone();
+            return *reg2;
         }
     }
-    return X86Register::None;
+    X86Register::None
 }
 
 /// Translates a frida instruction to a capstone instruction.
 /// Returns a [`capstone::Instructions`] with a single [`capstone::Insn`] inside.
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-pub(crate) fn frida_to_cs<'a>(
-    decoder: &'a InstDecoder,
-    frida_insn: &frida_gum_sys::Insn,
-) -> Instruction {
+pub(crate) fn frida_to_cs(decoder: InstDecoder, frida_insn: &frida_gum_sys::Insn) -> Instruction {
     decoder.decode_slice(frida_insn.bytes()).unwrap()
 }
 
-#[cfg(any(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 /// Get the base, idx, scale, disp for each operand
-pub fn operand_details(operand: Operand) -> Option<(X86Register, X86Register, u8, i32)> {
+pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u8, i32)> {
     match operand {
         Operand::RegDeref(base) => {
-            let base = writer_register(base);
+            let base = writer_register(*base);
             Some((base, X86Register::None, 0, 0))
         }
         Operand::RegDisp(base, disp) => {
-            let base = writer_register(base);
-            Some((base, X86Register::None, 0, disp))
+            let base = writer_register(*base);
+            Some((base, X86Register::None, 0, *disp))
         }
         Operand::RegScale(base, scale) => {
-            let base = writer_register(base);
-            Some((base, X86Register::None, scale, 0))
+            let base = writer_register(*base);
+            Some((base, X86Register::None, *scale, 0))
         }
         Operand::RegIndexBase(base, index) => {
-            let base = writer_register(base);
-            let index = writer_register(index);
+            let base = writer_register(*base);
+            let index = writer_register(*index);
             Some((base, index, 0, 0))
         }
         Operand::RegIndexBaseDisp(base, index, disp) => {
-            let base = writer_register(base);
-            let index = writer_register(index);
-            Some((base, index, 0, disp))
+            let base = writer_register(*base);
+            let index = writer_register(*index);
+            Some((base, index, 0, *disp))
         }
         Operand::RegScaleDisp(base, scale, disp) => {
-            let base = writer_register(base);
-            Some((base, X86Register::None, scale, disp))
+            let base = writer_register(*base);
+            Some((base, X86Register::None, *scale, *disp))
         }
         Operand::RegIndexBaseScale(base, index, scale) => {
-            let base = writer_register(base);
-            let index = writer_register(index);
-            Some((base, index, scale, 0))
+            let base = writer_register(*base);
+            let index = writer_register(*index);
+            Some((base, index, *scale, 0))
         }
         Operand::RegIndexBaseScaleDisp(base, index, scale, disp) => {
-            let base = writer_register(base);
-            let index = writer_register(index);
-            Some((base, index, scale, disp))
+            let base = writer_register(*base);
+            let index = writer_register(*index);
+            Some((base, index, *scale, *disp))
         }
         _ => None,
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-#[cfg(any(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 /// What kind of memory access this instruction has
 pub enum AccessType {
     /// Read-access
@@ -219,12 +217,11 @@ pub fn disas_count(decoder: &InstDecoder, data: &[u8], count: usize) -> Vec<Inst
     let mut ret = vec![];
     let mut start = 0;
     loop {
-        if counter <= 0 {
+        if counter == 0 {
             break ret;
         }
-        let inst = match decoder.decode_slice(&data[start..]) {
-            Ok(i) => i,
-            Err(_) => break ret, // am i right here?
+        let Ok(inst) = decoder.decode_slice(&data[start..]) else {
+            break ret;
         };
         start += inst.len().to_const() as usize;
 

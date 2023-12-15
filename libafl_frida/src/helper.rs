@@ -462,10 +462,10 @@ where
                 &output,
                 &ranges,
                 &runtimes,
-                #[cfg(any(target_arch = "aarch64"))]
+                #[cfg(target_arch = "aarch64")]
                 &capstone,
-                #[cfg(any(target_arch = "x86_64"))]
-                &decoder,
+                #[cfg(target_arch = "x86_64")]
+                decoder,
             );
         })
     }
@@ -475,7 +475,7 @@ where
         output: &StalkerOutput,
         ranges: &Rc<RefCell<RangeMap<usize, (u16, String)>>>,
         runtimes: &Rc<RefCell<RT>>,
-        decoder: &InstDecoder,
+        decoder: InstDecoder,
     ) {
         let mut first = true;
         let mut basic_block_start = 0;
