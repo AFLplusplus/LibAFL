@@ -6,7 +6,7 @@ use std::{
     rc::Rc,
 };
 
-#[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))]
+#[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone,
@@ -27,6 +27,8 @@ use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_x86::amd64::InstDecoder;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
@@ -450,13 +452,9 @@ where
             .detail(true)
             .build()
             .expect("Failed to create Capstone object");
-        #[cfg(all(target_arch = "x86_64", unix))]
-        let capstone = Capstone::new()
-            .x86()
-            .mode(arch::x86::ArchMode::Mode64)
-            .detail(true)
-            .build()
-            .expect("Failed to create Capstone object");
+
+        #[cfg(target_arch = "x86_64")]
+        let decoder = InstDecoder::minimal();
 
         Transformer::from_callback(gum, move |basic_block, output| {
             Self::transform(
@@ -464,8 +462,10 @@ where
                 &output,
                 &ranges,
                 &runtimes,
-                #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))]
+                #[cfg(target_arch = "aarch64")]
                 &capstone,
+                #[cfg(target_arch = "x86_64")]
+                decoder,
             );
         })
     }
@@ -475,7 +475,7 @@ where
         output: &StalkerOutput,
         ranges: &Rc<RefCell<RangeMap<usize, (u16, String)>>>,
         runtimes: &Rc<RefCell<RT>>,
-        #[cfg(any(target_arch = "aarch64", all(target_arch = "x86_64", unix)))] capstone: &Capstone,
+        decoder: InstDecoder,
     ) {
         let mut first = true;
         let mut basic_block_start = 0;
@@ -508,23 +508,16 @@ where
 
                 #[cfg(unix)]
                 let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
-                    AsanRuntime::asan_is_interesting_instruction(capstone, address, instr)
+                    AsanRuntime::asan_is_interesting_instruction(decoder, address, instr)
                 } else {
                     None
                 };
 
                 #[cfg(all(target_arch = "x86_64", unix))]
-                if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
+                if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
-                            address,
-                            output,
-                            segment,
-                            width,
-                            basereg,
-                            indexreg,
-                            scale,
-                            disp.try_into().unwrap(),
+                            address, output, details.0, details.1, details.2, details.3, details.4,
                         );
                     }
                 }

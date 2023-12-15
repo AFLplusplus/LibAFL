@@ -1,4 +1,4 @@
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[cfg(target_arch = "aarch64")]
 use capstone::Capstone;
 #[cfg(target_arch = "aarch64")]
 use capstone::{
@@ -13,6 +13,11 @@ use frida_gum::instruction_writer::X86Register;
 use frida_gum_sys;
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_arch::LengthedInstruction;
+use yaxpeax_x86::amd64::Operand;
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_x86::amd64::{InstDecoder, Instruction, RegSpec};
 
 /// Determine the width of the specified instruction
 #[cfg(target_arch = "aarch64")]
@@ -89,6 +94,44 @@ pub fn writer_register(reg: capstone::RegId) -> Aarch64Register {
     Aarch64Register::from_u32(u32::from(regint)).unwrap()
 }
 
+/// Translate from `RegSpec` to `X86Register`
+const X86_64_REGS: [(RegSpec, X86Register); 34] = [
+    (RegSpec::eax(), X86Register::Eax),
+    (RegSpec::ecx(), X86Register::Ecx),
+    (RegSpec::edx(), X86Register::Edx),
+    (RegSpec::ebx(), X86Register::Ebx),
+    (RegSpec::esp(), X86Register::Esp),
+    (RegSpec::ebp(), X86Register::Ebp),
+    (RegSpec::esi(), X86Register::Esi),
+    (RegSpec::edi(), X86Register::Edi),
+    (RegSpec::r8d(), X86Register::R8d),
+    (RegSpec::r9d(), X86Register::R9d),
+    (RegSpec::r10d(), X86Register::R10d),
+    (RegSpec::r11d(), X86Register::R11d),
+    (RegSpec::r12d(), X86Register::R12d),
+    (RegSpec::r13d(), X86Register::R13d),
+    (RegSpec::r14d(), X86Register::R14d),
+    (RegSpec::r15d(), X86Register::R15d),
+    (RegSpec::eip(), X86Register::Eip),
+    (RegSpec::rax(), X86Register::Rax),
+    (RegSpec::rcx(), X86Register::Rcx),
+    (RegSpec::rdx(), X86Register::Rdx),
+    (RegSpec::rbx(), X86Register::Rbx),
+    (RegSpec::rsp(), X86Register::Rsp),
+    (RegSpec::rbp(), X86Register::Rbp),
+    (RegSpec::rsi(), X86Register::Rsi),
+    (RegSpec::rdi(), X86Register::Rdi),
+    (RegSpec::r8(), X86Register::R8),
+    (RegSpec::r9(), X86Register::R9),
+    (RegSpec::r10(), X86Register::R10),
+    (RegSpec::r11(), X86Register::R11),
+    (RegSpec::r12(), X86Register::R12),
+    (RegSpec::r13(), X86Register::R13),
+    (RegSpec::r14(), X86Register::R14),
+    (RegSpec::r15(), X86Register::R15),
+    (RegSpec::rip(), X86Register::Rip),
+];
+
 /// The writer registers
 /// frida registers: <https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html>
 /// capstone registers: <https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html>
@@ -96,55 +139,93 @@ pub fn writer_register(reg: capstone::RegId) -> Aarch64Register {
 #[must_use]
 #[inline]
 #[allow(clippy::unused_self)]
-pub fn writer_register(reg: capstone::RegId) -> X86Register {
-    let regint: u16 = reg.0;
-    match regint {
-        19 => X86Register::Eax,
-        22 => X86Register::Ecx,
-        24 => X86Register::Edx,
-        21 => X86Register::Ebx,
-        30 => X86Register::Esp,
-        20 => X86Register::Ebp,
-        29 => X86Register::Esi,
-        23 => X86Register::Edi,
-        226 => X86Register::R8d,
-        227 => X86Register::R9d,
-        228 => X86Register::R10d,
-        229 => X86Register::R11d,
-        230 => X86Register::R12d,
-        231 => X86Register::R13d,
-        232 => X86Register::R14d,
-        233 => X86Register::R15d,
-        26 => X86Register::Eip,
-        35 => X86Register::Rax,
-        38 => X86Register::Rcx,
-        40 => X86Register::Rdx,
-        37 => X86Register::Rbx,
-        44 => X86Register::Rsp,
-        36 => X86Register::Rbp,
-        43 => X86Register::Rsi,
-        39 => X86Register::Rdi,
-        106 => X86Register::R8,
-        107 => X86Register::R9,
-        108 => X86Register::R10,
-        109 => X86Register::R11,
-        110 => X86Register::R12,
-        111 => X86Register::R13,
-        112 => X86Register::R14,
-        113 => X86Register::R15,
-        41 => X86Register::Rip,
-        _ => X86Register::None, // Ignore Xax..Xip
+pub fn writer_register(reg: RegSpec) -> X86Register {
+    for (reg1, reg2) in &X86_64_REGS {
+        // println!("reg1:{:#?} reg2:{:#?}", reg1, reg);
+        if *reg1 == reg {
+            return *reg2;
+        }
     }
+    X86Register::None
 }
 
 /// Translates a frida instruction to a capstone instruction.
 /// Returns a [`capstone::Instructions`] with a single [`capstone::Insn`] inside.
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-pub(crate) fn frida_to_cs<'a>(
-    capstone: &'a Capstone,
-    frida_insn: &frida_gum_sys::Insn,
-) -> capstone::Instructions<'a> {
-    capstone
-        .disasm_count(frida_insn.bytes(), frida_insn.address(), 1)
-        .unwrap()
+pub(crate) fn frida_to_cs(decoder: InstDecoder, frida_insn: &frida_gum_sys::Insn) -> Instruction {
+    decoder.decode_slice(frida_insn.bytes()).unwrap()
+}
+
+#[cfg(target_arch = "x86_64")]
+/// Get the base, idx, scale, disp for each operand
+pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u8, i32)> {
+    match operand {
+        Operand::RegDeref(base) => {
+            let base = writer_register(*base);
+            Some((base, X86Register::None, 0, 0))
+        }
+        Operand::RegDisp(base, disp) => {
+            let base = writer_register(*base);
+            Some((base, X86Register::None, 0, *disp))
+        }
+        Operand::RegScale(base, scale) => {
+            let base = writer_register(*base);
+            Some((base, X86Register::None, *scale, 0))
+        }
+        Operand::RegIndexBase(base, index) => {
+            let base = writer_register(*base);
+            let index = writer_register(*index);
+            Some((base, index, 0, 0))
+        }
+        Operand::RegIndexBaseDisp(base, index, disp) => {
+            let base = writer_register(*base);
+            let index = writer_register(*index);
+            Some((base, index, 0, *disp))
+        }
+        Operand::RegScaleDisp(base, scale, disp) => {
+            let base = writer_register(*base);
+            Some((base, X86Register::None, *scale, *disp))
+        }
+        Operand::RegIndexBaseScale(base, index, scale) => {
+            let base = writer_register(*base);
+            let index = writer_register(*index);
+            Some((base, index, *scale, 0))
+        }
+        Operand::RegIndexBaseScaleDisp(base, index, scale, disp) => {
+            let base = writer_register(*base);
+            let index = writer_register(*index);
+            Some((base, index, *scale, *disp))
+        }
+        _ => None,
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[cfg(target_arch = "x86_64")]
+/// What kind of memory access this instruction has
+pub enum AccessType {
+    /// Read-access
+    Read,
+    /// Write-access
+    Write,
+}
+
+#[cfg(target_arch = "x86_64")]
+/// Disassemble "count" number of instructions
+pub fn disas_count(decoder: &InstDecoder, data: &[u8], count: usize) -> Vec<Instruction> {
+    let mut counter = count;
+    let mut ret = vec![];
+    let mut start = 0;
+    loop {
+        if counter == 0 {
+            break ret;
+        }
+        let Ok(inst) = decoder.decode_slice(&data[start..]) else {
+            break ret;
+        };
+        start += inst.len().to_const() as usize;
+
+        ret.push(inst);
+        counter -= 1;
+    }
 }
