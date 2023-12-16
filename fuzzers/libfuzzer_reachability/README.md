@@ -26,7 +26,7 @@ The compiler wrappers, `libafl_cc` and `libafl_cxx`, will end up in `./target/re
 Then download libpng, and unpack the archive:
 ```bash
 wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
-tar -xvf libpng-1.6.37.tar.xz
+tar -xvf libpng-1.6.37.tar.gz
 ```
 Run `patch libpng-1.6.37/png.c diff.patch` before compiling the libpng
 Now compile libpng, using the libafl_cc compiler wrapper:

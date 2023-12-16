@@ -41,7 +41,7 @@ use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder, Opcode, Operand, ShiftStyle, S
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::{InstDecoder, Instruction, Opcode};
 
-#[cfg(any(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 use crate::utils::frida_to_cs;
 #[cfg(target_arch = "aarch64")]
 use crate::utils::{instruction_width, writer_register};
@@ -2138,8 +2138,6 @@ impl AsanRuntime {
         u32,                     //load/store size
         Option<(ShiftStyle, u8)>, //(shift type, shift size)
     )> {
-        // We need to re-decode frida-internal capstone values to upstream capstone
-
         let instr = disas_count(&decoder, instr.bytes(), 1)[0];
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
@@ -2235,7 +2233,6 @@ impl AsanRuntime {
         _address: u64,
         instr: &Insn,
     ) -> Option<(u8, X86Register, X86Register, u8, i32)> {
-        // We need to re-decode frida-internal capstone values to upstream capstone
         let cs_instr = frida_to_cs(decoder, instr);
         let mut operands = vec![];
         for operand_idx in 0..cs_instr.operand_count() {
