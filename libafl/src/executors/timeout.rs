@@ -34,9 +34,11 @@ use windows::Win32::{
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::inprocess::HasInProcessHandlers;
 #[cfg(any(windows, target_os = "linux"))]
-use crate::executors::inprocess::GLOBAL_STATE;
+use crate::executors::inprocess_hooks_unix::GLOBAL_STATE;
 use crate::{
-    executors::{inprocess::InProcessExecutorHandlerData, Executor, ExitKind, HasObservers},
+    executors::{
+        inprocess_hooks_unix::InProcessExecutorHandlerData, Executor, ExitKind, HasObservers,
+    },
     observers::UsesObservers,
     state::UsesState,
     Error,
