@@ -4,17 +4,15 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 
-use libafl_bolts::os::unix_signals::setup_signal_handler;
+use libafl_bolts::os::windows_exceptions::setup_exception_handler;
+use windows::Win32::System::Threading::PTP_TIMER;
 
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{
-        inprocess::run_observers_and_save_state, Executor, ExecutorHooks, ExitKind, HasObservers,
-    },
+    executors::{inprocess::HasInProcessHandlers, Executor, ExecutorHooks, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
-    state::{HasCorpus, HasExecutions, HasSolutions},
+    state::{HasCorpus, HasExecutions, HasSolutions, State},
     Error,
 };
 
@@ -90,16 +88,11 @@ impl DefaultExecutorHooks {
     #[must_use]
     pub fn nop() -> Self {
         let ret;
-        #[cfg(any(unix, feature = "std"))]
         {
             ret = Self {
                 crash_handler: ptr::null(),
                 timeout_handler: ptr::null(),
             };
-        }
-        #[cfg(not(any(unix, feature = "std")))]
-        {
-            ret = Self {};
         }
         ret
     }
@@ -174,6 +167,159 @@ impl ExecutorHooks for DefaultExecutorHooks {
     }
 }
 
+/// The global state of the in-process harness.
+#[derive(Debug)]
+pub struct InProcessExecutorHandlerData {
+    pub(crate) state_ptr: *mut c_void,
+    pub(crate) event_mgr_ptr: *mut c_void,
+    pub(crate) fuzzer_ptr: *mut c_void,
+    pub(crate) executor_ptr: *const c_void,
+    pub(crate) current_input_ptr: *const c_void,
+    pub(crate) in_handler: bool,
+
+    /// The timeout handler
+    #[cfg(any(unix, feature = "std"))]
+    pub(crate) crash_handler: *const c_void,
+    /// The timeout handler
+    #[cfg(any(unix, feature = "std"))]
+    pub(crate) timeout_handler: *const c_void,
+
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) ptp_timer: Option<PTP_TIMER>,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) in_target: u64,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) critical: *mut c_void,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) timeout_input_ptr: *mut c_void,
+
+    #[cfg(any(unix, feature = "std"))]
+    pub(crate) timeout_executor_ptr: *mut c_void,
+}
+
+unsafe impl Send for InProcessExecutorHandlerData {}
+unsafe impl Sync for InProcessExecutorHandlerData {}
+
+impl InProcessExecutorHandlerData {
+    #[cfg(feature = "std")]
+    fn executor_mut<'a, E>(&self) -> &'a mut E {
+        unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
+    }
+
+    #[cfg(feature = "std")]
+    fn state_mut<'a, S>(&self) -> &'a mut S {
+        unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
+    }
+
+    #[cfg(feature = "std")]
+    fn event_mgr_mut<'a, EM>(&self) -> &'a mut EM {
+        unsafe { (self.event_mgr_ptr as *mut EM).as_mut().unwrap() }
+    }
+
+    #[cfg(feature = "std")]
+    fn fuzzer_mut<'a, Z>(&self) -> &'a mut Z {
+        unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
+    }
+
+    #[cfg(feature = "std")]
+    fn take_current_input<'a, I>(&mut self) -> &'a I {
+        let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
+        self.current_input_ptr = ptr::null();
+        r
+    }
+
+    #[cfg(feature = "std")]
+    pub(crate) fn is_valid(&self) -> bool {
+        !self.current_input_ptr.is_null()
+    }
+
+    #[cfg(feature = "std")]
+    fn timeout_executor_mut<'a, E>(&self) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
+        unsafe {
+            (self.timeout_executor_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
+                .as_mut()
+                .unwrap()
+        }
+    }
+
+    #[cfg(feature = "std")]
+    fn set_in_handler(&mut self, v: bool) -> bool {
+        let old = self.in_handler;
+        self.in_handler = v;
+        old
+    }
+}
+
+/// Get the inprocess [`crate::state::State`]
+#[must_use]
+pub fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
+    unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
+}
+
+/// Get the [`crate::events::EventManager`]
+#[must_use]
+pub fn inprocess_get_event_manager<'a, EM>() -> Option<&'a mut EM> {
+    unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
+}
+
+/// Gets the inprocess [`crate::fuzzer::Fuzzer`]
+#[must_use]
+pub fn inprocess_get_fuzzer<'a, F>() -> Option<&'a mut F> {
+    unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }
+}
+
+/// Gets the inprocess [`Executor`]
+#[must_use]
+pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
+    unsafe { (GLOBAL_STATE.executor_ptr as *mut E).as_mut() }
+}
+
+/// Gets the inprocess input
+#[must_use]
+pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
+    unsafe { (GLOBAL_STATE.current_input_ptr as *const I).as_ref() }
+}
+
+/// Know if we ar eexecuting in a crash/timeout handler
+#[must_use]
+pub fn inprocess_in_handler() -> bool {
+    unsafe { GLOBAL_STATE.in_handler }
+}
+
+/// Exception handling needs some nasty unsafe.
+pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+    // The state ptr for signal handling
+    state_ptr: null_mut(),
+    // The event manager ptr for signal handling
+    event_mgr_ptr: null_mut(),
+    // The fuzzer ptr for signal handling
+    fuzzer_ptr: null_mut(),
+    // The executor ptr for signal handling
+    executor_ptr: ptr::null(),
+    // The current input for signal handling
+    current_input_ptr: ptr::null(),
+
+    in_handler: false,
+
+    // The crash handler fn
+    #[cfg(feature = "std")]
+    crash_handler: ptr::null(),
+    // The timeout handler fn
+    #[cfg(feature = "std")]
+    timeout_handler: ptr::null(),
+    #[cfg(all(windows, feature = "std"))]
+    ptp_timer: None,
+    #[cfg(all(windows, feature = "std"))]
+    in_target: 0,
+    #[cfg(all(windows, feature = "std"))]
+    critical: null_mut(),
+    #[cfg(all(windows, feature = "std"))]
+    timeout_input_ptr: null_mut(),
+
+    #[cfg(feature = "std")]
+    timeout_executor_ptr: null_mut(),
+};
+
 /// Same as `inproc_crash_handler`, but this is called when address sanitizer exits, not from the exception handler
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_asan_handler {
@@ -187,8 +333,8 @@ pub mod windows_asan_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{run_observers_and_save_state, GLOBAL_STATE},
-            Executor, ExitKind, HasObservers,
+            inprocess::run_observers_and_save_state, inprocess_hooks_win::GLOBAL_STATE, Executor,
+            ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -297,10 +443,8 @@ pub mod windows_exception_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{
-                run_observers_and_save_state, HasInProcessHandlers, InProcessExecutorHandlerData,
-                GLOBAL_STATE,
-            },
+            inprocess::{run_observers_and_save_state, HasInProcessHandlers},
+            inprocess_hooks_win::{InProcessExecutorHandlerData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
