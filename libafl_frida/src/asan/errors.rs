@@ -19,9 +19,11 @@ use libafl::{
 use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
-use yaxpeax_arch::{Arch, LengthedInstruction};
+use yaxpeax_arch::LengthedInstruction;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::ARMv8;
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arch::Arch;
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
 

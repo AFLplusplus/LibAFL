@@ -22,6 +22,7 @@ use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+#[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
 #[cfg(all(target_arch = "aarch64", unix))]
 use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder};
@@ -442,6 +443,9 @@ where
     ) -> Transformer<'a> {
         let ranges = Rc::clone(ranges);
         let runtimes = Rc::clone(runtimes);
+
+        #[cfg(target_arch = "x86_64")]
+        let decoder = InstDecoder::minimal();
 
         #[cfg(target_arch = "aarch64")]
         let decoder = <ARMv8 as Arch>::Decoder::default();

@@ -6,6 +6,7 @@
 use std::ffi::c_void;
 
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+#[cfg(target_arch = "aarch64")]
 use frida_gum_sys::Insn;
 use libafl::{
     inputs::{HasTargetBytes, Input},

@@ -34,6 +34,7 @@ use libc::{getrlimit, rlimit};
 use libc::{getrlimit64, rlimit64};
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+#[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder, Opcode, Operand, ShiftStyle, SizeCode};
@@ -43,14 +44,14 @@ use yaxpeax_x86::amd64::{InstDecoder, Instruction, Opcode};
 #[cfg(any(target_arch = "x86_64"))]
 use crate::utils::frida_to_cs;
 #[cfg(target_arch = "aarch64")]
-use crate::utils::instruction_width;
+use crate::utils::{instruction_width, writer_register};
 #[cfg(target_arch = "x86_64")]
-use crate::utils::operand_details;
+use crate::utils::{operand_details, AccessType};
 use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::{FridaRuntime, SkipRange},
-    utils::{disas_count, writer_register},
+    utils::disas_count,
 };
 
 extern "C" {
