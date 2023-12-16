@@ -13,15 +13,6 @@ use core::{
 use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile, rc::Rc};
 
 use backtrace::Backtrace;
-#[cfg(target_arch = "aarch64")]
-use capstone::{
-    arch::{
-        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
-        ArchOperand::Arm64Operand,
-        BuildsCapstone,
-    },
-    Capstone,
-};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
@@ -31,7 +22,6 @@ use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
     Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails,
 };
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
@@ -44,20 +34,24 @@ use libc::{getrlimit, rlimit};
 use libc::{getrlimit64, rlimit64};
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arch::Arch;
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder, Opcode, Operand, ShiftStyle, SizeCode};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::{InstDecoder, Instruction, Opcode};
 
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[cfg(any(target_arch = "x86_64"))]
 use crate::utils::frida_to_cs;
 #[cfg(target_arch = "aarch64")]
-use crate::utils::instruction_width;
+use crate::utils::{instruction_width, writer_register};
 #[cfg(target_arch = "x86_64")]
-use crate::utils::operand_details;
+use crate::utils::{operand_details, AccessType};
 use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::{FridaRuntime, SkipRange},
-    utils::{disas_count, AccessType},
+    utils::disas_count,
 };
 
 extern "C" {
@@ -193,15 +187,9 @@ impl FridaRuntime for AsanRuntime {
             }));
 
         self.hook_functions(gum);
-        /*
-        unsafe {
+
+        /* unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
-            mprotect(
-                (self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void,
-                0x1000,
-                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC,
-            )
-            .unwrap();
             log::info!("Test0");
             /*
             0x555555916ce9 <libafl_frida::asan_rt::AsanRuntime::init+13033>    je     libafl_frida::asan_rt::AsanRuntime::init+14852 <libafl_frida::asan_rt::AsanRuntime::init+14852>
@@ -265,8 +253,8 @@ impl FridaRuntime for AsanRuntime {
                 ));
             }
             // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
-        }
-        */
+        }*/
+
         self.register_thread();
     }
     fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
@@ -1074,113 +1062,61 @@ impl AsanRuntime {
     extern "C" fn handle_trap(&mut self) {
         let mut actual_pc = self.regs[31];
         actual_pc = match self.stalked_addresses.get(&actual_pc) {
+            //get the pc associated with the trapped insn
             Some(addr) => *addr,
             None => actual_pc,
         };
 
-        let cs = Capstone::new()
-            .arm64()
-            .mode(capstone::arch::arm64::ArchMode::Arm)
-            .detail(true)
-            .build()
-            .unwrap();
+        let decoder = <ARMv8 as Arch>::Decoder::default();
 
-        let instructions = cs
-            .disasm_count(
-                unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 24) },
-                actual_pc as u64,
-                3,
-            )
-            .unwrap();
-        let instructions = instructions.iter().collect::<Vec<&capstone::Insn>>();
-        let mut insn = instructions.first().unwrap();
-        if insn.mnemonic().unwrap() == "msr" && insn.op_str().unwrap() == "nzcv, x0" {
-            insn = instructions.get(2).unwrap();
-            actual_pc = insn.address() as usize;
+        let insn = disas_count(
+            &decoder,
+            unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 4) },
+            1,
+        )[0];
+
+        if insn.opcode == Opcode::MSR && insn.operands[0] == Operand::SystemReg(23056) { //the first operand is nzcv
+             //What case is this for??
+             /*insn = instructions.get(2).unwrap();
+             actual_pc = insn.address() as usize;*/
         }
 
-        let detail = cs.insn_detail(insn).unwrap();
-        let arch_detail = detail.arch_detail();
-        let (mut base_reg, mut index_reg, displacement) =
-            if let Arm64Operand(arm64operand) = arch_detail.operands().last().unwrap() {
-                if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
-                    (opmem.base().0, opmem.index().0, opmem.disp())
-                } else {
-                    (0, 0, 0)
-                }
-            } else {
-                (0, 0, 0)
-            };
+        let operands_len = insn
+            .operands
+            .iter()
+            .position(|item| *item == Operand::Nothing)
+            .unwrap_or_else(|| 4);
 
-        if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= base_reg
-            && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
-        {
-            base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
-        } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
-            base_reg = 29u16;
-        } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
-            base_reg = 30u16;
-        } else if base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16
-            || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16
-            || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16
-            || base_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16
-        {
-            base_reg = 31u16;
-        } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= base_reg
-            && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16
-        {
-            base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
-        } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= base_reg
-            && base_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16
-        {
-            base_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
-        }
+        //the memory operand is always the last operand in aarch64
+        let (base_reg, index_reg, displacement) = match insn.operands[operands_len - 1] {
+            Operand::RegRegOffset(reg1, reg2, _, _, _) => (reg1, Some(reg2), 0),
+            Operand::RegPreIndex(reg, disp, _) => (reg, None, disp),
+            Operand::RegPostIndex(reg, _) => {
+                //in post index the disp is applied after so it doesn't matter for this memory access
+                (reg, None, 0)
+            }
+            Operand::RegPostIndexReg(reg, _) => (reg, None, 0),
+            _ => {
+                return;
+            }
+        };
 
         #[allow(clippy::cast_possible_wrap)]
-        let mut fault_address =
+        let fault_address =
             (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
-
-        if index_reg == 0 {
-            index_reg = 0xffff;
-        } else {
-            if capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16 <= index_reg
-                && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_X28 as u16
-            {
-                index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_X0 as u16;
-            } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X29 as u16 {
-                index_reg = 29u16;
-            } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_X30 as u16 {
-                index_reg = 30u16;
-            } else if index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_SP as u16
-                || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WSP as u16
-                || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_XZR as u16
-                || index_reg == capstone::arch::arm64::Arm64Reg::ARM64_REG_WZR as u16
-            {
-                index_reg = 31u16;
-            } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16 <= index_reg
-                && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_W30 as u16
-            {
-                index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_W0 as u16;
-            } else if capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16 <= index_reg
-                && index_reg <= capstone::arch::arm64::Arm64Reg::ARM64_REG_S31 as u16
-            {
-                index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
-            }
-            fault_address += self.regs[index_reg as usize];
-        }
 
         let backtrace = Backtrace::new();
 
         let (stack_start, stack_end) = Self::current_stack();
         #[allow(clippy::option_if_let_else)]
         let error = if fault_address >= stack_start && fault_address < stack_end {
-            if insn.mnemonic().unwrap().starts_with('l') {
+            if insn.opcode.to_string().starts_with('l') {
                 AsanError::StackOobRead((
                     self.regs,
                     actual_pc,
                     (
                         Some(base_reg),
-                        Some(index_reg),
+                        Some(index_reg.unwrap_or_else(|| 0xffff)),
                         displacement as usize,
                         fault_address,
                     ),
@@ -1192,7 +1128,7 @@ impl AsanRuntime {
                     actual_pc,
                     (
                         Some(base_reg),
-                        Some(index_reg),
+                        Some(index_reg.unwrap_or_else(|| 0xffff)),
                         displacement as usize,
                         fault_address,
                     ),
@@ -1208,14 +1144,14 @@ impl AsanRuntime {
                 pc: actual_pc,
                 fault: (
                     Some(base_reg),
-                    Some(index_reg),
+                    Some(index_reg.unwrap_or_else(|| 0xffff)),
                     displacement as usize,
                     fault_address,
                 ),
                 metadata: metadata.clone(),
                 backtrace,
             };
-            if insn.mnemonic().unwrap().starts_with('l') {
+            if insn.opcode.to_string().starts_with('l') {
                 if metadata.freed {
                     AsanError::ReadAfterFree(asan_readwrite_error)
                 } else {
@@ -1232,7 +1168,7 @@ impl AsanRuntime {
                 actual_pc,
                 (
                     Some(base_reg),
-                    Some(index_reg),
+                    Some(index_reg.unwrap_or_else(|| 0xffff)),
                     displacement as usize,
                     fault_address,
                 ),
@@ -2192,53 +2128,101 @@ impl AsanRuntime {
     #[must_use]
     #[inline]
     pub fn asan_is_interesting_instruction(
-        capstone: &Capstone,
+        decoder: InstDecoder,
         _address: u64,
         instr: &Insn,
     ) -> Option<(
-        capstone::RegId,
-        capstone::RegId,
-        i32,
-        u32,
-        Arm64Shift,
-        Arm64Extender,
+        u16,                      //reg1
+        Option<(u16, SizeCode)>, //size of reg2. This needs to be an option in the case that we don't have one
+        i32,                     //displacement.
+        u32,                     //load/store size
+        Option<(ShiftStyle, u8)>, //(shift type, shift size)
     )> {
         // We need to re-decode frida-internal capstone values to upstream capstone
-        let cs_instr = frida_to_cs(capstone, instr);
-        let cs_instr = cs_instr.first().unwrap();
 
+        let instr = disas_count(&decoder, instr.bytes(), 1)[0];
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
-        match cs_instr.mnemonic().unwrap() {
-            "ldaxr" | "stlxr" | "ldxr" | "stxr" | "ldar" | "stlr" | "ldarb" | "ldarh" | "ldaxp"
-            | "ldaxrb" | "ldaxrh" | "stlrb" | "stlrh" | "stlxp" | "stlxrb" | "stlxrh" | "ldxrb"
-            | "ldxrh" | "stxrb" | "stxrh" => return None,
+        match instr.opcode {
+            Opcode::LDAXR
+            | Opcode::STLXR
+            | Opcode::LDXR
+            | Opcode::LDAR
+            | Opcode::STLR
+            | Opcode::LDARB
+            | Opcode::LDAXP
+            | Opcode::LDAXRB
+            | Opcode::LDAXRH
+            | Opcode::STLRB
+            | Opcode::STLRH
+            | Opcode::STLXP
+            | Opcode::STLXRB
+            | Opcode::STLXRH
+            | Opcode::LDXRB
+            | Opcode::LDXRH
+            | Opcode::STXRB
+            | Opcode::STXRH => {
+                return None;
+            }
             _ => (),
         }
-
-        let operands = capstone
-            .insn_detail(cs_instr)
-            .unwrap()
-            .arch_detail()
-            .operands();
-        if operands.len() < 2 {
+        //we need to do this convuluted operation because operands in yaxpeax are in a constant slice of size 4,
+        //and any unused operands are Operand::Nothing
+        let operands_len = instr
+            .operands
+            .iter()
+            .position(|item| *item == Operand::Nothing)
+            .unwrap_or_else(|| 4);
+        if operands_len < 2 {
             return None;
         }
 
-        if let Arm64Operand(arm64operand) = operands.last().unwrap() {
-            if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
-                return Some((
-                    opmem.base(),
-                    opmem.index(),
-                    opmem.disp(),
-                    instruction_width(cs_instr, &operands),
-                    arm64operand.shift,
-                    arm64operand.ext,
+        /*if instr.opcode == Opcode::LDRSW || instr.opcode == Opcode::LDR {
+            //this is a special case for pc-relative loads. The only two opcodes capable of this are LDR and LDRSW
+            // For more information on this, look up "literal" loads in the ARM docs.
+            match instr.operands[1] {
+                //this is safe because an ldr is guranteed to have at least 3 operands
+                Operand::PCOffset(off) => {
+                    return Some((32, None, off, memory_access_size, None));
+                }
+                _ => (),
+            }
+        }*/
+
+        // println!("{:?} {}", instr, memory_access_size);
+        //abuse the fact that the last operand is always the mem operand
+        match instr.operands[operands_len - 1] {
+            Operand::RegRegOffset(reg1, reg2, size, shift, shift_size) => {
+                let ret = Some((
+                    reg1,
+                    Some((reg2, size)),
+                    0,
+                    instruction_width(&instr),
+                    Some((shift, shift_size)),
                 ));
+                // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
+                return ret;
+            }
+            Operand::RegPreIndex(reg, disp, _) => {
+                let ret = Some((reg, None, disp, instruction_width(&instr), None));
+                // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
+                return ret;
+            }
+            Operand::RegPostIndex(reg, _) => {
+                //in post index the disp is applied after so it doesn't matter for this memory access
+                let ret = Some((reg, None, 0, instruction_width(&instr), None));
+                // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
+                return ret;
+            }
+            Operand::RegPostIndexReg(reg, _) => {
+                let ret = Some((reg, None, 0, instruction_width(&instr), None));
+                //  log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
+                return ret;
+            }
+            _ => {
+                return None;
             }
         }
-
-        None
     }
 
     /// Checks if the current instruction is interesting for address sanitization.
@@ -2474,12 +2458,11 @@ impl AsanRuntime {
         &mut self,
         _address: u64,
         output: &StalkerOutput,
-        basereg: capstone::RegId,
-        indexreg: capstone::RegId,
+        basereg: u16,
+        indexreg: Option<(u16, SizeCode)>,
         displacement: i32,
         width: u32,
-        shift: Arm64Shift,
-        extender: Arm64Extender,
+        shift: Option<(ShiftStyle, u8)>,
     ) {
         debug_assert!(
             i32::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).is_ok(),
@@ -2489,11 +2472,11 @@ impl AsanRuntime {
         let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         let writer = output.writer();
 
-        let basereg = writer_register(basereg);
-        let indexreg = if indexreg.0 == 0 {
-            None
+        let basereg = writer_register(basereg, SizeCode::X, false); //the writer register can never be zr and is always 64 bit
+        let indexreg = if let Some((reg, sizecode)) = indexreg {
+            Some(writer_register(reg, sizecode, true)) //the index register can be zr
         } else {
-            Some(writer_register(indexreg))
+            None
         };
 
         if self.current_report_impl == 0
@@ -2502,8 +2485,6 @@ impl AsanRuntime {
         {
             let after_report_impl = writer.code_offset() + 2;
 
-            #[cfg(target_arch = "x86_64")]
-            writer.put_jmp_near_label(after_report_impl);
             #[cfg(target_arch = "aarch64")]
             writer.put_b_label(after_report_impl);
 
@@ -2558,28 +2539,22 @@ impl AsanRuntime {
                 }
             }
 
-            if let (Arm64Extender::ARM64_EXT_INVALID, Arm64Shift::Invalid) = (extender, shift) {
-                writer.put_add_reg_reg_reg(
-                    Aarch64Register::X0,
-                    Aarch64Register::X0,
-                    Aarch64Register::X1,
-                );
-            } else {
-                let extender_encoding: i32 = match extender {
-                    Arm64Extender::ARM64_EXT_UXTB => 0b000,
-                    Arm64Extender::ARM64_EXT_UXTH => 0b001,
-                    Arm64Extender::ARM64_EXT_UXTW => 0b010,
-                    Arm64Extender::ARM64_EXT_UXTX => 0b011,
-                    Arm64Extender::ARM64_EXT_SXTB => 0b100,
-                    Arm64Extender::ARM64_EXT_SXTH => 0b101,
-                    Arm64Extender::ARM64_EXT_SXTW => 0b110,
-                    Arm64Extender::ARM64_EXT_SXTX => 0b111,
-                    Arm64Extender::ARM64_EXT_INVALID => -1,
+            if let Some((shift_type, amount)) = shift {
+                let extender_encoding: i32 = match shift_type {
+                    ShiftStyle::UXTB => 0b000,
+                    ShiftStyle::UXTH => 0b001,
+                    ShiftStyle::UXTW => 0b010,
+                    ShiftStyle::UXTX => 0b011,
+                    ShiftStyle::SXTB => 0b100,
+                    ShiftStyle::SXTH => 0b101,
+                    ShiftStyle::SXTW => 0b110,
+                    ShiftStyle::SXTX => 0b111,
+                    _ => -1,
                 };
-                let (shift_encoding, shift_amount): (i32, u32) = match shift {
-                    Arm64Shift::Lsl(amount) => (0b00, amount),
-                    Arm64Shift::Lsr(amount) => (0b01, amount),
-                    Arm64Shift::Asr(amount) => (0b10, amount),
+                let (shift_encoding, shift_amount): (i32, u32) = match shift_type {
+                    ShiftStyle::LSL => (0b00, amount as u32),
+                    ShiftStyle::LSR => (0b01, amount as u32),
+                    ShiftStyle::ASR => (0b10, amount as u32),
                     _ => (-1, 0),
                 };
 
@@ -2589,16 +2564,22 @@ impl AsanRuntime {
                     writer.put_bytes(
                         &(0x8b210000 | ((extender_encoding as u32) << 13) | (shift_amount << 10))
                             .to_le_bytes(),
-                    );
+                    ); //add x0, x0, w1, [shift] #[amount]
                 } else if shift_encoding != -1 {
                     #[allow(clippy::cast_sign_loss)]
                     writer.put_bytes(
                         &(0x8b010000 | ((shift_encoding as u32) << 22) | (shift_amount << 10))
                             .to_le_bytes(),
-                    );
+                    ); //add x0, x0, x1, [shift] #[amount]
                 } else {
-                    panic!("extender: {extender:?}, shift: {shift:?}");
+                    panic!("shift_type: {shift_type:?}, shift: {shift:?}");
                 }
+            } else {
+                writer.put_add_reg_reg_reg(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    Aarch64Register::X1,
+                );
             };
         }
 
@@ -2625,12 +2606,12 @@ impl AsanRuntime {
                 let displacement = displacement.unsigned_abs();
                 let displacement_hi = displacement / 4096;
                 let displacement_lo = displacement % 4096;
-                writer.put_bytes(&(0xd1400000u32 | (displacement_hi << 10)).to_le_bytes());
+                writer.put_bytes(&(0xd1400000u32 | (displacement_hi << 10)).to_le_bytes()); //sub x0, x0, #[displacement / 4096] LSL#12
                 writer.put_sub_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
                     u64::from(displacement_lo),
-                );
+                ); //sub x0, x0, #[displacement & 4095]
             }
         } else if displacement > 0 {
             #[allow(clippy::cast_sign_loss)]
@@ -2670,7 +2651,7 @@ impl AsanRuntime {
             64 => writer.put_bytes(self.blob_check_mem_64bytes()),
             _ => false,
         };
-
+        //Shouldn't there be some manipulation of the code_offset here?
         // Add the branch to report
         //writer.put_brk_imm(0x12);
         writer.put_branch_address(self.current_report_impl);

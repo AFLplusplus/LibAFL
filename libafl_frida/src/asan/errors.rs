@@ -19,8 +19,11 @@ use libafl::{
 use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
-#[cfg(target_arch = "x86_64")]
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arch::Arch;
 use yaxpeax_arch::LengthedInstruction;
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arm::armv8::a64::ARMv8;
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
 
@@ -239,21 +242,26 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
+                let decoder = <ARMv8 as Arch>::Decoder::default();
 
                 #[cfg(target_arch = "x86_64")]
                 let decoder = InstDecoder::minimal();
 
                 let start_pc = error.pc - 4 * 5;
+                #[cfg(target_arch = "x86_64")]
                 let insts = disas_count(
                     &decoder,
                     unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
                     11,
                 );
+
+                #[cfg(target_arch = "aarch64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                    11,
+                );
+
                 let mut inst_address = start_pc;
 
                 for insn in insts {
@@ -489,19 +497,24 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
+                let decoder = <ARMv8 as Arch>::Decoder::default();
 
                 #[cfg(target_arch = "x86_64")]
                 let decoder = InstDecoder::minimal();
 
                 let start_pc = pc;
+
+                #[cfg(target_arch = "x86_64")]
                 let insts = disas_count(
                     &decoder,
                     unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
+                    11,
+                );
+
+                #[cfg(target_arch = "aarch64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
                     11,
                 );
 

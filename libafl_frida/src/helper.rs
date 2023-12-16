@@ -6,11 +6,6 @@ use std::{
     rc::Rc,
 };
 
-#[cfg(target_arch = "aarch64")]
-use capstone::{
-    arch::{self, BuildsCapstone},
-    Capstone,
-};
 #[cfg(unix)]
 use frida_gum::instruction_writer::InstructionWriter;
 use frida_gum::{
@@ -27,6 +22,10 @@ use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arch::Arch;
+#[cfg(all(target_arch = "aarch64", unix))]
+use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
 
@@ -445,28 +444,14 @@ where
         let ranges = Rc::clone(ranges);
         let runtimes = Rc::clone(runtimes);
 
-        #[cfg(target_arch = "aarch64")]
-        let capstone = Capstone::new()
-            .arm64()
-            .mode(arch::arm64::ArchMode::Arm)
-            .detail(true)
-            .build()
-            .expect("Failed to create Capstone object");
-
         #[cfg(target_arch = "x86_64")]
         let decoder = InstDecoder::minimal();
 
+        #[cfg(target_arch = "aarch64")]
+        let decoder = <ARMv8 as Arch>::Decoder::default();
+
         Transformer::from_callback(gum, move |basic_block, output| {
-            Self::transform(
-                basic_block,
-                &output,
-                &ranges,
-                &runtimes,
-                #[cfg(target_arch = "aarch64")]
-                &capstone,
-                #[cfg(target_arch = "x86_64")]
-                decoder,
-            );
+            Self::transform(basic_block, &output, &ranges, &runtimes, decoder);
         })
     }
 
@@ -523,7 +508,7 @@ where
                 }
 
                 #[cfg(target_arch = "aarch64")]
-                if let Some((basereg, indexreg, displacement, width, shift, extender)) = res {
+                if let Some((basereg, indexreg, displacement, width, shift)) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
                             address,
@@ -533,18 +518,25 @@ where
                             displacement,
                             width,
                             shift,
-                            extender,
                         );
                     }
                 }
 
                 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
                 if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>() {
-                    if let Some((op1, op2, special_case)) =
-                        CmpLogRuntime::cmplog_is_interesting_instruction(&capstone, address, instr)
+                    if let Some((op1, op2, shift, special_case)) =
+                        CmpLogRuntime::cmplog_is_interesting_instruction(decoder, address, instr)
+                    //change this as well
                     {
                         //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                        rt.emit_comparison_handling(address, &output, &op1, &op2, special_case);
+                        rt.emit_comparison_handling(
+                            address,
+                            &output,
+                            &op1,
+                            &op2,
+                            shift,
+                            special_case,
+                        );
                     }
                 }
 
