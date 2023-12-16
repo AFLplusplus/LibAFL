@@ -259,7 +259,7 @@ impl AsanErrors {
 
                 while let Ok(insn) = decoder.decode(&mut reader)
                 {
-                    if <U8Reader<'_> as Reader<u64, u8>>::total_offset(&mut reader).to_linear() == error.pc-start_pc { //error.pc < start_pc
+                    if <U8Reader<'_> as Reader<u64, u8>>::total_offset(&mut reader).to_linear()-4 == error.pc-start_pc { //error.pc < start_pc
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -508,7 +508,7 @@ impl AsanErrors {
                 //unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) }
                 
                 while let Ok(insn) = decoder.decode(&mut reader) {
-                    if <U8Reader<'_> as Reader<u64, u8>>::total_offset(&mut reader).to_linear() == pc - start_pc {
+                    if <U8Reader<'_> as Reader<u64, u8>>::total_offset(&mut reader).to_linear()-4 == pc - start_pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
