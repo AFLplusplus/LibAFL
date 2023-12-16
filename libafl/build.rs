@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-cfg=nightly");
     #[cfg(feature = "unicode")]
     {
-        // build_unicode_property_map()?;
+        build_unicode_property_map()?;
     }
     Ok(())
 }
