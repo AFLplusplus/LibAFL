@@ -19,6 +19,7 @@ use crate::{
     state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
 };
 
+/// Unicode category data, as used by string analysis and mutators.
 #[allow(unused)]
 #[allow(missing_docs)]
 #[allow(clippy::redundant_static_lifetimes)]
