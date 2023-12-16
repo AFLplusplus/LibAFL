@@ -2,8 +2,6 @@
 use std::{fmt::Debug, io::Write, marker::PhantomData};
 
 use backtrace::Backtrace;
-#[cfg(target_arch = "x86_64")]
-use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
@@ -21,10 +19,15 @@ use libafl::{
 use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
+use yaxpeax_arch::LengthedInstruction;
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_x86::amd64::InstDecoder;
 
 #[cfg(target_arch = "x86_64")]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
-use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT};
+use crate::{
+    alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, utils::disas_count,
+};
 
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::ARMv8;
@@ -243,23 +246,28 @@ impl AsanErrors {
                 let decoder = <ARMv8 as Arch>::Decoder::default();
 
                 #[cfg(target_arch = "x86_64")]
-                let mut cs = Capstone::new()
-                    .x86()
-                    .mode(capstone::arch::x86::ArchMode::Mode64)
-                    .detail(true)
-                    .build()
-                    .expect("Failed to create Capstone object");
-
-                #[cfg(target_arch = "x86_64")]
-                cs.set_skipdata(true).expect("failed to set skipdata");
+                let decoder = InstDecoder::minimal();
 
                 
                 let start_pc = error.pc - 4 * 5;
-                let mut reader = ReaderBuilder::<u64, u8>::read_from(unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) });
+                #[cfg(target_arch = "x86_64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
+                    11,
+                );
 
-                while let Ok(insn) = decoder.decode(&mut reader)
-                {
-                    if <U8Reader<'_> as Reader<u64, u8>>::total_offset(&mut reader).to_linear()-4 == error.pc-start_pc { //error.pc < start_pc
+                #[cfg(target_arch = "aarch64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                    11,
+                );
+
+                let mut inst_address = start_pc;
+
+                for insn in insts {
+                    if inst_address == error.pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -268,6 +276,8 @@ impl AsanErrors {
                     } else {
                         writeln!(output, "\t    {insn}").unwrap();
                     }
+
+                    inst_address += insn.len().to_const() as usize;
                 }
                 backtrace_printer
                     .print_trace(&error.backtrace, output)
@@ -492,23 +502,27 @@ impl AsanErrors {
                 let decoder = <ARMv8 as Arch>::Decoder::default();
 
                 #[cfg(target_arch = "x86_64")]
-                let mut cs = Capstone::new()
-                    .x86()
-                    .mode(capstone::arch::x86::ArchMode::Mode64)
-                    .detail(true)
-                    .build()
-                    .expect("Failed to create Capstone object");
-
-                #[cfg(target_arch = "x86_64")]
-                cs.set_skipdata(true).expect("failed to set skipdata");
+                let decoder = InstDecoder::minimal();
 
                 let start_pc = pc;
-                let mut reader = ReaderBuilder::<u64, u8>::read_from(unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) });
-                
-                //unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) }
-                
-                while let Ok(insn) = decoder.decode(&mut reader) {
-                    if <U8Reader<'_> as Reader<u64, u8>>::total_offset(&mut reader).to_linear()-4 == pc - start_pc {
+
+                #[cfg(target_arch = "x86_64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
+                    11,
+                );
+
+                #[cfg(target_arch = "aarch64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                    11,
+                );
+
+                let mut inst_address = start_pc;
+                for insn in insts {
+                    if inst_address == pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -517,6 +531,8 @@ impl AsanErrors {
                     } else {
                         writeln!(output, "\t    {insn}").unwrap();
                     }
+
+                    inst_address += insn.len().to_const() as usize;
                 }
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
             }

@@ -13,11 +13,6 @@ use core::{
 use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile, rc::Rc};
 
 use backtrace::Backtrace;
-#[cfg(target_arch = "x86_64")]
-use capstone::{
-    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
-    Capstone, RegAccessType, RegId,
-};
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
@@ -40,6 +35,8 @@ use libc::{getrlimit, rlimit};
 use libc::{getrlimit64, rlimit64};
 use nix::sys::mman::{mmap, mprotect, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_x86::amd64::{InstDecoder, Instruction, Opcode};
 
 
 
@@ -47,11 +44,14 @@ use rangemap::RangeMap;
 use crate::utils::frida_to_cs;
 #[cfg(target_arch = "aarch64")]
 use crate::utils::instruction_width;
+#[cfg(target_arch = "x86_64")]
+use crate::utils::operand_details;
 use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::{FridaRuntime, SkipRange},
     utils::writer_register,
+    utils::disas_count
 };
 
 use yaxpeax_arch::{ReaderBuilder, Decoder, Arch};
@@ -916,32 +916,30 @@ impl AsanRuntime {
         let fault_address = self.regs[17];
         let actual_pc = self.regs[18];
 
-        let cs = Capstone::new()
-            .x86()
-            .mode(arch::x86::ArchMode::Mode64)
-            .detail(true)
-            .build()
-            .expect("Failed to create Capstone object");
+        let decoder = InstDecoder::minimal();
 
-        let instructions = cs
-            .disasm_count(
-                unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 24) },
-                actual_pc as u64,
-                3,
-            )
-            .expect("Failed to disassmeble");
+        let instructions: Vec<Instruction> = disas_count(
+            &decoder,
+            unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 24) },
+            3,
+        );
 
-        let insn = instructions.as_ref().first().unwrap(); // This is the very instruction that has triggered fault
+        let insn = instructions[0]; // This is the very instruction that has triggered fault
         log::info!("{insn:#?}");
-        let operands = cs.insn_detail(insn).unwrap().arch_detail().operands();
+        let operand_count = insn.operand_count();
 
-        let mut access_type: Option<RegAccessType> = None;
-        let mut regs: Option<(RegId, RegId, i64)> = None;
-        for operand in operands {
-            if let X86Operand(x86operand) = operand {
-                if let X86OperandType::Mem(mem) = x86operand.op_type {
-                    access_type = x86operand.access;
-                    regs = Some((mem.base(), mem.index(), mem.disp()));
+        let mut access_type: Option<AccessType> = None;
+        let mut regs: Option<(X86Register, X86Register, i32)> = None;
+        for operand_idx in 0..operand_count {
+            let operand = insn.operand(operand_idx);
+            if operand.is_memory() {
+                access_type = if operand_idx == 0 {
+                    Some(AccessType::Read)
+                } else {
+                    Some(AccessType::Write)
+                };
+                if let Some((basereg, indexreg, _, disp)) = operand_details(&operand) {
+                    regs = Some((basereg, indexreg, disp));
                 }
             }
         }
@@ -950,22 +948,24 @@ impl AsanRuntime {
         let (stack_start, stack_end) = Self::current_stack();
 
         if let Some(r) = regs {
-            let (base_idx, size) = self.register_idx(r.0); // safe to unwrap
-            let (index_idx, _) = self.register_idx(r.1);
+            let base = self.register_idx(r.0); // safe to unwrap
+            let index = self.register_idx(r.1);
             let disp = r.2;
 
-            // from capstone register id to self.regs's index
-            let base_value = match base_idx {
-                Some(base) => match size {
-                    Some(sz) => {
-                        if sz == 64 {
-                            Some(self.regs[base as usize])
-                        } else {
-                            Some(self.regs[base as usize] & 0xffffffff)
-                        }
-                    }
-                    _ => None,
-                },
+            let (base_idx, base_value) = match base {
+                Some((idx, size)) => {
+                    let value = if size == 64 {
+                        Some(self.regs[idx as usize])
+                    } else {
+                        Some(self.regs[idx as usize] & 0xffffffff)
+                    };
+                    (Some(idx), value)
+                }
+                _ => (None, None),
+            };
+
+            let index_idx = match index {
+                Some((idx, _)) => Some(idx),
                 _ => None,
             };
 
@@ -974,13 +974,13 @@ impl AsanRuntime {
             let error = if fault_address >= stack_start && fault_address < stack_end {
                 match access_type {
                     Some(typ) => match typ {
-                        RegAccessType::ReadOnly => AsanError::StackOobRead((
+                        AccessType::Read => AsanError::StackOobRead((
                             self.regs,
                             actual_pc,
                             (base_idx, index_idx, disp as usize, fault_address),
                             backtrace,
                         )),
-                        _ => AsanError::StackOobWrite((
+                        AccessType::Write => AsanError::StackOobWrite((
                             self.regs,
                             actual_pc,
                             (base_idx, index_idx, disp as usize, fault_address),
@@ -1009,14 +1009,14 @@ impl AsanRuntime {
                                 backtrace,
                             };
                             match typ {
-                                RegAccessType::ReadOnly => {
+                                AccessType::Read => {
                                     if metadata.freed {
                                         AsanError::ReadAfterFree(asan_readwrite_error)
                                     } else {
                                         AsanError::OobRead(asan_readwrite_error)
                                     }
                                 }
-                                _ => {
+                                AccessType::Write => {
                                     if metadata.freed {
                                         AsanError::WriteAfterFree(asan_readwrite_error)
                                     } else {
@@ -1073,24 +1073,18 @@ impl AsanRuntime {
             None => actual_pc,
         };
 
-        //log::error!("TRAPPED");
-        let instr_bytes = unsafe { std::slice::from_raw_parts(actual_pc as *const u8, 4) };
-        let mut reader = ReaderBuilder::<u64, u8>::read_from(instr_bytes);
         let decoder = <ARMv8 as Arch>::Decoder::default();
-        let decode_res = decoder.decode(&mut reader);
+        
+        let insn = disas_count(
+            &decoder,
+            unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 4) },
+            1,
+        )[0];
 
-        if let Err(_) = decode_res {
-            //uhhh. How did we get here?
-            panic!("Failed to disassemble instruction");
-        }
-
-        let insn = decode_res.unwrap();
         
         
         if insn.opcode == Opcode::MSR && insn.operands[0] == Operand::SystemReg(23056) { //the first operand is nzcv 
-
             //What case is this for??
-
             /*insn = instructions.get(2).unwrap();
             actual_pc = insn.address() as usize;*/
         }
@@ -1202,43 +1196,43 @@ impl AsanRuntime {
 
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::unused_self)]
-    fn register_idx(&self, capid: RegId) -> (Option<u16>, Option<u16>) {
-        match capid.0 {
-            19 => (Some(0), Some(32)),
-            22 => (Some(2), Some(32)),
-            24 => (Some(3), Some(32)),
-            21 => (Some(1), Some(32)),
-            30 => (Some(5), Some(32)),
-            20 => (Some(4), Some(32)),
-            29 => (Some(6), Some(32)),
-            23 => (Some(7), Some(32)),
-            226 => (Some(8), Some(32)),
-            227 => (Some(9), Some(32)),
-            228 => (Some(10), Some(32)),
-            229 => (Some(11), Some(32)),
-            230 => (Some(12), Some(32)),
-            231 => (Some(13), Some(32)),
-            232 => (Some(14), Some(32)),
-            233 => (Some(15), Some(32)),
-            26 => (Some(18), Some(32)),
-            35 => (Some(0), Some(64)),
-            38 => (Some(2), Some(64)),
-            40 => (Some(3), Some(64)),
-            37 => (Some(1), Some(64)),
-            44 => (Some(5), Some(64)),
-            36 => (Some(4), Some(64)),
-            43 => (Some(6), Some(64)),
-            39 => (Some(7), Some(64)),
-            106 => (Some(8), Some(64)),
-            107 => (Some(9), Some(64)),
-            108 => (Some(10), Some(64)),
-            109 => (Some(11), Some(64)),
-            110 => (Some(12), Some(64)),
-            111 => (Some(13), Some(64)),
-            112 => (Some(14), Some(64)),
-            113 => (Some(15), Some(64)),
-            41 => (Some(18), Some(64)),
-            _ => (None, None),
+    fn register_idx(&self, reg: X86Register) -> Option<(u16, u16)> {
+        match reg {
+            X86Register::Eax => Some((0, 32)),
+            X86Register::Ecx => Some((2, 32)),
+            X86Register::Edx => Some((3, 32)),
+            X86Register::Ebx => Some((1, 32)),
+            X86Register::Esp => Some((5, 32)),
+            X86Register::Ebp => Some((4, 32)),
+            X86Register::Esi => Some((6, 32)),
+            X86Register::Edi => Some((7, 32)),
+            X86Register::R8d => Some((8, 32)),
+            X86Register::R9d => Some((9, 32)),
+            X86Register::R10d => Some((10, 32)),
+            X86Register::R11d => Some((11, 32)),
+            X86Register::R12d => Some((12, 32)),
+            X86Register::R13d => Some((13, 32)),
+            X86Register::R14d => Some((14, 32)),
+            X86Register::R15d => Some((15, 32)),
+            X86Register::Eip => Some((18, 32)),
+            X86Register::Rax => Some((0, 4)),
+            X86Register::Rcx => Some((2, 4)),
+            X86Register::Rdx => Some((3, 4)),
+            X86Register::Rbx => Some((1, 4)),
+            X86Register::Rsp => Some((5, 4)),
+            X86Register::Rbp => Some((4, 4)),
+            X86Register::Rsi => Some((6, 4)),
+            X86Register::Rdi => Some((7, 4)),
+            X86Register::R8 => Some((8, 64)),
+            X86Register::R9 => Some((9, 64)),
+            X86Register::R10 => Some((10, 64)),
+            X86Register::R11 => Some((11, 64)),
+            X86Register::R12 => Some((12, 64)),
+            X86Register::R13 => Some((13, 64)),
+            X86Register::R14 => Some((14, 64)),
+            X86Register::R15 => Some((15, 64)),
+            X86Register::Rip => Some((18, 64)),
+            _ => None,
         }
     }
 
@@ -2270,60 +2264,46 @@ impl AsanRuntime {
     #[must_use]
     #[allow(clippy::result_unit_err)]
     pub fn asan_is_interesting_instruction(
-        capstone: &Capstone,
+        decoder: InstDecoder,
         _address: u64,
         instr: &Insn,
-    ) -> Option<(RegId, u8, RegId, RegId, i32, i64)> {
+    ) -> Option<(u8, X86Register, X86Register, u8, i32)> {
         // We need to re-decode frida-internal capstone values to upstream capstone
-        let cs_instr = frida_to_cs(capstone, instr);
-        let cs_instr = cs_instr.first().unwrap();
-        let operands = capstone
-            .insn_detail(cs_instr)
-            .unwrap()
-            .arch_detail()
-            .operands();
+        let cs_instr = frida_to_cs(decoder, instr);
+        let mut operands = vec![];
+        for operand_idx in 0..cs_instr.operand_count() {
+            operands.push(cs_instr.operand(operand_idx));
+        }
+
         // Ignore lea instruction
         // put nop into the white-list so that instructions like
         // like `nop dword [rax + rax]` does not get caught.
-        match cs_instr.mnemonic().unwrap() {
-            "lea" | "nop" => return None,
+        match cs_instr.opcode() {
+            Opcode::LEA | Opcode::NOP => return None,
 
             _ => (),
         }
 
         // This is a TODO! In this case, both the src and the dst are mem operand
         // so we would need to return two operadns?
-        if cs_instr.mnemonic().unwrap().starts_with("rep") {
+        if cs_instr.prefixes.rep_any() {
             return None;
         }
 
         for operand in operands {
-            if let X86Operand(x86operand) = operand {
-                if let X86OperandType::Mem(opmem) = x86operand.op_type {
-                    /*
-                    log::trace!(
-                        "insn: {:#?} {:#?} width: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
-                        insn_id,
-                        instr,
-                        x86operand.size,
-                        opmem.segment(),
-                        opmem.base(),
-                        opmem.index(),
-                        opmem.scale(),
-                        opmem.disp(),
-                    );
-                    */
-                    if opmem.segment() == RegId(0) {
-                        return Some((
-                            opmem.segment(),
-                            x86operand.size,
-                            opmem.base(),
-                            opmem.index(),
-                            opmem.scale(),
-                            opmem.disp(),
-                        ));
-                    }
-                }
+            if operand.is_memory() {
+                // log::trace!("{:#?}", operand)
+                // if we reach this point
+                // because in x64 there's no mem to mem inst, just return the first memory operand
+
+                if let Some((basereg, indexreg, scale, disp)) = operand_details(&operand) {
+                    let memsz = cs_instr.mem_size().unwrap().bytes_size().unwrap(); // this won't fail if it is mem access inst
+
+                    // println!("{:#?} {:#?} {:#?}", cs_instr, cs_instr.to_string(), operand);
+                    // println!("{:#?}", (memsz, basereg, indexreg, scale, disp));
+
+                    return Some((memsz, basereg, indexreg, scale, disp));
+                } // else {} // perhaps avx instructions?
             }
         }
 
@@ -2339,29 +2319,26 @@ impl AsanRuntime {
         &mut self,
         address: u64,
         output: &StalkerOutput,
-        _segment: RegId,
         width: u8,
-        basereg: RegId,
-        indexreg: RegId,
-        scale: i32,
-        disp: isize,
+        basereg: X86Register,
+        indexreg: X86Register,
+        scale: u8,
+        disp: i32,
     ) {
         let redzone_size = isize::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).unwrap();
         let writer = output.writer();
         let true_rip = address;
 
-        let basereg = if basereg.0 == 0 {
+        let basereg: Option<X86Register> = if basereg == X86Register::None {
             None
         } else {
-            let reg = writer_register(basereg);
-            Some(reg)
+            Some(basereg)
         };
 
-        let indexreg = if indexreg.0 == 0 {
+        let indexreg = if indexreg == X86Register::None {
             None
         } else {
-            let reg = writer_register(indexreg);
-            Some(reg)
+            Some(indexreg)
         };
 
         let scale = match scale {
@@ -2469,7 +2446,7 @@ impl AsanRuntime {
 
         // Finally set Rdi to base + index * scale + disp
         writer.put_add_reg_reg(X86Register::Rdi, X86Register::Rsi);
-        writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp);
+        writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp as isize);
 
         writer.put_mov_reg_address(X86Register::Rsi, true_rip); // load true_rip into rsi in case we need them in handle_trap
         writer.put_push_reg(X86Register::Rsi); // save true_rip

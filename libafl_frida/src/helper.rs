@@ -6,12 +6,6 @@ use std::{
     rc::Rc,
 };
 
-#[cfg(all(target_arch = "x86_64", unix))]
-use capstone::{
-    arch::{self, BuildsCapstone},
-    Capstone,
-};
-
 #[cfg(all(target_arch = "aarch64", unix))]
 use yaxpeax_arm::armv8::a64::{ARMv8,InstDecoder};
 
@@ -34,6 +28,8 @@ use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_x86::amd64::InstDecoder;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
@@ -504,23 +500,16 @@ where
                 
                 #[cfg(unix)]
                 let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
-                    AsanRuntime::asan_is_interesting_instruction(decoder, address, instr) //change this
+                    AsanRuntime::asan_is_interesting_instruction(decoder, address, instr)
                 } else {
                     None
                 };
 
                 #[cfg(all(target_arch = "x86_64", unix))]
-                if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
+                if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
-                            address,
-                            output,
-                            segment,
-                            width,
-                            basereg,
-                            indexreg,
-                            scale,
-                            disp.try_into().unwrap(),
+                            address, output, details.0, details.1, details.2, details.3, details.4,
                         );
                     }
                 }

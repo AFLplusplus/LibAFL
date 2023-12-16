@@ -202,7 +202,7 @@ pub struct BrokerId(pub u32);
 /// The flags, indicating, for example, enabled compression.
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Flags(u32);
+pub struct Flags(pub u32);
 
 impl Debug for Flags {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
