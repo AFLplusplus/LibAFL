@@ -1,6 +1,5 @@
 use std::{cell::UnsafeCell, cmp::max};
 
-use capstone::{Capstone, InsnDetail};
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{inputs::UsesInput, state::HasMetadata};
 pub use libafl_targets::{
