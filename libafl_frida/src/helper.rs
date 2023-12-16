@@ -17,7 +17,7 @@ use frida_gum::{
     stalker::{StalkerIterator, StalkerOutput, Transformer},
     Gum, Module, ModuleDetails, ModuleMap, PageProtection,
 };
-use frida_gum_sys::Insn;
+
 use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,

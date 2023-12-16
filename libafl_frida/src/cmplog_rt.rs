@@ -30,7 +30,7 @@ use frida_gum::{
 };
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-use crate::utils::writer_register;
+use crate::utils::{writer_register,disas_count};
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 /// Speciial `CmpLog` Cases for `aarch64`
@@ -44,7 +44,6 @@ pub enum SpecialCmpLogCase {
 
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{Operand, Opcode, ShiftStyle, InstDecoder};
-use yaxpeax_arch::{Arch, ReaderBuilder, Decoder};
 
 
 /// The [`frida_gum_sys::GUM_RED_ZONE_SIZE`] casted to [`i32`]
@@ -371,17 +370,8 @@ impl CmpLogRuntime {
         Option<(ShiftStyle, u8)>, //possible shifts: everything except MSL
         Option<SpecialCmpLogCase>,
     )> {
-        // We need to re-decode frida-internal capstone values to upstream capstone
-        
-        let mut reader = ReaderBuilder::<u64, u8>::read_from(instr.bytes());
-        let decode_res = decoder.decode(&mut reader);
 
-        if let Err(_) = decode_res {
-            //instruction is not supported by yaxpeax
-            return None;
-        }
-
-        let mut instr = decode_res.unwrap();
+        let mut instr = disas_count(&decoder, instr.bytes(), 1)[0];
         let operands_len = instr.operands.iter().position(|item| *item == Operand::Nothing).unwrap_or_else(|| 4);
         // "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cbz"
         //    | "cbnz" | "tbz" | "tbnz" | "adcs" - yaxpeax aliases insns (i.e., cmp -> subs)

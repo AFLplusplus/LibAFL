@@ -33,7 +33,7 @@ use libc::{c_char, wchar_t};
 use libc::{getrlimit, rlimit};
 #[cfg(all(unix, not(target_vendor = "apple")))]
 use libc::{getrlimit64, rlimit64};
-use nix::sys::mman::{mmap, mprotect, MapFlags, ProtFlags};
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::{InstDecoder, Instruction, Opcode};
@@ -54,7 +54,7 @@ use crate::{
     utils::disas_count
 };
 
-use yaxpeax_arch::{ReaderBuilder, Decoder, Arch};
+use yaxpeax_arch::Arch;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{ARMv8, Opcode, Operand, SizeCode, ShiftStyle, InstDecoder};
 
@@ -2161,17 +2161,8 @@ impl AsanRuntime {
         )
     > {
         // We need to re-decode frida-internal capstone values to upstream capstone
-        //let instr_bytes = unsafe { std::slice::from_raw_parts(address as *const u8, 4) };
-        let mut reader = ReaderBuilder::<u64, u8>::read_from(instr.bytes());
-        let decode_res = decoder.decode(&mut reader);
 
-        if let Err(e) = decode_res {
-            //println!("{}", e);
-            //instruction is not supported by yaxpeax
-            return None;
-        }
-
-        let instr = decode_res.unwrap();
+        let instr = disas_count(&decoder, instr.bytes(), 1)[0];
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
         match instr.opcode {

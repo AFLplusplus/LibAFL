@@ -19,9 +19,12 @@ use libafl::{
 use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
-use yaxpeax_arch::LengthedInstruction;
+use yaxpeax_arch::{LengthedInstruction, Arch};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arm::armv8::a64::ARMv8;
+
 
 #[cfg(target_arch = "x86_64")]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
@@ -29,9 +32,6 @@ use crate::{
     alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, utils::disas_count,
 };
 
-#[cfg(target_arch = "aarch64")]
-use yaxpeax_arm::armv8::a64::ARMv8;
-use yaxpeax_arch::{ReaderBuilder, Arch, Decoder, Reader, AddressBase, U8Reader};
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

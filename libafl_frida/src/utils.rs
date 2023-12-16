@@ -3,7 +3,7 @@ use frida_gum::instruction_writer::Aarch64Register;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{Instruction, Operand, Opcode, SIMDSizeCode, SizeCode, InstDecoder};
 #[cfg(target_arch = "aarch64")]
-use yaxpeax_arch::{ReaderBuilder, Arch, Decoder, Reader, AddressBase, U8Reader};
+use yaxpeax_arch::{ReaderBuilder, Decoder};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(any(target_arch = "x86_64"))]
@@ -269,9 +269,9 @@ pub fn disas_count(decoder: &InstDecoder, data: &[u8], count: usize) -> Vec<Inst
 
 #[cfg(target_arch = "aarch64")]
 pub fn disas_count(decoder: &InstDecoder, data: &[u8], count: usize) -> Vec<Instruction> {
-    let mut counter = count;
+    let _counter = count;
     let mut ret = vec![];
-    let mut start = 0;
+    let _start = 0;
 
    let mut reader =  ReaderBuilder::<u64, u8>::read_from(data);
 
