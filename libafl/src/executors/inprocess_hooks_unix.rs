@@ -60,32 +60,6 @@ impl DefaultExecutorHooks {
         Ok(Self {})
     }
 
-    /// Create new [`DefaultExecutorHooks`].
-    #[cfg(all(windows, feature = "std"))]
-    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
-    where
-        E: Executor<EM, Z> + HasObservers,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
-        E::State: State + HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
-    {
-        unsafe {
-            let data = &mut GLOBAL_STATE;
-            #[cfg(feature = "std")]
-            windows_exception_handler::setup_panic_hook::<E, EM, OF, Z>();
-            setup_exception_handler(data)?;
-            compiler_fence(Ordering::SeqCst);
-
-            Ok(Self {
-                crash_handler: windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
-                    as *const _,
-                timeout_handler: windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
-                    as *const c_void,
-            })
-        }
-    }
-
     /// Replace the handlers with `nop` handlers, deactivating the handlers
     #[must_use]
     pub fn nop() -> Self {
@@ -136,37 +110,12 @@ impl ExecutorHooks for DefaultExecutorHooks {
             write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
-        #[cfg(all(windows, feature = "std"))]
-        unsafe {
-            let data = &mut GLOBAL_STATE;
-            write_volatile(
-                &mut data.current_input_ptr,
-                _input as *const _ as *const c_void,
-            );
-            write_volatile(
-                &mut data.executor_ptr,
-                _executor as *const _ as *const c_void,
-            );
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
-            // Direct raw pointers access /aliasing is pretty undefined behavior.
-            // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
-            compiler_fence(Ordering::SeqCst);
-        }
     }
 
     /// Call after running a target.
     #[allow(clippy::unused_self)]
     fn post_run_target(&self) {
         #[cfg(unix)]
-        unsafe {
-            write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
-            compiler_fence(Ordering::SeqCst);
-        }
-        #[cfg(all(windows, feature = "std"))]
         unsafe {
             write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
             compiler_fence(Ordering::SeqCst);
