@@ -19,20 +19,17 @@ use libafl::{
 use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
-use yaxpeax_arch::{LengthedInstruction, Arch};
-#[cfg(target_arch = "x86_64")]
-use yaxpeax_x86::amd64::InstDecoder;
+use yaxpeax_arch::{Arch, LengthedInstruction};
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::ARMv8;
-
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_x86::amd64::InstDecoder;
 
 #[cfg(target_arch = "x86_64")]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 use crate::{
     alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, utils::disas_count,
 };
-
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -248,7 +245,6 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 let decoder = InstDecoder::minimal();
 
-                
                 let start_pc = error.pc - 4 * 5;
                 #[cfg(target_arch = "x86_64")]
                 let insts = disas_count(
@@ -698,5 +694,3 @@ impl<S> Default for AsanErrorsFeedback<S> {
         Self::new()
     }
 }
-
-

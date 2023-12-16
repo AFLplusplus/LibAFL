@@ -1,9 +1,5 @@
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::Aarch64Register;
-#[cfg(target_arch = "aarch64")]
-use yaxpeax_arm::armv8::a64::{Instruction, Operand, Opcode, SIMDSizeCode, SizeCode, InstDecoder};
-#[cfg(target_arch = "aarch64")]
-use yaxpeax_arch::{ReaderBuilder, Decoder};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(any(target_arch = "x86_64"))]
@@ -12,6 +8,10 @@ use frida_gum_sys;
 use num_traits::cast::FromPrimitive;
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_arch::LengthedInstruction;
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arch::{Decoder, ReaderBuilder};
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arm::armv8::a64::{InstDecoder, Instruction, Opcode, Operand, SIMDSizeCode, SizeCode};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::Operand;
 #[cfg(target_arch = "x86_64")]
@@ -22,22 +22,12 @@ use yaxpeax_x86::amd64::{InstDecoder, Instruction, RegSpec};
 #[inline]
 #[must_use]
 pub fn get_simd_size(sizecode: SIMDSizeCode) -> u32 {
-    match sizecode{
-        SIMDSizeCode::B => {
-            1
-        },
-        SIMDSizeCode::H => {
-            2
-        },
-        SIMDSizeCode::S => {
-            4
-        },
-        SIMDSizeCode::D => {
-            8
-        },
-        SIMDSizeCode::Q => {
-            16
-        }
+    match sizecode {
+        SIMDSizeCode::B => 1,
+        SIMDSizeCode::H => 2,
+        SIMDSizeCode::S => 4,
+        SIMDSizeCode::D => 8,
+        SIMDSizeCode::Q => 16,
     }
 }
 
@@ -46,24 +36,20 @@ pub fn get_simd_size(sizecode: SIMDSizeCode) -> u32 {
 #[inline]
 #[must_use]
 pub fn get_reg_size(sizecode: SizeCode) -> u32 {
-    match sizecode{ 
-        SizeCode::W => { //this is guaranteed to be 4 because we deal with the strb/ldrb and strh/ldrh should be dealt with in instruction_width
+    match sizecode {
+        SizeCode::W => {
+            //this is guaranteed to be 4 because we deal with the strb/ldrb and strh/ldrh should be dealt with in instruction_width
             4
-        },
-        SizeCode::X => {
-            8
-        },
+        }
+        SizeCode::X => 8,
     }
 }
-
 
 /// Determine the width of the specified instruction
 #[cfg(target_arch = "aarch64")]
 #[inline]
 #[must_use]
 pub fn instruction_width(instr: &Instruction) -> u32 {
-    
-
     let num_registers = match instr.opcode {
         Opcode::STP
         | Opcode::STXP
@@ -75,7 +61,7 @@ pub fn instruction_width(instr: &Instruction) -> u32 {
         _ => 1,
     };
 
-   // let mnemonic = instr.opcode.to_string().as_bytes();
+    // let mnemonic = instr.opcode.to_string().as_bytes();
     match instr.opcode.to_string().as_bytes().last().unwrap() {
         b'b' => return 1,
         b'h' => return 2,
@@ -83,26 +69,28 @@ pub fn instruction_width(instr: &Instruction) -> u32 {
         _ => (),
     }
 
-
     let size = match instr.operands.first().unwrap() {
-        Operand::Register(sizecode, _) => { //this is used for standard loads/stores including ldr, ldp, etc.
-            get_reg_size(*sizecode)
-        },
-        Operand::RegisterPair(sizecode, _) => { //not sure where this is used, but it is possible in yaxpeax
+        Operand::Register(sizecode, _) => {
+            //this is used for standard loads/stores including ldr, ldp, etc.
             get_reg_size(*sizecode)
         }
-        Operand::SIMDRegister(sizecode, _) => { //this is used in cases like ldr q0, [sp]
+        Operand::RegisterPair(sizecode, _) => {
+            //not sure where this is used, but it is possible in yaxpeax
+            get_reg_size(*sizecode)
+        }
+        Operand::SIMDRegister(sizecode, _) => {
+            //this is used in cases like ldr q0, [sp]
             get_simd_size(*sizecode)
-        },
-        Operand::SIMDRegisterGroup(sizecode, _, _, num) => { 
-            ////This is used for cases such as ld4 {v1.2s, v2.2s, v3.2s, v4.2s}, [x0]. 
+        }
+        Operand::SIMDRegisterGroup(sizecode, _, _, num) => {
+            ////This is used for cases such as ld4 {v1.2s, v2.2s, v3.2s, v4.2s}, [x0].
             //the sizecode is the size of each simd structure (This can only be D or Q), num is the number of them (i.e. ld4 would be 4)
             get_simd_size(*sizecode) * *num as u32
-        },
+        }
         Operand::SIMDRegisterGroupLane(_, sizecode, num, _) => {
             //This is used for cases such as ld4 {v0.s, v1.s, v2.s, v3.s}[0], [x0]. In this case sizecode is the size of each lane, num is the number of them
             get_simd_size(*sizecode) * *num as u32
-        },
+        }
         _ => {
             return 0;
         }
@@ -110,23 +98,26 @@ pub fn instruction_width(instr: &Instruction) -> u32 {
     num_registers * size
 }
 
-
 /// Convert from a yaxpeax register to frida gum's register state
 #[cfg(target_arch = "aarch64")]
 #[must_use]
 #[inline]
 pub fn writer_register(reg: u16, sizecode: SizeCode, zr: bool) -> Aarch64Register {
-    //yaxpeax and arm both make it so that depending on the opcode reg=31 can be EITHER SP or XZR. 
+    //yaxpeax and arm both make it so that depending on the opcode reg=31 can be EITHER SP or XZR.
     match (reg, sizecode, zr) {
-        (0..=28, SizeCode::X, _) => Aarch64Register::from_u32(Aarch64Register::X0 as u32 + reg as u32).unwrap(),
-        (0..=30, SizeCode::W, _) => Aarch64Register::from_u32(Aarch64Register::W0 as u32 + reg as u32).unwrap(),
+        (0..=28, SizeCode::X, _) => {
+            Aarch64Register::from_u32(Aarch64Register::X0 as u32 + reg as u32).unwrap()
+        }
+        (0..=30, SizeCode::W, _) => {
+            Aarch64Register::from_u32(Aarch64Register::W0 as u32 + reg as u32).unwrap()
+        }
         (29, SizeCode::X, _) => Aarch64Register::Fp,
         (30, SizeCode::X, _) => Aarch64Register::Lr,
         (31, SizeCode::X, false) => Aarch64Register::Sp,
         (31, SizeCode::W, false) => Aarch64Register::Wsp,
         (31, SizeCode::X, true) => Aarch64Register::Xzr,
         (31, SizeCode::W, true) => Aarch64Register::Wzr,
-        _ => panic!("Failed to get writer register")
+        _ => panic!("Failed to get writer register"),
     }
 }
 
@@ -273,7 +264,7 @@ pub fn disas_count(decoder: &InstDecoder, data: &[u8], count: usize) -> Vec<Inst
     let mut ret = vec![];
     let _start = 0;
 
-   let mut reader =  ReaderBuilder::<u64, u8>::read_from(data);
+    let mut reader = ReaderBuilder::<u64, u8>::read_from(data);
 
     while let Ok(insn) = decoder.decode(&mut reader) {
         ret.push(insn);

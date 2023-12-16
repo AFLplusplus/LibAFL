@@ -6,13 +6,13 @@
 use std::ffi::c_void;
 
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+use frida_gum_sys::Insn;
 use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
 };
 use libafl_targets::{self, CMPLOG_MAP_W};
 use rangemap::RangeMap;
-use frida_gum_sys::Insn;
 
 use crate::helper::FridaRuntime;
 extern "C" {
@@ -30,7 +30,7 @@ use frida_gum::{
 };
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-use crate::utils::{writer_register,disas_count};
+use crate::utils::{disas_count, writer_register};
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 /// Speciial `CmpLog` Cases for `aarch64`
@@ -43,8 +43,7 @@ pub enum SpecialCmpLogCase {
 }
 
 #[cfg(target_arch = "aarch64")]
-use yaxpeax_arm::armv8::a64::{Operand, Opcode, ShiftStyle, InstDecoder};
-
+use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand, ShiftStyle};
 
 /// The [`frida_gum_sys::GUM_RED_ZONE_SIZE`] casted to [`i32`]
 ///
@@ -274,7 +273,7 @@ impl CmpLogRuntime {
         output: &StalkerOutput,
         op1: &CmplogOperandType, //first operand of the comparsion
         op2: &CmplogOperandType, //second operand of the comparsion
-        _shift: Option<(ShiftStyle, u8)>, 
+        _shift: Option<(ShiftStyle, u8)>,
         special_case: Option<SpecialCmpLogCase>,
     ) {
         let writer = output.writer();
@@ -293,19 +292,17 @@ impl CmpLogRuntime {
             CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
                 writer.put_ldr_reg_u64(Aarch64Register::X0, *value);
             }
-            CmplogOperandType::Regid(reg) => {
-                match *reg {
-                    Aarch64Register::X0 | Aarch64Register::W0 => {}
-                    Aarch64Register::X1 | Aarch64Register::W1 => {
-                        writer.put_mov_reg_reg(Aarch64Register::X0, Aarch64Register::X1);
-                    }
-                    _ => {
-                        if !writer.put_mov_reg_reg(Aarch64Register::X0, *reg) {
-                            writer.put_mov_reg_reg(Aarch64Register::W0, *reg);
-                        }
+            CmplogOperandType::Regid(reg) => match *reg {
+                Aarch64Register::X0 | Aarch64Register::W0 => {}
+                Aarch64Register::X1 | Aarch64Register::W1 => {
+                    writer.put_mov_reg_reg(Aarch64Register::X0, Aarch64Register::X1);
+                }
+                _ => {
+                    if !writer.put_mov_reg_reg(Aarch64Register::X0, *reg) {
+                        writer.put_mov_reg_reg(Aarch64Register::W0, *reg);
                     }
                 }
-            }
+            },
         }
 
         // make sure operand2 value is saved into x1
@@ -323,23 +320,17 @@ impl CmpLogRuntime {
                     }
                 }
             }
-            CmplogOperandType::Regid(reg) => {
-                match *reg {
-                    Aarch64Register::X1 | Aarch64Register::W1 => {}
-                    Aarch64Register::X0 | Aarch64Register::W0 => {
-                        writer.put_ldr_reg_reg_offset(
-                            Aarch64Register::X1,
-                            Aarch64Register::Sp,
-                            0u64,
-                        );
-                    }
-                    _ => {
-                        if !writer.put_mov_reg_reg(Aarch64Register::X1, *reg) {
-                            writer.put_mov_reg_reg(Aarch64Register::W1, *reg);
-                        }
+            CmplogOperandType::Regid(reg) => match *reg {
+                Aarch64Register::X1 | Aarch64Register::W1 => {}
+                Aarch64Register::X0 | Aarch64Register::W0 => {
+                    writer.put_ldr_reg_reg_offset(Aarch64Register::X1, Aarch64Register::Sp, 0u64);
+                }
+                _ => {
+                    if !writer.put_mov_reg_reg(Aarch64Register::X1, *reg) {
+                        writer.put_mov_reg_reg(Aarch64Register::W1, *reg);
                     }
                 }
-            }
+            },
         }
 
         //call cmplog runtime to populate the values map
@@ -370,21 +361,41 @@ impl CmpLogRuntime {
         Option<(ShiftStyle, u8)>, //possible shifts: everything except MSL
         Option<SpecialCmpLogCase>,
     )> {
-
         let mut instr = disas_count(&decoder, instr.bytes(), 1)[0];
-        let operands_len = instr.operands.iter().position(|item| *item == Operand::Nothing).unwrap_or_else(|| 4);
+        let operands_len = instr
+            .operands
+            .iter()
+            .position(|item| *item == Operand::Nothing)
+            .unwrap_or_else(|| 4);
         // "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cbz"
         //    | "cbnz" | "tbz" | "tbnz" | "adcs" - yaxpeax aliases insns (i.e., cmp -> subs)
         // We only care for compare instructions - aka instructions which set the flags
         match instr.opcode {
-            Opcode::SUBS | Opcode::ANDS | Opcode::ADDS | Opcode::SBCS | Opcode::BICS | Opcode::CBZ
-            | Opcode::CBNZ | Opcode::TBZ | Opcode::TBNZ | Opcode::ADC => (),
+            Opcode::SUBS
+            | Opcode::ANDS
+            | Opcode::ADDS
+            | Opcode::SBCS
+            | Opcode::BICS
+            | Opcode::CBZ
+            | Opcode::CBNZ
+            | Opcode::TBZ
+            | Opcode::TBNZ
+            | Opcode::ADC => (),
             _ => return None,
         }
 
         // cbz - 1 operand, everything else - 3 operands
         let special_case = [
-            Opcode::CBZ, Opcode::CBNZ, Opcode::TBZ, Opcode::TBNZ, Opcode::SUBS, Opcode::ADDS, Opcode::ANDS, Opcode::SBCS, Opcode::BICS, Opcode::ADCS,
+            Opcode::CBZ,
+            Opcode::CBNZ,
+            Opcode::TBZ,
+            Opcode::TBNZ,
+            Opcode::SUBS,
+            Opcode::ADDS,
+            Opcode::ANDS,
+            Opcode::SBCS,
+            Opcode::BICS,
+            Opcode::ADCS,
         ]
         .contains(&instr.opcode);
         //this check is to ensure that there are the right number of operands
@@ -394,7 +405,15 @@ impl CmpLogRuntime {
 
         // handle special opcodes case which have 3 operands, but the 1st(dest) is not important to us
         ////subs", "adds", "ands", "sbcs", "bics", "adcs"
-        if [Opcode::SUBS, Opcode::ADDS, Opcode::ANDS, Opcode::SBCS, Opcode::BICS, Opcode::ADCS].contains(&instr.opcode)
+        if [
+            Opcode::SUBS,
+            Opcode::ADDS,
+            Opcode::ANDS,
+            Opcode::SBCS,
+            Opcode::BICS,
+            Opcode::ADCS,
+        ]
+        .contains(&instr.opcode)
         {
             //remove the dest operand from the list
             instr.operands.rotate_left(1);
@@ -406,10 +425,15 @@ impl CmpLogRuntime {
         let special_case = matches!(instr.opcode, Opcode::CBZ | Opcode::CBNZ);
 
         #[allow(clippy::cast_sign_loss, clippy::similar_names)]
-        let operand1 = match instr.operands[0] { //the only possibilities are registers for the first operand
+        let operand1 = match instr.operands[0] {
+            //the only possibilities are registers for the first operand
             //precompute the aarch64 frida register because it is ambiguous if register=31 means xzr or sp in yaxpeax
-            Operand::Register(sizecode, reg) => Some(CmplogOperandType::Regid(writer_register(reg, sizecode, true))),
-            Operand::RegisterOrSP(sizecode, reg) => Some(CmplogOperandType::Regid(writer_register(reg, sizecode, false))),
+            Operand::Register(sizecode, reg) => Some(CmplogOperandType::Regid(writer_register(
+                reg, sizecode, true,
+            ))),
+            Operand::RegisterOrSP(sizecode, reg) => Some(CmplogOperandType::Regid(
+                writer_register(reg, sizecode, false),
+            )),
             _ => panic!("First argument is not a register"), //this should never be possible in arm64
         };
 
@@ -418,15 +442,20 @@ impl CmpLogRuntime {
             Some((CmplogOperandType::Imm(0), None))
         } else {
             match instr.operands[1] {
-                Operand::Register(sizecode, reg) => Some((CmplogOperandType::Regid(writer_register(reg, sizecode, true)), None)),
-                Operand::ImmShift(imm, shift) => Some((CmplogOperandType::Imm((imm as u64) << shift), None)), //precalculate the shift
+                Operand::Register(sizecode, reg) => Some((
+                    CmplogOperandType::Regid(writer_register(reg, sizecode, true)),
+                    None,
+                )),
+                Operand::ImmShift(imm, shift) => {
+                    Some((CmplogOperandType::Imm((imm as u64) << shift), None))
+                } //precalculate the shift
                 Operand::RegShift(shiftstyle, amount, regsize, reg) => {
                     let reg = CmplogOperandType::Regid(writer_register(reg, regsize, true));
                     let shift = (shiftstyle, amount);
                     Some((reg, Some(shift)))
-                },
+                }
                 Operand::Immediate(imm) => Some((CmplogOperandType::Imm(imm as u64), None)),
-                _ => panic!("Second argument could not be decoded"), 
+                _ => panic!("Second argument could not be decoded"),
             }
         };
 
