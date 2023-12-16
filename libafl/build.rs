@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     #[cfg(feature = "unicode")]
     {
-        // build_unicode_property_map()?;
+        build_unicode_property_map()?;
     }
     Ok(())
 }
@@ -64,8 +64,10 @@ fn build_unicode_property_map() -> Result<(), Box<dyn Error>> {
         .arg("general-category")
         .arg(ucd_dir.as_os_str())
         .stdout(Stdio::from(File::create(generated_file)?))
-        .status()?;
-    assert!(status.success());
+        .status();
+    if status.is_err() {
+        println!("cargo:warning=ucd-generate failed to run. Check it is installed.");
+    }
 
     Ok(())
 }
