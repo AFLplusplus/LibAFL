@@ -13,15 +13,8 @@ use core::ptr::addr_of_mut;
 use core::time::Duration;
 use core::{
     borrow::BorrowMut,
-    ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{self, null_mut},
-};
-#[cfg(any(unix, all(windows, feature = "std")))]
-use core::{
-    ptr::write_volatile,
-    sync::atomic::{compiler_fence, Ordering},
 };
 #[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
@@ -30,8 +23,6 @@ use std::intrinsics::transmute;
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", unix))]
 use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
-#[cfg(all(windows, feature = "std"))]
-use libafl_bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use libafl_bolts::shmem::ShMemProvider;
 #[cfg(all(feature = "std", unix))]
@@ -43,15 +34,15 @@ use nix::{
 };
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
-#[cfg(all(windows, feature = "std"))]
-use windows::Win32::System::Threading::PTP_TIMER;
 
+#[cfg(unix)]
+use crate::executors::inprocess_hooks_unix::DefaultExecutorHooks;
+#[cfg(windows)]
+use crate::executors::inprocess_hooks_win::DefaultExecutorHooks;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
-    executors::{
-        inprocess_hooks_unix::DefaultExecutorHooks, Executor, ExecutorHooks, ExitKind, HasObservers,
-    },
+    executors::{Executor, ExecutorHooks, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
@@ -248,13 +239,13 @@ where
 
 /// The struct has [`InProcessHandlers`].
 #[cfg(windows)]
-pub trait HasInProcessHandlers {
+pub trait HasDefaultExecutorHooks {
     /// Get the in-process handlers.
-    fn inprocess_handlers(&self) -> &InProcessHandlers;
+    fn inprocess_handlers(&self) -> &DefaultExecutorHooks;
 }
 
 #[cfg(windows)]
-impl<H, HB, OT, S> HasInProcessHandlers for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, OT, S> HasDefaultExecutorHooks for GenericInProcessExecutor<H, HB, OT, S>
 where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
@@ -263,7 +254,7 @@ where
 {
     /// the timeout handler
     #[inline]
-    fn inprocess_handlers(&self) -> &InProcessHandlers {
+    fn inprocess_handlers(&self) -> &DefaultExecutorHooks {
         &self.handlers
     }
 }
@@ -1132,11 +1123,13 @@ mod tests {
     #[cfg(all(feature = "std", feature = "fork", unix))]
     use serial_test::serial;
 
+    #[cfg(unix)]
+    use crate::executors::inprocess_hooks_unix::DefaultExecutorHooks;
+    #[cfg(windows)]
+    use crate::executors::inprocess_hooks_win::DefaultExecutorHooks;
     use crate::{
         events::NopEventManager,
-        executors::{
-            inprocess_hooks_unix::DefaultExecutorHooks, Executor, ExitKind, InProcessExecutor,
-        },
+        executors::{Executor, ExitKind, InProcessExecutor},
         inputs::{NopInput, UsesInput},
         state::NopState,
         NopFuzzer,

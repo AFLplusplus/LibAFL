@@ -13,7 +13,7 @@ use libafl::{
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
-        inprocess::{InProcessExecutor, InProcessExecutorHandlerData},
+        inprocess::{DefaultExecutorHooksData, InProcessExecutor},
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
@@ -67,7 +67,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, OF, Z>(
     signal: Signal,
     info: &mut siginfo_t,
     mut context: Option<&mut ucontext_t>,
-    _data: &mut InProcessExecutorHandlerData,
+    _data: &mut DefaultExecutorHooksData,
 ) where
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -95,7 +95,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     signal: Signal,
     info: &mut siginfo_t,
     context: Option<&mut ucontext_t>,
-    data: &mut InProcessExecutorHandlerData,
+    data: &mut DefaultExecutorHooksData,
 ) where
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,

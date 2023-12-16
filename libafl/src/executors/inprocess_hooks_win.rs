@@ -9,7 +9,7 @@ use windows::Win32::System::Threading::PTP_TIMER;
 
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{inprocess::HasInProcessHandlers, Executor, ExecutorHooks, HasObservers},
+    executors::{Executor, ExecutorHooks, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     state::{HasCorpus, HasExecutions, HasSolutions, State},
@@ -28,7 +28,7 @@ pub struct DefaultExecutorHooks {
 }
 
 impl DefaultExecutorHooks {
-    /// Create new [`InProcessHandlers`].
+    /// Create new [`DefaultExecutorHooks`].
     #[cfg(not(all(windows, feature = "std")))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
@@ -58,11 +58,11 @@ impl DefaultExecutorHooks {
         Ok(Self {})
     }
 
-    /// Create new [`InProcessHandlers`].
+    /// Create new [`DefaultExecutorHooks`].
     #[cfg(all(windows, feature = "std"))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHandlers,
+        E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
@@ -169,7 +169,7 @@ impl ExecutorHooks for DefaultExecutorHooks {
 
 /// The global state of the in-process harness.
 #[derive(Debug)]
-pub struct InProcessExecutorHandlerData {
+pub struct DefaultExecutorHooksData {
     pub(crate) state_ptr: *mut c_void,
     pub(crate) event_mgr_ptr: *mut c_void,
     pub(crate) fuzzer_ptr: *mut c_void,
@@ -197,10 +197,10 @@ pub struct InProcessExecutorHandlerData {
     pub(crate) timeout_executor_ptr: *mut c_void,
 }
 
-unsafe impl Send for InProcessExecutorHandlerData {}
-unsafe impl Sync for InProcessExecutorHandlerData {}
+unsafe impl Send for DefaultExecutorHooksData {}
+unsafe impl Sync for DefaultExecutorHooksData {}
 
-impl InProcessExecutorHandlerData {
+impl DefaultExecutorHooksData {
     #[cfg(feature = "std")]
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
@@ -287,7 +287,7 @@ pub fn inprocess_in_handler() -> bool {
 }
 
 /// Exception handling needs some nasty unsafe.
-pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+pub(crate) static mut GLOBAL_STATE: DefaultExecutorHooksData = DefaultExecutorHooksData {
     // The state ptr for signal handling
     state_ptr: null_mut(),
     // The event manager ptr for signal handling
@@ -443,8 +443,8 @@ pub mod windows_exception_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{run_observers_and_save_state, HasInProcessHandlers},
-            inprocess_hooks_win::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess::{run_observers_and_save_state, HasDefaultExecutorHooks},
+            inprocess_hooks_win::{DefaultExecutorHooksData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -454,16 +454,16 @@ pub mod windows_exception_handler {
     };
 
     pub(crate) type HandlerFuncPtr =
-        unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
+        unsafe fn(*mut EXCEPTION_POINTERS, &mut DefaultExecutorHooksData);
 
     /*pub unsafe fn nop_handler(
         _code: ExceptionCode,
         _exception_pointers: *mut EXCEPTION_POINTERS,
-        _data: &mut InProcessExecutorHandlerData,
+        _data: &mut DefaultExecutorHooksData,
     ) {
     }*/
 
-    impl Handler for InProcessExecutorHandlerData {
+    impl Handler for DefaultExecutorHooksData {
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
             unsafe {
@@ -555,14 +555,14 @@ pub mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers + HasInProcessHandlers,
+        E: HasObservers + HasDefaultExecutorHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        let data: &mut InProcessExecutorHandlerData =
-            &mut *(global_state as *mut InProcessExecutorHandlerData);
+        let data: &mut DefaultExecutorHooksData =
+            &mut *(global_state as *mut DefaultExecutorHooksData);
         compiler_fence(Ordering::SeqCst);
         EnterCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
         compiler_fence(Ordering::SeqCst);
@@ -620,7 +620,7 @@ pub mod windows_exception_handler {
     #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
-        data: &mut InProcessExecutorHandlerData,
+        data: &mut DefaultExecutorHooksData,
     ) where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,

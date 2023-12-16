@@ -30,7 +30,7 @@ pub struct DefaultExecutorHooks {
 }
 
 impl DefaultExecutorHooks {
-    /// Create new [`InProcessHandlers`].
+    /// Create new [`DefaultExecutorHooks`].
     #[cfg(not(all(windows, feature = "std")))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
@@ -60,11 +60,11 @@ impl DefaultExecutorHooks {
         Ok(Self {})
     }
 
-    /// Create new [`InProcessHandlers`].
+    /// Create new [`DefaultExecutorHooks`].
     #[cfg(all(windows, feature = "std"))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHandlers,
+        E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
@@ -176,7 +176,7 @@ impl ExecutorHooks for DefaultExecutorHooks {
 
 /// The global state of the in-process harness.
 #[derive(Debug)]
-pub struct InProcessExecutorHandlerData {
+pub struct DefaultExecutorHooksData {
     pub(crate) state_ptr: *mut c_void,
     pub(crate) event_mgr_ptr: *mut c_void,
     pub(crate) fuzzer_ptr: *mut c_void,
@@ -204,10 +204,10 @@ pub struct InProcessExecutorHandlerData {
     pub(crate) timeout_executor_ptr: *mut c_void,
 }
 
-unsafe impl Send for InProcessExecutorHandlerData {}
-unsafe impl Sync for InProcessExecutorHandlerData {}
+unsafe impl Send for DefaultExecutorHooksData {}
+unsafe impl Sync for DefaultExecutorHooksData {}
 
-impl InProcessExecutorHandlerData {
+impl DefaultExecutorHooksData {
     #[cfg(any(unix, feature = "std"))]
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
@@ -258,7 +258,7 @@ impl InProcessExecutorHandlerData {
 }
 
 /// Exception handling needs some nasty unsafe.
-pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+pub(crate) static mut GLOBAL_STATE: DefaultExecutorHooksData = DefaultExecutorHooksData {
     // The state ptr for signal handling
     state_ptr: null_mut(),
     // The event manager ptr for signal handling
@@ -382,7 +382,7 @@ pub mod unix_signal_handler {
         events::{EventFirer, EventRestarter},
         executors::{
             inprocess::run_observers_and_save_state,
-            inprocess_hooks_unix::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess_hooks_unix::{DefaultExecutorHooksData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -395,7 +395,7 @@ pub mod unix_signal_handler {
         Signal,
         &mut siginfo_t,
         Option<&mut ucontext_t>,
-        data: &mut InProcessExecutorHandlerData,
+        data: &mut DefaultExecutorHooksData,
     );
 
     /// A handler that does nothing.
@@ -403,12 +403,12 @@ pub mod unix_signal_handler {
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
-        _data: &mut InProcessExecutorHandlerData,
+        _data: &mut DefaultExecutorHooksData,
     ) {
     }*/
 
     #[cfg(unix)]
-    impl Handler for InProcessExecutorHandlerData {
+    impl Handler for DefaultExecutorHooksData {
         fn handle(
             &mut self,
             signal: Signal,
@@ -501,7 +501,7 @@ pub mod unix_signal_handler {
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
-        data: &mut InProcessExecutorHandlerData,
+        data: &mut DefaultExecutorHooksData,
     ) where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -551,7 +551,7 @@ pub mod unix_signal_handler {
         signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
-        data: &mut InProcessExecutorHandlerData,
+        data: &mut DefaultExecutorHooksData,
     ) where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,

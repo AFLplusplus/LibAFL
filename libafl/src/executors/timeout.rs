@@ -36,9 +36,7 @@ use crate::executors::inprocess::HasInProcessHandlers;
 #[cfg(any(windows, target_os = "linux"))]
 use crate::executors::inprocess_hooks_unix::GLOBAL_STATE;
 use crate::{
-    executors::{
-        inprocess_hooks_unix::InProcessExecutorHandlerData, Executor, ExitKind, HasObservers,
-    },
+    executors::{inprocess_hooks_unix::DefaultExecutorHooksData, Executor, ExitKind, HasObservers},
     observers::UsesObservers,
     state::UsesState,
     Error,
@@ -220,7 +218,7 @@ impl<E> TimeoutExecutor<E> {
         self.exec_tmout = exec_tmout;
     }
 
-    pub(crate) fn handle_timeout(&mut self, data: &InProcessExecutorHandlerData) -> bool {
+    pub(crate) fn handle_timeout(&mut self, data: &DefaultExecutorHooksData) -> bool {
         if !self.batch_mode {
             return false;
         }
@@ -316,7 +314,7 @@ impl<E> TimeoutExecutor<E> {
     }
 
     #[allow(clippy::unused_self)]
-    pub(crate) fn handle_timeout(&mut self, _data: &mut InProcessExecutorHandlerData) -> bool {
+    pub(crate) fn handle_timeout(&mut self, _data: &mut DefaultExecutorHooksData) -> bool {
         false // TODO
     }
 }
@@ -365,7 +363,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
     }
 
     #[allow(clippy::unused_self)]
-    pub(crate) fn handle_timeout(&mut self, _data: &mut InProcessExecutorHandlerData) -> bool {
+    pub(crate) fn handle_timeout(&mut self, _data: &mut DefaultExecutorHooksData) -> bool {
         false // TODO
     }
 
