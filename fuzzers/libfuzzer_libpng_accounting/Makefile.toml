@@ -26,7 +26,7 @@ condition = { files_not_exist = ["./libpng-1.6.37"]}
 script_runner="@shell"
 script='''
 wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
-tar -xvf libpng-1.6.37.tar.gz
+tar -xvf v1.6.37.tar.gz
 '''
 
 # Compilers
