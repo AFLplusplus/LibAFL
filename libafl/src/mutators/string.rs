@@ -273,7 +273,7 @@ pub mod unicode_categories {
     #![allow(missing_docs)]
     #![allow(clippy::redundant_static_lifetimes)]
 
-    include!(concat!(env!("OUT_DIR"), "/unicode_categories.rs"));
+    include!(concat!(env!("OUT_DIR"), "/ucd-dir", "/unicode_categories.rs"));
 }
 
 /// Mutator which randomly replaces a randomly selected range of bytes with bytes that preserve the
