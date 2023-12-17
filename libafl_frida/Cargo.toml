@@ -32,7 +32,7 @@ cc = { version = "1.0", features = ["parallel"] }
 yaxpeax-arm = "0.2.4"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-yaxpeax-x86 = { git = "https://github.com/iximeow/yaxpeax-x86/", rev = "85668b2" } # replace this with origin later
+yaxpeax-x86 = "1.2.2"
 
 [dependencies]
 libafl = { path = "../libafl", default-features = false, version = "0.11.1", features = [
