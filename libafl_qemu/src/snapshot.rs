@@ -493,7 +493,7 @@ where
         QT: QemuHelperTuple<S>,
     {
         if hooks.match_helper::<QemuAsanHelper>().is_none() {
-            // The ASan helper, if present, will call the tracer hook for the snpahsot helper as opt
+            // The ASan helper, if present, will call the tracer hook for the snapshot helper as opt
             hooks.writes(
                 Hook::Empty,
                 Hook::Function(trace_write1_snapshot::<QT, S>),

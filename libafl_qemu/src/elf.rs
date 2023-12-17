@@ -12,6 +12,14 @@ pub struct EasyElf<'a> {
 }
 
 impl<'a> EasyElf<'a> {
+    pub fn get_needed(&self) -> Result<Vec<&'a str>, Error> {
+        let mut v: Vec<&str> = Vec::new();
+        for dyn_lib in &self.elf.libraries {
+            v.push(dyn_lib);
+        }
+        Ok(v)
+    }
+
     pub fn from_file<P>(path: P, buffer: &'a mut Vec<u8>) -> Result<Self, Error>
     where
         P: AsRef<Path>,

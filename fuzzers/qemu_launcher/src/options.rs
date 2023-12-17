@@ -18,10 +18,10 @@ use crate::version::Version;
     long_about = "Binary fuzzer using QEMU binary instrumentation"
 )]
 pub struct FuzzerOptions {
-    #[arg(long, help = "Input directory")]
+    #[arg(short, long, help = "Input directory")]
     pub input: String,
 
-    #[arg(long, help = "Output directory")]
+    #[arg(short, long, help = "Output directory")]
     pub output: String,
 
     #[arg(long, help = "Tokens file")]
