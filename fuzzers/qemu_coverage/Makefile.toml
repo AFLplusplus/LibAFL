@@ -145,11 +145,11 @@ condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/lib
 script_runner="@shell"
 script='''
 wget \
-    -O "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/libpng-1.6.37.tar.xz" \
-    https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
+    -O "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/v1.6.37.tar.gz" \
+    https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
 
 tar \
-    -xvf "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/libpng-1.6.37.tar.xz" \
+    -xvf "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/v1.6.37.tar.gz" \
     -C ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/
 '''
 

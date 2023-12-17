@@ -105,7 +105,7 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned
     /// Compute the hash of the map
     fn hash(&self) -> u64;
 
-    /// Get the initial value for reset()
+    /// Get the initial value for `reset()`
     fn initial(&self) -> Self::Entry;
 
     /// Reset the map
