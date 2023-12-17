@@ -11,10 +11,9 @@ use rangemap::RangeMap;
 use yaxpeax_arch::LengthedInstruction;
 use yaxpeax_x86::long_mode::{InstDecoder, Opcode};
 
-
 use crate::{
     helper::FridaRuntime,
-    utils::{frida_to_cs, writer_register, operand_details},
+    utils::{frida_to_cs, operand_details, writer_register},
 };
 
 /// Frida hooks for instrumented code
@@ -81,21 +80,19 @@ impl HookRuntime {
 
     /// Determine if this instruction is interesting for the purposes of hooking
     #[inline]
-    pub fn is_interesting(&self, 
-        decoder: InstDecoder,
-        instr: &Insn) -> Option<usize> {
+    pub fn is_interesting(&self, decoder: InstDecoder, instr: &Insn) -> Option<usize> {
         let instruction = frida_to_cs(decoder, instr);
 
         if instruction.opcode() == Opcode::CALL || instruction.opcode() == Opcode::CALLF {
-
             let operand = instruction.operand(0);
             if operand.is_memory() {
                 if let Some((basereg, indexreg, scale, disp)) = operand_details(&operand) {
-                    let target_address = unsafe {((instr.address() + instruction.len() + disp as u64) as *const usize).read() };
+                    let target_address = unsafe {
+                        ((instr.address() + instruction.len() + disp as u64) as *const usize).read()
+                    };
                     if self.hooks.contains_key(&target_address) {
-                        return Some(target_address)
+                        return Some(target_address);
                     }
-
                 }
             }
         }

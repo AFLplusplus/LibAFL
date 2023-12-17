@@ -55,8 +55,7 @@ use crate::{
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::{FridaRuntime, SkipRange},
     hook_rt::HookRuntime,
-    utils::writer_register,
-    utils::disas_count,
+    utils::{disas_count, writer_register},
 };
 
 extern "C" {
