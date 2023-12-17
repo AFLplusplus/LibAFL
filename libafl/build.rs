@@ -1,17 +1,19 @@
 use std::error::Error;
 
 #[rustversion::nightly]
+#[allow(clippy::unnecessary_wraps)]
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rustc-cfg=nightly");
     #[cfg(feature = "unicode")]
     {
-        build_unicode_property_map()?;
+        // build_unicode_property_map()?;
     }
     Ok(())
 }
 
 #[rustversion::not(nightly)]
+#[allow(clippy::unnecessary_wraps)]
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=build.rs");
     assert!(
@@ -20,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     #[cfg(feature = "unicode")]
     {
-        build_unicode_property_map()?;
+        // build_unicode_property_map()?;
     }
     Ok(())
 }
