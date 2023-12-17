@@ -23,6 +23,10 @@ pub mod inprocess_fork_hooks_unix;
 #[cfg(unix)]
 pub mod inprocess_hooks_unix;
 
+/// Hooks for setting/resetting timeouts
+#[cfg(feature = "std")]
+pub mod timeout_hooks_unix;
+
 #[cfg(windows)]
 pub mod inprocess_hooks_win;
 

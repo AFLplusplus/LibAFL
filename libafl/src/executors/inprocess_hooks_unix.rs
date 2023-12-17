@@ -22,16 +22,15 @@ use crate::{
 #[derive(Debug)]
 pub struct DefaultExecutorHooks {
     /// On crash C function pointer
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     pub crash_handler: *const c_void,
     /// On timeout C function pointer
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     pub timeout_handler: *const c_void,
 }
 
 impl DefaultExecutorHooks {
     /// Create new [`DefaultExecutorHooks`].
-    #[cfg(not(all(windows, feature = "std")))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers,
@@ -40,7 +39,7 @@ impl DefaultExecutorHooks {
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        #[cfg(unix)]
+        #[cfg(feature = "std")]
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut GLOBAL_STATE;
@@ -56,7 +55,7 @@ impl DefaultExecutorHooks {
                     as *const _,
             })
         }
-        #[cfg(not(any(unix, feature = "std")))]
+        #[cfg(not(feature = "std"))]
         Ok(Self {})
     }
 
@@ -134,22 +133,13 @@ pub struct DefaultExecutorHooksData {
     pub(crate) in_handler: bool,
 
     /// The timeout handler
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     pub(crate) crash_handler: *const c_void,
     /// The timeout handler
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     pub(crate) timeout_handler: *const c_void,
 
-    #[cfg(all(windows, feature = "std"))]
-    pub(crate) ptp_timer: Option<PTP_TIMER>,
-    #[cfg(all(windows, feature = "std"))]
-    pub(crate) in_target: u64,
-    #[cfg(all(windows, feature = "std"))]
-    pub(crate) critical: *mut c_void,
-    #[cfg(all(windows, feature = "std"))]
-    pub(crate) timeout_input_ptr: *mut c_void,
-
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     pub(crate) timeout_executor_ptr: *mut c_void,
 }
 
@@ -157,39 +147,39 @@ unsafe impl Send for DefaultExecutorHooksData {}
 unsafe impl Sync for DefaultExecutorHooksData {}
 
 impl DefaultExecutorHooksData {
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
 
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     fn state_mut<'a, S>(&self) -> &'a mut S {
         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
     }
 
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     fn event_mgr_mut<'a, EM>(&self) -> &'a mut EM {
         unsafe { (self.event_mgr_ptr as *mut EM).as_mut().unwrap() }
     }
 
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     fn fuzzer_mut<'a, Z>(&self) -> &'a mut Z {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
 
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
         self.current_input_ptr = ptr::null();
         r
     }
 
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg( feature = "std")]
     pub(crate) fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }
 
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     fn timeout_executor_mut<'a, E>(&self) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
         unsafe {
             (self.timeout_executor_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
@@ -198,7 +188,7 @@ impl DefaultExecutorHooksData {
         }
     }
 
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     fn set_in_handler(&mut self, v: bool) -> bool {
         let old = self.in_handler;
         self.in_handler = v;
@@ -222,21 +212,13 @@ pub(crate) static mut GLOBAL_STATE: DefaultExecutorHooksData = DefaultExecutorHo
     in_handler: false,
 
     // The crash handler fn
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     crash_handler: ptr::null(),
     // The timeout handler fn
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     timeout_handler: ptr::null(),
-    #[cfg(all(windows, feature = "std"))]
-    ptp_timer: None,
-    #[cfg(all(windows, feature = "std"))]
-    in_target: 0,
-    #[cfg(all(windows, feature = "std"))]
-    critical: null_mut(),
-    #[cfg(all(windows, feature = "std"))]
-    timeout_input_ptr: null_mut(),
 
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(feature = "std")]
     timeout_executor_ptr: null_mut(),
 };
 
@@ -278,7 +260,7 @@ pub fn inprocess_in_handler() -> bool {
 
 // TODO remove this after executor refactor and libafl qemu new executor
 /// Expose a version of the crash handler that can be called from e.g. an emulator
-#[cfg(any(unix, feature = "std"))]
+#[cfg(feature = "std")]
 pub fn generic_inproc_crash_handler<E, EM, OF, Z>()
 where
     E: Executor<EM, Z> + HasObservers,
