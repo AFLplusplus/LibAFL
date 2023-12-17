@@ -13,8 +13,8 @@ use libafl::{
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
-        inprocess::{DefaultExecutorHooksData, InProcessExecutor},
-        Executor, ExitKind, HasObservers,
+        inprocess::InProcessExecutor, inprocess_hooks_unix::DefaultExecutorHooksData, Executor,
+        ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -136,13 +136,13 @@ where
         let mut inner = InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?;
         #[cfg(emulation_mode = "usermode")]
         {
-            inner.handlers_mut().crash_handler =
+            inner.default_hooks_mut().crash_handler =
                 inproc_qemu_crash_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
                     as *const c_void;
 
             let handler = |hooks: &mut QemuHooks<QT, S>, host_sig| {
                 eprintln!("Crashed with signal {host_sig}");
-                libafl::executors::inprocess::generic_inproc_crash_handler::<
+                libafl::executors::inprocess_hooks_unix::generic_inproc_crash_handler::<
                     InProcessExecutor<'a, H, OT, S>,
                     EM,
                     OF,

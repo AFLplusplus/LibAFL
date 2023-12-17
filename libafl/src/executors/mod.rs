@@ -15,10 +15,14 @@ pub mod timeout;
 #[cfg(any(unix, feature = "std"))]
 pub use timeout::TimeoutExecutor;
 
+/// Hooks for inprocess fork executors
+#[cfg(all(unix, feature = "std"))]
+pub mod inprocess_fork_hooks_unix;
 /// The essential hooks for inproc executors
 /// hooks are the code that are run before and after each executor run
 #[cfg(unix)]
 pub mod inprocess_hooks_unix;
+
 #[cfg(windows)]
 pub mod inprocess_hooks_win;
 
