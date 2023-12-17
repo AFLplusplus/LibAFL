@@ -32,8 +32,8 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 use crate::executors::inprocess_hooks_win::DefaultExecutorHooks;
 #[cfg(unix)]
 use crate::executors::{
-    inprocess_fork_hooks_unix::InChildDefaultExecutorHooks,
-    inprocess_hooks_unix::DefaultExecutorHooks,
+    hooks::inprocess_fork_hooks_unix::InChildDefaultExecutorHooks,
+    hooks::inprocess_hooks_unix::DefaultExecutorHooks,
 };
 use crate::{
     corpus::{Corpus, Testcase},
@@ -849,7 +849,7 @@ mod tests {
     use serial_test::serial;
 
     #[cfg(unix)]
-    use crate::executors::inprocess_hooks_unix::DefaultExecutorHooks;
+    use crate::executors::hooks::inprocess_hooks_unix::DefaultExecutorHooks;
     #[cfg(windows)]
     use crate::executors::inprocess_hooks_win::DefaultExecutorHooks;
     use crate::{

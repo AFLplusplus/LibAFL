@@ -313,7 +313,7 @@ pub mod unix_signal_handler {
         events::{EventFirer, EventRestarter},
         executors::{
             inprocess::run_observers_and_save_state,
-            inprocess_hooks_unix::{DefaultExecutorHooksData, GLOBAL_STATE},
+            hooks::inprocess_hooks_unix::{DefaultExecutorHooksData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
