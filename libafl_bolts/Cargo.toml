@@ -85,7 +85,7 @@ llmp_small_maps = ["alloc"]
 rustversion = "1.0"
 
 [dependencies]
-libafl_derive = { version = "0.11.1", optional = true, path = "../libafl_derive" }
+libafl_derive = { version = "0.11.2", optional = true, path = "../libafl_derive" }
 
 rustversion = "1.0"
 tuple_list = { version = "0.1.3" }
