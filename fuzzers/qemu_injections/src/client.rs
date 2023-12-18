@@ -113,7 +113,6 @@ where
 
         if x0 > 0 && x1 > 0 {
             let c_array = x1 as *const *const c_char;
-eprintln!("unsafe1");
             let cmd = unsafe {
                 let c_str_ptr = x0 as *const c_char;
                 let c_str = CStr::from_ptr(c_str_ptr);
@@ -125,7 +124,6 @@ eprintln!("unsafe1");
             }
             //println!("CMD {}", cmd);
 
-eprintln!("unsafe2");
             let first_parameter = unsafe {
                 if !(*c_array.offset(1)).is_null() {
                     let c_str = CStr::from_ptr(*c_array.offset(1));
@@ -134,7 +132,6 @@ eprintln!("unsafe2");
                     return SyscallHookResult::new(None);
                 }
             };
-eprintln!("unsafe3");
             let second_parameter = unsafe {
                 if !(*c_array.offset(2)).is_null() {
                     let c_str = CStr::from_ptr(*c_array.offset(2));
@@ -251,29 +248,27 @@ impl<'a> Client<'a> {
         let mut env = self.env()?;
         log::debug!("ENV: {:#?}", env);
 
-        let injections = parse_yaml(self.options.get_yaml_file()).unwrap();
-        let mut vec = INJECTIONS.lock().unwrap();
-        *vec = injections.clone();
-        drop(vec);
-
         let (emu, mut asan) = {
             if self.options.is_asan_core(core_id) {
                 let (emu, asan) = init_with_asan(&mut args, &mut env)?;
                 (emu, Some(asan))
             } else {
-eprintln!("Bug is here");
+                //eprintln!("Bug is here");
                 (Emulator::new(&args, &env)?, None)
             }
         };
-eprintln!("after bug");
 
         let start_pc = Self::start_pc(&emu)?;
         log::debug!("start_pc @ {start_pc:#x}");
         println!("StartPC {:#x}", start_pc);
 
+        let injections = parse_yaml(self.options.get_yaml_file()).unwrap();
+        let mut vec = INJECTIONS.lock().unwrap();
+        *vec = injections.clone();
+        drop(vec);
+
         // Break at the entry point after the loading process
         emu.set_breakpoint(start_pc);
-eprintln!("unsafe4");
         let emu_state = unsafe { emu.run() };
         println!(
             "Entry break at {:#x}",
@@ -391,7 +386,6 @@ eprintln!("unsafe4");
         }
         //println!("reg value = {:x}", reg);
         if reg > 0 {
-eprintln!("unsafe5");
             let query = unsafe {
                 let c_str_ptr = reg as *const c_char;
                 let c_str = CStr::from_ptr(c_str_ptr);
