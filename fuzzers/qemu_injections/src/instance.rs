@@ -123,7 +123,6 @@ impl<'a> Instance<'a> {
 
         let vec = TOKENS.lock().unwrap();
         for token in &*vec {
-            println!("Adding token {}", token);
             let bytes = token.as_bytes().to_vec();
             let _ = tokens.add_token(&bytes);
         }
@@ -131,8 +130,6 @@ impl<'a> Instance<'a> {
         if let Some(tokenfile) = &self.options.tokens {
             tokens.add_from_file(tokenfile)?;
         }
-
-        println!("Token length {}", tokens.len());
 
         state.add_metadata(tokens);
 

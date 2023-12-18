@@ -1,9 +1,0 @@
-- name: "sql"
-  functions:
-    - function: "sqlite3_exec"
-      parameter: 1
-  tests:
-    - input_value: "'\" OR '1'=\"'1"
-      match_value: "'\" OR "
-    - input_value: "\"' OR \"1\"=\"'1\""
-      match_value: "\"' OR "
