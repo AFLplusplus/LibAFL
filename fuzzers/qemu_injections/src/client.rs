@@ -26,6 +26,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::{instance::Instance, options::FuzzerOptions};
 
+#[derive(Debug, Clone)]
+struct LibInfo {
+    name: String,
+    off: GuestAddr,
+}
+
+impl LibInfo {
+    fn add_unique(libs: &mut Vec<LibInfo>, new_lib: LibInfo) {
+        if !libs.iter().any(|lib| lib.name == new_lib.name) {
+            libs.push(new_lib);
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Test {
     input_value: String,
@@ -178,11 +192,21 @@ impl<'a> Client<'a> {
         Ok(env)
     }
 
-    fn find_function(emu: &Emulator, file: &String, function: &str) -> Result<GuestAddr, Error> {
+    fn find_function(
+        emu: &Emulator,
+        file: &String,
+        function: &str,
+        loadaddr: GuestAddr,
+    ) -> Result<GuestAddr, Error> {
         let mut elf_buffer = Vec::new();
         let elf = EasyElf::from_file(file, &mut elf_buffer)?;
+        let offset = if loadaddr > 0 {
+            loadaddr
+        } else {
+            emu.load_addr()
+        };
         let start_pc = elf
-            .resolve_symbol(function, emu.load_addr())
+            .resolve_symbol(function, offset)
             .ok_or_else(|| Error::empty_optional("Symbol {function} not found in {file}"))?;
         println!("Found {function} in {file}");
         Ok(start_pc)
@@ -254,7 +278,6 @@ impl<'a> Client<'a> {
 
         let start_pc = Self::start_pc(&emu)?;
         log::debug!("start_pc @ {start_pc:#x}");
-        println!("StartPC {:#x}", start_pc);
 
         let injections = parse_yaml(self.options.get_yaml_file()).unwrap();
         let mut vec = INJECTIONS.lock().unwrap();
@@ -264,10 +287,12 @@ impl<'a> Client<'a> {
         // Break at the entry point after the loading process
         emu.set_breakpoint(start_pc);
         let _emu_state = unsafe { emu.run() };
+        /*
         println!(
             "Entry break at {:#x}",
             emu.read_reg::<_, u64>(Regs::Pc).unwrap()
         );
+        */
         emu.remove_breakpoint(start_pc);
 
         let mut id: u64 = 0;
@@ -277,16 +302,22 @@ impl<'a> Client<'a> {
         tokens.push("';FUZZ;'".to_string());
         tokens.push("$(FUZZ)".to_string());
 
-        let mut libs = Vec::new();
+        let mut libs: Vec<LibInfo> = Vec::new();
 
         for region in emu.mappings() {
             if let Some(path) = region.path().map(|p| p.to_owned()) {
-                if path.len() > 0 && !libs.contains(&path) {
-                    libs.push(path.clone());
+                if path.len() > 0 {
+                    LibInfo::add_unique(
+                        &mut libs,
+                        LibInfo {
+                            name: path.clone(),
+                            off: region.start(),
+                        },
+                    );
                 }
             }
         }
-        println!("Mappings: {:?}", libs);
+        //println!("Mappings: {:?}", libs);
 
         for target in injections {
             for func in target.functions {
@@ -303,8 +334,8 @@ impl<'a> Client<'a> {
                     }
                 } else {
                     for lib in &libs {
-                        let func_pc =
-                            Self::find_function(&emu, lib, &func.function).unwrap_or_default();
+                        let func_pc = Self::find_function(&emu, &lib.name, &func.function, lib.off)
+                            .unwrap_or_default();
                         if func_pc > 0 {
                             println!("Function {} found at {:#x}", func.function, func_pc);
                             let data: u64 = (id << 8) + func.parameter as u64;
@@ -379,6 +410,8 @@ impl<'a> Client<'a> {
         let reg: GuestAddr;
         let parameter: u8 = (val & 0xff) as u8;
         let off: usize = (val >> 8) as usize;
+
+        //println!("on_call_check {} {}", parameter, off);
 
         match parameter {
             0 => reg = emu.current_cpu().unwrap().read_reg(Regs::Rdi).unwrap_or(0),
