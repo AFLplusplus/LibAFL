@@ -761,7 +761,7 @@ pub mod unix_signal_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, OF, Z>()
     where
-        E: HasObservers,
+        E: HasObservers + Executor<EM, Z>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
@@ -775,6 +775,7 @@ pub mod unix_signal_handler {
             if data.is_valid() {
                 // We are fuzzing!
                 let executor = data.executor_mut::<E>();
+                executor.post_run_reset();
                 let state = data.state_mut::<E::State>();
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
                 let fuzzer = data.fuzzer_mut::<Z>();
