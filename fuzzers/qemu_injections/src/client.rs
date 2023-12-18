@@ -113,6 +113,7 @@ where
     S: UsesInput,
 {
     //println!("syscall_hook {} {}", syscall, SYS_execve);
+    debug_assert!(i32::try_from(SYS_execve).is_ok());
     if syscall == SYS_execve as i32 {
         let _helper = hooks
             .helpers_mut()
@@ -127,26 +128,25 @@ where
                 c_str.to_string_lossy()
             };
 
-            if cmd.to_lowercase() == "fuzz" {
-                panic!("Found verified command injection!");
-            }
+            assert!(
+                !(cmd.to_lowercase() == "fuzz"),
+                "Found verified command injection!"
+            );
             //println!("CMD {}", cmd);
 
             let first_parameter = unsafe {
-                if !(*c_array.offset(1)).is_null() {
-                    let c_str = CStr::from_ptr(*c_array.offset(1));
-                    c_str.to_string_lossy()
-                } else {
+                if (*c_array.offset(1)).is_null() {
                     return SyscallHookResult::new(None);
                 }
+                let c_str = CStr::from_ptr(*c_array.offset(1));
+                c_str.to_string_lossy()
             };
             let second_parameter = unsafe {
-                if !(*c_array.offset(2)).is_null() {
-                    let c_str = CStr::from_ptr(*c_array.offset(2));
-                    c_str.to_string_lossy()
-                } else {
+                if (*c_array.offset(2)).is_null() {
                     return SyscallHookResult::new(None);
                 }
+                let c_str = CStr::from_ptr(*c_array.offset(2));
+                c_str.to_string_lossy()
             };
             if first_parameter == "-c"
                 && (second_parameter.to_lowercase().contains("';fuzz;'")
@@ -185,11 +185,10 @@ impl<'a> Client<'a> {
         Ok(args)
     }
 
-    fn env(&self) -> Result<Vec<(String, String)>, Error> {
-        let env = env::vars()
+    fn env() -> Vec<(String, String)> {
+        env::vars()
             .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
-            .collect::<Vec<(String, String)>>();
-        Ok(env)
+            .collect::<Vec<(String, String)>>()
     }
 
     fn find_function(
@@ -263,7 +262,7 @@ impl<'a> Client<'a> {
         let mut args = self.args()?;
         log::debug!("ARGS: {:#?}", args);
 
-        let mut env = self.env()?;
+        let mut env = Self::env();
         log::debug!("ENV: {:#?}", env);
 
         let (emu, mut asan) = {
@@ -305,8 +304,8 @@ impl<'a> Client<'a> {
         let mut libs: Vec<LibInfo> = Vec::new();
 
         for region in emu.mappings() {
-            if let Some(path) = region.path().map(|p| p.to_owned()) {
-                if path.len() > 0 {
+            if let Some(path) = region.path().map(ToOwned::to_owned) {
+                if !path.is_empty() {
                     LibInfo::add_unique(
                         &mut libs,
                         LibInfo {
@@ -327,8 +326,8 @@ impl<'a> Client<'a> {
                         .expect("Failed to parse hex string {func.function} from yaml")
                         as GuestAddr;
                     if func_pc > 0 {
-                        println!("Hooking hardcoded function {:#x}", func_pc);
-                        let data: u64 = (id << 8) + func.parameter as u64;
+                        println!("Hooking hardcoded function {func_pc:#x}");
+                        let data: u64 = (id << 8) + u64::from(func.parameter);
                         let _hook_id = emu.set_hook(data, func_pc, Self::on_call_check, false);
                         found = 1;
                     }
@@ -337,8 +336,8 @@ impl<'a> Client<'a> {
                         let func_pc = Self::find_function(&emu, &lib.name, &func.function, lib.off)
                             .unwrap_or_default();
                         if func_pc > 0 {
-                            println!("Function {} found at {:#x}", func.function, func_pc);
-                            let data: u64 = (id << 8) + func.parameter as u64;
+                            println!("Function {} found at {func_pc:#x}", func.function);
+                            let data: u64 = (id << 8) + u64::from(func.parameter);
                             let _hook_id = emu.set_hook(data, func_pc, Self::on_call_check, false);
                             found = 1;
                         }
@@ -407,21 +406,20 @@ impl<'a> Client<'a> {
 
     extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
         let emu = Emulator::new_empty();
-        let reg: GuestAddr;
         let parameter: u8 = (val & 0xff) as u8;
         let off: usize = (val >> 8) as usize;
 
         //println!("on_call_check {} {}", parameter, off);
 
-        match parameter {
-            0 => reg = emu.current_cpu().unwrap().read_reg(Regs::Rdi).unwrap_or(0),
-            1 => reg = emu.current_cpu().unwrap().read_reg(Regs::Rsi).unwrap_or(0),
-            2 => reg = emu.current_cpu().unwrap().read_reg(Regs::Rdx).unwrap_or(0),
-            3 => reg = emu.current_cpu().unwrap().read_reg(Regs::Rcx).unwrap_or(0),
-            4 => reg = emu.current_cpu().unwrap().read_reg(Regs::R8).unwrap_or(0),
-            5 => reg = emu.current_cpu().unwrap().read_reg(Regs::R9).unwrap_or(0),
+        let reg: GuestAddr = match parameter {
+            0 => emu.current_cpu().unwrap().read_reg(Regs::Rdi).unwrap_or(0),
+            1 => emu.current_cpu().unwrap().read_reg(Regs::Rsi).unwrap_or(0),
+            2 => emu.current_cpu().unwrap().read_reg(Regs::Rdx).unwrap_or(0),
+            3 => emu.current_cpu().unwrap().read_reg(Regs::Rcx).unwrap_or(0),
+            4 => emu.current_cpu().unwrap().read_reg(Regs::R8).unwrap_or(0),
+            5 => emu.current_cpu().unwrap().read_reg(Regs::R9).unwrap_or(0),
             _ => panic!("unknown register"),
-        }
+        };
         //println!("reg value = {:x}", reg);
         if reg > 0 {
             let query = unsafe {

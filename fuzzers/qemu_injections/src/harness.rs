@@ -14,7 +14,7 @@ pub struct Harness<'a> {
     ret_addr: GuestAddr,
 }
 
-pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
+pub const MAX_INPUT_SIZE: usize = 1_048_576; // 1MB
 
 impl<'a> Harness<'a> {
     pub fn new(emu: &Emulator) -> Result<Harness, Error> {

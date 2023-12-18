@@ -221,7 +221,7 @@ impl<'a> Instance<'a> {
             state
                 .load_initial_inputs(fuzzer, executor, &mut self.mgr, &corpus_dirs)
                 .unwrap_or_else(|_| {
-                    println!("Failed to load initial corpus at {:?}", corpus_dirs);
+                    println!("Failed to load initial corpus at {corpus_dirs:?}");
                     process::exit(0);
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());
