@@ -1,13 +1,7 @@
 use std::{
-    env,
-    ffi::CStr,
-    fs::File,
-    io::Read,
-    ops::Range,
-    os::raw::c_char,
-    path::Path,
-    sync::Mutex,
+    env, ffi::CStr, fs::File, io::Read, ops::Range, os::raw::c_char, path::Path, sync::Mutex,
 };
+
 use lazy_static::lazy_static;
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -25,11 +19,11 @@ use libafl_qemu::{
     cmplog::QemuCmpLogHelper,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    ArchExtras, Emulator, GuestAddr, Hook,
-    QemuHelper, QemuHelperTuple, QemuHooks, QemuInstrumentationFilter, Regs, SYS_execve,
-    SyscallHookResult,
+    ArchExtras, Emulator, GuestAddr, Hook, QemuHelper, QemuHelperTuple, QemuHooks,
+    QemuInstrumentationFilter, Regs, SYS_execve, SyscallHookResult,
 };
 use serde::{Deserialize, Serialize};
+
 use crate::{instance::Instance, options::FuzzerOptions};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -269,7 +263,7 @@ impl<'a> Client<'a> {
 
         // Break at the entry point after the loading process
         emu.set_breakpoint(start_pc);
-        let emu_state = unsafe { emu.run() };
+        let _emu_state = unsafe { emu.run() };
         println!(
             "Entry break at {:#x}",
             emu.read_reg::<_, u64>(Regs::Pc).unwrap()
@@ -278,7 +272,7 @@ impl<'a> Client<'a> {
 
         let mut id: u64 = 0;
         let mut tokens: Vec<String> = Vec::new();
-        // Initial tokens for command injection
+        // Initial tokens for syscall command injection detection
         tokens.push("\";FUZZ;\"".to_string());
         tokens.push("';FUZZ;'".to_string());
         tokens.push("$(FUZZ)".to_string());
@@ -297,22 +291,33 @@ impl<'a> Client<'a> {
         for target in injections {
             for func in target.functions {
                 let mut found = 0;
-                for lib in &libs {
-                    let func_pc =
-                        Self::find_function(&emu, lib, &func.function).unwrap_or_default();
+                if func.function.to_lowercase().starts_with(&"0x".to_string()) {
+                    let func_pc = u64::from_str_radix(&func.function[2..], 16)
+                        .expect("Failed to parse hex string {func.function} from yaml")
+                        as GuestAddr;
                     if func_pc > 0 {
-                        println!("Function {} found at {:#x}", func.function, func_pc);
+                        println!("Hooking hardcoded function {:#x}", func_pc);
                         let data: u64 = (id << 8) + func.parameter as u64;
                         let _hook_id = emu.set_hook(data, func_pc, Self::on_call_check, false);
-                        if found == 0 {
-                            for test in &target.tests {
-                                tokens.push(test.input_value.clone());
-                            }
+                        found = 1;
+                    }
+                } else {
+                    for lib in &libs {
+                        let func_pc =
+                            Self::find_function(&emu, lib, &func.function).unwrap_or_default();
+                        if func_pc > 0 {
+                            println!("Function {} found at {:#x}", func.function, func_pc);
+                            let data: u64 = (id << 8) + func.parameter as u64;
+                            let _hook_id = emu.set_hook(data, func_pc, Self::on_call_check, false);
                             found = 1;
                         }
                     }
                 }
-                if found == 0 {
+                if found > 0 {
+                    for test in &target.tests {
+                        tokens.push(test.input_value.clone());
+                    }
+                } else {
                     println!("Function not found: {}", func.function);
                 }
             }
