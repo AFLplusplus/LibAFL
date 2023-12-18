@@ -810,7 +810,7 @@ pub mod unix_signal_handler {
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers,
+        E: HasObservers + Executor<EM, Z>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
@@ -828,6 +828,7 @@ pub mod unix_signal_handler {
         }
 
         let executor = data.executor_mut::<E>();
+        executor.post_run_reset();
         let state = data.state_mut::<E::State>();
         let event_mgr = data.event_mgr_mut::<EM>();
         let fuzzer = data.fuzzer_mut::<Z>();
@@ -1129,7 +1130,7 @@ pub mod windows_exception_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, OF, Z>()
     where
-        E: HasObservers,
+        E: HasObservers + Executor<EM, Z>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
@@ -1160,6 +1161,7 @@ pub mod windows_exception_handler {
             if data.is_valid() {
                 // We are fuzzing!
                 let executor = data.executor_mut::<E>();
+                executor.post_run_reset();
                 let state = data.state_mut::<E::State>();
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
@@ -1193,7 +1195,7 @@ pub mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers + HasInProcessHandlers,
+        E: HasObservers + HasInProcessHandlers + Executor<EM, Z>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
@@ -1217,6 +1219,7 @@ pub mod windows_exception_handler {
 
         if data.in_target == 1 {
             let executor = data.executor_mut::<E>();
+            executor.post_run_reset();
             let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
