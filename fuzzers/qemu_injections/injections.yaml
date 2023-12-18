@@ -5,6 +5,10 @@
 #  functions:
 #     # multiple function targets to hook can be defined
 #     - function: "function_name"  # name of the function you want to hook
+#                                  # if the function name starts with 0x then
+#                                  # this is the QEMU Guest address of a
+#                                  # function you want to hook that does not
+#                                  # have a symbol.
 #       parameter: number  # which parameter to the function contains the string
 #                          # 0 = first, 1 = second, ... 0-5 are supported
 #  tests:
