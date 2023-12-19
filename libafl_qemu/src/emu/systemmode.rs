@@ -7,6 +7,7 @@ use std::{
     mem::MaybeUninit,
     ptr::null_mut,
     sync::atomic::{AtomicU64, Ordering},
+    marker::PhantomData,
 };
 
 use libafl::{
@@ -25,6 +26,8 @@ use crate::{
     MemAccessInfo, QemuEdgeCoverageHelper, QemuHooks, QemuInstrumentationPagingFilter,
     QemuShutdownCause, CPU,
 };
+
+use crate::sync_exit::{SyncExitError, SyncExit, VERSION};
 
 #[derive(Debug, Clone)]
 pub enum HandlerError {
