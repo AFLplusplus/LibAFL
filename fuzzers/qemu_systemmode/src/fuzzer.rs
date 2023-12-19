@@ -27,12 +27,8 @@ use libafl_bolts::{
     tuples::tuple_list,
     AsSlice,
 };
-use libafl_qemu::{
-    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
-    elf::EasyElf,
-    emu::Emulator,
-    GuestPhysAddr, NopEmuExitHandler, QemuExecutor, QemuHooks, Regs,
-};
+use libafl_bolts::os::unix_signals::Signal;
+use libafl_qemu::{edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM}, elf::EasyElf, emu::Emulator, EmuExitReason, EmuExitReasonError, GuestPhysAddr, NopEmuExitHandler, QemuExecutor, QemuHooks, QemuShutdownCause, Regs};
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
@@ -115,7 +111,10 @@ pub fn fuzz() {
 
                 emu.write_phys_mem(input_addr, buf);
 
-                let _ = emu.run();
+                match emu.run() {
+                    Ok(EmuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => process::exit(0),
+                    _ => {}
+                }
 
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                 let mut pcs = (0..emu.num_cpus())

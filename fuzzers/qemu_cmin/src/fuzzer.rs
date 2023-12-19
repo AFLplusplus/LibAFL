@@ -26,8 +26,14 @@ use libafl_bolts::{
     tuples::tuple_list,
     AsMutSlice, AsSlice,
 };
-use libafl_qemu::{edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE}, elf::EasyElf, emu::Emulator, ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, QemuForkExecutor, QemuHooks, Regs, NopEmuExitHandler};
-use libafl_qemu::breakpoint::Breakpoint;
+use libafl_qemu::{
+    breakpoint::Breakpoint,
+    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
+    elf::EasyElf,
+    emu::Emulator,
+    ArchExtras, CallingConvention, EmuExitReasonError, GuestAddr, GuestReg, MmapPerms,
+    NopEmuExitHandler, QemuForkExecutor, QemuHooks, Regs,
+};
 
 #[derive(Default)]
 pub struct Version;
@@ -204,7 +210,11 @@ pub fn fuzz() -> Result<(), Error> {
                 .unwrap();
             emu.write_function_argument(CallingConvention::Cdecl, 1, len)
                 .unwrap();
-            emu.run().unwrap();
+            match emu.run() {
+                Ok(_) => {}
+                Err(EmuExitReasonError::BreakpointNotFound(_)) => {}
+                Err(_) => panic!("QEMU unhandled error."),
+            }
         }
 
         ExitKind::Ok
