@@ -271,7 +271,12 @@ impl<'a> Client<'a> {
         let start_pc = Self::start_pc(&emu)?;
         log::debug!("start_pc @ {start_pc:#x}");
 
-        let injections = parse_yaml(self.options.get_yaml_file()).unwrap();
+        let mut injections = parse_yaml(self.options.get_yaml_file()).unwrap();
+        for injection in &mut injections {
+            for test in &mut injection.tests {
+                test.match_value = test.match_value.to_lowercase();
+            }
+        }
         INJECTIONS
             .set(injections)
             .expect("Failed to set injections");
@@ -424,10 +429,7 @@ impl<'a> Client<'a> {
             let injection = &vec[off];
             //println!("Checking {}", injection.name);
             for test in &injection.tests {
-                if query
-                    .to_lowercase()
-                    .contains(&test.match_value.to_lowercase())
-                {
+                if query.to_lowercase().contains(&test.match_value) {
                     panic!(
                         "Found value \"{}\" for {} in {}",
                         test.match_value, query, injection.name
