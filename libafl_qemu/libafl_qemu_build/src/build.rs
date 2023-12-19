@@ -316,6 +316,7 @@ pub fn build(
                 .arg("--disable-tests");
             if cfg!(feature = "debug_assertions") {
                 cmd.arg("--enable-debug");
+                cmd.arg("--enable-sanitizers");
             }
             cmd.status().expect("Configure failed");
         }
