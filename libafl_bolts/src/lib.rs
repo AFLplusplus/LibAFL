@@ -909,7 +909,7 @@ impl SimpleFdLogger {
     /// # Safety
     /// Needs a valid raw file descriptor opened for writing.
     pub unsafe fn set_fd(&mut self, fd: RawFd) {
-        self.fd = fd
+        self.fd = fd;
     }
 }
 
