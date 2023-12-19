@@ -5,7 +5,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use alloc::boxed::Box;
-#[cfg(all(unix, feature = "std"))]
+#[cfg(unix)]
 use alloc::vec::Vec;
 #[cfg(all(feature = "std", unix, target_os = "linux"))]
 use core::ptr::addr_of_mut;
@@ -28,8 +28,10 @@ use std::intrinsics::transmute;
 
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
+#[cfg(unix)]
+use libafl_bolts::os::unix_signals::Signal;
 #[cfg(all(feature = "std", unix))]
-use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
+use libafl_bolts::os::unix_signals::{ucontext_t, Handler};
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
@@ -279,7 +281,7 @@ pub struct InProcessHandlers {
 /// The common signals we want to handle
 #[cfg(unix)]
 #[inline]
-pub(self) fn common_signals() -> Vec<Signal> {
+fn common_signals() -> Vec<Signal> {
     vec![
         Signal::SigAlarm,
         Signal::SigUser2,
