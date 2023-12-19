@@ -1,22 +1,30 @@
 use std::{
-    collections::HashMap,
+    borrow::BorrowMut,
+    cell::OnceCell,
+    collections::{HashMap, HashSet},
     ffi::{c_void, CStr, CString},
     fmt::Debug,
+    marker::PhantomData,
     mem::MaybeUninit,
     ptr::null_mut,
     sync::atomic::{AtomicU64, Ordering},
-    borrow::BorrowMut,
 };
-use std::cell::OnceCell;
-use std::collections::HashSet;
-use std::marker::PhantomData;
 
-use crate::{emu::{libafl_page_from_addr, BytesInput, ExitKind}, CPUStatePtr, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestPhysAddr, GuestVirtAddr, IsEmuExitHandler, MemAccessInfo, CPU, CommandInput, Command, InnerHandlerResult, QemuHooks, get_qemu_hooks, QemuInstrumentationPagingFilter, HasInstrumentationFilter, QemuHelperTuple, QemuEdgeCoverageHelper};
-use crate::sync_exit::{SyncExitError, SyncExit, VERSION};
+use libafl::{
+    inputs::{HasTargetBytes, UsesInput},
+    prelude::{InMemoryCorpus, OnDiskCorpus, StdState},
+};
+use libafl_bolts::{bolts_prelude::RomuDuoJrRand, AsSlice};
 
-use libafl::{inputs::{UsesInput, HasTargetBytes}, prelude::{StdState, InMemoryCorpus, OnDiskCorpus}};
-use libafl_bolts::AsSlice;
-use libafl_bolts::bolts_prelude::RomuDuoJrRand;
+use crate::{
+    emu::{libafl_page_from_addr, BytesInput, ExitKind},
+    get_qemu_hooks,
+    sync_exit::{SyncExit, SyncExitError, VERSION},
+    CPUStatePtr, Command, CommandInput, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr,
+    GuestPhysAddr, GuestVirtAddr, HasInstrumentationFilter, InnerHandlerResult, IsEmuExitHandler,
+    MemAccessInfo, QemuEdgeCoverageHelper, QemuHelperTuple, QemuHooks,
+    QemuInstrumentationPagingFilter, CPU,
+};
 
 #[derive(Debug, Clone)]
 pub enum HandlerError {
@@ -184,8 +192,8 @@ impl IsSnapshotManager for FastSnapshotBuilder {
 /// Synchronous Exit handler maintaining only one snapshot.
 #[derive(Debug, Clone)]
 pub struct StdEmuExitHandler<SM>
-    where
-        SM: IsSnapshotManager,
+where
+    SM: IsSnapshotManager,
 {
     snapshot_manager: SM,
     snapshot_id: OnceCell<SnapshotId>,
@@ -194,8 +202,8 @@ pub struct StdEmuExitHandler<SM>
 }
 
 impl<SM> StdEmuExitHandler<SM>
-    where
-        SM: IsSnapshotManager,
+where
+    SM: IsSnapshotManager,
 {
     pub fn new(snapshot_manager: SM) -> Self {
         Self {
@@ -209,8 +217,8 @@ impl<SM> StdEmuExitHandler<SM>
 
 // TODO: replace handlers with generics to permit compile-time customization of handlers
 impl<SM> IsEmuExitHandler for StdEmuExitHandler<SM>
-    where
-        SM: IsSnapshotManager,
+where
+    SM: IsSnapshotManager,
 {
     fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput) {
         let target = input.target_bytes();
@@ -243,12 +251,14 @@ impl<SM> IsEmuExitHandler for StdEmuExitHandler<SM>
             Err(exit_error) => match exit_error {
                 EmuExitReasonError::UnexpectedExit => {
                     if let Some(snapshot_id) = self.snapshot_id.get() {
-                        self.snapshot_manager.borrow_mut().restore(snapshot_id, emu)?;
+                        self.snapshot_manager
+                            .borrow_mut()
+                            .restore(snapshot_id, emu)?;
                     }
-                    return Ok(InnerHandlerResult::EndOfRun(ExitKind::Crash))
+                    return Ok(InnerHandlerResult::EndOfRun(ExitKind::Crash));
                 }
-                _ => Err(exit_error)?
-            }
+                _ => Err(exit_error)?,
+            },
         };
 
         let mut is_sync_exit: Option<SyncExit> = None;
@@ -272,8 +282,26 @@ impl<SM> IsEmuExitHandler for StdEmuExitHandler<SM>
                         .map_err(|_| HandlerError::MultipleSnapshotDefinition)?;
 
                     // TODO: get helpers from harness cleanly. Find a way to use generics without trait overflow.
-                    let qemu_helpers: &mut QemuHooks<(QemuEdgeCoverageHelper, ()), StdState<BytesInput, InMemoryCorpus<BytesInput>, RomuDuoJrRand, OnDiskCorpus<BytesInput>>, Self> = unsafe {
-                        get_qemu_hooks::<(QemuEdgeCoverageHelper, ()), StdState<BytesInput, InMemoryCorpus<BytesInput>, RomuDuoJrRand, OnDiskCorpus<BytesInput>>, Self>()
+                    let qemu_helpers: &mut QemuHooks<
+                        (QemuEdgeCoverageHelper, ()),
+                        StdState<
+                            BytesInput,
+                            InMemoryCorpus<BytesInput>,
+                            RomuDuoJrRand,
+                            OnDiskCorpus<BytesInput>,
+                        >,
+                        Self,
+                    > = unsafe {
+                        get_qemu_hooks::<
+                            (QemuEdgeCoverageHelper, ()),
+                            StdState<
+                                BytesInput,
+                                InMemoryCorpus<BytesInput>,
+                                RomuDuoJrRand,
+                                OnDiskCorpus<BytesInput>,
+                            >,
+                            Self,
+                        >()
                     };
 
                     // TODO: Improve this part used to perform paging filtering
@@ -286,7 +314,9 @@ impl<SM> IsEmuExitHandler for StdEmuExitHandler<SM>
                     allowed_paging_ids.insert(current_paging_id);
 
                     let paging_filter =
-                        HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(helpers);
+                        HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(
+                            helpers,
+                        );
 
                     *paging_filter = QemuInstrumentationPagingFilter::AllowList(allowed_paging_ids);
 

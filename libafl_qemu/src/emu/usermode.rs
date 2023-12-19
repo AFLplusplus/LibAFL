@@ -1,21 +1,20 @@
-use core::{
-    convert::Into,
-    ffi::c_void,
-    mem::MaybeUninit,
-    ptr::copy_nonoverlapping,
-};
+use core::{convert::Into, ffi::c_void, mem::MaybeUninit, ptr::copy_nonoverlapping};
 use std::{cell::OnceCell, slice::from_raw_parts, str::from_utf8_unchecked};
 
 use libc::c_int;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-use crate::{emu::{
-    exec_path, free_self_maps, guest_base, libafl_dump_core_hook, libafl_force_dfl,
-    libafl_get_brk, libafl_load_addr, libafl_maps_next, libafl_qemu_run, libafl_set_brk,
-    mmap_next_start, read_self_maps, strlen,
-}, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestUsize, HookData, HookId, MapInfo, MmapPerms, SyscallHookResult, VerifyAccess, CPU, IsEmuExitHandler, NopEmuExitHandler};
-use crate::sync_exit::SyncExitError;
+use crate::{
+    emu::{
+        exec_path, free_self_maps, guest_base, libafl_dump_core_hook, libafl_force_dfl,
+        libafl_get_brk, libafl_load_addr, libafl_maps_next, libafl_qemu_run, libafl_set_brk,
+        mmap_next_start, read_self_maps, strlen,
+    },
+    sync_exit::SyncExitError,
+    EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestUsize, HookData, HookId,
+    IsEmuExitHandler, MapInfo, MmapPerms, NopEmuExitHandler, SyscallHookResult, VerifyAccess, CPU,
+};
 
 #[derive(Debug, Clone)]
 pub enum HandlerError {

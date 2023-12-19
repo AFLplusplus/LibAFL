@@ -17,10 +17,7 @@ use std::{
     str::from_utf8_unchecked,
 };
 
-use libafl::{
-    executors::ExitKind,
-    inputs::BytesInput,
-};
+use libafl::{executors::ExitKind, inputs::BytesInput};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
 use strum::IntoEnumIterator;
@@ -98,7 +95,7 @@ impl CommandInput {
         Self {
             addr: GuestAddrKind::Physical(addr),
             max_input_size,
-            cpu
+            cpu,
         }
     }
 
@@ -106,7 +103,7 @@ impl CommandInput {
         Self {
             addr: GuestAddrKind::Virtual(addr),
             max_input_size,
-            cpu: Some(cpu)
+            cpu: Some(cpu),
         }
     }
 
@@ -136,13 +133,19 @@ impl CommandInput {
                 }
             },
             GuestAddrKind::Virtual(vaddr) => unsafe {
-                self.cpu.as_ref().unwrap().write_mem(vaddr.try_into().unwrap(), input_sliced);
+                self.cpu
+                    .as_ref()
+                    .unwrap()
+                    .write_mem(vaddr.try_into().unwrap(), input_sliced);
             },
         };
 
         if let Some(backdoor) = backdoor {
             backdoor
-                .ret(&self.cpu.as_ref().unwrap(), input_sliced.len().try_into().unwrap())
+                .ret(
+                    &self.cpu.as_ref().unwrap(),
+                    input_sliced.len().try_into().unwrap(),
+                )
                 .unwrap();
         }
     }
@@ -185,12 +188,8 @@ impl IsEmuExitHandler for NopEmuExitHandler {
         _: &BytesInput,
     ) -> Result<InnerHandlerResult, HandlerError> {
         match exit_reason {
-            Ok(reason) => {
-                Ok(InnerHandlerResult::ReturnToHarness(reason))
-            }
-            Err(error) => {
-                return Err(error)?
-            }
+            Ok(reason) => Ok(InnerHandlerResult::ReturnToHarness(reason)),
+            Err(error) => return Err(error)?,
         }
     }
 }
@@ -258,7 +257,7 @@ pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
 pub use libafl_qemu_sys::{CPUArchState, CPUState};
 
-use crate::sync_exit::{SyncExitError, SyncExit};
+use crate::sync_exit::{SyncExit, SyncExitError};
 
 pub type CPUStatePtr = *mut libafl_qemu_sys::CPUState;
 pub type CPUArchStatePtr = *mut libafl_qemu_sys::CPUArchState;
