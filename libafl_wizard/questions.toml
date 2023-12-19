@@ -100,6 +100,12 @@ previous = ""
     answer = "Yes"
     next = "crash/timeout"
     code = """
+    use libafl::InProcessForkExecutor;
+    use libafl_bolts::{
+        shmem::{unix_shmem, ShMemProvider},
+        tuples::tuple_list,
+    };
+
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
 
     let mut executor = InProcessForkExecutor::new(
@@ -119,6 +125,9 @@ previous = ""
     answer = "No"
     next = "crash/timeout"
     code = """
+    use libafl::executors::inprocess::InProcessExecutor;
+    use libafl_bolts::tuples::tuple_list;
+
     let mut executor = InProcessExecutor::new(
         &mut harness,
         tuple_list!(observer),
@@ -153,6 +162,8 @@ previous = ""
     answer = "Crash"
     next = "default components"
     code = """
+    use libafl::feedbacks::CrashFeedback;
+
     let mut objective = CrashFeedback::new();
     """
     skip = []
@@ -162,6 +173,11 @@ previous = ""
     answer = "Crash or Timeout"
     next = "default components"
     code = """
+    use libafl::{
+        feedback_or_fast,
+        feedbacks::{CrashFeedback, TimeoutFeedback},
+    };
+
     let mut objective = feedback_or_fast!(
         CrashFeedback::new(),
         TimeoutFeedback::new()
@@ -174,6 +190,8 @@ previous = ""
     answer = "Timeout"
     next = "default components"
     code = """
+    use libafl::feedbacks::TimeoutFeedback;
+
     let mut objective = TimeoutFeedback::new();
     """
     skip = []
@@ -191,6 +209,24 @@ previous = ""
     answer = "Next"
     next = "END"
     code = """
+    use std::path::PathBuf;
+    use libafl::{
+        corpus::{InMemoryCorpus, OnDiskCorpus},
+        events::SimpleEventManager,
+        feedbacks::MaxMapFeedback,
+        fuzzer::{Fuzzer, StdFuzzer},
+        monitors::SimpleMonitor,
+        mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+        schedulers::QueueScheduler,
+        stages::mutational::StdMutationalStage,
+        state::StdState,
+    };
+    use libafl_bolts::{
+        current_nanos,
+        rands::StdRand,
+        tuples::tuple_list,
+    };
+
     let mut feedback = MaxMapFeedback::new(&observer);
 
     let mut state = StdState::new(

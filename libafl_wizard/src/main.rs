@@ -5,7 +5,10 @@ mod question;
 mod utils;
 
 use question::{find_question, flowchart_image, Question};
-use utils::{arrange_code, clear_terminal_screen, separate_code, validate_input, write_code};
+use utils::{
+    arrange_code, arrange_imports, clear_terminal_screen, separate_code, separate_imports,
+    validate_input, write_code,
+};
 
 fn main() {
     // The question diagram is a vector containing all the questions.
@@ -26,11 +29,8 @@ fn main() {
     // Basically, a question is shown, answered by the use and so on, until the last question.
     while questions[curr_q].id != "END" {
         clear_terminal_screen();
-
         questions[curr_q].print_question();
-
         print!("\nYour answer: ");
-
         io::stdout().flush().unwrap();
         io::stdin()
             .read_line(&mut input)
@@ -39,7 +39,6 @@ fn main() {
 
         while !questions[curr_q].is_answer(&input) {
             print!("Please, type a valid answer: ");
-
             io::stdout().flush().unwrap();
             input.clear();
             io::stdin()
@@ -72,7 +71,6 @@ fn main() {
             questions[curr_q].answers[ans_i].was_chosen = false;
         } else {
             (next_q, ans_i) = questions[curr_q].resolve_answer(&questions, &input);
-
             questions[curr_q].answers[ans_i].was_chosen = true;
 
             // Adds the code associated to the user choice.
@@ -92,12 +90,16 @@ fn main() {
             questions[next_q].update_previous(q_id);
         }
         input.clear();
-
         curr_q = next_q;
     }
 
+    let (imports_content, code_content) = separate_imports(code_content);
+
     // Separate by instances of components, arrange them in the correct order and write to the file.
-    let file_name = write_code(arrange_code(separate_code(code_content)));
+    let file_name = write_code(
+        arrange_code(separate_code(code_content)),
+        arrange_imports(imports_content),
+    );
 
     println!(
         "\nFile {} successfully created under the ./fuzzers directory.\nAll questions answered!",

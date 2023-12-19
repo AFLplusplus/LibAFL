@@ -46,7 +46,7 @@ impl Question {
 
         // Construct the output string
         output.push_str(&format!(
-            "+=====================+\n|    libafl wizard    |\n+=====================+\n\n"
+            "+=====================+\n|    libafl_wizard    |\n+=====================+\n\n"
         ));
         output.push_str(&format!("{}\n\n", self.title));
         output.push_str(&format!("{}\n\n\t", self.content));

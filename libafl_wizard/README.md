@@ -14,7 +14,7 @@ cargo run
 
 ## Have in mind that...
 
-The tool makes use of [graphviz](https://graphviz.org/download/) to generate an image containing the flowchart of the questions diagram, so the users can know beforehand where the answers will take them. Make sure it's installed before running the tool.
+The tool makes use of [graphviz](https://graphviz.org/download/) to generate an image containing the flowchart of the questions diagram, so the users can know beforehand where the answers will take them. Make sure it's installed (and added to PATH) before running the tool.
 
 When writing answers, the check if an input is a valid answer is such that it simply verifies if what's typed by the user has the same characters so far as the answer (check out `validate_input()`). The thing is that, e.g. if "Crash or Timeout" and "Crash" are both valid answers, if the user answers "crash", the first option will be deemed correct (even though the user wanted the second one). To avoid that, for now, one can simply reverse these answers, so "Crash" comes before "Crash or Timeout".
 
