@@ -7,20 +7,36 @@ use core::{
     mem::{transmute, MaybeUninit},
     ptr::{addr_of, copy_nonoverlapping, null},
 };
-#[cfg(emulation_mode = "usermode")]
-use std::cell::OnceCell;
-#[cfg(emulation_mode = "systemmode")]
-use std::{ffi::CStr, ptr::null_mut};
-use std::{ffi::CString, ptr, slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{
+    cell::RefCell,
+    collections::HashSet,
+    ffi::CString,
+    fmt::{Debug, Display, Formatter},
+    ptr,
+    slice::from_raw_parts,
+    str::from_utf8_unchecked,
+};
 
-#[cfg(emulation_mode = "usermode")]
-use libc::c_int;
+use libafl::{
+    executors::ExitKind,
+    inputs::BytesInput,
+};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::{GuestReg, Regs};
+
+#[cfg(emulation_mode = "systemmode")]
+pub mod systemmode;
+#[cfg(emulation_mode = "systemmode")]
+pub use systemmode::*;
+
+#[cfg(emulation_mode = "usermode")]
+pub mod usermode;
+#[cfg(emulation_mode = "usermode")]
+pub use usermode::*;
 
 pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
@@ -45,39 +61,135 @@ impl fmt::Display for GuestAddrKind {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
-pub type FastSnapshot = *mut libafl_qemu_sys::SyxSnapshot;
-
-#[cfg(emulation_mode = "systemmode")]
-pub enum DeviceSnapshotFilter {
-    All,
-    AllowList(Vec<String>),
-    DenyList(Vec<String>),
+#[derive(Debug, Clone)]
+pub enum Command {
+    Save,
+    Load,
+    Input(CommandInput),
+    Start(CommandInput),
+    Exit(Option<ExitKind>),
+    Version(u64),
 }
 
-#[cfg(emulation_mode = "systemmode")]
-impl DeviceSnapshotFilter {
-    fn enum_id(&self) -> libafl_qemu_sys::DeviceSnapshotKind {
+impl Display for Command {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DeviceSnapshotFilter::All => libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_ALL,
-            DeviceSnapshotFilter::AllowList(_) => {
-                libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_ALLOWLIST
+            Command::Save => write!(f, "Save VM"),
+            Command::Load => write!(f, "Reload VM"),
+            Command::Input(command_input) => write!(f, "Set fuzzing input @{command_input}"),
+            Command::Start(command_input) => {
+                write!(f, "Start fuzzing with input @{command_input}")
             }
-            DeviceSnapshotFilter::DenyList(_) => {
-                libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_DENYLIST
-            }
+            Command::Exit(exit_kind) => write!(f, "Exit of kind {exit_kind:?}"),
+            Command::Version(version) => write!(f, "Client version: {version}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CommandInput {
+    addr: GuestAddrKind,
+    max_input_size: GuestReg,
+    cpu: Option<CPU>,
+}
+
+impl CommandInput {
+    pub fn phys(addr: GuestPhysAddr, max_input_size: GuestReg, cpu: Option<CPU>) -> Self {
+        Self {
+            addr: GuestAddrKind::Physical(addr),
+            max_input_size,
+            cpu
         }
     }
 
-    fn devices(&self, v: &mut Vec<*mut i8>) -> *mut *mut i8 {
-        v.clear();
-        match self {
-            DeviceSnapshotFilter::All => null_mut(),
-            DeviceSnapshotFilter::AllowList(l) | DeviceSnapshotFilter::DenyList(l) => {
-                for name in l {
-                    v.push(name.as_bytes().as_ptr() as *mut i8);
+    pub fn virt(addr: GuestVirtAddr, max_input_size: GuestReg, cpu: CPU) -> Self {
+        Self {
+            addr: GuestAddrKind::Virtual(addr),
+            max_input_size,
+            cpu: Some(cpu)
+        }
+    }
+
+    pub fn exec<E>(&self, emu: &Emulator<E>, backdoor: Option<&SyncExit>, input: &[u8])
+    where
+        E: IsEmuExitHandler,
+    {
+        let max_len: usize = self.max_input_size.try_into().unwrap();
+
+        let input_sliced;
+        if input.len() > max_len {
+            input_sliced = &input[0..max_len];
+        } else {
+            input_sliced = input;
+        }
+
+        match self.addr {
+            GuestAddrKind::Physical(hwaddr) => unsafe {
+                #[cfg(emulation_mode = "usermode")]
+                {
+                    // For now the default behaviour is to fall back to virtual addresses
+                    emu.write_mem(hwaddr.try_into().unwrap(), input_sliced);
                 }
-                v.as_mut_ptr()
+                #[cfg(emulation_mode = "systemmode")]
+                {
+                    emu.write_phys_mem(hwaddr, input_sliced);
+                }
+            },
+            GuestAddrKind::Virtual(vaddr) => unsafe {
+                self.cpu.as_ref().unwrap().write_mem(vaddr.try_into().unwrap(), input_sliced);
+            },
+        };
+
+        if let Some(backdoor) = backdoor {
+            backdoor
+                .ret(&self.cpu.as_ref().unwrap(), input_sliced.len().try_into().unwrap())
+                .unwrap();
+        }
+    }
+}
+
+impl Display for CommandInput {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({:x} max nb bytes)", self.addr, self.max_input_size)
+    }
+}
+
+// TODO: Rework with generics for command handlers?
+pub trait IsEmuExitHandler: Sized + Debug {
+    fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput);
+
+    fn handle(
+        &mut self,
+        exit_reason: Result<EmuExitReason, EmuExitReasonError>,
+        emu: &Emulator<Self>,
+        input: &BytesInput,
+    ) -> Result<InnerHandlerResult, HandlerError>;
+}
+
+pub enum InnerHandlerResult {
+    EndOfRun(ExitKind), // The run is over and the emulator is ready for the next iteration.
+    ReturnToHarness(EmuExitReason), // Return to the harness immediately. Can happen at any point of the run when the handler is not supposed to handle a request.
+    Continue,                       // Resume QEMU and continue to run the handler.
+}
+
+#[derive(Clone, Debug)]
+pub struct NopEmuExitHandler;
+
+impl IsEmuExitHandler for NopEmuExitHandler {
+    fn try_put_input(&mut self, _: &Emulator<Self>, _: &BytesInput) {}
+
+    fn handle(
+        &mut self,
+        exit_reason: Result<EmuExitReason, EmuExitReasonError>,
+        _: &Emulator<Self>,
+        _: &BytesInput,
+    ) -> Result<InnerHandlerResult, HandlerError> {
+        match exit_reason {
+            Ok(reason) => {
+                Ok(InnerHandlerResult::ReturnToHarness(reason))
+            }
+            Err(error) => {
+                return Err(error)?
             }
         }
     }
@@ -146,7 +258,7 @@ pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
 pub use libafl_qemu_sys::{CPUArchState, CPUState};
 
-use crate::sync_backdoor::{SyncBackdoor, SyncBackdoorError};
+use crate::sync_exit::{SyncExitError, SyncExit};
 
 pub type CPUStatePtr = *mut libafl_qemu_sys::CPUState;
 pub type CPUArchStatePtr = *mut libafl_qemu_sys::CPUArchState;
@@ -338,25 +450,6 @@ extern "C" {
     static mut libafl_force_dfl: i32;
 }
 
-#[cfg(emulation_mode = "systemmode")]
-extern "C" {
-    fn qemu_init(argc: i32, argv: *const *const u8, envp: *const *const u8);
-
-    fn vm_start();
-    fn qemu_main_loop();
-    fn qemu_cleanup();
-
-    fn libafl_save_qemu_snapshot(name: *const u8, sync: bool);
-    fn libafl_load_qemu_snapshot(name: *const u8, sync: bool);
-}
-
-#[cfg(emulation_mode = "systemmode")]
-extern "C" fn qemu_cleanup_atexit() {
-    unsafe {
-        qemu_cleanup();
-    }
-}
-
 // TODO rely completely on libafl_qemu_sys
 extern "C" {
     //static libafl_page_size: GuestUsize;
@@ -390,72 +483,6 @@ extern "C" {
         data: *const (),
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
-
-    #[cfg(emulation_mode = "systemmode")]
-    fn libafl_qemu_current_paging_id(cpu: CPUStatePtr) -> GuestPhysAddr;
-}
-
-#[cfg(emulation_mode = "usermode")]
-#[cfg_attr(feature = "python", pyclass(unsendable))]
-pub struct GuestMaps {
-    orig_c_iter: *const c_void,
-    c_iter: *const c_void,
-}
-
-// Consider a private new only for Emulator
-#[cfg(emulation_mode = "usermode")]
-impl GuestMaps {
-    #[must_use]
-    pub(crate) fn new() -> Self {
-        unsafe {
-            let maps = read_self_maps();
-            Self {
-                orig_c_iter: maps,
-                c_iter: maps,
-            }
-        }
-    }
-}
-
-#[cfg(emulation_mode = "usermode")]
-impl Iterator for GuestMaps {
-    type Item = MapInfo;
-
-    #[allow(clippy::uninit_assumed_init)]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.c_iter.is_null() {
-            return None;
-        }
-        unsafe {
-            let mut ret = MaybeUninit::uninit();
-            self.c_iter = libafl_maps_next(self.c_iter, ret.as_mut_ptr());
-            if self.c_iter.is_null() {
-                None
-            } else {
-                Some(ret.assume_init())
-            }
-        }
-    }
-}
-
-#[cfg(all(emulation_mode = "usermode", feature = "python"))]
-#[pymethods]
-impl GuestMaps {
-    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
-        slf
-    }
-    fn __next__(mut slf: PyRefMut<Self>) -> Option<PyObject> {
-        Python::with_gil(|py| slf.next().map(|x| x.into_py(py)))
-    }
-}
-
-#[cfg(emulation_mode = "usermode")]
-impl Drop for GuestMaps {
-    fn drop(&mut self) {
-        unsafe {
-            free_self_maps(self.orig_c_iter);
-        }
-    }
 }
 
 #[repr(C)]
@@ -466,14 +493,16 @@ static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
 
 extern "C" fn gdb_cmd(data: *const (), buf: *const u8, len: usize) -> i32 {
     unsafe {
-        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&Emulator, &'r str) -> bool>);
+        let closure = &mut *(data as *mut Box<
+            dyn for<'r> FnMut(&Emulator<NopEmuExitHandler>, &'r str) -> bool,
+        >);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
-        let emu = Emulator::new_empty();
+        let emu = Emulator::<NopEmuExitHandler>::new_empty();
         i32::from(closure(&emu, cmd))
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct CPU {
     ptr: CPUStatePtr,
@@ -507,8 +536,8 @@ pub trait ArchExtras {
 #[allow(clippy::unused_self)]
 impl CPU {
     #[must_use]
-    pub fn emulator(&self) -> Emulator {
-        Emulator::new_empty()
+    pub fn emulator(&self) -> Emulator<NopEmuExitHandler> {
+        Emulator::<NopEmuExitHandler>::new_empty()
     }
 
     #[must_use]
@@ -544,110 +573,7 @@ impl CPU {
         }
     }
 
-    #[cfg(emulation_mode = "systemmode")]
-    #[must_use]
-    pub fn get_phys_addr(&self, vaddr: GuestAddr) -> Option<GuestPhysAddr> {
-        unsafe {
-            let page = libafl_page_from_addr(vaddr);
-            let mut attrs = MaybeUninit::<libafl_qemu_sys::MemTxAttrs>::uninit();
-            let paddr = libafl_qemu_sys::cpu_get_phys_page_attrs_debug(
-                self.ptr,
-                page as GuestVirtAddr,
-                attrs.as_mut_ptr(),
-            );
-            if paddr == (-1i64 as GuestPhysAddr) {
-                None
-            } else {
-                Some(paddr)
-            }
-        }
-    }
-
-    #[cfg(emulation_mode = "systemmode")]
-    #[must_use]
-    pub fn get_phys_addr_tlb(
-        &self,
-        vaddr: GuestAddr,
-        info: MemAccessInfo,
-        is_store: bool,
-    ) -> Option<GuestPhysAddr> {
-        unsafe {
-            let pminfo = libafl_qemu_sys::make_plugin_meminfo(
-                info.oi,
-                if is_store {
-                    libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_W
-                } else {
-                    libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_R
-                },
-            );
-            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr as GuestVirtAddr);
-            if phwaddr.is_null() {
-                None
-            } else {
-                Some(libafl_qemu_sys::qemu_plugin_hwaddr_phys_addr(phwaddr) as GuestPhysAddr)
-            }
-        }
-    }
-
-    #[cfg(emulation_mode = "systemmode")]
-    #[must_use]
-    pub fn get_current_paging_id(&self) -> Option<GuestPhysAddr> {
-        let paging_id = unsafe { libafl_qemu_current_paging_id(self.ptr) };
-
-        if paging_id == 0 {
-            None
-        } else {
-            Some(paging_id)
-        }
-    }
-
     // TODO expose tlb_set_dirty and tlb_reset_dirty
-
-    /// Write a value to a guest address.
-    ///
-    /// # Safety
-    /// This will write to a translated guest address (using `g2h`).
-    /// It just adds `guest_base` and writes to that location, without checking the bounds.
-    /// This may only be safely used for valid guest addresses!
-    pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-        #[cfg(emulation_mode = "usermode")]
-        {
-            let host_addr = Emulator::new_empty().g2h(addr);
-            copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
-        }
-        // TODO use gdbstub's target_cpu_memory_rw_debug
-        #[cfg(emulation_mode = "systemmode")]
-        libafl_qemu_sys::cpu_memory_rw_debug(
-            self.ptr,
-            addr as GuestVirtAddr,
-            buf.as_ptr() as *mut _,
-            buf.len(),
-            true,
-        );
-    }
-
-    /// Read a value from a guest address.
-    ///
-    /// # Safety
-    /// This will read from a translated guest address (using `g2h`).
-    /// It just adds `guest_base` and writes to that location, without checking the bounds.
-    /// This may only be safely used for valid guest addresses!
-    pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
-        #[cfg(emulation_mode = "usermode")]
-        {
-            let host_addr = Emulator::new_empty().g2h(addr);
-            copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
-        }
-        // TODO use gdbstub's target_cpu_memory_rw_debug
-        #[cfg(emulation_mode = "systemmode")]
-        libafl_qemu_sys::cpu_memory_rw_debug(
-            self.ptr,
-            addr as GuestVirtAddr,
-            buf.as_mut_ptr() as *mut _,
-            buf.len(),
-            false,
-        );
-    }
 
     #[must_use]
     pub fn num_regs(&self) -> i32 {
@@ -728,28 +654,6 @@ impl CPU {
     }
 
     #[must_use]
-    pub fn page_size(&self) -> usize {
-        #[cfg(emulation_mode = "usermode")]
-        {
-            thread_local! {
-                static PAGE_SIZE: OnceCell<usize> = OnceCell::new();
-            }
-
-            PAGE_SIZE.with(|s| {
-                *s.get_or_init(|| {
-                    unsafe { libc::sysconf(libc::_SC_PAGE_SIZE) }
-                        .try_into()
-                        .expect("Invalid page size")
-                })
-            })
-        }
-        #[cfg(emulation_mode = "systemmode")]
-        {
-            unsafe { libafl_qemu_sys::qemu_target_page_size() }
-        }
-    }
-
-    #[must_use]
     pub fn display_context(&self) -> String {
         let mut display = String::new();
         let mut maxl = 0;
@@ -775,6 +679,8 @@ impl CPU {
 pub struct HookId(pub(crate) usize);
 
 use std::pin::Pin;
+
+use crate::breakpoint::Breakpoint;
 
 #[derive(Debug)]
 pub struct HookData(u64);
@@ -848,16 +754,35 @@ pub enum EmuError {
 
 #[derive(Debug, Clone)]
 pub enum EmuExitReason {
-    End,                        // QEMU ended for some reason.
-    Breakpoint(GuestVirtAddr), // Breakpoint triggered. Contains the virtual address of the trigger.
-    SyncBackdoor(SyncBackdoor), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    End,                    // QEMU ended for some reason.
+    Breakpoint(Breakpoint), // Breakpoint triggered. Contains the address of the trigger.
+    SyncBackdoor(SyncExit), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+}
+
+/// High level result when finishing to handle requests
+#[derive(Debug, Clone)]
+pub enum HandlerResult {
+    UnhandledExit(EmuExitReason),
+    EndOfRun(ExitKind),
+}
+
+impl From<EmuExitReasonError> for HandlerError {
+    fn from(error: EmuExitReasonError) -> Self {
+        HandlerError::EmuExitReasonError(error)
+    }
+}
+
+impl From<SyncExitError> for HandlerError {
+    fn from(error: SyncExitError) -> Self {
+        HandlerError::SyncExitError(error)
+    }
 }
 
 impl fmt::Display for EmuExitReason {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             EmuExitReason::End => write!(f, "End"),
-            EmuExitReason::Breakpoint(vaddr) => write!(f, "Breakpoint @vaddr 0x{vaddr:x}"),
+            EmuExitReason::Breakpoint(bp) => write!(f, "{}", bp),
             EmuExitReason::SyncBackdoor(sync_backdoor) => {
                 write!(f, "Sync backdoor exit: {sync_backdoor}")
             }
@@ -867,20 +792,24 @@ impl fmt::Display for EmuExitReason {
 
 #[derive(Debug, Clone)]
 pub enum EmuExitReasonError {
-    UnknownKind(),
+    UnknownKind,
     UnexpectedExit,
-    SyncBackdoorError(SyncBackdoorError),
+    SyncBackdoorError(SyncExitError),
+    BreakpointNotFound(GuestAddr),
 }
 
-impl From<SyncBackdoorError> for EmuExitReasonError {
-    fn from(sync_backdoor_error: SyncBackdoorError) -> Self {
+impl From<SyncExitError> for EmuExitReasonError {
+    fn from(sync_backdoor_error: SyncExitError) -> Self {
         EmuExitReasonError::SyncBackdoorError(sync_backdoor_error)
     }
 }
 
-impl TryFrom<&Emulator> for EmuExitReason {
+impl<E> TryFrom<&Emulator<E>> for EmuExitReason
+where
+    E: IsEmuExitHandler,
+{
     type Error = EmuExitReasonError;
-    fn try_from(emu: &Emulator) -> Result<Self, Self::Error> {
+    fn try_from(emu: &Emulator<E>) -> Result<Self, Self::Error> {
         let exit_reason = unsafe { libafl_get_exit_reason() };
         if exit_reason.is_null() {
             Err(EmuExitReasonError::UnexpectedExit)
@@ -889,12 +818,19 @@ impl TryFrom<&Emulator> for EmuExitReason {
                 unsafe { transmute(&mut *exit_reason) };
             Ok(match exit_reason.kind {
                 libafl_qemu_sys::libafl_exit_reason_kind_BREAKPOINT => unsafe {
-                    EmuExitReason::Breakpoint(exit_reason.data.breakpoint.addr.into())
+                    let bp_addr = exit_reason.data.breakpoint.addr;
+                    let bp = emu
+                        .breakpoints
+                        .borrow()
+                        .get(&bp_addr)
+                        .ok_or(EmuExitReasonError::BreakpointNotFound(bp_addr))?
+                        .clone();
+                    EmuExitReason::Breakpoint(bp)
                 },
                 libafl_qemu_sys::libafl_exit_reason_kind_SYNC_BACKDOOR => {
                     EmuExitReason::SyncBackdoor(emu.try_into()?)
                 }
-                _ => return Err(EmuExitReasonError::UnknownKind()),
+                _ => return Err(EmuExitReasonError::UnknownKind),
             })
         }
     }
@@ -930,14 +866,26 @@ impl From<EmuError> for libafl::Error {
 static mut EMULATOR_IS_INITIALIZED: bool = false;
 
 #[derive(Clone, Debug)]
-pub struct Emulator {
+pub struct Emulator<E>
+where
+    E: IsEmuExitHandler,
+{
+    exit_handler: RefCell<E>,
+    breakpoints: RefCell<HashSet<Breakpoint>>,
     _private: (),
 }
 
 #[allow(clippy::unused_self)]
-impl Emulator {
+impl<E> Emulator<E>
+where
+    E: IsEmuExitHandler,
+{
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
-    pub fn new(args: &[String], env: &[(String, String)]) -> Result<Emulator, EmuError> {
+    pub fn new(
+        args: &[String],
+        env: &[(String, String)],
+        exit_handler: E,
+    ) -> Result<Emulator<E>, EmuError> {
         if args.is_empty() {
             return Err(EmuError::EmptyArgs);
         }
@@ -974,23 +922,27 @@ impl Emulator {
             qemu_user_init(argc, argv.as_ptr(), envp.as_ptr());
             #[cfg(emulation_mode = "systemmode")]
             {
-                qemu_init(
+                systemmode::qemu_init(
                     argc,
                     argv.as_ptr() as *const *const u8,
                     envp.as_ptr() as *const *const u8,
                 );
                 libc::atexit(qemu_cleanup_atexit);
-                libafl_qemu_sys::syx_snapshot_init();
+                libafl_qemu_sys::syx_snapshot_init(true);
             }
         }
-        Ok(Emulator { _private: () })
+        Ok(Emulator {
+            exit_handler: RefCell::new(exit_handler),
+            breakpoints: RefCell::new(HashSet::new()),
+            _private: (),
+        })
     }
 
     #[must_use]
-    pub fn get() -> Option<Self> {
+    pub fn get() -> Option<Emulator<NopEmuExitHandler>> {
         unsafe {
             if EMULATOR_IS_INITIALIZED {
-                Some(Self::new_empty())
+                Some(Emulator::<NopEmuExitHandler>::new_empty())
             } else {
                 None
             }
@@ -998,15 +950,12 @@ impl Emulator {
     }
 
     #[must_use]
-    pub fn new_empty() -> Emulator {
-        Emulator { _private: () }
-    }
-
-    /// This function gets the memory mappings from the emulator.
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn mappings(&self) -> GuestMaps {
-        GuestMaps::new()
+    pub(crate) fn new_empty() -> Emulator<NopEmuExitHandler> {
+        Emulator {
+            exit_handler: RefCell::new(NopEmuExitHandler),
+            breakpoints: RefCell::new(HashSet::new()),
+            _private: (),
+        }
     }
 
     #[must_use]
@@ -1046,26 +995,6 @@ impl Emulator {
         unsafe { libafl_page_size }
     }*/
 
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
-        unsafe { (addr as usize + guest_base) as *mut T }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
-        unsafe { (addr as usize - guest_base) as GuestAddr }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
-        self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index(0))
-            .access_ok(kind, addr, size)
-    }
-
     pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
@@ -1076,28 +1005,6 @@ impl Emulator {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
             .read_mem(addr, buf);
-    }
-
-    /// Write a value to a phsical guest address, including ROM areas.
-    #[cfg(emulation_mode = "systemmode")]
-    pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {
-        libafl_qemu_sys::cpu_physical_memory_rw(
-            paddr,
-            buf.as_ptr() as *mut _,
-            buf.len() as u64,
-            true,
-        );
-    }
-
-    /// Read a value from a physical guest address.
-    #[cfg(emulation_mode = "systemmode")]
-    pub unsafe fn read_phys_mem(&self, paddr: GuestPhysAddr, buf: &mut [u8]) {
-        libafl_qemu_sys::cpu_physical_memory_rw(
-            paddr,
-            buf.as_mut_ptr() as *mut _,
-            buf.len() as u64,
-            false,
-        );
     }
 
     #[must_use]
@@ -1121,149 +1028,67 @@ impl Emulator {
         self.current_cpu().unwrap().read_reg(reg)
     }
 
-    pub fn set_breakpoint(&self, addr: GuestAddr) {
+    pub fn add_breakpoint(&self, mut bp: Breakpoint, enable: bool) {
+        if enable {
+            bp.enable(self);
+        }
+
+        self.breakpoints.borrow_mut().insert(bp);
+    }
+
+    pub fn remove_breakpoint(&self, bp: &mut Breakpoint) {
+        bp.disable(self);
+
+        self.breakpoints.borrow_mut().remove(bp);
+    }
+
+    pub fn set_breakpoint_addr(&self, addr: GuestAddr) {
         unsafe {
             libafl_qemu_set_breakpoint(addr.into());
         }
     }
 
-    pub fn remove_breakpoint(&self, addr: GuestAddr) {
+    pub fn unset_breakpoint_addr(&self, addr: GuestAddr) {
         unsafe {
             libafl_qemu_remove_breakpoint(addr.into());
         }
     }
 
-    pub fn entry_break(&self, addr: GuestAddr) {
-        self.set_breakpoint(addr);
+    pub fn entry_break(&self, addr: GuestVirtAddr) {
+        let mut bp = Breakpoint::without_command(addr as GuestAddr, false);
+        self.add_breakpoint(bp.clone(), true);
         unsafe {
             // TODO: decide what to do with sync exit here: ignore or check for bp exit?
-            let _ = self.run();
+            self.run().unwrap();
         }
-        self.remove_breakpoint(addr);
+        self.remove_breakpoint(&mut bp);
     }
 
-    #[cfg(emulation_mode = "usermode")]
-    pub fn force_dfl(&self) {
-        unsafe {
-            libafl_force_dfl = 1;
-        }
-    }
-    /// This function will run the emulator until the next breakpoint, or until finish.
+    /// This function will run the emulator until the exit handler decides to stop the execution for
+    /// whatever reason, depending on the choosen handler.
+    /// It is a higher-level abstraction of [`Emulator::run`] that will take care of some part of the runtime logic,
+    /// returning only when something interesting happen.
     /// # Safety
     ///
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run(&self) -> Result<EmuExitReason, EmuExitReasonError> {
-        #[cfg(emulation_mode = "usermode")]
-        libafl_qemu_run();
-        #[cfg(emulation_mode = "systemmode")]
-        {
-            vm_start();
-            qemu_main_loop();
-        }
-        EmuExitReason::try_from(self)
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn binary_path<'a>(&self) -> &'a str {
-        unsafe { from_utf8_unchecked(from_raw_parts(exec_path, strlen(exec_path))) }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn load_addr(&self) -> GuestAddr {
-        unsafe { libafl_load_addr() as GuestAddr }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn get_brk(&self) -> GuestAddr {
-        unsafe { libafl_get_brk() as GuestAddr }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    pub fn set_brk(&self, brk: GuestAddr) {
-        unsafe { libafl_set_brk(brk.into()) };
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn get_mmap_start(&self) -> GuestAddr {
-        unsafe { mmap_next_start }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    pub fn set_mmap_start(&self, start: GuestAddr) {
-        unsafe { mmap_next_start = start };
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[allow(clippy::cast_sign_loss)]
-    fn mmap(
-        &self,
-        addr: GuestAddr,
-        size: usize,
-        perms: MmapPerms,
-        flags: c_int,
-    ) -> Result<GuestAddr, ()> {
-        let res = unsafe {
-            libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, -1, 0)
-        };
-        if res <= 0 {
-            Err(())
-        } else {
-            Ok(res as GuestAddr)
-        }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    pub fn map_private(
-        &self,
-        addr: GuestAddr,
-        size: usize,
-        perms: MmapPerms,
-    ) -> Result<GuestAddr, String> {
-        self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
-            .map_err(|()| format!("Failed to map {addr}"))
-            .map(|addr| addr as GuestAddr)
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    pub fn map_fixed(
-        &self,
-        addr: GuestAddr,
-        size: usize,
-        perms: MmapPerms,
-    ) -> Result<GuestAddr, String> {
-        self.mmap(
-            addr,
-            size,
-            perms,
-            libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-        )
-        .map_err(|()| format!("Failed to map {addr}"))
-        .map(|addr| addr as GuestAddr)
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
-        let res = unsafe {
-            libafl_qemu_sys::target_mprotect(addr.into(), size as GuestUsize, perms.into())
-        };
-        if res == 0 {
-            Ok(())
-        } else {
-            Err(format!("Failed to mprotect {addr}"))
-        }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    pub fn unmap(&self, addr: GuestAddr, size: usize) -> Result<(), String> {
-        if unsafe { libafl_qemu_sys::target_munmap(addr.into(), size as GuestUsize) } == 0 {
-            Ok(())
-        } else {
-            Err(format!("Failed to unmap {addr}"))
+    pub unsafe fn run_handle(&self, input: &BytesInput) -> Result<HandlerResult, HandlerError> {
+        loop {
+            self.exit_handler.borrow_mut().try_put_input(self, input);
+            let exit_reason = self.run();
+            let handler_res = self
+                .exit_handler
+                .borrow_mut()
+                .handle(exit_reason, self, input)?;
+            match handler_res {
+                InnerHandlerResult::ReturnToHarness(exit_reason) => {
+                    return Ok(HandlerResult::UnhandledExit(exit_reason))
+                }
+                InnerHandlerResult::EndOfRun(exit_kind) => {
+                    return Ok(HandlerResult::EndOfRun(exit_kind))
+                }
+                InnerHandlerResult::Continue => {}
+            }
         }
     }
 
@@ -1430,165 +1255,6 @@ impl Emulator {
         }
     }
 
-    #[cfg(emulation_mode = "usermode")]
-    #[allow(clippy::type_complexity)]
-    pub fn add_pre_syscall_hook<T: Into<HookData>>(
-        &self,
-        data: T,
-        callback: extern "C" fn(
-            T,
-            i32,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-        ) -> SyscallHookResult,
-    ) -> HookId {
-        unsafe {
-            let data: u64 = data.into().0;
-            let callback: extern "C" fn(
-                u64,
-                i32,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-            ) -> libafl_qemu_sys::syshook_ret = core::mem::transmute(callback);
-            let num = libafl_qemu_sys::libafl_add_pre_syscall_hook(Some(callback), data);
-            HookId(num)
-        }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[allow(clippy::type_complexity)]
-    pub fn add_post_syscall_hook<T: Into<HookData>>(
-        &self,
-        data: T,
-        callback: extern "C" fn(
-            T,
-            GuestAddr,
-            i32,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-        ) -> GuestAddr,
-    ) -> HookId {
-        unsafe {
-            let data: u64 = data.into().0;
-            let callback: extern "C" fn(
-                u64,
-                GuestAddr,
-                i32,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-            ) -> GuestAddr = core::mem::transmute(callback);
-            let num = libafl_qemu_sys::libafl_add_post_syscall_hook(Some(callback), data);
-            HookId(num)
-        }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    pub fn add_new_thread_hook<T: Into<HookData>>(
-        &self,
-        data: T,
-        callback: extern "C" fn(T, tid: u32) -> bool,
-    ) -> HookId {
-        unsafe {
-            let data: u64 = data.into().0;
-            let callback: extern "C" fn(u64, u32) -> bool = core::mem::transmute(callback);
-            let num = libafl_qemu_sys::libafl_add_new_thread_hook(Some(callback), data);
-            HookId(num)
-        }
-    }
-
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn save_snapshot(&self, name: &str, sync: bool) {
-        let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _, sync) };
-    }
-
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn load_snapshot(&self, name: &str, sync: bool) {
-        let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _, sync) };
-    }
-
-    #[cfg(emulation_mode = "systemmode")]
-    #[must_use]
-    pub fn create_fast_snapshot(&self, track: bool) -> FastSnapshot {
-        unsafe {
-            libafl_qemu_sys::syx_snapshot_new(
-                track,
-                libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_ALL,
-                null_mut(),
-            )
-        }
-    }
-
-    #[cfg(emulation_mode = "systemmode")]
-    #[must_use]
-    pub fn create_fast_snapshot_filter(
-        &self,
-        track: bool,
-        device_filter: &DeviceSnapshotFilter,
-    ) -> FastSnapshot {
-        let mut v = vec![];
-        unsafe {
-            libafl_qemu_sys::syx_snapshot_new(
-                track,
-                device_filter.enum_id(),
-                device_filter.devices(&mut v),
-            )
-        }
-    }
-
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn restore_fast_snapshot(&self, snapshot: FastSnapshot) {
-        unsafe { libafl_qemu_sys::syx_snapshot_root_restore(snapshot) }
-    }
-
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn list_devices(&self) -> Vec<String> {
-        let mut r = vec![];
-        unsafe {
-            let devices = libafl_qemu_sys::device_list_all();
-            if devices.is_null() {
-                return r;
-            }
-
-            let mut ptr = devices;
-            while !(*ptr).is_null() {
-                let c_str: &CStr = CStr::from_ptr(*ptr);
-                let name = c_str.to_str().unwrap().to_string();
-                r.push(name);
-
-                ptr = ptr.add(1);
-            }
-
-            libc::free(devices as *mut c_void);
-            r
-        }
-    }
-
     #[allow(clippy::type_complexity)]
     pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
         unsafe {
@@ -1603,17 +1269,12 @@ impl Emulator {
     pub fn gdb_reply(&self, output: &str) {
         unsafe { libafl_qemu_gdb_reply(output.as_bytes().as_ptr(), output.len()) };
     }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[allow(clippy::type_complexity)]
-    pub fn set_crash_hook(&self, callback: extern "C" fn(i32)) {
-        unsafe {
-            libafl_dump_core_hook = callback;
-        }
-    }
 }
 
-impl ArchExtras for Emulator {
+impl<E> ArchExtras for Emulator<E>
+where
+    E: IsEmuExitHandler,
+{
     fn read_return_address<T>(&self) -> Result<T, String>
     where
         T: From<GuestReg>,
