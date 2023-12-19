@@ -121,8 +121,8 @@ impl<'a> Instance<'a> {
 
         let mut tokens = Tokens::new();
 
-        let vec = TOKENS.lock().unwrap();
-        for token in &*vec {
+        let vec = TOKENS.get().unwrap();
+        for token in vec {
             let bytes = token.as_bytes().to_vec();
             let _ = tokens.add_token(&bytes);
         }

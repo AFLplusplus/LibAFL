@@ -1,8 +1,6 @@
-use std::{
-    env, ffi::CStr, fs::File, io::Read, ops::Range, os::raw::c_char, path::Path, sync::Mutex,
-};
+use std::sync::OnceLock;
+use std::{env, ffi::CStr, fs::File, io::Read, ops::Range, os::raw::c_char, path::Path};
 
-use lazy_static::lazy_static;
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
     events::LlmpRestartingEventManager,
@@ -59,10 +57,8 @@ struct InjectStructure {
     tests: Vec<Test>,
 }
 
-lazy_static! {
-    static ref INJECTIONS: Mutex<Vec<InjectStructure>> = Mutex::new(Vec::new());
-    pub static ref TOKENS: Mutex<Vec<String>> = Mutex::new(Vec::new());
-}
+static INJECTIONS: OnceLock<Vec<InjectStructure>> = OnceLock::new();
+pub static TOKENS: OnceLock<Vec<String>> = OnceLock::new();
 
 fn parse_yaml<P: AsRef<Path>>(path: P) -> Result<Vec<InjectStructure>, Box<dyn std::error::Error>> {
     let mut file = File::open(path)?;
@@ -129,7 +125,7 @@ where
             };
 
             assert!(
-                !(cmd.to_lowercase() == "fuzz"),
+                cmd.to_lowercase() != "fuzz",
                 "Found verified command injection!"
             );
             //println!("CMD {}", cmd);
@@ -260,10 +256,10 @@ impl<'a> Client<'a> {
         core_id: CoreId,
     ) -> Result<(), Error> {
         let mut args = self.args()?;
-        log::debug!("ARGS: {:#?}", args);
+        log::debug!("ARGS: {args:#?}");
 
         let mut env = Self::env();
-        log::debug!("ENV: {:#?}", env);
+        log::debug!("ENV: {env:#?}");
 
         let (emu, mut asan) = {
             if self.options.is_asan_core(core_id) {
@@ -279,9 +275,9 @@ impl<'a> Client<'a> {
         log::debug!("start_pc @ {start_pc:#x}");
 
         let injections = parse_yaml(self.options.get_yaml_file()).unwrap();
-        let mut vec = INJECTIONS.lock().unwrap();
-        *vec = injections.clone();
-        drop(vec);
+        INJECTIONS
+            .set(injections)
+            .expect("Failed to set injections");
 
         // Break at the entry point after the loading process
         emu.set_breakpoint(start_pc);
@@ -318,8 +314,8 @@ impl<'a> Client<'a> {
         }
         //println!("Mappings: {:?}", libs);
 
-        for target in injections {
-            for func in target.functions {
+        for target in INJECTIONS.get().expect("Could not get injections") {
+            for func in &target.functions {
                 let mut found = 0;
                 if func.function.to_lowercase().starts_with(&"0x".to_string()) {
                     let func_pc = u64::from_str_radix(&func.function[2..], 16)
@@ -354,9 +350,7 @@ impl<'a> Client<'a> {
             id += 1;
         }
 
-        let mut vec = TOKENS.lock().unwrap();
-        *vec = tokens.clone();
-        drop(vec);
+        TOKENS.set(tokens).expect("Failed to set tokens");
 
         emu.entry_break(start_pc);
 
@@ -429,7 +423,7 @@ impl<'a> Client<'a> {
             };
 
             //println!("query={}", query);
-            let vec = INJECTIONS.lock().unwrap();
+            let vec = INJECTIONS.get().unwrap();
             let injection = &vec[off];
             //println!("Checking {}", injection.name);
             for test in &injection.tests {
