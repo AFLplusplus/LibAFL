@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     capstone,
     emu::{ArchExtras, Emulator},
-    CallingConvention,
+    CallingConvention, NopEmuExitHandler,
 };
 use crate::{
     helper::{
@@ -22,7 +22,7 @@ use crate::{
         QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
-    GuestAddr,
+    GuestAddr, IsEmuExitHandler,
 };
 
 #[cfg_attr(
@@ -80,16 +80,17 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmp
     }
 }
 
-impl<S> QemuHelper<S> for QemuCmpLogHelper
+impl<S, E> QemuHelper<S, E> for QemuCmpLogHelper
 where
     S: UsesInput + HasMetadata,
+    E: IsEmuExitHandler,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
     {
         hooks.cmps(
-            Hook::Function(gen_unique_cmp_ids::<QT, S>),
+            Hook::Function(gen_unique_cmp_ids::<QT, S, E>),
             Hook::Raw(trace_cmp1_cmplog),
             Hook::Raw(trace_cmp2_cmplog),
             Hook::Raw(trace_cmp4_cmplog),
@@ -121,19 +122,19 @@ impl Default for QemuCmpLogChildHelper {
     }
 }
 
-impl<S> QemuHelper<S> for QemuCmpLogChildHelper
+impl<S, E> QemuHelper<S, E> for QemuCmpLogChildHelper
 where
-    S: UsesInput,
-    S: HasMetadata,
+    S: UsesInput + HasMetadata,
+    E: IsEmuExitHandler,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
     {
         hooks.cmps(
-            Hook::Function(gen_hashed_cmp_ids::<QT, S>),
+            Hook::Function(gen_hashed_cmp_ids::<QT, S, E>),
             Hook::Raw(trace_cmp1_cmplog),
             Hook::Raw(trace_cmp2_cmplog),
             Hook::Raw(trace_cmp4_cmplog),
@@ -142,8 +143,8 @@ where
     }
 }
 
-pub fn gen_unique_cmp_ids<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn gen_unique_cmp_ids<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
@@ -151,7 +152,8 @@ pub fn gen_unique_cmp_ids<QT, S>(
 where
     S: HasMetadata,
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     if let Some(h) = hooks.match_helper_mut::<QemuCmpLogHelper>() {
         if !h.must_instrument(pc) {
@@ -174,8 +176,8 @@ where
     }))
 }
 
-pub fn gen_hashed_cmp_ids<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn gen_hashed_cmp_ids<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
@@ -183,7 +185,8 @@ pub fn gen_hashed_cmp_ids<QT, S>(
 where
     S: HasMetadata,
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     if let Some(h) = hooks.match_helper_mut::<QemuCmpLogChildHelper>() {
         if !h.must_instrument(pc) {
@@ -246,7 +249,7 @@ impl QemuCmpLogRoutinesHelper {
             }
         }
 
-        let emu = Emulator::new_empty();
+        let emu = Emulator::<NopEmuExitHandler>::new_empty();
 
         let a0: GuestAddr = emu
             .read_function_argument(CallingConvention::Cdecl, 0)
@@ -266,14 +269,15 @@ impl QemuCmpLogRoutinesHelper {
         }
     }
 
-    fn gen_blocks_calls<QT, S>(
-        hooks: &mut QemuHooks<QT, S>,
+    fn gen_blocks_calls<QT, S, E>(
+        hooks: &mut QemuHooks<QT, S, E>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
     where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
+        E: IsEmuExitHandler,
     {
         if let Some(h) = hooks.helpers_mut().match_first_type_mut::<Self>() {
             if !h.must_instrument(pc) {
@@ -360,16 +364,17 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmp
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl<S> QemuHelper<S> for QemuCmpLogRoutinesHelper
+impl<S, E> QemuHelper<S, E> for QemuCmpLogRoutinesHelper
 where
     S: UsesInput,
+    E: IsEmuExitHandler,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
     {
         hooks.blocks(
-            Hook::Function(Self::gen_blocks_calls::<QT, S>),
+            Hook::Function(Self::gen_blocks_calls::<QT, S, E>),
             Hook::Empty,
             Hook::Empty,
         );

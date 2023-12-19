@@ -26,15 +26,17 @@ use crate::{
     emu::{Emulator, MmapPerms, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple},
     hooks::{Hook, QemuHooks},
-    GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
-    SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
+    GuestAddr, IsEmuExitHandler, NopEmuExitHandler, SYS_fstat, SYS_fstatfs, SYS_futex,
+    SYS_getrandom, SYS_mprotect, SYS_mremap, SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat,
+    SYS_statfs,
 };
 
 // TODO use the functions provided by Emulator
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
 
-pub type StopExecutionCallback = Box<dyn FnMut(&mut QemuSnapshotHelper, &Emulator)>;
+pub type StopExecutionCallback =
+    Box<dyn FnMut(&mut QemuSnapshotHelper, &Emulator<NopEmuExitHandler>)>;
 
 #[derive(Debug)]
 pub struct SnapshotPageInfo {
@@ -136,7 +138,10 @@ impl QemuSnapshotHelper {
     }
 
     #[allow(clippy::uninit_assumed_init)]
-    pub fn snapshot(&mut self, emulator: &Emulator) {
+    pub fn snapshot<E>(&mut self, emulator: &Emulator<E>)
+    where
+        E: IsEmuExitHandler,
+    {
         self.brk = emulator.get_brk();
         self.mmap_start = emulator.get_mmap_start();
         self.pages.clear();
@@ -208,7 +213,10 @@ impl QemuSnapshotHelper {
         }
     }
 
-    pub fn reset(&mut self, emulator: &Emulator) {
+    pub fn reset<E>(&mut self, emulator: &Emulator<E>)
+    where
+        E: IsEmuExitHandler,
+    {
         {
             let new_maps = self.new_maps.get_mut().unwrap();
 
@@ -331,8 +339,8 @@ impl QemuSnapshotHelper {
 
         if self.mmap_limit != 0 && total_size > self.mmap_limit {
             let mut cb = self.stop_execution.take().unwrap();
-            let emu = Emulator::new_empty();
-            (cb)(self, &emu);
+            let emu = Emulator::<NopEmuExitHandler>::new_empty();
+            cb(self, &emu);
             self.stop_execution = Some(cb);
         }
     }
@@ -425,7 +433,10 @@ impl QemuSnapshotHelper {
         }
     }
 
-    pub fn reset_maps(&mut self, emulator: &Emulator) {
+    pub fn reset_maps<E>(&mut self, emulator: &Emulator<E>)
+    where
+        E: IsEmuExitHandler,
+    {
         let new_maps = self.new_maps.get_mut().unwrap();
 
         for entry in self.maps.tree.query(0..GuestAddr::MAX) {
@@ -484,33 +495,34 @@ impl Default for QemuSnapshotHelper {
     }
 }
 
-impl<S> QemuHelper<S> for QemuSnapshotHelper
+impl<S, E> QemuHelper<S, E> for QemuSnapshotHelper
 where
     S: UsesInput + HasMetadata,
+    E: IsEmuExitHandler,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
     {
         if hooks.match_helper::<QemuAsanHelper>().is_none() {
             // The ASan helper, if present, will call the tracer hook for the snapshot helper as opt
             hooks.writes(
                 Hook::Empty,
-                Hook::Function(trace_write1_snapshot::<QT, S>),
-                Hook::Function(trace_write2_snapshot::<QT, S>),
-                Hook::Function(trace_write4_snapshot::<QT, S>),
-                Hook::Function(trace_write8_snapshot::<QT, S>),
-                Hook::Function(trace_write_n_snapshot::<QT, S>),
+                Hook::Function(trace_write1_snapshot::<QT, S, E>),
+                Hook::Function(trace_write2_snapshot::<QT, S, E>),
+                Hook::Function(trace_write4_snapshot::<QT, S, E>),
+                Hook::Function(trace_write8_snapshot::<QT, S, E>),
+                Hook::Function(trace_write_n_snapshot::<QT, S, E>),
             );
         }
 
         if !self.accurate_unmap {
-            hooks.syscalls(Hook::Function(filter_mmap_snapshot::<QT, S>));
+            hooks.syscalls(Hook::Function(filter_mmap_snapshot::<QT, S, E>));
         }
-        hooks.after_syscalls(Hook::Function(trace_mmap_snapshot::<QT, S>));
+        hooks.after_syscalls(Hook::Function(trace_mmap_snapshot::<QT, S, E>));
     }
 
-    fn pre_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
+    fn pre_exec(&mut self, emulator: &Emulator<E>, _input: &S::Input) {
         if self.empty {
             self.snapshot(emulator);
         } else {
@@ -519,67 +531,72 @@ where
     }
 }
 
-pub fn trace_write1_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn trace_write1_snapshot<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 1);
 }
 
-pub fn trace_write2_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn trace_write2_snapshot<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 2);
 }
 
-pub fn trace_write4_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn trace_write4_snapshot<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 4);
 }
 
-pub fn trace_write8_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn trace_write8_snapshot<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 8);
 }
 
-pub fn trace_write_n_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn trace_write_n_snapshot<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, size);
@@ -587,8 +604,8 @@ pub fn trace_write_n_snapshot<QT, S>(
 
 #[allow(clippy::too_many_arguments)]
 #[allow(non_upper_case_globals)]
-pub fn filter_mmap_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn filter_mmap_snapshot<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     _state: Option<&mut S>,
     sys_num: i32,
     a0: GuestAddr,
@@ -602,7 +619,8 @@ pub fn filter_mmap_snapshot<QT, S>(
 ) -> SyscallHookResult
 where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     if i64::from(sys_num) == SYS_munmap {
         let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
@@ -615,8 +633,8 @@ where
 
 #[allow(clippy::too_many_arguments)]
 #[allow(non_upper_case_globals)]
-pub fn trace_mmap_snapshot<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn trace_mmap_snapshot<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     _state: Option<&mut S>,
     result: GuestAddr,
     sys_num: i32,
@@ -631,7 +649,8 @@ pub fn trace_mmap_snapshot<QT, S>(
 ) -> GuestAddr
 where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
     match i64::from(sys_num) {

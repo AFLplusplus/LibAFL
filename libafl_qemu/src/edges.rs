@@ -15,7 +15,7 @@ use crate::{
         QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
-    IsFilter,
+    IsEmuExitHandler, IsFilter,
 };
 #[cfg(emulation_mode = "systemmode")]
 use crate::{helper::QemuInstrumentationPagingFilter, GuestPhysAddr};
@@ -151,20 +151,21 @@ impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for QemuEdgeCover
     }
 }
 
-impl<S> QemuHelper<S> for QemuEdgeCoverageHelper
+impl<S, E> QemuHelper<S, E> for QemuEdgeCoverageHelper
 where
     S: UsesInput + HasMetadata,
+    E: IsEmuExitHandler,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
     {
         if self.use_hitcounts {
             // hooks.edges(
             //     Hook::Function(gen_unique_edge_ids::<QT, S>),
             //     Hook::Raw(trace_edge_hitcount),
             // );
-            let hook_id = hooks.edges(Hook::Function(gen_unique_edge_ids::<QT, S>), Hook::Empty);
+            let hook_id = hooks.edges(Hook::Function(gen_unique_edge_ids::<QT, S, E>), Hook::Empty);
             unsafe {
                 libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
                     hook_id.0,
@@ -176,7 +177,7 @@ where
             //     Hook::Function(gen_unique_edge_ids::<QT, S>),
             //     Hook::Raw(trace_edge_single),
             // );
-            let hook_id = hooks.edges(Hook::Function(gen_unique_edge_ids::<QT, S>), Hook::Empty);
+            let hook_id = hooks.edges(Hook::Function(gen_unique_edge_ids::<QT, S, E>), Hook::Empty);
             unsafe {
                 libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
                     hook_id.0,
@@ -300,25 +301,25 @@ impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for QemuEdgeCover
     }
 }
 
-impl<S> QemuHelper<S> for QemuEdgeCoverageChildHelper
+impl<S, E> QemuHelper<S, E> for QemuEdgeCoverageChildHelper
 where
-    S: UsesInput,
-    S: HasMetadata,
+    S: UsesInput + HasMetadata,
+    E: IsEmuExitHandler,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
     {
         if self.use_hitcounts {
             hooks.edges(
-                Hook::Function(gen_hashed_edge_ids::<QT, S>),
+                Hook::Function(gen_hashed_edge_ids::<QT, S, E>),
                 Hook::Raw(trace_edge_hitcount_ptr),
             );
         } else {
             hooks.edges(
-                Hook::Function(gen_hashed_edge_ids::<QT, S>),
+                Hook::Function(gen_hashed_edge_ids::<QT, S, E>),
                 Hook::Raw(trace_edge_single_ptr),
             );
         }
@@ -330,6 +331,7 @@ where
 pub struct QemuEdgeCoverageClassicHelper {
     address_filter: QemuInstrumentationAddressRangeFilter,
     use_hitcounts: bool,
+    use_jit: bool,
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -338,23 +340,29 @@ pub struct QemuEdgeCoverageClassicHelper {
     address_filter: QemuInstrumentationAddressRangeFilter,
     paging_filter: QemuInstrumentationPagingFilter,
     use_hitcounts: bool,
+    use_jit: bool,
 }
 
 #[cfg(emulation_mode = "usermode")]
 impl QemuEdgeCoverageClassicHelper {
     #[must_use]
-    pub fn new(address_filter: QemuInstrumentationAddressRangeFilter) -> Self {
+    pub fn new(address_filter: QemuInstrumentationAddressRangeFilter, use_jit: bool) -> Self {
         Self {
             address_filter,
             use_hitcounts: true,
+            use_jit,
         }
     }
 
     #[must_use]
-    pub fn without_hitcounts(address_filter: QemuInstrumentationAddressRangeFilter) -> Self {
+    pub fn without_hitcounts(
+        address_filter: QemuInstrumentationAddressRangeFilter,
+        use_jit: bool,
+    ) -> Self {
         Self {
             address_filter,
             use_hitcounts: false,
+            use_jit,
         }
     }
 
@@ -370,11 +378,13 @@ impl QemuEdgeCoverageClassicHelper {
     pub fn new(
         address_filter: QemuInstrumentationAddressRangeFilter,
         paging_filter: QemuInstrumentationPagingFilter,
+        use_jit: bool,
     ) -> Self {
         Self {
             address_filter,
             paging_filter,
             use_hitcounts: true,
+            use_jit,
         }
     }
 
@@ -382,11 +392,13 @@ impl QemuEdgeCoverageClassicHelper {
     pub fn without_hitcounts(
         address_filter: QemuInstrumentationAddressRangeFilter,
         paging_filter: QemuInstrumentationPagingFilter,
+        use_jit: bool,
     ) -> Self {
         Self {
             address_filter,
             paging_filter,
             use_hitcounts: false,
+            use_jit,
         }
     }
 
@@ -399,7 +411,7 @@ impl QemuEdgeCoverageClassicHelper {
 #[cfg(emulation_mode = "usermode")]
 impl Default for QemuEdgeCoverageClassicHelper {
     fn default() -> Self {
-        Self::new(QemuInstrumentationAddressRangeFilter::None)
+        Self::new(QemuInstrumentationAddressRangeFilter::None, false)
     }
 }
 
@@ -409,6 +421,7 @@ impl Default for QemuEdgeCoverageClassicHelper {
         Self::new(
             QemuInstrumentationAddressRangeFilter::None,
             QemuInstrumentationPagingFilter::None,
+            false,
         )
     }
 }
@@ -436,37 +449,67 @@ impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for QemuEdgeCover
     }
 }
 
-impl<S> QemuHelper<S> for QemuEdgeCoverageClassicHelper
+impl<S, E> QemuHelper<S, E> for QemuEdgeCoverageClassicHelper
 where
-    S: UsesInput,
-    S: HasMetadata,
+    S: UsesInput + HasMetadata,
+    E: IsEmuExitHandler,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
     {
         if self.use_hitcounts {
-            hooks.blocks(
-                Hook::Function(gen_hashed_block_ids::<QT, S>),
-                Hook::Empty,
-                Hook::Raw(trace_block_transition_hitcount),
-            );
+            if self.use_jit {
+                let hook_id = hooks.blocks(
+                    Hook::Function(gen_hashed_block_ids::<QT, S, E>),
+                    Hook::Empty,
+                    Hook::Empty,
+                );
+
+                unsafe {
+                    libafl_qemu_sys::libafl_qemu_block_hook_set_jit(
+                        hook_id.0,
+                        Some(libafl_qemu_sys::libafl_jit_trace_block_hitcount),
+                    );
+                }
+            } else {
+                hooks.blocks(
+                    Hook::Function(gen_hashed_block_ids::<QT, S, E>),
+                    Hook::Empty,
+                    Hook::Raw(trace_block_transition_hitcount),
+                );
+            }
         } else {
-            hooks.blocks(
-                Hook::Function(gen_hashed_block_ids::<QT, S>),
-                Hook::Empty,
-                Hook::Raw(trace_block_transition_single),
-            );
+            if self.use_jit {
+                let hook_id = hooks.blocks(
+                    Hook::Function(gen_hashed_block_ids::<QT, S, E>),
+                    Hook::Empty,
+                    Hook::Empty,
+                );
+
+                unsafe {
+                    libafl_qemu_sys::libafl_qemu_block_hook_set_jit(
+                        hook_id.0,
+                        Some(libafl_qemu_sys::libafl_jit_trace_block_single),
+                    );
+                }
+            } else {
+                hooks.blocks(
+                    Hook::Function(gen_hashed_block_ids::<QT, S, E>),
+                    Hook::Empty,
+                    Hook::Raw(trace_block_transition_single),
+                );
+            }
         }
     }
 }
 
 thread_local!(static PREV_LOC : UnsafeCell<u64> = UnsafeCell::new(0));
 
-pub fn gen_unique_edge_ids<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn gen_unique_edge_ids<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
@@ -474,7 +517,8 @@ pub fn gen_unique_edge_ids<QT, S>(
 where
     S: HasMetadata,
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     if let Some(h) = hooks.helpers().match_first_type::<QemuEdgeCoverageHelper>() {
         #[cfg(emulation_mode = "usermode")]
@@ -541,15 +585,16 @@ pub extern "C" fn trace_edge_single(_: *const (), id: u64) {
     }
 }
 
-pub fn gen_hashed_edge_ids<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn gen_hashed_edge_ids<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     _state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
 ) -> Option<u64>
 where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     if let Some(h) = hooks
         .helpers()
@@ -600,7 +645,7 @@ pub fn gen_addr_block_ids<QT, S>(
 ) -> Option<u64>
 where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
 {
     // GuestAddress is u32 for 32 bit guests
     #[allow(clippy::unnecessary_cast)]
@@ -608,14 +653,15 @@ where
 }
 */
 
-pub fn gen_hashed_block_ids<QT, S>(
-    hooks: &mut QemuHooks<QT, S>,
+pub fn gen_hashed_block_ids<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
     S: UsesInput,
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
+    E: IsEmuExitHandler,
 {
     if let Some(h) = hooks
         .helpers()

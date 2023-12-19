@@ -17,126 +17,138 @@ use crate::{
         QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
-    GuestAddr,
+    GuestAddr, IsEmuExitHandler,
 };
 
 pub trait CallTraceCollector: 'static + Debug {
-    fn on_call<QT, S>(
+    fn on_call<QT, S, E>(
         &mut self,
-        hooks: &mut QemuHooks<QT, S>,
+        hooks: &mut QemuHooks<QT, S, E>,
         state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>;
+        E: IsEmuExitHandler,
+        QT: QemuHelperTuple<S, E>;
 
-    fn on_ret<QT, S>(
+    fn on_ret<QT, S, E>(
         &mut self,
-        hooks: &mut QemuHooks<QT, S>,
+        hooks: &mut QemuHooks<QT, S, E>,
         state: Option<&mut S>,
         pc: GuestAddr,
         ret_addr: GuestAddr,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>;
+        QT: QemuHelperTuple<S, E>,
+        E: IsEmuExitHandler;
 
     // Frowarded from the `QemuCallTracerHelper`
-    fn pre_exec<I>(&mut self, _emulator: &Emulator, _input: &I)
+    fn pre_exec<I, E>(&mut self, _emulator: &Emulator<E>, _input: &I)
     where
         I: Input,
+        E: IsEmuExitHandler,
     {
     }
 
-    fn post_exec<OT, S>(
+    fn post_exec<OT, S, E>(
         &mut self,
-        _emulator: &Emulator,
+        _emulator: &Emulator<E>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
         S: UsesInput,
+        E: IsEmuExitHandler,
     {
     }
 }
 
 pub trait CallTraceCollectorTuple: 'static + MatchFirstType + Debug {
-    fn on_call_all<QT, S>(
+    fn on_call_all<QT, S, E>(
         &mut self,
-        hooks: &mut QemuHooks<QT, S>,
+        hooks: &mut QemuHooks<QT, S, E>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>;
+        E: IsEmuExitHandler,
+        QT: QemuHelperTuple<S, E>;
 
-    fn on_ret_all<QT, S>(
+    fn on_ret_all<QT, S, E>(
         &mut self,
-        hooks: &mut QemuHooks<QT, S>,
+        hooks: &mut QemuHooks<QT, S, E>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>;
+        E: IsEmuExitHandler,
+        QT: QemuHelperTuple<S, E>;
 
-    fn pre_exec_all<I>(&mut self, _emulator: &Emulator, input: &I)
+    fn pre_exec_all<I, E>(&mut self, _emulator: &Emulator<E>, input: &I)
     where
-        I: Input;
+        I: Input,
+        E: IsEmuExitHandler;
 
-    fn post_exec_all<OT, S>(
+    fn post_exec_all<OT, S, E>(
         &mut self,
-        _emulator: &Emulator,
+        _emulator: &Emulator<E>,
         input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
+        E: IsEmuExitHandler,
         S: UsesInput;
 }
 
 impl CallTraceCollectorTuple for () {
-    fn on_call_all<QT, S>(
+    fn on_call_all<QT, S, E>(
         &mut self,
-        _hooks: &mut QemuHooks<QT, S>,
+        _hooks: &mut QemuHooks<QT, S, E>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         _call_len: usize,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        E: IsEmuExitHandler,
+        QT: QemuHelperTuple<S, E>,
     {
     }
 
-    fn on_ret_all<QT, S>(
+    fn on_ret_all<QT, S, E>(
         &mut self,
-        _hooks: &mut QemuHooks<QT, S>,
+        _hooks: &mut QemuHooks<QT, S, E>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         _ret_addr: GuestAddr,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        E: IsEmuExitHandler,
+        QT: QemuHelperTuple<S, E>,
     {
     }
 
-    fn pre_exec_all<I>(&mut self, _emulator: &Emulator, _input: &I)
+    fn pre_exec_all<I, E>(&mut self, _emulator: &Emulator<E>, _input: &I)
     where
         I: Input,
+        E: IsEmuExitHandler,
     {
     }
 
-    fn post_exec_all<OT, S>(
+    fn post_exec_all<OT, S, E>(
         &mut self,
-        _emulator: &Emulator,
+        _emulator: &Emulator<E>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
         S: UsesInput,
+        E: IsEmuExitHandler,
     {
     }
 }
@@ -146,15 +158,16 @@ where
     Head: CallTraceCollector,
     Tail: CallTraceCollectorTuple,
 {
-    fn on_call_all<QT, S>(
+    fn on_call_all<QT, S, E>(
         &mut self,
-        hooks: &mut QemuHooks<QT, S>,
+        hooks: &mut QemuHooks<QT, S, E>,
         mut state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
+        E: IsEmuExitHandler,
     {
         self.0.on_call(
             hooks,
@@ -168,15 +181,16 @@ where
         self.1.on_call_all(hooks, state, pc, call_len);
     }
 
-    fn on_ret_all<QT, S>(
+    fn on_ret_all<QT, S, E>(
         &mut self,
-        hooks: &mut QemuHooks<QT, S>,
+        hooks: &mut QemuHooks<QT, S, E>,
         mut state: Option<&mut S>,
         pc: GuestAddr,
         ret_addr: GuestAddr,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
+        E: IsEmuExitHandler,
     {
         self.0.on_ret(
             hooks,
@@ -190,23 +204,25 @@ where
         self.1.on_ret_all(hooks, state, pc, ret_addr);
     }
 
-    fn pre_exec_all<I>(&mut self, emulator: &Emulator, input: &I)
+    fn pre_exec_all<I, E>(&mut self, emulator: &Emulator<E>, input: &I)
     where
         I: Input,
+        E: IsEmuExitHandler,
     {
         self.0.pre_exec(emulator, input);
         self.1.pre_exec_all(emulator, input);
     }
 
-    fn post_exec_all<OT, S>(
+    fn post_exec_all<OT, S, E>(
         &mut self,
-        emulator: &Emulator,
+        emulator: &Emulator<E>,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
         S: UsesInput,
+        E: IsEmuExitHandler,
     {
         self.0.post_exec(emulator, input, observers, exit_kind);
         self.1.post_exec_all(emulator, input, observers, exit_kind);
@@ -241,10 +257,11 @@ where
         self.filter.allowed(addr)
     }
 
-    fn on_ret<QT, S>(hooks: &mut QemuHooks<QT, S>, state: Option<&mut S>, pc: GuestAddr)
+    fn on_ret<QT, S, E>(hooks: &mut QemuHooks<QT, S, E>, state: Option<&mut S>, pc: GuestAddr)
     where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
+        E: IsEmuExitHandler,
     {
         let ret_addr: GuestAddr = hooks.emulator().read_return_address().unwrap();
 
@@ -269,14 +286,15 @@ where
             .collectors = collectors;
     }
 
-    fn gen_blocks_calls<QT, S>(
-        hooks: &mut QemuHooks<QT, S>,
+    fn gen_blocks_calls<QT, S, E>(
+        hooks: &mut QemuHooks<QT, S, E>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
     where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        E: IsEmuExitHandler,
+        QT: QemuHelperTuple<S, E>,
     {
         if let Some(h) = hooks.helpers_mut().match_first_type_mut::<Self>() {
             if !h.must_instrument(pc) {
@@ -323,7 +341,9 @@ where
                             let call_len = insn.bytes().len();
                             // TODO do not use a closure, find a more efficient way to pass call_len
                             let call_cb = Box::new(
-                                move |hooks: &mut QemuHooks<QT, S>, state: Option<&mut S>, pc| {
+                                move |hooks: &mut QemuHooks<QT, S, E>,
+                                      state: Option<&mut S>,
+                                      pc| {
                                     // eprintln!("CALL @ 0x{:#x}", pc + call_len);
                                     let mut collectors = if let Some(h) =
                                         hooks.helpers_mut().match_first_type_mut::<Self>()
@@ -396,23 +416,24 @@ where
     }
 }
 
-impl<S, T> QemuHelper<S> for QemuCallTracerHelper<T>
+impl<S, T, E> QemuHelper<S, E> for QemuCallTracerHelper<T>
 where
     S: UsesInput,
     T: CallTraceCollectorTuple,
+    E: IsEmuExitHandler,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S, E>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
     {
         hooks.blocks(
-            Hook::Function(Self::gen_blocks_calls::<QT, S>),
+            Hook::Function(Self::gen_blocks_calls::<QT, S, E>),
             Hook::Empty,
             Hook::Empty,
         );
     }
 
-    fn pre_exec(&mut self, emulator: &Emulator, input: &S::Input) {
+    fn pre_exec(&mut self, emulator: &Emulator<E>, input: &S::Input) {
         self.collectors
             .as_mut()
             .unwrap()
@@ -421,7 +442,7 @@ where
 
     fn post_exec<OT>(
         &mut self,
-        emulator: &Emulator,
+        emulator: &Emulator<E>,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
@@ -471,49 +492,53 @@ impl OnCrashBacktraceCollector {
 
 impl CallTraceCollector for OnCrashBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
-    fn on_call<QT, S>(
+    fn on_call<QT, S, E>(
         &mut self,
-        _hooks: &mut QemuHooks<QT, S>,
+        _hooks: &mut QemuHooks<QT, S, E>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        E: IsEmuExitHandler,
+        QT: QemuHelperTuple<S, E>,
     {
         self.callstack_hash ^= pc as u64 + call_len as u64;
     }
 
     #[allow(clippy::unnecessary_cast)]
-    fn on_ret<QT, S>(
+    fn on_ret<QT, S, E>(
         &mut self,
-        _hooks: &mut QemuHooks<QT, S>,
+        _hooks: &mut QemuHooks<QT, S, E>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        E: IsEmuExitHandler,
+        QT: QemuHelperTuple<S, E>,
     {
         self.callstack_hash ^= ret_addr as u64;
     }
 
-    fn pre_exec<I>(&mut self, _emulator: &Emulator, _input: &I)
+    fn pre_exec<I, E>(&mut self, _emulator: &Emulator<E>, _input: &I)
     where
         I: Input,
+        E: IsEmuExitHandler,
     {
         self.reset();
     }
 
-    fn post_exec<OT, S>(
+    fn post_exec<OT, S, E>(
         &mut self,
-        _emulator: &Emulator,
+        _emulator: &Emulator<E>,
         _input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
         S: UsesInput,
+        E: IsEmuExitHandler,
     {
         let observer = observers
             .match_name_mut::<BacktraceObserver<'_>>(&self.observer_name)
@@ -560,15 +585,16 @@ impl FullBacktraceCollector {
 
 impl CallTraceCollector for FullBacktraceCollector {
     #[allow(clippy::unnecessary_cast)]
-    fn on_call<QT, S>(
+    fn on_call<QT, S, E>(
         &mut self,
-        _hooks: &mut QemuHooks<QT, S>,
+        _hooks: &mut QemuHooks<QT, S, E>,
         _state: Option<&mut S>,
         pc: GuestAddr,
         call_len: usize,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
+        E: IsEmuExitHandler,
     {
         // TODO handle Thumb
         unsafe {
@@ -577,15 +603,16 @@ impl CallTraceCollector for FullBacktraceCollector {
     }
 
     #[allow(clippy::unnecessary_cast)]
-    fn on_ret<QT, S>(
+    fn on_ret<QT, S, E>(
         &mut self,
-        _hooks: &mut QemuHooks<QT, S>,
+        _hooks: &mut QemuHooks<QT, S, E>,
         _state: Option<&mut S>,
         _pc: GuestAddr,
         ret_addr: GuestAddr,
     ) where
         S: UsesInput,
-        QT: QemuHelperTuple<S>,
+        E: IsEmuExitHandler,
+        QT: QemuHelperTuple<S, E>,
     {
         unsafe {
             let v = &mut *CALLSTACKS.as_mut().unwrap().get_or_default().get();
@@ -602,9 +629,10 @@ impl CallTraceCollector for FullBacktraceCollector {
         }
     }
 
-    fn pre_exec<I>(&mut self, _emulator: &Emulator, _input: &I)
+    fn pre_exec<I, E>(&mut self, _emulator: &Emulator<E>, _input: &I)
     where
         I: Input,
+        E: IsEmuExitHandler,
     {
         self.reset();
     }
