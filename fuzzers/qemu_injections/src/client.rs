@@ -120,8 +120,7 @@ where
             let c_array = x1 as *const *const c_char;
             let cmd = unsafe {
                 let c_str_ptr = x0 as *const c_char;
-                let c_str = CStr::from_ptr(c_str_ptr);
-                c_str.to_string_lossy()
+                CStr::from_ptr(c_str_ptr).to_string_lossy()
             };
 
             assert!(
@@ -134,15 +133,13 @@ where
                 if (*c_array.offset(1)).is_null() {
                     return SyscallHookResult::new(None);
                 }
-                let c_str = CStr::from_ptr(*c_array.offset(1));
-                c_str.to_string_lossy()
+                CStr::from_ptr(*c_array.offset(1)).to_string_lossy()
             };
             let second_parameter = unsafe {
                 if (*c_array.offset(2)).is_null() {
                     return SyscallHookResult::new(None);
                 }
-                let c_str = CStr::from_ptr(*c_array.offset(2));
-                c_str.to_string_lossy()
+                CStr::from_ptr(*c_array.offset(2)).to_string_lossy()
             };
             if first_parameter == "-c"
                 && (second_parameter.to_lowercase().contains("';fuzz;'")
