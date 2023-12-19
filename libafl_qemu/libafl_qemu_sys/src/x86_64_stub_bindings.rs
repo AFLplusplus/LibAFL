@@ -13500,7 +13500,14 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_add_read_hook(
-        gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong, oi: MemOpIdx) -> u64>,
+        gen: ::std::option::Option<
+            unsafe extern "C" fn(
+                data: u64,
+                pc: target_ulong,
+                addr: *mut TCGTemp,
+                oi: MemOpIdx,
+            ) -> u64,
+        >,
         exec1: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
         exec2: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
         exec4: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
@@ -13513,7 +13520,14 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_add_write_hook(
-        gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong, oi: MemOpIdx) -> u64>,
+        gen: ::std::option::Option<
+            unsafe extern "C" fn(
+                data: u64,
+                pc: target_ulong,
+                addr: *mut TCGTemp,
+                oi: MemOpIdx,
+            ) -> u64,
+        >,
         exec1: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
         exec2: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
         exec4: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,

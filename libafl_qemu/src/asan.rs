@@ -27,6 +27,7 @@ use crate::{
     },
     hooks::{Hook, QemuHooks},
     snapshot::QemuSnapshotHelper,
+    sys::TCGTemp,
     GuestAddr, Regs,
 };
 
@@ -1024,6 +1025,7 @@ pub fn gen_readwrite_asan<QT, S>(
     hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
+    _addr: *mut TCGTemp,
     _info: MemAccessInfo,
 ) -> Option<u64>
 where
@@ -1184,6 +1186,7 @@ pub fn gen_write_asan_snapshot<QT, S>(
     hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
+    _addr: *mut TCGTemp,
     _info: MemAccessInfo,
 ) -> Option<u64>
 where

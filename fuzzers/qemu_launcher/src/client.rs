@@ -12,6 +12,7 @@ use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
 use libafl_qemu::injections::QemuInjectionHelper;
 use libafl_qemu::{
     asan::{init_with_asan, QemuAsanHelper},
+    asan_guest::{init_with_asan_guest, QemuAsanGuestHelper},
     cmplog::QemuCmpLogHelper,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
@@ -113,12 +114,22 @@ impl<'a> Client<'a> {
         let mut env = self.env();
         log::debug!("ENV: {:#?}", env);
 
-        let (emu, mut asan) = {
-            if self.options.is_asan_core(core_id) {
+        let is_asan = self.options.is_asan_core(core_id);
+        let is_asan_guest = self.options.is_asan_guest_core(core_id);
+
+        if is_asan && is_asan_guest {
+            Err(Error::empty_optional("Multiple ASAN modes configured"))?;
+        }
+
+        let (emu, mut asan, mut asan_lib) = {
+            if is_asan {
                 let (emu, asan) = init_with_asan(&mut args, &mut env)?;
-                (emu, Some(asan))
+                (emu, Some(asan), None)
+            } else if is_asan_guest {
+                let (emu, asan_lib) = init_with_asan_guest(&mut args, &mut env)?;
+                (emu, None, Some(asan_lib))
             } else {
-                (Emulator::new(&args, &env)?, None)
+                (Emulator::new(&args, &env)?, None, None)
             }
         };
 
@@ -154,7 +165,6 @@ impl<'a> Client<'a> {
         log::debug!("ret_addr = {ret_addr:#x}");
         emu.set_breakpoint(ret_addr);
 
-        let is_asan = self.options.is_asan_core(core_id);
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
         let edge_coverage_helper = QemuEdgeCoverageHelper::new(self.coverage_filter(&emu)?);
@@ -206,6 +216,52 @@ impl<'a> Client<'a> {
                     state,
                 )
             }
+        } else if is_asan_guest && is_cmplog {
+            if let Some(injection_helper) = injection_helper {
+                instance.build().run(
+                    tuple_list!(
+                        edge_coverage_helper,
+                        QemuCmpLogHelper::default(),
+                        QemuAsanGuestHelper::default(&emu, asan_lib.take().unwrap()),
+                        injection_helper
+                    ),
+                    state,
+                )
+            } else {
+                instance.build().run(
+                    tuple_list!(
+                        edge_coverage_helper,
+                        QemuCmpLogHelper::default(),
+                        QemuAsanGuestHelper::default(&emu, asan_lib.take().unwrap()),
+                    ),
+                    state,
+                )
+            }
+        } else if is_asan {
+            if let Some(injection_helper) = injection_helper {
+                instance.build().run(
+                    tuple_list!(
+                        edge_coverage_helper,
+                        QemuAsanHelper::default(asan.take().unwrap()),
+                        injection_helper
+                    ),
+                    state,
+                )
+            } else {
+                instance.build().run(
+                    tuple_list!(
+                        edge_coverage_helper,
+                        QemuAsanHelper::default(asan.take().unwrap()),
+                    ),
+                    state,
+                )
+            }
+        } else if is_asan_guest {
+            let helpers = tuple_list!(
+                edge_coverage_helper,
+                QemuAsanGuestHelper::default(&emu, asan_lib.take().unwrap())
+            );
+            instance.build().run(helpers, state)
         } else if is_cmplog {
             if let Some(injection_helper) = injection_helper {
                 instance.build().run(

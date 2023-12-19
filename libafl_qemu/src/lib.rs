@@ -97,6 +97,11 @@ pub mod asan;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub use asan::{init_with_asan, QemuAsanHelper};
 
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub mod asan_guest;
+#[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
+pub use asan_guest::{init_with_asan_guest, QemuAsanGuestHelper};
+
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
 #[cfg(not(cpu_target = "hexagon"))]

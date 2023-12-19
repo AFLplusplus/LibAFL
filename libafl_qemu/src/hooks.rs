@@ -16,6 +16,7 @@ pub use crate::emu::SyscallHookResult;
 use crate::{
     emu::{Emulator, FatPtr, MemAccessInfo, SKIP_EXEC_HOOK},
     helper::QemuHelperTuple,
+    sys::TCGTemp,
     BackdoorHookId, BlockHookId, CmpHookId, EdgeHookId, GuestAddr, GuestUsize, HookId,
     InstructionHookId, NewThreadHookId, PostSyscallHookId, PreSyscallHookId, ReadHookId,
     WriteHookId,
@@ -287,7 +288,7 @@ create_post_gen_wrapper!(block, (addr: GuestAddr, len: GuestUsize), 1, BlockHook
 create_exec_wrapper!(block, (id: u64), 0, 1, BlockHookId);
 
 static mut READ_HOOKS: Vec<Pin<Box<HookState<5, ReadHookId>>>> = vec![];
-create_gen_wrapper!(read, (pc: GuestAddr, info: MemAccessInfo), u64, 5, ReadHookId);
+create_gen_wrapper!(read, (pc: GuestAddr, addr: *mut TCGTemp, info: MemAccessInfo), u64, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 0, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 1, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 2, 5, ReadHookId);
@@ -295,7 +296,7 @@ create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 3, 5, ReadHookId);
 create_exec_wrapper!(read, (id: u64, addr: GuestAddr, size: usize), 4, 5, ReadHookId);
 
 static mut WRITE_HOOKS: Vec<Pin<Box<HookState<5, WriteHookId>>>> = vec![];
-create_gen_wrapper!(write, (pc: GuestAddr, info: MemAccessInfo), u64, 5, WriteHookId);
+create_gen_wrapper!(write, (pc: GuestAddr, addr: *mut TCGTemp, info: MemAccessInfo), u64, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 0, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 1, 5, WriteHookId);
 create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 2, 5, WriteHookId);
@@ -603,16 +604,23 @@ where
     pub fn reads(
         &self,
         generation_hook: Hook<
-            fn(&mut Self, Option<&mut S>, pc: GuestAddr, info: MemAccessInfo) -> Option<u64>,
+            fn(
+                &mut Self,
+                Option<&mut S>,
+                pc: GuestAddr,
+                addr: *mut TCGTemp,
+                info: MemAccessInfo,
+            ) -> Option<u64>,
             Box<
                 dyn for<'a> FnMut(
                     &'a mut Self,
                     Option<&'a mut S>,
                     GuestAddr,
+                    *mut TCGTemp,
                     MemAccessInfo,
                 ) -> Option<u64>,
             >,
-            extern "C" fn(*const (), pc: GuestAddr, info: MemAccessInfo) -> u64,
+            extern "C" fn(*const (), pc: GuestAddr, addr: *mut TCGTemp, info: MemAccessInfo) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
@@ -647,6 +655,7 @@ where
                 extern "C" fn(
                     &mut HookState<5, ReadHookId>,
                     pc: GuestAddr,
+                    addr: *mut TCGTemp,
                     info: MemAccessInfo,
                 ) -> u64
             );
@@ -710,16 +719,23 @@ where
     pub fn writes(
         &self,
         generation_hook: Hook<
-            fn(&mut Self, Option<&mut S>, pc: GuestAddr, info: MemAccessInfo) -> Option<u64>,
+            fn(
+                &mut Self,
+                Option<&mut S>,
+                pc: GuestAddr,
+                addr: *mut TCGTemp,
+                info: MemAccessInfo,
+            ) -> Option<u64>,
             Box<
                 dyn for<'a> FnMut(
                     &'a mut Self,
                     Option<&'a mut S>,
                     GuestAddr,
+                    *mut TCGTemp,
                     MemAccessInfo,
                 ) -> Option<u64>,
             >,
-            extern "C" fn(*const (), pc: GuestAddr, info: MemAccessInfo) -> u64,
+            extern "C" fn(*const (), pc: GuestAddr, addr: *mut TCGTemp, info: MemAccessInfo) -> u64,
         >,
         execution_hook_1: Hook<
             fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr),
@@ -754,6 +770,7 @@ where
                 extern "C" fn(
                     &mut HookState<5, WriteHookId>,
                     pc: GuestAddr,
+                    addr: *mut TCGTemp,
                     info: MemAccessInfo,
                 ) -> u64
             );

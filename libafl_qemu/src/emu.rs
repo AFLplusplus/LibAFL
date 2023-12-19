@@ -2,8 +2,8 @@
 
 use core::{
     convert::Into,
-    ffi::c_void,
-    fmt,
+    ffi::{c_char, c_void, CStr},
+    fmt::{self, Debug, Formatter},
     mem::{transmute, MaybeUninit},
     ptr::{addr_of, copy_nonoverlapping, null},
 };
@@ -21,7 +21,7 @@ use paste::paste;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::{GuestReg, Regs};
+use crate::{sys::TCGTemp, GuestReg, Regs};
 
 /// Safe linking with of extern "C" functions.
 /// This macro makes sure the declared symbol is defined *at link time*, avoiding declaring non-existant symbols
@@ -215,7 +215,7 @@ pub type CPUArchStatePtr = *mut libafl_qemu_sys::CPUArchState;
 
 pub type ExitReasonPtr = *mut libafl_qemu_sys::libafl_exit_reason;
 
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
+#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(i32)]
 pub enum MmapPerms {
     None = 0,
@@ -260,6 +260,24 @@ impl MmapPerms {
                 | MmapPerms::WriteExecute
                 | MmapPerms::ReadWriteExecute
         )
+    }
+}
+
+impl Debug for MmapPerms {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.is_r() {
+            true => write!(f, "r")?,
+            false => write!(f, "-")?,
+        };
+        match self.is_w() {
+            true => write!(f, "w")?,
+            false => write!(f, "-")?,
+        };
+        match self.is_x() {
+            true => write!(f, "x")?,
+            false => write!(f, "-")?,
+        };
+        Ok(())
     }
 }
 
@@ -357,12 +375,7 @@ impl MapInfo {
         if self.path.is_null() {
             None
         } else {
-            unsafe {
-                Some(from_utf8_unchecked(from_raw_parts(
-                    self.path,
-                    strlen(self.path),
-                )))
-            }
+            unsafe { CStr::from_ptr(self.path as *const c_char).to_str().ok() }
         }
     }
 
@@ -374,6 +387,26 @@ impl MapInfo {
     #[must_use]
     pub fn is_priv(&self) -> bool {
         self.is_priv != 0
+    }
+}
+
+impl Debug for MapInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let p = match self.is_priv() {
+            true => 'p',
+            false => '-',
+        };
+        let path = self.path().unwrap_or("<None>");
+        write!(
+            f,
+            "0x{:016x}-0x{:016x} {}{:#?} 0x{:016x} {}",
+            self.start(),
+            self.end(),
+            p,
+            self.flags(),
+            self.offset(),
+            path
+        )
     }
 }
 
@@ -1448,7 +1481,7 @@ impl Emulator {
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        gen: Option<extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
         exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
@@ -1457,8 +1490,14 @@ impl Emulator {
     ) -> ReadHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64> =
-                core::mem::transmute(gen);
+            let gen: Option<
+                unsafe extern "C" fn(
+                    u64,
+                    GuestAddr,
+                    *mut TCGTemp,
+                    libafl_qemu_sys::MemOpIdx,
+                ) -> u64,
+            > = core::mem::transmute(gen);
             let exec1: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec1);
             let exec2: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec2);
             let exec4: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec4);
@@ -1476,7 +1515,7 @@ impl Emulator {
     pub fn add_write_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<extern "C" fn(T, GuestAddr, MemAccessInfo) -> u64>,
+        gen: Option<extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
         exec1: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec2: Option<extern "C" fn(T, u64, GuestAddr)>,
         exec4: Option<extern "C" fn(T, u64, GuestAddr)>,
@@ -1485,8 +1524,14 @@ impl Emulator {
     ) -> WriteHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<extern "C" fn(u64, GuestAddr, libafl_qemu_sys::MemOpIdx) -> u64> =
-                core::mem::transmute(gen);
+            let gen: Option<
+                unsafe extern "C" fn(
+                    u64,
+                    GuestAddr,
+                    *mut TCGTemp,
+                    libafl_qemu_sys::MemOpIdx,
+                ) -> u64,
+            > = core::mem::transmute(gen);
             let exec1: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec1);
             let exec2: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec2);
             let exec4: Option<extern "C" fn(u64, u64, GuestAddr)> = core::mem::transmute(exec4);
