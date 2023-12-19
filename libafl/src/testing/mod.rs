@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use libafl::{
+use crate::{
     corpus::{NopCorpus,CorpusId},
     events::{NopEventManager, ProgressReporter},
     feedbacks::ConstFeedback,
@@ -10,7 +10,7 @@ use libafl::{
     stages::{StagesTuple, StdMutationalStage},
     executors::{HasObservers,Executor, ExitKind},
     state::{
-        HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, State, StdState,
+        HasExecutions, HasLastReportTime, HasMetadata, State, StdState,
         UsesState, HasRand
     },
     generators::{Generator,RandBytesGenerator},
@@ -21,7 +21,7 @@ use libafl_bolts::rands::{RomuDuoJrRand, StdRand};
 
 pub struct TestFuzzer<S, E, EM, F, ST>
 where
-    S: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + UsesInput + State,
+    S: HasMetadata + HasExecutions + HasLastReportTime + UsesInput + State,
     E: HasObservers<State = S> + Executor<EM, F>,
     EM: ProgressReporter<State = S>,
     F: Fuzzer<E, EM, ST> + UsesState<State = S>,
@@ -33,7 +33,6 @@ where
     _phantom: (PhantomData<E>, PhantomData<ST>),
 }
 
-//where S: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + UsesInput + State,
 
 pub type DefaultFuzzer = StdFuzzer<StdScheduler<DefaultState>, ConstFeedback, ConstFeedback, ()>;
 pub type DefaultState =
@@ -44,7 +43,7 @@ pub type DefaultStage = ();
 
 impl<S, E, EM, F, ST> TestFuzzer<S, E, EM, F, ST>
 where
-    S: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + UsesInput + State,
+    S: HasMetadata + HasExecutions + HasLastReportTime + UsesInput + State,
     E: HasObservers<State = S> + Executor<EM, F>,
     EM: ProgressReporter<State = S>,
     F: Fuzzer<E, EM, ST> + UsesState<State = S>,
@@ -97,7 +96,7 @@ where
 
 impl<S, E, EM, F, ST> TestFuzzer<S, E, EM, F, ST>
 where
-    S: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime + UsesInput<Input = BytesInput> + State + HasRand,
+    S: HasMetadata + HasExecutions + HasLastReportTime + UsesInput<Input = BytesInput> + State + HasRand,
     E: HasObservers<State = S> + Executor<EM, F>,
     EM: ProgressReporter<State = S>,
     F: Fuzzer<E, EM, ST> + UsesState<State = S>,
@@ -106,7 +105,7 @@ where
     pub fn execute_one(&mut self, executor: &mut E) -> Result<ExitKind, Error>{
         let mut generator = RandBytesGenerator::new(1024); 
 
-        let input = generator.generate(&mut self.state).expect("Failed to generate random bytesinput");
+        let input = generator.generate(&mut self.state)?;
 
         self.execute_one_input(executor, &input) 
     }

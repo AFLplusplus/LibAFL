@@ -109,6 +109,7 @@ pub mod observers;
 pub mod schedulers;
 pub mod stages;
 pub mod state;
+pub mod testing;
 
 pub use fuzzer::*;
 pub use libafl_bolts::Error;
