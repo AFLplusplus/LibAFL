@@ -12,10 +12,12 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     asan::{init_with_asan, QemuAsanHelper},
+    breakpoint::Breakpoint,
     cmplog::QemuCmpLogHelper,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    ArchExtras, Emulator, GuestAddr, QemuInstrumentationAddressRangeFilter,
+    ArchExtras, Emulator, GuestAddr, IsEmuExitHandler, NopEmuExitHandler,
+    QemuInstrumentationAddressRangeFilter,
 };
 
 use crate::{instance::Instance, options::FuzzerOptions};
@@ -49,7 +51,10 @@ impl<'a> Client<'a> {
         Ok(env)
     }
 
-    fn start_pc(emu: &Emulator) -> Result<GuestAddr, Error> {
+    fn start_pc<E>(emu: &Emulator<E>) -> Result<GuestAddr, Error>
+    where
+        E: IsEmuExitHandler,
+    {
         let mut elf_buffer = Vec::new();
         let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
 
@@ -59,7 +64,13 @@ impl<'a> Client<'a> {
         Ok(start_pc)
     }
 
-    fn coverage_filter(&self, emu: &Emulator) -> Result<QemuInstrumentationAddressRangeFilter, Error> {
+    fn coverage_filter<E>(
+        &self,
+        emu: &Emulator<E>,
+    ) -> Result<QemuInstrumentationAddressRangeFilter, Error>
+    where
+        E: IsEmuExitHandler,
+    {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
         if let Some(includes) = &self.options.include {
             #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
@@ -108,7 +119,7 @@ impl<'a> Client<'a> {
                 let (emu, asan) = init_with_asan(&mut args, &mut env)?;
                 (emu, Some(asan))
             } else {
-                (Emulator::new(&args, &env)?, None)
+                (Emulator::new(&args, &env, NopEmuExitHandler)?, None)
             }
         };
 
@@ -121,7 +132,7 @@ impl<'a> Client<'a> {
             .read_return_address()
             .map_err(|e| Error::unknown(format!("Failed to read return address: {e:}")))?;
         log::debug!("ret_addr = {ret_addr:#x}");
-        emu.set_breakpoint(ret_addr);
+        emu.add_breakpoint(Breakpoint::without_command(ret_addr, false), true);
 
         let is_asan = self.options.is_asan_core(core_id);
         let is_cmplog = self.options.is_cmplog_core(core_id);

@@ -26,13 +26,8 @@ use libafl_bolts::{
     tuples::tuple_list,
     AsMutSlice, AsSlice,
 };
-use libafl_qemu::{
-    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
-    elf::EasyElf,
-    emu::Emulator,
-    ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, QemuForkExecutor, QemuHooks,
-    Regs,
-};
+use libafl_qemu::{edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE}, elf::EasyElf, emu::Emulator, ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, QemuForkExecutor, QemuHooks, Regs, NopEmuExitHandler};
+use libafl_qemu::breakpoint::Breakpoint;
 
 #[derive(Default)]
 pub struct Version;
@@ -113,7 +108,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     env::remove_var("LD_LIBRARY_PATH");
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&options.args, &env).unwrap();
+    let emu = Emulator::new(&options.args, &env, NopEmuExitHandler).unwrap();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer).unwrap();
@@ -130,7 +125,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     let ret_addr: GuestAddr = emu.read_return_address().unwrap();
     log::debug!("Return address = {ret_addr:#x}");
-    emu.set_breakpoint(ret_addr);
+    emu.add_breakpoint(Breakpoint::without_command(ret_addr, false), true);
 
     let input_addr = emu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
@@ -209,7 +204,7 @@ pub fn fuzz() -> Result<(), Error> {
                 .unwrap();
             emu.write_function_argument(CallingConvention::Cdecl, 1, len)
                 .unwrap();
-            emu.run();
+            emu.run().unwrap();
         }
 
         ExitKind::Ok

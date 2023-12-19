@@ -4,10 +4,15 @@ use libafl::{
     Error,
 };
 use libafl_bolts::AsSlice;
-use libafl_qemu::{ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Regs};
+use libafl_qemu::{
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, IsEmuExitHandler, MmapPerms, Regs,
+};
 
-pub struct Harness<'a> {
-    emu: &'a Emulator,
+pub struct Harness<'a, E>
+where
+    E: IsEmuExitHandler,
+{
+    emu: &'a Emulator<E>,
     input_addr: GuestAddr,
     pc: GuestAddr,
     stack_ptr: GuestAddr,
@@ -16,8 +21,11 @@ pub struct Harness<'a> {
 
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
-impl<'a> Harness<'a> {
-    pub fn new(emu: &Emulator) -> Result<Harness, Error> {
+impl<'a, E> Harness<'a, E>
+where
+    E: IsEmuExitHandler,
+{
+    pub fn new(emu: &Emulator<E>) -> Result<Harness<E>, Error> {
         let input_addr = emu
             .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
             .map_err(|e| Error::unknown(format!("Failed to map input buffer: {e:}")))?;
@@ -79,9 +87,7 @@ impl<'a> Harness<'a> {
         self.emu
             .write_function_argument(CallingConvention::Cdecl, 1, len)
             .map_err(|e| Error::unknown(format!("Failed to write argument 1: {e:}")))?;
-        unsafe {
-            let _ = self.emu.run();
-        };
+        unsafe { self.emu.run().unwrap() };
         Ok(())
     }
 }

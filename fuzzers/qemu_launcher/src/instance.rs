@@ -35,7 +35,7 @@ use libafl_qemu::{
     cmplog::CmpLogObserver,
     edges::{edges_map_mut_slice, MAX_EDGES_NUM},
     helper::QemuHelperTuple,
-    Emulator, QemuExecutor, QemuHooks,
+    Emulator, IsEmuExitHandler, QemuExecutor, QemuHooks,
 };
 use typed_builder::TypedBuilder;
 
@@ -47,17 +47,23 @@ pub type ClientState =
 pub type ClientMgr = LlmpRestartingEventManager<ClientState, StdShMemProvider>;
 
 #[derive(TypedBuilder)]
-pub struct Instance<'a> {
+pub struct Instance<'a, E>
+where
+    E: IsEmuExitHandler,
+{
     options: &'a FuzzerOptions,
-    emu: &'a Emulator,
+    emu: &'a Emulator<E>,
     mgr: ClientMgr,
     core_id: CoreId,
 }
 
-impl<'a> Instance<'a> {
+impl<'a, EH> Instance<'a, EH>
+where
+    EH: IsEmuExitHandler + Clone,
+{
     pub fn run<QT>(&mut self, helpers: QT, state: Option<ClientState>) -> Result<(), Error>
     where
-        QT: QemuHelperTuple<ClientState>,
+        QT: QemuHelperTuple<ClientState, EH>,
     {
         let mut hooks = QemuHooks::new(self.emu.clone(), helpers);
 
