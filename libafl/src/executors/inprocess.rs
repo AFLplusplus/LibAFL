@@ -276,6 +276,24 @@ pub struct InProcessHandlers {
     pub timeout_handler: *const c_void,
 }
 
+/// The common signals we want to handle
+#[cfg(unix)]
+#[inline]
+pub(self) fn common_signals() -> Vec<Signal> {
+    vec![
+        Signal::SigAlarm,
+        Signal::SigUser2,
+        Signal::SigAbort,
+        Signal::SigBus,
+        #[cfg(feature = "handle_sigpipe")]
+        Signal::SigPipe,
+        Signal::SigFloatingPointException,
+        Signal::SigIllegalInstruction,
+        Signal::SigSegmentationFault,
+        Signal::SigTrap,
+    ]
+}
+
 impl InProcessHandlers {
     /// Call before running a target.
     #[allow(clippy::unused_self)]
@@ -697,6 +715,8 @@ pub mod unix_signal_handler {
         state::{HasCorpus, HasExecutions, HasSolutions},
     };
 
+    use super::common_signals;
+
     pub(crate) type HandlerFuncPtr = unsafe fn(
         Signal,
         &mut siginfo_t,
@@ -743,17 +763,7 @@ pub mod unix_signal_handler {
         }
 
         fn signals(&self) -> Vec<Signal> {
-            vec![
-                Signal::SigAlarm,
-                Signal::SigUser2,
-                Signal::SigAbort,
-                Signal::SigBus,
-                Signal::SigPipe,
-                Signal::SigFloatingPointException,
-                Signal::SigIllegalInstruction,
-                Signal::SigSegmentationFault,
-                Signal::SigTrap,
-            ]
+            common_signals()
         }
     }
 
@@ -1541,17 +1551,7 @@ impl Handler for InProcessForkExecutorGlobalData {
     }
 
     fn signals(&self) -> Vec<Signal> {
-        vec![
-            Signal::SigAlarm,
-            Signal::SigUser2,
-            Signal::SigAbort,
-            Signal::SigBus,
-            Signal::SigPipe,
-            Signal::SigFloatingPointException,
-            Signal::SigIllegalInstruction,
-            Signal::SigSegmentationFault,
-            Signal::SigTrap,
-        ]
+        common_signals()
     }
 }
 
