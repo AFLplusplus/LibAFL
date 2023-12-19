@@ -49,6 +49,21 @@ pub enum GuestAddrKind {
     Virtual(GuestVirtAddr),
 }
 
+#[derive(Debug, Clone)]
+pub enum QemuShutdownCause {
+    None,
+    HostError,
+    HostQmpQuit,
+    HostQmpSystemReset,
+    HostSignal(Signal),
+    HostUi,
+    GuestShutdown,
+    GuestReset,
+    GuestPanic,
+    SubsystemReset,
+    SnapshotLoad,
+}
+
 impl fmt::Display for GuestAddrKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -173,6 +188,7 @@ pub enum InnerHandlerResult {
     EndOfRun(ExitKind), // The run is over and the emulator is ready for the next iteration.
     ReturnToHarness(EmuExitReason), // Return to the harness immediately. Can happen at any point of the run when the handler is not supposed to handle a request.
     Continue,                       // Resume QEMU and continue to run the handler.
+    Interrupt,                      // QEMU has been interrupted by user.
 }
 
 #[derive(Clone, Debug)]
@@ -679,6 +695,8 @@ pub struct HookId(pub(crate) usize);
 
 use std::pin::Pin;
 
+use libafl_bolts::os::unix_signals::Signal;
+
 use crate::breakpoint::Breakpoint;
 
 #[derive(Debug)]
@@ -753,7 +771,7 @@ pub enum EmuError {
 
 #[derive(Debug, Clone)]
 pub enum EmuExitReason {
-    End,                    // QEMU ended for some reason.
+    End(QemuShutdownCause), // QEMU ended for some reason.
     Breakpoint(Breakpoint), // Breakpoint triggered. Contains the address of the trigger.
     SyncBackdoor(SyncExit), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
 }
@@ -761,8 +779,9 @@ pub enum EmuExitReason {
 /// High level result when finishing to handle requests
 #[derive(Debug, Clone)]
 pub enum HandlerResult {
-    UnhandledExit(EmuExitReason),
-    EndOfRun(ExitKind),
+    UnhandledExit(EmuExitReason), // QEMU exit not handled by the current exit handler.
+    EndOfRun(ExitKind),           // QEMU ended the current run and should pass some exit kind.
+    Interrupted,                  // User sent an interrupt signal
 }
 
 impl From<EmuExitReasonError> for HandlerError {
@@ -780,7 +799,7 @@ impl From<SyncExitError> for HandlerError {
 impl fmt::Display for EmuExitReason {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            EmuExitReason::End => write!(f, "End"),
+            EmuExitReason::End(shutdown_cause) => write!(f, "End: {:?}", shutdown_cause),
             EmuExitReason::Breakpoint(bp) => write!(f, "{}", bp),
             EmuExitReason::SyncBackdoor(sync_backdoor) => {
                 write!(f, "Sync backdoor exit: {sync_backdoor}")
@@ -816,6 +835,50 @@ where
             let exit_reason: &mut libafl_qemu_sys::libafl_exit_reason =
                 unsafe { transmute(&mut *exit_reason) };
             Ok(match exit_reason.kind {
+                libafl_qemu_sys::libafl_exit_reason_kind_INTERNAL => unsafe {
+                    let qemu_shutdown_cause: QemuShutdownCause =
+                        match exit_reason.data.internal.cause {
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_NONE => {
+                                QemuShutdownCause::None
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_ERROR => {
+                                QemuShutdownCause::HostError
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_QMP_QUIT => {
+                                QemuShutdownCause::HostQmpQuit
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_QMP_SYSTEM_RESET => {
+                                QemuShutdownCause::HostQmpSystemReset
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_SIGNAL => {
+                                QemuShutdownCause::HostSignal(
+                                    Signal::try_from(exit_reason.data.internal.signal).unwrap(),
+                                )
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_UI => {
+                                QemuShutdownCause::HostUi
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_GUEST_SHUTDOWN => {
+                                QemuShutdownCause::GuestShutdown
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_GUEST_RESET => {
+                                QemuShutdownCause::GuestReset
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_GUEST_PANIC => {
+                                QemuShutdownCause::GuestPanic
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_SUBSYSTEM_RESET => {
+                                QemuShutdownCause::SubsystemReset
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_SNAPSHOT_LOAD => {
+                                QemuShutdownCause::SnapshotLoad
+                            }
+
+                            _ => panic!("shutdown cause not handled."),
+                        };
+
+                    EmuExitReason::End(qemu_shutdown_cause)
+                },
                 libafl_qemu_sys::libafl_exit_reason_kind_BREAKPOINT => unsafe {
                     let bp_addr = exit_reason.data.breakpoint.addr;
                     let bp = emu
@@ -1086,6 +1149,7 @@ where
                 InnerHandlerResult::EndOfRun(exit_kind) => {
                     return Ok(HandlerResult::EndOfRun(exit_kind))
                 }
+                InnerHandlerResult::Interrupt => return Ok(HandlerResult::Interrupted),
                 InnerHandlerResult::Continue => {}
             }
         }

@@ -4,17 +4,16 @@ use std::{
     collections::{HashMap, HashSet},
     ffi::{c_void, CStr, CString},
     fmt::Debug,
-    marker::PhantomData,
     mem::MaybeUninit,
     ptr::null_mut,
     sync::atomic::{AtomicU64, Ordering},
 };
 
 use libafl::{
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     prelude::{InMemoryCorpus, OnDiskCorpus, StdState},
 };
-use libafl_bolts::{bolts_prelude::RomuDuoJrRand, AsSlice};
+use libafl_bolts::{bolts_prelude::RomuDuoJrRand, os::unix_signals::Signal, AsSlice};
 
 use crate::{
     emu::{libafl_page_from_addr, BytesInput, ExitKind},
@@ -22,8 +21,8 @@ use crate::{
     sync_exit::{SyncExit, SyncExitError, VERSION},
     CPUStatePtr, Command, CommandInput, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr,
     GuestPhysAddr, GuestVirtAddr, HasInstrumentationFilter, InnerHandlerResult, IsEmuExitHandler,
-    MemAccessInfo, QemuEdgeCoverageHelper, QemuHelperTuple, QemuHooks,
-    QemuInstrumentationPagingFilter, CPU,
+    MemAccessInfo, QemuEdgeCoverageHelper, QemuHooks, QemuInstrumentationPagingFilter,
+    QemuShutdownCause, CPU,
 };
 
 #[derive(Debug, Clone)]
@@ -263,9 +262,15 @@ where
 
         let mut is_sync_exit: Option<SyncExit> = None;
         let command = match &mut exit_reason {
-            EmuExitReason::End => {
-                return Ok(InnerHandlerResult::EndOfRun(ExitKind::Crash));
-            }
+            EmuExitReason::End(shutdown_cause) => match shutdown_cause {
+                QemuShutdownCause::HostSignal(Signal::SigInterrupt) => {
+                    return Ok(InnerHandlerResult::Interrupt)
+                }
+                QemuShutdownCause::GuestPanic => {
+                    return Ok(InnerHandlerResult::EndOfRun(ExitKind::Crash))
+                }
+                _ => panic!("Unhandled QEMU shutdown cause: {:?}.", shutdown_cause),
+            },
             EmuExitReason::Breakpoint(bp) => bp.trigger(emu).cloned(),
             EmuExitReason::SyncBackdoor(sync_exit) => {
                 let command = sync_exit.command().clone();

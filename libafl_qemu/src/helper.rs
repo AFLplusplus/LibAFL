@@ -213,6 +213,7 @@ where
     }
 }
 
+#[cfg(emulation_mode = "systemmode")]
 impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for (QemuEdgeCoverageHelper, ()) {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         self.0.filter()
