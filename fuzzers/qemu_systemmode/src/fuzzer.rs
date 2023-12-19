@@ -31,7 +31,7 @@ use libafl_qemu::{
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
     emu::Emulator,
-    GuestPhysAddr, QemuExecutor, QemuHooks, Regs,
+    GuestPhysAddr, NopEmuExitHandler, QemuExecutor, QemuHooks, Regs,
 };
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
@@ -81,15 +81,15 @@ pub fn fuzz() {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
-        let emu = Emulator::new(&args, &env).unwrap();
+        let emu = Emulator::new(&args, &env, NopEmuExitHandler).unwrap();
 
-        emu.set_breakpoint(main_addr);
+        emu.set_breakpoint_addr(main_addr);
         unsafe {
-            emu.run();
+            let _ = emu.run();
         }
-        emu.remove_breakpoint(main_addr);
+        emu.unset_breakpoint_addr(main_addr);
 
-        emu.set_breakpoint(breakpoint); // BREAKPOINT
+        emu.set_breakpoint_addr(breakpoint); // BREAKPOINT
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
@@ -115,7 +115,7 @@ pub fn fuzz() {
 
                 emu.write_phys_mem(input_addr, buf);
 
-                emu.run();
+                let _ = emu.run();
 
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                 let mut pcs = (0..emu.num_cpus())
