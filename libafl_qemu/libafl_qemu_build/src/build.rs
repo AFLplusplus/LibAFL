@@ -64,7 +64,29 @@ pub fn build(
     let cpp_compiler = cc::Build::new().cpp(true).get_compiler();
 
     let qemu_path = if let Some(qemu_dir) = custom_qemu_dir.as_ref() {
-        Path::new(&qemu_dir).to_path_buf()
+        let qemu_path = Path::new(&qemu_dir).to_path_buf();
+        let qemu_rev = target_dir.join("QEMU_REVISION");
+
+        if !qemu_path.join("configure").exists() {
+            Command::new("git")
+                .current_dir(&qemu_path)
+                .arg("fetch")
+                .arg("--depth")
+                .arg("1")
+                .arg("origin")
+                .arg(QEMU_REVISION)
+                .status()
+                .unwrap();
+            Command::new("git")
+                .current_dir(&qemu_path)
+                .arg("checkout")
+                .arg("FETCH_HEAD")
+                .status()
+                .unwrap();
+            fs::write(qemu_rev, QEMU_REVISION).unwrap();
+        }
+
+        qemu_path
     } else {
         let qemu_path = target_dir.join(QEMU_DIRNAME);
 

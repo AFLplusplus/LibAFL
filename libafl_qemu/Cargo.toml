@@ -72,6 +72,7 @@ pyo3 = { version = "0.18", optional = true }
 
 [build-dependencies]
 pyo3-build-config = { version = "0.18", optional = true }
+bindgen = "0.69"
 
 [lib]
 name = "libafl_qemu"
