@@ -24,8 +24,11 @@ pub struct FuzzerOptions {
     #[arg(short, long, help = "Output directory")]
     pub output: String,
 
-    #[arg(long, help = "Tokens file")]
+    #[arg(short = 'x', long, help = "Tokens file")]
     pub tokens: Option<String>,
+
+    #[arg(short, long, help = "YAML file")]
+    pub yaml_file: Option<String>,
 
     #[arg(long, help = "Log file")]
     pub log: Option<String>,

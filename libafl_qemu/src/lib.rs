@@ -76,6 +76,11 @@ pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::QemuCmpLogHelper;
 
+#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon", cpu_target = "arm")))]
+pub mod injections;
+#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon", cpu_target = "arm")))]
+pub use injections::QemuInjectionHelper;
+
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod snapshot;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]

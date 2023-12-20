@@ -15,6 +15,7 @@ use libafl_qemu::{
     cmplog::QemuCmpLogHelper,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
+    injections::QemuInjectionHelper,
     ArchExtras, Emulator, GuestAddr, QemuInstrumentationFilter,
 };
 
@@ -115,6 +116,12 @@ impl<'a> Client<'a> {
         let start_pc = Self::start_pc(&emu)?;
         log::debug!("start_pc @ {start_pc:#x}");
 
+        let extra_tokens: Vec<String>;
+
+        if let Some(yaml_file) = &self.options.yaml_file {
+            extra_tokens = QemuInjectionHelper::configure_injections(&emu, yaml_file, start_pc);
+        }
+
         emu.entry_break(start_pc);
 
         let ret_addr: GuestAddr = emu
@@ -138,19 +145,25 @@ impl<'a> Client<'a> {
                 edge_coverage_helper,
                 QemuCmpLogHelper::default(),
                 QemuAsanHelper::default(asan.take().unwrap()),
+                QemuInjectionHelper::default(),
             );
             instance.build().run(helpers, state)
         } else if is_asan {
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuAsanHelper::default(asan.take().unwrap()),
+                QemuInjectionHelper::default(),
             );
             instance.build().run(helpers, state)
         } else if is_cmplog {
-            let helpers = tuple_list!(edge_coverage_helper, QemuCmpLogHelper::default(),);
+            let helpers = tuple_list!(
+                edge_coverage_helper,
+                QemuCmpLogHelper::default(),
+                QemuInjectionHelper::default(),
+            );
             instance.build().run(helpers, state)
         } else {
-            let helpers = tuple_list!(edge_coverage_helper,);
+            let helpers = tuple_list!(edge_coverage_helper, QemuInjectionHelper::default(),);
             instance.build().run(helpers, state)
         }
     }

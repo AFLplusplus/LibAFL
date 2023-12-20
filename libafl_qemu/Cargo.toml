@@ -67,7 +67,7 @@ addr2line = "0.21"
 typed-arena = "2.0"
 paste = "1"
 enum-map = "2.7"
-
+serde_yaml = "0.8"
 pyo3 = { version = "0.18", optional = true }
 
 [build-dependencies]

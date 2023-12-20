@@ -1,5 +1,6 @@
-use std::sync::OnceLock;
-use std::{env, ffi::CStr, fs::File, io::Read, ops::Range, os::raw::c_char, path::Path};
+use std::{
+    env, ffi::CStr, fs::File, io::Read, ops::Range, os::raw::c_char, path::Path, sync::OnceLock,
+};
 
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -407,6 +408,7 @@ impl<'a> Client<'a> {
 
         //println!("on_call_check {} {}", parameter, off);
 
+        //        #[cfg(not(cpu_target = "aarch64"))]
         let reg: GuestAddr = match parameter {
             0 => emu.current_cpu().unwrap().read_reg(Regs::Rdi).unwrap_or(0),
             1 => emu.current_cpu().unwrap().read_reg(Regs::Rsi).unwrap_or(0),
@@ -416,6 +418,18 @@ impl<'a> Client<'a> {
             5 => emu.current_cpu().unwrap().read_reg(Regs::R9).unwrap_or(0),
             _ => panic!("unknown register"),
         };
+        /*
+                #[cfg(cpu_target = "aarch64")]
+                let reg: GuestAddr = match parameter {
+                    0 => emu.current_cpu().unwrap().read_reg(Regs::X0).unwrap_or(0),
+                    1 => emu.current_cpu().unwrap().read_reg(Regs::X1).unwrap_or(0),
+                    2 => emu.current_cpu().unwrap().read_reg(Regs::X2).unwrap_or(0),
+                    3 => emu.current_cpu().unwrap().read_reg(Regs::X3).unwrap_or(0),
+                    4 => emu.current_cpu().unwrap().read_reg(Regs::X4).unwrap_or(0),
+                    5 => emu.current_cpu().unwrap().read_reg(Regs::X5).unwrap_or(0),
+                    _ => panic!("unknown register"),
+                };
+        */
         //println!("reg value = {:x}", reg);
         if reg > 0 {
             let query = unsafe {
