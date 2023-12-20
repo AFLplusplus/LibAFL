@@ -37,7 +37,7 @@ use libafl_bolts::{
 pub use libafl_qemu::emu::Emulator;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::QemuCmpLogHelper;
-use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
+use libafl_qemu::{edges, IsEmuExitHandler, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
 use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
@@ -118,7 +118,10 @@ where
 {
     /// Run the fuzzer
     #[allow(clippy::too_many_lines, clippy::similar_names)]
-    pub fn run(&mut self, emulator: &Emulator) {
+    pub fn run<E>(&mut self, emulator: &Emulator<E>)
+    where
+        E: IsEmuExitHandler + Clone,
+    {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
