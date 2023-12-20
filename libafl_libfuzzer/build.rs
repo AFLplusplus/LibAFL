@@ -75,7 +75,7 @@ fn main() {
 
     assert!(
         !command.status().map(|s| !s.success()).unwrap_or(true),
-        "Couldn't build runtime crate! Did you remember to use nightly?"
+        "Couldn't build runtime crate! Did you remember to use nightly? (`rustup default nightly` to install) Or, did you remember to install ucd-generate? (`cargo install ucd-generate` to install)"
     );
 
     let mut lib_path = custom_lib_dir.join(std::env::var_os("TARGET").unwrap());
@@ -112,7 +112,7 @@ fn main() {
 
         assert!(
             !command.status().map(|s| !s.success()).unwrap_or(true),
-            "Couldn't link runtime crate! Do you have the llvm-tools component installed?"
+            "Couldn't link runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
         );
 
         let mut child = Command::new(nm)
@@ -145,7 +145,7 @@ fn main() {
 
         assert!(
             !child.wait().map(|s| !s.success()).unwrap_or(true),
-            "Couldn't link runtime crate! Do you have the llvm-tools component installed?"
+            "Couldn't link runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
         );
 
         let mut command = Command::new(rust_objcopy);
@@ -182,7 +182,7 @@ fn main() {
 
         assert!(
             !command.status().map(|s| !s.success()).unwrap_or(true),
-            "Couldn't rename allocators in the runtime crate! Do you have the llvm-tools component installed?"
+            "Couldn't rename allocators in the runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
         );
 
         let mut command = Command::new(rust_ar);
