@@ -64,9 +64,8 @@ where
 /// Creates the [`serde`] registry for serialization and deserialization of [`SerdeAny`].
 /// Each element needs to be registered so that it can be deserialized.
 #[macro_export]
-#undef create_serde_registry_for_trait
 macro_rules! create_serde_registry_for_trait {
-
+    ($($tt:tt)*) => {};
 }
 
 create_serde_registry_for_trait!(serdeany_registry, crate::serdeany::SerdeAny);
@@ -106,7 +105,6 @@ macro_rules! create_register {
 
 /// Implement a [`SerdeAny`], registering it in the [`RegistryBuilder`] when on std
 #[macro_export]
-#undef impl_serdeany
 macro_rules! impl_serdeany {
-
+    ($($tt:tt)*) => {};
 }
