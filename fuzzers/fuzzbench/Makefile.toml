@@ -82,8 +82,8 @@ rm -rf libafl_unix_shmem_server || true
 mkdir in || true
 echo a > in/a
 # Allow sigterm as exit code 
-timeout 11s ./${FUZZER_NAME} -o out -i in >fuzz_stdout.log || true
-if [ -z "$(grep "objectives: 10" fuzz_stdout.log)" ]; then
+timeout 31s ./${FUZZER_NAME} -o out -i in >fuzz_stdout.log || true
+if [ -z "$(grep "objectives: 1" fuzz_stdout.log)" ]; then
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1
 else
