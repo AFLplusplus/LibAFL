@@ -134,6 +134,31 @@ pub mod staterestore;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 pub mod tuples;
 
+/// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
+#[cfg(feature = "prelude")]
+pub mod bolts_prelude {
+    #[cfg(feature = "std")]
+    pub use super::build_id::*;
+    #[cfg(all(
+        any(feature = "cli", feature = "frida_cli", feature = "qemu_cli"),
+        feature = "std"
+    ))]
+    pub use super::cli::*;
+    #[cfg(feature = "gzip")]
+    pub use super::compress::*;
+    #[cfg(feature = "std")]
+    pub use super::core_affinity::*;
+    #[cfg(feature = "std")]
+    pub use super::fs::*;
+    #[cfg(all(feature = "std", unix))]
+    pub use super::minibsod::*;
+    #[cfg(feature = "std")]
+    pub use super::staterestore::*;
+    #[cfg(feature = "alloc")]
+    pub use super::{anymap::*, llmp::*, ownedref::*, rands::*, serdeany::*, shmem::*, tuples::*};
+    pub use super::{cpu::*, os::*};
+}
+
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
@@ -142,6 +167,13 @@ use core::hash::BuildHasher;
 use core::hash::Hasher;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(all(unix, feature = "std"))]
+use std::{
+    fs::File,
+    io::Write,
+    mem,
+    os::fd::{FromRawFd, RawFd},
+};
 
 // There's a bug in ahash that doesn't let it build in `alloc` without once_cell right now.
 // TODO: re-enable once <https://github.com/tkaitchuck/aHash/issues/155> is resolved.
@@ -777,7 +809,7 @@ impl Default for SimpleStdoutLogger {
 
 #[cfg(feature = "std")]
 impl SimpleStdoutLogger {
-    /// Create a new [`log::Log`] logger that will wrte log to stdout
+    /// Create a new [`log::Log`] logger that will write log to stdout
     #[must_use]
     pub const fn new() -> Self {
         Self {}
@@ -823,7 +855,7 @@ impl Default for SimpleStderrLogger {
 
 #[cfg(feature = "std")]
 impl SimpleStderrLogger {
-    /// Create a new [`log::Log`] logger that will wrte log to stdout
+    /// Create a new [`log::Log`] logger that will write log to stdout
     #[must_use]
     pub const fn new() -> Self {
         Self {}
@@ -854,29 +886,55 @@ impl log::Log for SimpleStderrLogger {
 
     fn flush(&self) {}
 }
-/// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
-#[cfg(feature = "prelude")]
-pub mod bolts_prelude {
-    #[cfg(feature = "std")]
-    pub use super::build_id::*;
-    #[cfg(all(
-        any(feature = "cli", feature = "frida_cli", feature = "qemu_cli"),
-        feature = "std"
-    ))]
-    pub use super::cli::*;
-    #[cfg(feature = "gzip")]
-    pub use super::compress::*;
-    #[cfg(feature = "std")]
-    pub use super::core_affinity::*;
-    #[cfg(feature = "std")]
-    pub use super::fs::*;
-    #[cfg(all(feature = "std", unix))]
-    pub use super::minibsod::*;
-    #[cfg(feature = "std")]
-    pub use super::staterestore::*;
-    #[cfg(feature = "alloc")]
-    pub use super::{anymap::*, llmp::*, ownedref::*, rands::*, serdeany::*, shmem::*, tuples::*};
-    pub use super::{cpu::*, os::*};
+
+/// A simple logger struct that logs to a `RawFd` when used with [`log::set_logger`].
+#[derive(Debug)]
+#[cfg(all(feature = "std", unix))]
+pub struct SimpleFdLogger {
+    fd: RawFd,
+}
+
+#[cfg(all(feature = "std", unix))]
+impl SimpleFdLogger {
+    /// Create a new [`log::Log`] logger that will write the log to the given `fd`
+    ///
+    /// # Safety
+    /// Needs a valid raw file descriptor opened for writing.
+    #[must_use]
+    pub const unsafe fn new(fd: RawFd) -> Self {
+        Self { fd }
+    }
+
+    /// Sets the `fd` this logger will write to
+    ///
+    /// # Safety
+    /// Needs a valid raw file descriptor opened for writing.
+    pub unsafe fn set_fd(&mut self, fd: RawFd) {
+        self.fd = fd;
+    }
+}
+
+#[cfg(all(feature = "std", unix))]
+impl log::Log for SimpleFdLogger {
+    #[inline]
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        let mut f = unsafe { File::from_raw_fd(self.fd) };
+        writeln!(
+            f,
+            "[{:?}] {}: {}",
+            current_time(),
+            record.level(),
+            record.args()
+        )
+        .unwrap_or_else(|err| println!("Failed to log to fd {}: {err}", self.fd));
+        mem::forget(f);
+    }
+
+    fn flush(&self) {}
 }
 
 #[cfg(feature = "python")]
@@ -1018,5 +1076,28 @@ pub mod pybind {
     pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
         crate::rands::pybind::register(py, m)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[cfg(all(feature = "std", unix))]
+    use crate::SimpleFdLogger;
+
+    #[cfg(all(feature = "std", unix))]
+    pub static mut LOGGER: SimpleFdLogger = unsafe { SimpleFdLogger::new(1) };
+
+    #[test]
+    #[cfg(all(unix, feature = "std"))]
+    fn test_logger() {
+        use std::{io::stdout, os::fd::AsRawFd};
+
+        unsafe { LOGGER.fd = stdout().as_raw_fd() };
+        unsafe {
+            log::set_logger(&LOGGER).unwrap();
+        }
+        log::set_max_level(log::LevelFilter::Debug);
+        log::info!("Test");
     }
 }
