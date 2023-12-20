@@ -171,6 +171,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{
     fs::File,
     io::Write,
+    mem,
     os::fd::{FromRawFd, RawFd},
 };
 
@@ -201,7 +202,6 @@ use log::{Metadata, Record};
 pub mod launcher {}
 
 use core::{
-    mem,
     array::TryFromSliceError,
     fmt::{self, Display},
     iter::Iterator,
