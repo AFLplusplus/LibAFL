@@ -20,7 +20,7 @@ pub struct Breakpoint {
 
 impl Hash for Breakpoint {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.addr.hash(state)
+        self.addr.hash(state);
     }
 }
 
