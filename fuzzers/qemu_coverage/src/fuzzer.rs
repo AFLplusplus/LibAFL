@@ -26,8 +26,11 @@ use libafl_bolts::{
     tuples::tuple_list,
     AsSlice,
 };
-use libafl_qemu::{drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, QemuExecutor, QemuHooks, QemuInstrumentationAddressRangeFilter, Regs, NopEmuExitHandler};
-use libafl_qemu::breakpoint::Breakpoint;
+use libafl_qemu::{
+    breakpoint::Breakpoint, drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, ArchExtras,
+    CallingConvention, GuestAddr, GuestReg, MmapPerms, NopEmuExitHandler, QemuExecutor, QemuHooks,
+    QemuInstrumentationAddressRangeFilter, Regs,
+};
 use rangemap::RangeMap;
 
 #[derive(Default)]

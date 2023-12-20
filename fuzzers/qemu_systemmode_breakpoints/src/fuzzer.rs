@@ -15,11 +15,10 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::StdMutationalStage,
+    stages::{CalibrationStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
-use libafl::stages::CalibrationStage;
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
@@ -27,8 +26,14 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_qemu::{Command, CommandInput, edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM}, elf::EasyElf, emu::Emulator, EmuExitReasonError, FastSnapshotBuilder, GuestPhysAddr, GuestReg, HandlerError, HandlerResult, QemuExecutor, QemuHooks, QemuSnapshotBuilder, StdEmuExitHandler};
-use libafl_qemu::breakpoint::Breakpoint;
+use libafl_qemu::{
+    breakpoint::Breakpoint,
+    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
+    elf::EasyElf,
+    emu::Emulator,
+    Command, CommandInput, EmuExitReasonError, FastSnapshotBuilder, GuestPhysAddr, GuestReg,
+    HandlerError, HandlerResult, QemuExecutor, QemuHooks, QemuSnapshotBuilder, StdEmuExitHandler,
+};
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
@@ -89,8 +94,22 @@ pub fn fuzz() {
         let emu = Emulator::new(&args, &env, emu_exit_handler).unwrap();
 
         // Set breakpoints of interest with corresponding commands.
-        emu.add_breakpoint(Breakpoint::with_command(main_addr.into(), Command::Start(CommandInput::phys(input_addr, unsafe { MAX_INPUT_SIZE } as GuestReg, None)), true), true);
-        emu.add_breakpoint(Breakpoint::with_command(breakpoint.into(), Command::Exit(Some(ExitKind::Ok)), false), true);
+        emu.add_breakpoint(
+            Breakpoint::with_command(
+                main_addr.into(),
+                Command::Start(CommandInput::phys(
+                    input_addr,
+                    unsafe { MAX_INPUT_SIZE } as GuestReg,
+                    None,
+                )),
+                true,
+            ),
+            true,
+        );
+        emu.add_breakpoint(
+            Breakpoint::with_command(breakpoint.into(), Command::Exit(Some(ExitKind::Ok)), false),
+            true,
+        );
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
@@ -106,7 +125,7 @@ pub fn fuzz() {
                         HandlerResult::EndOfRun(exit_kind) => return exit_kind,
                         HandlerResult::Interrupted => {
                             std::process::exit(0);
-                        },
+                        }
                     },
                     Err(handler_error) => match handler_error {
                         HandlerError::EmuExitReasonError(emu_exit_reason_error) => {

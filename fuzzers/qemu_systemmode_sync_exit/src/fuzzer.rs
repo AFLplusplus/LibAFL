@@ -52,7 +52,8 @@ pub fn fuzz() {
         let env: Vec<(String, String)> = env::vars().collect();
         // let emu_snapshot_manager = QemuSnapshotBuilder::new(true);
         let emu_snapshot_manager = FastSnapshotBuilder::new(false);
-        let emu_exit_handler: StdEmuExitHandler<FastSnapshotBuilder> = StdEmuExitHandler::new(emu_snapshot_manager);
+        let emu_exit_handler: StdEmuExitHandler<FastSnapshotBuilder> =
+            StdEmuExitHandler::new(emu_snapshot_manager);
         let emu = Emulator::new(&args, &env, emu_exit_handler).unwrap();
 
         let devices = emu.list_devices();
@@ -70,7 +71,7 @@ pub fn fuzz() {
                         HandlerResult::Interrupted => {
                             println!("Interrupted.");
                             std::process::exit(0);
-                        },
+                        }
                     },
                     Err(handler_error) => match handler_error {
                         HandlerError::EmuExitReasonError(emu_exit_reason_error) => {
