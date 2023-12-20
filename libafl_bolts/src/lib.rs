@@ -201,6 +201,7 @@ use log::{Metadata, Record};
 pub mod launcher {}
 
 use core::{
+    mem,
     array::TryFromSliceError,
     fmt::{self, Display},
     iter::Iterator,
@@ -930,6 +931,7 @@ impl log::Log for SimpleFdLogger {
             record.args()
         )
         .unwrap_or_else(|err| println!("Failed to log to fd {}: {err}", self.fd));
+        mem::forget(f);
     }
 
     fn flush(&self) {}
