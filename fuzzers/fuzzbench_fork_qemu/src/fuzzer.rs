@@ -51,7 +51,7 @@ use libafl_qemu::{
     emu::Emulator,
     filter_qemu_args,
     hooks::QemuHooks,
-    GuestReg, MmapPerms, QemuForkExecutor, Regs,
+    GuestReg, MmapPerms, NopEmuExitHandler, QemuForkExecutor, Regs,
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -147,7 +147,7 @@ fn fuzz(
 
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&args, &env)?;
+    let emu = Emulator::new(&args, &env, NopEmuExitHandler)?;
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
@@ -157,8 +157,10 @@ fn fuzz(
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    emu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    unsafe { emu.run() };
+    emu.set_breakpoint_addr(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    unsafe {
+        let _ = emu.run();
+    }
 
     println!("Break at {:#x}", emu.read_reg::<_, u64>(Regs::Rip).unwrap());
 
@@ -170,8 +172,8 @@ fn fuzz(
     println!("Stack pointer = {stack_ptr:#x}");
     println!("Return address = {ret_addr:#x}");
 
-    emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
+    emu.unset_breakpoint_addr(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    emu.set_breakpoint_addr(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
     let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
     println!("Placing input at {input_addr:#x}");
@@ -322,7 +324,7 @@ fn fuzz(
             emu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
             emu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
-            emu.run();
+            let _ = emu.run();
         }
 
         ExitKind::Ok
