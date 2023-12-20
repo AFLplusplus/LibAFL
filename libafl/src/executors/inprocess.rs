@@ -703,6 +703,7 @@ pub mod unix_signal_handler {
     use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
     use libc::siginfo_t;
 
+    use super::common_signals;
     #[cfg(feature = "std")]
     use crate::inputs::Input;
     use crate::{
@@ -716,8 +717,6 @@ pub mod unix_signal_handler {
         inputs::UsesInput,
         state::{HasCorpus, HasExecutions, HasSolutions},
     };
-
-    use super::common_signals;
 
     pub(crate) type HandlerFuncPtr = unsafe fn(
         Signal,
