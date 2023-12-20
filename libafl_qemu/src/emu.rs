@@ -1442,13 +1442,10 @@ pub mod pybind {
     }
 
     #[pymethods]
-    impl Emulator<NopEmuExitHandler> {
+    impl Emulator {
         #[allow(clippy::needless_pass_by_value)]
         #[new]
-        fn new(
-            args: Vec<String>,
-            env: Vec<(String, String)>,
-        ) -> PyResult<Emulator<NopEmuExitHandler>> {
+        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Emulator> {
             let emu = super::Emulator::new(&args, &env, NopEmuExitHandler)
                 .map_err(|e| PyValueError::new_err(format!("{e}")))?;
             Ok(Emulator { emu })
