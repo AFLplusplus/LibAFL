@@ -68,7 +68,7 @@ pub fn fuzz() {
                     HandlerResult::UnhandledExit(unhandled_exit) => {
                         panic!("Unhandled exit: {}", unhandled_exit)
                     }
-                    HandlerResult::EndOfRun(exit_kind) => return exit_kind,
+                    HandlerResult::EndOfRun(exit_kind) => exit_kind,
                     HandlerResult::Interrupted => {
                         println!("Interrupted.");
                         std::process::exit(0);
@@ -78,7 +78,7 @@ pub fn fuzz() {
                     HandlerError::EmuExitReasonError(emu_exit_reason_error) => {
                         match emu_exit_reason_error {
                             EmuExitReasonError::UnknownKind => panic!("unknown kind"),
-                            EmuExitReasonError::UnexpectedExit => return ExitKind::Crash,
+                            EmuExitReasonError::UnexpectedExit => ExitKind::Crash,
                             _ => {
                                 panic!("Emu Exit unhandled error: {:?}", emu_exit_reason_error)
                             }
