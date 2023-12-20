@@ -1386,7 +1386,7 @@ pub mod pybind {
     use pyo3::{exceptions::PyValueError, prelude::*, types::PyInt};
 
     use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};
-    use crate::{IsEmuExitHandler, NopEmuExitHandler};
+    use crate::NopEmuExitHandler;
 
     static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
@@ -1477,7 +1477,7 @@ pub mod pybind {
         }
 
         fn set_breakpoint(&self, addr: GuestAddr) {
-            self.emu.set_breakpoint(addr);
+            self.emu.set_breakpoint_addr(addr);
         }
 
         fn entry_break(&self, addr: GuestAddr) {
@@ -1485,7 +1485,7 @@ pub mod pybind {
         }
 
         fn remove_breakpoint(&self, addr: GuestAddr) {
-            self.emu.remove_breakpoint(addr);
+            self.emu.unset_breakpoint_addr(addr);
         }
 
         fn run(&self) {
