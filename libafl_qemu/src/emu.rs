@@ -1387,6 +1387,7 @@ pub mod pybind {
     use pyo3::{exceptions::PyValueError, prelude::*, types::PyInt};
 
     use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};
+    use crate::{IsEmuExitHandler, NopEmuExitHandler};
 
     static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
@@ -1437,15 +1438,18 @@ pub mod pybind {
 
     #[pyclass(unsendable)]
     pub struct Emulator {
-        pub emu: super::Emulator,
+        pub emu: super::Emulator<NopEmuExitHandler>,
     }
 
     #[pymethods]
-    impl Emulator {
+    impl Emulator<NopEmuExitHandler> {
         #[allow(clippy::needless_pass_by_value)]
         #[new]
-        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Emulator> {
-            let emu = super::Emulator::new(&args, &env)
+        fn new(
+            args: Vec<String>,
+            env: Vec<(String, String)>,
+        ) -> PyResult<Emulator<NopEmuExitHandler>> {
+            let emu = super::Emulator::new(&args, &env, NopEmuExitHandler)
                 .map_err(|e| PyValueError::new_err(format!("{e}")))?;
             Ok(Emulator { emu })
         }
@@ -1490,7 +1494,7 @@ pub mod pybind {
 
         fn run(&self) {
             unsafe {
-                self.emu.run();
+                let _ = self.emu.run();
             }
         }
 
