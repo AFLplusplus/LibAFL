@@ -8,6 +8,7 @@ use core::{
 use libafl::{
     events::EventManager,
     executors::InProcessForkExecutor,
+    inputs::UsesInput,
     state::{HasLastReportTime, HasMetadata},
 };
 use libafl::{
@@ -18,7 +19,6 @@ use libafl::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,

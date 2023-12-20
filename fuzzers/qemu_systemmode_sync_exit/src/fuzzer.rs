@@ -30,8 +30,10 @@ use libafl_qemu::{
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     emu::Emulator,
     EmuExitReasonError, FastSnapshotBuilder, HandlerError, HandlerResult, QemuExecutor, QemuHooks,
-    QemuSnapshotBuilder, StdEmuExitHandler,
+    StdEmuExitHandler,
 };
+
+// use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot
 
 pub fn fuzz() {
     env_logger::init();
@@ -61,31 +63,29 @@ pub fn fuzz() {
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| unsafe {
-            loop {
-                match emu.run_handle(input) {
-                    Ok(handler_result) => match handler_result {
-                        HandlerResult::UnhandledExit(unhandled_exit) => {
-                            panic!("Unhandled exit: {}", unhandled_exit)
-                        }
-                        HandlerResult::EndOfRun(exit_kind) => return exit_kind,
-                        HandlerResult::Interrupted => {
-                            println!("Interrupted.");
-                            std::process::exit(0);
-                        }
-                    },
-                    Err(handler_error) => match handler_error {
-                        HandlerError::EmuExitReasonError(emu_exit_reason_error) => {
-                            match emu_exit_reason_error {
-                                EmuExitReasonError::UnknownKind => panic!("unknown kind"),
-                                EmuExitReasonError::UnexpectedExit => return ExitKind::Crash,
-                                _ => {
-                                    panic!("Emu Exit unhandled error: {:?}", emu_exit_reason_error)
-                                }
+            match emu.run_handle(input) {
+                Ok(handler_result) => match handler_result {
+                    HandlerResult::UnhandledExit(unhandled_exit) => {
+                        panic!("Unhandled exit: {}", unhandled_exit)
+                    }
+                    HandlerResult::EndOfRun(exit_kind) => return exit_kind,
+                    HandlerResult::Interrupted => {
+                        println!("Interrupted.");
+                        std::process::exit(0);
+                    }
+                },
+                Err(handler_error) => match handler_error {
+                    HandlerError::EmuExitReasonError(emu_exit_reason_error) => {
+                        match emu_exit_reason_error {
+                            EmuExitReasonError::UnknownKind => panic!("unknown kind"),
+                            EmuExitReasonError::UnexpectedExit => return ExitKind::Crash,
+                            _ => {
+                                panic!("Emu Exit unhandled error: {:?}", emu_exit_reason_error)
                             }
                         }
-                        _ => panic!("Unhandled error: {:?}", handler_error),
-                    },
-                }
+                    }
+                    _ => panic!("Unhandled error: {:?}", handler_error),
+                },
             }
         };
 

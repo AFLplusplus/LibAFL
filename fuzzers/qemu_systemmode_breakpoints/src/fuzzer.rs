@@ -32,8 +32,10 @@ use libafl_qemu::{
     elf::EasyElf,
     emu::Emulator,
     Command, CommandInput, EmuExitReasonError, FastSnapshotBuilder, GuestPhysAddr, GuestReg,
-    HandlerError, HandlerResult, QemuExecutor, QemuHooks, QemuSnapshotBuilder, StdEmuExitHandler,
+    HandlerError, HandlerResult, QemuExecutor, QemuHooks, StdEmuExitHandler,
 };
+
+// use libafl_qemu::QemuSnapshotBuilder; // for normal qemu snapshot
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
@@ -96,7 +98,7 @@ pub fn fuzz() {
         // Set breakpoints of interest with corresponding commands.
         emu.add_breakpoint(
             Breakpoint::with_command(
-                main_addr.into(),
+                main_addr,
                 Command::Start(CommandInput::phys(
                     input_addr,
                     unsafe { MAX_INPUT_SIZE } as GuestReg,
@@ -107,7 +109,7 @@ pub fn fuzz() {
             true,
         );
         emu.add_breakpoint(
-            Breakpoint::with_command(breakpoint.into(), Command::Exit(Some(ExitKind::Ok)), false),
+            Breakpoint::with_command(breakpoint, Command::Exit(Some(ExitKind::Ok)), false),
             true,
         );
 
@@ -116,30 +118,28 @@ pub fn fuzz() {
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| unsafe {
-            loop {
-                match emu.run_handle(input) {
-                    Ok(handler_result) => match handler_result {
-                        HandlerResult::UnhandledExit(unhandled_exit) => {
-                            panic!("Unhandled exit: {}", unhandled_exit)
-                        }
-                        HandlerResult::EndOfRun(exit_kind) => return exit_kind,
-                        HandlerResult::Interrupted => {
-                            std::process::exit(0);
-                        }
-                    },
-                    Err(handler_error) => match handler_error {
-                        HandlerError::EmuExitReasonError(emu_exit_reason_error) => {
-                            match emu_exit_reason_error {
-                                EmuExitReasonError::UnknownKind => panic!("unknown kind"),
-                                EmuExitReasonError::UnexpectedExit => return ExitKind::Crash,
-                                _ => {
-                                    panic!("Emu Exit unhandled error: {:?}", emu_exit_reason_error)
-                                }
+            match emu.run_handle(input) {
+                Ok(handler_result) => match handler_result {
+                    HandlerResult::UnhandledExit(unhandled_exit) => {
+                        panic!("Unhandled exit: {}", unhandled_exit)
+                    }
+                    HandlerResult::EndOfRun(exit_kind) => return exit_kind,
+                    HandlerResult::Interrupted => {
+                        std::process::exit(0);
+                    }
+                },
+                Err(handler_error) => match handler_error {
+                    HandlerError::EmuExitReasonError(emu_exit_reason_error) => {
+                        match emu_exit_reason_error {
+                            EmuExitReasonError::UnknownKind => panic!("unknown kind"),
+                            EmuExitReasonError::UnexpectedExit => return ExitKind::Crash,
+                            _ => {
+                                panic!("Emu Exit unhandled error: {:?}", emu_exit_reason_error)
                             }
                         }
-                        _ => panic!("Unhandled error: {:?}", handler_error),
-                    },
-                }
+                    }
+                    _ => panic!("Unhandled error: {:?}", handler_error),
+                },
             }
         };
 

@@ -14,7 +14,7 @@ use libafl::{
     inputs::HasTargetBytes,
     state::StdState,
 };
-use libafl_bolts::{bolts_prelude::RomuDuoJrRand, os::unix_signals::Signal, AsSlice};
+use libafl_bolts::{os::unix_signals::Signal, rands::RomuDuoJrRand, AsSlice};
 
 use crate::{
     emu::{libafl_page_from_addr, BytesInput, ExitKind},
