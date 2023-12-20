@@ -6,65 +6,67 @@
 
 // Target Specific imports / definitions
 #ifdef _WIN32
-#include <stdint.h>
-#include <intsafe.h>
+  #include <stdint.h>
+  #include <intsafe.h>
 
 typedef UINT64 libafl_word;
-#define LIBAFL_CALLING_CONVENTION	__fastcall
+  #define LIBAFL_CALLING_CONVENTION __fastcall
 
 #else
-#ifdef __x86_64__
-#include <stdint.h>
+  #ifdef __x86_64__
+    #include <stdint.h>
 
 typedef uint64_t libafl_word;
-#define LIBAFL_CALLING_CONVENTION  __attribute__(())
+    #define LIBAFL_CALLING_CONVENTION __attribute__(())
+  #endif
+
+  #ifdef __arm__
+    #include <stdint.h>
+
+typedef uint32_t                      libafl_word;
+    #define LIBAFL_CALLING_CONVENTION __attribute__(())
+  #endif
 #endif
 
-#ifdef __arm__
-#include <stdint.h>
-
-typedef uint32_t libafl_word;
-#define LIBAFL_CALLING_CONVENTION  __attribute__(())
-#endif
-#endif
-
-#define LIBAFL_EXIT_OPCODE            0x66f23a0f
-#define LIBAFL_EXIT_VERSION_NUMBER    0111 // TODO: find a nice way to set it.
+#define LIBAFL_EXIT_OPCODE 0x66f23a0f
+#define LIBAFL_EXIT_VERSION_NUMBER 0111  // TODO: find a nice way to set it.
 
 typedef enum LibaflExit {
-	LIBAFL_EXIT_START_VIRT		= 0,
-	LIBAFL_EXIT_START_PHYS		= 1,
-	LIBAFL_EXIT_INPUT_VIRT		= 2,
-	LIBAFL_EXIT_INPUT_PHYS		= 3,
-	LIBAFL_EXIT_END			= 4,
-	LIBAFL_EXIT_SAVE		= 5,
-	LIBAFL_EXIT_LOAD		= 6,
-        LIBAFL_EXIT_VERSION		= 7,
+  LIBAFL_EXIT_START_VIRT = 0,
+  LIBAFL_EXIT_START_PHYS = 1,
+  LIBAFL_EXIT_INPUT_VIRT = 2,
+  LIBAFL_EXIT_INPUT_PHYS = 3,
+  LIBAFL_EXIT_END = 4,
+  LIBAFL_EXIT_SAVE = 5,
+  LIBAFL_EXIT_LOAD = 6,
+  LIBAFL_EXIT_VERSION = 7,
 } LibaflExit;
 
 typedef enum LibaflExitEndStatus {
-	LIBAFL_EXIT_END_UNKNOWN		= 0,
-	LIBAFL_EXIT_END_OK		= 1,
-	LIBAFL_EXIT_END_CRASH		= 2,
+  LIBAFL_EXIT_END_UNKNOWN = 0,
+  LIBAFL_EXIT_END_OK = 1,
+  LIBAFL_EXIT_END_CRASH = 2,
 } LibaflExitEndParams;
 
 #ifdef _WIN32
-#ifdef __cplusplus
+  #ifdef __cplusplus
 extern "C" {
-#endif
-	libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call0(libafl_word action);
-	libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call1(libafl_word action, libafl_word arg1);
-	libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action, libafl_word arg1, libafl_word arg2);
-#ifdef __cplusplus
+  #endif
+libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call0(libafl_word action);
+libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call1(libafl_word action,
+                                                         libafl_word arg1);
+libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action,
+                                                         libafl_word arg1,
+                                                         libafl_word arg2);
+  #ifdef __cplusplus
 }
-#endif
+  #endif
 #else
 
-#ifdef __x86_64__
-libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call0(libafl_word action)
-{
-    libafl_word ret;
-    __asm__ volatile (
+  #ifdef __x86_64__
+libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call0(libafl_word action) {
+  libafl_word ret;
+  __asm__ volatile (
         "mov %1, %%rax\n"
         ".dword " XSTRINGIFY(LIBAFL_EXIT_OPCODE) "\n"
         "mov %%rax, %0\n"
@@ -72,11 +74,11 @@ libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call0(libafl_word action)
         : "g"(action)
         : "%rax"
     );
-    return ret;
+  return ret;
 }
 
-libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call1(libafl_word action, libafl_word arg1)
-{
+libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call1(libafl_word action,
+                                                         libafl_word arg1) {
   libafl_word ret;
   __asm__ volatile (
       "mov %1, %%rax\n"
@@ -90,8 +92,9 @@ libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call1(libafl_word action, lib
   return ret;
 }
 
-libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action, libafl_word arg1, libafl_word arg2)
-{
+libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action,
+                                                         libafl_word arg1,
+                                                         libafl_word arg2) {
   libafl_word ret;
   __asm__ volatile (
       "mov %1, %%rax\n"
@@ -105,11 +108,10 @@ libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action, lib
       );
   return ret;
 }
-#endif
+  #endif
 
-#ifdef __arm__
-libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call0(libafl_word action)
-{
+  #ifdef __arm__
+libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call0(libafl_word action) {
   libafl_word ret;
   __asm__ volatile (
       "mov r0, %1\n"
@@ -122,8 +124,8 @@ libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call0(libafl_word action)
   return ret;
 }
 
-libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call1(libafl_word action, libafl_word arg1)
-{
+libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call1(libafl_word action,
+                                                         libafl_word arg1) {
   libafl_word ret;
   __asm__ volatile (
       "mov r0, %1\n"
@@ -137,8 +139,9 @@ libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call1(libafl_word action, lib
   return ret;
 }
 
-libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action, libafl_word arg1, libafl_word arg2)
-{
+libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action,
+                                                         libafl_word arg1,
+                                                         libafl_word arg2) {
   libafl_word ret;
   __asm__ volatile (
       "mov r0, %1\n"
@@ -152,17 +155,21 @@ libafl_word LIBAFL_CALLING_CONVENTION _libafl_exit_call2(libafl_word action, lib
   );
   return ret;
 }
-#endif
+  #endif
 
 #endif
 
-#define LIBAFL_EXIT_START_VIRT(buf_vaddr, max_len)		_libafl_exit_call2(LIBAFL_EXIT_START_VIRT, buf_vaddr, max_len)
-#define LIBAFL_EXIT_START_PHYS(buf_paddr, max_len)		_libafl_exit_call2(LIBAFL_EXIT_START_PHYS, buf_paddr, max_len)
-#define LIBAFL_EXIT_INPUT_VIRT(buf_vaddr, max_len)		_libafl_exit_call2(LIBAFL_EXIT_INPUT_VIRT, buf_vaddr, max_len)
-#define LIBAFL_EXIT_INPUT_PHYS(buf_paddr, max_len)		_libafl_exit_call2(LIBAFL_EXIT_INPUT_PHYS, buf_paddr, max_len)
-#define LIBAFL_EXIT_END(status)					_libafl_exit_call1(LIBAFL_EXIT_END, status)
-#define LIBAFL_EXIT_SAVE()					_libafl_exit_call0(LIBAFL_EXIT_SAVE)
-#define LIBAFL_EXIT_LOAD()					_libafl_exit_call0(LIBAFL_EXIT_LOAD)
-#define LIBAFL_EXIT_VERSION()                                   _libafl_exit_call0(LIBAFL_EXIT_VERSION_NUMBER)
+#define LIBAFL_EXIT_START_VIRT(buf_vaddr, max_len) \
+  _libafl_exit_call2(LIBAFL_EXIT_START_VIRT, buf_vaddr, max_len)
+#define LIBAFL_EXIT_START_PHYS(buf_paddr, max_len) \
+  _libafl_exit_call2(LIBAFL_EXIT_START_PHYS, buf_paddr, max_len)
+#define LIBAFL_EXIT_INPUT_VIRT(buf_vaddr, max_len) \
+  _libafl_exit_call2(LIBAFL_EXIT_INPUT_VIRT, buf_vaddr, max_len)
+#define LIBAFL_EXIT_INPUT_PHYS(buf_paddr, max_len) \
+  _libafl_exit_call2(LIBAFL_EXIT_INPUT_PHYS, buf_paddr, max_len)
+#define LIBAFL_EXIT_END(status) _libafl_exit_call1(LIBAFL_EXIT_END, status)
+#define LIBAFL_EXIT_SAVE() _libafl_exit_call0(LIBAFL_EXIT_SAVE)
+#define LIBAFL_EXIT_LOAD() _libafl_exit_call0(LIBAFL_EXIT_LOAD)
+#define LIBAFL_EXIT_VERSION() _libafl_exit_call0(LIBAFL_EXIT_VERSION_NUMBER)
 
 #endif
