@@ -106,6 +106,7 @@ pub struct CommandInput {
 }
 
 impl CommandInput {
+    #[must_use]
     pub fn phys(addr: GuestPhysAddr, max_input_size: GuestReg, cpu: Option<CPU>) -> Self {
         Self {
             addr: GuestAddrKind::Physical(addr),
@@ -114,6 +115,7 @@ impl CommandInput {
         }
     }
 
+    #[must_use]
     pub fn virt(addr: GuestVirtAddr, max_input_size: GuestReg, cpu: CPU) -> Self {
         Self {
             addr: GuestAddrKind::Virtual(addr),
@@ -798,8 +800,8 @@ impl From<SyncExitError> for HandlerError {
 impl fmt::Display for EmuExitReason {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            EmuExitReason::End(shutdown_cause) => write!(f, "End: {:?}", shutdown_cause),
-            EmuExitReason::Breakpoint(bp) => write!(f, "{}", bp),
+            EmuExitReason::End(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
+            EmuExitReason::Breakpoint(bp) => write!(f, "{bp}"),
             EmuExitReason::SyncBackdoor(sync_backdoor) => {
                 write!(f, "Sync backdoor exit: {sync_backdoor}")
             }

@@ -192,7 +192,7 @@ where
         unsafe { mmap_next_start = start };
     }
 
-    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::cast_sign_loss, clippy::unused_self)]
     fn mmap(
         &self,
         addr: GuestAddr,

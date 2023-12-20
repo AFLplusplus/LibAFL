@@ -46,6 +46,7 @@ impl Borrow<GuestAddr> for Breakpoint {
 
 impl Breakpoint {
     // Emu will return with the breakpoint as exit reason.
+    #[must_use]
     pub fn without_command(addr: GuestAddr, disable_on_trigger: bool) -> Self {
         Self {
             addr,
@@ -56,6 +57,7 @@ impl Breakpoint {
     }
 
     // Emu will execute the command when it meets the breakpoint.
+    #[must_use]
     pub fn with_command(addr: GuestAddr, cmd: Command, disable_on_trigger: bool) -> Self {
         Self {
             addr,
@@ -65,6 +67,7 @@ impl Breakpoint {
         }
     }
 
+    #[must_use]
     pub fn addr(&self) -> GuestAddr {
         self.addr
     }
