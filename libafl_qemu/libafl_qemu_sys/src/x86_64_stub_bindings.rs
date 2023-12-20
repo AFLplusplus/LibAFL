@@ -13420,7 +13420,7 @@ impl Default for libafl_hook {
 extern "C" {
     pub fn libafl_qemu_set_hook(
         pc: target_ulong,
-        callback: ::std::option::Option< extern "C" fn(data: u64, pc: target_ulong)>,
+        callback: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong)>,
         data: u64,
         invalidate: ::std::os::raw::c_int,
     ) -> usize;
@@ -13442,7 +13442,7 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_add_backdoor_hook(
-        exec: ::std::option::Option< extern "C" fn(data: u64, pc: target_ulong)>,
+        exec: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong)>,
         data: u64,
     ) -> usize;
 }
@@ -13455,9 +13455,9 @@ extern "C" {
 extern "C" {
     pub fn libafl_add_edge_hook(
         gen: ::std::option::Option<
-             extern "C" fn(data: u64, src: target_ulong, dst: target_ulong) -> u64,
+            extern "C" fn(data: u64, src: target_ulong, dst: target_ulong) -> u64,
         >,
-        exec: ::std::option::Option< extern "C" fn(data: u64, id: u64)>,
+        exec: ::std::option::Option<extern "C" fn(data: u64, id: u64)>,
         data: u64,
     ) -> usize;
 }
@@ -13475,11 +13475,11 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_add_block_hook(
-        gen: ::std::option::Option< extern "C" fn(data: u64, pc: target_ulong) -> u64>,
+        gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong) -> u64>,
         post_gen: ::std::option::Option<
-             extern "C" fn(data: u64, pc: target_ulong, block_length: target_ulong),
+            extern "C" fn(data: u64, pc: target_ulong, block_length: target_ulong),
         >,
-        exec: ::std::option::Option< extern "C" fn(data: u64, id: u64)>,
+        exec: ::std::option::Option<extern "C" fn(data: u64, id: u64)>,
         data: u64,
     ) -> usize;
 }
@@ -13497,30 +13497,26 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_add_read_hook(
-        gen: ::std::option::Option<
-             extern "C" fn(data: u64, pc: target_ulong, oi: MemOpIdx) -> u64,
-        >,
-        exec1: ::std::option::Option< extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
-        exec2: ::std::option::Option< extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
-        exec4: ::std::option::Option< extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
-        exec8: ::std::option::Option< extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong, oi: MemOpIdx) -> u64>,
+        exec1: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec2: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec4: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec8: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
         execN: ::std::option::Option<
-             extern "C" fn(data: u64, id: u64, addr: target_ulong, size: usize),
+            extern "C" fn(data: u64, id: u64, addr: target_ulong, size: usize),
         >,
         data: u64,
     ) -> usize;
 }
 extern "C" {
     pub fn libafl_add_write_hook(
-        gen: ::std::option::Option<
-             extern "C" fn(data: u64, pc: target_ulong, oi: MemOpIdx) -> u64,
-        >,
-        exec1: ::std::option::Option< extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
-        exec2: ::std::option::Option< extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
-        exec4: ::std::option::Option< extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
-        exec8: ::std::option::Option< extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong, oi: MemOpIdx) -> u64>,
+        exec1: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec2: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec4: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
+        exec8: ::std::option::Option<extern "C" fn(data: u64, id: u64, addr: target_ulong)>,
         execN: ::std::option::Option<
-             extern "C" fn(data: u64, id: u64, addr: target_ulong, size: usize),
+            extern "C" fn(data: u64, id: u64, addr: target_ulong, size: usize),
         >,
         data: u64,
     ) -> usize;
@@ -13545,13 +13541,11 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_add_cmp_hook(
-        gen: ::std::option::Option<
-             extern "C" fn(data: u64, pc: target_ulong, size: usize) -> u64,
-        >,
-        exec1: ::std::option::Option< extern "C" fn(data: u64, id: u64, v0: u8, v1: u8)>,
-        exec2: ::std::option::Option< extern "C" fn(data: u64, id: u64, v0: u16, v1: u16)>,
-        exec4: ::std::option::Option< extern "C" fn(data: u64, id: u64, v0: u32, v1: u32)>,
-        exec8: ::std::option::Option< extern "C" fn(data: u64, id: u64, v0: u64, v1: u64)>,
+        gen: ::std::option::Option<extern "C" fn(data: u64, pc: target_ulong, size: usize) -> u64>,
+        exec1: ::std::option::Option<extern "C" fn(data: u64, id: u64, v0: u8, v1: u8)>,
+        exec2: ::std::option::Option<extern "C" fn(data: u64, id: u64, v0: u16, v1: u16)>,
+        exec4: ::std::option::Option<extern "C" fn(data: u64, id: u64, v0: u32, v1: u32)>,
+        exec8: ::std::option::Option<extern "C" fn(data: u64, id: u64, v0: u64, v1: u64)>,
         data: u64,
     ) -> usize;
 }
@@ -13649,7 +13643,7 @@ extern "C" {
 }
 extern "C" {
     pub fn libafl_add_new_thread_hook(
-        callback: ::std::option::Option< extern "C" fn(data: u64, tid: u32) -> bool>,
+        callback: ::std::option::Option<extern "C" fn(data: u64, tid: u32) -> bool>,
         data: u64,
     ) -> usize;
 }
