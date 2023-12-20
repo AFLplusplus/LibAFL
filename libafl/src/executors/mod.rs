@@ -17,9 +17,6 @@ pub use timeout::TimeoutExecutor;
 
 pub mod hooks;
 
-#[cfg(windows)]
-pub mod inprocess_hooks_win;
-
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub mod forkserver;
 #[cfg(all(feature = "std", feature = "fork", unix))]

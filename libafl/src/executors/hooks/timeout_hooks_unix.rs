@@ -1,7 +1,17 @@
+use core::{
+    ffi::c_void,
+    fmt::{self, Debug, Formatter},
+    mem::zeroed,
+    ptr::{addr_of, addr_of_mut, null_mut, write_volatile},
+};
 use std::time::Duration;
-use core::{fmt::{self, Debug, Formatter}, ptr::{null_mut, addr_of_mut, addr_of}, mem::zeroed};
+
 use libafl_bolts::current_time;
-use crate::executors::hooks::inprocess_hooks_unix::DefaultExecutorHooksData;
+
+use crate::executors::hooks::{
+    inprocess_hooks_unix::{MainExecutorHooksData, GLOBAL_STATE},
+    ExecutorHooks,
+};
 
 /// Set the timer with this hook
 #[cfg(unix)]
@@ -87,6 +97,66 @@ extern "C" {
 }
 
 #[cfg(target_os = "linux")]
+impl ExecutorHooks for TimeoutExecutorHooks {
+    fn pre_run_target<E, EM, I, S, Z>(
+        &mut self,
+        _executor: &E,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) {
+        unsafe {
+            if self.batch_mode {
+                let data = &mut GLOBAL_STATE;
+                write_volatile(&mut data.timeout_hook_ptr, self as *const _ as *mut c_void);
+
+                if self.executions == 0 {
+                    libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
+                    self.tmout_start_time = current_time();
+                }
+                self.start_time = current_time();
+            } else {
+                libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
+            }
+        }
+    }
+
+    fn post_run_target(&mut self) {
+        if self.batch_mode {
+            unsafe {
+                let elapsed = current_time() - self.tmout_start_time;
+                // elapsed may be > than tmout in case of received but ingored signal
+                if elapsed > self.exec_tmout
+                    || self.exec_tmout - elapsed < self.avg_exec_time * self.avg_mul_k
+                {
+                    let disarmed: libc::itimerspec = zeroed();
+                    libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
+                    // set timer the next exec
+                    if self.executions > 0 {
+                        self.avg_exec_time = elapsed / self.executions;
+                        self.executions = 0;
+                    }
+                    // readjust K
+                    if self.last_signal_time > self.exec_tmout * self.avg_mul_k
+                        && self.avg_mul_k > 1
+                    {
+                        self.avg_mul_k -= 1;
+                    }
+                } else {
+                    self.executions += 1;
+                }
+            }
+        } else {
+            unsafe {
+                let disarmed: libc::itimerspec = zeroed();
+                libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
 impl TimeoutExecutorHooks {
     /// Create a new [`TimeoutExecutorHooks`]
     pub fn new(exec_tmout: Duration) -> Self {
@@ -149,7 +219,7 @@ impl TimeoutExecutorHooks {
         self.exec_tmout = exec_tmout;
     }
 
-    pub(crate) fn handle_timeout(&mut self, data: &DefaultExecutorHooksData) -> bool {
+    pub(crate) fn handle_timeout(&mut self, data: &MainExecutorHooksData) -> bool {
         if !self.batch_mode {
             return false;
         }

@@ -9,7 +9,8 @@ use libafl_bolts::os::unix_signals::setup_signal_handler;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
-        inprocess::run_observers_and_save_state, Executor, ExecutorHooks, ExitKind, HasObservers,
+        hooks::ExecutorHooks, inprocess::run_observers_and_save_state, Executor, ExitKind,
+        HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -19,8 +20,9 @@ use crate::{
 };
 
 /// The inmem executor's handlers.
+/// This hook serves the most important role as registering the crash and the timeout
 #[derive(Debug)]
-pub struct DefaultExecutorHooks {
+pub struct MainExecutorHooks {
     /// On crash C function pointer
     #[cfg(feature = "std")]
     pub crash_handler: *const c_void,
@@ -29,8 +31,8 @@ pub struct DefaultExecutorHooks {
     pub timeout_handler: *const c_void,
 }
 
-impl DefaultExecutorHooks {
-    /// Create new [`DefaultExecutorHooks`].
+impl MainExecutorHooks {
+    /// Create new [`MainExecutorHooks`].
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers,
@@ -63,14 +65,14 @@ impl DefaultExecutorHooks {
     #[must_use]
     pub fn nop() -> Self {
         let ret;
-        #[cfg(any(unix, feature = "std"))]
+        #[cfg(feature = "std")]
         {
             ret = Self {
                 crash_handler: ptr::null(),
                 timeout_handler: ptr::null(),
             };
         }
-        #[cfg(not(any(unix, feature = "std")))]
+        #[cfg(not(feature = "std"))]
         {
             ret = Self {};
         }
@@ -78,11 +80,11 @@ impl DefaultExecutorHooks {
     }
 }
 
-impl ExecutorHooks for DefaultExecutorHooks {
+impl ExecutorHooks for MainExecutorHooks {
     /// Call before running a target.
     #[allow(clippy::unused_self)]
     fn pre_run_target<E, EM, I, S, Z>(
-        &self,
+        &mut self,
         _executor: &E,
         _fuzzer: &mut Z,
         _state: &mut S,
@@ -113,7 +115,7 @@ impl ExecutorHooks for DefaultExecutorHooks {
 
     /// Call after running a target.
     #[allow(clippy::unused_self)]
-    fn post_run_target(&self) {
+    fn post_run_target(&mut self) {
         #[cfg(unix)]
         unsafe {
             write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
@@ -124,7 +126,7 @@ impl ExecutorHooks for DefaultExecutorHooks {
 
 /// The global state of the in-process harness.
 #[derive(Debug)]
-pub struct DefaultExecutorHooksData {
+pub struct MainExecutorHooksData {
     pub(crate) state_ptr: *mut c_void,
     pub(crate) event_mgr_ptr: *mut c_void,
     pub(crate) fuzzer_ptr: *mut c_void,
@@ -140,13 +142,13 @@ pub struct DefaultExecutorHooksData {
     pub(crate) timeout_handler: *const c_void,
 
     #[cfg(feature = "std")]
-    pub(crate) timeout_executor_ptr: *mut c_void,
+    pub(crate) timeout_hook_ptr: *mut c_void,
 }
 
-unsafe impl Send for DefaultExecutorHooksData {}
-unsafe impl Sync for DefaultExecutorHooksData {}
+unsafe impl Send for MainExecutorHooksData {}
+unsafe impl Sync for MainExecutorHooksData {}
 
-impl DefaultExecutorHooksData {
+impl MainExecutorHooksData {
     #[cfg(feature = "std")]
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
@@ -174,15 +176,18 @@ impl DefaultExecutorHooksData {
         r
     }
 
-    #[cfg( feature = "std")]
+    #[cfg(feature = "std")]
     pub(crate) fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }
 
     #[cfg(feature = "std")]
-    fn timeout_executor_mut<'a, E>(&self) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
+    fn timeout_hook<'a>(
+        &self,
+    ) -> &'a mut crate::executors::hooks::timeout_hooks_unix::TimeoutExecutorHooks {
         unsafe {
-            (self.timeout_executor_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
+            (self.timeout_hook_ptr
+                as *mut crate::executors::hooks::timeout_hooks_unix::TimeoutExecutorHooks)
                 .as_mut()
                 .unwrap()
         }
@@ -197,7 +202,7 @@ impl DefaultExecutorHooksData {
 }
 
 /// Exception handling needs some nasty unsafe.
-pub(crate) static mut GLOBAL_STATE: DefaultExecutorHooksData = DefaultExecutorHooksData {
+pub(crate) static mut GLOBAL_STATE: MainExecutorHooksData = MainExecutorHooksData {
     // The state ptr for signal handling
     state_ptr: null_mut(),
     // The event manager ptr for signal handling
@@ -219,7 +224,7 @@ pub(crate) static mut GLOBAL_STATE: DefaultExecutorHooksData = DefaultExecutorHo
     timeout_handler: ptr::null(),
 
     #[cfg(feature = "std")]
-    timeout_executor_ptr: null_mut(),
+    timeout_hook_ptr: null_mut(),
 };
 
 /// Get the inprocess [`crate::state::State`]
@@ -312,8 +317,8 @@ pub mod unix_signal_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
+            hooks::inprocess_hooks_unix::{MainExecutorHooksData, GLOBAL_STATE},
             inprocess::run_observers_and_save_state,
-            hooks::inprocess_hooks_unix::{DefaultExecutorHooksData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -326,7 +331,7 @@ pub mod unix_signal_handler {
         Signal,
         &mut siginfo_t,
         Option<&mut ucontext_t>,
-        data: &mut DefaultExecutorHooksData,
+        data: &mut MainExecutorHooksData,
     );
 
     /// A handler that does nothing.
@@ -334,12 +339,12 @@ pub mod unix_signal_handler {
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
-        _data: &mut DefaultExecutorHooksData,
+        _data: &mut MainExecutorHooksData,
     ) {
     }*/
 
     #[cfg(unix)]
-    impl Handler for DefaultExecutorHooksData {
+    impl Handler for MainExecutorHooksData {
         fn handle(
             &mut self,
             signal: Signal,
@@ -432,7 +437,7 @@ pub mod unix_signal_handler {
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
-        data: &mut DefaultExecutorHooksData,
+        data: &mut MainExecutorHooksData,
     ) where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -440,9 +445,7 @@ pub mod unix_signal_handler {
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        if !data.timeout_executor_ptr.is_null()
-            && data.timeout_executor_mut::<E>().handle_timeout(data)
-        {
+        if !data.timeout_hook_ptr.is_null() && data.timeout_hook().handle_timeout(data) {
             return;
         }
 
@@ -482,7 +485,7 @@ pub mod unix_signal_handler {
         signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
-        data: &mut DefaultExecutorHooksData,
+        data: &mut MainExecutorHooksData,
     ) where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,

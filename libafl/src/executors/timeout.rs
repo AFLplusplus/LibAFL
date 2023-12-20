@@ -31,12 +31,14 @@ use windows::Win32::{
     },
 };
 
-#[cfg(all(windows, feature = "std"))]
-use crate::executors::inprocess::HasInProcessHandlers;
 #[cfg(any(windows, target_os = "linux"))]
 use crate::executors::hooks::inprocess_hooks_unix::GLOBAL_STATE;
+#[cfg(all(windows, feature = "std"))]
+use crate::executors::inprocess::HasInProcessHandlers;
 use crate::{
-    executors::{hooks::inprocess_hooks_unix::DefaultExecutorHooksData, Executor, ExitKind, HasObservers},
+    executors::{
+        hooks::inprocess_hooks_unix::MainExecutorHooksData, Executor, ExitKind, HasObservers,
+    },
     observers::UsesObservers,
     state::UsesState,
     Error,
@@ -218,7 +220,7 @@ impl<E> TimeoutExecutor<E> {
         self.exec_tmout = exec_tmout;
     }
 
-    pub(crate) fn handle_timeout(&mut self, data: &DefaultExecutorHooksData) -> bool {
+    pub(crate) fn handle_timeout(&mut self, data: &MainExecutorHooksData) -> bool {
         if !self.batch_mode {
             return false;
         }
@@ -314,7 +316,7 @@ impl<E> TimeoutExecutor<E> {
     }
 
     #[allow(clippy::unused_self)]
-    pub(crate) fn handle_timeout(&mut self, _data: &mut DefaultExecutorHooksData) -> bool {
+    pub(crate) fn handle_timeout(&mut self, _data: &mut MainExecutorHooksData) -> bool {
         false // TODO
     }
 }
@@ -363,7 +365,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
     }
 
     #[allow(clippy::unused_self)]
-    pub(crate) fn handle_timeout(&mut self, _data: &mut DefaultExecutorHooksData) -> bool {
+    pub(crate) fn handle_timeout(&mut self, _data: &mut MainExecutorHooksData) -> bool {
         false // TODO
     }
 
@@ -390,10 +392,7 @@ where
     ) -> Result<ExitKind, Error> {
         unsafe {
             let data = &mut GLOBAL_STATE;
-            write_volatile(
-                &mut data.timeout_executor_ptr,
-                self as *mut _ as *mut c_void,
-            );
+            write_volatile(&mut data.timeout_hook_ptr, self as *mut _ as *mut c_void);
 
             write_volatile(&mut data.ptp_timer, Some(self.ptp_timer));
             write_volatile(
@@ -466,10 +465,7 @@ where
         unsafe {
             if self.batch_mode {
                 let data = &mut GLOBAL_STATE;
-                write_volatile(
-                    &mut data.timeout_executor_ptr,
-                    self as *mut _ as *mut c_void,
-                );
+                write_volatile(&mut data.timeout_hook_ptr, self as *mut _ as *mut c_void);
 
                 if self.executions == 0 {
                     libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());

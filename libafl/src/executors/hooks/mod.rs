@@ -15,7 +15,7 @@ pub trait ExecutorHooks {
     /// The pre_exec hook that is called before running a target.
     #[allow(clippy::unused_self)]
     fn pre_run_target<E, EM, I, S, Z>(
-        &self,
+        &mut self,
         _executor: &E,
         _fuzzer: &mut Z,
         _state: &mut S,
@@ -24,5 +24,5 @@ pub trait ExecutorHooks {
     );
 
     /// The post_exec hooks that runs before and after running the target
-    fn post_run_target(&self);
+    fn post_run_target(&mut self);
 }

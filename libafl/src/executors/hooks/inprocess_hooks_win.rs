@@ -18,7 +18,7 @@ use crate::{
 
 /// The inmem executor's handlers.
 #[derive(Debug)]
-pub struct DefaultExecutorHooks {
+pub struct MainExecutorHooks {
     /// On crash C function pointer
     #[cfg(any(unix, feature = "std"))]
     pub crash_handler: *const c_void,
@@ -27,8 +27,8 @@ pub struct DefaultExecutorHooks {
     pub timeout_handler: *const c_void,
 }
 
-impl DefaultExecutorHooks {
-    /// Create new [`DefaultExecutorHooks`].
+impl MainExecutorHooks {
+    /// Create new [`MainExecutorHooks`].
     #[cfg(all(windows, feature = "std"))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
@@ -68,7 +68,7 @@ impl DefaultExecutorHooks {
     }
 }
 
-impl ExecutorHooks for DefaultExecutorHooks {
+impl ExecutorHooks for MainExecutorHooks {
     /// Call before running a target.
     #[allow(clippy::unused_self)]
     fn pre_run_target<E, EM, I, S, Z>(
@@ -114,7 +114,7 @@ impl ExecutorHooks for DefaultExecutorHooks {
 
 /// The global state of the in-process harness.
 #[derive(Debug)]
-pub struct DefaultExecutorHooksData {
+pub struct MainExecutorHooksData {
     pub(crate) state_ptr: *mut c_void,
     pub(crate) event_mgr_ptr: *mut c_void,
     pub(crate) fuzzer_ptr: *mut c_void,
@@ -139,13 +139,13 @@ pub struct DefaultExecutorHooksData {
     pub(crate) timeout_input_ptr: *mut c_void,
 
     #[cfg(any(unix, feature = "std"))]
-    pub(crate) timeout_executor_ptr: *mut c_void,
+    pub(crate) timeout_hook_ptr: *mut c_void,
 }
 
-unsafe impl Send for DefaultExecutorHooksData {}
-unsafe impl Sync for DefaultExecutorHooksData {}
+unsafe impl Send for MainExecutorHooksData {}
+unsafe impl Sync for MainExecutorHooksData {}
 
-impl DefaultExecutorHooksData {
+impl MainExecutorHooksData {
     #[cfg(feature = "std")]
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
@@ -181,7 +181,7 @@ impl DefaultExecutorHooksData {
     #[cfg(feature = "std")]
     fn timeout_executor_mut<'a, E>(&self) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
         unsafe {
-            (self.timeout_executor_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
+            (self.timeout_hook_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
                 .as_mut()
                 .unwrap()
         }
@@ -232,7 +232,7 @@ pub fn inprocess_in_handler() -> bool {
 }
 
 /// Exception handling needs some nasty unsafe.
-pub(crate) static mut GLOBAL_STATE: DefaultExecutorHooksData = DefaultExecutorHooksData {
+pub(crate) static mut GLOBAL_STATE: MainExecutorHooksData = MainExecutorHooksData {
     // The state ptr for signal handling
     state_ptr: null_mut(),
     // The event manager ptr for signal handling
@@ -262,7 +262,7 @@ pub(crate) static mut GLOBAL_STATE: DefaultExecutorHooksData = DefaultExecutorHo
     timeout_input_ptr: null_mut(),
 
     #[cfg(feature = "std")]
-    timeout_executor_ptr: null_mut(),
+    timeout_hook_ptr: null_mut(),
 };
 
 /// Same as `inproc_crash_handler`, but this is called when address sanitizer exits, not from the exception handler
@@ -278,7 +278,7 @@ pub mod windows_asan_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::run_observers_and_save_state, inprocess_hooks_win::GLOBAL_STATE, Executor,
+            inprocess::run_observers_and_save_state, hooks::inprocess_hooks_win::GLOBAL_STATE, Executor,
             ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -388,8 +388,8 @@ pub mod windows_exception_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{run_observers_and_save_state, HasDefaultExecutorHooks},
-            inprocess_hooks_win::{DefaultExecutorHooksData, GLOBAL_STATE},
+            inprocess::{run_observers_and_save_state, HasMainExecutorHooks},
+            hooks::inprocess_hooks_win::{MainExecutorHooksData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -399,16 +399,16 @@ pub mod windows_exception_handler {
     };
 
     pub(crate) type HandlerFuncPtr =
-        unsafe fn(*mut EXCEPTION_POINTERS, &mut DefaultExecutorHooksData);
+        unsafe fn(*mut EXCEPTION_POINTERS, &mut MainExecutorHooksData);
 
     /*pub unsafe fn nop_handler(
         _code: ExceptionCode,
         _exception_pointers: *mut EXCEPTION_POINTERS,
-        _data: &mut DefaultExecutorHooksData,
+        _data: &mut MainExecutorHooksData,
     ) {
     }*/
 
-    impl Handler for DefaultExecutorHooksData {
+    impl Handler for MainExecutorHooksData {
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
             unsafe {
@@ -500,19 +500,19 @@ pub mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers + HasDefaultExecutorHooks,
+        E: HasObservers + HasMainExecutorHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        let data: &mut DefaultExecutorHooksData =
-            &mut *(global_state as *mut DefaultExecutorHooksData);
+        let data: &mut MainExecutorHooksData =
+            &mut *(global_state as *mut MainExecutorHooksData);
         compiler_fence(Ordering::SeqCst);
         EnterCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
         compiler_fence(Ordering::SeqCst);
 
-        if !data.timeout_executor_ptr.is_null()
+        if !data.timeout_hook_ptr.is_null()
             && data.timeout_executor_mut::<E>().handle_timeout(data)
         {
             compiler_fence(Ordering::SeqCst);
@@ -565,7 +565,7 @@ pub mod windows_exception_handler {
     #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
-        data: &mut DefaultExecutorHooksData,
+        data: &mut MainExecutorHooksData,
     ) where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,

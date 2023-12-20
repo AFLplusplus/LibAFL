@@ -19,13 +19,13 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
     Signal,
     &mut siginfo_t,
     Option<&mut ucontext_t>,
-    data: &mut InChildDefaultExecutorHooksData,
+    data: &mut InChildMainExecutorHooksData,
 );
 
 /// The inmem fork executor's handlers.
 #[cfg(all(feature = "std", unix))]
 #[derive(Debug)]
-pub struct InChildDefaultExecutorHooks {
+pub struct InChildMainExecutorHooks {
     /// On crash C function pointer
     pub crash_handler: *const c_void,
     /// On timeout C function pointer
@@ -33,7 +33,7 @@ pub struct InChildDefaultExecutorHooks {
 }
 
 #[cfg(all(feature = "std", unix))]
-impl InChildDefaultExecutorHooks {
+impl InChildMainExecutorHooks {
     /// Call before running a target.
     pub fn pre_run_target<E, I, S>(&self, executor: &E, state: &mut S, input: &I) {
         unsafe {
@@ -53,7 +53,7 @@ impl InChildDefaultExecutorHooks {
         }
     }
 
-    /// Create new [`InChildDefaultExecutorHooks`].
+    /// Create new [`InChildMainExecutorHooks`].
     pub fn new<E>() -> Result<Self, Error>
     where
         E: HasObservers,
@@ -72,7 +72,7 @@ impl InChildDefaultExecutorHooks {
         }
     }
 
-    /// Create new [`InChildDefaultExecutorHooks`].
+    /// Create new [`InChildMainExecutorHooks`].
     pub fn with_timeout<E>() -> Result<Self, Error>
     where
         E: HasObservers,
@@ -104,7 +104,7 @@ impl InChildDefaultExecutorHooks {
 /// The global state of the in-process-fork harness.
 #[cfg(all(feature = "std", unix))]
 #[derive(Debug)]
-pub(crate) struct InChildDefaultExecutorHooksData {
+pub(crate) struct InChildMainExecutorHooksData {
     /// Stores a pointer to the fork executor struct
     pub executor_ptr: *const c_void,
     /// Stores a pointer to the state
@@ -118,12 +118,12 @@ pub(crate) struct InChildDefaultExecutorHooksData {
 }
 
 #[cfg(all(feature = "std", unix))]
-unsafe impl Sync for InChildDefaultExecutorHooksData {}
+unsafe impl Sync for InChildMainExecutorHooksData {}
 #[cfg(all(feature = "std", unix))]
-unsafe impl Send for InChildDefaultExecutorHooksData {}
+unsafe impl Send for InChildMainExecutorHooksData {}
 
 #[cfg(all(feature = "std", unix))]
-impl InChildDefaultExecutorHooksData {
+impl InChildMainExecutorHooksData {
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
@@ -149,8 +149,8 @@ impl InChildDefaultExecutorHooksData {
 
 /// a static variable storing the global state
 #[cfg(all(feature = "std", unix))]
-pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InChildDefaultExecutorHooksData =
-    InChildDefaultExecutorHooksData {
+pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InChildMainExecutorHooksData =
+    InChildMainExecutorHooksData {
         executor_ptr: ptr::null(),
         state_ptr: ptr::null(),
         current_input_ptr: ptr::null(),
@@ -159,7 +159,7 @@ pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InChildDefaultExecutorHooksData
     };
 
 #[cfg(all(feature = "std", unix))]
-impl Handler for InChildDefaultExecutorHooksData {
+impl Handler for InChildMainExecutorHooksData {
     fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: Option<&mut ucontext_t>) {
         match signal {
             Signal::SigUser2 | Signal::SigAlarm => unsafe {
@@ -203,7 +203,7 @@ pub mod child_signal_handlers {
     use libafl_bolts::os::unix_signals::{ucontext_t, Signal};
     use libc::siginfo_t;
 
-    use super::{InChildDefaultExecutorHooksData, FORK_EXECUTOR_GLOBAL_DATA};
+    use super::{InChildMainExecutorHooksData, FORK_EXECUTOR_GLOBAL_DATA};
     use crate::{
         executors::{ExitKind, HasObservers},
         inputs::UsesInput,
@@ -245,7 +245,7 @@ pub mod child_signal_handlers {
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
-        data: &mut InChildDefaultExecutorHooksData,
+        data: &mut InChildMainExecutorHooksData,
     ) where
         E: HasObservers,
     {
@@ -267,7 +267,7 @@ pub mod child_signal_handlers {
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
-        data: &mut InChildDefaultExecutorHooksData,
+        data: &mut InChildMainExecutorHooksData,
     ) where
         E: HasObservers,
     {

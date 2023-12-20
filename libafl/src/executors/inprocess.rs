@@ -29,16 +29,16 @@ use nix::{
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 #[cfg(windows)]
-use crate::executors::inprocess_hooks_win::DefaultExecutorHooks;
+use crate::executors::hooks::inprocess_hooks_win::MainExecutorHooks;
 #[cfg(unix)]
 use crate::executors::{
-    hooks::inprocess_fork_hooks_unix::InChildDefaultExecutorHooks,
-    hooks::inprocess_hooks_unix::DefaultExecutorHooks,
+    hooks::inprocess_fork_hooks_unix::InChildMainExecutorHooks,
+    hooks::inprocess_hooks_unix::MainExecutorHooks,
 };
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
-    executors::{Executor, ExecutorHooks, ExitKind, HasObservers},
+    executors::{hooks::ExecutorHooks, Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
@@ -71,8 +71,8 @@ where
     harness_fn: HB,
     /// The observers, observing each run
     observers: OT,
-    // Crash and timeout hah
-    default_hooks: DefaultExecutorHooks,
+    // Crash and timeout handling
+    default_hooks: MainExecutorHooks,
     phantom: PhantomData<(S, *const H)>,
 }
 
@@ -183,7 +183,7 @@ where
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let default_hooks = DefaultExecutorHooks::new::<Self, EM, OF, Z>()?;
+        let default_hooks = MainExecutorHooks::new::<Self, EM, OF, Z>()?;
         #[cfg(windows)]
         // Some initialization necessary for windows.
         unsafe {
@@ -222,26 +222,26 @@ where
 
     /// The default hooks
     #[inline]
-    pub fn default_hooks(&self) -> &DefaultExecutorHooks {
+    pub fn default_hooks(&self) -> &MainExecutorHooks {
         &self.default_hooks
     }
 
     /// The default hooks (mutable)
     #[inline]
-    pub fn default_hooks_mut(&mut self) -> &mut DefaultExecutorHooks {
+    pub fn default_hooks_mut(&mut self) -> &mut MainExecutorHooks {
         &mut self.default_hooks
     }
 }
 
 /// The struct has [`InProcessHandlers`].
 #[cfg(windows)]
-pub trait HasDefaultExecutorHooks {
+pub trait HasMainExecutorHooks {
     /// Get the in-process handlers.
-    fn inprocess_handlers(&self) -> &DefaultExecutorHooks;
+    fn inprocess_handlers(&self) -> &MainExecutorHooks;
 }
 
 #[cfg(windows)]
-impl<H, HB, OT, S> HasDefaultExecutorHooks for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, OT, S> HasMainExecutorHooks for GenericInProcessExecutor<H, HB, OT, S>
 where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
@@ -250,7 +250,7 @@ where
 {
     /// the timeout handler
     #[inline]
-    fn inprocess_handlers(&self) -> &DefaultExecutorHooks {
+    fn inprocess_handlers(&self) -> &MainExecutorHooks {
         &self.handlers
     }
 }
@@ -364,7 +364,7 @@ where
     harness_fn: &'a mut H,
     shmem_provider: SP,
     observers: OT,
-    handlers: InChildDefaultExecutorHooks,
+    handlers: InChildMainExecutorHooks,
     phantom: PhantomData<S>,
 }
 
@@ -380,7 +380,7 @@ where
     harness_fn: &'a mut H,
     shmem_provider: SP,
     observers: OT,
-    handlers: InChildDefaultExecutorHooks,
+    handlers: InChildMainExecutorHooks,
     #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_os = "linux")))]
@@ -652,7 +652,7 @@ where
         S: HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let handlers = InChildDefaultExecutorHooks::new::<Self>()?;
+        let handlers = InChildMainExecutorHooks::new::<Self>()?;
         Ok(Self {
             harness_fn,
             shmem_provider,
@@ -700,7 +700,7 @@ where
         S: HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let handlers = InChildDefaultExecutorHooks::with_timeout::<Self>()?;
+        let handlers = InChildMainExecutorHooks::with_timeout::<Self>()?;
         let milli_sec = timeout.as_millis();
         let it_value = libc::timespec {
             tv_sec: (milli_sec / 1000) as _,
@@ -742,7 +742,7 @@ where
         S: HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let handlers = InChildDefaultExecutorHooks::with_timeout::<Self>()?;
+        let handlers = InChildMainExecutorHooks::with_timeout::<Self>()?;
         let milli_sec = timeout.as_millis();
         let it_value = Timeval {
             tv_sec: (milli_sec / 1000) as i64,
@@ -849,9 +849,9 @@ mod tests {
     use serial_test::serial;
 
     #[cfg(unix)]
-    use crate::executors::hooks::inprocess_hooks_unix::DefaultExecutorHooks;
+    use crate::executors::hooks::inprocess_hooks_unix::MainExecutorHooks;
     #[cfg(windows)]
-    use crate::executors::inprocess_hooks_win::DefaultExecutorHooks;
+    use crate::executors::hooks::inprocess_hooks_win::MainExecutorHooks;
     use crate::{
         events::NopEventManager,
         executors::{Executor, ExitKind, InProcessExecutor},
@@ -871,7 +871,7 @@ mod tests {
         let mut in_process_executor = InProcessExecutor::<_, _, _> {
             harness_fn: &mut harness,
             observers: tuple_list!(),
-            default_hooks: DefaultExecutorHooks::nop(),
+            default_hooks: MainExecutorHooks::nop(),
             phantom: PhantomData,
         };
         let input = NopInput {};
@@ -894,7 +894,7 @@ mod tests {
 
         use crate::{
             events::SimpleEventManager,
-            executors::{inprocess::InChildDefaultExecutorHooks, InProcessForkExecutor},
+            executors::{inprocess::InChildMainExecutorHooks, InProcessForkExecutor},
             state::NopState,
             NopFuzzer,
         };
@@ -906,7 +906,7 @@ mod tests {
             harness_fn: &mut harness,
             shmem_provider: provider,
             observers: tuple_list!(),
-            handlers: InChildDefaultExecutorHooks::nop(),
+            handlers: InChildMainExecutorHooks::nop(),
             phantom: PhantomData,
         };
         let input = NopInput {};
