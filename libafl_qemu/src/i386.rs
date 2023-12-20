@@ -28,7 +28,7 @@ pub enum Regs {
 static BACKDOOR_ARCH_REGS: OnceLock<EnumMap<BackdoorArgs, Regs>> = OnceLock::new();
 
 pub fn get_backdoor_arch_regs() -> &'static EnumMap<BackdoorArgs, Regs> {
-    SYNC_BACKDOOR_ARCH_REGS.get_or_init(|| {
+    BACKDOOR_ARCH_REGS.get_or_init(|| {
         enum_map! {
             BackdoorArgs::Ret  => Regs::Eax,
             BackdoorArgs::Cmd  => Regs::Eax,
