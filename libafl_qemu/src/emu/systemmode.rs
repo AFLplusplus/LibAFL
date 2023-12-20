@@ -10,8 +10,9 @@ use std::{
 };
 
 use libafl::{
+    corpus::{InMemoryCorpus, OnDiskCorpus},
     inputs::HasTargetBytes,
-    prelude::{InMemoryCorpus, OnDiskCorpus, StdState},
+    state::StdState,
 };
 use libafl_bolts::{bolts_prelude::RomuDuoJrRand, os::unix_signals::Signal, AsSlice};
 
