@@ -128,12 +128,11 @@ impl CommandInput {
     {
         let max_len: usize = self.max_input_size.try_into().unwrap();
 
-        let input_sliced;
-        if input.len() > max_len {
-            input_sliced = &input[0..max_len];
+        let input_sliced = if input.len() > max_len {
+            &input[0..max_len]
         } else {
-            input_sliced = input;
-        }
+            input
+        };
 
         match self.addr {
             GuestAddrKind::Physical(hwaddr) => unsafe {
@@ -158,7 +157,7 @@ impl CommandInput {
         if let Some(backdoor) = backdoor {
             backdoor
                 .ret(
-                    &self.cpu.as_ref().unwrap(),
+                    self.cpu.as_ref().unwrap(),
                     input_sliced.len().try_into().unwrap(),
                 )
                 .unwrap();
@@ -205,7 +204,7 @@ impl IsEmuExitHandler for NopEmuExitHandler {
     ) -> Result<InnerHandlerResult, HandlerError> {
         match exit_reason {
             Ok(reason) => Ok(InnerHandlerResult::ReturnToHarness(reason)),
-            Err(error) => return Err(error)?,
+            Err(error) => Err(error)?,
         }
     }
 }
@@ -1116,8 +1115,8 @@ where
         }
     }
 
-    pub fn entry_break(&self, addr: GuestVirtAddr) {
-        let mut bp = Breakpoint::without_command(addr as GuestAddr, false);
+    pub fn entry_break(&self, addr: GuestAddr) {
+        let mut bp = Breakpoint::without_command(addr, false);
         self.add_breakpoint(bp.clone(), true);
         unsafe {
             // TODO: decide what to do with sync exit here: ignore or check for bp exit?

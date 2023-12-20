@@ -449,6 +449,7 @@ impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for QemuEdgeCover
     }
 }
 
+#[allow(clippy::collapsible_else_if)]
 impl<S, E> QemuHelper<S, E> for QemuEdgeCoverageClassicHelper
 where
     S: UsesInput + HasMetadata,

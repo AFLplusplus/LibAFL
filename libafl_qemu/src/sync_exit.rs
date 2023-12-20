@@ -23,7 +23,6 @@ mod bindings {
     #![allow(clippy::all)]
     #![allow(clippy::pedantic)]
 
-    #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
     include!(concat!(env!("OUT_DIR"), "/sync_exit_bindings.rs"));
 }
 
