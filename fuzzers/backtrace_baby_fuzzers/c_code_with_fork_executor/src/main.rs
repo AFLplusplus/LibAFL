@@ -50,7 +50,7 @@ pub fn main() {
     let mut bt = shmem_provider.new_shmem_object::<Option<u64>>().unwrap();
     let bt_observer = BacktraceObserver::new(
         "BacktraceObserver",
-        unsafe { bt.as_object_mut::<Option<u64>>() },
+        unsafe { bt.as_owned_ref_mut_of::<Option<u64>>() },
         libafl::observers::HarnessType::Child,
     );
 

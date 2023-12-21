@@ -31,7 +31,10 @@ pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 use crate::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
 pub use crate::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
-use crate::{AsMutSlice, AsSlice, Error};
+use crate::{
+    ownedref::{OwnedMutSlice, OwnedRef, OwnedRefMut, OwnedSlice},
+    AsMutSlice, AsSlice, Error,
+};
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -204,52 +207,53 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
         self.len() == 0
     }
 
-    /// Convert to an owned object reference
+    /// Convert to a [`OwnedRef`] of a given type, checking that the size is correct
     ///
     /// # Safety
-    /// This function is not safe as the object may be not initialized.
-    /// The user is responsible to initialize the object with something like
-    /// `*shmem.as_object_mut::<T>() = T::new();`
-    unsafe fn as_object<T: Sized + 'static>(&self) -> &T {
+    /// This function is not safe if the type was not previously initialized
+    /// or a different type may be placed at this memory location.
+    /// Further users of this [`OwnedRefMut`] will access the underlying data directly.
+    unsafe fn as_owned_ref_of<'a, T: Sized + 'static>(&self) -> OwnedRef<'a, T> {
         assert!(self.len() >= core::mem::size_of::<T>());
-        (self.as_slice().as_ptr() as *const () as *const T)
-            .as_ref()
-            .unwrap()
+        OwnedRef::from_ptr(self.as_slice().as_ptr() as *const T)
     }
 
-    /// Convert to an owned object mutable reference
+    /// Convert to a [`OwnedRefMut`] of a given type, checking that the size is correct
     ///
     /// # Safety
-    /// This function is not safe as the object may be not initialized.
-    /// The user is responsible to initialize the object with something like
-    /// `*shmem.as_object_mut::<T>() = T::new();`
-    unsafe fn as_object_mut<T: Sized + 'static>(&mut self) -> &mut T {
+    /// This function is not safe if the type was not previously initialized
+    /// or a different type may be placed at this memory location.
+    /// Further users of this [`OwnedRefMut`] will access the underlying data directly.
+    unsafe fn as_owned_ref_mut_of<'a, T: Sized + 'static>(&mut self) -> OwnedRefMut<'a, T> {
         assert!(self.len() >= core::mem::size_of::<T>());
-        (self.as_mut_slice().as_mut_ptr() as *mut () as *mut T)
-            .as_mut()
-            .unwrap()
+        OwnedRefMut::from_mut_ptr(
+            (self.as_mut_slice().as_mut_ptr() as *mut () as *mut T)
+                .as_mut()
+                .unwrap(),
+        )
     }
 
-    /// Convert to a slice of type &\[T\]
+    /// Convert to an [`OwnedSlice`] of type `T`
     ///
     /// # Safety
-    /// This function is not safe as the object may be not initialized.
-    /// The user is responsible to initialize the objects in the slice
-    unsafe fn as_objects_slice<T: Sized + 'static>(&self, len: usize) -> &[T] {
+    /// This function is not safe if the type was not previously initialized
+    /// or a different type may be placed at this memory location.
+    unsafe fn as_owned_slice_of<T: Sized + 'static>(&self, len: usize) -> OwnedSlice<T> {
         assert!(self.len() >= core::mem::size_of::<T>() * len);
-        let ptr = self.as_slice().as_ptr() as *const () as *const T;
-        core::slice::from_raw_parts(ptr, len)
+        OwnedSlice::from_raw_parts(self.as_slice().as_ptr() as _, len)
     }
 
-    /// Convert to a slice of type &mut \[T\]
+    /// Convert to an [`OwnedMutSlice`] of type `T`
     ///
     /// # Safety
-    /// This function is not safe as the object may be not initialized.
-    /// The user is responsible to initialize the objects in the slice
-    unsafe fn as_objects_slice_mut<T: Sized + 'static>(&mut self, len: usize) -> &mut [T] {
+    /// This function is not safe if the type was not previously initialized
+    /// or a different type may be placed at this memory location.
+    unsafe fn as_owned_slice_slice_mut_of<T: Sized + 'static>(
+        &mut self,
+        len: usize,
+    ) -> OwnedMutSlice<'_, T> {
         assert!(self.len() >= core::mem::size_of::<T>() * len);
-        let ptr = self.as_mut_slice().as_mut_ptr() as *mut () as *mut T;
-        core::slice::from_raw_parts_mut(ptr, len)
+        OwnedMutSlice::from_raw_parts_mut(self.as_mut_slice().as_mut_ptr() as _, len)
     }
 
     /// Get the description of the shared memory mapping
