@@ -18,9 +18,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{
-    current_nanos, ownedref::OwnedRefMut, rands::StdRand, tuples::tuple_list, AsSlice,
-};
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -63,9 +61,8 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
     // Create a stacktrace observer to add the observers tuple
-    let bt_observer = BacktraceObserver::new(
+    let bt_observer = BacktraceObserver::owned(
         "BacktraceObserver",
-        OwnedRefMut::owned(None),
         libafl::observers::HarnessType::InProcess,
     );
 

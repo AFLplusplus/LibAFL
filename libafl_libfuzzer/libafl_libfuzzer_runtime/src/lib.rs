@@ -150,7 +150,6 @@ macro_rules! fuzz_with {
     ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
         use libafl_bolts::{
                 current_nanos,
-                ownedref::OwnedRefMut,
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
                 AsSlice,
@@ -214,9 +213,8 @@ macro_rules! fuzz_with {
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
             // Create a stacktrace observer
-            let backtrace_observer = BacktraceObserver::new(
+            let backtrace_observer = BacktraceObserver::owned(
                 "BacktraceObserver",
-                OwnedRefMut::owned(None),
                 if $options.forks().is_some() || $options.tui() { libafl::observers::HarnessType::Child } else { libafl::observers::HarnessType::InProcess }
             );
 

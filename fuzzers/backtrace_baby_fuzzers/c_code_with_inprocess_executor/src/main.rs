@@ -16,9 +16,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{
-    current_nanos, ownedref::OwnedRefMut, rands::StdRand, tuples::tuple_list, AsSlice,
-};
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 use libc::c_uchar;
 extern crate libc;
 
@@ -39,9 +37,8 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = unsafe { ConstMapObserver::<u8, 3>::from_mut_ptr("signals", array_ptr) };
     // Create a stacktrace observer
-    let bt_observer = BacktraceObserver::new(
+    let bt_observer = BacktraceObserver::owned(
         "BacktraceObserver",
-        OwnedRefMut::owned(None),
         libafl::observers::HarnessType::InProcess,
     );
 
