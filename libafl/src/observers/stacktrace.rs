@@ -155,10 +155,7 @@ impl<'a> BacktraceObserver<'a> {
 
     /// Creates a new [`BacktraceObserver`] with the given name, owning a new `backtrace_hash` variable.
     #[must_use]
-    pub fn owned(
-        observer_name: &str,
-        harness_type: HarnessType,
-    ) -> Self {
+    pub fn owned(observer_name: &str, harness_type: HarnessType) -> Self {
         Self::new(observer_name, OwnedRefMut::owned(None), harness_type)
     }
 
