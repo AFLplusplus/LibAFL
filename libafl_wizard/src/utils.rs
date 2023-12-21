@@ -138,17 +138,17 @@ pub fn write_code(code_content: Vec<String>, imports: Vec<String>) -> String {
     }
 
     out_file
-        .write_all(&format!("\n\nfn main() {}", "{").as_bytes())
+        .write_all(&format!("\nfn main() {}", "{\n").as_bytes())
         .expect("Failed to write to the fuzzer file.");
 
     for code in code_content.iter() {
         out_file
-            .write_all(&format!("\n\n{}{}", " ".repeat(4), code).as_bytes())
+            .write_all(&format!("{}{}\n\n", " ".repeat(4), code).as_bytes())
             .expect("Failed to write to the fuzzer file.");
     }
 
     out_file
-        .write_all("\n}".as_bytes())
+        .write_all("}".as_bytes())
         .expect("Failed to write to the fuzzer file.");
 
     file_name
@@ -210,10 +210,6 @@ pub fn separate_imports(code_content: Vec<String>) -> (Vec<String>, Vec<String>)
         new_code_content.push(code_string.trim_end().to_string());
     }
 
-    for i in &imports {
-        println!("nf:{}", i);
-    }
-
     (imports, new_code_content)
 }
 
@@ -222,58 +218,92 @@ pub fn arrange_imports(imports_content: Vec<String>) -> Vec<String> {
     let mut result: Vec<String> = Vec::new();
 
     for import in imports_content {
-        let import_names: Vec<String> = parse_imports(import.clone());
-        let mut import_iter = import_names.iter();
+        let mut i: Option<usize> = None;
+        let mut single_line_import = false;
 
-        if let Some(module_name) = import_iter.next() {
-            if let Some(index) = result
-                .iter()
-                .position(|s| s.starts_with(&format!("use {}", module_name(&module_name))))
-            {
-                // Modify in alphabetical order.
-                let result_names: Vec<String> = parse_imports(result[index].clone());
-                let mut result_iter = result_names.iter().skip(0); // VER SE TA CERTO
+        // Check if the crate that we are trying to insert is already in the 'result' vector (final imports).
+        if let Some(i_line) = import.lines().next() {
+            if let Some(crate_name) = parse_imports(i_line.trim().to_string()).iter().next() {
+                println!("CRATE NAME: {}", crate_name);
+                single_line_import = crate_name.contains(";");
+                if let Some(index) = result
+                    .iter()
+                    .position(|s| s.starts_with(&format!("use {}", crate_name)))
+                {
+                    i = Some(index)
+                }
+            }
+        }
 
-                while let Some(import_mod) = import_iter.next() {
-                    let result_mod = result_iter.next();
+        match i {
+            Some(i) => {
+                let mut single_line_result = false;
 
-                    if module_name(&result_mod) == module_name(&import_mod) {
-                        // If equal, iterate on the same module.
-                    } else if module_name(&result_mod) < module_name(&import_mod) {
-                        // If less, skip the current module.
-                        let mut multiple_import = false;
+                if let Some(r_line) = result[i].lines().next() {
+                    if let Some(crate_name) = parse_imports(r_line.trim().to_string()).iter().next() {
+                        single_line_result = crate_name.contains(";");
+                    }
+                }
+                if single_line_import {
+                    let import_names = parse_imports(import.trim().to_string());
 
-                        while let Some(value) = result_iter.next() {
-                            if value.contains("{") {
-                                multiple_import = true;
-                            }
+                    if single_line_result {
+                        // Both are single line imports, so no need to iterate through their "lines".
+                        let result_names = parse_imports(result[i].trim().to_string());
 
-                            if multiple_import {
-                                if value.contains("},") {
-                                    break;
-                                }
-                            } else {
-                                if value.contains(",") {
-                                    break;
-                                }
-                            }
+                        if let Some(new_import) = insert_import(&import_names, &result_names, &result[i]) {
+                            result[i] = new_import;
                         }
                     } else {
-                        // If what we are trying to insert is greater than the current module, insertion happens right here.
-                        if let Some(i) = result[index].find(result_mod) {
-                            let mut import_string = String::new();
+                        // Single line into multiline.
+                        let mut r_lines_iter = result[i].lines();
 
-                            // Builds the string that will be inserted
-                            for line in import.lines() {
-                                if line.contains(import_mod) {
-                                    result[index].insert_str(i, &line);
-                                }
+                        while let Some(r_line) = r_lines_iter.next() {
+                            let result_names = parse_imports(r_line.trim().to_string());
+
+                            if let Some(new_import) = insert_import(&import_names, &result_names, &result[i]) {
+                                result[i] = new_import;
+                                break;
                             }
                         }
                     }
+                } else {
+                    let mut i_lines_iter = import.lines();
+
+                    if single_line_result {
+                        // Multiline into single, so we simply do the opposite.
+                        let result_names = parse_imports(result[i].trim().to_string());
+
+                        while let Some(i_line) = i_lines_iter.next() {
+                            let i_line_names = parse_imports(i_line.trim().to_string());
+
+                            if let Some(new_import) = insert_import(&result_names, &i_line_names, &result[i]) {
+                                result[i] = new_import;
+                                break;
+                            }
+                        }
+                    } else {
+                        // Both are multiline imports, so we have to iterate through their lines until the last component is checked for insertion.
+                        let mut r_lines_iter = result[i].lines();
+                        let mut temp_import = String::new();
+
+                        while let Some(r_line) = r_lines_iter.next() {
+                            if let Some(i_line) = import.lines().next() {
+                                let r_line_names = parse_imports(r_line.trim().to_string());
+                                let i_line_names = parse_imports(i_line.trim().to_string());
+
+                                if let Some(new_import) = insert_import(&i_line_names, &r_line_names, &result[i])
+                                {
+                                    temp_import = new_import;
+                                }
+                            }
+                        }
+                        result[i] = temp_import
+                    }
                 }
-            } else {
-                // Insert in alphabetical order.
+            }
+            None => {
+                // Insert and sort alphabetically.
                 result.push(import.trim().to_string());
                 result.sort();
             }
@@ -297,7 +327,7 @@ fn parse_imports(import: String) -> Vec<String> {
         while let Some(c) = chars.next() {
             import_string.push(c);
 
-            // We want to break the import string into 'word::' or 'word};' patterns.
+            // We want to break the import string into 'word::', 'word};'... patterns.
             if c == ':' || c == '{' || c == '}' || c == ',' || c == ';' {
                 if import_string.contains("::") {
                     if let Some(&next_char) = chars.peek() {
@@ -330,18 +360,100 @@ fn parse_imports(import: String) -> Vec<String> {
         imports_names.remove(*index);
     }
 
-    println!("\nIMPORTS NAMES:");
-    for i in &imports_names {
-        println!("{}", i)
-    }
-
     imports_names
 }
 
-fn module_name(input: &String) -> String {
-    // Removes the ';', '::', etc from the string (module name).
+fn rm_punct(input: &String) -> String {
+    // Removes the ';', '::', etc from the string.
     input
         .chars()
         .filter(|&c| c != ':' && c != ';' && c != ',' && c != '{' && c != '}')
         .collect()
+}
+
+fn insert_import(import: &Vec<String>, result: &Vec<String>, curr_import: &String) -> Option<String> {
+    // Basically, we try to insert 'import' in 'result', as a new string.
+    let mut new_import = curr_import.clone();
+    let mut i_iter = import.iter();
+    let mut r_iter = result.iter();
+
+    if let Some(i_name_punct) = i_iter.next() {
+        if let Some(r_name_punct) = r_iter.next() {
+            let i_name = rm_punct(&i_name_punct);
+            let r_name = rm_punct(&r_name_punct);
+
+            if i_name == r_name {
+                // Insert into this module.
+                while let Some(r_name_punct) = r_iter.next() {
+                    if let Some(i_name_punct) = i_iter.next() {
+                        let r_name = rm_punct(&r_name);
+
+                        if i_name < r_name {
+                            if let Some(position) = new_import.find(r_name_punct) {
+                                let mut insert_string = String::new();
+                                insert_string.push_str(i_name_punct);
+
+                                while let Some(i_name_punct) = i_iter.next() {
+                                    insert_string.push_str(i_name_punct);
+                                }
+                                insert_string = insert_string.replace(";", ",");
+
+                                new_import.insert_str(position, &insert_string);
+
+                                return Some(new_import);
+                            }
+                        } else if r_name_punct.contains("},") && i_name > r_name {
+                            if let Some(position) = new_import.find(r_name_punct) {
+                                let mut insert_string = String::new();
+                                insert_string.push_str(i_name_punct);
+
+                                while let Some(i_name_punct) = i_iter.next() {
+                                    insert_string.push_str(i_name_punct);
+                                }
+                                insert_string = insert_string.replace(";", "},");
+                                new_import = new_import.replace("},", ",");
+                                new_import.insert_str(position, &insert_string);
+
+                                return Some(new_import);
+                            }
+                        }
+                    }
+                }
+            } else if i_name < r_name {
+                // No equal module was found, so insert here.
+                if let Some(position) = new_import.find(r_name_punct) {
+                    let mut insert_string = String::new();
+                    insert_string.push_str(i_name_punct);
+
+                    while let Some(i_name_punct) = i_iter.next() {
+                        insert_string.push_str(i_name_punct);
+                    }
+                    insert_string = insert_string.replace(";", ",");
+                    insert_string.push_str("\n");
+                    new_import.insert_str(position, &insert_string);
+
+                    return Some(new_import);
+                }
+            } else {
+                if r_name_punct.contains("};") && (i_name > r_name) {
+                    // Insert it as the last import.
+                    if let Some(position) = new_import.find(r_name_punct) {
+                        let mut insert_string = String::new();
+                        insert_string.push_str(i_name_punct);
+
+                        while let Some(i_name_punct) = i_iter.next() {
+                            insert_string.push_str(i_name_punct);
+                        }
+                        insert_string = insert_string.replace(";", "};");
+                        new_import = new_import.replace("};", ",");
+                        new_import.insert_str(position, &insert_string);
+
+                        return Some(new_import);
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }

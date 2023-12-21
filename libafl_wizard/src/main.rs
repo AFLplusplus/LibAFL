@@ -102,7 +102,7 @@ fn main() {
     );
 
     println!(
-        "\nFile {} successfully created under the ./fuzzers directory.\nAll questions answered!",
+        "\nFile {} successfully created in the ./fuzzers directory.\nAll questions answered!",
         file_name
     );
 }
