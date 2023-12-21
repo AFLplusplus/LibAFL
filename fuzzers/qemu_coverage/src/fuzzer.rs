@@ -142,7 +142,7 @@ pub fn fuzz() {
     let ret_addr: GuestAddr = emu.read_return_address().unwrap();
     log::debug!("Return address = {ret_addr:#x}");
 
-    emu.add_breakpoint(Breakpoint::without_command(ret_addr, false), true);
+    emu.set_breakpoint_addr(ret_addr);
 
     let input_addr = emu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
@@ -159,7 +159,7 @@ pub fn fuzz() {
             emu.write_return_address(ret_addr)?;
             emu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
             emu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
-            emu.run().unwrap();
+            let _ = emu.run();
             Ok(())
         }
     };
