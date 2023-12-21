@@ -215,7 +215,7 @@ macro_rules! fuzz_with {
             // Create a stacktrace observer
             let backtrace_observer = BacktraceObserver::new(
                 "BacktraceObserver",
-                unsafe { &mut BACKTRACE },
+                OwnedRefMut::from_mut_ptr(addr_of_mut!(BACKTRACE)),
                 if $options.forks().is_some() || $options.tui() { libafl::observers::HarnessType::Child } else { libafl::observers::HarnessType::InProcess }
             );
 

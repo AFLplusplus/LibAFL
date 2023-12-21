@@ -70,7 +70,7 @@ pub fn main() {
     // Create a stacktrace observer
     let bt_observer = BacktraceObserver::new(
         "BacktraceObserver",
-        unsafe { OwnedRefMut::from_mut_ptr(bt.as_mut_ptr_of().unwrap()) },
+        unsafe { OwnedRefMut::from_shmem(&mut bt) },
         libafl::observers::HarnessType::Child,
     );
 

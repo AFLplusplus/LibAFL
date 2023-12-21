@@ -16,7 +16,9 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{
+    current_nanos, ownedref::OwnedRefMut, rands::StdRand, tuples::tuple_list, AsSlice,
+};
 use libc::c_uchar;
 extern crate libc;
 
@@ -40,7 +42,7 @@ pub fn main() {
     let mut bt = None;
     let bt_observer = BacktraceObserver::new(
         "BacktraceObserver",
-        &mut bt,
+        OwnedRefMut::Ref(&mut bt),
         libafl::observers::HarnessType::InProcess,
     );
 
