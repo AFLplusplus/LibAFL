@@ -347,7 +347,7 @@ fn fuzz(
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
         let mut cmplog_shmem = shmem_provider
-            .new_shmem(core::mem::size_of::<AFLppCmpLogMap>())
+            .uninit_on_shmem::<AFLppCmpLogMap>()
             .unwrap();
         // let the forkserver know the shmid
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();

@@ -3,11 +3,11 @@
 
 #[cfg(feature = "alloc")]
 use alloc::{rc::Rc, string::ToString};
-use core::{mem, fmt::Debug};
 #[cfg(feature = "alloc")]
 use core::fmt::Display;
 #[cfg(feature = "alloc")]
 use core::{cell::RefCell, fmt, mem::ManuallyDrop};
+use core::{fmt::Debug, mem};
 #[cfg(feature = "std")]
 use std::env;
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
@@ -261,13 +261,18 @@ pub trait ShMemProvider: Clone + Default + Debug {
 
     /// Create a new shared memory mapping to hold an object of the given type, and initializes it with the given value.
     fn new_on_shmem<T: Sized + 'static>(&mut self, value: T) -> Result<Self::ShMem, Error> {
-        self.new_shmem(mem::size_of::<T>()).map(|mut shmem| {
+        self.uninit_on_shmem::<T>().map(|mut shmem| {
             // # Safety
             // The map has been created at this point in time, and is large enough.
             // The map is fresh from the OS and, hence, the pointer should be properly aligned for any object.
             unsafe { shmem.as_mut_ptr_of::<T>().unwrap().write_volatile(value) };
             shmem
         })
+    }
+
+    /// Create a new shared memory mapping to hold an object of the given type, and initializes it with the given value.
+    fn uninit_on_shmem<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
+        self.new_shmem(mem::size_of::<T>()).map(|mut shmem| shmem)
     }
 
     /// Get a mapping given a description
