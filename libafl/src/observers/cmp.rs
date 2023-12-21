@@ -374,7 +374,7 @@ where
         Self {
             name: name.to_string(),
             size: Some(size),
-            cmp_map: cmp_map,
+            cmp_map,
             add_meta,
             data: M::Data::default(),
             phantom: PhantomData,
