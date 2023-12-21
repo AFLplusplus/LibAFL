@@ -25,8 +25,6 @@ sudo apt install \
     g++-mipsel-linux-gnu \
     gcc-powerpc-linux-gnu \
     g++-powerpc-linux-gnu
-    
-cargo install cargo-make
 ```
 
 ## Run
