@@ -63,10 +63,9 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
     // Create a stacktrace observer to add the observers tuple
-    let mut bt = None;
     let bt_observer = BacktraceObserver::new(
         "BacktraceObserver",
-        OwnedRefMut::Ref(&mut bt),
+        OwnedRefMut::owned(None),
         libafl::observers::HarnessType::InProcess,
     );
 

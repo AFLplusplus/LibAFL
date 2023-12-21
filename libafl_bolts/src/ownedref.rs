@@ -92,7 +92,7 @@ where
     /// The shared memory needs to start with a valid object of type `T`.
     /// Any use of this [`OwnedRef`] will dereference a pointer to the shared memory accordingly.
     pub unsafe fn from_shmem<S: ShMem>(shmem: &mut S) -> Self {
-        Self::from_mut_ptr(shmem.as_mut_ptr_of().unwrap())
+        Self::from_ptr(shmem.as_mut_ptr_of().unwrap())
     }
 
     /// Returns a new [`OwnedRef`], owning the given value.
