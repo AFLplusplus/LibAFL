@@ -8,7 +8,7 @@ use libafl::{
     feedbacks::MapNoveltiesMetadata,
     inputs::UsesInput,
     schedulers::{RemovableScheduler, Scheduler},
-    state::{HasCorpus, HasMetadata, UsesState, State},
+    state::{HasCorpus, HasMetadata, State, UsesState},
     Error,
 };
 

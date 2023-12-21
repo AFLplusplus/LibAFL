@@ -115,8 +115,6 @@ use mimalloc::MiMalloc;
 #[cfg(feature = "mimalloc")]
 static GLOBAL: MiMalloc = MiMalloc;
 
-static mut BACKTRACE: Option<u64> = None;
-
 #[allow(clippy::struct_excessive_bools)]
 struct CustomMutationStatus {
     std_mutational: bool,
@@ -152,6 +150,7 @@ macro_rules! fuzz_with {
     ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
         use libafl_bolts::{
                 current_nanos,
+                ownedref::OwnedRefMut,
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
                 AsSlice,
@@ -184,11 +183,13 @@ macro_rules! fuzz_with {
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
 
-        use crate::{BACKTRACE, CustomMutationStatus};
-        use crate::corpus::{ArtifactCorpus, LibfuzzerCorpus};
-        use crate::feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback, ShrinkMapFeedback};
-        use crate::misc::should_use_grimoire;
-        use crate::observers::{MappedEdgeMapObserver, SizeValueObserver};
+        use crate::{
+            CustomMutationStatus,
+            corpus::{ArtifactCorpus, LibfuzzerCorpus},
+            feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback, ShrinkMapFeedback},
+            misc::should_use_grimoire,
+            observers::{MappedEdgeMapObserver, SizeValueObserver},
+        };
 
         let edge_maker = &$edge_maker;
 
@@ -215,7 +216,7 @@ macro_rules! fuzz_with {
             // Create a stacktrace observer
             let backtrace_observer = BacktraceObserver::new(
                 "BacktraceObserver",
-                OwnedRefMut::from_mut_ptr(addr_of_mut!(BACKTRACE)),
+                OwnedRefMut::owned(None),
                 if $options.forks().is_some() || $options.tui() { libafl::observers::HarnessType::Child } else { libafl::observers::HarnessType::InProcess }
             );
 

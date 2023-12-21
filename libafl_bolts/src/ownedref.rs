@@ -79,6 +79,28 @@ where
     }
 }
 
+impl<'a, T> OwnedRef<'a, T>
+where
+    T: Sized + 'static,
+{
+    /// Returns a new [`OwnedRef`], pointing to the given [`ShMem`].
+    ///
+    /// # Panics
+    /// Panics if the given shared mem is too small
+    ///
+    /// # Safety
+    /// The shared memory needs to start with a valid object of type `T`.
+    /// Any use of this [`OwnedRef`] will dereference a pointer to the shared memory accordingly.
+    pub unsafe fn from_shmem<S: ShMem>(shmem: &mut S) -> Self {
+        Self::from_mut_ptr(shmem.as_mut_ptr_of().unwrap())
+    }
+
+    /// Returns a new [`OwnedRef`], owning the given value.
+    pub fn owned(val: T) -> Self {
+        Self::Owned(Box::new(val))
+    }
+}
+
 impl<'a, T> Serialize for OwnedRef<'a, T>
 where
     T: 'a + ?Sized + Serialize,
@@ -195,6 +217,11 @@ where
     /// Any use of this [`OwnedRefMut`] will dereference a pointer to the shared memory accordingly.
     pub unsafe fn from_shmem<S: ShMem>(shmem: &mut S) -> Self {
         Self::from_mut_ptr(shmem.as_mut_ptr_of().unwrap())
+    }
+
+    /// Returns a new [`OwnedRefMut`], owning the given value.
+    pub fn owned(val: T) -> Self {
+        Self::Owned(Box::new(val))
     }
 }
 
