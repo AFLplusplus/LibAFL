@@ -34,6 +34,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_nanos, current_time,
+    ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
@@ -350,7 +351,7 @@ fn fuzz(
             .unwrap();
         // let the forkserver know the shmid
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
-        let cmpmap = unsafe { cmplog_shmem.as_owned_ref_mut_of::<AFLppCmpLogMap>() };
+        let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
 

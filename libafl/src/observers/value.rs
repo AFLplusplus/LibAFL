@@ -123,7 +123,7 @@ where
     pub fn new(name: &'static str, value: OwnedRef<'a, RefCell<T>>) -> Self {
         Self {
             name: name.to_string(),
-            value: value,
+            value,
         }
     }
 

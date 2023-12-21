@@ -10,7 +10,7 @@ use core::{clone::Clone, fmt::Debug, slice};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{AsMutSlice, AsSlice, IntoOwned, Truncate};
+use crate::{bolts_prelude::ShMem, AsMutSlice, AsSlice, IntoOwned, Truncate};
 
 /// Private part of the unsafe marker, making sure this cannot be initialized directly.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -166,6 +166,9 @@ where
 {
     /// Returns a new [`OwnedRefMut`], wrapping a mutable pointer.
     ///
+    /// # Panics
+    /// Panics if the given pointer is `null`
+    ///
     /// # Safety
     /// The pointer needs to point to a valid object of type `T`.
     /// Any use of this [`OwnedRefMut`] will dereference the pointer accordingly.
@@ -175,6 +178,23 @@ where
             "Null pointer passed to OwnedRefMut::from_mut_ptr constructor!"
         );
         Self::RefRaw(ptr, UnsafeMarker::new())
+    }
+}
+
+impl<'a, T> OwnedRefMut<'a, T>
+where
+    T: Sized + 'static,
+{
+    /// Returns a new [`OwnedRefMut`], pointing to the given [`ShMem`].
+    ///
+    /// # Panics
+    /// Panics if the given shared mem is too small
+    ///
+    /// # Safety
+    /// The shared memory needs to start with a valid object of type `T`.
+    /// Any use of this [`OwnedRefMut`] will dereference a pointer to the shared memory accordingly.
+    pub unsafe fn from_shmem<S: ShMem>(shmem: &mut S) -> Self {
+        Self::from_mut_ptr(shmem.as_mut_ptr_of().unwrap())
     }
 }
 

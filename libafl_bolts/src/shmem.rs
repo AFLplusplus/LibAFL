@@ -31,10 +31,7 @@ pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 use crate::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
 pub use crate::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
-use crate::{
-    ownedref::{OwnedMutSlice, OwnedRef, OwnedRefMut, OwnedSlice},
-    AsMutSlice, AsSlice, Error,
-};
+use crate::{AsMutSlice, AsSlice, Error};
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -207,53 +204,24 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
         self.len() == 0
     }
 
-    /// Convert to a [`OwnedRef`] of a given type, checking that the size is correct
-    ///
-    /// # Safety
-    /// This function is not safe if the type was not previously initialized
-    /// or a different type may be placed at this memory location.
-    /// Further users of this [`OwnedRefMut`] will access the underlying data directly.
-    unsafe fn as_owned_ref_of<'a, T: Sized + 'static>(&self) -> OwnedRef<'a, T> {
-        assert!(self.len() >= core::mem::size_of::<T>());
-        OwnedRef::from_ptr(self.as_slice().as_ptr() as *const T)
+    /// Convert to a ptr of a given type, checking the size.
+    /// If the map is too small, returns `None`
+    unsafe fn as_ptr<'a, T: Sized + 'static>(&self) -> Option<*const T> {
+        if self.len() >= core::mem::size_of::<T>() {
+            Some(self.as_slice().as_ptr() as *const T)
+        } else {
+            None
+        }
     }
 
-    /// Convert to a [`OwnedRefMut`] of a given type, checking that the size is correct
-    ///
-    /// # Safety
-    /// This function is not safe if the type was not previously initialized
-    /// or a different type may be placed at this memory location.
-    /// Further users of this [`OwnedRefMut`] will access the underlying data directly.
-    unsafe fn as_owned_ref_mut_of<'a, T: Sized + 'static>(&mut self) -> OwnedRefMut<'a, T> {
-        assert!(self.len() >= core::mem::size_of::<T>());
-        OwnedRefMut::from_mut_ptr(
-            (self.as_mut_slice().as_mut_ptr() as *mut () as *mut T)
-                .as_mut()
-                .unwrap(),
-        )
-    }
-
-    /// Convert to an [`OwnedSlice`] of type `T`
-    ///
-    /// # Safety
-    /// This function is not safe if the type was not previously initialized
-    /// or a different type may be placed at this memory location.
-    unsafe fn as_owned_slice_of<T: Sized + 'static>(&self, len: usize) -> OwnedSlice<T> {
-        assert!(self.len() >= core::mem::size_of::<T>() * len);
-        OwnedSlice::from_raw_parts(self.as_slice().as_ptr() as _, len)
-    }
-
-    /// Convert to an [`OwnedMutSlice`] of type `T`
-    ///
-    /// # Safety
-    /// This function is not safe if the type was not previously initialized
-    /// or a different type may be placed at this memory location.
-    unsafe fn as_owned_slice_slice_mut_of<T: Sized + 'static>(
-        &mut self,
-        len: usize,
-    ) -> OwnedMutSlice<'_, T> {
-        assert!(self.len() >= core::mem::size_of::<T>() * len);
-        OwnedMutSlice::from_raw_parts_mut(self.as_mut_slice().as_mut_ptr() as _, len)
+    /// Convert to a mut ptr of a given type, checking the size.
+    /// If the map is too small, returns `None`
+    fn as_mut_ptr_of<T: Sized>(&mut self) -> Option<*mut T> {
+        if self.len() >= core::mem::size_of::<T>() {
+            Some(self.as_mut_slice().as_mut_ptr() as *mut T)
+        } else {
+            None
+        }
     }
 
     /// Get the description of the shared memory mapping
@@ -291,25 +259,15 @@ pub trait ShMemProvider: Clone + Default + Debug {
     /// Get a mapping given its id and size
     fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error>;
 
-    /// Create a new shared memory mapping to hold an object of the given type
-    fn new_shmem_object<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
-        self.new_shmem(core::mem::size_of::<T>())
-    }
-
-    /// Create a new shared memory mapping to hold an array of objects of the given type
-    fn new_shmem_objects_array<T: Sized + 'static>(
-        &mut self,
-        len: usize,
-    ) -> Result<Self::ShMem, Error> {
-        self.new_shmem(core::mem::size_of::<T>() * len)
-    }
-
-    /// Get a mapping given its id to hold an object of the given type
-    fn shmem_object_from_id<T: Sized + 'static>(
-        &mut self,
-        id: ShMemId,
-    ) -> Result<Self::ShMem, Error> {
-        self.shmem_from_id_and_size(id, core::mem::size_of::<T>())
+    /// Create a new shared memory mapping to hold an object of the given type, and initializes it with the given value.
+    fn new_on_shmem<T: Sized + 'static>(&mut self, value: T) -> Result<Self::ShMem, Error> {
+        self.new_shmem(core::mem::size_of::<T>()).map(|mut shmem| {
+            // # Safety
+            // The map has been created at this point in time, and is large enough.
+            // The map is fresh from the OS and, hence, the pointer should be properly aligned for any object.
+            unsafe { shmem.as_mut_ptr_of::<T>().unwrap().write_volatile(value) };
+            shmem
+        })
     }
 
     /// Get a mapping given a description
