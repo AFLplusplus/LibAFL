@@ -15,7 +15,7 @@ use libafl_qemu::{
     cmplog::QemuCmpLogHelper,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    ArchExtras, Emulator, GuestAddr, QemuInstrumentationFilter,
+    ArchExtras, Emulator, GuestAddr, QemuInstrumentationAddressRangeFilter,
 };
 
 use crate::{instance::Instance, options::FuzzerOptions};
@@ -59,7 +59,10 @@ impl<'a> Client<'a> {
         Ok(start_pc)
     }
 
-    fn coverage_filter(&self, emu: &Emulator) -> Result<QemuInstrumentationFilter, Error> {
+    fn coverage_filter(
+        &self,
+        emu: &Emulator,
+    ) -> Result<QemuInstrumentationAddressRangeFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
         if let Some(includes) = &self.options.include {
             #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
@@ -70,7 +73,7 @@ impl<'a> Client<'a> {
                     end: x.end.into(),
                 })
                 .collect::<Vec<Range<GuestAddr>>>();
-            Ok(QemuInstrumentationFilter::AllowList(rules))
+            Ok(QemuInstrumentationAddressRangeFilter::AllowList(rules))
         } else if let Some(excludes) = &self.options.exclude {
             #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
             let rules = excludes
@@ -80,14 +83,16 @@ impl<'a> Client<'a> {
                     end: x.end.into(),
                 })
                 .collect::<Vec<Range<GuestAddr>>>();
-            Ok(QemuInstrumentationFilter::DenyList(rules))
+            Ok(QemuInstrumentationAddressRangeFilter::DenyList(rules))
         } else {
             let mut elf_buffer = Vec::new();
             let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
             let range = elf
                 .get_section(".text", emu.load_addr())
                 .ok_or_else(|| Error::key_not_found("Failed to find .text section"))?;
-            Ok(QemuInstrumentationFilter::AllowList(vec![range]))
+            Ok(QemuInstrumentationAddressRangeFilter::AllowList(vec![
+                range,
+            ]))
         }
     }
 

@@ -1,4 +1,5 @@
 use core::{fmt::Debug, ops::Range};
+use std::{collections::HashSet, hash};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
@@ -6,6 +7,7 @@ use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 use crate::{
     emu::{Emulator, GuestAddr},
     hooks::QemuHooks,
+    GuestPhysAddr,
 };
 
 /// A helper for `libafl_qemu`.
@@ -143,48 +145,82 @@ where
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum QemuInstrumentationFilter {
-    AllowList(Vec<Range<GuestAddr>>),
-    DenyList(Vec<Range<GuestAddr>>),
+#[derive(Debug)]
+pub enum QemuFilterList<T: IsFilter + Debug> {
+    AllowList(T),
+    DenyList(T),
     None,
 }
 
-impl QemuInstrumentationFilter {
-    #[must_use]
-    pub fn allowed(&self, addr: GuestAddr) -> bool {
+impl<T> IsFilter for QemuFilterList<T>
+where
+    T: IsFilter,
+{
+    type FilterParameter = T::FilterParameter;
+
+    fn allowed(&self, filter_parameter: Self::FilterParameter) -> bool {
         match self {
-            QemuInstrumentationFilter::AllowList(l) => {
-                for rng in l {
-                    if rng.contains(&addr) {
-                        return true;
-                    }
-                }
-                false
-            }
-            QemuInstrumentationFilter::DenyList(l) => {
-                for rng in l {
-                    if rng.contains(&addr) {
-                        return false;
-                    }
-                }
-                true
-            }
-            QemuInstrumentationFilter::None => true,
+            QemuFilterList::AllowList(allow_list) => allow_list.allowed(filter_parameter),
+            QemuFilterList::DenyList(deny_list) => !deny_list.allowed(filter_parameter),
+            QemuFilterList::None => true,
         }
     }
 }
 
-pub trait HasInstrumentationFilter {
-    fn filter(&self) -> &QemuInstrumentationFilter;
+pub type QemuInstrumentationPagingFilter = QemuFilterList<HashSet<GuestPhysAddr>>;
 
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter;
+impl<H: hash::BuildHasher> IsFilter for HashSet<GuestPhysAddr, H> {
+    type FilterParameter = Option<GuestPhysAddr>;
 
-    fn update_filter(&mut self, filter: QemuInstrumentationFilter, emu: &Emulator) {
+    fn allowed(&self, paging_id: Self::FilterParameter) -> bool {
+        paging_id.is_some_and(|pid| self.contains(&pid))
+    }
+}
+
+pub type QemuInstrumentationAddressRangeFilter = QemuFilterList<Vec<Range<GuestAddr>>>;
+
+impl IsFilter for Vec<Range<GuestAddr>> {
+    type FilterParameter = GuestAddr;
+
+    fn allowed(&self, addr: Self::FilterParameter) -> bool {
+        for rng in self {
+            if rng.contains(&addr) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+pub trait HasInstrumentationFilter<F>
+where
+    F: IsFilter,
+{
+    fn filter(&self) -> &F;
+
+    fn filter_mut(&mut self) -> &mut F;
+
+    fn update_filter(&mut self, filter: F, emu: &Emulator) {
         *self.filter_mut() = filter;
         emu.flush_jit();
     }
 }
+
+pub trait IsFilter: Debug {
+    type FilterParameter;
+
+    fn allowed(&self, filter_parameter: Self::FilterParameter) -> bool;
+}
+
+pub trait IsAddressFilter: IsFilter<FilterParameter = GuestAddr> {}
+
+#[cfg(emulation_mode = "systemmode")]
+pub trait IsPagingFilter: IsFilter<FilterParameter = Option<GuestPhysAddr>> {}
+
+#[cfg(emulation_mode = "systemmode")]
+impl IsPagingFilter for QemuInstrumentationPagingFilter {}
+
+impl IsAddressFilter for QemuInstrumentationAddressRangeFilter {}
 
 #[must_use]
 pub fn hash_me(mut x: u64) -> u64 {
