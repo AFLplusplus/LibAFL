@@ -3,7 +3,7 @@
 
 #[cfg(feature = "alloc")]
 use alloc::{rc::Rc, string::ToString};
-use core::fmt::Debug;
+use core::{mem, fmt::Debug};
 #[cfg(feature = "alloc")]
 use core::fmt::Display;
 #[cfg(feature = "alloc")]
@@ -206,8 +206,8 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
 
     /// Convert to a ptr of a given type, checking the size.
     /// If the map is too small, returns `None`
-    unsafe fn as_ptr<'a, T: Sized + 'static>(&self) -> Option<*const T> {
-        if self.len() >= core::mem::size_of::<T>() {
+    fn as_ptr_of<T: Sized>(&self) -> Option<*const T> {
+        if self.len() >= mem::size_of::<T>() {
             Some(self.as_slice().as_ptr() as *const T)
         } else {
             None
@@ -217,7 +217,7 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
     /// Convert to a mut ptr of a given type, checking the size.
     /// If the map is too small, returns `None`
     fn as_mut_ptr_of<T: Sized>(&mut self) -> Option<*mut T> {
-        if self.len() >= core::mem::size_of::<T>() {
+        if self.len() >= mem::size_of::<T>() {
             Some(self.as_mut_slice().as_mut_ptr() as *mut T)
         } else {
             None
@@ -261,7 +261,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
 
     /// Create a new shared memory mapping to hold an object of the given type, and initializes it with the given value.
     fn new_on_shmem<T: Sized + 'static>(&mut self, value: T) -> Result<Self::ShMem, Error> {
-        self.new_shmem(core::mem::size_of::<T>()).map(|mut shmem| {
+        self.new_shmem(mem::size_of::<T>()).map(|mut shmem| {
             // # Safety
             // The map has been created at this point in time, and is large enough.
             // The map is fresh from the OS and, hence, the pointer should be properly aligned for any object.
