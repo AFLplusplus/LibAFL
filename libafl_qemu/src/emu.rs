@@ -998,7 +998,7 @@ impl Emulator {
     }
 
     #[must_use]
-    pub(crate) fn new_empty() -> Emulator {
+    pub fn new_empty() -> Emulator {
         Emulator { _private: () }
     }
 

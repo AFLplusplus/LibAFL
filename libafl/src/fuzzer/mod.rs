@@ -72,7 +72,7 @@ pub trait HasObjective: UsesState {
     fn objective_mut(&mut self) -> &mut Self::Objective;
 }
 
-/// Evaluate if an input is interesting using the feedback
+/// Evaluates if an input is interesting using the feedback
 pub trait ExecutionProcessor<OT>: UsesState {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -88,7 +88,7 @@ pub trait ExecutionProcessor<OT>: UsesState {
         EM: EventFirer<State = Self::State>;
 }
 
-/// Evaluate an input modifying the state of the fuzzer
+/// Evaluates an input modifying the state of the fuzzer
 pub trait EvaluatorObservers<OT>: UsesState + Sized {
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new
