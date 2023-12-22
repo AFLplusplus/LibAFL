@@ -22,10 +22,7 @@ use libafl::{
         Monitor, MultiMonitor, SimpleMonitor,
     },
     stages::StagesTuple,
-    state::{
-        HasExecutions, HasLastReportTime, HasMetadata, HasSolutions,
-        UsesState,
-    },
+    state::{HasExecutions, HasLastReportTime, HasMetadata, HasSolutions, UsesState},
     Error, Fuzzer,
 };
 use libafl_bolts::{
@@ -70,11 +67,7 @@ fn do_fuzz<F, ST, E, S, EM>(
 ) -> Result<(), Error>
 where
     F: Fuzzer<E, EM, ST, State = S>,
-    S: HasMetadata
-        + HasExecutions
-        + UsesInput
-        + HasSolutions
-        + HasLastReportTime,
+    S: HasMetadata + HasExecutions + UsesInput + HasSolutions + HasLastReportTime,
     E: UsesState<State = S>,
     EM: ProgressReporter<State = S>,
     ST: StagesTuple<E, EM, S, F>,

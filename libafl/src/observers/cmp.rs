@@ -333,11 +333,11 @@ where
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut CM, add_meta: bool) -> Self {
+    pub fn new(name: &'static str, map: OwnedRefMut<'a, CM>, add_meta: bool) -> Self {
         Self {
             name: name.to_string(),
             size: None,
-            cmp_map: OwnedRefMut::Ref(map),
+            cmp_map: map,
             add_meta,
             data: M::Data::default(),
             phantom: PhantomData,
@@ -347,11 +347,16 @@ where
     /// Creates a new [`StdCmpObserver`] with the given name, map, and auxiliary data used to
     /// populate metadata
     #[must_use]
-    pub fn with_data(name: &'static str, map: &'a mut CM, add_meta: bool, data: M::Data) -> Self {
+    pub fn with_data(
+        name: &'static str,
+        cmp_map: OwnedRefMut<'a, CM>,
+        add_meta: bool,
+        data: M::Data,
+    ) -> Self {
         Self {
             name: name.to_string(),
             size: None,
-            cmp_map: OwnedRefMut::Ref(map),
+            cmp_map,
             add_meta,
             data,
             phantom: PhantomData,
@@ -362,14 +367,14 @@ where
     #[must_use]
     pub fn with_size(
         name: &'static str,
-        map: &'a mut CM,
+        cmp_map: OwnedRefMut<'a, CM>,
         add_meta: bool,
-        size: &'a mut usize,
+        size: OwnedRefMut<'a, usize>,
     ) -> Self {
         Self {
             name: name.to_string(),
-            size: Some(OwnedRefMut::Ref(size)),
-            cmp_map: OwnedRefMut::Ref(map),
+            size: Some(size),
+            cmp_map,
             add_meta,
             data: M::Data::default(),
             phantom: PhantomData,
@@ -381,15 +386,15 @@ where
     #[must_use]
     pub fn with_size_data(
         name: &'static str,
-        map: &'a mut CM,
+        cmp_map: OwnedRefMut<'a, CM>,
         add_meta: bool,
         data: M::Data,
-        size: &'a mut usize,
+        size: OwnedRefMut<'a, usize>,
     ) -> Self {
         Self {
             name: name.to_string(),
-            size: Some(OwnedRefMut::Ref(size)),
-            cmp_map: OwnedRefMut::Ref(map),
+            size: Some(size),
+            cmp_map,
             add_meta,
             data,
             phantom: PhantomData,
