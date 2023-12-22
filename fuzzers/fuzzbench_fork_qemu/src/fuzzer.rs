@@ -209,9 +209,7 @@ fn fuzz(
     let edges = edges_shmem.as_mut_slice();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
-    let mut cmp_shmem = shmem_provider
-        .new_shmem(core::mem::size_of::<CmpLogMap>())
-        .unwrap();
+    let mut cmp_shmem = shmem_provider.uninit_on_shmem::<CmpLogMap>().unwrap();
     let cmplog = cmp_shmem.as_mut_slice();
 
     // Beginning of a page should be properly aligned.

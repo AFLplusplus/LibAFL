@@ -20,6 +20,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_nanos,
+    ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{unix_shmem, ShMem, ShMemProvider},
     tuples::tuple_list,
@@ -32,7 +33,7 @@ pub fn main() {
     let mut signals = shmem_provider.new_shmem(16).unwrap();
     let signals_len = signals.len();
     let signals_ptr = signals.as_mut_slice().as_mut_ptr();
-    let mut bt = shmem_provider.new_shmem_object::<Option<u64>>().unwrap();
+    let mut bt = shmem_provider.new_on_shmem::<Option<u64>>(None).unwrap();
 
     let signals_set = |idx: usize| {
         unsafe { write(signals_ptr.add(idx), 1) };
@@ -69,7 +70,7 @@ pub fn main() {
     // Create a stacktrace observer
     let bt_observer = BacktraceObserver::new(
         "BacktraceObserver",
-        unsafe { bt.as_object_mut::<Option<u64>>() },
+        unsafe { OwnedRefMut::from_shmem(&mut bt) },
         libafl::observers::HarnessType::Child,
     );
 

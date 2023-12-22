@@ -127,12 +127,12 @@ impl<'a> BacktraceObserver<'a> {
     #[must_use]
     pub fn new(
         observer_name: &str,
-        backtrace_hash: &'a mut Option<u64>,
+        backtrace_hash: OwnedRefMut<'a, Option<u64>>,
         harness_type: HarnessType,
     ) -> Self {
         Self {
             observer_name: observer_name.to_string(),
-            hash: OwnedRefMut::Ref(backtrace_hash),
+            hash: backtrace_hash,
             harness_type,
         }
     }
@@ -142,15 +142,21 @@ impl<'a> BacktraceObserver<'a> {
     #[must_use]
     pub fn new(
         observer_name: &str,
-        backtrace_hash: &'a mut Option<u64>,
+        backtrace_hash: OwnedRefMut<'a, Option<u64>>,
         harness_type: HarnessType,
     ) -> Self {
         init_ignored_frames!("rust", "cpp", "go");
         Self {
             observer_name: observer_name.to_string(),
-            hash: OwnedRefMut::Ref(backtrace_hash),
+            hash: backtrace_hash,
             harness_type,
         }
+    }
+
+    /// Creates a new [`BacktraceObserver`] with the given name, owning a new `backtrace_hash` variable.
+    #[must_use]
+    pub fn owned(observer_name: &str, harness_type: HarnessType) -> Self {
+        Self::new(observer_name, OwnedRefMut::owned(None), harness_type)
     }
 
     /// Updates the hash value of this observer.

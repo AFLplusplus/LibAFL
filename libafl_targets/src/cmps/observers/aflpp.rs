@@ -179,11 +179,15 @@ where
 {
     /// Creates a new [`AFLppCmpLogObserver`] with the given name and map.
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut AFLppCmpLogMap, add_meta: bool) -> Self {
+    pub fn new(
+        name: &'static str,
+        cmp_map: OwnedRefMut<'a, AFLppCmpLogMap>,
+        add_meta: bool,
+    ) -> Self {
         Self {
             name: name.to_string(),
             size: None,
-            cmp_map: OwnedRefMut::Ref(map),
+            cmp_map,
             add_meta,
             original: false,
             phantom: PhantomData,
@@ -198,15 +202,15 @@ where
     #[must_use]
     pub fn with_size(
         name: &'static str,
-        map: &'a mut AFLppCmpLogMap,
+        cmp_map: OwnedRefMut<'a, AFLppCmpLogMap>,
         add_meta: bool,
         original: bool,
-        size: &'a mut usize,
+        size: OwnedRefMut<'a, usize>,
     ) -> Self {
         Self {
             name: name.to_string(),
-            size: Some(OwnedRefMut::Ref(size)),
-            cmp_map: OwnedRefMut::Ref(map),
+            size: Some(size),
+            cmp_map,
             add_meta,
             original,
             phantom: PhantomData,

@@ -428,7 +428,7 @@ pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
 pub use libafl_cmplog_map as CMPLOG_MAP;
 pub use libafl_cmplog_map_extended as CMPLOG_MAP_EXTENDED;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 #[repr(C, packed)]
 /// Comparison map compatible with AFL++ cmplog instrumentation
 pub struct AFLppCmpLogMap {
