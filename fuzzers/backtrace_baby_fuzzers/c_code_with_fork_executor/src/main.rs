@@ -18,8 +18,9 @@ use libafl::{
 };
 use libafl_bolts::{
     current_nanos,
+    ownedref::OwnedRefMut,
     rands::StdRand,
-    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
     AsSlice,
 };
@@ -47,10 +48,10 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = unsafe { ConstMapObserver::<u8, 3>::from_mut_ptr("signals", map_ptr) };
     // Create a stacktrace observer
-    let mut bt = shmem_provider.new_shmem_object::<Option<u64>>().unwrap();
+    let mut bt = shmem_provider.new_on_shmem::<Option<u64>>(None).unwrap();
     let bt_observer = BacktraceObserver::new(
         "BacktraceObserver",
-        unsafe { bt.as_object_mut::<Option<u64>>() },
+        unsafe { OwnedRefMut::from_shmem(&mut bt) },
         libafl::observers::HarnessType::Child,
     );
 
