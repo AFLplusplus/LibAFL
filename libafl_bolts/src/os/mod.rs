@@ -1,9 +1,6 @@
 //! Operating System specific abstractions
 //!
 
-#[cfg(feature = "std")]
-use std::{env, fs::File, os::fd::AsRawFd, process::Command, sync::OnceLock};
-
 #[cfg(any(unix, all(windows, feature = "std")))]
 use crate::Error;
 
@@ -20,8 +17,12 @@ pub mod pipes;
 use alloc::borrow::Cow;
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::CStr;
+#[cfg(feature = "std")]
+use std::{env, process::Command};
 #[cfg(all(unix, feature = "std"))]
 use std::{ffi::CString, os::fd::RawFd};
+#[cfg(all(unix, feature = "std"))]
+use std::{fs::File, os::fd::AsRawFd, sync::OnceLock};
 
 // Allow a few extra features we need for the whole module
 #[cfg(all(windows, feature = "std"))]
@@ -126,6 +127,7 @@ pub fn dup2(fd: RawFd, device: RawFd) -> Result<(), Error> {
 /// Gets the stringified version of the last `errno`.
 /// This is roughly equivalent to `strerror(errno)` in C.
 #[cfg(all(unix, feature = "std"))]
+#[must_use]
 pub fn last_error_str<'a>() -> Option<Cow<'a, str>> {
     std::io::Error::last_os_error().raw_os_error().map(|errno| {
         // # Safety

@@ -96,6 +96,7 @@ where
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
     /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
@@ -103,6 +104,7 @@ where
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
     /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
@@ -428,6 +430,7 @@ where
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
     /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
@@ -435,6 +438,7 @@ where
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
     /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
