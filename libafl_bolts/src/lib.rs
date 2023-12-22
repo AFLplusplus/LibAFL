@@ -97,7 +97,6 @@ extern crate std;
 #[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
-use alloc::boxed::Box;
 
 #[cfg(feature = "ctor")]
 #[doc(hidden)]
@@ -161,14 +160,14 @@ pub mod bolts_prelude {
     pub use super::{cpu::*, os::*};
 }
 
+#[cfg(all(unix, feature = "std"))]
+use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::Hasher;
-use log::SetLoggerError;
-use std::panic;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
@@ -177,12 +176,14 @@ use std::{
     io::{stderr, stdout, Write},
     mem,
     os::fd::{AsRawFd, FromRawFd, RawFd},
+    panic,
 };
 
 // There's a bug in ahash that doesn't let it build in `alloc` without once_cell right now.
 // TODO: re-enable once <https://github.com/tkaitchuck/aHash/issues/155> is resolved.
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use ahash::RandomState;
+use log::SetLoggerError;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "xxh3")]
 use xxhash_rust::xxh3::xxh3_64;
@@ -575,6 +576,7 @@ impl From<TryFromSliceError> for Error {
 }
 
 impl From<SetLoggerError> for Error {
+    #[allow(unused_variables)]
     fn from(err: SetLoggerError) -> Self {
         Self::illegal_state(format!("Failed to register logger: {err:?}"))
     }
@@ -972,16 +974,15 @@ impl log::Log for SimpleFdLogger {
 ///
 /// # Safety
 /// The function is arguably safe, but it might have undesirable side effects since it closes `stdout` and `stderr`.
-#[cfg(unix)]
-pub unsafe fn mute_inprocess_target() -> Result<(RawFd, RawFd), Error> {
+#[cfg(all(unix, feature = "std"))]
+pub unsafe fn dup_and_mute_outputs() -> Result<(RawFd, RawFd), Error> {
     let old_stdout = stdout().as_raw_fd();
     let old_stderr = stderr().as_raw_fd();
+    let null_fd = crate::os::null_fd()?;
 
     let new_stdout = crate::os::dup(old_stdout)?;
-
     let new_stderr = crate::os::dup(old_stderr)?;
 
-    let null_fd = crate::os::null_fd()?;
     crate::os::dup2(null_fd, old_stdout)?;
     crate::os::dup2(null_fd, old_stderr)?;
 
@@ -989,6 +990,11 @@ pub unsafe fn mute_inprocess_target() -> Result<(RawFd, RawFd), Error> {
 }
 
 /// Set up an error print hook that will
+///
+/// # Safety
+/// Will fail if `new_stderr` is not a valid file descriptor.
+/// May not be called multiple times concurrently.
+#[cfg(all(unix, feature = "std"))]
 pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
     // Make sure potential errors get printed to the correct (non-closed) stderr
     panic::set_hook(Box::new(move |panic_info| {

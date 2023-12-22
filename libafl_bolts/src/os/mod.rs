@@ -2,8 +2,7 @@
 //!
 
 #[cfg(feature = "std")]
-use std::{env, process::Command};
-use std::{fs::File, os::fd::AsRawFd, sync::OnceLock};
+use std::{env, fs::File, os::fd::AsRawFd, process::Command, sync::OnceLock};
 
 #[cfg(any(unix, all(windows, feature = "std")))]
 use crate::Error;
@@ -33,6 +32,7 @@ pub mod windows_exceptions;
 use libc::pid_t;
 
 /// A file that we keep open, pointing to /dev/null
+#[cfg(all(feature = "std", unix))]
 static NULL_FILE: OnceLock<File> = OnceLock::new();
 
 /// Child Process Handle
@@ -136,6 +136,7 @@ pub fn last_error_str<'a>() -> Option<Cow<'a, str>> {
 }
 
 /// Get a file descriptor ([`RawFd`]) pointing to "/dev/null"
+#[cfg(all(unix, feature = "std"))]
 pub fn null_fd() -> Result<RawFd, Error> {
     // We don't care about opening the file twice here - races are ok.
     if let Some(file) = NULL_FILE.get() {
