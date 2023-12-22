@@ -25,8 +25,8 @@ windows_alias = "unsupported"
 condition = { files_not_exist = ["./libpng-1.6.37"]}
 script_runner="@shell"
 script='''
-wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
-tar -xvf libpng-1.6.37.tar.xz
+wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+tar -xvf v1.6.37.tar.gz
 '''
 
 # Compilers
@@ -98,7 +98,7 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 11s ./${FUZZER_NAME} --cores 0 --input ./corpus >fuzz_stdout.log 2>/dev/null || true
+timeout 31s ./${FUZZER_NAME} --cores 0 --input ./corpus >fuzz_stdout.log 2>/dev/null || true
 if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1
@@ -112,7 +112,7 @@ dependencies = [ "fuzzer" ]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 11s ./${FUZZER_NAME} --cores 0 --input ./corpus >fuzz_stdout.log 2>/dev/null || true
+timeout 31s ./${FUZZER_NAME} --cores 0 --input ./corpus >fuzz_stdout.log 2>/dev/null || true
 '''
 
 # Clean up

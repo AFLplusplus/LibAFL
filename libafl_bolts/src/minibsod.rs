@@ -382,6 +382,26 @@ pub fn dump_registers<W: Write>(
 }
 ///
 /// Write the content of all important registers
+#[cfg(all(target_os = "openbsd", target_arch = "aarch64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    for reg in 0..29_usize {
+        write!(writer, "x{:02}: 0x{:016x} ", reg, ucontext.sc_x[reg])?;
+        if reg % 4 == 3 {
+            writeln!(writer)?;
+        }
+    }
+    write!(writer, "lr : {:#016x}, ", ucontext.sc_lr)?;
+    write!(writer, "elr : {:#016x}, ", ucontext.sc_elr)?;
+    write!(writer, "sp : {:#016x}, ", ucontext.sc_sp)?;
+    write!(writer, "spsr : {:#016x}, ", ucontext.sc_spsr)?;
+}
+
+///
+/// Write the content of all important registers
 #[cfg(all(
     any(target_os = "solaris", target_os = "illumos"),
     target_arch = "x86_64"
@@ -630,7 +650,7 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
-#[cfg(target_os = "openbsd")]
+#[cfg(all(target_os = "openbsd", target_arch = "x86_64"))]
 #[allow(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
@@ -641,6 +661,22 @@ fn write_crash<W: Write>(
         writer,
         "Received signal {} at{:016x}, fault address: 0x{:016x}",
         signal, ucontext.sc_rip, ucontext.sc_fs
+    )?;
+
+    Ok(())
+}
+
+#[cfg(all(target_os = "openbsd", target_arch = "aarch64"))]
+#[allow(clippy::similar_names)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at{:016x}",
+        signal, ucontext.sc_elr
     )?;
 
     Ok(())

@@ -2,7 +2,6 @@
 use std::{fmt::Debug, io::Write, marker::PhantomData};
 
 use backtrace::Backtrace;
-use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
@@ -20,10 +19,19 @@ use libafl::{
 use libafl_bolts::{ownedref::OwnedPtr, Named, SerdeAny};
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arch::Arch;
+use yaxpeax_arch::LengthedInstruction;
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arm::armv8::a64::ARMv8;
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_x86::amd64::InstDecoder;
 
 #[cfg(target_arch = "x86_64")]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
-use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT};
+use crate::{
+    alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, utils::disas_count,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -234,32 +242,30 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
+                let decoder = <ARMv8 as Arch>::Decoder::default();
 
                 #[cfg(target_arch = "x86_64")]
-                let mut cs = Capstone::new()
-                    .x86()
-                    .mode(capstone::arch::x86::ArchMode::Mode64)
-                    .detail(true)
-                    .build()
-                    .expect("Failed to create Capstone object");
-
-                cs.set_skipdata(true).expect("failed to set skipdata");
+                let decoder = InstDecoder::minimal();
 
                 let start_pc = error.pc - 4 * 5;
-                for insn in &*cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
-                {
-                    if insn.address() as usize == error.pc {
+                #[cfg(target_arch = "x86_64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
+                    11,
+                );
+
+                #[cfg(target_arch = "aarch64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                    11,
+                );
+
+                let mut inst_address = start_pc;
+
+                for insn in insts {
+                    if inst_address == error.pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -268,6 +274,8 @@ impl AsanErrors {
                     } else {
                         writeln!(output, "\t    {insn}").unwrap();
                     }
+
+                    inst_address += insn.len().to_const() as usize;
                 }
                 backtrace_printer
                     .print_trace(&error.backtrace, output)
@@ -489,32 +497,30 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
+                let decoder = <ARMv8 as Arch>::Decoder::default();
 
                 #[cfg(target_arch = "x86_64")]
-                let mut cs = Capstone::new()
-                    .x86()
-                    .mode(capstone::arch::x86::ArchMode::Mode64)
-                    .detail(true)
-                    .build()
-                    .expect("Failed to create Capstone object");
-
-                cs.set_skipdata(true).expect("failed to set skipdata");
+                let decoder = InstDecoder::minimal();
 
                 let start_pc = pc;
-                for insn in &*cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
-                {
-                    if insn.address() as usize == pc {
+
+                #[cfg(target_arch = "x86_64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
+                    11,
+                );
+
+                #[cfg(target_arch = "aarch64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                    11,
+                );
+
+                let mut inst_address = start_pc;
+                for insn in insts {
+                    if inst_address == pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -523,6 +529,8 @@ impl AsanErrors {
                     } else {
                         writeln!(output, "\t    {insn}").unwrap();
                     }
+
+                    inst_address += insn.len().to_const() as usize;
                 }
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
             }

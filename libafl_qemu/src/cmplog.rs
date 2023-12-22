@@ -18,7 +18,8 @@ use crate::{
 };
 use crate::{
     helper::{
-        hash_me, HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter,
+        hash_me, HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
+        QemuInstrumentationAddressRangeFilter,
     },
     hooks::{Hook, QemuHooks},
     GuestAddr,
@@ -48,12 +49,12 @@ libafl_bolts::impl_serdeany!(QemuCmpsMapMetadata);
 
 #[derive(Debug)]
 pub struct QemuCmpLogHelper {
-    filter: QemuInstrumentationFilter,
+    filter: QemuInstrumentationAddressRangeFilter,
 }
 
 impl QemuCmpLogHelper {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter) -> Self {
+    pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
         Self { filter }
     }
 
@@ -65,16 +66,16 @@ impl QemuCmpLogHelper {
 
 impl Default for QemuCmpLogHelper {
     fn default() -> Self {
-        Self::new(QemuInstrumentationFilter::None)
+        Self::new(QemuInstrumentationAddressRangeFilter::None)
     }
 }
 
-impl HasInstrumentationFilter for QemuCmpLogHelper {
-    fn filter(&self) -> &QemuInstrumentationFilter {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogHelper {
+    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
 
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
         &mut self.filter
     }
 }
@@ -99,12 +100,12 @@ where
 
 #[derive(Debug)]
 pub struct QemuCmpLogChildHelper {
-    filter: QemuInstrumentationFilter,
+    filter: QemuInstrumentationAddressRangeFilter,
 }
 
 impl QemuCmpLogChildHelper {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter) -> Self {
+    pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
         Self { filter }
     }
 
@@ -116,7 +117,7 @@ impl QemuCmpLogChildHelper {
 
 impl Default for QemuCmpLogChildHelper {
     fn default() -> Self {
-        Self::new(QemuInstrumentationFilter::None)
+        Self::new(QemuInstrumentationAddressRangeFilter::None)
     }
 }
 
@@ -219,14 +220,14 @@ pub extern "C" fn trace_cmp8_cmplog(_: *const (), id: u64, v0: u64, v1: u64) {
 #[cfg(emulation_mode = "usermode")]
 #[derive(Debug)]
 pub struct QemuCmpLogRoutinesHelper {
-    filter: QemuInstrumentationFilter,
+    filter: QemuInstrumentationAddressRangeFilter,
     cs: Capstone,
 }
 
 #[cfg(emulation_mode = "usermode")]
 impl QemuCmpLogRoutinesHelper {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter) -> Self {
+    pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
         Self {
             filter,
             cs: capstone().detail(true).build().unwrap(),
@@ -348,12 +349,12 @@ impl QemuCmpLogRoutinesHelper {
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl HasInstrumentationFilter for QemuCmpLogRoutinesHelper {
-    fn filter(&self) -> &QemuInstrumentationFilter {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogRoutinesHelper {
+    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
 
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
         &mut self.filter
     }
 }

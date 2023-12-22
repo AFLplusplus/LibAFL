@@ -10,11 +10,8 @@ use core::{
 #[cfg(emulation_mode = "usermode")]
 use std::cell::OnceCell;
 #[cfg(emulation_mode = "systemmode")]
-use std::{
-    ffi::{CStr, CString},
-    ptr::null_mut,
-};
-use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{ffi::CStr, ptr::null_mut};
+use std::{ffi::CString, ptr, slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
@@ -393,6 +390,9 @@ extern "C" {
         data: *const (),
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn libafl_qemu_current_paging_id(cpu: CPUStatePtr) -> GuestPhysAddr;
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -586,6 +586,18 @@ impl CPU {
             } else {
                 Some(libafl_qemu_sys::qemu_plugin_hwaddr_phys_addr(phwaddr) as GuestPhysAddr)
             }
+        }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    #[must_use]
+    pub fn get_current_paging_id(&self) -> Option<GuestPhysAddr> {
+        let paging_id = unsafe { libafl_qemu_current_paging_id(self.ptr) };
+
+        if paging_id == 0 {
+            None
+        } else {
+            Some(paging_id)
         }
     }
 
@@ -945,8 +957,12 @@ impl Emulator {
         #[allow(clippy::cast_possible_wrap)]
         let argc = argc as i32;
 
-        let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
-        let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
+        let args: Vec<CString> = args
+            .iter()
+            .map(|x| CString::new(x.clone()).unwrap())
+            .collect();
+        let mut argv: Vec<*const u8> = args.iter().map(|x| x.as_ptr() as *const u8).collect();
+        argv.push(ptr::null()); // argv is always null terminated.
         let env_strs: Vec<String> = env
             .iter()
             .map(|(k, v)| format!("{}={}\0", &k, &v))
@@ -982,7 +998,7 @@ impl Emulator {
     }
 
     #[must_use]
-    pub(crate) fn new_empty() -> Emulator {
+    pub fn new_empty() -> Emulator {
         Emulator { _private: () }
     }
 

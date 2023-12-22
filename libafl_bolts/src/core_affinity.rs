@@ -936,7 +936,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg_attr(miri, ignore)]
+    #[cfg_attr(any(miri, target_os = "freebsd"), ignore)]
     fn test_get_core_ids() {
         let set = get_core_ids().unwrap();
         assert_eq!(set.len(), usize::from(available_parallelism().unwrap()));

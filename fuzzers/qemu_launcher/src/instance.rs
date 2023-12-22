@@ -186,7 +186,7 @@ impl<'a> Instance<'a> {
             let mut executor = TimeoutExecutor::new(executor, self.options.timeout);
 
             // Setup an havoc mutator with a mutational stage
-            let mutator = StdScheduledMutator::new(havoc_mutations());
+            let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
             let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
             self.fuzz(&mut state, &mut fuzzer, &mut executor, &mut stages)

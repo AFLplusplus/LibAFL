@@ -19,6 +19,12 @@ use crate::{
     state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
 };
 
+/// Unicode category data, as used by string analysis and mutators.
+#[allow(unused)]
+#[allow(missing_docs)]
+#[allow(clippy::redundant_static_lifetimes)]
+pub mod unicode_categories;
+
 /// Input which contains the context necessary to perform unicode mutations
 pub type UnicodeInput = (BytesInput, StringIdentificationMetadata);
 
@@ -265,15 +271,6 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     input.1 = extract_metadata(input.0.bytes());
 
     MutationResult::Mutated
-}
-
-/// Unicode category data, as used by string analysis and mutators.
-pub mod unicode_categories {
-    #![allow(unused)]
-    #![allow(missing_docs)]
-    #![allow(clippy::redundant_static_lifetimes)]
-
-    include!(concat!(env!("OUT_DIR"), "/unicode_categories.rs"));
 }
 
 /// Mutator which randomly replaces a randomly selected range of bytes with bytes that preserve the
