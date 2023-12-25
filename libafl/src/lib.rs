@@ -153,6 +153,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::similar_names)]
+    #[cfg_attr(miri, ignore)]
     fn test_fuzzer() {
         let rand = StdRand::with_seed(0);
 

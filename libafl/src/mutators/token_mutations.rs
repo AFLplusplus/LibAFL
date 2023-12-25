@@ -1875,6 +1875,7 @@ mod tests {
 
     #[cfg(feature = "std")]
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_read_tokens() {
         let _res = fs::remove_file("test.tkns");
         let data = r#"

@@ -160,6 +160,7 @@ mod test {
     use crate::fs::{write_file_atomic, InputFile};
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_atomic_file_write() {
         let path = "test_atomic_file_write.tmp";
         write_file_atomic(path, b"test").unwrap();
@@ -169,6 +170,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_cloned_ref() {
         let mut one = InputFile::create("test_cloned_ref.tmp").unwrap();
         let two = one.clone();

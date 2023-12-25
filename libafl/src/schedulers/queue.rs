@@ -91,6 +91,7 @@ mod tests {
     };
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_queuecorpus() {
         let rand = StdRand::with_seed(4);
         let mut scheduler = QueueScheduler::new();

@@ -1090,6 +1090,7 @@ mod tests {
 
     #[test]
     #[cfg(all(unix, feature = "std"))]
+    #[cfg_attr(miri, ignore)]
     fn test_logger() {
         use std::{io::stdout, os::fd::AsRawFd};
 

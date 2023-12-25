@@ -195,6 +195,7 @@ mod test {
     use crate::{events::NopEventManager, inputs::BytesInput, state::NopState, NopFuzzer};
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn nop_executor() {
         let empty_input = BytesInput::new(vec![]);
         let nonempty_input = BytesInput::new(vec![1u8]);

@@ -670,6 +670,7 @@ mod tests {
     static mut MAP: [u32; 4] = [0; 4];
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_event_serde() {
         let obv = unsafe { StdMapObserver::new("test", &mut MAP) };
         let map = tuple_list!(obv);

@@ -190,6 +190,7 @@ mod tests {
         ProbabilitySamplingScheduler<UniformDistribution<<S as UsesInput>::Input>, S>;
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_prob_sampling() {
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {

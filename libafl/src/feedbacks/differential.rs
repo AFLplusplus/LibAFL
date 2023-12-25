@@ -213,6 +213,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(miri, ignore)]
     fn test_diff(should_equal: bool) {
         let mut nop_state = NopState::new();
 
@@ -245,11 +246,13 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_diff_eq() {
         test_diff(true);
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_diff_neq() {
         test_diff(false);
     }

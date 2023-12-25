@@ -380,6 +380,7 @@ mod test {
     };
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_tuning() {
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
@@ -403,6 +404,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_mutation_distribution() {
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {

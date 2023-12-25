@@ -405,6 +405,7 @@ mod tests {
 
     #[cfg(feature = "std")]
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_random_seed() {
         use crate::rands::RandomSeed;
 
