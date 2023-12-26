@@ -508,7 +508,7 @@ pub trait ArchExtras {
 impl CPU {
     #[must_use]
     pub fn emulator(&self) -> Emulator {
-        Emulator::new_empty()
+        unsafe { Emulator::new_empty() }
     }
 
     #[must_use]
@@ -997,8 +997,14 @@ impl Emulator {
         }
     }
 
+    /// Get an empty emulator.
+    ///
+    /// # Safety
+    ///
+    /// Should not be used if `Emulator::new` has never been used before (otherwise QEMU will not be initialized).
+    /// Prefer `Emulator::get` for a safe version of this method.
     #[must_use]
-    pub fn new_empty() -> Emulator {
+    unsafe fn new_empty() -> Emulator {
         Emulator { _private: () }
     }
 
