@@ -39,7 +39,7 @@ use libafl_qemu::{
 };
 use typed_builder::TypedBuilder;
 
-use crate::{harness::Harness, options::FuzzerOptions};
+use crate::{client::TOKENS, harness::Harness, options::FuzzerOptions};
 
 pub type ClientState =
     StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
@@ -119,11 +119,19 @@ impl<'a> Instance<'a> {
 
         let observers = tuple_list!(edges_observer, time_observer);
 
-        if let Some(tokenfile) = &self.options.tokens {
-            if state.metadata_map().get::<Tokens>().is_none() {
-                state.add_metadata(Tokens::from_file(tokenfile)?);
-            }
+        let mut tokens = Tokens::new();
+        let vec = TOKENS.get().unwrap();
+
+        for token in vec {
+            let bytes = token.as_bytes().to_vec();
+            let _ = tokens.add_token(&bytes);
         }
+
+        if let Some(tokenfile) = &self.options.tokens {
+            tokens.add_from_file(tokenfile)?;
+        }
+
+        state.add_metadata(tokens);
 
         let harness = Harness::new(self.emu)?;
         let mut harness = |input: &BytesInput| harness.run(input);

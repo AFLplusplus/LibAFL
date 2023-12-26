@@ -1,4 +1,4 @@
-use std::{env, ops::Range};
+use std::{env, ops::Range, sync::OnceLock};
 
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -27,6 +27,8 @@ pub type ClientState =
 pub struct Client<'a> {
     options: &'a FuzzerOptions,
 }
+
+pub static TOKENS: OnceLock<Vec<String>> = OnceLock::new();
 
 impl<'a> Client<'a> {
     pub fn new(options: &FuzzerOptions) -> Client {
@@ -120,7 +122,10 @@ impl<'a> Client<'a> {
 
         if let Some(yaml_file) = &self.options.yaml_file {
             extra_tokens = QemuInjectionHelper::configure_injections(&emu, yaml_file, start_pc);
+        } else {
+            extra_tokens = Vec::new();
         }
+        TOKENS.set(extra_tokens).expect("Failed to set tokens");
 
         emu.entry_break(start_pc);
 

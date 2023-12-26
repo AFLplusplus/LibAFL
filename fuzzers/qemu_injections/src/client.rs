@@ -126,7 +126,7 @@ where
 
             assert!(
                 cmd.to_lowercase() != "fuzz",
-                "Found verified command injection!"
+                "INJECTION FUZZER: Found verified command injection!"
             );
             //println!("CMD {}", cmd);
 
@@ -146,7 +146,7 @@ where
                 && (second_parameter.to_lowercase().contains("';fuzz;'")
                     || second_parameter.to_lowercase().contains("\";fuzz;\""))
             {
-                panic!("Found command injection!");
+                panic!("INJECTION FUZZER: Found command injection!");
             }
 
             //println!("PARAMETERS First {} Second {}", first_parameter, second_parameter);
@@ -445,7 +445,7 @@ impl<'a> Client<'a> {
             for test in &injection.tests {
                 if query.to_lowercase().contains(&test.match_value) {
                     panic!(
-                        "Found value \"{}\" for {} in {}",
+                        "INJECTION FUZZER: Found value \"{}\" for {} in {}",
                         test.match_value, query, injection.name
                     );
                 }
