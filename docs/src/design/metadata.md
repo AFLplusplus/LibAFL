@@ -23,11 +23,11 @@ As an alternative to `derive(SerdeAny)` which is a proc-macro in `libafl_derive`
 
 ## Usage
 
-Metadata objects are primarly intended to be used inside [`SerdeAnyMap`](https://docs.rs/libafl/0.5.0/libafl/bolts/serdeany/serdeany_registry/struct.SerdeAnyMap.html) and [`NamedSerdeAnyMap`](https://docs.rs/libafl/0.5.0/libafl/bolts/serdeany/serdeany_registry/struct.NamedSerdeAnyMap.html).
+Metadata objects are primarly intended to be used inside [`SerdeAnyMap`](https://docs.rs/libafl_bolts/latest/libafl_bolts/serdeany/serdeany_registry/struct.SerdeAnyMap.html) and [`NamedSerdeAnyMap`](https://docs.rs/libafl_bolts/latest/libafl_bolts/serdeany/serdeany_registry/struct.NamedSerdeAnyMap.html).
 
 With these maps, the user can retrieve instances by type (and name). Internally, the instances are stored as SerdeAny trait objects.
 
-Structs that want to have a set of metadata must implement the [`HasMetadata`](https://docs.rs/libafl/0.5.0/libafl/state/trait.HasMetadata.html) trait.
+Structs that want to have a set of metadata must implement the [`HasMetadata`](https://docs.rs/libafl/latest/libafl/state/trait.HasMetadata.html) trait.
 
 By default, Testcase and State implement it and hold a SerdeAnyMap testcase.
 

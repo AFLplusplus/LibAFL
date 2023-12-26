@@ -5,7 +5,7 @@ use alloc::{
     vec::Vec,
 };
 #[rustversion::nightly]
-use core::simd::cmp::SimdOrd;
+use core::simd::prelude::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,
