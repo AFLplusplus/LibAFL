@@ -113,11 +113,11 @@ impl<'a> Client<'a> {
                 let (emu, asan) = init_with_asan(&mut args, &mut env)?;
                 (emu, Some(asan))
             } else {
-                (Emulator::new(&args, &env)?, None)
+                (Emulator::init(&args, &env)?, None)
             }
         };
 
-        let start_pc = Self::start_pc(&emu)?;
+        let start_pc = Self::start_pc(emu)?;
         log::debug!("start_pc @ {start_pc:#x}");
 
         emu.entry_break(start_pc);
@@ -135,7 +135,7 @@ impl<'a> Client<'a> {
 
         let instance = Instance::builder()
             .options(self.options)
-            .emu(&emu)
+            .emu(emu)
             .mgr(mgr)
             .core_id(core_id);
         if is_asan && is_cmplog {

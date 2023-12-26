@@ -332,7 +332,7 @@ impl QemuSnapshotHelper {
         if self.mmap_limit != 0 && total_size > self.mmap_limit {
             let mut cb = self.stop_execution.take().unwrap();
             let emu = Emulator::get().unwrap();
-            (cb)(self, &emu);
+            (cb)(self, emu);
             self.stop_execution = Some(cb);
         }
     }

@@ -346,7 +346,7 @@ where
     S: UsesInput,
 {
     helpers: QT,
-    emulator: Emulator,
+    emulator: &'static Emulator,
     phantom: PhantomData<S>,
 }
 
@@ -358,7 +358,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuHooks")
             .field("helpers", &self.helpers)
-            .field("emulator", &self.emulator)
+            .field("emulator", self.emulator)
             .finish()
     }
 }
@@ -368,7 +368,7 @@ where
     QT: QemuHelperTuple<NopState<I>>,
     NopState<I>: UsesInput<Input = I>,
 {
-    pub fn reproducer(emulator: Emulator, helpers: QT) -> Box<Self> {
+    pub fn reproducer(emulator: &'static Emulator, helpers: QT) -> Box<Self> {
         Self::new(emulator, helpers)
     }
 
@@ -382,12 +382,12 @@ where
                 FIRST_EXEC = false;
             }
         }
-        self.helpers.pre_exec_all(&self.emulator, input);
+        self.helpers.pre_exec_all(self.emulator, input);
 
         let mut exit_kind = harness(input);
 
         self.helpers
-            .post_exec_all(&self.emulator, input, &mut (), &mut exit_kind);
+            .post_exec_all(self.emulator, input, &mut (), &mut exit_kind);
 
         exit_kind
     }
@@ -398,7 +398,7 @@ where
     QT: QemuHelperTuple<S>,
     S: UsesInput,
 {
-    pub fn new(emulator: Emulator, helpers: QT) -> Box<Self> {
+    pub fn new(emulator: &'static Emulator, helpers: QT) -> Box<Self> {
         unsafe {
             assert!(
                 !HOOKS_IS_INITIALIZED,
@@ -436,8 +436,8 @@ where
         self.helpers.match_first_type_mut::<T>()
     }
 
-    pub fn emulator(&self) -> &Emulator {
-        &self.emulator
+    pub fn emulator(&self) -> &'static Emulator {
+        self.emulator
     }
 
     pub fn helpers(&self) -> &QT {

@@ -774,7 +774,7 @@ impl CPU {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct HookId(pub(crate) usize);
 
-use std::pin::Pin;
+use std::{pin::Pin, sync::OnceLock};
 
 #[derive(Debug)]
 pub struct HookData(u64);
@@ -927,17 +927,17 @@ impl From<EmuError> for libafl::Error {
     }
 }
 
-static mut EMULATOR_IS_INITIALIZED: bool = false;
-
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Emulator {
     _private: (),
 }
 
+static EMULATOR: OnceLock<Emulator> = OnceLock::new();
+
 #[allow(clippy::unused_self)]
 impl Emulator {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
-    pub fn new(args: &[String], env: &[(String, String)]) -> Result<Emulator, EmuError> {
+    pub fn init(args: &[String], env: &[(String, String)]) -> Result<&'static Emulator, EmuError> {
         if args.is_empty() {
             return Err(EmuError::EmptyArgs);
         }
@@ -947,12 +947,9 @@ impl Emulator {
             return Err(EmuError::TooManyArgs(argc));
         }
 
-        unsafe {
-            if EMULATOR_IS_INITIALIZED {
-                return Err(EmuError::MultipleInstances);
-            }
-            EMULATOR_IS_INITIALIZED = true;
-        }
+        EMULATOR
+            .set(Emulator { _private: () })
+            .map_err(|_| EmuError::MultipleInstances)?;
 
         #[allow(clippy::cast_possible_wrap)]
         let argc = argc as i32;
@@ -983,18 +980,13 @@ impl Emulator {
                 libafl_qemu_sys::syx_snapshot_init();
             }
         }
-        Ok(Emulator { _private: () })
+
+        Ok(EMULATOR.get().unwrap())
     }
 
     #[must_use]
-    pub fn get() -> Option<Self> {
-        unsafe {
-            if EMULATOR_IS_INITIALIZED {
-                Some(Self::new_empty())
-            } else {
-                None
-            }
-        }
+    pub fn get() -> Option<&'static Self> {
+        EMULATOR.get()
     }
 
     /// Get an empty emulator.
@@ -1719,15 +1711,15 @@ pub mod pybind {
 
     #[pyclass(unsendable)]
     pub struct Emulator {
-        pub emu: super::Emulator,
+        pub emu: &'static super::Emulator,
     }
 
     #[pymethods]
     impl Emulator {
         #[allow(clippy::needless_pass_by_value)]
         #[new]
-        fn new(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Emulator> {
-            let emu = super::Emulator::new(&args, &env)
+        fn init(args: Vec<String>, env: Vec<(String, String)>) -> PyResult<Emulator> {
+            let emu = super::Emulator::init(&args, &env)
                 .map_err(|e| PyValueError::new_err(format!("{e}")))?;
             Ok(Emulator { emu })
         }

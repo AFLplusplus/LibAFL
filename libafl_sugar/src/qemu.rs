@@ -118,7 +118,7 @@ where
 {
     /// Run the fuzzer
     #[allow(clippy::too_many_lines, clippy::similar_names)]
-    pub fn run(&mut self, emulator: &Emulator) {
+    pub fn run(&mut self, emulator: &'static Emulator) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -214,7 +214,7 @@ where
 
             if self.use_cmplog.unwrap_or(false) {
                 let mut hooks = QemuHooks::new(
-                    emulator.clone(),
+                    emulator,
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     tuple_list!(
                         QemuEdgeCoverageHelper::default(),
@@ -325,10 +325,8 @@ where
                     }
                 }
             } else {
-                let mut hooks = QemuHooks::new(
-                    emulator.clone(),
-                    tuple_list!(QemuEdgeCoverageHelper::default()),
-                );
+                let mut hooks =
+                    QemuHooks::new(emulator, tuple_list!(QemuEdgeCoverageHelper::default()));
 
                 let executor = QemuExecutor::new(
                     &mut hooks,
@@ -511,7 +509,7 @@ pub mod pybind {
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
                 .build()
-                .run(&emulator.emu);
+                .run(emulator.emu);
         }
     }
 
