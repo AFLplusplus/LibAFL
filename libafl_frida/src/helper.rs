@@ -28,12 +28,11 @@ use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
 
-#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-use crate::cmplog_rt::CmpLogRuntime;
-use crate::coverage_rt::CoverageRuntime;
 #[cfg(unix)]
 use crate::asan::asan_rt::AsanRuntime;
-use crate::drcov_rt::DrCovRuntime;
+#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+use crate::cmplog_rt::CmpLogRuntime;
+use crate::{coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
 #[cfg(target_vendor = "apple")]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
