@@ -9,11 +9,11 @@ So the Executor is for instance responsible to inform the program about the inpu
 
 In our model, it can also hold a set of Observers connected with each execution.
 
-In Rust, we bind this concept to the [`Executor`](https://docs.rs/libafl/0/libafl/executors/trait.Executor.html) trait. A structure implementing this trait must implement [`HasObservers`](https://docs.rs/libafl/0/libafl/executors/trait.HasObservers.html) too if wants to hold a set of Observers.
+In Rust, we bind this concept to the [`Executor`](https://docs.rs/libafl/latest/libafl/executors/trait.Executor.html) trait. A structure implementing this trait must implement [`HasObservers`](https://docs.rs/libafl/latest/libafl/executors/trait.HasObservers.html) too if wants to hold a set of Observers.
 
-By default, we implement some commonly used Executors such as [`InProcessExecutor`](https://docs.rs/libafl/0/libafl/executors/inprocess/type.InProcessExecutor.html) in which the target is a harness function providing in-process crash detection. Another Executor is the [`ForkserverExecutor`](https://docs.rs/libafl/0/libafl/executors/forkserver/struct.ForkserverExecutor.html) that implements an AFL-like mechanism to spawn child processes to fuzz.
+By default, we implement some commonly used Executors such as [`InProcessExecutor`](https://docs.rs/libafl/latest/libafl/executors/inprocess/type.InProcessExecutor.html) in which the target is a harness function providing in-process crash detection. Another Executor is the [`ForkserverExecutor`](https://docs.rs/libafl/latest/libafl/executors/forkserver/struct.ForkserverExecutor.html) that implements an AFL-like mechanism to spawn child processes to fuzz.
 
-A common pattern when creating an Executor is wrapping an existing one, for instance [`TimeoutExecutor`](https://docs.rs/libafl/0.6.1/libafl/executors/timeout/struct.TimeoutExecutor.html) wraps an executor and installs a timeout callback before calling the original `run` function of the wrapped executor.
+A common pattern when creating an Executor is wrapping an existing one, for instance [`TimeoutExecutor`](https://docs.rs/libafl/latest/libafl/executors/timeout/struct.TimeoutExecutor.html) wraps an executor and installs a timeout callback before calling the original `run` function of the wrapped executor.
 
 ## InProcessExecutor
 Let's begin with the base case; `InProcessExecutor`.
