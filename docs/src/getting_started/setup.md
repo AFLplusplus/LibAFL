@@ -22,9 +22,9 @@ $ git clone https://github.com/AFLplusplus/LibAFL.git
 Alternatively, on a UNIX-like machine, you can download a compressed archive and extract it with:
 
 ```sh
-wget https://github.com/AFLplusplus/LibAFL/archive/main.tar.gz
-$ tar xvf LibAFL-main.tar.gz
-$ rm LibAFL-main.tar.gz
+$ wget https://github.com/AFLplusplus/LibAFL/archive/main.tar.gz
+$ tar xvf main.tar.gz
+$ rm main.tar.gz
 $ ls LibAFL-main # this is the extracted folder
 ```
 

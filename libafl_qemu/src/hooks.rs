@@ -87,7 +87,9 @@ macro_rules! hook_to_repr {
 }
 
 static mut QEMU_HOOKS_PTR: *const c_void = ptr::null();
-unsafe fn get_qemu_hooks<'a, QT, S>() -> &'a mut QemuHooks<QT, S>
+
+#[must_use]
+pub unsafe fn get_qemu_hooks<'a, QT, S>() -> &'a mut QemuHooks<QT, S>
 where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
