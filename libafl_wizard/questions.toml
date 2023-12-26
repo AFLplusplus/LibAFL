@@ -198,7 +198,7 @@ previous = ""
 
 [[question]]
 id = "default components"
-title = "TODO: create questions to choose between these components."
+title = "Type in finsish to end the generation."
 content = """
 """
 skipped_by = ""
@@ -206,7 +206,7 @@ previous = ""
 
     [[question.answers]]
     was_chosen = false
-    answer = "Next"
+    answer = "Finish"
     next = "END"
     code = """
     use std::path::PathBuf;

@@ -30,7 +30,7 @@ fn main() {
     while questions[curr_q].id != "END" {
         clear_terminal_screen();
         questions[curr_q].print_question();
-        print!("\nYour answer: ");
+        print!("\n >> ");
         io::stdout().flush().unwrap();
         io::stdin()
             .read_line(&mut input)

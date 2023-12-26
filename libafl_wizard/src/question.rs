@@ -52,7 +52,7 @@ impl Question {
         output.push_str(&format!("{}\n\n\t", self.content));
 
         for ans in self.answers.iter() {
-            output.push_str(&format!("{}{}", ans.answer, " ".repeat(8)));
+            output.push_str(&format!("{}{}|{}", ans.answer, " ".repeat(4), " ".repeat(4)));
         }
 
         output.push_str("Undo\n");

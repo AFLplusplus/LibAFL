@@ -1,5 +1,20 @@
-use libafl::        corpus::{InMemoryCorpus, OnDiskCorpus},executors::        corpus::{InMemoryCorpus, OnDiskCorpus},inprocess::InProcessExecutor;
-use libafl_bolts::        current_nanos,tuples::        rands::StdRand,tuple_list;
+use libafl::{
+    corpus::{InMemoryCorpus, OnDiskCorpus},
+    events::SimpleEventManager,
+    executors::inprocess::InProcessExecutor,
+    feedbacks::{CrashFeedback, MaxMapFeedback},
+    fuzzer::{Fuzzer, StdFuzzer},
+    monitors::SimpleMonitor,
+    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    schedulers::QueueScheduler,
+    stages::mutational::StdMutationalStage,
+    state::StdState,
+};
+use libafl_bolts::{
+    current_nanos,
+    rands::StdRand,
+    tuples::tuple_list,
+};
 use std::path::PathBuf;
 
 fn main() {
