@@ -85,11 +85,11 @@ echo a > in/a
 # Allow sigterm as exit code 
 timeout 31s ./${FUZZER_NAME} -o out -i in >fuzz_stdout.log || true
 cat fuzz_stdout.log
-if [ -z "$(grep "objectives: 1" fuzz_stdout.log)" ]; then
+if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1
-else
-    echo "Fuzzer is working"
 fi
 rm -rf out || true
 rm -rf in || true
