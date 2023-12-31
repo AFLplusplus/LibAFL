@@ -11,6 +11,9 @@ The following architectures are supported:
 * mips
 * ppc
 
+Note that the injection feature `-y` is currently only supported on x86_64
+and aarch64.
+
 ## Prerequisites
 ```bash
 sudo apt install \
