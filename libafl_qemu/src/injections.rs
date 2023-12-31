@@ -1,12 +1,12 @@
 /*
  * TODOs:
  *  - also read in export addresses of shared libraries to resolve functions
- *  - fix aarch64 support
  *
  * Maybe:
- *  - maybe also arm/ppc/mips support (would be easy)
+ *  - arm/ppc/mips support (would be easy)
  *  - return code analysis support (not needed currently)
  *  - regex support (not needed currently)
+ *  - std::string and Rust String support (would need such target functions added)
  *
  */
 
@@ -81,6 +81,8 @@ impl QemuInjectionHelper {
         Self {}
     }
 
+    /// configure_injections is the main function to activatr the injection
+    /// vulnerability detection feature.
     pub fn configure_injections(
         emu: &Emulator,
         yaml_file: &String,
@@ -265,7 +267,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
 
     //println!("on_call_check {} {}", parameter, off);
 
-    //#[cfg(not(cpu_target = "aarch64"))]
+    #[cfg(any(target_arch = "x86_64", not(target_arch)))]
     let reg: GuestAddr = match parameter {
         0 => emu.current_cpu().unwrap().read_reg(Regs::Rdi).unwrap_or(0),
         1 => emu.current_cpu().unwrap().read_reg(Regs::Rsi).unwrap_or(0),
@@ -275,18 +277,16 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
         5 => emu.current_cpu().unwrap().read_reg(Regs::R9).unwrap_or(0),
         _ => panic!("unknown register"),
     };
-    /*
-        #[cfg(cpu_target = "aarch64")]
-        let reg: GuestAddr = match parameter {
-            0 => emu.current_cpu().unwrap().read_reg(Regs::X0).unwrap_or(0),
-            1 => emu.current_cpu().unwrap().read_reg(Regs::X1).unwrap_or(0),
-            2 => emu.current_cpu().unwrap().read_reg(Regs::X2).unwrap_or(0),
-            3 => emu.current_cpu().unwrap().read_reg(Regs::X3).unwrap_or(0),
-            4 => emu.current_cpu().unwrap().read_reg(Regs::X4).unwrap_or(0),
-            5 => emu.current_cpu().unwrap().read_reg(Regs::X5).unwrap_or(0),
-            _ => panic!("unknown register"),
-        };
-    */
+    #[cfg(cpu_target = "aarch64")]
+    let reg: GuestAddr = match parameter {
+        0 => emu.current_cpu().unwrap().read_reg(Regs::X0).unwrap_or(0),
+        1 => emu.current_cpu().unwrap().read_reg(Regs::X1).unwrap_or(0),
+        2 => emu.current_cpu().unwrap().read_reg(Regs::X2).unwrap_or(0),
+        3 => emu.current_cpu().unwrap().read_reg(Regs::X3).unwrap_or(0),
+        4 => emu.current_cpu().unwrap().read_reg(Regs::X4).unwrap_or(0),
+        5 => emu.current_cpu().unwrap().read_reg(Regs::X5).unwrap_or(0),
+        _ => panic!("unknown register"),
+    };
 
     //println!("reg value = {:x}", reg);
     if reg > 0 {

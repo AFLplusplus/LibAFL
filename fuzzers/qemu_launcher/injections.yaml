@@ -4,7 +4,7 @@
 # -name: "name"  # any name you want, it is not important
 #  functions:
 #     # multiple function targets to hook can be defined
-#     - function: "function_name"  # name of the function you want to hook
+#     - function: "function_name"  # name of the function you want to hook.
 #                                  # if the function name starts with 0x then
 #                                  # this is the QEMU Guest address of a
 #                                  # function you want to hook that does not
@@ -31,14 +31,15 @@
     - function: "mysql_send_query"
       parameter: 1
   tests:
-    - input_value: "'\" OR '1'=\"'1"
-      match_value: "'\" OR "
-    - input_value: "\"' OR \"1\"=\"'1\""
-      match_value: "\"' OR "
+    - input_value: "'\"\"'"
+      match_value: "'\"\"'"
+    # this one is not needed, just to show you can have many entries:
+    - input_value: "1\" OR '1'=\"1"
+      match_value: "1\" OR '1'=\"1"
 
 # Command injection. Note that for most you will need a libc with debug symbols
-# We do not need this as we automatically watch the SYS_execve syscall, this is
-# just an example-
+# We do not need this as we watch the SYS_execve syscall, this is just an
+# example.
 - name: "cmd"
   functions:
     - function: "popen"
