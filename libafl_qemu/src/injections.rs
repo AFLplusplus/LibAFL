@@ -1,3 +1,15 @@
+/*
+ * TODOs:
+ *  - also read in export addresses of shared libraries to resolve functions
+ *  - fix aarch64 support
+ *
+ * Maybe:
+ *  - maybe also arm/ppc/mips support (would be easy)
+ *  - return code analysis support (not needed currently)
+ *  - regex support (not needed currently)
+ *
+ */
+
 #[cfg(emulation_mode = "usermode")]
 use std::sync::OnceLock;
 use std::{ffi::CStr, fs::File, io::Read, os::raw::c_char, path::Path};
