@@ -1184,7 +1184,8 @@ pub mod pybind {
             EM: EventFirer<State = PythonStdState>,
             OT: ObserversTuple<PythonStdState>,
         {
-            // SAFETY: We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
+            // # Safety
+            // We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
             let dont_look_at_this: &PythonObserversTuple =
                 unsafe { &*(observers as *const OT as *const PythonObserversTuple) };
             let dont_look_at_this2: &PythonEventManager =
@@ -1217,7 +1218,8 @@ pub mod pybind {
         where
             OT: ObserversTuple<PythonStdState>,
         {
-            // SAFETY: We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
+            // # Safety
+            // We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
             let dont_look_at_this: &PythonObserversTuple =
                 unsafe { &*(observers as *const OT as *const PythonObserversTuple) };
             Python::with_gil(|py| -> PyResult<()> {

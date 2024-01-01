@@ -192,7 +192,8 @@ where
         #[allow(clippy::cast_possible_truncation)] // we cannot have more than usize elements..
         let hash = (self.build_hasher.hash_one(location) % usize::MAX as u64) as usize;
         let val = unsafe {
-            // SAFETY: the index is modulo by the length, therefore it is always in bounds
+            // # Safety
+            // The index is modulo by the length, therefore it is always in bounds
             let len = self.hitcounts_map.len();
             self.hitcounts_map
                 .as_mut_slice()

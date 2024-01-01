@@ -1,10 +1,11 @@
 use core::ffi::c_int;
 #[cfg(unix)]
-use std::io::Write;
+use std::io::{stderr, stdout, Write};
 use std::{
     fmt::Debug,
     fs::File,
     net::TcpListener,
+    os::fd::AsRawFd,
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -35,23 +36,21 @@ use crate::{feedbacks::LibfuzzerCrashCauseMetadata, fuzz_with, options::Libfuzze
 fn destroy_output_fds(options: &LibfuzzerOptions) {
     #[cfg(unix)]
     {
-        use std::os::fd::AsRawFd;
+        use libafl_bolts::os::{dup2, null_fd};
+
+        let null_fd = null_fd().unwrap();
+        let stdout_fd = stdout().as_raw_fd();
+        let stderr_fd = stderr().as_raw_fd();
 
         if options.tui() {
-            let file_null = File::open("/dev/null").unwrap();
-            unsafe {
-                libc::dup2(file_null.as_raw_fd(), 1);
-                libc::dup2(file_null.as_raw_fd(), 2);
-            }
+            dup2(null_fd, stdout_fd).unwrap();
+            dup2(null_fd, stderr_fd).unwrap();
         } else if options.close_fd_mask() != 0 {
-            let file_null = File::open("/dev/null").unwrap();
-            unsafe {
-                if options.close_fd_mask() & 1 != 0 {
-                    libc::dup2(file_null.as_raw_fd(), 1);
-                }
-                if options.close_fd_mask() & 2 != 0 {
-                    libc::dup2(file_null.as_raw_fd(), 2);
-                }
+            if options.close_fd_mask() & u8::try_from(stderr_fd).unwrap() != 0 {
+                dup2(null_fd, stdout_fd).unwrap();
+            }
+            if options.close_fd_mask() & u8::try_from(stderr_fd).unwrap() != 0 {
+                dup2(null_fd, stderr_fd).unwrap();
             }
         }
     }
