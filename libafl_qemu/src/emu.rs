@@ -1012,6 +1012,12 @@ where
         }
     }
 
+    /// Get an empty emulator.
+    ///
+    /// # Safety
+    ///
+    /// Should not be used if `Emulator::new` has never been used before (otherwise QEMU will not be initialized).
+    /// Prefer `Emulator::get` for a safe version of this method.
     #[must_use]
     pub(crate) fn new_empty() -> Emulator<NopEmuExitHandler> {
         Emulator {
