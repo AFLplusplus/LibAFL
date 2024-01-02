@@ -1096,7 +1096,7 @@ impl<I: HasBytesVec> CrossoverInsertMutator<I> {
         target: usize,
         range: Range<usize>,
         other: &I,
-    ) -> Result<MutationResult, Error> {
+    ) -> MutationResult {
         input.bytes_mut().resize(size + range.len(), 0);
         unsafe {
             buffer_self_copy(
@@ -1116,7 +1116,7 @@ impl<I: HasBytesVec> CrossoverInsertMutator<I> {
                 range.len(),
             );
         }
-        Ok(MutationResult::Mutated)
+        MutationResult::Mutated
     }
 }
 
@@ -1162,7 +1162,7 @@ where
         // No need to load the input again, it'll still be cached.
         let other = other_testcase.input().as_ref().unwrap();
 
-        Self::crossover_insert(input, size, target, range, other)
+        Ok(Self::crossover_insert(input, size, target, range, other))
     }
 }
 
@@ -1194,7 +1194,7 @@ impl<I: HasBytesVec> CrossoverReplaceMutator<I> {
         target: usize,
         range: Range<usize>,
         other: &I,
-    ) -> Result<MutationResult, Error> {
+    ) -> MutationResult {
         unsafe {
             buffer_copy(
                 input.bytes_mut(),
@@ -1204,7 +1204,7 @@ impl<I: HasBytesVec> CrossoverReplaceMutator<I> {
                 range.len(),
             );
         }
-        Ok(MutationResult::Mutated)
+        MutationResult::Mutated
     }
 }
 
@@ -1248,7 +1248,7 @@ where
         // No need to load the input again, it'll still be cached.
         let other = other_testcase.input().as_ref().unwrap();
 
-        Self::crossover_replace(input, target, range, other)
+        Ok(Self::crossover_replace(input, target, range, other))
     }
 }
 

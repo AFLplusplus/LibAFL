@@ -167,7 +167,7 @@ where
                         }
                     };
 
-                    return Self::crossover_insert(part, size, target, range, chosen);
+                    return Ok(Self::crossover_insert(part, size, target, range, chosen));
                 }
 
                 return Ok(MutationResult::Skipped);
@@ -202,7 +202,13 @@ where
             // No need to load the input again, it'll still be cached.
             let other = other_testcase.input().as_ref().unwrap();
 
-            Self::crossover_insert(part, size, target, range, &other.parts()[choice])
+            Ok(Self::crossover_insert(
+                part,
+                size,
+                target,
+                range,
+                &other.parts()[choice],
+            ))
         } else {
             // just add it!
             input.add_part(name.clone(), other.parts()[choice].clone());
@@ -266,7 +272,7 @@ where
                         }
                     };
 
-                    return Self::crossover_replace(part, target, range, chosen);
+                    return Ok(Self::crossover_replace(part, target, range, chosen));
                 }
 
                 return Ok(MutationResult::Skipped);
@@ -301,7 +307,12 @@ where
             // No need to load the input again, it'll still be cached.
             let other = other_testcase.input().as_ref().unwrap();
 
-            Self::crossover_replace(part, target, range, &other.parts()[choice])
+            Ok(Self::crossover_replace(
+                part,
+                target,
+                range,
+                &other.parts()[choice],
+            ))
         } else {
             // just add it!
             input.add_part(name.clone(), other.parts()[choice].clone());
