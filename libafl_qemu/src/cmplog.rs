@@ -249,7 +249,7 @@ impl QemuCmpLogRoutinesHelper {
             }
         }
 
-        let emu = Emulator::<NopEmuExitHandler>::new_empty();
+        let emu = Emulator::<NopEmuExitHandler>::get().unwrap();
 
         let a0: GuestAddr = emu
             .read_function_argument(CallingConvention::Cdecl, 0)
