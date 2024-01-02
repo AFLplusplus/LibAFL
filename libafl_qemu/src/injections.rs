@@ -1,3 +1,5 @@
+//! Detect injection vulnerabilities
+
 /*
  * TODOs:
  *  - also read in export addresses of shared libraries to resolve functions
