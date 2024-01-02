@@ -13,7 +13,7 @@ use crate::{
     feedbacks::{Feedback, HasObserverName},
     inputs::UsesInput,
     observers::{ObserverWithHashField, ObserversTuple},
-    state::{HasClientPerfMonitor, HasNamedMetadata},
+    state::{HasNamedMetadata, State},
     Error,
 };
 
@@ -88,7 +88,7 @@ pub struct NewHashFeedback<O, S> {
 impl<O, S> Feedback<S> for NewHashFeedback<O, S>
 where
     O: ObserverWithHashField + Named,
-    S: UsesInput + HasNamedMetadata + HasClientPerfMonitor,
+    S: State + HasNamedMetadata,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_named_metadata(

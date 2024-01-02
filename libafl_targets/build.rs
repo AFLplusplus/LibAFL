@@ -64,6 +64,21 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
 
+    #[cfg(feature = "common")]
+    {
+        println!("cargo:rerun-if-changed=src/common.h");
+        println!("cargo:rerun-if-changed=src/common.c");
+
+        let mut common = cc::Build::new();
+
+        #[cfg(feature = "sanitizers_flags")]
+        {
+            common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
+        }
+
+        common.file(src_dir.join("common.c")).compile("common");
+    }
+
     #[cfg(any(feature = "sancov_value_profile", feature = "sancov_cmplog"))]
     {
         println!("cargo:rerun-if-changed=src/sancov_cmp.c");
@@ -133,9 +148,83 @@ fn main() {
         libfuzzer.compile("libfuzzer");
     }
 
-    println!("cargo:rerun-if-changed=src/common.h");
-    println!("cargo:rerun-if-changed=src/common.c");
+    #[cfg(feature = "coverage")]
+    {
+        println!("cargo:rerun-if-changed=src/coverage.c");
 
+        cc::Build::new()
+            .file(src_dir.join("coverage.c"))
+            .define("EDGES_MAP_SIZE", Some(&*format!("{edges_map_size}")))
+            .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
+            .compile("coverage");
+    }
+
+    #[cfg(feature = "cmplog")]
+    {
+        println!("cargo:rerun-if-changed=src/cmplog.h");
+        println!("cargo:rerun-if-changed=src/cmplog.c");
+
+        #[cfg(unix)]
+        {
+            cc::Build::new()
+                .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
+                .flag("-Wno-sign-compare")
+                .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+                .define(
+                    "AFLPP_CMPLOG_MAP_W",
+                    Some(&*format!("{aflpp_cmplog_map_w}")),
+                )
+                .define(
+                    "AFLPP_CMPLOG_MAP_H",
+                    Some(&*format!("{aflpp_cmplog_map_h}")),
+                )
+                .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+                .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+                .file(src_dir.join("cmplog.c"))
+                .compile("cmplog");
+        }
+
+        #[cfg(not(unix))]
+        {
+            cc::Build::new()
+                .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+                .define(
+                    "AFLPP_CMPLOG_MAP_W",
+                    Some(&*format!("{aflpp_cmplog_map_w}")),
+                )
+                .define(
+                    "AFLPP_CMPLOG_MAP_H",
+                    Some(&*format!("{aflpp_cmplog_map_h}")),
+                )
+                .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+                .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+                .file(src_dir.join("cmplog.c"))
+                .compile("cmplog");
+        }
+    }
+
+    #[cfg(feature = "forkserver")]
+    {
+        #[cfg(unix)]
+        {
+            println!("cargo:rerun-if-changed=src/forkserver.c");
+
+            cc::Build::new()
+                .file(src_dir.join("forkserver.c"))
+                .compile("forkserver");
+        }
+    }
+
+    #[cfg(all(feature = "windows_asan", windows))]
+    {
+        println!("cargo:rerun-if-changed=src/windows_asan.c");
+
+        cc::Build::new()
+            .file(src_dir.join("windows_asan.c"))
+            .compile("windows_asan");
+    }
+
+    // NOTE: Sanitizer interfaces doesn't require common
     #[cfg(feature = "sanitizer_interfaces")]
     if env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap() == "64" {
         println!("cargo:rerun-if-changed=src/sanitizer_interfaces.h");
@@ -155,82 +244,6 @@ fn main() {
         let mut file = File::create(Path::new(&out_dir).join("sanitizer_interfaces.rs"))
             .expect("Could not create file");
         write!(file, "").unwrap();
-    }
-
-    let mut common = cc::Build::new();
-
-    #[cfg(feature = "sanitizers_flags")]
-    {
-        common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
-    }
-
-    common.file(src_dir.join("common.c")).compile("common");
-
-    println!("cargo:rerun-if-changed=src/coverage.c");
-
-    cc::Build::new()
-        .file(src_dir.join("coverage.c"))
-        .define("EDGES_MAP_SIZE", Some(&*format!("{edges_map_size}")))
-        .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
-        .compile("coverage");
-
-    println!("cargo:rerun-if-changed=src/cmplog.h");
-    println!("cargo:rerun-if-changed=src/cmplog.c");
-
-    #[cfg(unix)]
-    {
-        cc::Build::new()
-            .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
-            .flag("-Wno-sign-compare")
-            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-            .define(
-                "AFLPP_CMPLOG_MAP_W",
-                Some(&*format!("{aflpp_cmplog_map_w}")),
-            )
-            .define(
-                "AFLPP_CMPLOG_MAP_H",
-                Some(&*format!("{aflpp_cmplog_map_h}")),
-            )
-            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-            .file(src_dir.join("cmplog.c"))
-            .compile("cmplog");
-    }
-
-    #[cfg(not(unix))]
-    {
-        cc::Build::new()
-            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-            .define(
-                "AFLPP_CMPLOG_MAP_W",
-                Some(&*format!("{aflpp_cmplog_map_w}")),
-            )
-            .define(
-                "AFLPP_CMPLOG_MAP_H",
-                Some(&*format!("{aflpp_cmplog_map_h}")),
-            )
-            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-            .file(src_dir.join("cmplog.c"))
-            .compile("cmplog");
-    }
-
-    #[cfg(unix)]
-    {
-        println!("cargo:rerun-if-changed=src/forkserver.c");
-
-        cc::Build::new()
-            .file(src_dir.join("forkserver.c"))
-            .compile("forkserver");
-    }
-
-    #[cfg(windows)]
-    {
-        println!("cargo:rerun-if-changed=src/windows_asan.c");
-
-        cc::Build::new()
-            .file(src_dir.join("windows_asan.c"))
-            .compile("windows_asan");
     }
 
     println!("cargo:rustc-link-search=native={}", &out_dir);

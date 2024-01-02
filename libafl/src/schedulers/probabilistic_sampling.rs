@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
     inputs::UsesInput,
     schedulers::{Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
     Error,
 };
 
@@ -93,7 +93,7 @@ where
 
 impl<F, S> UsesState for ProbabilitySamplingScheduler<F, S>
 where
-    S: UsesInput + HasTestcase,
+    S: State + HasTestcase,
 {
     type State = S;
 }
@@ -101,7 +101,7 @@ where
 impl<F, S> Scheduler for ProbabilitySamplingScheduler<F, S>
 where
     F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();

@@ -7,7 +7,7 @@ use libafl::{
     feedbacks::Feedback,
     inputs::UsesInput,
     observers::{Observer, ObserversTuple},
-    state::HasClientPerfMonitor,
+    state::State,
     Error,
 };
 use libafl_bolts::Named;
@@ -149,7 +149,7 @@ impl Named for OomFeedback {
 
 impl<S> Feedback<S> for OomFeedback
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: State,
 {
     fn is_interesting<EM, OT>(
         &mut self,

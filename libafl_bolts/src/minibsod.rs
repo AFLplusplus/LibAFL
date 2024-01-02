@@ -51,6 +51,33 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
+#[cfg(all(any(target_os = "linux", target_os = "android"), target_arch = "x86"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    use libc::{
+        REG_EAX, REG_EBP, REG_EBX, REG_ECX, REG_EDI, REG_EDX, REG_EFL, REG_EIP, REG_ESI, REG_ESP,
+    };
+
+    let mcontext = &ucontext.uc_mcontext;
+
+    write!(writer, "eax: {:#016x}, ", mcontext.gregs[REG_EAX as usize])?;
+    write!(writer, "ebx: {:#016x}, ", mcontext.gregs[REG_EBX as usize])?;
+    write!(writer, "ecx: {:#016x}, ", mcontext.gregs[REG_ECX as usize])?;
+    writeln!(writer, "edx: {:#016x}, ", mcontext.gregs[REG_EDX as usize])?;
+    write!(writer, "edi: {:#016x}, ", mcontext.gregs[REG_EDI as usize])?;
+    write!(writer, "esi: {:#016x}, ", mcontext.gregs[REG_ESI as usize])?;
+    write!(writer, "esp: {:#016x}, ", mcontext.gregs[REG_ESP as usize])?;
+    writeln!(writer, "ebp: {:#016x}, ", mcontext.gregs[REG_EBP as usize])?;
+    write!(writer, "eip: {:#016x}, ", mcontext.gregs[REG_EIP as usize])?;
+    writeln!(writer, "efl: {:#016x}, ", mcontext.gregs[REG_EFL as usize])?;
+
+    Ok(())
+}
+
+/// Write the content of all important registers
 #[cfg(all(
     any(target_os = "linux", target_os = "android"),
     target_arch = "aarch64"
@@ -355,6 +382,26 @@ pub fn dump_registers<W: Write>(
 }
 ///
 /// Write the content of all important registers
+#[cfg(all(target_os = "openbsd", target_arch = "aarch64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    for reg in 0..29_usize {
+        write!(writer, "x{:02}: 0x{:016x} ", reg, ucontext.sc_x[reg])?;
+        if reg % 4 == 3 {
+            writeln!(writer)?;
+        }
+    }
+    write!(writer, "lr : {:#016x}, ", ucontext.sc_lr)?;
+    write!(writer, "elr : {:#016x}, ", ucontext.sc_elr)?;
+    write!(writer, "sp : {:#016x}, ", ucontext.sc_sp)?;
+    write!(writer, "spsr : {:#016x}, ", ucontext.sc_spsr)?;
+}
+
+///
+/// Write the content of all important registers
 #[cfg(all(
     any(target_os = "solaris", target_os = "illumos"),
     target_arch = "x86_64"
@@ -478,7 +525,7 @@ fn write_crash<W: Write>(
         "Received signal {} at {:#08x}, fault address: {:#08x}",
         signal,
         ucontext.uc_mcontext.gregs[libc::REG_EIP as usize],
-        ucontext.uc_mcontext.gregs[libc::REG_ERR as usize]
+        ucontext.uc_mcontext.cr2
     )?;
 
     Ok(())
@@ -603,7 +650,7 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
-#[cfg(target_os = "openbsd")]
+#[cfg(all(target_os = "openbsd", target_arch = "x86_64"))]
 #[allow(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
@@ -614,6 +661,22 @@ fn write_crash<W: Write>(
         writer,
         "Received signal {} at{:016x}, fault address: 0x{:016x}",
         signal, ucontext.sc_rip, ucontext.sc_fs
+    )?;
+
+    Ok(())
+}
+
+#[cfg(all(target_os = "openbsd", target_arch = "aarch64"))]
+#[allow(clippy::similar_names)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at{:016x}",
+        signal, ucontext.sc_elr
     )?;
 
     Ok(())
@@ -654,6 +717,21 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
+#[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:#016x}",
+        signal, ucontext.uc_mcontext.rip
+    )?;
+
+    Ok(())
+}
+
 #[cfg(not(any(
     target_vendor = "apple",
     target_os = "linux",
@@ -662,6 +740,7 @@ fn write_crash<W: Write>(
     target_os = "dragonfly",
     target_os = "openbsd",
     target_os = "netbsd",
+    target_os = "haiku",
     any(target_os = "solaris", target_os = "illumos"),
 )))]
 fn write_crash<W: Write>(

@@ -18,9 +18,10 @@ use crate::{
 };
 use crate::{
     helper::{
-        hash_me, HasInstrumentationFilter, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter,
+        hash_me, HasInstrumentationFilter, IsFilter, QemuHelper, QemuHelperTuple,
+        QemuInstrumentationAddressRangeFilter,
     },
-    hooks::QemuHooks,
+    hooks::{Hook, QemuHooks},
     GuestAddr,
 };
 
@@ -48,12 +49,12 @@ libafl_bolts::impl_serdeany!(QemuCmpsMapMetadata);
 
 #[derive(Debug)]
 pub struct QemuCmpLogHelper {
-    filter: QemuInstrumentationFilter,
+    filter: QemuInstrumentationAddressRangeFilter,
 }
 
 impl QemuCmpLogHelper {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter) -> Self {
+    pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
         Self { filter }
     }
 
@@ -65,16 +66,16 @@ impl QemuCmpLogHelper {
 
 impl Default for QemuCmpLogHelper {
     fn default() -> Self {
-        Self::new(QemuInstrumentationFilter::None)
+        Self::new(QemuInstrumentationAddressRangeFilter::None)
     }
 }
 
-impl HasInstrumentationFilter for QemuCmpLogHelper {
-    fn filter(&self) -> &QemuInstrumentationFilter {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogHelper {
+    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
 
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
         &mut self.filter
     }
 }
@@ -83,28 +84,28 @@ impl<S> QemuHelper<S> for QemuCmpLogHelper
 where
     S: UsesInput + HasMetadata,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.cmps_raw(
-            Some(gen_unique_cmp_ids::<QT, S>),
-            Some(trace_cmp1_cmplog),
-            Some(trace_cmp2_cmplog),
-            Some(trace_cmp4_cmplog),
-            Some(trace_cmp8_cmplog),
+        hooks.cmps(
+            Hook::Function(gen_unique_cmp_ids::<QT, S>),
+            Hook::Raw(trace_cmp1_cmplog),
+            Hook::Raw(trace_cmp2_cmplog),
+            Hook::Raw(trace_cmp4_cmplog),
+            Hook::Raw(trace_cmp8_cmplog),
         );
     }
 }
 
 #[derive(Debug)]
 pub struct QemuCmpLogChildHelper {
-    filter: QemuInstrumentationFilter,
+    filter: QemuInstrumentationAddressRangeFilter,
 }
 
 impl QemuCmpLogChildHelper {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter) -> Self {
+    pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
         Self { filter }
     }
 
@@ -116,7 +117,7 @@ impl QemuCmpLogChildHelper {
 
 impl Default for QemuCmpLogChildHelper {
     fn default() -> Self {
-        Self::new(QemuInstrumentationFilter::None)
+        Self::new(QemuInstrumentationAddressRangeFilter::None)
     }
 }
 
@@ -127,22 +128,22 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.cmps_raw(
-            Some(gen_hashed_cmp_ids::<QT, S>),
-            Some(trace_cmp1_cmplog),
-            Some(trace_cmp2_cmplog),
-            Some(trace_cmp4_cmplog),
-            Some(trace_cmp8_cmplog),
+        hooks.cmps(
+            Hook::Function(gen_hashed_cmp_ids::<QT, S>),
+            Hook::Raw(trace_cmp1_cmplog),
+            Hook::Raw(trace_cmp2_cmplog),
+            Hook::Raw(trace_cmp4_cmplog),
+            Hook::Raw(trace_cmp8_cmplog),
         );
     }
 }
 
 pub fn gen_unique_cmp_ids<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
@@ -174,7 +175,7 @@ where
 }
 
 pub fn gen_hashed_cmp_ids<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
+    hooks: &mut QemuHooks<QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _size: usize,
@@ -192,25 +193,25 @@ where
     Some(hash_me(pc.into()) & (CMPLOG_MAP_W as u64 - 1))
 }
 
-pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8, _data: u64) {
+pub extern "C" fn trace_cmp1_cmplog(_: *const (), id: u64, v0: u8, v1: u8) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 1, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp2_cmplog(id: u64, v0: u16, v1: u16, _data: u64) {
+pub extern "C" fn trace_cmp2_cmplog(_: *const (), id: u64, v0: u16, v1: u16) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 2, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp4_cmplog(id: u64, v0: u32, v1: u32, _data: u64) {
+pub extern "C" fn trace_cmp4_cmplog(_: *const (), id: u64, v0: u32, v1: u32) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 4, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64, _data: u64) {
+pub extern "C" fn trace_cmp8_cmplog(_: *const (), id: u64, v0: u64, v1: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 8, v0, v1);
     }
@@ -219,14 +220,14 @@ pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64, _data: u64) {
 #[cfg(emulation_mode = "usermode")]
 #[derive(Debug)]
 pub struct QemuCmpLogRoutinesHelper {
-    filter: QemuInstrumentationFilter,
+    filter: QemuInstrumentationAddressRangeFilter,
     cs: Capstone,
 }
 
 #[cfg(emulation_mode = "usermode")]
 impl QemuCmpLogRoutinesHelper {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter) -> Self {
+    pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
         Self {
             filter,
             cs: capstone().detail(true).build().unwrap(),
@@ -238,14 +239,14 @@ impl QemuCmpLogRoutinesHelper {
         self.filter.allowed(addr)
     }
 
-    extern "C" fn on_call(_pc: GuestAddr, k: u64) {
+    extern "C" fn on_call(k: u64, _pc: GuestAddr) {
         unsafe {
             if CMPLOG_ENABLED == 0 {
                 return;
             }
         }
 
-        let emu = Emulator::new_empty();
+        let emu = Emulator::get().unwrap();
 
         let a0: GuestAddr = emu
             .read_function_argument(CallingConvention::Cdecl, 0)
@@ -266,7 +267,7 @@ impl QemuCmpLogRoutinesHelper {
     }
 
     fn gen_blocks_calls<QT, S>(
-        hooks: &mut QemuHooks<'_, QT, S>,
+        hooks: &mut QemuHooks<QT, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
@@ -317,7 +318,7 @@ impl QemuCmpLogRoutinesHelper {
                     match u32::from(detail.0) {
                         capstone::InsnGroupType::CS_GRP_CALL => {
                             let k = (hash_me(pc.into())) & (CMPLOG_MAP_W as u64 - 1);
-                            emu.set_hook(insn.address() as GuestAddr, Self::on_call, k, false);
+                            emu.set_hook(k, insn.address() as GuestAddr, Self::on_call, false);
                         }
                         capstone::InsnGroupType::CS_GRP_RET
                         | capstone::InsnGroupType::CS_GRP_INVALID
@@ -348,12 +349,12 @@ impl QemuCmpLogRoutinesHelper {
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl HasInstrumentationFilter for QemuCmpLogRoutinesHelper {
-    fn filter(&self) -> &QemuInstrumentationFilter {
+impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for QemuCmpLogRoutinesHelper {
+    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
         &self.filter
     }
 
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationFilter {
+    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
         &mut self.filter
     }
 }
@@ -363,10 +364,14 @@ impl<S> QemuHelper<S> for QemuCmpLogRoutinesHelper
 where
     S: UsesInput,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.blocks(Some(Self::gen_blocks_calls::<QT, S>), None, None);
+        hooks.blocks(
+            Hook::Function(Self::gen_blocks_calls::<QT, S>),
+            Hook::Empty,
+            Hook::Empty,
+        );
     }
 }

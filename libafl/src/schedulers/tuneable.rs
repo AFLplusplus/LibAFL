@@ -11,9 +11,8 @@ use serde::{Deserialize, Serialize};
 use super::RemovableScheduler;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
-    inputs::UsesInput,
     schedulers::Scheduler,
-    state::{HasCorpus, HasMetadata, UsesState},
+    state::{HasCorpus, HasMetadata, State, UsesState},
     Error,
 };
 
@@ -91,16 +90,19 @@ where
 
 impl<S> UsesState for TuneableScheduler<S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
 
-impl<S> RemovableScheduler for TuneableScheduler<S> where S: HasCorpus + HasMetadata + HasTestcase {}
+impl<S> RemovableScheduler for TuneableScheduler<S> where
+    S: HasCorpus + HasMetadata + HasTestcase + State
+{
+}
 
 impl<S> Scheduler for TuneableScheduler<S>
 where
-    S: HasCorpus + HasMetadata + HasTestcase,
+    S: HasCorpus + HasMetadata + HasTestcase + State,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         // Set parent id

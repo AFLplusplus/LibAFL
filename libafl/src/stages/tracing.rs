@@ -2,8 +2,6 @@
 
 use core::{fmt::Debug, marker::PhantomData};
 
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId},
     executors::{Executor, HasObservers, ShadowExecutor},
@@ -11,9 +9,11 @@ use crate::{
     observers::ObserversTuple,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, State, UsesState},
+    state::{HasCorpus, HasExecutions, State, UsesState},
     Error,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
@@ -34,7 +34,7 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
 where
     E: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    TE::State: HasExecutions + HasCorpus,
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
@@ -115,7 +115,7 @@ where
     EM: UsesState<State = E::State>,
     SOT: ObserversTuple<E::State>,
     Z: UsesState<State = E::State>,
-    E::State: State + HasClientPerfMonitor + HasExecutions + HasCorpus + Debug,
+    E::State: State + HasExecutions + HasCorpus + Debug,
 {
     #[inline]
     fn perform(
@@ -160,7 +160,7 @@ where
 impl<E, EM, SOT, Z> ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    E::State: State + HasClientPerfMonitor + HasExecutions + HasCorpus,
+    E::State: State + HasExecutions + HasCorpus,
     EM: UsesState<State = E::State>,
     SOT: ObserversTuple<E::State>,
     Z: UsesState<State = E::State>,

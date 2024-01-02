@@ -10,8 +10,6 @@ use core::{
 use libafl_bolts::rands::Rand;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
@@ -22,11 +20,11 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand,
-    },
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// The default maximum number of mutations to perform per input.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
@@ -46,7 +44,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand + HasCorpus + Clone + Debug,
+    CS::State: HasRand + HasCorpus + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -68,7 +66,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + Clone + Debug,
+    CS::State: HasCorpus + HasRand + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -91,14 +89,8 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor
-        + HasCorpus
-        + HasRand
-        + HasExecutions
-        + HasLastReportTime
-        + HasMetadata
-        + Clone
-        + Debug,
+    CS::State:
+        HasCorpus + HasRand + HasExecutions + HasLastReportTime + HasMetadata + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -211,14 +203,8 @@ where
     EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter<State = CS::State>,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor
-        + HasCorpus
-        + HasRand
-        + HasExecutions
-        + HasMetadata
-        + HasLastReportTime
-        + Clone
-        + Debug,
+    CS::State:
+        HasCorpus + HasRand + HasExecutions + HasMetadata + HasLastReportTime + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -236,7 +222,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + Clone + Debug,
+    CS::State: HasCorpus + HasRand + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,

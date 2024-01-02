@@ -15,7 +15,7 @@ use libafl_qemu::{
     cmplog::QemuCmpLogHelper,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    ArchExtras, Emulator, GuestAddr, QemuInstrumentationFilter,
+    ArchExtras, Emulator, GuestAddr, QemuInstrumentationAddressRangeFilter,
 };
 
 use crate::{instance::Instance, options::FuzzerOptions};
@@ -59,7 +59,10 @@ impl<'a> Client<'a> {
         Ok(start_pc)
     }
 
-    fn coverage_filter(&self, emu: &Emulator) -> Result<QemuInstrumentationFilter, Error> {
+    fn coverage_filter(
+        &self,
+        emu: &Emulator,
+    ) -> Result<QemuInstrumentationAddressRangeFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
         if let Some(includes) = &self.options.include {
             #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
@@ -70,7 +73,7 @@ impl<'a> Client<'a> {
                     end: x.end.into(),
                 })
                 .collect::<Vec<Range<GuestAddr>>>();
-            Ok(QemuInstrumentationFilter::AllowList(rules))
+            Ok(QemuInstrumentationAddressRangeFilter::AllowList(rules))
         } else if let Some(excludes) = &self.options.exclude {
             #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
             let rules = excludes
@@ -80,14 +83,16 @@ impl<'a> Client<'a> {
                     end: x.end.into(),
                 })
                 .collect::<Vec<Range<GuestAddr>>>();
-            Ok(QemuInstrumentationFilter::DenyList(rules))
+            Ok(QemuInstrumentationAddressRangeFilter::DenyList(rules))
         } else {
             let mut elf_buffer = Vec::new();
             let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
             let range = elf
                 .get_section(".text", emu.load_addr())
                 .ok_or_else(|| Error::key_not_found("Failed to find .text section"))?;
-            Ok(QemuInstrumentationFilter::AllowList(vec![range]))
+            Ok(QemuInstrumentationAddressRangeFilter::AllowList(vec![
+                range,
+            ]))
         }
     }
 
@@ -103,11 +108,12 @@ impl<'a> Client<'a> {
         let mut env = self.env()?;
         log::debug!("ENV: {:#?}", env);
 
-        let emu = {
+        let (emu, mut asan) = {
             if self.options.is_asan_core(core_id) {
-                init_with_asan(&mut args, &mut env)?
+                let (emu, asan) = init_with_asan(&mut args, &mut env)?;
+                (emu, Some(asan))
             } else {
-                Emulator::new(&args, &env)?
+                (Emulator::new(&args, &env)?, None)
             }
         };
 
@@ -136,11 +142,14 @@ impl<'a> Client<'a> {
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuCmpLogHelper::default(),
-                QemuAsanHelper::default(),
+                QemuAsanHelper::default(asan.take().unwrap()),
             );
             instance.build().run(helpers, state)
         } else if is_asan {
-            let helpers = tuple_list!(edge_coverage_helper, QemuAsanHelper::default(),);
+            let helpers = tuple_list!(
+                edge_coverage_helper,
+                QemuAsanHelper::default(asan.take().unwrap()),
+            );
             instance.build().run(helpers, state)
         } else if is_cmplog {
             let helpers = tuple_list!(edge_coverage_helper, QemuCmpLogHelper::default(),);

@@ -19,8 +19,8 @@ In addition, it will also build two C and C++ compiler wrappers (bin/libafl_c(li
 
 Then download libpng, and unpack the archive:
 ```bash
-wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
-tar -xvf libpng-1.6.37.tar.xz
+wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+tar -xvf v1.6.37.tar.gz
 ```
 
 Now compile libpng, using the libafl_cc compiler wrapper:

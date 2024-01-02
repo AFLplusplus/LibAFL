@@ -1569,6 +1569,7 @@ mod tests {
 
     /// This test guarantees that the likelihood of a byte being re-inserted is equally likely
     #[test]
+    #[cfg_attr(all(miri, target_arch = "aarch64", target_vendor = "apple"), ignore)] // Regex miri fails on M1
     fn test_insert() -> Result<(), Error> {
         let base = BytesInput::new((0..10).collect());
         let mut counts = [0usize; 10];
@@ -1618,6 +1619,7 @@ mod tests {
 
     /// This test guarantees that the likelihood of a random byte being inserted is equally likely
     #[test]
+    #[cfg_attr(all(miri, target_arch = "aarch64", target_vendor = "apple"), ignore)] // Regex miri fails on M1
     fn test_rand_insert() -> Result<(), Error> {
         let base = BytesInput::new((0..10).collect());
         let mut counts = [0usize; 256];

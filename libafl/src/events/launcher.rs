@@ -38,18 +38,18 @@ use libafl_bolts::{
     shmem::ShMemProvider,
 };
 #[cfg(feature = "std")]
-use serde::de::DeserializeOwned;
-#[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
-use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
-    events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+    events::{
+        llmp::{LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+        EventConfig,
+    },
     monitors::Monitor,
-    state::{HasClientPerfMonitor, HasExecutions},
+    state::{HasExecutions, State},
     Error,
 };
 
@@ -76,7 +76,7 @@ where
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput + 'a,
+    S: State + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -95,10 +95,18 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
+    /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[builder(setter(skip), default = None)]
+    opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
     /// `stdout_file`.
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
+    /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[builder(setter(skip), default = None)]
+    opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
     #[builder(default = None)]
@@ -121,7 +129,7 @@ where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput,
+    S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -141,7 +149,7 @@ impl<'a, CF, MT, S, SP> Launcher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
@@ -166,12 +174,10 @@ where
 
         log::info!("spawning on cores: {:?}", self.cores);
 
-        #[cfg(feature = "std")]
-        let stdout_file = self
+        self.opened_stdout_file = self
             .stdout_file
             .map(|filename| File::create(filename).unwrap());
-        #[cfg(feature = "std")]
-        let stderr_file = self
+        self.opened_stderr_file = self
             .stderr_file
             .map(|filename| File::create(filename).unwrap());
 
@@ -204,9 +210,9 @@ where
 
                         #[cfg(feature = "std")]
                         if !debug_output {
-                            if let Some(file) = stdout_file {
+                            if let Some(file) = &self.opened_stdout_file {
                                 dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                if let Some(stderr) = stderr_file {
+                                if let Some(stderr) = &self.opened_stderr_file {
                                     dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
                                 } else {
                                     dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
@@ -401,7 +407,7 @@ where
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput + 'a,
+    S: State + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -423,12 +429,21 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
+    /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[builder(setter(skip), default = None)]
+    opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
     /// `stdout_file`.
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
+    /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[builder(setter(skip), default = None)]
+    opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
+
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
@@ -454,7 +469,7 @@ where
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput,
+    S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -478,7 +493,7 @@ where
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
@@ -503,10 +518,10 @@ where
 
         log::info!("spawning on cores: {:?}", self.cores);
 
-        let stdout_file = self
+        self.opened_stdout_file = self
             .stdout_file
             .map(|filename| File::create(filename).unwrap());
-        let stderr_file = self
+        self.opened_stderr_file = self
             .stderr_file
             .map(|filename| File::create(filename).unwrap());
 
@@ -556,9 +571,9 @@ where
                         std::thread::sleep(std::time::Duration::from_millis(index * 10));
 
                         if !debug_output {
-                            if let Some(file) = stdout_file {
+                            if let Some(file) = &self.opened_stdout_file {
                                 dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                if let Some(stderr) = stderr_file {
+                                if let Some(stderr) = &self.opened_stderr_file {
                                     dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
                                 } else {
                                     dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
@@ -582,7 +597,7 @@ where
                             mgr,
                             self.shmem_provider.clone(),
                             self.centralized_broker_port,
-                            id == 0,
+                            index == 1,
                         )?;
 
                         return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);
