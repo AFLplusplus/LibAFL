@@ -618,7 +618,7 @@ pub mod pybind {
     /// Python class for StdHavocMutator
     pub struct PythonStdHavocMutator {
         /// Rust wrapped StdHavocMutator object
-        pub inner: StdScheduledMutator<BytesInput, HavocMutationsType, PythonStdState>,
+        pub inner: StdScheduledMutator<BytesInput, HavocMutationsType<BytesInput>, PythonStdState>,
     }
 
     #[pymethods]
