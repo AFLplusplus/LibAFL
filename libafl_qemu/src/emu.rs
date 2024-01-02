@@ -553,9 +553,7 @@ pub trait ArchExtras {
 impl CPU {
     #[must_use]
     pub fn emulator(&self) -> Emulator<NopEmuExitHandler> {
-        unsafe {
-            Emulator::<NopEmuExitHandler>::new_empty()
-        }
+        unsafe { Emulator::<NopEmuExitHandler>::new_empty() }
     }
 
     #[must_use]
