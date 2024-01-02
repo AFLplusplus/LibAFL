@@ -68,6 +68,8 @@ typedef struct CmpLogRoutine {
   uint8_t v1[CMPLOG_RTN_LEN];
 } CmpLogRoutine;
 
+typedef CmpLogRoutine CmpLogRoutineExtended;
+
 typedef struct CmpLogMap {
   CmpLogHeader headers[CMPLOG_MAP_W];
   union {
@@ -80,7 +82,7 @@ typedef struct CmpLogMapExtended {
   CmpLogHeaderExtended headers[CMPLOG_MAP_W];
   union {
     CmpLogInstructionExtended operands[CMPLOG_MAP_W][CMPLOG_MAP_H];
-    CmpLogRoutine             routines[CMPLOG_MAP_W][CMPLOG_MAP_RTN_EXTENDED_H];
+    CmpLogRoutineExtended             routines[CMPLOG_MAP_W][CMPLOG_MAP_RTN_EXTENDED_H];
   } vals;
 } CmpLogMapExtended;
 
