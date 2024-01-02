@@ -49,7 +49,7 @@ pub type ClientMgr = LlmpRestartingEventManager<ClientState, StdShMemProvider>;
 #[derive(TypedBuilder)]
 pub struct Instance<'a> {
     options: &'a FuzzerOptions,
-    emu: &'a Emulator,
+    emu: &'static Emulator,
     mgr: ClientMgr,
     core_id: CoreId,
 }
@@ -59,7 +59,7 @@ impl<'a> Instance<'a> {
     where
         QT: QemuHelperTuple<ClientState>,
     {
-        let mut hooks = QemuHooks::new(self.emu.clone(), helpers);
+        let mut hooks = QemuHooks::new(self.emu, helpers);
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
