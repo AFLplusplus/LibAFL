@@ -21,7 +21,7 @@ which = "4.4"
 [dependencies]
 libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
-libafl_targets = { path = "../../libafl_targets/", features = ["pointer_maps", "sancov_cmplog", "libfuzzer"] }
+libafl_targets = { path = "../../libafl_targets/", features = ["pointer_maps", "sancov_cmplog", "libfuzzer", "sancov_8bit"] }
 clap = { version = "4.0", features = ["default"] }
 
 [lib]
