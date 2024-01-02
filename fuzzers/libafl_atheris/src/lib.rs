@@ -3,7 +3,7 @@
 //! This is the drop-in replacement for libfuzzer, to be used together with [`Atheris`](https://github.com/google/atheris)
 //! for python instrumentation and fuzzing.
 
-use core::{convert::TryInto, ffi::c_void, slice, time::Duration};
+use core::time::Duration;
 use std::{
     env,
     os::raw::{c_char, c_int},
@@ -39,7 +39,7 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-use libafl_targets::{extra_counters, std_edges_map_observer, CmpLogObserver};
+use libafl_targets::{extra_counters, CmpLogObserver};
 
 /// It's called by Atheris after the fuzzer has been initialized.
 /// The main entrypoint to our fuzzer, which will be called by `Atheris` when fuzzing starts.
@@ -95,7 +95,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         .get_matches();
 
     let workdir = env::current_dir().unwrap();
-    println!("{}", env::current_dir().unwrap().to_string_lossy().to_string());
+    println!("{}", env::current_dir().unwrap().to_string_lossy());
 
     let cores = Cores::from_cmdline(matches.get_one::<String>("cores").unwrap())
         .expect("No valid core count given!");
@@ -133,8 +133,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         // Create an observation channel using the coverage map
         let edges = unsafe { extra_counters() };
         println!("edges: {:?}", edges);
-        let edges_observer;
-        edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_slice(
+        let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_slice(
             "edges",
             edges.into_iter().next().unwrap(),
         ));
