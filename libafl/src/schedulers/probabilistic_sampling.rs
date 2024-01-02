@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
     inputs::UsesInput,
     schedulers::{Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasMetadata, HasRand, State, UsesState},
     Error,
 };
 
@@ -93,7 +93,7 @@ where
 
 impl<F, S> UsesState for ProbabilitySamplingScheduler<F, S>
 where
-    S: UsesInput + HasTestcase,
+    S: State + HasTestcase,
 {
     type State = S;
 }
@@ -101,7 +101,7 @@ where
 impl<F, S> Scheduler for ProbabilitySamplingScheduler<F, S>
 where
     F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
 {
     fn on_add(&mut self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
@@ -191,6 +191,11 @@ mod tests {
 
     #[test]
     fn test_prob_sampling() {
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            super::ProbabilityMetadata::register();
+        }
+
         // the first 3 probabilities will be .69, .86, .44
         let rand = StdRand::with_seed(12);
 

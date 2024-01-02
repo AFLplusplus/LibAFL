@@ -1,17 +1,11 @@
 //! The [`TMinMutationalStage`] is a stage which will attempt to minimize corpus entries.
 
 use alloc::string::{String, ToString};
-use core::{
-    fmt::Debug,
-    hash::{BuildHasher, Hash, Hasher},
-    marker::PhantomData,
-};
+use core::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{HasLen, Named};
 
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     events::EventFirer,
@@ -24,9 +18,11 @@ use crate::{
     schedulers::{RemovableScheduler, Scheduler},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, HasSolutions, UsesState},
+    state::{HasCorpus, HasExecutions, HasMaxSize, HasSolutions, State, UsesState},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// Mutational stage which minimizes corpus entries.
 ///
@@ -34,7 +30,7 @@ use crate::{
 pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F2, CS::State, OT>
 where
-    Self::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    Self::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize,
     <Self::State as UsesInput>::Input: HasLen + Hash,
     CS: Scheduler<State = Self::State> + RemovableScheduler,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
@@ -73,9 +69,7 @@ where
 
         start_timer!(state);
         let mut base = state.corpus().cloned_input_for_id(base_corpus_idx)?;
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        base.hash(&mut hasher);
-        let base_hash = hasher.finish();
+        let base_hash = RandomState::with_seeds(0, 0, 0, 0).hash_one(&base);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         fuzzer.execute_input(state, executor, manager, &base)?;
@@ -115,7 +109,6 @@ where
                 // TODO replace if process_execution adds a return value for solution index
                 let solution_count = state.solutions().count();
                 let corpus_count = state.corpus().count();
-                *state.executions_mut() += 1;
                 let (_, corpus_idx) = fuzzer.process_execution(
                     state,
                     manager,
@@ -152,13 +145,10 @@ where
             i = next_i;
         }
 
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        base.hash(&mut hasher);
-        let new_hash = hasher.finish();
+        let new_hash = RandomState::with_seeds(0, 0, 0, 0).hash_one(&base);
         if base_hash != new_hash {
             let exit_kind = fuzzer.execute_input(state, executor, manager, &base)?;
             let observers = executor.observers();
-            *state.executions_mut() += 1;
             // assumption: this input should not be marked interesting because it was not
             // marked as interesting above; similarly, it should not trigger objectives
             fuzzer
@@ -205,8 +195,7 @@ impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler + RemovableScheduler,
-    CS::State:
-        HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize + HasCorpus,
     <CS::State as UsesInput>::Input: HasLen + Hash,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
@@ -243,7 +232,6 @@ where
     F2: Feedback<Z::State>,
     FF: FeedbackFactory<F2, Z::State, OT>,
     Z: UsesState,
-    Z::State: HasClientPerfMonitor,
 {
     fn create_feedback(&self, ctx: &OT) -> F2 {
         self.factory.create_feedback(ctx)
@@ -262,7 +250,7 @@ where
     <CS::State as UsesInput>::Input: HasLen + Hash,
     M: Mutator<CS::Input, CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasSolutions + HasExecutions + HasMaxSize,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasMaxSize,
     Z: ExecutionProcessor<OT, State = CS::State>
         + ExecutesInput<E, EM>
         + HasFeedback<Feedback = F1>
@@ -341,8 +329,8 @@ impl<M, S> HasObserverName for MapEqualityFeedback<M, S> {
 
 impl<M, S> Feedback<S> for MapEqualityFeedback<M, S>
 where
-    M: MapObserver + Debug,
-    S: UsesInput + HasClientPerfMonitor + Debug,
+    M: MapObserver,
+    S: State,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -393,7 +381,7 @@ impl<M, OT, S> FeedbackFactory<MapEqualityFeedback<M, S>, S, OT> for MapEquality
 where
     M: MapObserver,
     OT: ObserversTuple<S>,
-    S: UsesInput + HasClientPerfMonitor + Debug,
+    S: State + Debug,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<M, S> {
         let obs = observers

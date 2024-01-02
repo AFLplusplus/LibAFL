@@ -1,6 +1,4 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
-//!
-//!
 #![no_std]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
@@ -50,7 +48,6 @@
         overflowing_literals,
         path_statements,
         patterns_in_fns_without_body,
-        private_in_public,
         unconditional_recursion,
         unused,
         unused_allocation,
@@ -79,6 +76,20 @@ pub mod sancov_cmp;
 #[cfg(any(feature = "sancov_cmplog", feature = "sancov_value_profile"))]
 pub use sancov_cmp::*;
 
+/// Module containing bindings to the various sanitizer interface headers
+#[cfg(feature = "sanitizer_interfaces")]
+pub mod sanitizer_ifaces {
+    #![allow(non_snake_case)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_upper_case_globals)]
+    #![allow(unused)]
+    #![allow(improper_ctypes)]
+    #![allow(clippy::unreadable_literal)]
+    #![allow(missing_docs)]
+    #![allow(missing_debug_implementations)]
+    include!(concat!(env!("OUT_DIR"), "/sanitizer_interfaces.rs"));
+}
+
 #[cfg(feature = "libfuzzer")]
 pub mod libfuzzer;
 #[cfg(feature = "libfuzzer")]
@@ -89,24 +100,27 @@ pub mod sancov_8bit;
 #[cfg(feature = "sancov_8bit")]
 pub use sancov_8bit::*;
 
+#[cfg(feature = "coverage")]
 pub mod coverage;
+#[cfg(feature = "coverage")]
 pub use coverage::*;
 
 pub mod value_profile;
 pub use value_profile::*;
 
-pub mod cmplog;
-pub use cmplog::*;
+/// runtime related to comparisons
+pub mod cmps;
+pub use cmps::*;
 
 #[cfg(feature = "std")]
 pub mod drcov;
 
-#[cfg(all(windows, feature = "std"))]
+#[cfg(all(windows, feature = "std", feture = "windows_asan"))]
 pub mod windows_asan;
-#[cfg(all(windows, feature = "std"))]
+#[cfg(all(windows, feature = "std", feture = "windows_asan"))]
 pub use windows_asan::*;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "forkserver"))]
 pub mod forkserver;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "forkserver"))]
 pub use forkserver::*;

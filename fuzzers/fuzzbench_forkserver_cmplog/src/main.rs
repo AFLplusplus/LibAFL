@@ -21,26 +21,28 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations,
         StdMOptMutator, Tokens,
     },
-    observers::{
-        AFLppCmpMap, AFLppForkserverCmpObserver, HitcountsMapObserver, StdMapObserver, TimeObserver,
-    },
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
         calibrate::CalibrationStage, mutational::MultiMutationalStage,
-        power::StdPowerMutationalStage, tracing::AFLppCmplogTracingStage, ColorizationStage,
-        IfStage,
+        power::StdPowerMutationalStage, ColorizationStage, IfStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
 use libafl_bolts::{
     current_nanos, current_time,
+    ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
     AsMutSlice,
+};
+use libafl_targets::{
+    cmps::{observers::AFLppCmpLogObserver, stages::AFLppCmplogTracingStage},
+    AFLppCmpLogMap,
 };
 use nix::sys::signal::Signal;
 
@@ -206,6 +208,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
+#[allow(clippy::too_many_arguments)]
 fn fuzz(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
@@ -343,14 +346,12 @@ fn fuzz(
 
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
-        let mut cmplog_shmem = shmem_provider
-            .new_shmem(core::mem::size_of::<AFLppCmpMap>())
-            .unwrap();
+        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
         // let the forkserver know the shmid
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
-        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpMap>() };
+        let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
-        let cmplog_observer = AFLppForkserverCmpObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
 
         let cmplog_forkserver = ForkserverExecutor::builder()
             .program(exec)

@@ -223,6 +223,11 @@ impl Tokens {
     pub fn tokens(&self) -> &[Vec<u8>] {
         &self.tokens_vec
     }
+
+    /// Returns an iterator over the tokens.
+    pub fn iter(&self) -> Iter<'_, Vec<u8>> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
 }
 
 impl AddAssign for Tokens {

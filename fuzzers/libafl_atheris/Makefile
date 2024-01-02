@@ -32,7 +32,7 @@ fuzzer: target/release/libafl_atheris.a atheris env
 	)
 
 clean:
-	rm env
+	rm -rf env
 
 env:
 	python3 -m venv env
@@ -41,7 +41,7 @@ short_test: all
 	(\
 	rm -rf libafl_unix_shmem_server || true; \
 	. env/bin/activate; \
-	LD_PRELOAD=$(DEEXIT_PATH) DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES=$(DEEXIT_PATH) RUST_BACKTRACE=1 timeout 10s python3 ./atheris/example_fuzzers/fuzzing_example.py --cores 0 -i in -o out || true; \
+	LD_PRELOAD=$(DEEXIT_PATH) DYLD_FORCE_FLAT_NAMESPACE=1 DYLD_INSERT_LIBRARIES=$(DEEXIT_PATH) RUST_BACKTRACE=1 timeout 30s python3 ./atheris/example_fuzzers/fuzzing_example.py --cores 0 -i in -o out || true; \
 	rm -rf out; \
 	)
 

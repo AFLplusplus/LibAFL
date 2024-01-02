@@ -67,7 +67,7 @@ use nix::{self, unistd::dup};
 pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
+    // unsafe { RegistryBuilder::register::<Tokens>(); }
 
     let res = match Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
@@ -448,7 +448,7 @@ fn fuzz_binary(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Remove target ouput (logs still survive)
+    // Remove target output (logs still survive)
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
@@ -675,7 +675,7 @@ fn fuzz_text(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Remove target ouput (logs still survive)
+    // Remove target output (logs still survive)
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();

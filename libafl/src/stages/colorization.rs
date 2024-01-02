@@ -1,4 +1,4 @@
-//! The colorization stage from colorization() in afl++
+//! The colorization stage from `colorization()` in afl++
 use alloc::{
     collections::binary_heap::BinaryHeap,
     string::{String, ToString},

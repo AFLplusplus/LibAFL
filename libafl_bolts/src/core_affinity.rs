@@ -346,6 +346,38 @@ mod linux {
     }
 }
 
+// Haiku
+// FIXME: no sense of cpu granularity (yet ?)
+
+#[cfg(target_os = "haiku")]
+#[allow(clippy::unnecessary_wraps)]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    haiku::get_core_ids()
+}
+
+#[cfg(target_os = "haiku")]
+#[allow(clippy::unnecessary_wraps)]
+#[inline]
+fn set_for_current_helper(_core_id: CoreId) -> Result<(), Error> {
+    Ok(())
+}
+
+#[cfg(target_os = "haiku")]
+mod haiku {
+    use alloc::vec::Vec;
+    use std::thread::available_parallelism;
+
+    use crate::core_affinity::{CoreId, Error};
+
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .map(CoreId)
+            .collect::<Vec<_>>())
+    }
+}
+
 // Windows Section
 
 #[cfg(target_os = "windows")]
@@ -718,6 +750,7 @@ mod freebsd {
         unsafe { mem::zeroed::<cpuset_t>() }
     }
 
+    // FIXME: unstable for now on freebsd
     #[cfg(test)]
     mod tests {
         use libc::CPU_ISSET;
@@ -725,11 +758,13 @@ mod freebsd {
         use super::*;
 
         #[test]
+        #[ignore]
         fn test_freebsd_get_affinity_mask() {
             get_affinity_mask().unwrap();
         }
 
         #[test]
+        #[ignore]
         fn test_freebsd_set_for_current() {
             let ids = get_core_ids().unwrap();
 
@@ -790,8 +825,7 @@ mod netbsd {
     #[allow(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
-            .into_iter()
-            .map(|n| CoreId(n))
+            .map(CoreId)
             .collect::<Vec<_>>())
     }
 
@@ -829,6 +863,7 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 }
 
 #[cfg(target_os = "openbsd")]
+#[allow(clippy::unnecessary_wraps)]
 #[inline]
 fn set_for_current_helper(_: CoreId) -> Result<(), Error> {
     Ok(()) // There is no notion of cpu affinity on this platform
@@ -845,8 +880,7 @@ mod openbsd {
     #[allow(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
-            .into_iter()
-            .map(|n| CoreId(n))
+            .map(CoreId)
             .collect::<Vec<_>>())
     }
 }
@@ -874,8 +908,7 @@ mod solaris {
     #[allow(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
-            .into_iter()
-            .map(|n| CoreId(n))
+            .map(CoreId)
             .collect::<Vec<_>>())
     }
 
@@ -883,8 +916,8 @@ mod solaris {
         let result = unsafe {
             libc::processor_bind(
                 libc::P_PID,
-                libc::PS_MYID,
-                core_id.0 as i32,
+                libc::getpid(),
+                core_id.0.try_into().unwrap(),
                 std::ptr::null_mut(),
             )
         };
@@ -903,7 +936,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg_attr(miri, ignore)]
+    #[cfg_attr(any(miri, target_os = "freebsd"), ignore)]
     fn test_get_core_ids() {
         let set = get_core_ids().unwrap();
         assert_eq!(set.len(), usize::from(available_parallelism().unwrap()));

@@ -73,6 +73,7 @@ impl Default for TopRatedsMetadata {
 pub struct MinimizerScheduler<CS, F, M> {
     base: CS,
     skip_non_favored_prob: u64,
+    remove_metadata: bool,
     phantom: PhantomData<(F, M)>,
 }
 
@@ -101,7 +102,7 @@ where
         self.update_score(state, idx)
     }
 
-    /// Removes an entry from the corpus, returning M if M was present.
+    /// Removes an entry from the corpus
     fn on_remove(
         &mut self,
         state: &mut CS::State,
@@ -252,7 +253,7 @@ where
     M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
-    /// Update the `Corpus` score using the `MinimizerScheduler`
+    /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_score(&self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
@@ -293,7 +294,7 @@ where
                         old_meta.refcnt() <= 0
                     };
 
-                    if must_remove {
+                    if must_remove && self.remove_metadata {
                         drop(old.metadata_map_mut().remove::<M>());
                     }
                 }
@@ -304,7 +305,7 @@ where
             *meta.refcnt_mut() = new_favoreds.len() as isize;
         }
 
-        if new_favoreds.is_empty() {
+        if new_favoreds.is_empty() && self.remove_metadata {
             drop(
                 state
                     .corpus()
@@ -327,7 +328,7 @@ where
         Ok(())
     }
 
-    /// Cull the `Corpus` using the `MinimizerScheduler`
+    /// Cull the [`Corpus`] using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
     pub fn cull(&self, state: &CS::State) -> Result<(), Error> {
         let Some(top_rated) = state.metadata_map().get::<TopRatedsMetadata>() else {
@@ -368,10 +369,25 @@ where
 
     /// Creates a new [`MinimizerScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
+    /// This will remove the metadata `M` when it is no longer needed, after consumption. This might
+    /// for example be a `MapIndexesMetadata`.
     pub fn new(base: CS) -> Self {
         Self {
             base,
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
+            remove_metadata: true,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Creates a new [`MinimizerScheduler`] that wraps a `base` [`Scheduler`]
+    /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
+    /// This method will prevent the metadata `M` from being removed at the end of scoring.
+    pub fn non_metadata_removing(base: CS) -> Self {
+        Self {
+            base,
+            skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
+            remove_metadata: false,
             phantom: PhantomData,
         }
     }
@@ -382,6 +398,7 @@ where
         Self {
             base,
             skip_non_favored_prob,
+            remove_metadata: true,
             phantom: PhantomData,
         }
     }

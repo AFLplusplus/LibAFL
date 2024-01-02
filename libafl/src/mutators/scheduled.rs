@@ -8,16 +8,26 @@ use core::{
 
 use libafl_bolts::{
     rands::Rand,
-    tuples::{tuple_list, tuple_list_type, NamedTuple},
+    tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
     AsMutSlice, AsSlice, Named,
 };
 use serde::{Deserialize, Serialize};
 
 use super::MutationId;
-pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
     corpus::{Corpus, CorpusId},
-    mutators::{MutationResult, Mutator, MutatorsTuple},
+    mutators::{
+        mutations::{
+            BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator, ByteIncMutator,
+            ByteInterestingMutator, ByteNegMutator, ByteRandMutator, BytesCopyMutator,
+            BytesDeleteMutator, BytesExpandMutator, BytesInsertCopyMutator, BytesInsertMutator,
+            BytesRandInsertMutator, BytesRandSetMutator, BytesSetMutator, BytesSwapMutator,
+            CrossoverInsertMutator, CrossoverReplaceMutator, DwordAddMutator,
+            DwordInterestingMutator, QwordAddMutator, WordAddMutator, WordInterestingMutator,
+        },
+        token_mutations::{TokenInsert, TokenReplace},
+        MutationResult, Mutator, MutatorsTuple,
+    },
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -82,7 +92,7 @@ where
     fn schedule(&self, state: &mut S, input: &I) -> MutationId;
 
     /// New default implementation for mutate.
-    /// Implementations must forward mutate() to this method
+    /// Implementations must forward `mutate()` to this method
     fn scheduled_mutate(
         &mut self,
         state: &mut S,
@@ -218,6 +228,38 @@ where
     }
 }
 
+/// Tuple type of the mutations that compose the Havoc mutator without crossover mutations
+pub type HavocMutationsNoCrossoverType = tuple_list_type!(
+    BitFlipMutator,
+    ByteFlipMutator,
+    ByteIncMutator,
+    ByteDecMutator,
+    ByteNegMutator,
+    ByteRandMutator,
+    ByteAddMutator,
+    WordAddMutator,
+    DwordAddMutator,
+    QwordAddMutator,
+    ByteInterestingMutator,
+    WordInterestingMutator,
+    DwordInterestingMutator,
+    BytesDeleteMutator,
+    BytesDeleteMutator,
+    BytesDeleteMutator,
+    BytesDeleteMutator,
+    BytesExpandMutator,
+    BytesInsertMutator,
+    BytesRandInsertMutator,
+    BytesSetMutator,
+    BytesRandSetMutator,
+    BytesCopyMutator,
+    BytesInsertCopyMutator,
+    BytesSwapMutator,
+);
+
+/// Tuple type of the mutations that compose the Havoc mutator's crossover mutations
+pub type HavocCrossoverType = tuple_list_type!(CrossoverInsertMutator, CrossoverReplaceMutator);
+
 /// Tuple type of the mutations that compose the Havoc mutator
 pub type HavocMutationsType = tuple_list_type!(
     BitFlipMutator,
@@ -249,9 +291,9 @@ pub type HavocMutationsType = tuple_list_type!(
     CrossoverReplaceMutator,
 );
 
-/// Get the mutations that compose the Havoc mutator
+/// Get the mutations that compose the Havoc mutator (only applied to single inputs)
 #[must_use]
-pub fn havoc_mutations() -> HavocMutationsType {
+pub fn havoc_mutations_no_crossover() -> HavocMutationsNoCrossoverType {
     tuple_list!(
         BitFlipMutator::new(),
         ByteFlipMutator::new(),
@@ -278,9 +320,22 @@ pub fn havoc_mutations() -> HavocMutationsType {
         BytesCopyMutator::new(),
         BytesInsertCopyMutator::new(),
         BytesSwapMutator::new(),
+    )
+}
+
+/// Get the mutations that compose the Havoc mutator's crossover strategy
+#[must_use]
+pub fn havoc_crossover() -> HavocCrossoverType {
+    tuple_list!(
         CrossoverInsertMutator::new(),
         CrossoverReplaceMutator::new(),
     )
+}
+
+/// Get the mutations that compose the Havoc mutator
+#[must_use]
+pub fn havoc_mutations() -> HavocMutationsType {
+    havoc_mutations_no_crossover().merge(havoc_crossover())
 }
 
 /// Get the mutations that uses the Tokens metadata
@@ -548,6 +603,7 @@ mod tests {
 /// `SchedulerMutator` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
+#[allow(clippy::unnecessary_fallible_conversions)]
 pub mod pybind {
     use pyo3::prelude::*;
 

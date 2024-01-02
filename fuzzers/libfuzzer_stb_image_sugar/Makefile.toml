@@ -3,27 +3,29 @@
 FUZZER_NAME='libfuzzer_stb_image_sugar'
 PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-LIBAFL_CC = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/release/libafl_cc", mapping = {"windows" = '.\\target\\release\\libafl_cc.exe'} }
-LIBAFL_CXX = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/release/libafl_cxx", mapping = {"windows" = '.\\target\\release\\libafl_cxx.exe'} }
-FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/release/libfuzzer_stb_image_sugar", mapping = {"windows" = '.\\target\\release\\libfuzzer_stb_image_sugar.exe'} }
+PROFILE = { value = "release" }
+PROFILE_DIR = {value = "release" }
+LIBAFL_CC = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc", mapping = {"windows" = '.\\target\\${PROFILE_DIR}\\libafl_cc.exe'} }
+LIBAFL_CXX = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx", mapping = {"windows" = '.\\target\\${PROFILE_DIR}\\libafl_cxx.exe'} }
+FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libfuzzer_stb_image_sugar", mapping = {"windows" = '.\\target\\${PROFILE_DIR}\\libfuzzer_stb_image_sugar.exe'} }
 
 # Compilers
 [tasks.cxx]
 condition = { files_not_exist = ["${LIBAFL_CXX}"] }
 command = "cargo"
-args = ["build" , "--release"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 [tasks.cc]
 condition = { files_not_exist = ["${LIBAFL_CC}"] }
 command = "cargo"
-args = ["build" , "--release"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 
 # Build the fuzzer
 [tasks.fuzzer]
 script_runner="@shell"
 script='''
-cargo build --release
+cargo build --profile ${PROFILE}
 cp ${FUZZER} .
 '''
 dependencies = ["cc", "cxx"]
@@ -58,7 +60,7 @@ windows_alias = "test_windows"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 11s ./${FUZZER_NAME} 2>/dev/null >fuzz_stdout.log || true
+timeout 31s ./${FUZZER_NAME} 2>/dev/null >fuzz_stdout.log || true
 echo "The test is skipped. See https://github.com/AFLplusplus/LibAFL/issues/1176"
 '''
 dependencies = [ "fuzzer" ]

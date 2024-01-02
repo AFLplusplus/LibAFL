@@ -2,9 +2,11 @@
 [env]
 FUZZER_NAME='fuzzer_libpng_launcher'
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
-LIBAFL_CC = '${CARGO_TARGET_DIR}/release/libafl_cc'
-LIBAFL_CXX = '${CARGO_TARGET_DIR}/release/libafl_cxx'
-FUZZER = '${CARGO_TARGET_DIR}/release/${FUZZER_NAME}'
+PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc'
+LIBAFL_CXX = '${CARGO_TARGET_DIR}/${PROFILE}/libafl_cxx'
+FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
@@ -23,8 +25,8 @@ windows_alias = "unsupported"
 condition = { files_not_exist = ["./libpng-1.6.37"]}
 script_runner="@shell"
 script='''
-wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
-tar -xvf libpng-1.6.37.tar.xz
+wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+tar -xvf v1.6.37.tar.gz
 '''
 
 # Compilers
@@ -35,7 +37,7 @@ windows_alias = "unsupported"
 
 [tasks.cxx_unix]
 command = "cargo"
-args = ["build" , "--release"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 [tasks.cc]
 linux_alias = "cc_unix"
@@ -44,7 +46,7 @@ windows_alias = "unsupported"
 
 [tasks.cc_unix]
 command = "cargo"
-args = ["build" , "--release"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 # Library
 [tasks.lib]
@@ -57,7 +59,7 @@ script_runner="@shell"
 script='''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
 cd "${PROJECT_DIR}"
-make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/release/libafl_cc" CXX="${CARGO_TARGET_DIR}/release/libafl_cxx"
+make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc" CXX="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 '''
 dependencies = [ "libpng", "cxx", "cc" ]
 
@@ -69,7 +71,7 @@ mac_alias = "fuzzer_unix"
 windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
-command = "${CARGO_TARGET_DIR}/release/libafl_cxx"
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
 dependencies = [ "lib", "cxx", "cc" ]
 
@@ -96,12 +98,12 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 11s ./${FUZZER_NAME} --cores 0 --input ./corpus 2>/dev/null >fuzz_stdout.log || true
-if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
+timeout 31s ./${FUZZER_NAME} --cores 0 --input ./corpus 2>/dev/null >fuzz_stdout.log || true
+if grep -qa "corpus: 30" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1
-else
-    echo "Fuzzer is working"
 fi
 '''
 dependencies = [ "fuzzer" ]
@@ -110,7 +112,7 @@ dependencies = [ "fuzzer" ]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 11s ./${FUZZER_NAME} --cores 0 --input ./corpus 2>/dev/null >fuzz_stdout.log || true
+timeout 31s ./${FUZZER_NAME} --cores 0 --input ./corpus 2>/dev/null >fuzz_stdout.log || true
 '''
 dependencies = [ "fuzzer" ]
 

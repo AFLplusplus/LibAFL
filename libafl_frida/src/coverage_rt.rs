@@ -5,7 +5,7 @@ use std::{cell::RefCell, marker::PhantomPinned, pin::Pin, rc::Rc};
 #[cfg(target_arch = "aarch64")]
 use dynasmrt::DynasmLabelApi;
 use dynasmrt::{dynasm, DynasmApi};
-use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
+use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput, ModuleMap};
 use libafl_bolts::math::xxh3_rrmxmx_mixer;
 use rangemap::RangeMap;
 
@@ -38,7 +38,7 @@ impl FridaRuntime for CoverageRuntime {
         &mut self,
         _gum: &frida_gum::Gum,
         _ranges: &RangeMap<usize, (u16, String)>,
-        _modules_to_instrument: &[&str],
+        _module_map: &Rc<ModuleMap>,
     ) {
     }
 

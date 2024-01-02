@@ -57,7 +57,7 @@ To start, we create the closure that we want to fuzz. It takes a buffer as input
 To test the crash manually, you can add a feature in `Cargo.toml` that enables the call that triggers the panic:
 
 ```toml
-{{#include ../../listings/baby_fuzzer/listing-03/Cargo.toml:22:23}}
+{{#include ../../listings/baby_fuzzer/listing-03/Cargo.toml:23:25}}
 ```
 
 And then run the program with that feature activated:

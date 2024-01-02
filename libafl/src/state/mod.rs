@@ -13,14 +13,16 @@ use std::{
     vec::Vec,
 };
 
-#[cfg(test)]
-use libafl_bolts::rands::StdRand;
 use libafl_bolts::{
-    rands::Rand,
+    rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::monitors::ClientPerfMonitor;
+#[cfg(feature = "scalability_introspection")]
+use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
@@ -28,7 +30,6 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
-    monitors::ClientPerfMonitor,
     Error,
 };
 
@@ -38,12 +39,15 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// The [`State`] of the fuzzer.
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
-pub trait State: UsesInput + Serialize + DeserializeOwned {}
+pub trait State:
+    UsesInput + Serialize + DeserializeOwned + MaybeHasClientPerfMonitor + MaybeHasScalabilityMonitor
+{
+}
 
 /// Structs which implement this trait are aware of the state. This is used for type enforcement.
 pub trait UsesState: UsesInput<Input = <Self::State as UsesInput>::Input> {
     /// The state known by this type.
-    type State: UsesInput;
+    type State: State;
 }
 
 // blanket impl which automatically defines UsesInput for anything that implements UsesState
@@ -94,6 +98,7 @@ pub trait HasRand {
     fn rand_mut(&mut self) -> &mut Self::Rand;
 }
 
+#[cfg(feature = "introspection")]
 /// Trait for offering a [`ClientPerfMonitor`]
 pub trait HasClientPerfMonitor {
     /// [`ClientPerfMonitor`] itself
@@ -101,6 +106,43 @@ pub trait HasClientPerfMonitor {
 
     /// Mutatable ref to [`ClientPerfMonitor`]
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
+}
+
+/// Intermediate trait for `HasClientPerfMonitor`
+#[cfg(feature = "introspection")]
+pub trait MaybeHasClientPerfMonitor: HasClientPerfMonitor {}
+
+/// Intermediate trait for `HasClientPerfmonitor`
+#[cfg(not(feature = "introspection"))]
+pub trait MaybeHasClientPerfMonitor {}
+
+#[cfg(not(feature = "introspection"))]
+impl<T> MaybeHasClientPerfMonitor for T {}
+
+#[cfg(feature = "introspection")]
+impl<T> MaybeHasClientPerfMonitor for T where T: HasClientPerfMonitor {}
+
+/// Intermediate trait for `HasScalabilityMonitor`
+#[cfg(feature = "scalability_introspection")]
+pub trait MaybeHasScalabilityMonitor: HasScalabilityMonitor {}
+/// Intermediate trait for `HasScalabilityMonitor`
+#[cfg(not(feature = "scalability_introspection"))]
+pub trait MaybeHasScalabilityMonitor {}
+
+#[cfg(not(feature = "scalability_introspection"))]
+impl<T> MaybeHasScalabilityMonitor for T {}
+
+#[cfg(feature = "scalability_introspection")]
+impl<T> MaybeHasScalabilityMonitor for T where T: HasScalabilityMonitor {}
+
+/// Trait for offering a [`ScalabilityMonitor`]
+#[cfg(feature = "scalability_introspection")]
+pub trait HasScalabilityMonitor {
+    /// Ref to [`ScalabilityMonitor`]
+    fn scalability_monitor(&self) -> &ScalabilityMonitor;
+
+    /// Mutable ref to [`ScalabilityMonitor`]
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor;
 }
 
 /// Trait for elements offering metadata
@@ -210,6 +252,15 @@ pub trait HasExecutions {
     fn executions_mut(&mut self) -> &mut usize;
 }
 
+/// Trait for some stats of AFL
+pub trait HasImported {
+    ///the imported testcases counter
+    fn imported(&self) -> &usize;
+
+    ///the imported testcases counter (mutable)
+    fn imported_mut(&mut self) -> &mut usize;
+}
+
 /// Trait for the starting time
 pub trait HasStartTime {
     /// The starting time
@@ -244,6 +295,8 @@ pub struct StdState<I, C, R, SC> {
     executions: usize,
     /// At what time the fuzzing started
     start_time: Duration,
+    /// the number of new paths that imported from other fuzzers
+    imported: usize,
     /// The corpus
     corpus: C,
     // Solutions corpus
@@ -257,9 +310,14 @@ pub struct StdState<I, C, R, SC> {
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
+    #[cfg(feature = "scalability_introspection")]
+    scalability_monitor: ScalabilityMonitor,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
+    #[cfg(feature = "std")]
+    /// Remaining initial inputs to load, if any
+    dont_reenter: Option<Vec<PathBuf>>,
     /// The last time we reported progress (if available/used).
     /// This information is used by fuzzer `maybe_report_progress`.
     last_report_time: Option<Duration>,
@@ -404,6 +462,20 @@ impl<I, C, R, SC> HasExecutions for StdState<I, C, R, SC> {
     }
 }
 
+impl<I, C, R, SC> HasImported for StdState<I, C, R, SC> {
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn imported(&self) -> &usize {
+        &self.imported
+    }
+
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn imported_mut(&mut self) -> &mut usize {
+        &mut self.imported
+    }
+}
+
 impl<I, C, R, SC> HasLastReportTime for StdState<I, C, R, SC> {
     /// The last time we reported progress,if available/used.
     /// This information is used by fuzzer `maybe_report_progress`.
@@ -458,30 +530,48 @@ where
     }
 
     /// List initial inputs from a directory.
-    fn visit_initial_directory(files: &mut Vec<PathBuf>, in_dir: &Path) -> Result<(), Error> {
-        for entry in fs::read_dir(in_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.file_name().unwrap().to_string_lossy().starts_with('.') {
-                continue;
-            }
+    fn next_file(&mut self) -> Result<PathBuf, Error> {
+        loop {
+            if let Some(path) = self.remaining_initial_files.as_mut().and_then(Vec::pop) {
+                let filename = path.file_name().unwrap().to_string_lossy();
+                if filename.starts_with('.')
+                // || filename
+                //     .rsplit_once('-')
+                //     .map_or(false, |(_, s)| u64::from_str(s).is_ok())
+                {
+                    continue;
+                }
 
-            let attributes = fs::metadata(&path);
+                let attributes = fs::metadata(&path);
 
-            if attributes.is_err() {
-                continue;
-            }
+                if attributes.is_err() {
+                    continue;
+                }
 
-            let attr = attributes?;
+                let attr = attributes?;
 
-            if attr.is_file() && attr.len() > 0 {
-                files.push(path);
-            } else if attr.is_dir() {
-                Self::visit_initial_directory(files, &path)?;
+                if attr.is_file() && attr.len() > 0 {
+                    return Ok(path);
+                } else if attr.is_dir() {
+                    let files = self.remaining_initial_files.as_mut().unwrap();
+                    path.read_dir()?
+                        .try_for_each(|entry| entry.map(|e| files.push(e.path())))?;
+                } else if attr.is_symlink() {
+                    let path = fs::canonicalize(path)?;
+                    let dont_reenter = self.dont_reenter.get_or_insert_with(Default::default);
+                    if dont_reenter.iter().any(|p| path.starts_with(p)) {
+                        continue;
+                    }
+                    if path.is_dir() {
+                        dont_reenter.push(path.clone());
+                    }
+                    let files = self.remaining_initial_files.as_mut().unwrap();
+                    files.push(path);
+                }
+            } else {
+                return Err(Error::iterator_end("No remaining files to load."));
             }
         }
-
-        Ok(())
     }
 
     /// Loads initial inputs from the passed-in `in_dirs`.
@@ -506,11 +596,13 @@ where
                 return Ok(());
             }
         } else {
-            let mut files = vec![];
-            for in_dir in in_dirs {
-                Self::visit_initial_directory(&mut files, in_dir)?;
-            }
-
+            let files = in_dirs.iter().try_fold(Vec::new(), |mut res, file| {
+                file.canonicalize().map(|canonicalized| {
+                    res.push(canonicalized);
+                    res
+                })
+            })?;
+            self.dont_reenter = Some(files.clone());
             self.remaining_initial_files = Some(files);
         }
 
@@ -562,20 +654,22 @@ where
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
-        if self.remaining_initial_files.is_none() {
-            return Err(Error::illegal_state("No initial files were loaded, cannot continue loading. Call a `load_initial_input` fn first!"));
-        }
-
-        while let Some(path) = self.remaining_initial_files.as_mut().unwrap().pop() {
-            log::info!("Loading file {:?} ...", &path);
-            let input = loader(fuzzer, self, &path)?;
-            if forced {
-                let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
-            } else {
-                let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
-                if res == ExecuteInputResult::None {
-                    log::warn!("File {:?} was not interesting, skipped.", &path);
+        loop {
+            match self.next_file() {
+                Ok(path) => {
+                    log::info!("Loading file {:?} ...", &path);
+                    let input = loader(fuzzer, self, &path)?;
+                    if forced {
+                        let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
+                    } else {
+                        let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+                        if res == ExecuteInputResult::None {
+                            log::warn!("File {:?} was not interesting, skipped.", &path);
+                        }
+                    }
                 }
+                Err(Error::IteratorEnd(_, _)) => break,
+                Err(e) => return Err(e),
             }
         }
 
@@ -787,6 +881,7 @@ where
         let mut state = Self {
             rand,
             executions: 0,
+            imported: 0,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
@@ -795,8 +890,12 @@ where
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
+            #[cfg(feature = "scalability_introspection")]
+            scalability_monitor: ScalabilityMonitor::new(),
             #[cfg(feature = "std")]
             remaining_initial_files: None,
+            #[cfg(feature = "std")]
+            dont_reenter: None,
             last_report_time: None,
             phantom: PhantomData,
         };
@@ -817,40 +916,39 @@ impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
     }
 }
 
-#[cfg(not(feature = "introspection"))]
-impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
-    fn introspection_monitor(&self) -> &ClientPerfMonitor {
-        unimplemented!()
+#[cfg(feature = "scalability_introspection")]
+impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
+    fn scalability_monitor(&self) -> &ScalabilityMonitor {
+        &self.scalability_monitor
     }
 
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!()
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
+        &mut self.scalability_monitor
     }
 }
 
-#[cfg(test)]
 /// A very simple state without any bells or whistles, for testing.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
+    execution: usize,
     rand: StdRand,
     phantom: PhantomData<I>,
 }
 
-#[cfg(test)]
 impl<I> NopState<I> {
     /// Create a new State that does nothing (for tests)
     #[must_use]
     pub fn new() -> Self {
         NopState {
             metadata: SerdeAnyMap::new(),
+            execution: 0,
             rand: StdRand::default(),
             phantom: PhantomData,
         }
     }
 }
 
-#[cfg(test)]
 impl<I> UsesInput for NopState<I>
 where
     I: Input,
@@ -858,18 +956,16 @@ where
     type Input = I;
 }
 
-#[cfg(test)]
 impl<I> HasExecutions for NopState<I> {
     fn executions(&self) -> &usize {
-        unimplemented!();
+        &self.execution
     }
 
     fn executions_mut(&mut self) -> &mut usize {
-        unimplemented!();
+        &mut self.execution
     }
 }
 
-#[cfg(test)]
 impl<I> HasLastReportTime for NopState<I> {
     fn last_report_time(&self) -> &Option<Duration> {
         unimplemented!();
@@ -880,7 +976,6 @@ impl<I> HasLastReportTime for NopState<I> {
     }
 }
 
-#[cfg(test)]
 impl<I> HasMetadata for NopState<I> {
     fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
@@ -891,7 +986,6 @@ impl<I> HasMetadata for NopState<I> {
     }
 }
 
-#[cfg(test)]
 impl<I> HasRand for NopState<I> {
     type Rand = StdRand;
 
@@ -904,19 +998,29 @@ impl<I> HasRand for NopState<I> {
     }
 }
 
-#[cfg(test)]
+impl<I> State for NopState<I> where I: Input {}
+
+#[cfg(feature = "introspection")]
 impl<I> HasClientPerfMonitor for NopState<I> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
-        unimplemented!()
+        unimplemented!();
     }
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!()
+        unimplemented!();
     }
 }
 
-#[cfg(test)]
-impl<I> State for NopState<I> where I: Input {}
+#[cfg(feature = "scalability_introspection")]
+impl<I> HasScalabilityMonitor for NopState<I> {
+    fn scalability_monitor(&self) -> &ScalabilityMonitor {
+        unimplemented!();
+    }
+
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
+        unimplemented!();
+    }
+}
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]

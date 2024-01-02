@@ -1,6 +1,8 @@
 //! The [`Launcher`] launches multiple fuzzer instances in parallel.
 //! Thanks to it, we won't need a `for` loop in a shell script...
 //!
+//! It will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
+//!
 //! To use multiple [`Launcher`]`s` for individual configurations,
 //! we can set `spawn_broker` to `false` on all but one.
 //!
@@ -36,25 +38,31 @@ use libafl_bolts::{
     shmem::ShMemProvider,
 };
 #[cfg(feature = "std")]
-use serde::de::DeserializeOwned;
-#[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::events::{CentralizedEventManager, CentralizedLlmpEventBroker};
-use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
-    events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+    events::{
+        llmp::{LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+        EventConfig,
+    },
     monitors::Monitor,
-    state::{HasClientPerfMonitor, HasExecutions},
+    state::{HasExecutions, State},
     Error,
 };
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 
-/// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
+/// The env variable to set in order to enable child output
+#[cfg(all(feature = "fork", unix))]
+const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
+
+/// Provides a [`Launcher`], which can be used to launch a fuzzing run on a specified list of cores
+///
+/// Will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
 #[cfg(feature = "std")]
 #[allow(
     clippy::type_complexity,
@@ -68,7 +76,7 @@ where
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput + 'a,
+    S: State + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -87,10 +95,18 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
+    /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[builder(setter(skip), default = None)]
+    opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
     /// `stdout_file`.
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
+    /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[builder(setter(skip), default = None)]
+    opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
     #[builder(default = None)]
@@ -113,7 +129,7 @@ where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput,
+    S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -133,7 +149,7 @@ impl<'a, CF, MT, S, SP> Launcher<'a, CF, MT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, CoreId) -> Result<(), Error>,
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
@@ -158,17 +174,15 @@ where
 
         log::info!("spawning on cores: {:?}", self.cores);
 
-        #[cfg(feature = "std")]
-        let stdout_file = self
+        self.opened_stdout_file = self
             .stdout_file
             .map(|filename| File::create(filename).unwrap());
-        #[cfg(feature = "std")]
-        let stderr_file = self
+        self.opened_stderr_file = self
             .stderr_file
             .map(|filename| File::create(filename).unwrap());
 
         #[cfg(feature = "std")]
-        let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
+        let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
         // Spawn clients
         let mut index = 0_u64;
@@ -196,9 +210,9 @@ where
 
                         #[cfg(feature = "std")]
                         if !debug_output {
-                            if let Some(file) = stdout_file {
+                            if let Some(file) = &self.opened_stdout_file {
                                 dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                if let Some(stderr) = stderr_file {
+                                if let Some(stderr) = &self.opened_stderr_file {
                                     dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
                                 } else {
                                     dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
@@ -277,7 +291,8 @@ where
             Ok(core_conf) => {
                 let core_id = core_conf.parse()?;
 
-                //todo: silence stdout and stderr for clients
+                // TODO: silence stdout and stderr for clients
+                // let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
                 // the actual client. do the fuzzing
                 let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
@@ -308,6 +323,8 @@ where
 
                 log::info!("spawning on cores: {:?}", self.cores);
 
+                let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
+
                 //spawn clients
                 for (id, _) in core_ids.iter().enumerate().take(num_cores) {
                     if self.cores.ids.iter().any(|&x| x == id.into()) {
@@ -318,7 +335,13 @@ where
                         };
 
                         std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
-                        let child = startable_self()?.stdout(stdio).spawn()?;
+                        let mut child = startable_self()?;
+                        let child = (if debug_output {
+                            &mut child
+                        } else {
+                            child.stdout(stdio)
+                        })
+                        .spawn()?;
                         handles.push(child);
                     }
                 }
@@ -384,7 +407,7 @@ where
     S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput + 'a,
+    S: State + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -406,12 +429,21 @@ where
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
+    /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[builder(setter(skip), default = None)]
+    opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
     /// `stdout_file`.
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
+    /// The actual, opened, stdout_file - so that we keep it open until the end
+    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[builder(setter(skip), default = None)]
+    opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
+
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
@@ -437,7 +469,7 @@ where
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + UsesInput,
+    S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -461,7 +493,7 @@ where
         CoreId,
     ) -> Result<(), Error>,
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
@@ -486,14 +518,14 @@ where
 
         log::info!("spawning on cores: {:?}", self.cores);
 
-        let stdout_file = self
+        self.opened_stdout_file = self
             .stdout_file
             .map(|filename| File::create(filename).unwrap());
-        let stderr_file = self
+        self.opened_stderr_file = self
             .stderr_file
             .map(|filename| File::create(filename).unwrap());
 
-        let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
+        let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
         // Spawn centralized broker
         self.shmem_provider.pre_fork()?;
@@ -539,9 +571,9 @@ where
                         std::thread::sleep(std::time::Duration::from_millis(index * 10));
 
                         if !debug_output {
-                            if let Some(file) = stdout_file {
+                            if let Some(file) = &self.opened_stdout_file {
                                 dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                if let Some(stderr) = stderr_file {
+                                if let Some(stderr) = &self.opened_stderr_file {
                                     dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
                                 } else {
                                     dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
@@ -565,7 +597,7 @@ where
                             mgr,
                             self.shmem_provider.clone(),
                             self.centralized_broker_port,
-                            id == 0,
+                            index == 1,
                         )?;
 
                         return (self.run_client.take().unwrap())(state, c_mgr, *bind_to);

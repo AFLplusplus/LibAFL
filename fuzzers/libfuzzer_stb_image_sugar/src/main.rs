@@ -13,7 +13,7 @@ use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input};
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
+    // unsafe { RegistryBuilder::register::<Tokens>(); }
 
     println!(
         "Workdir: {:?}",

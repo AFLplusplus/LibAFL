@@ -240,4 +240,7 @@ impl Filter for NoFloat {
     fn build_fp_rem(&mut self, _a: RSymExpr, _b: RSymExpr) -> bool {
         false
     }
+    fn build_fp_neg(&mut self, _a: RSymExpr) -> bool {
+        false
+    }
 }

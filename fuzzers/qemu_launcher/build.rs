@@ -5,8 +5,7 @@ macro_rules! assert_unique_feature {
     () => {};
     ($first:tt $(,$rest:tt)*) => {
         $(
-            #[cfg(not(feature = "clippy"))] // ignore multiple definition for clippy
-            #[cfg(all(feature = $first, feature = $rest))]
+            #[cfg(all(not(any(doc, feature = "clippy")), feature = $first, feature = $rest))]
             compile_error!(concat!("features \"", $first, "\" and \"", $rest, "\" cannot be used together"));
         )*
         assert_unique_feature!($($rest),*);

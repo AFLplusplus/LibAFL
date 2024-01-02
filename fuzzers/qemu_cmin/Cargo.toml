@@ -1,0 +1,33 @@
+[package]
+name = "qemu_cmin"
+version = "0.11.2"
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>", "WorksButNotTested"]
+edition = "2021"
+
+[profile.release]
+#lto = true
+#codegen-units = 1
+#opt-level = 3
+debug = true
+
+[features]
+default = ["std"]
+std = []
+be = ["libafl_qemu/be"]
+arm = ["libafl_qemu/arm"]
+x86_64 = ["libafl_qemu/x86_64"]
+i386 = ["libafl_qemu/i386"]
+aarch64 = ["libafl_qemu/aarch64"]
+mips = ["libafl_qemu/mips"]
+ppc = ["libafl_qemu/ppc", "be"]
+
+[build-dependencies]
+vergen = { version = "8.2.1", features = ["build", "cargo", "git", "gitcl", "rustc", "si"] }
+
+[dependencies]
+clap = { version = "4.3.0", features = ["derive", "string"]}
+libafl = { path = "../../libafl/" }
+libafl_bolts = { path = "../../libafl_bolts/" }
+libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode"] }
+log = {version = "0.4.20" }
+rangemap = { version = "1.3" }

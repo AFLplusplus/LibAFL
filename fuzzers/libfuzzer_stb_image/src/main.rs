@@ -33,7 +33,7 @@ use libafl_targets::{
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
+    // unsafe { RegistryBuilder::register::<Tokens>(); }
 
     println!(
         "Workdir: {:?}",

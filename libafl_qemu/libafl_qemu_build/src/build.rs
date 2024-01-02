@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "659539eaceb7acf242f2f6a573b705e1be1befb6";
+const QEMU_REVISION: &str = "c92d7c2ef66811278e8d665d4aec57661c980186";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -43,9 +43,9 @@ pub fn build(
         cpu_target += "el";
     }
 
-    let custum_qemu_dir = env::var_os("CUSTOM_QEMU_DIR").map(|x| x.to_string_lossy().to_string());
-    let custum_qemu_no_build = env::var("CUSTOM_QEMU_NO_BUILD").is_ok();
-    let custum_qemu_no_configure = env::var("CUSTOM_QEMU_NO_CONFIGURE").is_ok();
+    let custom_qemu_dir = env::var_os("CUSTOM_QEMU_DIR").map(|x| x.to_string_lossy().to_string());
+    let custom_qemu_no_build = env::var("CUSTOM_QEMU_NO_BUILD").is_ok();
+    let custom_qemu_no_configure = env::var("CUSTOM_QEMU_NO_CONFIGURE").is_ok();
     println!("cargo:rerun-if-env-changed=CUSTOM_QEMU_DIR");
     println!("cargo:rerun-if-env-changed=CUSTOM_QEMU_NO_BUILD");
     println!("cargo:rerun-if-env-changed=CUSTOM_QEMU_NO_CONFIGURE");
@@ -60,9 +60,10 @@ pub fn build(
 
     build_dep_check(&["git", "make"]);
 
+    let cc_compiler = cc::Build::new().cpp(false).get_compiler();
     let cpp_compiler = cc::Build::new().cpp(true).get_compiler();
 
-    let qemu_path = if let Some(qemu_dir) = custum_qemu_dir.as_ref() {
+    let qemu_path = if let Some(qemu_dir) = custom_qemu_dir.as_ref() {
         Path::new(&qemu_dir).to_path_buf()
     } else {
         let qemu_path = target_dir.join(QEMU_DIRNAME);
@@ -127,22 +128,27 @@ pub fn build(
 
     println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy());
 
-    if !output_lib.is_file() || (custum_qemu_dir.is_some() && !custum_qemu_no_build) {
+    if !output_lib.is_file() || (custom_qemu_dir.is_some() && !custom_qemu_no_build) {
         /*drop(
             Command::new("make")
                 .current_dir(&qemu_path)
                 .arg("distclean")
                 .status(),
         );*/
-        if is_usermode && !custum_qemu_no_configure {
+        if is_usermode && !custom_qemu_no_configure {
             let mut cmd = Command::new("./configure");
             cmd.current_dir(&qemu_path)
                 //.arg("--as-static-lib")
                 .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
+                .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
                 .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
                 .arg(&format!(
-                    "--cxx={}",
+                    "--cc={}",
                     qemu_path.join("linker_interceptor.py").display()
+                ))
+                .arg(&format!(
+                    "--cxx={}",
+                    qemu_path.join("linker_interceptor++.py").display()
                 ))
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
@@ -156,16 +162,21 @@ pub fn build(
                 cmd.arg("--enable-debug");
             }
             cmd.status().expect("Configure failed");
-        } else if !custum_qemu_no_configure {
+        } else if !custom_qemu_no_configure {
             let mut cmd = Command::new("./configure");
             cmd.current_dir(&qemu_path)
                 //.arg("--as-static-lib")
                 .env("__LIBAFL_QEMU_BUILD_OUT", build_dir.join("linkinfo.json"))
+                .env("__LIBAFL_QEMU_BUILD_CC", cc_compiler.path())
                 .env("__LIBAFL_QEMU_BUILD_CXX", cpp_compiler.path())
                 .arg(&format!(
-                    "--cxx={}",
+                    "--cc={}",
                     qemu_path.join("linker_interceptor.py").display()
-                )) // TODO set __LIBAFL_QEMU_BUILD_CXX
+                ))
+                .arg(&format!(
+                    "--cxx={}",
+                    qemu_path.join("linker_interceptor++.py").display()
+                ))
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
                 .arg(if cfg!(feature = "slirp") {
@@ -205,7 +216,6 @@ pub fn build(
                 .arg("--disable-gtk")
                 .arg("--disable-guest-agent")
                 .arg("--disable-guest-agent-msi")
-                .arg("--disable-hax")
                 .arg("--disable-hvf")
                 .arg("--disable-iconv")
                 .arg("--disable-jack")
@@ -280,7 +290,8 @@ pub fn build(
                 .arg("--disable-xen")
                 .arg("--disable-xen-pci-passthrough")
                 .arg("--disable-xkbcommon")
-                .arg("--disable-zstd");
+                .arg("--disable-zstd")
+                .arg("--disable-tests");
             if cfg!(feature = "debug_assertions") {
                 cmd.arg("--enable-debug");
             }

@@ -299,15 +299,37 @@ pub enum Signal {
     SigTrap = SIGTRAP,
 }
 
-/// A list of crashing signals
-pub static CRASH_SIGNALS: &[Signal] = &[
-    Signal::SigAbort,
-    Signal::SigBus,
-    Signal::SigFloatingPointException,
-    Signal::SigIllegalInstruction,
-    Signal::SigPipe,
-    Signal::SigSegmentationFault,
-];
+impl TryFrom<&str> for Signal {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value {
+            "SIGABRT" => Signal::SigAbort,
+            "SIGBUS" => Signal::SigBus,
+            "SIGFPE" => Signal::SigFloatingPointException,
+            "SIGILL" => Signal::SigIllegalInstruction,
+            "SIGPIPE" => Signal::SigPipe,
+            "SIGSEGV" => Signal::SigSegmentationFault,
+            "SIGUSR2" => Signal::SigUser2,
+            "SIGALRM" => Signal::SigAlarm,
+            "SIGHUP" => Signal::SigHangUp,
+            "SIGKILL" => Signal::SigKill,
+            "SIGQUIT" => Signal::SigQuit,
+            "SIGTERM" => Signal::SigTerm,
+            "SIGINT" => Signal::SigInterrupt,
+            "SIGTRAP" => Signal::SigTrap,
+            _ => return Err(Error::illegal_argument(format!("No signal named {value}"))),
+        })
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<Signal> for nix::sys::signal::Signal {
+    fn from(value: Signal) -> Self {
+        // we can be semi-certain that all signals exist in nix.
+        i32::from(value).try_into().unwrap()
+    }
+}
 
 impl PartialEq for Signal {
     fn eq(&self, other: &Self) -> bool {
@@ -346,7 +368,7 @@ impl Display for Signal {
 #[cfg(feature = "alloc")]
 pub trait Handler {
     /// Handle a signal
-    fn handle(&mut self, signal: Signal, info: siginfo_t, _context: &mut ucontext_t);
+    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, _context: Option<&mut ucontext_t>);
     /// Return a list of signals to handle
     fn signals(&self) -> Vec<Signal>;
 }
@@ -382,7 +404,7 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 /// This should be somewhat safe to call for signals previously registered,
 /// unless the signal handlers registered using [`setup_signal_handler()`] are broken.
 #[cfg(feature = "alloc")]
-unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
+unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
     let signal = &Signal::try_from(sig).unwrap();
     let handler = {
         match &SIGNAL_HANDLERS[*signal as usize] {
@@ -390,7 +412,11 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
             None => return,
         }
     };
-    handler.handle(*signal, info, &mut *(void as *mut ucontext_t));
+    handler.handle(
+        *signal,
+        &mut ptr::read_unaligned(info),
+        (void as *mut ucontext_t).as_mut(),
+    );
 }
 
 /// Setup signal handlers in a somewhat rusty way.

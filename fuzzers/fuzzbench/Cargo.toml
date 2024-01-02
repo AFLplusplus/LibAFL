@@ -1,6 +1,6 @@
 [package]
 name = "fuzzbench"
-version = "0.10.1"
+version = "0.11.2"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
 
@@ -14,6 +14,11 @@ lto = true
 codegen-units = 1
 opt-level = 3
 debug = true
+
+[profile.release-fuzzbench]
+inherits = "release"
+debug = false
+strip = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }

@@ -6,6 +6,7 @@ use crate::observers::concolic::{serialization_format::MessageFileReader, SymExp
 
 /// A metadata holding a buffer of a concolic trace.
 #[derive(Default, Serialize, Deserialize, Debug)]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct ConcolicMetadata {
     /// Constraints data
     buffer: Vec<u8>,

@@ -5,8 +5,6 @@ use core::marker::PhantomData;
 
 use libafl_bolts::rands::Rand;
 
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     fuzzer::Evaluator,
@@ -15,9 +13,11 @@ use crate::{
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
+    state::{HasCorpus, HasRand, UsesState},
     Error,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 // TODO multi mutators stage
 
@@ -94,7 +94,7 @@ where
     M: Mutator<I, Self::State>,
     EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM, State = Self::State>,
-    Self::State: HasClientPerfMonitor + HasCorpus,
+    Self::State: HasCorpus,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     /// The mutator registered for this stage
@@ -146,6 +146,7 @@ where
             post.post_exec(state, i as i32, corpus_idx)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
         }
+
         Ok(())
     }
 }
@@ -169,7 +170,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     /// The mutator, added to this stage
@@ -196,7 +197,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     type State = Z::State;
 }
@@ -207,7 +208,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     #[inline]
@@ -235,7 +236,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<Z::Input, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -254,7 +255,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
@@ -285,7 +286,7 @@ where
     EM: UsesState<State = Z::State>,
     M: MultiMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     type State = Z::State;
 }
@@ -296,7 +297,7 @@ where
     EM: UsesState<State = Z::State>,
     M: MultiMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     #[inline]
@@ -337,7 +338,7 @@ where
     EM: UsesState<State = Z::State>,
     M: MultiMutator<Z::Input, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -351,7 +352,7 @@ where
     EM: UsesState<State = Z::State>,
     M: MultiMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     /// Creates a new transforming mutational stage
     pub fn transforming(mutator: M) -> Self {
@@ -364,6 +365,7 @@ where
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
+#[allow(clippy::unnecessary_fallible_conversions)]
 /// `StdMutationalStage` Python bindings
 pub mod pybind {
     use pyo3::prelude::*;

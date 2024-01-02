@@ -1,5 +1,5 @@
 /*******************************************************************************
-Copyright (c) 2019-2020, Andrea Fioraldi
+Copyright (c) 2019-2023, Andrea Fioraldi
 
 
 Redistribution and use in source and binary forms, with or without
@@ -23,12 +23,19 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *******************************************************************************/
 
+// do not use dlmalloc for now
+// #define USE_LIBC_ALLOC
+
 #include "libqasan.h"
 #include <features.h>
 #include <errno.h>
 #include <stddef.h>
 #include <assert.h>
 #include <pthread.h>
+
+#ifdef __GLIBC__
+  #define USE_LIBC_ALLOC
+#endif
 
 #define REDZONE_SIZE 128
 // 50 mb quarantine
@@ -53,15 +60,17 @@ struct chunk_begin {
   struct chunk_begin *next;
   struct chunk_begin *prev;
   char                redzone[REDZONE_SIZE];
-};
+
+} __attribute__((packed));
 
 struct chunk_struct {
   struct chunk_begin begin;
   char               redzone[REDZONE_SIZE];
   size_t             prev_size_padding;
-};
 
-#ifdef __GLIBC__
+} __attribute__((packed));
+
+#ifdef USE_LIBC_ALLOC
 
 void *(*__lq_libc_malloc)(size_t);
 void (*__lq_libc_free)(void *);
@@ -130,7 +139,7 @@ static int quarantine_push(struct chunk_begin *ck) {
 void __libqasan_init_malloc(void) {
   if (__libqasan_malloc_initialized) return;
 
-#ifdef __GLIBC__
+#ifdef USE_LIBC_ALLOC
   __lq_libc_malloc = dlsym(RTLD_NEXT, "malloc");
   __lq_libc_free = dlsym(RTLD_NEXT, "free");
 #endif
@@ -157,7 +166,7 @@ void *__libqasan_malloc(size_t size) {
   if (!__libqasan_malloc_initialized) {
     __libqasan_init_malloc();
 
-#ifdef __GLIBC__
+#ifdef USE_LIBC_ALLOC
     void *r = &__tmp_alloc_zone[__tmp_alloc_zone_idx];
 
     if (size & (ALLOC_ALIGN_SIZE - 1))
@@ -193,7 +202,7 @@ void *__libqasan_malloc(size_t size) {
   else
     QASAN_POISON((char *)&p[1] + size, REDZONE_SIZE, ASAN_HEAP_RIGHT_RZ);
 
-  __builtin_memset(&p[1], 0xff, size);
+  __libqasan_memset(&p[1], 0xff, size);
 
   return &p[1];
 }
@@ -201,7 +210,7 @@ void *__libqasan_malloc(size_t size) {
 void __libqasan_free(void *ptr) {
   if (!ptr) return;
 
-#ifdef __GLIBC__
+#ifdef USE_LIBC_ALLOC
   if (ptr >= (void *)__tmp_alloc_zone &&
       ptr < ((void *)__tmp_alloc_zone + TMP_ZONE_SIZE))
     return;
@@ -237,7 +246,7 @@ void __libqasan_free(void *ptr) {
 void *__libqasan_calloc(size_t nmemb, size_t size) {
   size *= nmemb;
 
-#ifdef __GLIBC__
+#ifdef USE_LIBC_ALLOC
   if (!__libqasan_malloc_initialized) {
     void *r = &__tmp_alloc_zone[__tmp_alloc_zone_idx];
     __tmp_alloc_zone_idx += size;
@@ -249,7 +258,7 @@ void *__libqasan_calloc(size_t nmemb, size_t size) {
   char *p = __libqasan_malloc(size);
   if (!p) return NULL;
 
-  __builtin_memset(p, 0, size);
+  __libqasan_memset(p, 0, size);
 
   return p;
 }
@@ -263,7 +272,7 @@ void *__libqasan_realloc(void *ptr, size_t size) {
   size_t n = ((struct chunk_begin *)ptr)[-1].requested_size;
   if (size < n) n = size;
 
-  __builtin_memcpy(p, ptr, n);
+  __libqasan_memcpy(p, ptr, n);
 
   __libqasan_free(ptr);
   return p;
@@ -306,7 +315,7 @@ int __libqasan_posix_memalign(void **ptr, size_t align, size_t len) {
   else
     QASAN_POISON(data + len, REDZONE_SIZE, ASAN_HEAP_RIGHT_RZ);
 
-  __builtin_memset(data, 0xff, len);
+  __libqasan_memset(data, 0xff, len);
 
   *ptr = data;
 

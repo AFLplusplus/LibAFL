@@ -7,7 +7,7 @@ use alloc::{
 use core::{
     cell::{Ref, RefCell},
     fmt::Debug,
-    hash::{BuildHasher, Hash, Hasher},
+    hash::Hash,
     ops::Deref,
 };
 
@@ -40,10 +40,10 @@ where
 {
     /// Creates a new [`ValueObserver`] with the given name.
     #[must_use]
-    pub fn new(name: &'static str, value: &'a T) -> Self {
+    pub fn new(name: &'static str, value: OwnedRef<'a, T>) -> Self {
         Self {
             name: name.to_string(),
-            value: OwnedRef::Ref(value),
+            value,
         }
     }
 
@@ -65,6 +65,7 @@ where
         T: Clone,
     {
         match self.value {
+            OwnedRef::RefRaw(r, _) => unsafe { (*r).clone() },
             OwnedRef::Ref(r) => r.clone(),
             OwnedRef::Owned(v) => *v,
         }
@@ -96,9 +97,7 @@ where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     fn hash(&self) -> Option<u64> {
-        let mut s = RandomState::with_seeds(1, 2, 3, 4).build_hasher();
-        Hash::hash(self.value.as_ref(), &mut s);
-        Some(s.finish())
+        Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(self.value.as_ref()))
     }
 }
 
@@ -121,10 +120,10 @@ where
 {
     /// Creates a new [`RefCellValueObserver`] with the given name.
     #[must_use]
-    pub fn new(name: &'static str, value: &'a RefCell<T>) -> Self {
+    pub fn new(name: &'static str, value: OwnedRef<'a, RefCell<T>>) -> Self {
         Self {
             name: name.to_string(),
-            value: OwnedRef::Ref(value),
+            value,
         }
     }
 
@@ -149,6 +148,7 @@ where
         T: Clone,
     {
         match self.value {
+            OwnedRef::RefRaw(r, _) => unsafe { (*r).borrow().deref().clone() },
             OwnedRef::Ref(r) => r.borrow().deref().clone(),
             OwnedRef::Owned(v) => v.borrow().clone(),
         }
@@ -180,8 +180,6 @@ where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     fn hash(&self) -> Option<u64> {
-        let mut s = RandomState::with_seeds(1, 2, 3, 4).build_hasher();
-        self.value.as_ref().borrow().hash(&mut s);
-        Some(s.finish())
+        Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(&*self.value.as_ref().borrow()))
     }
 }

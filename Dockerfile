@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.2
-FROM rust:bullseye AS libafl
+FROM rust:1.73.0 AS libafl
 LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
 LABEL "about"="LibAFL Docker image"
 
@@ -17,9 +17,11 @@ RUN sh -c 'echo set encoding=utf-8 > /root/.vimrc' \
     echo "[build]\nrustc-wrapper = \"${RUSTC_WRAPPER}\"" >> ~/.cargo/config
 
 RUN rustup component add rustfmt clippy
+RUN rustup default nightly
 
 # Install clang 11, common build tools
-RUN apt update && apt install -y build-essential gdb git wget clang clang-tools libc++-11-dev libc++abi-11-dev llvm
+RUN apt update && apt install -y build-essential gdb git wget python3-venv ninja-build lsb-release software-properties-common gnupg
+RUN wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 16
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl
@@ -28,7 +30,7 @@ COPY Cargo.toml README.md ./
 COPY libafl_derive/Cargo.toml libafl_derive/Cargo.toml
 COPY scripts/dummy.rs libafl_derive/src/lib.rs
 
-COPY libafl/Cargo.toml libafl/build.rs libafl/
+COPY libafl/Cargo.toml libafl/build.rs libafl/README.md libafl/
 COPY scripts/dummy.rs libafl/src/lib.rs
 
 COPY libafl_bolts/Cargo.toml libafl_bolts/build.rs libafl_bolts/README.md libafl_bolts/
@@ -78,6 +80,10 @@ COPY scripts/dummy.rs libafl_nyx/src/lib.rs
 COPY libafl_tinyinst/Cargo.toml libafl_tinyinst/
 COPY scripts/dummy.rs libafl_tinyinst/src/lib.rs
 
+# avoid pulling in the runtime, as this is quite an expensive build, until later
+COPY libafl_libfuzzer/Cargo.toml libafl_libfuzzer/
+COPY scripts/dummy.rs libafl_libfuzzer/src/lib.rs
+
 COPY utils utils
 
 RUN cargo build && cargo build --release
@@ -117,6 +123,10 @@ COPY libafl_concolic/symcc_runtime libafl_concolic/symcc_runtime
 COPY libafl_concolic/test libafl_concolic/test
 COPY libafl_nyx/src libafl_nyx/src
 RUN touch libafl_nyx/src/lib.rs
+COPY libafl_libfuzzer/src libafl_libfuzzer/src
+COPY libafl_libfuzzer/libafl_libfuzzer_runtime libafl_libfuzzer/libafl_libfuzzer_runtime
+COPY libafl_libfuzzer/build.rs libafl_libfuzzer/build.rs
+RUN touch libafl_libfuzzer/src/lib.rs
 RUN cargo build && cargo build --release
 
 # Copy fuzzers over

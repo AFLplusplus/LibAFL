@@ -39,9 +39,9 @@ use libafl_bolts::AsSlice;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     observers::{ObserversTuple, UsesObservers},
-    state::UsesState,
+    state::{HasExecutions, State, UsesState},
     Error,
 };
 
@@ -118,7 +118,7 @@ pub trait HasObservers: UsesObservers {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, Z>: UsesState + Debug
+pub trait Executor<EM, Z>: UsesState
 where
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
@@ -158,7 +158,7 @@ struct NopExecutor<S> {
 
 impl<S> UsesState for NopExecutor<S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -166,17 +166,19 @@ where
 impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
 where
     EM: UsesState<State = S>,
-    S: UsesInput + Debug,
+    S: State + HasExecutions,
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
+
         if input.target_bytes().as_slice().is_empty() {
             Err(Error::empty("Input Empty"))
         } else {

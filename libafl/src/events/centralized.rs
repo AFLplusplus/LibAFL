@@ -20,6 +20,8 @@ use serde::{Deserialize, Serialize};
 use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
+#[cfg(feature = "scalability_introspection")]
+use crate::state::HasScalabilityMonitor;
 use crate::{
     events::{
         llmp::EventStatsCollector, BrokerEventResult, Event, EventConfig, EventFirer, EventManager,
@@ -29,7 +31,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, UsesState},
     Error,
 };
 
@@ -377,7 +379,7 @@ where
     }
 
     fn send_exiting(&mut self) -> Result<(), Error> {
-        self.client.sender.send_exiting()?;
+        self.client.sender_mut().send_exiting()?;
         self.inner.send_exiting()
     }
 
@@ -417,7 +419,7 @@ where
 impl<E, EM, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + EventManager<E, Z>,
-    EM::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasLastReportTime,
+    EM::State: HasExecutions + HasMetadata + HasLastReportTime,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
@@ -445,7 +447,7 @@ where
 impl<EM, SP> ProgressReporter for CentralizedEventManager<EM, SP>
 where
     EM: EventStatsCollector + ProgressReporter + HasEventManagerId,
-    EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
+    EM::State: HasMetadata + HasExecutions + HasLastReportTime,
     SP: ShMemProvider + 'static,
 {
 }
@@ -594,7 +596,7 @@ where
         Z: ExecutionProcessor<E::Observers, State = EM::State> + EvaluatorObservers<E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
-        let self_id = self.client.sender.id;
+        let self_id = self.client.sender().id();
         let mut count = 0;
         while let Some((client_id, tag, _flags, msg)) = self.client.recv_buf_with_flags()? {
             assert!(
@@ -644,26 +646,59 @@ where
                 input,
                 client_config,
                 exit_kind,
-                corpus_size: _,
+                corpus_size,
                 observers_buf,
-                time: _,
-                executions: _,
+                time,
+                executions,
                 forward_id,
             } => {
                 log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
 
-                let res = if client_config.match_with(&self.configuration())
-                    && observers_buf.is_some()
-                {
-                    let observers: E::Observers =
-                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                    fuzzer.process_execution(state, self, input, &observers, &exit_kind, true)?
-                } else {
-                    fuzzer.evaluate_input_with_observers::<E, Self>(
-                        state, executor, self, input, true,
-                    )?
-                };
+                let res =
+                    if client_config.match_with(&self.configuration()) && observers_buf.is_some() {
+                        let observers: E::Observers =
+                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                        #[cfg(feature = "scalability_introspection")]
+                        {
+                            state.scalability_monitor_mut().testcase_with_observers += 1;
+                        }
+                        fuzzer.process_execution(
+                            state,
+                            self,
+                            input.clone(),
+                            &observers,
+                            &exit_kind,
+                            false,
+                        )?
+                    } else {
+                        #[cfg(feature = "scalability_introspection")]
+                        {
+                            state.scalability_monitor_mut().testcase_without_observers += 1;
+                        }
+                        fuzzer.evaluate_input_with_observers::<E, Self>(
+                            state,
+                            executor,
+                            self,
+                            input.clone(),
+                            false,
+                        )?
+                    };
                 if let Some(item) = res.1 {
+                    if res.1.is_some() {
+                        self.inner.fire(
+                            state,
+                            Event::NewTestcase {
+                                input,
+                                client_config,
+                                exit_kind,
+                                corpus_size,
+                                observers_buf,
+                                time,
+                                executions,
+                                forward_id,
+                            },
+                        )?;
+                    }
                     log::info!("Added received Testcase as item #{item}");
                 }
                 Ok(())

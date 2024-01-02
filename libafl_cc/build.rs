@@ -26,7 +26,7 @@ fn dll_extension<'a>() -> &'a str {
             return "dylib";
         }
     }
-    let family = env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+    let family = env::var("CARGO_CFG_TARGET_FAMILY").unwrap_or_else(|_| "unknown".into());
     match family.as_str() {
         "windows" => "dll",
         "unix" => "so",
@@ -82,7 +82,15 @@ fn find_llvm_config() -> Result<String, String> {
         }
     };
 
-    #[cfg(not(target_vendor = "apple"))]
+    #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+    for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
+        let llvm_config_name: String = format!("/usr/clang/{version}.0/bin/llvm-config");
+        if Path::new(&llvm_config_name).exists() {
+            return Ok(llvm_config_name);
+        }
+    }
+
+    #[cfg(not(any(target_vendor = "apple", target_os = "solaris", target_os = "illumos")))]
     for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
         let llvm_config_name: String = format!("llvm-config-{version}");
         if which(&llvm_config_name).is_ok() {
@@ -159,6 +167,7 @@ fn build_pass(
     let r = if cfg!(unix) {
         let r = Command::new(bindir_path.join("clang++"))
             .arg("-v")
+            .arg(format!("--target={}", env::var("HOST").unwrap()))
             .args(cxxflags)
             .arg(src_dir.join(src_file))
             .args(additionals)
@@ -171,6 +180,7 @@ fn build_pass(
     } else if cfg!(windows) {
         let r = Command::new(bindir_path.join("clang-cl.exe"))
             .arg("-v")
+            .arg(format!("--target={}", env::var("HOST").unwrap()))
             .args(cxxflags)
             .arg(src_dir.join(src_file))
             .args(additionals)
@@ -397,6 +407,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         "afl-coverage-pass.cc",
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",
+        "cmplog-instructions-pass.cc",
+        "cmplog-switches-pass.cc",
     ] {
         build_pass(
             bindir_path,

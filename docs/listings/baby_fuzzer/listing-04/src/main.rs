@@ -61,7 +61,7 @@ fn main() {
     /* ANCHOR_END: event_manager */
 
     /* ANCHOR: scheduler_fuzzer */
-    // A queue policy to get testcasess from the corpus
+    // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler

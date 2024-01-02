@@ -1,10 +1,10 @@
-//! Monitor based on tui-rs
+//! Monitor based on ratatui
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, string::ToString};
 use std::{
     collections::VecDeque,
-    fmt::Write,
-    io::{self, BufRead},
+    fmt::Write as _,
+    io::{self, BufRead, Write},
     panic,
     string::String,
     sync::{Arc, RwLock},
@@ -21,11 +21,12 @@ use crossterm::{
 };
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
-use tui::{backend::CrosstermBackend, Terminal};
+use ratatui::{backend::CrosstermBackend, Terminal};
+use serde_json::{self, Value};
 
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
-use crate::monitors::{ClientStats, Monitor, UserStats};
+use crate::monitors::{Aggregator, AggregatorOps, ClientStats, Monitor, UserStats, UserStatsValue};
 
 pub mod ui;
 use ui::TuiUI;
@@ -163,13 +164,52 @@ impl PerfTuiContext {
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct ProcessTiming {
+    pub client_start_time: Duration,
+    pub exec_speed: String,
+    pub last_new_entry: Duration,
+    pub last_saved_solution: Duration,
+}
+
+impl ProcessTiming {
+    fn new() -> Self {
+        Self {
+            exec_speed: "0".to_string(),
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ItemGeometry {
+    pub pending: u64,
+    pub pend_fav: u64,
+    pub own_finds: u64,
+    pub imported: u64,
+    pub stability: String,
+}
+
+impl ItemGeometry {
+    fn new() -> Self {
+        Self {
+            stability: "0%".to_string(),
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct ClientTuiContext {
     pub corpus: u64,
     pub objectives: u64,
     pub executions: u64,
     /// Float value formatted as String
-    pub exec_sec: String,
+    pub map_density: String,
 
+    pub cycles_done: u64,
+
+    pub process_timing: ProcessTiming,
+    pub item_geometry: ItemGeometry,
     pub user_stats: HashMap<String, UserStats>,
 }
 
@@ -178,7 +218,47 @@ impl ClientTuiContext {
         self.corpus = client.corpus_size;
         self.objectives = client.objective_size;
         self.executions = client.executions;
-        self.exec_sec = exec_sec;
+        self.process_timing.client_start_time = client.start_time;
+        self.process_timing.last_new_entry = if client.last_corpus_time > client.start_time {
+            client.last_corpus_time - client.start_time
+        } else {
+            Duration::default()
+        };
+
+        self.process_timing.last_saved_solution = if client.last_objective_time > client.start_time
+        {
+            client.last_objective_time - client.start_time
+        } else {
+            Duration::default()
+        };
+
+        self.process_timing.exec_speed = exec_sec;
+
+        self.map_density = client
+            .get_user_stats("edges")
+            .map_or("0%".to_string(), ToString::to_string);
+
+        let default_json = serde_json::json!({
+            "pending": 0,
+            "pend_fav": 0,
+            "imported": 0,
+            "own_finds": 0,
+        });
+        let afl_stats = client
+            .get_user_stats("AflStats")
+            .map_or(default_json.to_string(), ToString::to_string);
+
+        let afl_stats_json: Value =
+            serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
+        self.item_geometry.pending = afl_stats_json["pending"].as_u64().unwrap_or_default();
+        self.item_geometry.pend_fav = afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
+        self.item_geometry.imported = afl_stats_json["imported"].as_u64().unwrap_or_default();
+        self.item_geometry.own_finds = afl_stats_json["own_finds"].as_u64().unwrap_or_default();
+
+        let stability = client
+            .get_user_stats("stability")
+            .map_or("0%".to_string(), ToString::to_string);
+        self.item_geometry.stability = stability;
 
         for (key, val) in &client.user_monitor {
             self.user_stats.insert(key.clone(), val.clone());
@@ -205,6 +285,14 @@ pub struct TuiContext {
     pub clients_num: usize,
     pub total_execs: u64,
     pub start_time: Duration,
+
+    pub total_map_density: String,
+    pub total_solutions: u64,
+    pub total_cycles_done: u64,
+    pub total_corpus_count: u64,
+
+    pub total_process_timing: ProcessTiming,
+    pub total_item_geometry: ItemGeometry,
 }
 
 impl TuiContext {
@@ -226,17 +314,25 @@ impl TuiContext {
             clients_num: 0,
             total_execs: 0,
             start_time,
+
+            total_map_density: "0%".to_string(),
+            total_solutions: 0,
+            total_cycles_done: 0,
+            total_corpus_count: 0,
+            total_item_geometry: ItemGeometry::new(),
+            total_process_timing: ProcessTiming::new(),
         }
     }
 }
 
-/// Tracking monitor during fuzzing and display with tui-rs.
+/// Tracking monitor during fuzzing and display with ratatui
 #[derive(Debug, Clone)]
 pub struct TuiMonitor {
     pub(crate) context: Arc<RwLock<TuiContext>>,
 
     start_time: Duration,
     client_stats: Vec<ClientStats>,
+    aggregator: Aggregator,
 }
 
 impl Monitor for TuiMonitor {
@@ -251,8 +347,13 @@ impl Monitor for TuiMonitor {
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.start_time
+    }
+
+    /// Set creation time
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
     }
 
     #[allow(clippy::cast_sign_loss)]
@@ -264,16 +365,24 @@ impl Monitor for TuiMonitor {
             let execsec = self.execs_per_sec() as u64;
             let totalexec = self.total_execs();
             let run_time = cur_time - self.start_time;
+            let total_process_timing = self.process_timing();
 
             let mut ctx = self.context.write().unwrap();
+            ctx.total_process_timing = total_process_timing;
             ctx.corpus_size_timed.add(run_time, self.corpus_size());
             ctx.objective_size_timed
                 .add(run_time, self.objective_size());
             ctx.execs_per_sec_timed.add(run_time, execsec);
             ctx.total_execs = totalexec;
             ctx.clients_num = self.client_stats.len();
+            ctx.total_map_density = self.map_density();
+            ctx.total_solutions = self.objective_size();
+            ctx.total_cycles_done = 0;
+            ctx.total_corpus_count = self.corpus_size();
+            ctx.total_item_geometry = self.item_geometry();
         }
 
+        self.client_stats_insert(sender_id);
         let client = self.client_stats_mut_for(sender_id);
         let exec_sec = client.execs_per_sec_pretty(cur_time);
 
@@ -289,6 +398,10 @@ impl Monitor for TuiMonitor {
             head, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {
+            write!(fmt, ", {key}: {val}").unwrap();
+        }
+        write!(fmt, ", (Aggregated):").unwrap();
+        for (key, val) in &self.aggregator.aggregated {
             write!(fmt, ", {key}: {val}").unwrap();
         }
 
@@ -319,6 +432,10 @@ impl Monitor for TuiMonitor {
             }
         }
     }
+
+    fn aggregate(&mut self, name: &str) {
+        self.aggregator.aggregate(name, &self.client_stats);
+    }
 }
 
 impl TuiMonitor {
@@ -332,20 +449,137 @@ impl TuiMonitor {
     #[must_use]
     pub fn with_time(tui_ui: TuiUI, start_time: Duration) -> Self {
         let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
-        run_tui_thread(context.clone(), Duration::from_millis(250), tui_ui);
+
+        enable_raw_mode().unwrap();
+        #[cfg(unix)]
+        {
+            use std::{
+                fs::File,
+                os::fd::{AsRawFd, FromRawFd},
+            };
+
+            let stdout = unsafe { libc::dup(io::stdout().as_raw_fd()) };
+            let stdout = unsafe { File::from_raw_fd(stdout) };
+            run_tui_thread(
+                context.clone(),
+                Duration::from_millis(250),
+                tui_ui,
+                move || stdout.try_clone().unwrap(),
+            );
+        }
+        #[cfg(not(unix))]
+        {
+            run_tui_thread(
+                context.clone(),
+                Duration::from_millis(250),
+                tui_ui,
+                io::stdout,
+            );
+        }
         Self {
             context,
             start_time,
             client_stats: vec![],
+            aggregator: Aggregator::new(),
         }
+    }
+
+    fn map_density(&self) -> String {
+        if self.client_stats.len() < 2 {
+            return "0%".to_string();
+        }
+        let mut max_map_density = self
+            .client_stats()
+            .get(1)
+            .unwrap()
+            .get_user_stats("edges")
+            .map_or("0%".to_string(), ToString::to_string);
+
+        for client in self.client_stats().iter().skip(2) {
+            let client_map_density = client
+                .get_user_stats("edges")
+                .map_or(String::new(), ToString::to_string);
+            if client_map_density > max_map_density {
+                max_map_density = client_map_density;
+            }
+        }
+        max_map_density
+    }
+
+    fn item_geometry(&self) -> ItemGeometry {
+        let mut total_item_geometry = ItemGeometry::new();
+        if self.client_stats.len() < 2 {
+            return total_item_geometry;
+        }
+        let mut ratio_a: u64 = 0;
+        let mut ratio_b: u64 = 0;
+        for client in self.client_stats().iter().skip(1) {
+            let afl_stats = client
+                .get_user_stats("AflStats")
+                .map_or("None".to_string(), ToString::to_string);
+            let stability = client.get_user_stats("stability").map_or(
+                UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
+                core::clone::Clone::clone,
+            );
+
+            if afl_stats != "None" {
+                let default_json = serde_json::json!({
+                    "pending": 0,
+                    "pend_fav": 0,
+                    "imported": 0,
+                    "own_finds": 0,
+                });
+                let afl_stats_json: Value =
+                    serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
+                total_item_geometry.pending +=
+                    afl_stats_json["pending"].as_u64().unwrap_or_default();
+                total_item_geometry.pend_fav +=
+                    afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
+                total_item_geometry.own_finds +=
+                    afl_stats_json["own_finds"].as_u64().unwrap_or_default();
+                total_item_geometry.imported +=
+                    afl_stats_json["imported"].as_u64().unwrap_or_default();
+            }
+
+            if let UserStatsValue::Ratio(a, b) = stability.value() {
+                ratio_a += a;
+                ratio_b += b;
+            }
+        }
+        total_item_geometry.stability = format!("{}%", ratio_a * 100 / ratio_b);
+        total_item_geometry
+    }
+
+    fn process_timing(&mut self) -> ProcessTiming {
+        let mut total_process_timing = ProcessTiming::new();
+        total_process_timing.exec_speed = self.execs_per_sec_pretty();
+        if self.client_stats.len() > 1 {
+            let mut new_path_time = Duration::default();
+            let mut new_objectives_time = Duration::default();
+            for client in self.client_stats().iter().skip(1) {
+                new_path_time = client.last_corpus_time.max(new_path_time);
+                new_objectives_time = client.last_objective_time.max(new_objectives_time);
+            }
+            if new_path_time > self.start_time {
+                total_process_timing.last_new_entry = new_path_time - self.start_time;
+            }
+            if new_objectives_time > self.start_time {
+                total_process_timing.last_saved_solution = new_objectives_time - self.start_time;
+            }
+        }
+        total_process_timing
     }
 }
 
-fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration, tui_ui: TuiUI) {
+fn run_tui_thread<W: Write + Send + Sync + 'static>(
+    context: Arc<RwLock<TuiContext>>,
+    tick_rate: Duration,
+    tui_ui: TuiUI,
+    stdout_provider: impl Send + Sync + 'static + Fn() -> W,
+) {
     thread::spawn(move || -> io::Result<()> {
         // setup terminal
-        let mut stdout = io::stdout();
-        enable_raw_mode()?;
+        let mut stdout = stdout_provider();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
         let backend = CrosstermBackend::new(stdout);
@@ -359,9 +593,10 @@ fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration, tui_ui:
         // Catching panics when the main thread dies
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
+            let mut stdout = stdout_provider();
             disable_raw_mode().unwrap();
             execute!(
-                io::stdout(),
+                stdout,
                 LeaveAlternateScreen,
                 DisableMouseCapture,
                 Show,

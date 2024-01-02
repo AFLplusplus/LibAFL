@@ -6,6 +6,11 @@
 #define true 1
 #define false 0
 
+#if !defined(_WIN32) && defined(__SIZEOF_INT128__)
+typedef unsigned __int128 uint128_t;
+typedef uint128_t         u128;
+#endif
+
 #define STATIC_ASSERT(pred) \
   switch (0) {              \
     case 0:                 \
@@ -44,6 +49,22 @@
 #else
   #define RETADDR (uintptr_t) __builtin_return_address(0)
   #define EXPORT_FN
+#endif
+
+#if __GNUC__ < 6
+  #ifndef likely
+    #define likely(_x) (_x)
+  #endif
+  #ifndef unlikely
+    #define unlikely(_x) (_x)
+  #endif
+#else
+  #ifndef likely
+    #define likely(_x) __builtin_expect(!!(_x), 1)
+  #endif
+  #ifndef unlikely
+    #define unlikely(_x) __builtin_expect(!!(_x), 0)
+  #endif
 #endif
 
 #ifdef __GNUC__

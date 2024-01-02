@@ -2,9 +2,9 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     observers::{ObserversTuple, UsesObservers},
-    state::{State, UsesState},
+    state::{HasExecutions, State, UsesState},
     Error,
 };
 use libafl_bolts::AsSlice;
@@ -32,7 +32,7 @@ impl<'a, S, OT> Debug for NyxExecutor<'a, S, OT> {
 
 impl<'a, S, OT> UsesState for NyxExecutor<'a, S, OT>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -40,7 +40,7 @@ where
 impl<'a, S, OT> UsesObservers for NyxExecutor<'a, S, OT>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
 {
     type Observers = OT;
 }
@@ -48,17 +48,18 @@ where
 impl<'a, EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<'a, S, OT>
 where
     EM: UsesState<State = S>,
-    S: UsesInput,
+    S: State + HasExecutions,
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
         let input_owned = input.target_bytes();
         let input = input_owned.as_slice();
         self.helper.nyx_process.set_input(

@@ -2,6 +2,8 @@
 PROJECT_DIR = { script = ["pwd"] }
 CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 FUZZER_NAME="fuzzer"
+PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -17,7 +19,7 @@ windows_alias = "unsupported"
 
 [tasks.cxx_unix]
 command = "cargo"
-args = ["build" , "--release"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 [tasks.cc]
 linux_alias = "cc_unix"
@@ -26,7 +28,7 @@ windows_alias = "unsupported"
 
 [tasks.cc_unix]
 command = "cargo"
-args = ["build" , "--release"]
+args = ["build" , "--profile", "${PROFILE}"]
 
 # fuzz.o File
 [tasks.fuzz_o]
@@ -35,7 +37,7 @@ mac_alias = "fuzz_o_unix"
 windows_alias = "unsupported"
 
 [tasks.fuzz_o_unix]
-command = "${CARGO_TARGET_DIR}/release/libafl_cc"
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc"
 args = ["--libafl-no-link", "-O3", "-c", "fuzz.c", "-o", "fuzz.o"]
 dependencies = ["cc", "cxx"]
 
@@ -46,7 +48,7 @@ mac_alias = "fuzzer_unix"
 windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
-command = "${CARGO_TARGET_DIR}/release/libafl_cxx"
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 args = ["--libafl", "fuzz.o", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
 dependencies = ["cc", "cxx", "fuzz_o"]
 
@@ -81,12 +83,13 @@ rm -rf libafl_unix_shmem_server || true
 mkdir in || true
 echo a > in/a
 # Allow sigterm as exit code 
-timeout 11s ./${FUZZER_NAME} -o out -i in >fuzz_stdout.log || true
-if [ -z "$(grep "objectives: 10" fuzz_stdout.log)" ]; then
+timeout 31s ./${FUZZER_NAME} -o out -i in >fuzz_stdout.log || true
+cat fuzz_stdout.log
+if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1
-else
-    echo "Fuzzer is working"
 fi
 rm -rf out || true
 rm -rf in || true

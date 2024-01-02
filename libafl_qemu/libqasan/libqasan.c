@@ -37,7 +37,7 @@ void __libqasan_print_maps(void) {
   read(fd, buf, 4095);
   close(fd);
 
-  size_t len = strlen(buf);
+  size_t len = __libqasan_strlen(buf);
 
   QASAN_LOG("Guest process maps:\n");
   int   i;
@@ -77,7 +77,7 @@ __attribute__((constructor)) void __libqasan_init() {
       "Copyright (C) 2019-2021 Andrea Fioraldi <andreafioraldi@gmail.com>\n");
   QASAN_LOG("\n");
 
-  if (__qasan_log) { __libqasan_print_maps(); }
+  // if (__qasan_log) { __libqasan_print_maps(); }
 }
 
 int __libc_start_main(int (*main)(int, char **, char **), int argc, char **argv,

@@ -178,9 +178,7 @@ impl ToolWrapper for LibtoolWrapper {
                         let extension = extension.to_str().unwrap();
                         let extension_lowercase = extension.to_lowercase();
                         match &extension_lowercase[..] {
-                            "o" | "lo" | "a" | "la" | "so" => {
-                                configuration.replace_extension(&arg_as_path)
-                            }
+                            "lo" | "la" | "so" => configuration.replace_extension(&arg_as_path),
                             _ => arg_as_path,
                         }
                     } else {

@@ -1,13 +1,19 @@
 #![allow(clippy::missing_panics_doc)]
 use std::{
-    fs,
+    env, fs,
     path::{Path, PathBuf},
+    process::Command,
 };
+
+use regex::Regex;
+use which::which;
 
 mod bindings;
 mod build;
 
 pub use build::build;
+
+const LLVM_VERSION_MAX: i32 = 33;
 
 pub fn build_with_bindings(
     cpu_target: &str,
@@ -16,8 +22,6 @@ pub fn build_with_bindings(
     jobs: Option<u32>,
     bindings_file: &Path,
 ) {
-    println!("cargo:rerun-if-changed={}", bindings_file.display());
-
     let (qemu_dir, build_dir) = build::build(cpu_target, is_big_endian, is_usermode, jobs);
     let clang_args = qemu_bindgen_clang_args(&qemu_dir, &build_dir, cpu_target, is_usermode);
 
@@ -25,6 +29,80 @@ pub fn build_with_bindings(
         .expect("Failed to generate the bindings");
     bind.write_to_file(bindings_file)
         .expect("Faield to write to the bindings file");
+
+    // """Fix""" the bindings here
+    let contents =
+        fs::read_to_string(bindings_file).expect("Should have been able to read the file");
+    let re = Regex::new("(Option<\\s*)unsafe( extern \"C\" fn\\(data: u64)").unwrap();
+    let replaced = re.replace_all(&contents, "$1$2");
+    fs::write(bindings_file, replaced.as_bytes()).expect("Unable to write file");
+}
+
+// For bindgen, the llvm version must be >= of the rust llvm version
+fn find_llvm_config() -> Result<String, String> {
+    if let Ok(var) = env::var("LLVM_CONFIG") {
+        return Ok(var);
+    }
+
+    let rustc_llvm_ver = find_rustc_llvm_version().unwrap();
+    for version in (rustc_llvm_ver..=LLVM_VERSION_MAX).rev() {
+        let llvm_config_name: String = format!("llvm-config-{version}");
+        if which(&llvm_config_name).is_ok() {
+            return Ok(llvm_config_name);
+        }
+    }
+
+    if which("llvm-config").is_ok() {
+        if let Some(ver) = find_llvm_version("llvm-config".to_owned()) {
+            if ver >= rustc_llvm_ver {
+                return Ok("llvm-config".to_owned());
+            }
+        }
+    }
+
+    Err("could not find llvm-config".to_owned())
+}
+
+fn exec_llvm_config(llvm_config: String, args: &[&str]) -> String {
+    match Command::new(llvm_config).args(args).output() {
+        Ok(output) => String::from_utf8(output.stdout)
+            .expect("Unexpected llvm-config output")
+            .trim()
+            .to_string(),
+        Err(e) => panic!("Could not execute llvm-config: {e}"),
+    }
+}
+
+fn find_llvm_version(llvm_config: String) -> Option<i32> {
+    let output = exec_llvm_config(llvm_config, &["--version"]);
+    if let Some(major) = output.split('.').collect::<Vec<&str>>().first() {
+        if let Ok(res) = major.parse::<i32>() {
+            return Some(res);
+        }
+    }
+    None
+}
+
+fn exec_rustc(args: &[&str]) -> String {
+    let rustc = env::var("RUSTC").unwrap();
+    match Command::new(rustc).args(args).output() {
+        Ok(output) => String::from_utf8(output.stdout)
+            .expect("Unexpected rustc output")
+            .trim()
+            .to_string(),
+        Err(e) => panic!("Could not execute rustc: {e}"),
+    }
+}
+
+fn find_rustc_llvm_version() -> Option<i32> {
+    let output = exec_rustc(&["--verbose", "--version"]);
+    let ver = output.split(':').last().unwrap().trim();
+    if let Some(major) = ver.split('.').collect::<Vec<&str>>().first() {
+        if let Ok(res) = major.parse::<i32>() {
+            return Some(res);
+        }
+    }
+    None
 }
 
 //linux-user_main.c.o libqemu-x86_64-linux-user.fa.p
@@ -35,6 +113,11 @@ fn qemu_bindgen_clang_args(
     cpu_target: &str,
     is_usermode: bool,
 ) -> Vec<String> {
+    if env::var("LLVM_CONFIG_PATH").is_err() {
+        let found = find_llvm_config().expect("Cannot find a suitable llvm-config, it must be a version equal or greater than the rustc LLVM version");
+        env::set_var("LLVM_CONFIG_PATH", found);
+    }
+
     // load compile commands
     let compile_commands_string = &fs::read_to_string(build_dir.join("compile_commands.json"))
         .expect("failed to read compile commands");
@@ -49,8 +132,8 @@ fn qemu_bindgen_clang_args(
         )
     } else {
         (
-            "/softmmu/main.c",
-            format!("qemu-system-{cpu_target}.p/softmmu_main.c.o"),
+            "/system/main.c",
+            format!("libqemu-system-{cpu_target}.so.p/system_main.c.o"),
         )
     };
 

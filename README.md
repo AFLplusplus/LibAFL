@@ -45,36 +45,36 @@ We highly recommend *not* to use e.g. your Linux distribition package as this is
 Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
 
 - LLVM tools  
-The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 but older than LLVM 15.0.0)
+The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 up to LLVM 17.0.0)
 
 - Cargo-make  
 We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with
 
-```
+```sh
 cargo install cargo-make
 ```
 
 2. Clone the LibAFL repository with
 
-```
+```sh
 git clone https://github.com/AFLplusplus/LibAFL
 ```
 
 3. Build the library using
 
-```
+```sh
 cargo build --release
 ```
 
 4. Build the API documentation with
 
-```
+```sh
 cargo doc
 ```
 
 5. Browse the LibAFL book (WIP!) with (requires [mdbook](https://rust-lang.github.io/mdBook/index.html))
 
-```
+```sh
 cd docs && mdbook serve
 ```
 
@@ -82,9 +82,11 @@ We collect all example fuzzers in [`./fuzzers`](./fuzzers/).
 Be sure to read their documentation (and source), this is *the natural way to get started!*
 
 You can run each example fuzzer with
-```
+
+```sh
 cargo make run
 ```
+
 as long as the fuzzer directory has `Makefile.toml` file.
 
 The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
@@ -106,6 +108,8 @@ The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_lib
 + The Fuzzing101 [solutions](https://github.com/epi052/fuzzing-101-solutions) & series of [blog posts](https://epi052.gitlab.io/notes-to-self/blog/2021-11-01-fuzzing-101-with-libafl/) by [epi](https://github.com/epi052)
 
 + Blogpost on binary-only fuzzing lib libaf_qemu, [Hacking TMNF - Fuzzing the game server](https://blog.bricked.tech/posts/tmnf/part1/), by [RickdeJager](https://github.com/RickdeJager).
+
++ [A LibAFL Introductory Workshop](https://www.atredis.com/blog/2023/12/4/a-libafl-introductory-workshop), by [Jordan Whitehead](https://github.com/jordan9001)
 
 ## Contributing
 

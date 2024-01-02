@@ -2,7 +2,8 @@
 [env]
 CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 FUZZER_NAME={ source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "frida_gdiplus", mapping = {"linux" = "frida_gdiplus", "macos" = "frida_gdiplus", "windows" = "frida_gdiplus.exe"} }
-
+PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
+PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -32,8 +33,8 @@ windows_alias = "fuzzer_windows"
 [tasks.fuzzer_windows]
 script_runner="@shell"
 script='''
-cargo build --release
-cp ./target/release/${FUZZER_NAME} .
+cargo build --profile ${PROFILE}
+cp ./target/${PROFILE_DIR}/${FUZZER_NAME} .
 '''
 
 # Run the fuzzer

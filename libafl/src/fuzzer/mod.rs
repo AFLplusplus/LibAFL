@@ -8,8 +8,6 @@ use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(test)]
 use crate::inputs::Input;
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 #[cfg(test)]
 use crate::state::NopState;
 use crate::{
@@ -24,11 +22,13 @@ use crate::{
     stages::StagesTuple,
     start_timer,
     state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasLastReportTime, HasMetadata,
-        HasSolutions, UsesState,
+        HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasMetadata, HasSolutions,
+        UsesState,
     },
     Error,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
@@ -49,10 +49,7 @@ where
 }
 
 /// Holds an feedback
-pub trait HasFeedback: UsesState
-where
-    Self::State: HasClientPerfMonitor,
-{
+pub trait HasFeedback: UsesState {
     /// The feedback type
     type Feedback: Feedback<Self::State>;
 
@@ -64,10 +61,7 @@ where
 }
 
 /// Holds an objective feedback
-pub trait HasObjective: UsesState
-where
-    Self::State: HasClientPerfMonitor,
-{
+pub trait HasObjective: UsesState {
     /// The type of the [`Feedback`] used to find objectives for this fuzzer
     type Objective: Feedback<Self::State>;
 
@@ -78,7 +72,7 @@ where
     fn objective_mut(&mut self) -> &mut Self::Objective;
 }
 
-/// Evaluate if an input is interesting using the feedback
+/// Evaluates if an input is interesting using the feedback
 pub trait ExecutionProcessor<OT>: UsesState {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -94,7 +88,7 @@ pub trait ExecutionProcessor<OT>: UsesState {
         EM: EventFirer<State = Self::State>;
 }
 
-/// Evaluate an input modifying the state of the fuzzer
+/// Evaluates an input modifying the state of the fuzzer
 pub trait EvaluatorObservers<OT>: UsesState + Sized {
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new
@@ -158,7 +152,7 @@ where
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions + HasLastReportTime,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,
@@ -187,7 +181,7 @@ where
         executor: &mut E,
         state: &mut EM::State,
         manager: &mut EM,
-    ) -> Result<CorpusId, Error> {
+    ) -> Result<(), Error> {
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
             manager.maybe_report_progress(state, monitor_timeout)?;
@@ -255,7 +249,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus,
 {
     scheduler: CS,
     feedback: F,
@@ -268,7 +262,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus,
 {
     type State = CS::State;
 }
@@ -278,7 +272,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus,
 {
     type Scheduler = CS;
 
@@ -296,7 +290,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus,
 {
     type Feedback = F;
 
@@ -314,7 +308,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus,
+    CS::State: HasCorpus,
 {
     type Objective = OF;
 
@@ -333,14 +327,14 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions + HasCorpus,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasCorpus + HasImported,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
         &mut self,
-        state: &mut CS::State,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: <CS::State as UsesInput>::Input,
+        input: <Self::State as UsesInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
@@ -415,6 +409,9 @@ where
                             forward_id: None,
                         },
                     )?;
+                } else {
+                    // This testcase is from the other fuzzers.
+                    *state.imported_mut() += 1;
                 }
                 Ok((res, Some(idx)))
             }
@@ -450,7 +447,7 @@ where
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasImported,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -483,16 +480,16 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    CS::State: HasCorpus + HasSolutions + HasExecutions + HasImported,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
     fn evaluate_input_events(
         &mut self,
-        state: &mut CS::State,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <CS::State as UsesInput>::Input,
+        input: <Self::State as UsesInput>::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
@@ -501,47 +498,57 @@ where
     /// Adds an input, even if it's not considered `interesting` by any of the executors
     fn add_input(
         &mut self,
-        state: &mut CS::State,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <CS::State as UsesInput>::Input,
+        input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
+        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
 
-        // However, we still want to trigger the side effects of objectives and feedbacks.
+        // Maybe a solution
         #[cfg(not(feature = "introspection"))]
-        let _is_solution = self
+        let is_solution = self
             .objective_mut()
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
 
         #[cfg(feature = "introspection")]
-        let _is_solution = self
+        let is_solution = self
             .objective_mut()
             .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
 
-        #[cfg(not(feature = "introspection"))]
-        let _is_corpus = self
-            .feedback_mut()
-            .is_interesting(state, manager, &input, observers, &exit_kind)?;
+        if is_solution {
+            self.objective_mut()
+                .append_metadata(state, observers, &mut testcase)?;
+            let idx = state.solutions_mut().add(testcase)?;
 
-        #[cfg(feature = "introspection")]
-        let _is_corpus = self
-            .feedback_mut()
-            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+            manager.fire(
+                state,
+                Event::Objective {
+                    objective_size: state.solutions().count(),
+                },
+            )?;
+            return Ok(idx);
+        }
 
         // Not a solution
         self.objective_mut().discard_metadata(state, &input)?;
 
         // several is_interesting implementations collect some data about the run, later used in
         // append_metadata; we *must* invoke is_interesting here to collect it
-        let _: bool = self
+        #[cfg(not(feature = "introspection"))]
+        let _is_corpus = self
             .feedback_mut()
             .is_interesting(state, manager, &input, observers, &exit_kind)?;
 
+        #[cfg(feature = "introspection")]
+        let _is_corpus = self
+            .feedback_mut()
+            .is_interesting_introspection(state, manager, &input, observers, &exit_kind)?;
+
         // Add the input to the main corpus
-        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
         self.feedback_mut()
             .append_metadata(state, observers, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
@@ -576,12 +583,8 @@ where
     EM: ProgressReporter + EventProcessor<E, Self, State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: HasClientPerfMonitor
-        + HasExecutions
-        + HasMetadata
-        + HasCorpus
-        + HasTestcase
-        + HasLastReportTime,
+    CS::State:
+        HasExecutions + HasMetadata + HasCorpus + HasTestcase + HasImported + HasLastReportTime,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
     fn fuzz_one(
@@ -623,11 +626,9 @@ where
         {
             let mut testcase = state.testcase_mut(idx)?;
             let scheduled_count = testcase.scheduled_count();
-
             // increase scheduled count, this was fuzz_level in afl
             testcase.set_scheduled_count(scheduled_count + 1);
         }
-
         Ok(idx)
     }
 }
@@ -637,7 +638,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: UsesInput + HasExecutions + HasClientPerfMonitor + HasCorpus,
+    CS::State: UsesInput + HasExecutions + HasCorpus,
 {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
@@ -665,8 +666,6 @@ where
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
-
-        *state.executions_mut() += 1;
 
         start_timer!(state);
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
@@ -705,7 +704,7 @@ where
     OF: Feedback<CS::State>,
     E: Executor<EM, Self> + HasObservers<State = CS::State>,
     EM: UsesState<State = CS::State>,
-    CS::State: UsesInput + HasExecutions + HasClientPerfMonitor + HasCorpus,
+    CS::State: UsesInput + HasExecutions + HasCorpus,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input(
@@ -718,8 +717,6 @@ where
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
-
-        *state.executions_mut() += 1;
 
         start_timer!(state);
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;

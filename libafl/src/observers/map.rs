@@ -9,15 +9,16 @@ use core::{
     hash::{BuildHasher, Hasher},
     iter::Flatten,
     marker::PhantomData,
-    slice::{from_raw_parts, Iter, IterMut},
+    mem::size_of,
+    slice::{self, Iter, IterMut},
 };
 
 use ahash::RandomState;
-use intervaltree::IntervalTree;
 use libafl_bolts::{
     ownedref::{OwnedMutPtr, OwnedMutSlice},
     AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen, Named, Truncate,
 };
+use meminterval::IntervalTree;
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
@@ -72,9 +73,9 @@ fn init_count_class_16() {
 fn hash_slice<T>(slice: &[T]) -> u64 {
     let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
     let ptr = slice.as_ptr() as *const u8;
-    let map_size = slice.len() / core::mem::size_of::<T>();
+    let map_size = slice.len() / size_of::<T>();
     unsafe {
-        hasher.write(from_raw_parts(ptr, map_size));
+        hasher.write(slice::from_raw_parts(ptr, map_size));
     }
     hasher.finish()
 }
@@ -82,7 +83,7 @@ fn hash_slice<T>(slice: &[T]) -> u64 {
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
-pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug
+pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
@@ -104,7 +105,7 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
     /// Compute the hash of the map
     fn hash(&self) -> u64;
 
-    /// Get the initial value for reset()
+    /// Get the initial value for `reset()`
     fn initial(&self) -> Self::Entry;
 
     /// Reset the map
@@ -320,6 +321,28 @@ where
     fn into_iter(self) -> Self::IntoIter {
         let cnt = self.usable_count();
         self.as_mut_slice()[..cnt].iter_mut()
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 
@@ -780,6 +803,28 @@ where
     }
 }
 
+impl<'a, T, const N: usize> ConstMapObserver<'a, T, N>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
 impl<'a, T, const N: usize> MapObserver for ConstMapObserver<'a, T, N>
 where
     T: Bounded
@@ -1053,6 +1098,28 @@ where
     }
 }
 
+impl<'a, T> VariableMapObserver<'a, T>
+where
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
 impl<'a, T> MapObserver for VariableMapObserver<'a, T>
 where
     T: Bounded
@@ -1234,7 +1301,23 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         let map = self.as_mut_slice();
-        let len = map.len();
+        let mut len = map.len();
+        let align_offset = map.as_ptr().align_offset(size_of::<u16>());
+
+        // if len == 1, the next branch will already do this lookup
+        if len > 1 && align_offset != 0 {
+            debug_assert_eq!(
+                align_offset, 1,
+                "Aligning u8 to u16 should always be offset of 1?"
+            );
+            unsafe {
+                *map.get_unchecked_mut(0) =
+                    *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(0) as usize);
+            }
+            len -= 1;
+        }
+
+        // Fix the last element
         if (len & 1) != 0 {
             unsafe {
                 *map.get_unchecked_mut(len - 1) =
@@ -1243,13 +1326,18 @@ where
         }
 
         let cnt = len / 2;
-        let map16 = unsafe { core::slice::from_raw_parts_mut(map.as_mut_ptr() as *mut u16, cnt) };
+
+        let map16 = unsafe {
+            slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt)
+        };
         // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
+        #[allow(clippy::unused_enumerate_index)]
         for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
             unsafe {
                 *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);
             }
         }
+
         self.base.post_exec(state, input, exit_kind)
     }
 }
@@ -1391,7 +1479,7 @@ where
 
 impl<'it, M> IntoIterator for &'it HitcountsMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned,
+    M: Serialize + serde::de::DeserializeOwned,
     &'it M: IntoIterator<Item = &'it u8>,
 {
     type Item = &'it u8;
@@ -1404,7 +1492,7 @@ where
 
 impl<'it, M> IntoIterator for &'it mut HitcountsMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned,
+    M: Serialize + serde::de::DeserializeOwned,
     &'it mut M: IntoIterator<Item = &'it mut u8>,
 {
     type Item = &'it mut u8;
@@ -1412,6 +1500,28 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.base.into_iter()
+    }
+}
+
+impl<M> HitcountsMapObserver<M>
+where
+    M: Serialize + serde::de::DeserializeOwned,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> <&M as IntoIterator>::IntoIter {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+}
+
+impl<M> HitcountsMapObserver<M>
+where
+    M: Serialize + serde::de::DeserializeOwned,
+    for<'it> &'it mut M: IntoIterator<Item = &'it mut u8>,
+{
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> <&mut M as IntoIterator>::IntoIter {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 
@@ -1618,7 +1728,7 @@ where
 
 impl<'it, M> IntoIterator for &'it HitcountsIterableMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned,
+    M: Serialize + serde::de::DeserializeOwned,
     &'it M: IntoIterator<Item = &'it u8>,
 {
     type Item = &'it u8;
@@ -1631,7 +1741,7 @@ where
 
 impl<'it, M> IntoIterator for &'it mut HitcountsIterableMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned,
+    M: Serialize + serde::de::DeserializeOwned,
     &'it mut M: IntoIterator<Item = &'it mut u8>,
 {
     type Item = &'it mut u8;
@@ -1639,6 +1749,28 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.base.into_iter()
+    }
+}
+
+impl<M> HitcountsIterableMapObserver<M>
+where
+    M: Serialize + serde::de::DeserializeOwned,
+    for<'it> &'it M: IntoIterator<Item = &'it u8>,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> <&M as IntoIterator>::IntoIter {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+}
+
+impl<M> HitcountsIterableMapObserver<M>
+where
+    M: Serialize + serde::de::DeserializeOwned,
+    for<'it> &'it mut M: IntoIterator<Item = &'it mut u8>,
+{
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> <&mut M as IntoIterator>::IntoIter {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 
@@ -1739,17 +1871,17 @@ where
 
     #[inline]
     fn get(&self, idx: usize) -> &T {
-        let elem = self.intervals.query_point(idx).next().unwrap();
-        let i = elem.value;
-        let j = idx - elem.range.start;
+        let elem = self.intervals.query(idx..=idx).next().unwrap();
+        let i = *elem.value;
+        let j = idx - elem.interval.start;
         &self.maps[i].as_slice()[j]
     }
 
     #[inline]
     fn get_mut(&mut self, idx: usize) -> &mut T {
-        let elem = self.intervals.query_point(idx).next().unwrap();
-        let i = elem.value;
-        let j = idx - elem.range.start;
+        let elem = self.intervals.query(idx..=idx).next().unwrap();
+        let i = *elem.value;
+        let j = idx - elem.interval.start;
         &mut self.maps[i].as_mut_slice()[j]
     }
 
@@ -1776,9 +1908,9 @@ where
         for map in &self.maps {
             let slice = map.as_slice();
             let ptr = slice.as_ptr() as *const u8;
-            let map_size = slice.len() / core::mem::size_of::<T>();
+            let map_size = slice.len() / size_of::<T>();
             unsafe {
-                hasher.write(from_raw_parts(ptr, map_size));
+                hasher.write(slice::from_raw_parts(ptr, map_size));
             }
         }
         hasher.finish()
@@ -1829,16 +1961,15 @@ where
     #[must_use]
     fn maybe_differential(name: &'static str, maps: Vec<OwnedMutSlice<'a, T>>) -> Self {
         let mut idx = 0;
-        let mut builder = vec![];
+        let mut intervals = IntervalTree::new();
         for (v, x) in maps.iter().enumerate() {
             let l = x.as_slice().len();
-            let r = (idx..(idx + l), v);
+            intervals.insert(idx..(idx + l), v);
             idx += l;
-            builder.push(r);
         }
         Self {
             maps,
-            intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
+            intervals,
             len: idx,
             name: name.to_string(),
             initial: T::default(),
@@ -1873,21 +2004,20 @@ where
     pub fn owned(name: &'static str, maps: Vec<Vec<T>>) -> Self {
         let mut idx = 0;
         let mut v = 0;
-        let mut builder = vec![];
+        let mut intervals = IntervalTree::new();
         let maps: Vec<_> = maps
             .into_iter()
             .map(|x| {
                 let l = x.len();
-                let r = (idx..(idx + l), v);
+                intervals.insert(idx..(idx + l), v);
                 idx += l;
-                builder.push(r);
                 v += 1;
                 OwnedMutSlice::from(x)
             })
             .collect();
         Self {
             maps,
-            intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
+            intervals,
             len: idx,
             name: name.to_string(),
             initial: T::default(),
@@ -1945,6 +2075,21 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.maps.iter_mut().flatten()
+    }
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> <&mut Self as IntoIterator>::IntoIter {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 
@@ -2049,6 +2194,21 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.as_mut_slice().iter_mut()
+    }
+}
+
+impl<T> OwnedMapObserver<T>
+where
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    /// Returns an iterator over the map.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the map.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
     }
 }
 

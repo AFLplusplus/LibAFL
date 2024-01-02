@@ -10,6 +10,7 @@ members = [
     "libafl_concolic/test/runtime_test",
     "libafl_derive",
     "libafl_frida",
+    "libafl_libfuzzer",
     "libafl_nyx",
     "libafl_qemu",
     "libafl_sugar",
@@ -32,15 +33,16 @@ exclude = [
     "fuzzers",
     "libafl_qemu/libafl_qemu_build",
     "libafl_qemu/libafl_qemu_sys",
+    "utils/noaslr",
+    "utils/gdb_qemu",
     "scripts",
 ]
 
 [workspace.package]
-version = "0.10.1"
+version = "0.11.2"
 
 [profile.release]
 lto = true
 codegen-units = 1
 opt-level = 3
 debug = true
-

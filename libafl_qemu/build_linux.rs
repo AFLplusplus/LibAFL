@@ -70,6 +70,7 @@ pub fn build() {
     if (emulation_mode == "usermode") && build_libqasan {
         let qasan_dir = Path::new("libqasan");
         let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
+        println!("cargo:rerun-if-changed={}", qasan_dir.display());
 
         assert!(Command::new("make")
             .current_dir(out_dir_path)
@@ -81,7 +82,11 @@ pub fn build() {
             .status()
             .expect("make failed")
             .success());
-        assert!(Command::new("make")
+        let mut make = Command::new("make");
+        if cfg!(debug_assertions) {
+            make.env("CFLAGS", "-DDEBUG=1");
+        }
+        assert!(make
             .current_dir(out_dir_path)
             .env("CC", &cross_cc)
             .env("OUT_DIR", &target_dir)
@@ -90,5 +95,6 @@ pub fn build() {
             .status()
             .expect("make failed")
             .success());
+        println!("cargo:rerun-if-changed={}/libqasan.so", target_dir.display());
     }
 }
