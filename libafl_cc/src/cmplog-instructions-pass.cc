@@ -620,6 +620,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
       }
     }
   }
+  return true;
 }
 
 #if USE_NEW_PM
