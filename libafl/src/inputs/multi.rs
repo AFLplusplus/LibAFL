@@ -9,6 +9,7 @@ use alloc::{
     vec::Vec,
 };
 
+use arrayvec::ArrayVec;
 use serde::{Deserialize, Serialize};
 
 use crate::inputs::Input;
@@ -30,9 +31,49 @@ impl<I> MultipartInput<I> {
         }
     }
 
+    fn idxs_to_skips(idxs: &mut [usize]) {
+        for following in (1..idxs.len()).rev() {
+            let first = idxs[following - 1];
+            let second = idxs[following];
+
+            idxs[following] = second
+                .checked_sub(first)
+                .expect("idxs was not sorted")
+                .checked_sub(1)
+                .expect("idxs had duplicate elements");
+        }
+    }
+
     /// Get the individual parts of this input.
     pub fn parts(&self) -> &[I] {
         &self.parts
+    }
+
+    /// Access multiple parts mutably.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if idxs is not sorted, has duplicate elements, or any entry is out of bounds.
+    pub fn parts_mut<const N: usize>(&mut self, mut idxs: [usize; N]) -> [&mut I; N] {
+        Self::idxs_to_skips(&mut idxs);
+
+        let mut parts = self.parts.iter_mut();
+        if let Ok(arr) = idxs
+            .into_iter()
+            .map(|i| {
+                (&mut parts)
+                    .skip(i)
+                    .next()
+                    .expect("idx had an out of bounds entry")
+            })
+            .collect::<ArrayVec<_, N>>()
+            .into_inner()
+        {
+            arr
+        } else {
+            // avoid Debug trait requirement for expect/unwrap
+            panic!("arrayvec collection failed somehow")
+        }
     }
 
     /// Get a specific part of this input by index.

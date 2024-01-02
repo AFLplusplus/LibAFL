@@ -1,6 +1,7 @@
 //! Mutator definitions for [`MultipartInput`]s. See [`crate::inputs::multi`] for details.
 
-use std::cmp::min;
+use core::cmp::min;
+use std::cmp::Ordering;
 
 use libafl_bolts::{rands::Rand, Error};
 use rand::RngCore;
@@ -123,23 +124,66 @@ where
         input: &mut MultipartInput<I>,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
-        if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
-                return Ok(MutationResult::Skipped);
-            }
-        }
-
         // we can eat the slight bias; number of parts will be small
         let name_choice = state.rand_mut().next() as usize;
         let part_choice = state.rand_mut().next() as usize;
+
+        // We special-case crossover with self
+        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        if let Some(cur) = state.corpus().current() {
+            if idx == *cur {
+                let choice = name_choice % input.names().len();
+                let name = input.names()[choice].clone();
+
+                let other_size = input.parts()[choice].bytes().len();
+                if other_size < 2 {
+                    return Ok(MutationResult::Skipped);
+                }
+
+                let parts = input.parts_by_name(&name).count() - 1;
+
+                if parts == 0 {
+                    return Ok(MutationResult::Skipped);
+                }
+
+                let maybe_size = input
+                    .parts_by_name(&name)
+                    .filter(|&(p, _)| p != choice)
+                    .nth(part_choice % parts)
+                    .map(|(idx, part)| (idx, part.bytes().len()));
+
+                if let Some((part_idx, size)) = maybe_size {
+                    let target = state.rand_mut().below(size as u64) as usize;
+                    let range = rand_range(state, other_size, min(other_size, size - target));
+
+                    let [part, chosen] = match part_idx.cmp(&choice) {
+                        Ordering::Less => input.parts_mut([part_idx, choice]),
+                        Ordering::Equal => {
+                            unreachable!("choice should never equal the part idx!")
+                        }
+                        Ordering::Greater => {
+                            let [chosen, part] = input.parts_mut([choice, part_idx]);
+                            [part, chosen]
+                        }
+                    };
+
+                    return Self::crossover_insert(part, size, target, range, chosen);
+                }
+
+                return Ok(MutationResult::Skipped);
+            }
+        }
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
         let choice = name_choice % other.names().len();
         let name = &other.names()[choice];
+
+        let other_size = other.parts()[choice].bytes().len();
+        if other_size < 2 {
+            return Ok(MutationResult::Skipped);
+        }
 
         let parts = input.parts_by_name(name).count();
 
@@ -148,13 +192,8 @@ where
                 .parts_by_name_mut(name)
                 .nth(part_choice % parts)
                 .unwrap();
-            let size = part.bytes().len();
-            let other_size = other.parts()[choice].bytes().len();
-
-            if other_size < 2 {
-                return Ok(MutationResult::Skipped);
-            }
             drop(other_testcase);
+            let size = part.bytes().len();
 
             let target = state.rand_mut().below(size as u64) as usize;
             let range = rand_range(state, other_size, min(other_size, size - target));
@@ -184,23 +223,66 @@ where
         input: &mut MultipartInput<I>,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        // We don't want to use the testcase we're already using for splicing
-        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
-        if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
-                return Ok(MutationResult::Skipped);
-            }
-        }
-
         // we can eat the slight bias; number of parts will be small
         let name_choice = state.rand_mut().next() as usize;
         let part_choice = state.rand_mut().next() as usize;
+
+        // We special-case crossover with self
+        let idx = random_corpus_id!(state.corpus(), state.rand_mut());
+        if let Some(cur) = state.corpus().current() {
+            if idx == *cur {
+                let choice = name_choice % input.names().len();
+                let name = input.names()[choice].clone();
+
+                let other_size = input.parts()[choice].bytes().len();
+                if other_size < 2 {
+                    return Ok(MutationResult::Skipped);
+                }
+
+                let parts = input.parts_by_name(&name).count() - 1;
+
+                if parts == 0 {
+                    return Ok(MutationResult::Skipped);
+                }
+
+                let maybe_size = input
+                    .parts_by_name(&name)
+                    .filter(|&(p, _)| p != choice)
+                    .nth(part_choice % parts)
+                    .map(|(idx, part)| (idx, part.bytes().len()));
+
+                if let Some((part_idx, size)) = maybe_size {
+                    let target = state.rand_mut().below(size as u64) as usize;
+                    let range = rand_range(state, other_size, min(other_size, size - target));
+
+                    let [part, chosen] = match part_idx.cmp(&choice) {
+                        Ordering::Less => input.parts_mut([part_idx, choice]),
+                        Ordering::Equal => {
+                            unreachable!("choice should never equal the part idx!")
+                        }
+                        Ordering::Greater => {
+                            let [chosen, part] = input.parts_mut([choice, part_idx]);
+                            [part, chosen]
+                        }
+                    };
+
+                    return Self::crossover_replace(part, target, range, chosen);
+                }
+
+                return Ok(MutationResult::Skipped);
+            }
+        }
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
         let choice = name_choice % other.names().len();
         let name = &other.names()[choice];
+
+        let other_size = other.parts()[choice].bytes().len();
+        if other_size < 2 {
+            return Ok(MutationResult::Skipped);
+        }
 
         let parts = input.parts_by_name(name).count();
 
@@ -209,13 +291,8 @@ where
                 .parts_by_name_mut(name)
                 .nth(part_choice % parts)
                 .unwrap();
-            let size = part.bytes().len();
-            let other_size = other.parts()[choice].bytes().len();
-
-            if other_size < 2 {
-                return Ok(MutationResult::Skipped);
-            }
             drop(other_testcase);
+            let size = part.bytes().len();
 
             let target = state.rand_mut().below(size as u64) as usize;
             let range = rand_range(state, other_size, min(other_size, size - target));

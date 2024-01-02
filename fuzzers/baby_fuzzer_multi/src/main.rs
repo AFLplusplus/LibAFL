@@ -10,7 +10,8 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    feedback_or_fast,
+    feedbacks::{CrashFeedback, MaxMapFeedback, MinMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, MultipartInput},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
@@ -23,18 +24,28 @@ use libafl::{
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
-static mut SIGNALS: [u8; 16] = [0; 16];
+static mut SIGNALS: [u8; 128] = [0; 128];
 static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+
+/// "Coverage" map for count, just to help things along
+static mut LAST_COUNT: [usize; 1] = [usize::MAX];
+static mut LAST_COUNT_PTR: *mut usize = unsafe { LAST_COUNT.as_mut_ptr() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
+/// Assign a count to the count "map"
+fn count_set(count: usize) {
+    unsafe { LAST_COUNT[0] = count };
+}
+
 #[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &MultipartInput<BytesInput>| {
+        let mut count = input.parts().len();
         for (i, input) in input.parts().iter().enumerate() {
             let target = input.target_bytes();
             let buf = target.as_slice();
@@ -44,29 +55,44 @@ pub fn main() {
                 if buf.len() > 1 && buf[1] == b'b' {
                     signals_set(2 + i * 8);
                     if buf.len() > 2 && buf[2] == b'c' {
-                        #[cfg(unix)]
-                        panic!("Artificial bug triggered =)");
-
-                        // panic!() raises a STATUS_STACK_BUFFER_OVERRUN exception which cannot be caught by the exception handler.
-                        // Here we make it raise STATUS_ACCESS_VIOLATION instead.
-                        // Extending the windows exception handler is a TODO. Maybe we can refer to what winafl code does.
-                        // https://github.com/googleprojectzero/winafl/blob/ea5f6b85572980bb2cf636910f622f36906940aa/winafl.c#L728
-                        #[cfg(windows)]
-                        unsafe {
-                            write_volatile(0 as *mut u32, 0);
-                        }
+                        count -= 1;
                     }
                 }
             }
         }
+        if count == 0 {
+            #[cfg(unix)]
+            panic!("Artificial bug triggered =)");
+
+            // panic!() raises a STATUS_STACK_BUFFER_OVERRUN exception which cannot be caught by the exception handler.
+            // Here we make it raise STATUS_ACCESS_VIOLATION instead.
+            // Extending the windows exception handler is a TODO. Maybe we can refer to what winafl code does.
+            // https://github.com/googleprojectzero/winafl/blob/ea5f6b85572980bb2cf636910f622f36906940aa/winafl.c#L728
+            #[cfg(windows)]
+            unsafe {
+                write_volatile(0 as *mut u32, 0);
+            }
+        }
+
+        // without this, artificial bug is not found
+        // maybe interesting to try to auto-derive this, researchers! :)
+        count_set(count);
+
         ExitKind::Ok
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let signals_observer =
+        unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let mut count_observer =
+        unsafe { StdMapObserver::from_mut_ptr("count", LAST_COUNT_PTR, LAST_COUNT.len()) };
+    *count_observer.initial_mut() = usize::MAX; // we are minimising!
 
     // Feedback to rate the interestingness of an input
-    let mut feedback = MaxMapFeedback::new(&observer);
+    let signals_feedback = MaxMapFeedback::new(&signals_observer);
+    let count_feedback = MinMapFeedback::new(&count_observer);
+
+    let mut feedback = feedback_or_fast!(count_feedback, signals_feedback);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -109,7 +135,7 @@ pub fn main() {
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
         &mut harness,
-        tuple_list!(observer),
+        tuple_list!(signals_observer, count_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
@@ -118,8 +144,10 @@ pub fn main() {
 
     // a generator here is not generalisable
     let initial = MultipartInput::from([
-        ("one", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
-        ("two", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
+        ("part", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
+        ("part", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
+        ("part", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
+        ("part", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
     ]);
 
     fuzzer
