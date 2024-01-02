@@ -166,8 +166,12 @@ fn main() {
 
         #[cfg(unix)]
         {
-            cc::Build::new()
-                .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
+            let mut cc = cc::Build::new();
+
+            #[cfg(feature = "cmplog_extended")]
+            cc.define("CMPLOG_EXTENDED");
+
+            cc.flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
                 .flag("-Wno-sign-compare")
                 .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
                 .define(

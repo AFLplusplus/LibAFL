@@ -38,7 +38,9 @@ __attribute__((weak)) void *__asan_region_is_poisoned(const void *beg,
 #endif
 
 CmpLogMap         *libafl_cmplog_map_ptr = &libafl_cmplog_map;
+#ifdef CMPLOG_EXTENDED
 CmpLogMapExtended *libafl_cmplog_map_extended_ptr = &libafl_cmplog_map_extended;
+#endif
 
 void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
                                           uint64_t arg1, uint64_t arg2) {
@@ -67,6 +69,7 @@ void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
 void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t shape,
                                                    uint64_t arg1, uint64_t arg2,
                                                    uint8_t attr) {
+#ifdef CMPLOG_EXTENDED
   if (!libafl_cmplog_enabled) { return; }
   libafl_cmplog_enabled = false;
 
@@ -88,6 +91,14 @@ void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t shape,
   libafl_cmplog_map_extended_ptr->vals.operands[k][hits].v1 = arg2;
   libafl_cmplog_map_extended_ptr->headers[k].attribute = attr;
   libafl_cmplog_enabled = true;
+#else
+  // just do nothing
+  (void)k;
+  (void)shape;
+  (void)arg1;
+  (void)arg2;
+  (void)attr;
+#endif
 }
 
 // POSIX shenanigan to see if an area is mapped.
@@ -166,6 +177,7 @@ void __libafl_targets_cmplog_routines_checked_extended(uintptr_t      k,
                                                        const uint8_t *ptr1,
                                                        const uint8_t *ptr2,
                                                        size_t         len) {
+#ifdef CMPLOG_EXTENDED
   libafl_cmplog_enabled = false;
   uint32_t hits;
 
@@ -186,6 +198,13 @@ void __libafl_targets_cmplog_routines_checked_extended(uintptr_t      k,
   MEMCPY(libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0, ptr1, len);
   MEMCPY(libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v1, ptr2, len);
   libafl_cmplog_enabled = true;
+#else
+  // just do nothing
+  (void)k;
+  (void)ptr1;
+  (void)ptr2;
+  (void)len;
+#endif
 }
 
 // Very generic cmplog routines callback
