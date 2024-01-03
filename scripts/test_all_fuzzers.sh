@@ -15,6 +15,19 @@ else
     export PROFILE_DIR=debug
 fi
 
+
+if [[ -z "${RUN_ON_CI}" ]]; then
+    :
+else
+    if [[ -z "${RUN_QEMU_FUZZER}" ]]; then
+        fuzzers=$(echo "$fuzzers" | tr ' ' '\n' | grep -v "qemu")
+        backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n' | grep "qemu")
+    else
+        fuzzers=$(echo "$fuzzers" | tr ' ' '\n' | grep  "qemu")
+        backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n' | grep -v "qemu")
+    fi
+fi
+
 libafl=$(pwd)
 
 # build with a shared target dir for all fuzzers. this should speed up

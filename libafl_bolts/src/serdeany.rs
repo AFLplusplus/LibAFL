@@ -85,7 +85,7 @@ macro_rules! create_serde_registry_for_trait {
                 Error,
             };
 
-            /// Visitor object used internally for the [`SerdeAny`] registry.
+            /// Visitor object used internally for the [`crate::serdeany::SerdeAny`] registry.
             #[derive(Debug)]
             pub struct BoxDynVisitor {}
             #[allow(unused_qualifications)]
@@ -319,7 +319,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
-            /// A serializable [`HashMap`] wrapper for [`SerdeAny`] types, addressable by name.
+            /// A serializable [`HashMap`] wrapper for [`crate::serdeany::SerdeAny`] types, addressable by name.
             #[allow(clippy::unsafe_derive_deserialize)]
             #[allow(unused_qualifications)]
             #[derive(Debug, Serialize, Deserialize)]

@@ -17,14 +17,11 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverName},
     fuzzer::Evaluator,
-    inputs::UsesInput,
-    monitors::UserStats,
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
-    },
+    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, State, UsesState},
     Error,
 };
 
@@ -80,7 +77,7 @@ const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
 impl<O, OT, S> UsesState for CalibrationStage<O, OT, S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -92,7 +89,7 @@ where
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<E::State>,
-    E::State: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata + HasExecutions,
+    E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
     Z: Evaluator<E, EM, State = E::State>,
 {
     #[inline]
@@ -307,9 +304,12 @@ where
                     state,
                     Event::UpdateUserStats {
                         name: "stability".to_string(),
-                        value: UserStats::Ratio(
-                            (map_len - unstable_entries) as u64,
-                            map_len as u64,
+                        value: UserStats::new(
+                            UserStatsValue::Ratio(
+                                (map_len - unstable_entries) as u64,
+                                map_len as u64,
+                            ),
+                            AggregatorOps::Avg,
                         ),
                         phantom: PhantomData,
                     },

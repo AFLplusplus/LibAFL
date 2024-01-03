@@ -331,16 +331,6 @@ impl From<Signal> for nix::sys::signal::Signal {
     }
 }
 
-/// A list of crashing signals
-pub static CRASH_SIGNALS: &[Signal] = &[
-    Signal::SigAbort,
-    Signal::SigBus,
-    Signal::SigFloatingPointException,
-    Signal::SigIllegalInstruction,
-    Signal::SigPipe,
-    Signal::SigSegmentationFault,
-];
-
 impl PartialEq for Signal {
     fn eq(&self, other: &Self) -> bool {
         *self as i32 == *other as i32

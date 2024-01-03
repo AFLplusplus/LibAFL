@@ -5,7 +5,7 @@ use alloc::{
     vec::Vec,
 };
 #[rustversion::nightly]
-use core::simd::SimdOrd;
+use core::simd::prelude::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,
@@ -22,9 +22,9 @@ use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverName},
     inputs::UsesInput,
-    monitors::UserStats,
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, Observer, ObserversTuple, UsesObserver},
-    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
+    state::{HasMetadata, HasNamedMetadata, State},
     Error,
 };
 
@@ -395,7 +395,7 @@ where
     N: IsNovel<T>,
     O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T>,
     R: Reducer<T>,
-    S: UsesInput + HasClientPerfMonitor + HasNamedMetadata,
+    S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
@@ -496,7 +496,7 @@ impl<O, S> Feedback<S> for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
-    S: UsesInput + HasNamedMetadata + HasClientPerfMonitor,
+    S: State + HasNamedMetadata,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -547,20 +547,20 @@ where
             }
         }*/
 
-        let steps = size / VectorType::LANES;
-        let left = size % VectorType::LANES;
+        let steps = size / VectorType::LEN;
+        let left = size % VectorType::LEN;
 
         if let Some(novelties) = self.novelties.as_mut() {
             novelties.clear();
             for step in 0..steps {
-                let i = step * VectorType::LANES;
+                let i = step * VectorType::LEN;
                 let history = VectorType::from_slice(&history_map[i..]);
                 let items = VectorType::from_slice(&map[i..]);
 
                 if items.simd_max(history) != history {
                     interesting = true;
                     unsafe {
-                        for j in i..(i + VectorType::LANES) {
+                        for j in i..(i + VectorType::LEN) {
                             let item = *map.get_unchecked(j);
                             if item > *history_map.get_unchecked(j) {
                                 novelties.push(j);
@@ -581,7 +581,7 @@ where
             }
         } else {
             for step in 0..steps {
-                let i = step * VectorType::LANES;
+                let i = step * VectorType::LEN;
                 let history = VectorType::from_slice(&history_map[i..]);
                 let items = VectorType::from_slice(&map[i..]);
 
@@ -615,12 +615,15 @@ where
                 state,
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
-                    value: UserStats::Ratio(
-                        self.novelties
-                            .as_ref()
-                            .map_or(filled, |novelties| filled + novelties.len())
-                            as u64,
-                        len as u64,
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(
+                            self.novelties
+                                .as_ref()
+                                .map_or(filled, |novelties| filled + novelties.len())
+                                as u64,
+                            len as u64,
+                        ),
+                        AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,
                 },
@@ -664,7 +667,7 @@ where
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    S: UsesInput + HasNamedMetadata + HasClientPerfMonitor,
+    S: UsesInput + HasNamedMetadata,
 {
     /// Create new `MapFeedback`
     #[must_use]
@@ -823,12 +826,15 @@ where
                 state,
                 Event::UpdateUserStats {
                     name: self.stats_name.to_string(),
-                    value: UserStats::Ratio(
-                        self.novelties
-                            .as_ref()
-                            .map_or(filled, |novelties| filled + novelties.len())
-                            as u64,
-                        len as u64,
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(
+                            self.novelties
+                                .as_ref()
+                                .map_or(filled, |novelties| filled + novelties.len())
+                                as u64,
+                            len as u64,
+                        ),
+                        AggregatorOps::Avg,
                     ),
                     phantom: PhantomData,
                 },
@@ -875,7 +881,7 @@ where
 
 impl<O, S> Feedback<S> for ReachabilityFeedback<O, S>
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: State,
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {

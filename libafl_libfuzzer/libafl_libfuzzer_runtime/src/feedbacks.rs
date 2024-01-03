@@ -7,9 +7,9 @@ use libafl::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, MinMapFeedback},
-    inputs::{BytesInput, Input, UsesInput},
+    inputs::{BytesInput, Input},
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasMetadata},
+    state::{HasMetadata, State},
     Error,
 };
 use libafl_bolts::{impl_serdeany, Named};
@@ -43,7 +43,7 @@ impl Named for LibfuzzerKeepFeedback {
 
 impl<S> Feedback<S> for LibfuzzerKeepFeedback
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: State,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -113,7 +113,7 @@ impl LibfuzzerCrashCauseFeedback {
 
 impl<S> Feedback<S> for LibfuzzerCrashCauseFeedback
 where
-    S: UsesInput<Input = BytesInput> + HasClientPerfMonitor,
+    S: State<Input = BytesInput>,
 {
     fn is_interesting<EM, OT>(
         &mut self,

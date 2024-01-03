@@ -2,7 +2,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     observers::{ObserversTuple, UsesObservers},
     state::{HasExecutions, State, UsesState},
     Error,
@@ -32,7 +32,7 @@ impl<'a, S, OT> Debug for NyxExecutor<'a, S, OT> {
 
 impl<'a, S, OT> UsesState for NyxExecutor<'a, S, OT>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -40,7 +40,7 @@ where
 impl<'a, S, OT> UsesObservers for NyxExecutor<'a, S, OT>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
 {
     type Observers = OT;
 }
@@ -48,7 +48,7 @@ where
 impl<'a, EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<'a, S, OT>
 where
     EM: UsesState<State = S>,
-    S: UsesInput + HasExecutions,
+    S: State + HasExecutions,
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
 {

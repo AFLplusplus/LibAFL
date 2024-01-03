@@ -46,6 +46,7 @@ pub const AFL_CMP_TYPE_RTN: u32 = 2;
 
 // EXTERNS, GLOBALS
 
+#[cfg(feature = "cmplog")]
 // void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2)
 extern "C" {
     /// Logs an instruction for feedback during fuzzing
@@ -58,6 +59,7 @@ extern "C" {
     pub static mut libafl_cmplog_map_ptr: *mut CmpLogMap;
 }
 
+#[cfg(feature = "cmplog")]
 pub use libafl_cmplog_map_ptr as CMPLOG_MAP_PTR;
 
 /// Value indicating if cmplog is enabled.
@@ -426,7 +428,7 @@ pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
 pub use libafl_cmplog_map as CMPLOG_MAP;
 pub use libafl_cmplog_map_extended as CMPLOG_MAP_EXTENDED;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 #[repr(C, packed)]
 /// Comparison map compatible with AFL++ cmplog instrumentation
 pub struct AFLppCmpLogMap {

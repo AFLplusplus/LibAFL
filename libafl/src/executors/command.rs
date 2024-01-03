@@ -30,7 +30,7 @@ use crate::{inputs::Input, Error};
 use crate::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::{HasExecutions, UsesState},
+    state::{HasExecutions, State, UsesState},
     std::borrow::ToOwned,
 };
 
@@ -313,7 +313,7 @@ where
 impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
-    S: UsesInput + HasExecutions,
+    S: State + HasExecutions,
     S::Input: HasTargetBytes,
     T: CommandConfigurator,
     OT: Debug + MatchName + ObserversTuple<S>,
@@ -378,7 +378,7 @@ where
 
 impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -386,14 +386,14 @@ where
 impl<OT, S, T> UsesObservers for CommandExecutor<OT, S, T>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
 {
     type Observers = OT;
 }
 
 impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
 where
-    S: UsesInput,
+    S: State,
     T: Debug,
     OT: ObserversTuple<S>,
 {

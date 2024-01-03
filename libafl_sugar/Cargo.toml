@@ -33,10 +33,10 @@ hexagon = ["libafl_qemu/hexagon"] # build qemu for hexagon
 pyo3-build-config = { version = "0.18", optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.11.1" }
-libafl_bolts = { path = "../libafl_bolts", version = "0.11.1" }
-libafl_targets = { path = "../libafl_targets", version = "0.11.1" }
-libafl_qemu = { path = "../libafl_qemu", version = "0.11.1" }
+libafl = { path = "../libafl", version = "0.11.2" }
+libafl_bolts = { path = "../libafl_bolts", version = "0.11.2" }
+libafl_targets = { path = "../libafl_targets", version = "0.11.2" }
+libafl_qemu = { path = "../libafl_qemu", version = "0.11.2" }
 
 typed-builder = "0.16" # Implement the builder pattern at compiletime
 pyo3 = { version = "0.18", optional = true }

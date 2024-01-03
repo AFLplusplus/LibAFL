@@ -25,16 +25,8 @@
 #include <list>
 #include <string>
 #include <fstream>
-#include "llvm/Config/llvm-config.h"
 
-#if USE_NEW_PM
-  #include "llvm/Passes/PassPlugin.h"
-  #include "llvm/Passes/PassBuilder.h"
-  #include "llvm/IR/PassManager.h"
-#else
-  #include "llvm/IR/LegacyPassManager.h"
-  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#endif
+#include "common-llvm.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
@@ -62,65 +54,6 @@ static cl::opt<bool> CmplogExtended("cmplog_routines_extended",
                                     cl::desc("Uses extended header"),
                                     cl::init(false), cl::NotHidden);
 namespace {
-
-/* Function that we never instrument or analyze */
-/* Note: this ignore check is also called in isInInstrumentList() */
-bool isIgnoreFunction(const llvm::Function *F) {
-  // Starting from "LLVMFuzzer" these are functions used in libfuzzer based
-  // fuzzing campaign installations, e.g. oss-fuzz
-
-  static constexpr const char *ignoreList[] = {
-
-      "asan.",
-      "llvm.",
-      "sancov.",
-      "__ubsan",
-      "ign.",
-      "__afl",
-      "_fini",
-      "__libc_",
-      "__asan",
-      "__msan",
-      "__cmplog",
-      "__sancov",
-      "__san",
-      "__cxx_",
-      "__decide_deferred",
-      "_GLOBAL",
-      "_ZZN6__asan",
-      "_ZZN6__lsan",
-      "msan.",
-      "LLVMFuzzerM",
-      "LLVMFuzzerC",
-      "LLVMFuzzerI",
-      "maybe_duplicate_stderr",
-      "discard_output",
-      "close_stdout",
-      "dup_and_close_stderr",
-      "maybe_close_fd_mask",
-      "ExecuteFilesOnyByOne"
-
-  };
-
-  for (auto const &ignoreListFunc : ignoreList) {
-    if (F->getName().startswith(ignoreListFunc)) { return true; }
-  }
-
-  static constexpr const char *ignoreSubstringList[] = {
-
-      "__asan",       "__msan",     "__ubsan", "__lsan",
-      "__san",        "__sanitize", "__cxx",   "_GLOBAL__",
-      "DebugCounter", "DwarfDebug", "DebugLoc"
-
-  };
-
-  for (auto const &ignoreListFunc : ignoreSubstringList) {
-    // hexcoder: F->getName().contains() not avaiilable in llvm 3.8.0
-    if (StringRef::npos != F->getName().find(ignoreListFunc)) { return true; }
-  }
-
-  return false;
-}
 
 #if USE_NEW_PM
 class CmpLogRoutines : public PassInfoMixin<CmpLogRoutines> {
@@ -338,7 +271,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
           isStrcmp &=
               FT->getNumParams() == 2 && FT->getReturnType()->isIntegerTy(32) &&
               FT->getParamType(0) == FT->getParamType(1) &&
-              FT->getParamType(0) == IntegerType::getInt8PtrTy(M.getContext());
+              FT->getParamType(0) ==
+                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0);
 
           bool isStrncmp = (!FuncName.compare("strncmp") ||
                             !FuncName.compare("xmlStrncmp") ||
@@ -351,12 +285,12 @@ bool CmpLogRoutines::hookRtns(Module &M) {
                             !FuncName.compare("g_ascii_strncasecmp") ||
                             !FuncName.compare("Curl_strncasecompare") ||
                             !FuncName.compare("g_strncasecmp"));
-          isStrncmp &= FT->getNumParams() == 3 &&
-                       FT->getReturnType()->isIntegerTy(32) &&
-                       FT->getParamType(0) == FT->getParamType(1) &&
-                       FT->getParamType(0) ==
-                           IntegerType::getInt8PtrTy(M.getContext()) &&
-                       FT->getParamType(2)->isIntegerTy();
+          isStrncmp &=
+              FT->getNumParams() == 3 && FT->getReturnType()->isIntegerTy(32) &&
+              FT->getParamType(0) == FT->getParamType(1) &&
+              FT->getParamType(0) ==
+                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0) &&
+              FT->getParamType(2)->isIntegerTy();
 
           bool isGccStdStringStdString =
               Callee->getName().find("__is_charIT_EE7__value") !=
