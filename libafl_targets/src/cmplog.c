@@ -37,7 +37,7 @@ __attribute__((weak)) void *__asan_region_is_poisoned(const void *beg,
 
 #endif
 
-CmpLogMap         *libafl_cmplog_map_ptr = &libafl_cmplog_map;
+CmpLogMap *libafl_cmplog_map_ptr = &libafl_cmplog_map;
 #ifdef CMPLOG_EXTENDED
 CmpLogMapExtended *libafl_cmplog_map_extended_ptr = &libafl_cmplog_map_extended;
 #endif
