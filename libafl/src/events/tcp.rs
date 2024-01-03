@@ -1136,7 +1136,10 @@ where
 
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE) } {
+            if let Err(_e) = unsafe {
+                EVENTMGR_SIGHANDLER_STATE.shmem_allocated();
+                setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE)
+            } {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }
