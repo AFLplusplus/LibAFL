@@ -73,9 +73,10 @@ void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t shape,
   if (!libafl_cmplog_enabled) { return; }
   libafl_cmplog_enabled = false;
 
+  // printf("%ld %ld %ld\n", k, arg1, arg2);
   uint16_t hits;
-  if (libafl_cmplog_map_extended_ptr->headers[k].type != CMPLOG_KIND_INS) {
-    libafl_cmplog_map_extended_ptr->headers[k].type = CMPLOG_KIND_INS;
+  if (libafl_cmplog_map_extended_ptr->headers[k].type != AFL_CMP_TYPE_INS) {
+    libafl_cmplog_map_extended_ptr->headers[k].type = AFL_CMP_TYPE_INS;
     libafl_cmplog_map_extended_ptr->headers[k].hits = 1;
     libafl_cmplog_map_extended_ptr->headers[k].shape = shape;
     hits = 0;
@@ -180,9 +181,9 @@ void __libafl_targets_cmplog_routines_checked_extended(uintptr_t      k,
 #ifdef CMPLOG_EXTENDED
   libafl_cmplog_enabled = false;
   uint32_t hits;
-
-  if (libafl_cmplog_map_extended_ptr->headers[k].type != CMPLOG_KIND_RTN) {
-    libafl_cmplog_map_extended_ptr->headers[k].type = CMPLOG_KIND_RTN;
+  // printf("RTN: %ld %ld %ld %ld\n", k, *ptr1, *ptr2, len);
+  if (libafl_cmplog_map_extended_ptr->headers[k].type != AFL_CMP_TYPE_RTN) {
+    libafl_cmplog_map_extended_ptr->headers[k].type = AFL_CMP_TYPE_RTN;
     libafl_cmplog_map_extended_ptr->headers[k].hits = 1;
     libafl_cmplog_map_extended_ptr->headers[k].shape = len;
     hits = 0;
@@ -195,6 +196,8 @@ void __libafl_targets_cmplog_routines_checked_extended(uintptr_t      k,
   }
 
   hits &= CMPLOG_MAP_RTN_H - 1;
+  libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0_len = len;
+  libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v1_len = len;
   MEMCPY(libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0, ptr1, len);
   MEMCPY(libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v1, ptr2, len);
   libafl_cmplog_enabled = true;
