@@ -169,7 +169,7 @@ fn main() {
             let mut cc = cc::Build::new();
 
             #[cfg(feature = "cmplog_extended")]
-            cc.define("CMPLOG_EXTENDED", 1);
+            cc.define("CMPLOG_EXTENDED", Some("1"));
 
             cc.flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
                 .flag("-Wno-sign-compare")
