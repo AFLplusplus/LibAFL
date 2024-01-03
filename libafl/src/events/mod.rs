@@ -68,6 +68,7 @@ pub struct ShutdownSignalData {
     shmem_allocated: bool,
 }
 
+#[cfg(all(unix, feature = "std"))]
 impl ShutdownSignalData {
     /// Set the flag to true, indicating that this process has allocated shmem
     pub fn set_shmem_allocated(&mut self) {
