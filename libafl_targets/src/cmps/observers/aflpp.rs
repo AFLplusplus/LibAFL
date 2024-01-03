@@ -18,6 +18,8 @@ use libafl_bolts::{ownedref::OwnedRefMut, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::cmps::AFLppCmpLogMap;
+#[cfg(feature = "cmplog_extended_instrumentation")]
+use crate::cmps::CMPLOG_ENABLED;
 
 /* From AFL++ cmplog.h
 
@@ -147,6 +149,16 @@ where
     S: UsesInput + Debug + HasMetadata,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+        #[cfg(feature = "cmplog_extended_instrumentation")]
+        unsafe {
+            // if the target is compiled with aflpp and you are running forkserver then this is not needed
+            // because with forkserver, you have two executors (processes), one is dedicated for edge-cov
+            // the other dedicated for cmplog.
+            // however if it is in-process, then cmplog instrumentation is in the same binary as the edge-cov binary
+            // (so we only have one executable)
+            // therefore we need to turn this thing on and off to change this according to what executors we are using
+            CMPLOG_ENABLED = 1;
+        }
         self.cmp_map.as_mut().reset()?;
         Ok(())
     }
@@ -157,6 +169,10 @@ where
         _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
+        #[cfg(feature = "cmplog_extended_instrumentation")]
+        unsafe {
+            CMPLOG_ENABLED = 0;
+        }
         if self.add_meta {
             self.add_cmpvalues_meta(state);
         }
@@ -295,6 +311,18 @@ impl<'a> CmpObserverMetadata<'a, AFLppCmpLogMap> for AFLppCmpValuesMetadata {
                 } else {
                     // push into new_cmpvals
                     // println!("Adding to new_cmpvals");
+                    /*
+                    unsafe {
+                        println!(
+                            "idx {:#?} type {:#?} sz {:#?} ptr1 {:p} val1 {:x}",
+                            i,
+                            cmp_map.headers()[i]._type(),
+                            cmp_map.headers()[i].shape(),
+                            &cmp_map.vals.operands[i][0],
+                            cmp_map.vals.operands[i][0].v0(),
+                        );
+                    }
+                    */
                     for j in 0..execs {
                         if let Some(val) = cmp_map.values_of(i, j) {
                             cmp_values.push(val);

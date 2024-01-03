@@ -53,6 +53,7 @@ cmplog = ["common"] # Compile C code defining cmp log maps
 forkserver = ["common"] # Compile C code for forkserver support
 windows_asan = ["common"] # Compile C code for ASAN on Windows
 whole_archive = [] # use +whole-archive to ensure the presence of weak symbols
+cmplog_extended_instrumentation = [] # support for aflpp cmplog map, we will remove this once aflpp and libafl cmplog shares the same LLVM passes.
 
 [build-dependencies]
 bindgen = "0.68"
