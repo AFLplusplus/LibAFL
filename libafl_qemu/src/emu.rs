@@ -1004,7 +1004,7 @@ impl Emulator {
     /// Should not be used if `Emulator::new` has never been used before (otherwise QEMU will not be initialized).
     /// Prefer `Emulator::get` for a safe version of this method.
     #[must_use]
-    unsafe fn new_empty() -> Emulator {
+    unsafe pub fn new_empty() -> Emulator {
         Emulator { _private: () }
     }
 
