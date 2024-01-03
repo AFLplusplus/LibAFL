@@ -88,7 +88,8 @@ impl<I> MultipartInput<I> {
     /// Get the names associated with the subparts of this input. Used to distinguish between the
     /// input components in the case where some parts may or may not be present, or in different
     /// orders.
-    #[must_use] pub fn names(&self) -> &[String] {
+    #[must_use]
+    pub fn names(&self) -> &[String] {
         &self.names
     }
 
