@@ -1276,7 +1276,7 @@ where
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
                             unsafe {
-                                EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
+                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
                             }
                             self.shmem_provider.post_fork(false)?;
                             handle.status()
@@ -1290,7 +1290,7 @@ where
 
                 #[cfg(all(unix, not(feature = "fork")))]
                 unsafe {
-                    EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
+                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
                 }
 
                 // On Windows (or in any case without fork), we spawn ourself again

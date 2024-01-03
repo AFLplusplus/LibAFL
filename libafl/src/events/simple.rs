@@ -502,7 +502,7 @@ where
                             unsafe {
                                 // The parent will later exit through is_shutting down below
                                 // if the process exits gracefully, it cleans up the shmem.
-                                EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
+                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
                             }
                             shmem_provider.post_fork(false)?;
                             handle.status()
@@ -519,7 +519,7 @@ where
                 // so that it exits after cleaning up the shmem segments
                 #[cfg(all(unix, not(feature = "fork")))]
                 unsafe {
-                    EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
+                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
                 }
 
                 // On Windows (or in any case without forks), we spawn ourself again

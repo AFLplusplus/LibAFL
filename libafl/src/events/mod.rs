@@ -56,7 +56,7 @@ use crate::{
 #[cfg(all(unix, feature = "std"))]
 pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {
     shutting_down: false,
-    shmem_allocated: false,
+    exit_from_main: false,
 };
 
 /// A signal handler for releasing `StateRestore` `ShMem`
@@ -65,14 +65,16 @@ pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalDat
 #[derive(Debug, Clone)]
 pub struct ShutdownSignalData {
     shutting_down: bool,
-    shmem_allocated: bool,
+    exit_from_main: bool,
 }
 
 #[cfg(all(unix, feature = "std"))]
 impl ShutdownSignalData {
     /// Set the flag to true, indicating that this process has allocated shmem
-    pub fn set_shmem_allocated(&mut self) {
-        self.shmem_allocated = true;
+    pub fn set_exit_from_main(&mut self) {
+        unsafe {
+            core::ptr::write_volatile(core::ptr::addr_of_mut!(self.exit_from_main), true);
+        }
     }
 }
 
@@ -86,13 +88,15 @@ impl Handler for ShutdownSignalData {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
+        /*
         println!(
             "in handler! {} {}",
-            self.shmem_allocated,
+            self.exit_from_main,
             std::process::id()
         );
+        */
         // if this process has not allocated any shmem. then simply exit()
-        if !self.shmem_allocated {
+        if !self.exit_from_main {
             unsafe {
                 #[cfg(unix)]
                 libc::_exit(0);
