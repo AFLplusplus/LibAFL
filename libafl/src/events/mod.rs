@@ -56,6 +56,7 @@ use crate::{
 #[cfg(all(unix, feature = "std"))]
 pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {
     shutting_down: false,
+    shmem_allocated: false,
 };
 
 /// A signal handler for releasing `StateRestore` `ShMem`
@@ -64,6 +65,15 @@ pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalDat
 #[derive(Debug, Clone)]
 pub struct ShutdownSignalData {
     shutting_down: bool,
+    shmem_allocated: bool,
+}
+
+#[cfg(all(unix, feature = "std"))]
+impl ShutdownSignalData {
+    /// Set the flag to true, indicating that this process has allocated shmem
+    pub fn set_shmem_allocated(&mut self) {
+        self.shmem_allocated = true;
+    }
 }
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
@@ -76,6 +86,23 @@ impl Handler for ShutdownSignalData {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
+        println!(
+            "in handler! {} {}",
+            self.shmem_allocated,
+            std::process::id()
+        );
+        // if this process has not allocated any shmem. then simply exit()
+        if !self.shmem_allocated {
+            unsafe {
+                #[cfg(unix)]
+                libc::_exit(0);
+
+                #[cfg(windows)]
+                windows::Win32::System::Threading::ExitProcess(1);
+            }
+        }
+
+        // else wait till the next is_shutting_down() is called. then the process will exit throught main().
         unsafe {
             core::ptr::write_volatile(core::ptr::addr_of_mut!(self.shutting_down), true);
         }

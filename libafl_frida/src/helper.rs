@@ -390,7 +390,8 @@ where
 
         path == Path::new(&module_name)
             || path == module_path
-            || fs::canonicalize(path).ok() == canonicalized_module_path
+            || (canonicalized_module_path.is_some()
+                && fs::canonicalize(path).ok() == canonicalized_module_path)
     })
 }
 

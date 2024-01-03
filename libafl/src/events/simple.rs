@@ -499,6 +499,11 @@ where
                     shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
+                            unsafe {
+                                // The parent will later exit through is_shutting down below
+                                // if the process exits gracefully, it cleans up the shmem.
+                                EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
+                            }
                             shmem_provider.post_fork(false)?;
                             handle.status()
                         }
@@ -508,6 +513,14 @@ where
                         }
                     }
                 };
+
+                // Same, as fork version, mark this main thread as the shmem allocator
+                // then it will not call exit or exitprocess in the sigint handler
+                // so that it exits after cleaning up the shmem segments
+                #[cfg(all(unix, not(feature = "fork")))]
+                unsafe {
+                    EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
+                }
 
                 // On Windows (or in any case without forks), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]
