@@ -62,7 +62,7 @@ where
 }
 
 mod macros {
-    /// Implements the marker trait [`DefaultMultipartMutator`] for one to many types, e.g.:
+    /// Implements the marker trait [`super::DefaultMultipartMutator`] for one to many types, e.g.:
     ///
     /// ```rs
     /// impl_default_multipart!(
