@@ -2,10 +2,9 @@
 
 /*
  * TODOs:
- *  - also read in export addresses of shared libraries to resolve functions
+ *  - read in export addresses of shared libraries to resolve functions
  *
  * Maybe:
- *  - arm/ppc/mips support (would be easy)
  *  - return code analysis support (not needed currently)
  *  - regex support (not needed currently)
  *  - std::string and Rust String support (would need such target functions added)
@@ -289,8 +288,40 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
         5 => emu.current_cpu().unwrap().read_reg(Regs::X5).unwrap_or(0),
         _ => panic!("unknown register"),
     };
+    #[cfg(cpu_target = "arm")]
+    let reg: GuestAddr = match parameter {
+        0 => emu.current_cpu().unwrap().read_reg(Regs::R0).unwrap_or(0),
+        1 => emu.current_cpu().unwrap().read_reg(Regs::R1).unwrap_or(0),
+        2 => emu.current_cpu().unwrap().read_reg(Regs::R2).unwrap_or(0),
+        3 => emu.current_cpu().unwrap().read_reg(Regs::R3).unwrap_or(0),
+        // 4.. would be on the stack, let's not do this for now
+        _ => panic!("unknown register"),
+    };
+    #[cfg(cpu_target = "mips")]
+    let reg: GuestAddr = match parameter {
+        0 => emu.current_cpu().unwrap().read_reg(Regs::A0).unwrap_or(0),
+        1 => emu.current_cpu().unwrap().read_reg(Regs::A1).unwrap_or(0),
+        2 => emu.current_cpu().unwrap().read_reg(Regs::A2).unwrap_or(0),
+        3 => emu.current_cpu().unwrap().read_reg(Regs::A3).unwrap_or(0),
+        // 4.. would be on the stack, let's not do this for now
+        _ => panic!("unknown register"),
+    };
+    #[cfg(cpu_target = "ppc")]
+    let reg: GuestAddr = match parameter {
+        0 => emu.current_cpu().unwrap().read_reg(Regs::R3).unwrap_or(0),
+        1 => emu.current_cpu().unwrap().read_reg(Regs::R4).unwrap_or(0),
+        2 => emu.current_cpu().unwrap().read_reg(Regs::R5).unwrap_or(0),
+        3 => emu.current_cpu().unwrap().read_reg(Regs::R6).unwrap_or(0),
+        4 => emu.current_cpu().unwrap().read_reg(Regs::R7).unwrap_or(0),
+        5 => emu.current_cpu().unwrap().read_reg(Regs::R8).unwrap_or(0),
+        _ => panic!("unknown register"),
+    };
+    //i386 is unsupported
+    #[cfg(cpu_target = "i386")]
+    let reg: GuestAddr = 0;
 
     //println!("reg value = {:x}", reg);
+
     if reg > 0 {
         let query = unsafe {
             let c_str_ptr = reg as *const c_char;
