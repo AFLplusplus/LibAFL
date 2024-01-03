@@ -479,10 +479,7 @@ where
 
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe {
-                EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
-                setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE)
-            } {
+            if let Err(_e) = unsafe { setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE) } {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }
@@ -498,6 +495,11 @@ where
                     shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
+                            unsafe {
+                                // The parent will later exit through is_shutting down below
+                                // if the process exits gracefully, it cleans up the shmem.
+                                EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
+                            }
                             shmem_provider.post_fork(false)?;
                             handle.status()
                         }
@@ -507,6 +509,14 @@ where
                         }
                     }
                 };
+
+                // Same, as fork version, mark this main thread as the shmem allocator
+                // then it will not call exit or exitprocess in the sigint handler
+                // so that it exits after cleaning up the shmem segments
+                #[cfg(not(feature = "fork"))]
+                unsafe {
+                    EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
+                }
 
                 // On Windows (or in any case without forks), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]

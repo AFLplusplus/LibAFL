@@ -86,6 +86,11 @@ impl Handler for ShutdownSignalData {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
+        println!(
+            "in handler! {} {}",
+            self.shmem_allocated,
+            std::process::id()
+        );
         // if this process has not allocated any shmem. then simply exit()
         if !self.shmem_allocated {
             unsafe {
