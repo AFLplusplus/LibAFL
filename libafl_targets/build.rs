@@ -48,8 +48,6 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMP_MAP_SIZE");
-    println!("cargo:rerun-if-env-changed=LIBAFL_AFLPP_CMPLOG_MAP_W");
-    println!("cargo:rerun-if-env-changed=LIBAFL_AFLPP_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
@@ -166,14 +164,6 @@ fn main() {
         {
             cc::Build::new()
                 .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-                .define(
-                    "AFLPP_CMPLOG_MAP_W",
-                    Some(&*format!("{aflpp_cmplog_map_w}")),
-                )
-                .define(
-                    "AFLPP_CMPLOG_MAP_H",
-                    Some(&*format!("{aflpp_cmplog_map_h}")),
-                )
                 .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
                 .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
                 .file(src_dir.join("cmplog.c"))
