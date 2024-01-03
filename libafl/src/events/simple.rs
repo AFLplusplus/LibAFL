@@ -450,9 +450,13 @@ where
     #[inline]
     #[allow(clippy::unused_self)]
     fn is_shutting_down() -> bool {
+        #[cfg(unix)]
         unsafe {
             core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
         }
+
+        #[cfg(windows)]
+        false
     }
 
     /// Launch the simple restarting manager.
@@ -513,7 +517,7 @@ where
                 // Same, as fork version, mark this main thread as the shmem allocator
                 // then it will not call exit or exitprocess in the sigint handler
                 // so that it exits after cleaning up the shmem segments
-                #[cfg(not(feature = "fork"))]
+                #[cfg(all(unix, not(feature = "fork")))]
                 unsafe {
                     EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
                 }

@@ -1159,9 +1159,13 @@ where
     #[inline]
     #[allow(clippy::unused_self)]
     fn is_shutting_down() -> bool {
+        #[cfg(unix)]
         unsafe {
             core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
         }
+
+        #[cfg(windows)]
+        false
     }
 
     /// Launch the restarting manager
@@ -1271,6 +1275,9 @@ where
                     self.shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
+                            unsafe {
+                                EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
+                            }
                             self.shmem_provider.post_fork(false)?;
                             handle.status()
                         }
@@ -1280,6 +1287,11 @@ where
                         }
                     }
                 };
+
+                #[cfg(all(unix, not(feature = "fork")))]
+                unsafe {
+                    EVENTMGR_SIGHANDLER_STATE.set_shmem_allocated();
+                }
 
                 // On Windows (or in any case without fork), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]

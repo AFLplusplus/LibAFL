@@ -61,14 +61,14 @@ pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalDat
 
 /// A signal handler for releasing `StateRestore` `ShMem`
 /// This struct holds a pointer to `StateRestore` and clean up the `ShMem` segment used by it.
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "std"))]
 #[derive(Debug, Clone)]
 pub struct ShutdownSignalData {
     shutting_down: bool,
     shmem_allocated: bool,
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "std"))]
 impl ShutdownSignalData {
     /// Set the flag to true, indicating that this process has allocated shmem
     pub fn set_shmem_allocated(&mut self) {
@@ -78,7 +78,7 @@ impl ShutdownSignalData {
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "std"))]
 impl Handler for ShutdownSignalData {
     fn handle(
         &mut self,
