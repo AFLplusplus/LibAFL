@@ -3,7 +3,6 @@
 use core::cmp::{min, Ordering};
 
 use libafl_bolts::{rands::Rand, Error};
-use rand::RngCore;
 
 use crate::{
     corpus::{Corpus, CorpusId},
@@ -35,7 +34,6 @@ impl<I, M, S> Mutator<MultipartInput<I>, S> for M
 where
     M: DefaultMultipartMutator + Mutator<I, S>,
     S: HasRand,
-    <S as HasRand>::Rand: RngCore,
 {
     fn mutate(
         &mut self,
