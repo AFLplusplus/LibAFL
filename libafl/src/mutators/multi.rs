@@ -6,6 +6,7 @@ use libafl_bolts::{rands::Rand, Error};
 
 use crate::{
     corpus::{Corpus, CorpusId},
+    impl_default_multipart,
     inputs::{multi::MultipartInput, HasBytesVec, Input},
     mutators::{
         mutations::{
@@ -60,29 +61,31 @@ where
     }
 }
 
-/// Implements the marker trait [`DefaultMultipartMutator`] for one to many types, e.g.:
-///
-/// ```rs
-/// impl_default_multipart!(
-///     // --- havoc ---
-///     BitFlipMutator,
-///     ByteAddMutator,
-///     ByteDecMutator,
-///     ByteFlipMutator,
-///     ByteIncMutator,
-///     ...
-/// );
-/// ```
-#[macro_export]
-macro_rules! impl_default_multipart {
-    ($mutator: ty, $($mutators: ty),+$(,)?) => {
-        impl $crate::mutators::multi::DefaultMultipartMutator for $mutator {}
-        impl_default_multipart!($($mutators),+);
-    };
+mod macros {
+    /// Implements the marker trait [`DefaultMultipartMutator`] for one to many types, e.g.:
+    ///
+    /// ```rs
+    /// impl_default_multipart!(
+    ///     // --- havoc ---
+    ///     BitFlipMutator,
+    ///     ByteAddMutator,
+    ///     ByteDecMutator,
+    ///     ByteFlipMutator,
+    ///     ByteIncMutator,
+    ///     ...
+    /// );
+    /// ```
+    #[macro_export]
+    macro_rules! impl_default_multipart {
+        ($mutator: ty, $($mutators: ty),+$(,)?) => {
+            impl $crate::mutators::multi::DefaultMultipartMutator for $mutator {}
+            impl_default_multipart!($($mutators),+);
+        };
 
-    ($mutator: ty) => {
-        impl $crate::mutators::multi::DefaultMultipartMutator for $mutator {}
-    };
+        ($mutator: ty) => {
+            impl $crate::mutators::multi::DefaultMultipartMutator for $mutator {}
+        };
+    }
 }
 
 impl_default_multipart!(
