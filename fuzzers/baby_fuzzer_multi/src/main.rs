@@ -49,7 +49,7 @@ pub fn main() {
         for (i, input) in input.parts().iter().enumerate() {
             let target = input.target_bytes();
             let buf = target.as_slice();
-            signals_set(0 + i * 8);
+            signals_set(i * 8);
             if !buf.is_empty() && buf[0] == b'a' {
                 signals_set(1 + i * 8);
                 if buf.len() > 1 && buf[1] == b'b' {

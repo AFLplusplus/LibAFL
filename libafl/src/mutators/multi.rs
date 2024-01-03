@@ -1,7 +1,6 @@
 //! Mutator definitions for [`MultipartInput`]s. See [`crate::inputs::multi`] for details.
 
-use core::cmp::min;
-use std::cmp::Ordering;
+use core::cmp::{min, Ordering};
 
 use libafl_bolts::{rands::Rand, Error};
 use rand::RngCore;
@@ -10,7 +9,14 @@ use crate::{
     corpus::{Corpus, CorpusId},
     inputs::{multi::MultipartInput, HasBytesVec, Input},
     mutators::{
-        mutations::*,
+        mutations::{
+            rand_range, BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator,
+            ByteIncMutator, ByteInterestingMutator, ByteNegMutator, ByteRandMutator,
+            BytesCopyMutator, BytesDeleteMutator, BytesExpandMutator, BytesInsertCopyMutator,
+            BytesInsertMutator, BytesRandInsertMutator, BytesRandSetMutator, BytesSetMutator,
+            BytesSwapMutator, CrossoverInsertMutator, CrossoverReplaceMutator, DwordAddMutator,
+            DwordInterestingMutator, QwordAddMutator, WordAddMutator, WordInterestingMutator,
+        },
         token_mutations::{I2SRandReplace, TokenInsert, TokenReplace},
         MutationResult, Mutator,
     },
@@ -37,12 +43,12 @@ where
         input: &mut MultipartInput<I>,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        if !input.parts().is_empty() {
+        if input.parts().is_empty() {
+            Ok(MutationResult::Skipped)
+        } else {
             let selected = state.rand_mut().below(input.parts().len() as u64) as usize;
             let mutated = input.part_mut(selected).unwrap();
             self.mutate(state, mutated, stage_idx)
-        } else {
-            Ok(MutationResult::Skipped)
         }
     }
 

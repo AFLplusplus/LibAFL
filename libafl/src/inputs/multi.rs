@@ -22,8 +22,15 @@ pub struct MultipartInput<I> {
     names: Vec<String>,
 }
 
+impl<I> Default for MultipartInput<I> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<I> MultipartInput<I> {
     /// Create a new multipart input.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             parts: Vec::new(),
@@ -45,6 +52,7 @@ impl<I> MultipartInput<I> {
     }
 
     /// Get the individual parts of this input.
+    #[must_use]
     pub fn parts(&self) -> &[I] {
         &self.parts
     }
@@ -54,18 +62,14 @@ impl<I> MultipartInput<I> {
     /// ## Panics
     ///
     /// Panics if idxs is not sorted, has duplicate elements, or any entry is out of bounds.
+    #[must_use]
     pub fn parts_mut<const N: usize>(&mut self, mut idxs: [usize; N]) -> [&mut I; N] {
         Self::idxs_to_skips(&mut idxs);
 
         let mut parts = self.parts.iter_mut();
         if let Ok(arr) = idxs
             .into_iter()
-            .map(|i| {
-                (&mut parts)
-                    .skip(i)
-                    .next()
-                    .expect("idx had an out of bounds entry")
-            })
+            .map(|i| parts.nth(i).expect("idx had an out of bounds entry"))
             .collect::<ArrayVec<_, N>>()
             .into_inner()
         {
@@ -84,7 +88,7 @@ impl<I> MultipartInput<I> {
     /// Get the names associated with the subparts of this input. Used to distinguish between the
     /// input components in the case where some parts may or may not be present, or in different
     /// orders.
-    pub fn names(&self) -> &Vec<String> {
+    #[must_use] pub fn names(&self) -> &[String] {
         &self.names
     }
 
