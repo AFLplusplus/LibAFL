@@ -26,15 +26,15 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens, AFLppRedQueen,
+        StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, ColorizationStage,
-        StdMutationalStage, TracingStage, mutational::MultiMutationalStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
+        TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -47,12 +47,10 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-use libafl_bolts::prelude::OwnedRefMut;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, stages::AFLppCmplogTracingStage,
-    std_edges_map_observer, AFLppCmpLogObserver, CmpLogObserver, libafl_cmplog_map_extended,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -245,12 +243,11 @@ fn fuzz(
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
-    let colorization = ColorizationStage::new(&edges_observer);
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
-    let cmpmap = unsafe { OwnedRefMut::from_mut_ptr(&mut libafl_cmplog_map_extended) };
-    let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
+
+    let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
@@ -296,6 +293,9 @@ fn fuzz(
         println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
+    // Setup a randomic Input2State stage
+    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(
         &mut state,
@@ -338,7 +338,8 @@ fn fuzz(
         timeout,
     );
 
-    let tracing_exetutor = TimeoutExecutor::new(
+    // Setup a tracing stage in which we log comparisons
+    let tracing = TracingStage::new(TimeoutExecutor::new(
         InProcessExecutor::new(
             &mut tracing_harness,
             tuple_list!(cmplog_observer),
@@ -348,16 +349,11 @@ fn fuzz(
         )?,
         // Give it more time!
         timeout * 10,
-    );
-
-    let tracing = AFLppCmplogTracingStage::with_cmplog_observer_name(tracing_exetutor, "cmplog");
-
-    let rq = MultiMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));
+    ));
 
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, colorization, tracing, rq, power);
+    let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
-    /*
     // Read tokens
     if state.metadata_map().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
@@ -373,7 +369,6 @@ fn fuzz(
             state.add_metadata(toks);
         }
     }
-    */
 
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
@@ -387,7 +382,6 @@ fn fuzz(
     }
 
     // Remove target output (logs still survive)
-    /*
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
@@ -396,7 +390,6 @@ fn fuzz(
             dup2(null_fd, io::stderr().as_raw_fd())?;
         }
     }
-    */
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
 
