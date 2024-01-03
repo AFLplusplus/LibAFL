@@ -5,6 +5,7 @@ use std::{
     process::Command,
 };
 
+/// Clears the terminal screen.
 pub fn clear_terminal_screen() {
     if cfg!(target_os = "windows") {
         Command::new("cmd")
@@ -22,7 +23,28 @@ pub fn clear_terminal_screen() {
     };
 }
 
-pub fn separate_code(code_content: Vec<String>) -> Vec<String> {
+/// Returns true if the 'input' provided by the user is equal to 'ans'.
+pub fn validate_input(input: &String, ans: &String) -> bool {
+    let input_low = input.to_lowercase();
+    let mut input_chars = input_low.chars();
+    let ans_low = ans.to_lowercase();
+    let mut ans_chars = ans_low.chars();
+
+    // Basically, an aswer is valid if it is an acceptable variant of that given answer. Acceptable variants are strings that contain
+    // the characters in the same order as the answer, so for the answer "Yes", acceptable variants are: "y", "Ye", "yes", "YES", but
+    // not "Yess", "yy", "Yhes", "yYess"...
+    while let (Some(input_c), Some(ans_c)) = (input_chars.next(), ans_chars.next()) {
+        if input_c != ans_c {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Returns a vector containing indivdual declarations of Libafl's components
+/// and sorted according to correct order of components.
+pub fn arrange_code(code_content: Vec<String>) -> Vec<String> {
     // List of libafl's components.
     let components = vec![
         "Observer",
@@ -38,6 +60,33 @@ pub fn separate_code(code_content: Vec<String>) -> Vec<String> {
         "Stage",
     ];
 
+    let code_content = separate_code(code_content, &components);
+
+    let mut ordered_code: Vec<String> = Vec::new();
+    let mut placed_code: Vec<bool> = vec![false; code_content.len()];
+
+    for comp in components {
+        for (i, code_line) in code_content.iter().enumerate() {
+            if code_line.contains(comp) {
+                // Place in the correct order.
+                ordered_code.push(code_line.to_string());
+                placed_code[i] = true;
+            }
+        }
+    }
+
+    // Deals with cases where there is no definition of a component.
+    for (i, code_line) in code_content.iter().enumerate() {
+        if !placed_code[i] {
+            ordered_code.insert(i, code_line.to_string());
+        }
+    }
+
+    ordered_code
+}
+
+/// Returns a vector containing individual declarations of Libafl's components.
+fn separate_code(code_content: Vec<String>, components: &Vec<&str>) -> Vec<String> {
     let mut separated_code: Vec<String> = Vec::new();
 
     for code_string in code_content {
@@ -69,45 +118,7 @@ pub fn separate_code(code_content: Vec<String>) -> Vec<String> {
     separated_code
 }
 
-pub fn arrange_code(code_content: Vec<String>) -> Vec<String> {
-    // List of libafl's components.
-    let components = vec![
-        "Observer",
-        "Feedback",
-        "State",
-        "Monitor",
-        "Event",
-        "Scheduler",
-        "Fuzzer",
-        "Executor",
-        "Generator",
-        "Mutator",
-        "Stage",
-    ];
-
-    let mut ordered_code: Vec<String> = Vec::new();
-    let mut placed_code: Vec<bool> = vec![false; code_content.len()];
-
-    for comp in components {
-        for (i, code_line) in code_content.iter().enumerate() {
-            if code_line.contains(comp) {
-                // Place in the correct order.
-                ordered_code.push(code_line.to_string());
-                placed_code[i] = true;
-            }
-        }
-    }
-
-    // Deals with cases where there is no definition of a component.
-    for (i, code_line) in code_content.iter().enumerate() {
-        if !placed_code[i] {
-            ordered_code.insert(i, code_line.to_string());
-        }
-    }
-
-    ordered_code
-}
-
+/// Creates a file and writes the imports and code to that file.
 pub fn write_code(code_content: Vec<String>, imports: Vec<String>) -> String {
     let mut counter = 0;
     let mut file_name = format!("fuzzer.rs");
@@ -154,24 +165,8 @@ pub fn write_code(code_content: Vec<String>, imports: Vec<String>) -> String {
     file_name
 }
 
-pub fn validate_input(input: &String, ans: &String) -> bool {
-    let input_low = input.to_lowercase();
-    let mut input_chars = input_low.chars();
-    let ans_low = ans.to_lowercase();
-    let mut ans_chars = ans_low.chars();
-
-    // Basically, an aswer is valid if it is an acceptable variant of that given answer. Acceptable variants are strings that contain
-    // the characters in the same order as the answer, so for the answer "Yes", acceptable variants are: "y", "Ye", "yes", "YES", but
-    // not "Yess", "yy", "Yhes", "yYess"...
-    while let (Some(input_c), Some(ans_c)) = (input_chars.next(), ans_chars.next()) {
-        if input_c != ans_c {
-            return false;
-        }
-    }
-
-    true
-}
-
+/// Returns a tuple containing a vector with only the code of the components and
+/// another containing only the imports.
 pub fn separate_imports(code_content: Vec<String>) -> (Vec<String>, Vec<String>) {
     let mut imports: Vec<String> = Vec::new();
     let mut new_code_content: Vec<String> = Vec::new();
@@ -186,7 +181,7 @@ pub fn separate_imports(code_content: Vec<String>) -> (Vec<String>, Vec<String>)
                 import_string.push_str(&format!("{}\n", line));
                 if line.contains(";") {
                     is_import = false;
-                    imports.push(import_string.trim_end().to_string());
+                    imports.push(format_import(&import_string));
                     import_string.clear();
                 }
             } else {
@@ -196,7 +191,7 @@ pub fn separate_imports(code_content: Vec<String>) -> (Vec<String>, Vec<String>)
                         is_import = true;
                         import_string.push_str(&format!("{}\n", line));
                     } else {
-                        imports.push(format!("{}\n", line).trim_end().to_string());
+                        imports.push(format_import(&line.to_string()));
                     }
                 } else {
                     if !trimmed_line.is_empty() {
@@ -213,170 +208,185 @@ pub fn separate_imports(code_content: Vec<String>) -> (Vec<String>, Vec<String>)
     (imports, new_code_content)
 }
 
+/// Fixes identation and new line characters for the imports.
+fn format_import(import: &String) -> String {
+    let mut new_import = String::new();
+
+    for (index, line) in import.lines().enumerate() {
+        let mut line = line.trim().to_string();
+
+        if index > 0 {
+            if line != "};" {
+                line.insert_str(0, "    ");
+                line.push('\n');
+                new_import.push_str(&line);
+            } else {
+                new_import.push_str(&line);
+            }
+        } else {
+            if !line.contains(";") {
+                line.push('\n');
+            }
+            new_import.push_str(&line);
+        }
+    }
+
+    new_import
+}
+
+/// Arranges all the imports by sorting them alphabetically and making
+/// insertions.
+///
+/// For example, if there are two 'use libafl::' imports, then their code
+/// will be joined so that it becomes only one 'use libafl::' import.
 pub fn arrange_imports(imports_content: Vec<String>) -> Vec<String> {
-    // Each field of 'result' is a single import (use).
+    // Each field of 'result' will be a single import/use of a crate, after the insertions.
     let mut result: Vec<String> = Vec::new();
 
     for import in imports_content {
         let mut i: Option<usize> = None;
-        let mut single_line_import = false;
 
-        // Check if the crate that we are trying to insert is already in the 'result' vector (final imports).
+        // Check if the crate that we are trying to insert is already in 'result'.
         if let Some(i_line) = import.lines().next() {
-            let mut crate_name = String::new();
-            single_line_import = i_line.contains(";");
-
-            if single_line_import {
-                if let Some(name) = parse_imports(i_line.trim().to_string()).iter().next() {
-                    crate_name = name.to_string();
+            if let Some(crate_name) = i_line.split("::").next() {
+                if let Some(index) = result.iter().position(|s| s.starts_with(crate_name)) {
+                    i = Some(index);
                 }
-            } else {
-                crate_name = i_line.trim().strip_prefix("use ").unwrap().to_string();
-            }
-
-            if let Some(index) = result
-                .iter()
-                .position(|s| s.starts_with(&format!("use {}::", rm_punct(&crate_name))))
-            {
-                i = Some(index);
             }
         }
 
         match i {
             Some(i) => {
-                let mut single_line_result = false;
+                let mut i_lines = import.lines();
+                let mut r_lines = result[i].lines().peekable();
 
-                if let Some(r_line) = result[i].lines().next() {
-                    single_line_result = r_line.contains(";");
-                }
+                while let Some(i_line) = i_lines.next() {
+                    if i_line != "};" {
+                        let mut i_chars = i_line.chars().peekable();
+                        let mut i_name_punct = next_module_name(&i_chars);
 
-                if single_line_import {
-                    let mut i_line_names = parse_imports(import.trim().to_string());
-                    if !i_line_names.is_empty() {
-                        i_line_names.remove(0); // Skip the crate name.
-                    }
-
-                    if single_line_result {
-                        // Both are single line imports, so no need to iterate through their "lines".
-                        let mut r_line_names = parse_imports(result[i].trim().to_string());
-
-                        if !r_line_names.is_empty() {
-                            r_line_names.remove(0); // Skip the crate name.
+                        if i_name_punct.starts_with("use ") {
+                            i_name_punct = next_module_name(&i_chars);
                         }
+                        let i_name = rm_punct(&i_name_punct).trim();
 
-                        if let Some(new_import) =
-                            insert_import(&i_line_names, &r_line_names, &result[i])
-                        {
-                            result[i] = new_import;
-                        }
-                    } else {
-                        // Single line into multiline.
-                        let mut r_lines_iter = result[i].lines().skip(1);
+                        while let Some(r_line) = r_lines.next() {
+                            if r_line != "};" {
+                                let mut r_chars = r_line.chars().peekable();
+                                let mut r_name_punct = next_module_name(&r_chars);
 
-                        while let Some(r_line) = r_lines_iter.next() {
-                            let r_line_names = parse_imports(r_line.trim().to_string());
-
-                            if let Some(new_import) =
-                                insert_import(&i_line_names, &r_line_names, &result[i])
-                            {
-                                result[i] = new_import;
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    let mut i_lines_iter = import.lines().skip(1);
-
-                    if single_line_result {
-                        // Multiline into single, so we simply do the opposite.
-                        let mut result_names = parse_imports(result[i].trim().to_string());
-
-                        if !result_names.is_empty() {
-                            result_names.remove(0); // Skip the crate name.
-                        }
-                        let mut insert = false;
-                        while let Some(i_line) = i_lines_iter.next() {
-                            if i_line.trim() != "};" {
-                                let i_line_names = parse_imports(i_line.trim().to_string());
-
-                                if let Some(new_import) =
-                                    insert_import(&result_names, &i_line_names, &import)
-                                {
-                                    result[i] = new_import;
-                                    insert = true;
-                                    break;
+                                if r_name_punct.starts_with("use ") {
+                                    r_name_punct = next_module_name(&r_chars);
                                 }
-                            }
-                        }
-                        if !insert {
-                            result[i].clear();
-                            for (index, line) in import.lines().enumerate() {
-                                let mut line = line.to_string();
-                                if index > 0 {
-                                    if line.trim() != "};" {
-                                        line = line.trim_start().to_string();
-                                        line.insert_str(0, "    ");
-                                        line.push('\n');
-                                        result[i].push_str(&line);
+                                let r_name = rm_punct(&r_name_punct).trim();
+
+                                if i_name == r_name {
+                                    // Iterate on this line.
+                                    loop {
+                                        i_name_punct = next_module_name(&i_chars); 
+                                        i_name = rm_punct(&i_name_punct).trim();
+                                        r_name_punct = next_module_name(&r_chars);
+                                        r_name = rm_punct(&r_name_punct).trim();
+
+                                        if i_name < r_name {
+                                            // Check if have to make it a multiple import here.
+                                        } else if i_name > r_name {
+                                            if let None = peek_next_module_name(&r_chars) {
+                                                // Insert at the end and check if have to make it a multiple import.
+                                            }
+                                        }
+                                    }
+                                } else if i_name < r_name {
+                                    if r_line.ends_with(";") {
+                                        // If inserting in a SL: then make it ML and insert at the beginning.
+                                        let (first, second) = r_line.split_inclusive("::");
+                                        let insert_line = i_line.trim().to_string();
+
+                                        first.push_str("{\n");
+                                        if insert_line.starts_with("use ") {
+                                            insert_line =
+                                                insert_line.split_once("::").skip(1).collect();
+                                        }
+                                        insert_line.insert_str(0, &" ".repeat(4));
+                                        insert_line.push('\n');
+                                        insert_line = insert_line.replace(";", ",");
+                                        second.insert_str(0, &" ".repeat(4));
+                                        second.push('\n');
+                                        second = second.replace(";", ",");
+                                        result[i] =
+                                            format!("{}{}{}{}", first, insert_line, second, "};");
                                     } else {
-                                        result[i].push_str(line.trim_start());
+                                        // If inserting in ML, simply insert the line here.
+                                        let mut result_lines = result[i].lines().collect();
+
+                                        for (i, line) in result[i].lines().enumerate() {
+                                            if line.contains(r_name_punct) {
+                                                let insert_line = i_line.trim().to_string();
+
+                                                if insert_line.starts_with("use ") {
+                                                    insert_line = insert_line
+                                                        .split_once("::")
+                                                        .skip(1)
+                                                        .collect();
+                                                }
+                                                insert_line.insert_str(0, &" ".repeat(4));
+                                                insert_line.push('\n');
+                                                insert_line = insert_line.replace(";", ",");
+                                                result_lines.insert(i, insert_line);
+                                                break;
+                                            }
+                                        }
+                                        result[i] = result_lines.join("");
+                                        break;
                                     }
                                 } else {
-                                    line = line.trim_start().to_string();
-                                    line.push('\n');
-                                    result[i].push_str(&line);
-                                }
-                            }
-                        }
-                    } else {
-                        // Both are multiline imports, so we have to iterate through their lines until the last component is checked for insertion.
-                        let mut temp_result = result[i].clone();
-                        let mut i_lines_iter = import.lines().skip(1); // Skip the crate name.
+                                    if r_line.ends_with(";") {
+                                        // If inserting in a SL: the make it ML and insert the line at the end.
+                                        let (first, second) = r_line.split_inclusive("::");
+                                        let insert_line = i_line.trim().to_string();
 
-                        while let Some(i_line) = i_lines_iter.next() {
-                            if i_line.trim() != "};" {
-                                let i_line_names = parse_imports(i_line.trim().to_string());
-                                let mut r_lines_iter = result[i].lines().skip(1);
+                                        first.push_str("{\n");
+                                        second.insert_str(0, &" ".repeat(4));
+                                        second.push('\n');
+                                        second = second.replace(";", ",");
+                                        if insert_line.starts_with("use ") {
+                                            insert_line =
+                                                insert_line.split_once("::").skip(1).collect();
+                                        }
+                                        insert_line.insert_str(0, &" ".repeat(4));
+                                        insert_line.push('\n');
+                                        insert_line = insert_line.replace(";", ",");
+                                        result[i] =
+                                            format!("{}{}{}{}", first, second, insert_line, "};");
+                                        break;
+                                    } else {
+                                        // If inserting in ML, if there arent anymore lines: then insert the line at the end.
+                                        if let Some(end) = r_lines.peek() {
+                                            if end == "};" {
+                                                let mut result_lines = result[i].lines().collect();
+                                                let insert_line = i_line.trim().to_string();
 
-                                while let Some(r_line) = r_lines_iter.next() {
-                                    if r_line.trim() != "};" {
-                                        let r_line_names = parse_imports(r_line.trim().to_string());
-
-                                        if let Some(new_import) = insert_import(
-                                            &i_line_names,
-                                            &r_line_names,
-                                            &temp_result,
-                                        ) {
-                                            temp_result = new_import;
-                                            break;
+                                                if insert_line.starts_with("use ") {
+                                                    insert_line = insert_line
+                                                        .split_once("::")
+                                                        .skip(1)
+                                                        .collect();
+                                                }
+                                                insert_line.insert_str(0, &" ".repeat(4));
+                                                insert_line.push('\n');
+                                                insert_line = insert_line.replace(";", ",");
+                                                result_lines
+                                                    .insert(result_lines.len() - 2, insert_line);
+                                                result[i] = result_lines.join("");
+                                                break;
+                                            }
                                         }
                                     }
                                 }
-                                result[i] = temp_result.clone();
                             }
                         }
                     }
                 }
-                // Fix the formatting.
-                let mut new_result = String::new();
-                for (index, line) in result[i].lines().enumerate() {
-                    let mut line = line.to_string();
-                    if index > 0 {
-                        if line.trim() != "};" {
-                            line = line.trim().to_string();
-                            line.insert_str(0, "    ");
-                            line.push('\n');
-                            new_result.push_str(&line);
-                        } else {
-                            new_result.push_str(line.trim());
-                        }
-                    } else {
-                        line = line.trim().to_string();
-                        line.push('\n');
-                        new_result.push_str(&line);
-                    }
-                }
-                result[i] = new_result;
             }
             None => {
                 // Insert and sort alphabetically.
@@ -389,203 +399,44 @@ pub fn arrange_imports(imports_content: Vec<String>) -> Vec<String> {
     result
 }
 
-fn parse_imports(import: String) -> Vec<String> {
-    let mut imports_names: Vec<String> = Vec::new();
-    let mut import = import;
-
-    if let Some(import_stripped) = import.trim().strip_prefix("use ") {
-        import = import_stripped.to_string();
-    }
-
-    let mut import_string = String::new();
-    let mut chars = import.chars().peekable();
+/// Returns the next module name for an iterator of characters of a line of an
+/// import.
+fn next_module_name<I>(chars: &mut std::iterator::Peekable<I>) -> String
+where
+    I: Iterator<Item = char>,
+{
+    let mut module_name = String::new();
 
     while let Some(c) = chars.next() {
-        import_string.push(c);
+        module_name.push(c);
 
-        // We want to break the import string into 'word::', 'word};'... patterns.
-        if c == ':' || c == '{' || c == '}' || c == ',' || c == ';' {
-            if import_string.contains("::") {
+        if c == ':' {
+            if module_name.contains("::") {
                 if let Some(&next_char) = chars.peek() {
                     if next_char != '{' {
-                        imports_names.push(import_string.trim().to_string().clone());
-                        import_string.clear();
+                        break;
                     }
                 }
-            } else if import_string.contains(",") || import_string.contains(";") {
-                imports_names.push(import_string.trim().to_string().clone());
-                import_string.clear();
             }
+        } else if module_name.contains(",") || module_name.contains("{") {
+            if let Some(&next_char) = chars.peek() {
+                if next_char != '\n' {
+                    break;
+                }
+            }
+        } else if c == ';' {
+            break;
         }
     }
 
-    imports_names
+    module_name
 }
 
+/// Removes the punctuation characters of the name of a module.
 fn rm_punct(input: &String) -> String {
     // Removes the ';', '::', etc from the string.
     input
         .chars()
         .filter(|&c| c != ':' && c != ';' && c != ',' && c != '{' && c != '}')
         .collect()
-}
-
-fn insert_import(
-    import: &Vec<String>,
-    result: &Vec<String>,
-    curr_import: &String,
-) -> Option<String> {
-    // Basically, we try to insert 'import' in 'result', and return the new import.
-    let mut new_import = curr_import.clone();
-    let mut i_iter = import.iter();
-    let mut r_iter = result.iter();
-
-    if let Some(i_name_punct) = i_iter.next() {
-        if let Some(r_name_punct) = r_iter.next() {
-            let i_name = rm_punct(&i_name_punct);
-            let r_name = rm_punct(&r_name_punct);
-            if i_name == r_name {
-                // Insert into this module.
-                while let Some(r_name_punct) = r_iter.next() {
-                    if let Some(i_name_punct) = i_iter.next() {
-                        let r_name = rm_punct(&r_name_punct);
-                        let i_name = rm_punct(&i_name_punct);
-                        if i_name < r_name {
-                            if let Some(position) = new_import.find(r_name_punct) {
-                                let mut insert_string = String::new();
-                                insert_string.push_str(i_name_punct);
-                                while let Some(i_name_punct) = i_iter.next() {
-                                    insert_string.push_str(i_name_punct);
-                                }
-                                insert_string = insert_string.replace(";", ",");
-                                new_import.insert_str(position, &insert_string);
-
-                                return Some(new_import);
-                            }
-                        } else if r_name_punct.ends_with(",") && i_name > r_name {
-                            // Check if this is the last element.
-                            if let None = r_iter.clone().next() {
-                                let mut r_peek = result.iter().peekable();
-                                while let Some(name_to_modify) = r_peek.next() {
-                                    if let Some(name) = r_peek.peek() {
-                                        if &r_name_punct == name {
-                                            let mut new_name = name_to_modify.clone();
-                                            new_name.push('{');
-                                            new_import =
-                                                new_import.replace(name_to_modify, &new_name);
-                                            if let Some(position) = new_import.find(r_name_punct) {
-                                                let mut insert_string = String::new();
-                                                insert_string.push_str(i_name_punct);
-                                                insert_string.insert(0, ' ');
-                                                if insert_string.ends_with(";") {
-                                                    insert_string =
-                                                        insert_string.replace(";", "},");
-                                                } else if insert_string.ends_with(",") {
-                                                    insert_string =
-                                                        insert_string.replace(",", "},");
-                                                }
-                                                new_import.insert_str(
-                                                    position + r_name_punct.len(),
-                                                    &insert_string,
-                                                );
-
-                                                return Some(new_import);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } else if i_name < r_name {
-                // No equal module was found, so insert here.
-                if let Some(position) = new_import.find(r_name_punct) {
-                    let mut insert_string = String::new();
-                    let mut sp = String::new();
-                    insert_string.push_str(i_name_punct);
-                    if i_name_punct.contains("{") {
-                        sp = " ".to_string();
-                    }
-                    let mut i = 0;
-                    while let Some(i_name_punct) = i_iter.next() {
-                        if i > 0 {
-                            insert_string.push_str(&(sp.clone() + i_name_punct));
-                        } else {
-                            insert_string.push_str(&i_name_punct);
-                            i += 1;
-                        }
-                        if i_name_punct.contains("{") {
-                            sp = " ".to_string();
-                            i = 0;
-                        }
-                    }
-                    insert_string = insert_string.replace(";", ",");
-                    insert_string.push_str("\n    ");
-                    new_import.insert_str(position, &insert_string);
-
-                    return Some(new_import);
-                }
-            } else {
-                if new_import.lines().next()?.contains(";") {
-                    let mut insert_string = String::new();
-                    insert_string.push_str(i_name_punct);
-                    while let Some(i_name_punct) = i_iter.next() {
-                        insert_string.push_str(i_name_punct);
-                    }
-                    let index = new_import.find("::").unwrap_or(0);
-                    let (crate_name, after_insertion) = new_import.split_at(index);
-                    let new_import = format!(
-                        "{}::{}\n    {}\n    {}\n{}",
-                        crate_name,
-                        "{",
-                        after_insertion.trim_start_matches("::").replace(";", ","),
-                        insert_string.replace(";", ","),
-                        "};",
-                    );
-
-                    return Some(new_import);
-                } else {
-                    let mut curr_import_lines = curr_import.lines();
-                    while let Some(line) = curr_import_lines.next() {
-                        if line.contains(r_name_punct) {
-                            break;
-                        }
-                    }
-                    if let Some(next) = curr_import_lines.next() {
-                        if next == "};" && (i_name > r_name) {
-                            // Insert it as the last import.
-                            if let Some(position) = new_import.rfind('\n') {
-                                let mut insert_string = String::new();
-                                let mut sp = String::new();
-                                insert_string.push_str(i_name_punct);
-                                insert_string.insert_str(0, "\n    ");
-                                if i_name_punct.contains("{") {
-                                    sp = " ".to_string();
-                                }
-                                let mut i = 0;
-                                while let Some(i_name_punct) = i_iter.next() {
-                                    if i > 0 {
-                                        insert_string.push_str(&(sp.clone() + i_name_punct));
-                                    } else {
-                                        insert_string.push_str(&i_name_punct);
-                                        i += 1;
-                                    }
-                                    if i_name_punct.contains("{") {
-                                        sp = " ".to_string();
-                                        i = 0;
-                                    }
-                                }
-                                new_import.insert_str(position, &insert_string);
-
-                                return Some(new_import);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    None
 }
