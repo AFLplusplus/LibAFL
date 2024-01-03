@@ -53,7 +53,7 @@ use crate::{
 };
 
 /// Check if ctrl-c is sent with this struct
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "std"))]
 pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {
     shutting_down: false,
     shmem_allocated: false,
