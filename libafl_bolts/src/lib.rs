@@ -97,6 +97,7 @@ extern crate std;
 #[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
+
 #[cfg(feature = "ctor")]
 #[doc(hidden)]
 pub use ctor::ctor;
@@ -159,6 +160,8 @@ pub mod bolts_prelude {
     pub use super::{cpu::*, os::*};
 }
 
+#[cfg(all(unix, feature = "std"))]
+use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
@@ -170,15 +173,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
 use std::{
     fs::File,
-    io::Write,
+    io::{stderr, stdout, Write},
     mem,
-    os::fd::{FromRawFd, RawFd},
+    os::fd::{AsRawFd, FromRawFd, RawFd},
+    panic,
 };
 
 // There's a bug in ahash that doesn't let it build in `alloc` without once_cell right now.
 // TODO: re-enable once <https://github.com/tkaitchuck/aHash/issues/155> is resolved.
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use ahash::RandomState;
+use log::SetLoggerError;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "xxh3")]
 use xxhash_rust::xxh3::xxh3_64;
@@ -570,6 +575,13 @@ impl From<TryFromSliceError> for Error {
     }
 }
 
+impl From<SetLoggerError> for Error {
+    #[allow(unused_variables)]
+    fn from(err: SetLoggerError) -> Self {
+        Self::illegal_state(format!("Failed to register logger: {err:?}"))
+    }
+}
+
 #[cfg(windows)]
 impl From<windows::core::Error> for Error {
     #[allow(unused_variables)]
@@ -795,6 +807,10 @@ pub static LIBAFL_STDERR_LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
 #[cfg(feature = "std")]
 pub static LIBAFL_STDOUT_LOGGER: SimpleStdoutLogger = SimpleStdoutLogger::new();
 
+/// A logger we can use log to raw fds.
+#[cfg(all(unix, feature = "std"))]
+static mut LIBAFL_RAWFD_LOGGER: SimpleFdLogger = unsafe { SimpleFdLogger::new(1) };
+
 /// A simple logger struct that logs to stdout when used with [`log::set_logger`].
 #[derive(Debug)]
 #[cfg(feature = "std")]
@@ -817,8 +833,8 @@ impl SimpleStdoutLogger {
 
     /// register stdout logger
     pub fn set_logger() -> Result<(), Error> {
-        log::set_logger(&LIBAFL_STDOUT_LOGGER)
-            .map_err(|_| Error::unknown("Failed to register logger"))
+        log::set_logger(&LIBAFL_STDOUT_LOGGER)?;
+        Ok(())
     }
 }
 
@@ -863,8 +879,8 @@ impl SimpleStderrLogger {
 
     /// register stderr logger
     pub fn set_logger() -> Result<(), Error> {
-        log::set_logger(&LIBAFL_STDERR_LOGGER)
-            .map_err(|_| Error::unknown("Failed to register logger"))
+        log::set_logger(&LIBAFL_STDERR_LOGGER)?;
+        Ok(())
     }
 }
 
@@ -912,6 +928,22 @@ impl SimpleFdLogger {
     pub unsafe fn set_fd(&mut self, fd: RawFd) {
         self.fd = fd;
     }
+
+    /// Register this logger, logging to the given `fd`
+    ///
+    /// # Safety
+    /// This function may not be called multiple times concurrently.
+    /// The passed-in `fd` has to be a legal file descriptor to log to.
+    pub unsafe fn set_logger(log_fd: RawFd) -> Result<(), Error> {
+        // # Safety
+        // The passed-in `fd` has to be a legal file descriptor to log to.
+        // We also access a shared variable here.
+        unsafe {
+            LIBAFL_RAWFD_LOGGER.set_fd(log_fd);
+            log::set_logger(&LIBAFL_RAWFD_LOGGER)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(all(feature = "std", unix))]
@@ -935,6 +967,42 @@ impl log::Log for SimpleFdLogger {
     }
 
     fn flush(&self) {}
+}
+
+/// Closes `stdout` and `stderr` and returns a new `stdout` and `stderr`
+/// to be used in the fuzzer for further logging.
+///
+/// # Safety
+/// The function is arguably safe, but it might have undesirable side effects since it closes `stdout` and `stderr`.
+#[cfg(all(unix, feature = "std"))]
+pub unsafe fn dup_and_mute_outputs() -> Result<(RawFd, RawFd), Error> {
+    let old_stdout = stdout().as_raw_fd();
+    let old_stderr = stderr().as_raw_fd();
+    let null_fd = crate::os::null_fd()?;
+
+    let new_stdout = crate::os::dup(old_stdout)?;
+    let new_stderr = crate::os::dup(old_stderr)?;
+
+    crate::os::dup2(null_fd, old_stdout)?;
+    crate::os::dup2(null_fd, old_stderr)?;
+
+    Ok((new_stdout, new_stderr))
+}
+
+/// Set up an error print hook that will
+///
+/// # Safety
+/// Will fail if `new_stderr` is not a valid file descriptor.
+/// May not be called multiple times concurrently.
+#[cfg(all(unix, feature = "std"))]
+pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
+    // Make sure potential errors get printed to the correct (non-closed) stderr
+    panic::set_hook(Box::new(move |panic_info| {
+        let mut f = unsafe { File::from_raw_fd(new_stderr) };
+        writeln!(f, "{panic_info}",)
+            .unwrap_or_else(|err| println!("Failed to log to fd {new_stderr}: {err}"));
+        std::mem::forget(f);
+    }));
 }
 
 #[cfg(feature = "python")]
@@ -1083,19 +1151,16 @@ pub mod pybind {
 mod tests {
 
     #[cfg(all(feature = "std", unix))]
-    use crate::SimpleFdLogger;
-
-    #[cfg(all(feature = "std", unix))]
-    pub static mut LOGGER: SimpleFdLogger = unsafe { SimpleFdLogger::new(1) };
+    use crate::LIBAFL_RAWFD_LOGGER;
 
     #[test]
     #[cfg(all(unix, feature = "std"))]
     fn test_logger() {
         use std::{io::stdout, os::fd::AsRawFd};
 
-        unsafe { LOGGER.fd = stdout().as_raw_fd() };
+        unsafe { LIBAFL_RAWFD_LOGGER.fd = stdout().as_raw_fd() };
         unsafe {
-            log::set_logger(&LOGGER).unwrap();
+            log::set_logger(&LIBAFL_RAWFD_LOGGER).unwrap();
         }
         log::set_max_level(log::LevelFilter::Debug);
         log::info!("Test");

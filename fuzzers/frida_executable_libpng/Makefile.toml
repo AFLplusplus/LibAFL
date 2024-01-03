@@ -90,11 +90,11 @@ script='''
 rm -rf libafl_unix_shmem_server || true
 LD_PRELOAD=$CARGO_TARGET_DIR/${PROFILE_DIR}/libfrida_executable_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness > fuzz_stdout.log &
 sleep 10s && pkill libpng-harness
-if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
+if grep -qa "corpus: 30" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
     echo "Fuzzer does not generate any testcases or any crashes"
     exit 1
-else
-    echo "Fuzzer is working"
 fi
 '''
 dependencies = [ "fuzzer", "harness" ]

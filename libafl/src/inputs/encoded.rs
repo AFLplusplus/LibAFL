@@ -271,6 +271,7 @@ mod tests {
     };
 
     #[test]
+    #[cfg_attr(all(miri, target_arch = "aarch64", target_vendor = "apple"), ignore)] // Regex miri fails on M1
     fn test_input() {
         let mut t = NaiveTokenizer::default();
         let mut ed = TokenInputEncoderDecoder::new();

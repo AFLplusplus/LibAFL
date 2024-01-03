@@ -154,7 +154,7 @@ impl ConfigTarget for Command {
         if memlimit == 0 {
             return self;
         }
-        // SAFETY
+        // # Safety
         // This method does not do shady pointer foo.
         // It merely call libc functions.
         let func = move || {
@@ -181,7 +181,7 @@ impl ConfigTarget for Command {
             }
             Ok(())
         };
-        // # SAFETY
+        // # Safety
         // This calls our non-shady function from above.
         unsafe { self.pre_exec(func) }
     }
@@ -547,7 +547,7 @@ where
                 self.executor.shmem_mut().is_some(),
                 "The uses_shmem_testcase() bool can only exist when a map is set"
             );
-            // # SAFETY
+            // # Safety
             // Struct can never be created when uses_shmem_testcase is true and map is none.
             let map = unsafe { self.executor.shmem_mut().as_mut().unwrap_unchecked() };
             let target_bytes = input.target_bytes();
@@ -1237,7 +1237,7 @@ where
                 self.map.is_some(),
                 "The uses_shmem_testcase bool can only exist when a map is set"
             );
-            // # SAFETY
+            // # Safety
             // Struct can never be created when uses_shmem_testcase is true and map is none.
             let map = unsafe { self.map.as_mut().unwrap_unchecked() };
             let target_bytes = input.target_bytes();

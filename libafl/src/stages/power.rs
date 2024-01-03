@@ -7,9 +7,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mutators::Mutator,
-    schedulers::{
-        ecofuzz::EcoTestcaseScore, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
-    },
+    schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{mutational::MutatedTransform, MutationalStage, Stage},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
@@ -124,7 +122,3 @@ where
 /// The standard powerscheduling stage
 pub type StdPowerMutationalStage<E, EM, I, M, Z> =
     PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;
-
-/// Ecofuzz scheduling stage
-pub type EcoPowerMutationalStage<E, EM, I, M, Z> =
-    PowerMutationalStage<E, EcoTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;
