@@ -715,8 +715,8 @@ impl AFLppRedQueen {
             };
 
             // Try arith
-            let diff: i64 = (pattern - b_val) as i64;
-            let new_diff: i64 = (another_pattern - o_b_val) as i64;
+            let diff = pattern as i64 - b_val as i64;
+            let new_diff = another_pattern as i64 - o_b_val as i64;
 
             if diff == new_diff && diff != 0 {
                 let new_repl: u64 = (repl as i64 - diff) as u64;

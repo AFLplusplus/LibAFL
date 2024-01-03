@@ -18,12 +18,6 @@ fn main() {
     let cmp_map_size: usize = option_env!("LIBAFL_CMP_MAP_SIZE")
         .map_or(Ok(65536), str::parse)
         .expect("Could not parse LIBAFL_CMP_MAP_SIZE");
-    let aflpp_cmplog_map_w: usize = option_env!("LIBAFL_AFLPP_CMPLOG_MAP_W")
-        .map_or(Ok(65536), str::parse)
-        .expect("Could not parse LIBAFL_AFLPP_CMPLOG_MAP_W");
-    let aflpp_cmplog_map_h: usize = option_env!("LIBAFL_AFLPP_CMPLOG_MAP_W")
-        .map_or(Ok(32), str::parse)
-        .expect("Could not parse LIBAFL_AFLPP_CMPLOG_MAP_W");
     let cmplog_map_w: usize = option_env!("LIBAFL_CMPLOG_MAP_W")
         .map_or(Ok(65536), str::parse)
         .expect("Could not parse LIBAFL_CMPLOG_MAP_W");
@@ -42,10 +36,6 @@ fn main() {
         pub const EDGES_MAP_SIZE: usize = {edges_map_size};
         /// The size of the cmps map
         pub const CMP_MAP_SIZE: usize = {cmp_map_size};
-        /// The width of the aflpp cmplog map
-        pub const AFLPP_CMPLOG_MAP_W: usize = {aflpp_cmplog_map_w};
-        /// The height of the aflpp cmplog map
-        pub const AFLPP_CMPLOG_MAP_H: usize = {aflpp_cmplog_map_h};
         /// The width of the `CmpLog` map
         pub const CMPLOG_MAP_W: usize = {cmplog_map_w};
         /// The height of the `CmpLog` map
@@ -58,8 +48,6 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMP_MAP_SIZE");
-    println!("cargo:rerun-if-env-changed=LIBAFL_AFLPP_CMPLOG_MAP_W");
-    println!("cargo:rerun-if-env-changed=LIBAFL_AFLPP_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
@@ -107,14 +95,6 @@ fn main() {
 
         sancov_cmp
             .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-            .define(
-                "AFLPP_CMPLOG_MAP_W",
-                Some(&*format!("{aflpp_cmplog_map_w}")),
-            )
-            .define(
-                "AFLPP_CMPLOG_MAP_H",
-                Some(&*format!("{aflpp_cmplog_map_h}")),
-            )
             .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
             .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
             .file(src_dir.join("sancov_cmp.c"))
@@ -166,18 +146,14 @@ fn main() {
 
         #[cfg(unix)]
         {
-            cc::Build::new()
-                .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
+            let mut cc = cc::Build::new();
+
+            #[cfg(feature = "cmplog_extended_instrumentation")]
+            cc.define("CMPLOG_EXTENDED", Some("1"));
+
+            cc.flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
                 .flag("-Wno-sign-compare")
                 .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-                .define(
-                    "AFLPP_CMPLOG_MAP_W",
-                    Some(&*format!("{aflpp_cmplog_map_w}")),
-                )
-                .define(
-                    "AFLPP_CMPLOG_MAP_H",
-                    Some(&*format!("{aflpp_cmplog_map_h}")),
-                )
                 .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
                 .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
                 .file(src_dir.join("cmplog.c"))
@@ -188,14 +164,6 @@ fn main() {
         {
             cc::Build::new()
                 .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-                .define(
-                    "AFLPP_CMPLOG_MAP_W",
-                    Some(&*format!("{aflpp_cmplog_map_w}")),
-                )
-                .define(
-                    "AFLPP_CMPLOG_MAP_H",
-                    Some(&*format!("{aflpp_cmplog_map_h}")),
-                )
                 .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
                 .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
                 .file(src_dir.join("cmplog.c"))
