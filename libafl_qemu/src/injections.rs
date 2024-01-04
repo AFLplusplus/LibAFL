@@ -82,7 +82,7 @@ impl QemuInjectionHelper {
         Self {}
     }
 
-    /// configure_injections is the main function to activatr the injection
+    /// `configure_injections` is the main function to activatr the injection
     /// vulnerability detection feature.
     pub fn configure_injections(
         emu: &Emulator,
@@ -334,6 +334,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
         let injection = &vec[off];
         //println!("Checking {}", injection.name);
         for test in &injection.tests {
+            #[allow(clippy::manual_assert)]
             if query.to_lowercase().contains(&test.match_value) {
                 panic!(
                     "Found value \"{}\" for {} in {}",
