@@ -268,7 +268,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
 
     //println!("on_call_check {} {}", parameter, off);
 
-    #[cfg(any(cpu_target = "x86_64", not(cpu_target)))]
+    #[cfg(any(cpu_target = "x86_64"))]
     let reg_id = match parameter {
         0 => Regs::Rdi,
         1 => Regs::Rsi,
@@ -276,7 +276,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
         3 => Regs::Rcx,
         4 => Regs::R8,
         5 => Regs::R9,
-        r => panic!("unsupported register id {r}"),
+        r => panic!("Injection fuzzing: unsupported register id {r}"),
     };
     #[cfg(cpu_target = "aarch64")]
     let reg_id = match parameter {
@@ -286,7 +286,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
         3 => Regs::X3,
         4 => Regs::X4,
         5 => Regs::X5,
-        r => panic!("unsupported register id {r}"),
+        r => panic!("Injection fuzzing: unsupported register id {r}"),
     };
     #[cfg(cpu_target = "arm")]
     let reg_id = match parameter {
@@ -295,7 +295,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
         2 => Regs::R2,
         3 => Regs::R3,
         // 4.. would be on the stack, let's not do this for now
-        r => panic!("unsupported register id {r}"),
+        r => panic!("Injection fuzzing: unsupported register id {r}"),
     };
     #[cfg(cpu_target = "mips")]
     let reg_id = match parameter {
@@ -304,7 +304,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
         2 => Regs::A2,
         3 => Regs::A3,
         // 4.. would be on the stack, let's not do this for now
-        r => panic!("unsupported register id {r}"),
+        r => panic!("Injection fuzzing: unsupported register id {r}"),
     };
     #[cfg(cpu_target = "ppc")]
     let reg_id = match parameter {
@@ -314,11 +314,8 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
         3 => Regs::R6,
         4 => Regs::R7,
         5 => Regs::R8,
-        r => panic!("unsupported register id {r}"),
+        r => panic!("Injection fuzzing: unsupported register id {r}"),
     };
-    //i386 is unsupported
-    #[cfg(cpu_target = "i386")]
-    return;
 
     let reg: GuestAddr = emu.current_cpu().unwrap().read_reg(reg_id).unwrap_or(0);
 

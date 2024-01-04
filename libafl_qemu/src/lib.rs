@@ -81,10 +81,8 @@ pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::QemuCmpLogHelper;
 
-#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon", cpu_target = "arm")))]
 #[cfg(feature = "injections")]
 pub mod injections;
-#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon", cpu_target = "arm")))]
 #[cfg(feature = "injections")]
 pub use injections::QemuInjectionHelper;
 
