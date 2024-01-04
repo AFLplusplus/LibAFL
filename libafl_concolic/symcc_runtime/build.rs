@@ -134,6 +134,7 @@ fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {
                 .to_str()
                 .unwrap()
         ))
+        .clang_args(["-x", "c++", "-std=c++17"].iter())
         .header(
             symcc_src_path
                 .join("runtime")
