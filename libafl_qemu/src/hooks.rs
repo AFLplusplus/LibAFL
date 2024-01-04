@@ -598,6 +598,7 @@ where
         }
     }
 
+    #[allow(clippy::similar_names)]
     pub fn reads(
         &self,
         generation_hook: Hook<

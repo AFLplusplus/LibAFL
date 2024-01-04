@@ -1772,7 +1772,7 @@ pub mod pybind {
 
         fn run(&self) {
             unsafe {
-                self.emu.run();
+                self.emu.run().unwrap();
             }
         }
 

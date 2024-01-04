@@ -1,4 +1,8 @@
-//! LibAFL QEMU
+//! Welcome to `LibAFL`` QEMU
+//! 
+#![doc = include_str!("../README.md")]
+/*! */
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 
 // libafl_qemu only supports Linux currently
 #![cfg(target_os = "linux")]

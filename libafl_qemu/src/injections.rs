@@ -268,7 +268,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
 
     //println!("on_call_check {} {}", parameter, off);
 
-    #[cfg(any(target_arch = "x86_64", not(target_arch)))]
+    #[cfg(any(cpu_target = "x86_64", not(cpu_target)))]
     let reg_id = match parameter {
         0 => Regs::Rdi,
         1 => Regs::Rsi,
