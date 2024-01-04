@@ -1,3 +1,5 @@
+//! LibAFL QEMU
+
 // libafl_qemu only supports Linux currently
 #![cfg(target_os = "linux")]
 // This lint triggers too often on the current GuestAddr type when emulating 64-bit targets because
@@ -77,8 +79,10 @@ pub mod cmplog;
 pub use cmplog::QemuCmpLogHelper;
 
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon", cpu_target = "arm")))]
+#[cfg(feature = "injections")]
 pub mod injections;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon", cpu_target = "arm")))]
+#[cfg(feature = "injections")]
 pub use injections::QemuInjectionHelper;
 
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]

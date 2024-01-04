@@ -256,7 +256,7 @@ fn find_function(
     };
     let start_pc = elf
         .resolve_symbol(function, offset)
-        .ok_or_else(|| Error::empty_optional("Symbol {function} not found in {file}"))?;
+        .ok_or_else(|| Error::empty_optional(format!("Symbol {function} not found in {file}")))?;
     println!("Found {function} in {file}");
     Ok(start_pc)
 }
@@ -269,56 +269,58 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
     //println!("on_call_check {} {}", parameter, off);
 
     #[cfg(any(target_arch = "x86_64", not(target_arch)))]
-    let reg: GuestAddr = match parameter {
-        0 => emu.current_cpu().unwrap().read_reg(Regs::Rdi).unwrap_or(0),
-        1 => emu.current_cpu().unwrap().read_reg(Regs::Rsi).unwrap_or(0),
-        2 => emu.current_cpu().unwrap().read_reg(Regs::Rdx).unwrap_or(0),
-        3 => emu.current_cpu().unwrap().read_reg(Regs::Rcx).unwrap_or(0),
-        4 => emu.current_cpu().unwrap().read_reg(Regs::R8).unwrap_or(0),
-        5 => emu.current_cpu().unwrap().read_reg(Regs::R9).unwrap_or(0),
-        _ => panic!("unknown register"),
+    let reg_id = match parameter {
+        0 => Regs::Rdi,
+        1 => Regs::Rsi,
+        2 => Regs::Rdx,
+        3 => Regs::Rcx,
+        4 => Regs::R8,
+        5 => Regs::R9,
+        r => panic!("unsupported register id {r}"),
     };
     #[cfg(cpu_target = "aarch64")]
-    let reg: GuestAddr = match parameter {
-        0 => emu.current_cpu().unwrap().read_reg(Regs::X0).unwrap_or(0),
-        1 => emu.current_cpu().unwrap().read_reg(Regs::X1).unwrap_or(0),
-        2 => emu.current_cpu().unwrap().read_reg(Regs::X2).unwrap_or(0),
-        3 => emu.current_cpu().unwrap().read_reg(Regs::X3).unwrap_or(0),
-        4 => emu.current_cpu().unwrap().read_reg(Regs::X4).unwrap_or(0),
-        5 => emu.current_cpu().unwrap().read_reg(Regs::X5).unwrap_or(0),
-        _ => panic!("unknown register"),
+    let reg_id = match parameter {
+        0 => Regs::X0,
+        1 => Regs::X1,
+        2 => Regs::X2,
+        3 => Regs::X3,
+        4 => Regs::X4,
+        5 => Regs::X5,
+        r => panic!("unsupported register id {r}"),
     };
     #[cfg(cpu_target = "arm")]
-    let reg: GuestAddr = match parameter {
-        0 => emu.current_cpu().unwrap().read_reg(Regs::R0).unwrap_or(0),
-        1 => emu.current_cpu().unwrap().read_reg(Regs::R1).unwrap_or(0),
-        2 => emu.current_cpu().unwrap().read_reg(Regs::R2).unwrap_or(0),
-        3 => emu.current_cpu().unwrap().read_reg(Regs::R3).unwrap_or(0),
+    let reg_id = match parameter {
+        0 => Regs::R0,
+        1 => Regs::R1,
+        2 => Regs::R2,
+        3 => Regs::R3,
         // 4.. would be on the stack, let's not do this for now
-        _ => panic!("unknown register"),
+        r => panic!("unsupported register id {r}"),
     };
     #[cfg(cpu_target = "mips")]
-    let reg: GuestAddr = match parameter {
-        0 => emu.current_cpu().unwrap().read_reg(Regs::A0).unwrap_or(0),
-        1 => emu.current_cpu().unwrap().read_reg(Regs::A1).unwrap_or(0),
-        2 => emu.current_cpu().unwrap().read_reg(Regs::A2).unwrap_or(0),
-        3 => emu.current_cpu().unwrap().read_reg(Regs::A3).unwrap_or(0),
+    let reg_id = match parameter {
+        0 => Regs::A0,
+        1 => Regs::A1,
+        2 => Regs::A2,
+        3 => Regs::A3,
         // 4.. would be on the stack, let's not do this for now
-        _ => panic!("unknown register"),
+        r => panic!("unsupported register id {r}"),
     };
     #[cfg(cpu_target = "ppc")]
-    let reg: GuestAddr = match parameter {
-        0 => emu.current_cpu().unwrap().read_reg(Regs::R3).unwrap_or(0),
-        1 => emu.current_cpu().unwrap().read_reg(Regs::R4).unwrap_or(0),
-        2 => emu.current_cpu().unwrap().read_reg(Regs::R5).unwrap_or(0),
-        3 => emu.current_cpu().unwrap().read_reg(Regs::R6).unwrap_or(0),
-        4 => emu.current_cpu().unwrap().read_reg(Regs::R7).unwrap_or(0),
-        5 => emu.current_cpu().unwrap().read_reg(Regs::R8).unwrap_or(0),
-        _ => panic!("unknown register"),
+    let reg_id = match parameter {
+        0 => Regs::R3,
+        1 => Regs::R4,
+        2 => Regs::R5,
+        3 => Regs::R6,
+        4 => Regs::R7,
+        5 => Regs::R8,
+        r => panic!("unsupported register id {r}"),
     };
     //i386 is unsupported
     #[cfg(cpu_target = "i386")]
-    let reg: GuestAddr = 0;
+    return;
+
+    let reg: GuestAddr = emu.current_cpu().unwrap().read_reg(reg_id).unwrap_or(0);
 
     //println!("reg value = {:x}", reg);
 
@@ -334,13 +336,14 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
         let injection = &vec[off];
         //println!("Checking {}", injection.name);
         for test in &injection.tests {
-            #[allow(clippy::manual_assert)]
-            if query.to_lowercase().contains(&test.match_value) {
-                panic!(
-                    "Found value \"{}\" for {} in {}",
-                    test.match_value, query, injection.name
-                );
-            }
+            // "crash" if we found the right value
+            assert!(
+                query.to_lowercase().contains(&test.match_value),
+                "Found value \"{}\" for {} in {}",
+                test.match_value,
+                query,
+                injection.name
+            );
         }
     }
 }
