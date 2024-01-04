@@ -262,7 +262,7 @@ fn find_function(
 }
 
 extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
-    let emu = Emulator::new_empty();
+    let emu = Emulator::get().unwrap();
     let parameter: u8 = (val & 0xff) as u8;
     let off: usize = (val >> 8) as usize;
 
