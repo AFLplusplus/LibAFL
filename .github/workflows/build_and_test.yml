@@ -128,8 +128,6 @@ jobs:
       run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
     - name: Run clippy
       run: ./scripts/clippy.sh
 
