@@ -102,7 +102,7 @@ jobs:
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v1
       with:
-        directory: /work/llvm
+        directory: ${{ runner.temp }}/llvm
         version: "15"
     # ---- format check ----
     # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
@@ -151,7 +151,7 @@ jobs:
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v1
       with:
-        directory: /work/llvm
+        directory: ${{ runner.temp }}/llvm
         version: "15"
     - name: Run clippy
       run: ./scripts/clippy.sh
