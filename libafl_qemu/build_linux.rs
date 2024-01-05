@@ -46,9 +46,9 @@ pub fn build() {
     let supports_injections = ["aarch64", "x86_64", "arm", "mips", "ppc"].iter().any(|x| x == &cpu_target);
     println!("cargo:rustc-cfg=supports_injections=\"{supports_injections}\"");
 
-    if !supports_injections && cfg!(feature = "injections") && !cfg!(feature = "clippy") {
-        panic!("Injection fuzzing is not yet supported on {cpu_target} - teach injections.rs to read the correct parameters, or disable the injections feature.");
-    }
+    assert!(supports_injections || !cfg!(feature = "injections") || cfg!(feature = "clippy"),
+        "Injection fuzzing is not yet supported on {cpu_target} - teach injections.rs to read the correct parameters, or disable the injections feature."
+    );
 
     let cross_cc = if (emulation_mode == "usermode") && build_libqasan {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)

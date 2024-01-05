@@ -14,8 +14,9 @@ i386 = ["libafl_qemu/i386"]
 aarch64 = ["libafl_qemu/aarch64", "injections"]
 mips = ["libafl_qemu/mips", "injections"]
 ppc = ["libafl_qemu/ppc", "be", "injections"]
+hexagon = ["libafl_qemu/hexagon"]
 
-## Enable fuzzing for injections
+## Enable fuzzing for injections (where supported)
 injections = ["libafl_qemu/injections"]
 
 [profile.release]
