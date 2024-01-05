@@ -62,7 +62,7 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        llvm-version: ["11", "12", "13", "14", "15.0.0", "16", "17"]
+        llvm-version: ["11", "12", "13", "14", "15.0.7", "16", "17"]
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
@@ -103,7 +103,7 @@ jobs:
       uses: KyleMayes/install-llvm-action@v1
       with:
         directory: ${{ runner.temp }}/llvm
-        version: "15.0.0"
+        version: "15.0.7"
     # ---- format check ----
     # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
     - name: Check pcguard edges
@@ -152,7 +152,7 @@ jobs:
       uses: KyleMayes/install-llvm-action@v1
       with:
         directory: ${{ runner.temp }}/llvm
-        version: "15.0.0"
+        version: "15.0.7"
     - name: Run clippy
       run: ./scripts/clippy.sh
 
