@@ -187,7 +187,11 @@ jobs:
       run: rustup toolchain install nightly --allow-downgrade
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
-
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@v1
+      with:
+        directory: ${{ runner.temp }}/llvm
+        version: 16
     # ---- build and feature check ----
     # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
     - name: Check each feature
