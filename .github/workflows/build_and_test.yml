@@ -74,7 +74,7 @@ jobs:
         with:
           version: "${{matrix.llvm-version}}"
       - name: Build and test with llvm-${{ matrix.llvm-version }}
-        run: ls & cd libafl_cc && cargo build --release
+        run: pwd && ls & cd libafl_cc && cargo build --release
 
 
   ubuntu:
@@ -93,7 +93,7 @@ jobs:
       with:
         version: "15"
     - name: Install and cache deps
-      run: apt install ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+      run: sudo apt install ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: get clang version
       run: command -v llvm-config-15 && clang-15 -v
     - name: Add nightly rustfmt and clippy
@@ -145,7 +145,7 @@ jobs:
       with:
         version: "15"
     - name: Install and cache deps
-      run: apt install ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+      run: sudo apt install ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
     - uses: actions/checkout@v3
@@ -179,7 +179,7 @@ jobs:
       with:
         version: "15"
     - name: Install and cache deps
-      run: apt install ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+      run: sudo apt install ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: Install cargo-hack
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
     - name: Install ucd-generate
