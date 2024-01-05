@@ -11,16 +11,15 @@
  *
  */
 
-#[cfg(emulation_mode = "usermode")]
-use std::sync::OnceLock;
-use std::{ffi::CStr, fs::File, io::Read, os::raw::c_char, path::Path};
+use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path, sync::OnceLock};
 
+use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    elf::EasyElf, Emulator, GuestAddr, Hook, QemuHelper, QemuHelperTuple, QemuHooks, Regs,
-    SYS_execve, SyscallHookResult,
+    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper,
+    QemuHelperTuple, QemuHooks, SYS_execve, SyscallHookResult,
 };
 
 #[derive(Debug, Clone)]
@@ -50,21 +49,37 @@ struct Functions {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct InjectStructure {
+struct YamlInjectionEntry {
     name: String,
     functions: Vec<Functions>,
     tests: Vec<Test>,
 }
 
-static INJECTIONS: OnceLock<Vec<InjectStructure>> = OnceLock::new();
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+struct Param {
+    param: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct TomlInjectionDefinition {
+    tokens: Vec<String>,
+    matches: Vec<String>,
+    functions: HashMap<String, Param>,
+}
+
+static INJECTIONS: OnceLock<Vec<YamlInjectionEntry>> = OnceLock::new();
 pub static TOKENS: OnceLock<Vec<String>> = OnceLock::new();
 
-fn parse_yaml<P: AsRef<Path>>(path: P) -> Result<Vec<InjectStructure>, Box<dyn std::error::Error>> {
-    let mut file = File::open(path)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    let data: Vec<InjectStructure> = serde_yaml::from_str(&contents)?;
-    Ok(data)
+fn parse_yaml<P: AsRef<Path> + Display>(path: P) -> Result<Vec<YamlInjectionEntry>, Error> {
+    serde_yaml::from_str(&fs::read_to_string(&path)?)
+        .map_err(|e| Error::serialize(format!("Failed to deserialize yaml at {path}: {e}")))
+}
+
+fn parse_toml<P: AsRef<Path> + Display>(
+    path: P,
+) -> Result<HashMap<String, TomlInjectionDefinition>, Error> {
+    toml::from_str(&fs::read_to_string(&path)?)
+        .map_err(|e| Error::serialize(format!("Failed to deserialize toml at {path}: {e}")))
 }
 
 #[derive(Debug)]
@@ -268,7 +283,11 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
 
     //println!("on_call_check {} {}", parameter, off);
 
-    let reg: GuestAddr = emu.current_cpu().unwrap().read_function_argument(parameter);
+    let reg: GuestAddr = emu
+        .current_cpu()
+        .unwrap()
+        .read_function_argument(CallingConvention::Cdecl, parameter)
+        .unwrap_or_default();
 
     //println!("reg value = {:x}", reg);
 
@@ -293,5 +312,66 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
                 injection.name
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TomlInjectionDefinition, YamlInjectionEntry};
+    use hashbrown::HashMap;
+
+    #[test]
+    fn test_yaml_parsing() {
+        let injections: Vec<YamlInjectionEntry> = serde_yaml::from_str(
+            r#"
+            # LDAP injection tests
+            - name: "ldap"
+              functions:
+                - function: "ldap_search_ext"
+                  parameter: 3
+                - function: "ldap_search_ext_s"
+                  parameter: 3
+              tests:
+                - input_value: "*)(FUZZ=*))(|"
+                  match_value: "*)(FUZZ=*))(|"
+            
+            # XSS injection tests
+            # This is a minimal example that only checks for libxml2
+            - name: "xss"
+              functions:
+                - function: "htmlReadMemory"
+                  parameter: 0
+              tests:
+                - input_value: "'\"><FUZZ"
+                  match_value: "'\"><FUZZ"
+            "#,
+        )
+        .unwrap();
+        assert_eq!(injections.len(), 2);
+    }
+
+    #[test]
+    fn test_toml_parsing() {
+        let injections: HashMap<String, TomlInjectionDefinition> = toml::from_str(
+            r#"
+            [ldap]
+            tokens = ["*)(FUZZ=*))(|"]
+            matches = ["*)(FUZZ=*))(|"]
+
+            [ldap.functions]
+            ldap_search_ext = {param = 3}
+            ldap_search_ext_s = {param = 3}
+
+            # XSS injection tests
+            # This is a minimal example that only checks for libxml2
+            [xss]
+            tokens = ["'\"><FUZZ"]
+            matches = ["'\"><FUZZ"]
+            [xss.functions]
+            htmlReadMemory = {param = 0}
+            "#,
+        )
+        .unwrap();
+        assert_eq!(injections.keys().len(), 2);
     }
 }

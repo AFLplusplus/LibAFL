@@ -10,10 +10,10 @@
 #                                  # function you want to hook that does not
 #                                  # have a symbol.
 #       parameter: number  # which parameter to the function contains the string
-#                          # 0 = first, 1 = second, ... 0-5 are supported
+#                          # 0 = first, 1 = second, ... 0-5 are supported (depending on architecture)
 #  tests:
 #     # multiple tests can be defined.
-#     - input_value: "a string"  # the injection string to add to the dictionary
+#     - input_value: "a string"  # the injection string to add to the tokens list
 #       match_value: "a string"  # if this substring (case insensitive) is found
 #                                # in the parameter of the function then crash!
 #                                # note that this is not a regex.

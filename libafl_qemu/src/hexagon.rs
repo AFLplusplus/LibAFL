@@ -106,7 +106,7 @@ impl crate::ArchExtras for crate::CPU {
         self.write_reg(Regs::Lr, val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>,
     {

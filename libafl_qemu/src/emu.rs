@@ -491,7 +491,7 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), String>
     where
         T: Into<GuestReg>;
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>;
     fn write_function_argument<T>(
@@ -1640,7 +1640,7 @@ impl ArchExtras for Emulator {
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>,
     {
