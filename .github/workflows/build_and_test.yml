@@ -73,7 +73,6 @@ jobs:
         uses: KyleMayes/install-llvm-action@v1
         with:
           version: "${{matrix.llvm-version}}"
-          directory: /usr/bin/llvm
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
       - name: Build and test with llvm-${{ matrix.llvm-version }}
