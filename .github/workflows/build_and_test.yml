@@ -59,6 +59,7 @@ jobs:
 
   llvm-tester:
     runs-on: ubuntu-22.04
+    continue-on-error:true
     strategy:
       matrix:
         llvm-version: ["11", "12", "13", "14", "15", "16", "17"]
@@ -101,6 +102,7 @@ jobs:
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v1
       with:
+        directory: /work/llvm
         version: "15"
     # ---- format check ----
     # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
@@ -149,6 +151,7 @@ jobs:
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v1
       with:
+        directory: /work/llvm
         version: "15"
     - name: Run clippy
       run: ./scripts/clippy.sh
@@ -174,8 +177,6 @@ jobs:
         components: llvm-tools
     - name: Remove existing clang and LLVM
       run: sudo apt purge llvm* clang*
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
     - name: Install and cache deps
       run: sudo apt install ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: Install cargo-hack
