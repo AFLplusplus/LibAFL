@@ -311,7 +311,7 @@ jobs:
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
     - name: Build and run example fuzzers (Linux)
       if: runner.os == 'Linux'
-      run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-16 ./scripts/test_all_fuzzers.sh
+      run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_all_fuzzers.sh
 
   qemu_fuzzers:
     strategy:
@@ -385,7 +385,7 @@ jobs:
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
     - name: Build and run example fuzzers (Linux)
       if: runner.os == 'Linux'
-      run: RUN_ON_CI=1 RUN_QEMU_FUZZER=1 LLVM_CONFIG=llvm-config-16 ./scripts/test_all_fuzzers.sh
+      run: RUN_ON_CI=1 RUN_QEMU_FUZZER=1 LLVM_CONFIG=llvm-config ./scripts/test_all_fuzzers.sh
 
 
   nostd-build:
