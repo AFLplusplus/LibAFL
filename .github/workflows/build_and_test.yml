@@ -74,7 +74,7 @@ jobs:
         with:
           version: "${{matrix.llvm-version}}"
       - name: Build and test with llvm-${{ matrix.llvm-version }}
-        run: cd libafl_cc && cargo build --release
+        run: ls & cd libafl_cc && cargo build --release
 
 
   ubuntu:
@@ -142,8 +142,8 @@ jobs:
         toolchain: stable
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v1
-      with:
-        version: "15"
+        with:
+          version: "15"
     - name: Install and cache deps
       run: apt install ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
     - name: Add nightly rustfmt and clippy
