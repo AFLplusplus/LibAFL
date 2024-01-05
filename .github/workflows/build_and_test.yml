@@ -76,6 +76,8 @@ jobs:
         uses: KyleMayes/install-llvm-action@v1
         with:
           version: "${{matrix.llvm-version}}"
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Build and test with llvm-${{ matrix.llvm-version }}
         run: pwd && ls & cd libafl_cc && cargo build --release
 
@@ -190,8 +192,6 @@ jobs:
 
     # ---- build and feature check ----
     # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
     - name: Check each feature
       # Skipping `python` as it has to be built with the `maturin` tool
       # `agpl`, `nautilus` require nightly
