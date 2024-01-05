@@ -115,9 +115,9 @@ pub use cmps::*;
 #[cfg(feature = "std")]
 pub mod drcov;
 
-#[cfg(all(windows, feature = "std", feture = "windows_asan"))]
+#[cfg(all(windows, feature = "std", feature = "windows_asan"))]
 pub mod windows_asan;
-#[cfg(all(windows, feature = "std", feture = "windows_asan"))]
+#[cfg(all(windows, feature = "std", feature = "windows_asan"))]
 pub use windows_asan::*;
 
 #[cfg(all(unix, feature = "forkserver"))]
