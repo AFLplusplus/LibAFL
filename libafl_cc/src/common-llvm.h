@@ -33,6 +33,8 @@ constexpr std::nullopt_t None = std::nullopt;
   #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #endif
 
+#include "llvm/IR/Function.h"
+
 #define FATAL(...)                          \
   do {                                      \
     fprintf(stderr, "FATAL: " __VA_ARGS__); \
