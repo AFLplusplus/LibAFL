@@ -59,7 +59,7 @@ jobs:
 
   llvm-tester:
     runs-on: ubuntu-22.04
-    continue-on-error:true
+    continue-on-error: true
     strategy:
       matrix:
         llvm-version: ["11", "12", "13", "14", "15", "16", "17"]
