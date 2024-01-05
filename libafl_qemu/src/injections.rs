@@ -181,8 +181,8 @@ where
 fn syscall_hook<QT, S>(
     hooks: &mut QemuHooks<QT, S>, // our instantiated QemuHooks
     _state: Option<&mut S>,
-    syscall: i32, // syscall number
-    x0: GuestAddr,      // registers ...
+    syscall: i32,  // syscall number
+    x0: GuestAddr, // registers ...
     x1: GuestAddr,
     _x2: GuestAddr,
     _x3: GuestAddr,
