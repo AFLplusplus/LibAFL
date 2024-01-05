@@ -73,8 +73,6 @@ jobs:
         uses: KyleMayes/install-llvm-action@v1
         with:
           version: "${{matrix.llvm-version}}"
-      - name: get clang version
-        run: command -v llvm-config-${{ matrix.llvm-version }} && clang-${{ matrix.llvm-version }} -v
       - name: Add nightly rustfmt and clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
       - name: Build and test with llvm-${{ matrix.llvm-version }}
