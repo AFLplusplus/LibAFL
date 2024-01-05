@@ -272,7 +272,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
 
     //println!("reg value = {:x}", reg);
 
-    if reg > 0 {
+    if reg != 0x00 {
         let query = unsafe {
             let c_str_ptr = reg as *const c_char;
             let c_str = CStr::from_ptr(c_str_ptr);

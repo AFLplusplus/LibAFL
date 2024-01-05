@@ -114,8 +114,18 @@ impl crate::ArchExtras for crate::CPU {
             return Err(format!("Unsupported calling convention: {conv:#?}"));
         }
 
-        // TODO
-        Err(format!("Unsupported argument: {idx:}"))
+        // Note that 64 bit values may be passed in two registers (and may have padding), then this mapping is off.
+        let reg_id = match idx {
+            0 => Regs::R0,
+            1 => Regs::R1,
+            2 => Regs::R2,
+            3 => Regs::R3,
+            4 => Regs::R4,
+            5 => Regs::R5,
+            r => return Err(format!("Unsupported argument: {r:}")),
+        };
+
+        self.reg_read(reg_id)
     }
 
     fn write_function_argument<T>(
