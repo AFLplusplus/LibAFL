@@ -82,11 +82,11 @@ impl QemuInjectionHelper {
         Self {}
     }
 
-    /// `configure_injections` is the main function to activatr the injection
+    /// `configure_injections` is the main function to activate the injection
     /// vulnerability detection feature.
     pub fn configure_injections(
         emu: &Emulator,
-        yaml_file: &String,
+        yaml_file: &str,
         breakpoint: GuestAddr,
     ) -> Vec<String> {
         let mut injections = parse_yaml(yaml_file).unwrap();

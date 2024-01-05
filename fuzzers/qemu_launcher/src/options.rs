@@ -11,6 +11,7 @@ use crate::version::Version;
 #[readonly::make]
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
+#[allow(clippy::module_name_repetitions)]
 #[command(
     name = format!("qemu_coverage-{}",env!("CPU_TARGET")),
     version = Version::default(),
@@ -27,7 +28,8 @@ pub struct FuzzerOptions {
     #[arg(short = 'x', long, help = "Tokens file")]
     pub tokens: Option<String>,
 
-    #[arg(short, long, help = "YAML file")]
+    #[cfg(feature = "injections")]
+    #[arg(short, long, help = "Injections YAML file")]
     pub yaml_file: Option<String>,
 
     #[arg(long, help = "Log file")]

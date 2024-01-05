@@ -8,12 +8,15 @@ edition = "2021"
 default = ["std"]
 std = []
 be = ["libafl_qemu/be"]
-arm = ["libafl_qemu/arm"]
-x86_64 = ["libafl_qemu/x86_64"]
+arm = ["libafl_qemu/arm", "injections"]
+x86_64 = ["libafl_qemu/x86_64", "injections"]
 i386 = ["libafl_qemu/i386"]
-aarch64 = ["libafl_qemu/aarch64"]
-mips = ["libafl_qemu/mips"]
-ppc = ["libafl_qemu/ppc", "be"]
+aarch64 = ["libafl_qemu/aarch64", "injections"]
+mips = ["libafl_qemu/mips", "injections"]
+ppc = ["libafl_qemu/ppc", "be", "injections"]
+
+## Enable fuzzing for injections
+injections = ["libafl_qemu/injections"]
 
 [profile.release]
 lto = true
@@ -28,7 +31,7 @@ vergen = { version = "8.2.1", features = ["build", "cargo", "git", "gitcl", "rus
 clap = { version = "4.3.0", features = ["derive", "string"]}
 libafl = { path = "../../libafl/" }
 libafl_bolts = { path = "../../libafl_bolts/" }
-libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode", "injections"] }
+libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode"] }
 log = {version = "0.4.20" }
 nix = { version = "0.26" }
 rangemap = { version = "1.3" }

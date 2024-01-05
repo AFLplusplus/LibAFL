@@ -1,4 +1,4 @@
-use std::{env, ops::Range, sync::OnceLock};
+use std::{env, ops::Range};
 
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -15,20 +15,21 @@ use libafl_qemu::{
     cmplog::QemuCmpLogHelper,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    injections::QemuInjectionHelper,
     ArchExtras, Emulator, GuestAddr, QemuInstrumentationAddressRangeFilter,
 };
 
+#[cfg(feature = "injections")]
+use libafl_qemu::injections::QemuInjectionHelper;
+
 use crate::{instance::Instance, options::FuzzerOptions};
 
+#[allow(clippy::module_name_repetitions)]
 pub type ClientState =
     StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
 
 pub struct Client<'a> {
     options: &'a FuzzerOptions,
 }
-
-pub static TOKENS: OnceLock<Vec<String>> = OnceLock::new();
 
 impl<'a> Client<'a> {
     pub fn new(options: &FuzzerOptions) -> Client {
@@ -45,11 +46,11 @@ impl<'a> Client<'a> {
         Ok(args)
     }
 
-    fn env(&self) -> Result<Vec<(String, String)>, Error> {
-        let env = env::vars()
+    #[allow(clippy::unused_self)] // Api should look the same as args above
+    fn env(&self) -> Vec<(String, String)> {
+        env::vars()
             .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
-            .collect::<Vec<(String, String)>>();
-        Ok(env)
+            .collect::<Vec<(String, String)>>()
     }
 
     fn start_pc(emu: &Emulator) -> Result<GuestAddr, Error> {
@@ -62,6 +63,7 @@ impl<'a> Client<'a> {
         Ok(start_pc)
     }
 
+    #[allow(clippy::similar_names)] // elf != self
     fn coverage_filter(
         &self,
         emu: &Emulator,
@@ -108,7 +110,7 @@ impl<'a> Client<'a> {
         let mut args = self.args()?;
         log::debug!("ARGS: {:#?}", args);
 
-        let mut env = self.env()?;
+        let mut env = self.env();
         log::debug!("ENV: {:#?}", env);
 
         let (emu, mut asan) = {
@@ -123,14 +125,13 @@ impl<'a> Client<'a> {
         let start_pc = Self::start_pc(&emu)?;
         log::debug!("start_pc @ {start_pc:#x}");
 
-        let extra_tokens: Vec<String>;
-
-        if let Some(yaml_file) = &self.options.yaml_file {
-            extra_tokens = QemuInjectionHelper::configure_injections(&emu, yaml_file, start_pc);
-        } else {
-            extra_tokens = Vec::new();
-        }
-        TOKENS.set(extra_tokens).expect("Failed to set tokens");
+        #[cfg(not(feature = "injections"))]
+        let extra_tokens = None;
+        #[cfg(feature = "injections")]
+        let extra_tokens =
+            self.options.yaml_file.as_ref().map(|yaml_file| {
+                QemuInjectionHelper::configure_injections(&emu, yaml_file, start_pc)
+            });
 
         emu.entry_break(start_pc);
 
@@ -149,16 +150,30 @@ impl<'a> Client<'a> {
             .options(self.options)
             .emu(&emu)
             .mgr(mgr)
-            .core_id(core_id);
+            .core_id(core_id)
+            .extra_tokens(extra_tokens);
         if is_asan && is_cmplog {
+            #[cfg(not(feature = "injections"))]
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuCmpLogHelper::default(),
                 QemuAsanHelper::default(asan.take().unwrap()),
-                QemuInjectionHelper::default(),
+            );
+            #[cfg(feature = "injections")]
+            let helpers = tuple_list!(
+                edge_coverage_helper,
+                QemuCmpLogHelper::default(),
+                QemuAsanHelper::default(asan.take().unwrap()),
+                QemuInjectionHelper::default()
             );
             instance.build().run(helpers, state)
         } else if is_asan {
+            #[cfg(not(feature = "injections"))]
+            let helpers = tuple_list!(
+                edge_coverage_helper,
+                QemuAsanHelper::default(asan.take().unwrap()),
+            );
+            #[cfg(feature = "injections")]
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuAsanHelper::default(asan.take().unwrap()),
@@ -166,6 +181,9 @@ impl<'a> Client<'a> {
             );
             instance.build().run(helpers, state)
         } else if is_cmplog {
+            #[cfg(not(feature = "injections"))]
+            let helpers = tuple_list!(edge_coverage_helper, QemuCmpLogHelper::default(),);
+            #[cfg(feature = "injections")]
             let helpers = tuple_list!(
                 edge_coverage_helper,
                 QemuCmpLogHelper::default(),
@@ -173,6 +191,9 @@ impl<'a> Client<'a> {
             );
             instance.build().run(helpers, state)
         } else {
+            #[cfg(not(feature = "injections"))]
+            let helpers = tuple_list!(edge_coverage_helper,);
+            #[cfg(feature = "injections")]
             let helpers = tuple_list!(edge_coverage_helper, QemuInjectionHelper::default(),);
             instance.build().run(helpers, state)
         }
