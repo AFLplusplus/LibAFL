@@ -268,56 +268,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
 
     //println!("on_call_check {} {}", parameter, off);
 
-    #[cfg(cpu_target = "x86_64")]
-    let reg_id = match parameter {
-        0 => Regs::Rdi,
-        1 => Regs::Rsi,
-        2 => Regs::Rdx,
-        3 => Regs::Rcx,
-        4 => Regs::R8,
-        5 => Regs::R9,
-        r => panic!("Injection fuzzing: unsupported register id {r}"),
-    };
-    #[cfg(cpu_target = "aarch64")]
-    let reg_id = match parameter {
-        0 => Regs::X0,
-        1 => Regs::X1,
-        2 => Regs::X2,
-        3 => Regs::X3,
-        4 => Regs::X4,
-        5 => Regs::X5,
-        r => panic!("Injection fuzzing: unsupported register id {r}"),
-    };
-    #[cfg(cpu_target = "arm")]
-    let reg_id = match parameter {
-        0 => Regs::R0,
-        1 => Regs::R1,
-        2 => Regs::R2,
-        3 => Regs::R3,
-        // 4.. would be on the stack, let's not do this for now
-        r => panic!("Injection fuzzing: unsupported register id {r}"),
-    };
-    #[cfg(cpu_target = "mips")]
-    let reg_id = match parameter {
-        0 => Regs::A0,
-        1 => Regs::A1,
-        2 => Regs::A2,
-        3 => Regs::A3,
-        // 4.. would be on the stack, let's not do this for now
-        r => panic!("Injection fuzzing: unsupported register id {r}"),
-    };
-    #[cfg(cpu_target = "ppc")]
-    let reg_id = match parameter {
-        0 => Regs::R3,
-        1 => Regs::R4,
-        2 => Regs::R5,
-        3 => Regs::R6,
-        4 => Regs::R7,
-        5 => Regs::R8,
-        r => panic!("Injection fuzzing: unsupported register id {r}"),
-    };
-
-    let reg: GuestAddr = emu.current_cpu().unwrap().read_reg(reg_id).unwrap_or(0);
+    let reg: GuestAddr = emu.current_cpu().unwrap().read_function_argument(parameter);
 
     //println!("reg value = {:x}", reg);
 

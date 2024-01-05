@@ -105,11 +105,17 @@ impl crate::ArchExtras for crate::CPU {
             return Err(format!("Unsupported calling convention: {conv:#?}"));
         }
 
-        match idx {
-            0 => self.read_reg(Regs::Rdi),
-            1 => self.read_reg(Regs::Rsi),
-            _ => Err(format!("Unsupported argument: {idx:}")),
-        }
+        let reg_id = match parameter {
+            0 => Regs::Rdi,
+            1 => Regs::Rsi,
+            2 => Regs::Rdx,
+            3 => Regs::Rcx,
+            4 => Regs::R8,
+            5 => Regs::R9,
+            r => Err(format!("Unsupported argument: {r:}")),
+        };
+
+        self.read_reg(reg_id)
     }
 
     fn write_function_argument<T>(
