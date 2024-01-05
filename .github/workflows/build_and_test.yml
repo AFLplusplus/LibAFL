@@ -73,6 +73,7 @@ jobs:
         uses: KyleMayes/install-llvm-action@v1
         with:
           version: "${{matrix.llvm-version}}"
+          directory: /usr/bin/llvm
       - name: Build and test with llvm-${{ matrix.llvm-version }}
         run: pwd && ls & cd libafl_cc && cargo build --release
 
