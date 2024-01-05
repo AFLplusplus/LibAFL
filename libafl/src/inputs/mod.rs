@@ -12,8 +12,14 @@ pub use gramatron::*;
 pub mod generalized;
 pub use generalized::*;
 
+#[cfg(feature = "multipart_inputs")]
+pub mod multi;
+#[cfg(feature = "multipart_inputs")]
+pub use multi::*;
+
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+
 use alloc::{
     boxed::Box,
     string::{String, ToString},

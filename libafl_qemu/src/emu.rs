@@ -980,7 +980,7 @@ impl Emulator {
                     envp.as_ptr() as *const *const u8,
                 );
                 libc::atexit(qemu_cleanup_atexit);
-                libafl_qemu_sys::syx_snapshot_init();
+                libafl_qemu_sys::syx_snapshot_init(true);
             }
         }
         Ok(Emulator { _private: () })
@@ -1544,6 +1544,7 @@ impl Emulator {
         unsafe {
             libafl_qemu_sys::syx_snapshot_new(
                 track,
+                true,
                 libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_ALL,
                 null_mut(),
             )
@@ -1561,6 +1562,7 @@ impl Emulator {
         unsafe {
             libafl_qemu_sys::syx_snapshot_new(
                 track,
+                true,
                 device_filter.enum_id(),
                 device_filter.devices(&mut v),
             )
