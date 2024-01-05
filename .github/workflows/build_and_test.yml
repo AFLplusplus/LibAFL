@@ -191,6 +191,8 @@ jobs:
 
     # ---- build and feature check ----
     # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
     - name: Check each feature
       # Skipping `python` as it has to be built with the `maturin` tool
       # `agpl`, `nautilus` require nightly
