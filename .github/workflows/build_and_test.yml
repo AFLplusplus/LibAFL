@@ -69,10 +69,10 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
-      - name: Install and cache deps
-        uses: awalsh128/cache-apt-pkgs-action@v1.1.0
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
         with:
-          packages: llvm-${{ matrix.llvm-version }} clang-${{ matrix.llvm-version }} llvm-${{ matrix.llvm-version }}-dev ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
+          version: "${{matrix.llvm-version}}"
       - name: get clang version
         run: command -v llvm-config-${{ matrix.llvm-version }} && clang-${{ matrix.llvm-version }} -v
       - name: Add nightly rustfmt and clippy
