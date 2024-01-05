@@ -182,14 +182,14 @@ fn syscall_hook<QT, S>(
     hooks: &mut QemuHooks<QT, S>, // our instantiated QemuHooks
     _state: Option<&mut S>,
     syscall: i32, // syscall number
-    x0: u64,      // registers ...
-    x1: u64,
-    _x2: u64,
-    _x3: u64,
-    _x4: u64,
-    _x5: u64,
-    _x6: u64,
-    _x7: u64,
+    x0: GuestAddr,      // registers ...
+    x1: GuestAddr,
+    _x2: GuestAddr,
+    _x3: GuestAddr,
+    _x4: GuestAddr,
+    _x5: GuestAddr,
+    _x6: GuestAddr,
+    _x7: GuestAddr,
 ) -> SyscallHookResult
 where
     QT: QemuHelperTuple<S>,
@@ -268,7 +268,7 @@ extern "C" fn on_call_check(val: u64, _pc: GuestAddr) {
 
     //println!("on_call_check {} {}", parameter, off);
 
-    #[cfg(any(cpu_target = "x86_64"))]
+    #[cfg(cpu_target = "x86_64")]
     let reg_id = match parameter {
         0 => Regs::Rdi,
         1 => Regs::Rsi,
