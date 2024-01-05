@@ -19,6 +19,10 @@ use libafl_bolts::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::monitors::ClientPerfMonitor;
+#[cfg(feature = "scalability_introspection")]
+use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
@@ -26,7 +30,6 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
-    monitors::ClientPerfMonitor,
     Error,
 };
 
@@ -36,12 +39,15 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// The [`State`] of the fuzzer.
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
-pub trait State: UsesInput + Serialize + DeserializeOwned {}
+pub trait State:
+    UsesInput + Serialize + DeserializeOwned + MaybeHasClientPerfMonitor + MaybeHasScalabilityMonitor
+{
+}
 
 /// Structs which implement this trait are aware of the state. This is used for type enforcement.
 pub trait UsesState: UsesInput<Input = <Self::State as UsesInput>::Input> {
     /// The state known by this type.
-    type State: UsesInput;
+    type State: State;
 }
 
 // blanket impl which automatically defines UsesInput for anything that implements UsesState
@@ -92,6 +98,7 @@ pub trait HasRand {
     fn rand_mut(&mut self) -> &mut Self::Rand;
 }
 
+#[cfg(feature = "introspection")]
 /// Trait for offering a [`ClientPerfMonitor`]
 pub trait HasClientPerfMonitor {
     /// [`ClientPerfMonitor`] itself
@@ -99,6 +106,43 @@ pub trait HasClientPerfMonitor {
 
     /// Mutatable ref to [`ClientPerfMonitor`]
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
+}
+
+/// Intermediate trait for `HasClientPerfMonitor`
+#[cfg(feature = "introspection")]
+pub trait MaybeHasClientPerfMonitor: HasClientPerfMonitor {}
+
+/// Intermediate trait for `HasClientPerfmonitor`
+#[cfg(not(feature = "introspection"))]
+pub trait MaybeHasClientPerfMonitor {}
+
+#[cfg(not(feature = "introspection"))]
+impl<T> MaybeHasClientPerfMonitor for T {}
+
+#[cfg(feature = "introspection")]
+impl<T> MaybeHasClientPerfMonitor for T where T: HasClientPerfMonitor {}
+
+/// Intermediate trait for `HasScalabilityMonitor`
+#[cfg(feature = "scalability_introspection")]
+pub trait MaybeHasScalabilityMonitor: HasScalabilityMonitor {}
+/// Intermediate trait for `HasScalabilityMonitor`
+#[cfg(not(feature = "scalability_introspection"))]
+pub trait MaybeHasScalabilityMonitor {}
+
+#[cfg(not(feature = "scalability_introspection"))]
+impl<T> MaybeHasScalabilityMonitor for T {}
+
+#[cfg(feature = "scalability_introspection")]
+impl<T> MaybeHasScalabilityMonitor for T where T: HasScalabilityMonitor {}
+
+/// Trait for offering a [`ScalabilityMonitor`]
+#[cfg(feature = "scalability_introspection")]
+pub trait HasScalabilityMonitor {
+    /// Ref to [`ScalabilityMonitor`]
+    fn scalability_monitor(&self) -> &ScalabilityMonitor;
+
+    /// Mutable ref to [`ScalabilityMonitor`]
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor;
 }
 
 /// Trait for elements offering metadata
@@ -266,6 +310,8 @@ pub struct StdState<I, C, R, SC> {
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
+    #[cfg(feature = "scalability_introspection")]
+    scalability_monitor: ScalabilityMonitor,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
@@ -844,6 +890,8 @@ where
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
+            #[cfg(feature = "scalability_introspection")]
+            scalability_monitor: ScalabilityMonitor::new(),
             #[cfg(feature = "std")]
             remaining_initial_files: None,
             #[cfg(feature = "std")]
@@ -868,14 +916,14 @@ impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
     }
 }
 
-#[cfg(not(feature = "introspection"))]
-impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
-    fn introspection_monitor(&self) -> &ClientPerfMonitor {
-        unimplemented!()
+#[cfg(feature = "scalability_introspection")]
+impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
+    fn scalability_monitor(&self) -> &ScalabilityMonitor {
+        &self.scalability_monitor
     }
 
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!()
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
+        &mut self.scalability_monitor
     }
 }
 
@@ -950,17 +998,29 @@ impl<I> HasRand for NopState<I> {
     }
 }
 
+impl<I> State for NopState<I> where I: Input {}
+
+#[cfg(feature = "introspection")]
 impl<I> HasClientPerfMonitor for NopState<I> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
-        unimplemented!()
+        unimplemented!();
     }
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!()
+        unimplemented!();
     }
 }
 
-impl<I> State for NopState<I> where I: Input {}
+#[cfg(feature = "scalability_introspection")]
+impl<I> HasScalabilityMonitor for NopState<I> {
+    fn scalability_monitor(&self) -> &ScalabilityMonitor {
+        unimplemented!();
+    }
+
+    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
+        unimplemented!();
+    }
+}
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]

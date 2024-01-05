@@ -28,7 +28,7 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     drcov::QemuDrCovHelper, elf::EasyElf, emu::Emulator, ArchExtras, CallingConvention, GuestAddr,
-    GuestReg, MmapPerms, QemuExecutor, QemuHooks, QemuInstrumentationFilter, Regs,
+    GuestReg, MmapPerms, QemuExecutor, QemuHooks, QemuInstrumentationAddressRangeFilter, Regs,
 };
 use rangemap::RangeMap;
 
@@ -236,9 +236,9 @@ pub fn fuzz() {
         coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
         let mut hooks = QemuHooks::new(
-            &emu,
+            emu.clone(),
             tuple_list!(QemuDrCovHelper::new(
-                QemuInstrumentationFilter::None,
+                QemuInstrumentationAddressRangeFilter::None,
                 rangemap,
                 PathBuf::from(coverage),
                 false,

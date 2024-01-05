@@ -40,10 +40,10 @@ where
 {
     /// Creates a new [`ValueObserver`] with the given name.
     #[must_use]
-    pub fn new(name: &'static str, value: &'a T) -> Self {
+    pub fn new(name: &'static str, value: OwnedRef<'a, T>) -> Self {
         Self {
             name: name.to_string(),
-            value: OwnedRef::Ref(value),
+            value,
         }
     }
 
@@ -65,6 +65,7 @@ where
         T: Clone,
     {
         match self.value {
+            OwnedRef::RefRaw(r, _) => unsafe { (*r).clone() },
             OwnedRef::Ref(r) => r.clone(),
             OwnedRef::Owned(v) => *v,
         }
@@ -119,10 +120,10 @@ where
 {
     /// Creates a new [`RefCellValueObserver`] with the given name.
     #[must_use]
-    pub fn new(name: &'static str, value: &'a RefCell<T>) -> Self {
+    pub fn new(name: &'static str, value: OwnedRef<'a, RefCell<T>>) -> Self {
         Self {
             name: name.to_string(),
-            value: OwnedRef::Ref(value),
+            value,
         }
     }
 
@@ -147,6 +148,7 @@ where
         T: Clone,
     {
         match self.value {
+            OwnedRef::RefRaw(r, _) => unsafe { (*r).borrow().deref().clone() },
             OwnedRef::Ref(r) => r.borrow().deref().clone(),
             OwnedRef::Owned(v) => v.borrow().clone(),
         }

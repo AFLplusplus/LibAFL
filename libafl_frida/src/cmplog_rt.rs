@@ -6,6 +6,8 @@
 use std::ffi::c_void;
 
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+#[cfg(target_arch = "aarch64")]
+use frida_gum_sys::Insn;
 use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
@@ -27,11 +29,9 @@ use frida_gum::{
     instruction_writer::{Aarch64Register, IndexMode, InstructionWriter},
     stalker::StalkerOutput,
 };
-#[cfg(target_arch = "aarch64")]
-use frida_gum_sys::Insn;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-use crate::utils::{frida_to_cs, instruction_width, writer_register};
+use crate::utils::{disas_count, writer_register};
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 /// Speciial `CmpLog` Cases for `aarch64`
@@ -44,10 +44,7 @@ pub enum SpecialCmpLogCase {
 }
 
 #[cfg(target_arch = "aarch64")]
-use capstone::{
-    arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand},
-    Capstone,
-};
+use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand, ShiftStyle};
 
 /// The [`frida_gum_sys::GUM_RED_ZONE_SIZE`] casted to [`i32`]
 ///
@@ -68,13 +65,12 @@ fn gum_red_zone_size_i32() -> i32 {
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 pub enum CmplogOperandType {
     /// A Register
-    Regid(capstone::RegId),
+    Regid(Aarch64Register),
     /// An immediate value
     Imm(u64),
     /// A constant immediate value
     Cimm(u64),
-    /// A memory operand
-    Mem(capstone::RegId, capstone::RegId, i32, u32),
+    // We don't need a memory type because you cannot directly compare with memory
 }
 
 /// `Frida`-based binary-only innstrumentation that logs compares to the fuzzer
@@ -276,8 +272,9 @@ impl CmpLogRuntime {
         &self,
         _address: u64,
         output: &StalkerOutput,
-        op1: &CmplogOperandType,
-        op2: &CmplogOperandType,
+        op1: &CmplogOperandType, //first operand of the comparsion
+        op2: &CmplogOperandType, //second operand of the comparsion
+        _shift: Option<(ShiftStyle, u8)>,
         special_case: Option<SpecialCmpLogCase>,
     ) {
         let writer = output.writer();
@@ -296,67 +293,17 @@ impl CmpLogRuntime {
             CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
                 writer.put_ldr_reg_u64(Aarch64Register::X0, *value);
             }
-            CmplogOperandType::Regid(reg) => {
-                let reg = writer_register(*reg);
-                match reg {
-                    Aarch64Register::X0 | Aarch64Register::W0 => {}
-                    Aarch64Register::X1 | Aarch64Register::W1 => {
-                        writer.put_mov_reg_reg(Aarch64Register::X0, Aarch64Register::X1);
-                    }
-                    _ => {
-                        if !writer.put_mov_reg_reg(Aarch64Register::X0, reg) {
-                            writer.put_mov_reg_reg(Aarch64Register::W0, reg);
-                        }
+            CmplogOperandType::Regid(reg) => match *reg {
+                Aarch64Register::X0 | Aarch64Register::W0 => {}
+                Aarch64Register::X1 | Aarch64Register::W1 => {
+                    writer.put_mov_reg_reg(Aarch64Register::X0, Aarch64Register::X1);
+                }
+                _ => {
+                    if !writer.put_mov_reg_reg(Aarch64Register::X0, *reg) {
+                        writer.put_mov_reg_reg(Aarch64Register::W0, *reg);
                     }
                 }
-            }
-            CmplogOperandType::Mem(basereg, indexreg, displacement, _width) => {
-                let basereg = writer_register(*basereg);
-                let indexreg = if indexreg.0 == 0 {
-                    None
-                } else {
-                    Some(writer_register(*indexreg))
-                };
-
-                // calculate base+index+displacment into x0
-                let displacement = displacement
-                    + if basereg == Aarch64Register::Sp {
-                        16 + gum_red_zone_size_i32()
-                    } else {
-                        0
-                    };
-
-                if indexreg.is_some() {
-                    if let Some(indexreg) = indexreg {
-                        writer.put_add_reg_reg_reg(Aarch64Register::X0, basereg, indexreg);
-                    }
-                } else {
-                    match basereg {
-                        Aarch64Register::X0 | Aarch64Register::W0 => {}
-                        Aarch64Register::X1 | Aarch64Register::W1 => {
-                            writer.put_mov_reg_reg(Aarch64Register::X0, Aarch64Register::X1);
-                        }
-                        _ => {
-                            if !writer.put_mov_reg_reg(Aarch64Register::X0, basereg) {
-                                writer.put_mov_reg_reg(Aarch64Register::W0, basereg);
-                            }
-                        }
-                    }
-                }
-
-                debug_assert!(displacement >= 0);
-
-                //add displacement
-                #[allow(clippy::cast_sign_loss)]
-                writer.put_add_reg_reg_imm(
-                    Aarch64Register::X0,
-                    Aarch64Register::X0,
-                    displacement as u64,
-                );
-
-                //deref into x0 to get the real value
-                writer.put_ldr_reg_reg_offset(Aarch64Register::X0, Aarch64Register::X0, 0u64);
-            }
+            },
         }
 
         // make sure operand2 value is saved into x1
@@ -374,207 +321,17 @@ impl CmpLogRuntime {
                     }
                 }
             }
-            CmplogOperandType::Regid(reg) => {
-                let reg = writer_register(*reg);
-                match reg {
-                    Aarch64Register::X1 | Aarch64Register::W1 => {}
-                    Aarch64Register::X0 | Aarch64Register::W0 => {
-                        writer.put_ldr_reg_reg_offset(
-                            Aarch64Register::X1,
-                            Aarch64Register::Sp,
-                            0u64,
-                        );
-                    }
-                    _ => {
-                        if !writer.put_mov_reg_reg(Aarch64Register::X1, reg) {
-                            writer.put_mov_reg_reg(Aarch64Register::W1, reg);
-                        }
+            CmplogOperandType::Regid(reg) => match *reg {
+                Aarch64Register::X1 | Aarch64Register::W1 => {}
+                Aarch64Register::X0 | Aarch64Register::W0 => {
+                    writer.put_ldr_reg_reg_offset(Aarch64Register::X1, Aarch64Register::Sp, 0u64);
+                }
+                _ => {
+                    if !writer.put_mov_reg_reg(Aarch64Register::X1, *reg) {
+                        writer.put_mov_reg_reg(Aarch64Register::W1, *reg);
                     }
                 }
-            }
-            CmplogOperandType::Mem(basereg, indexreg, displacement, _width) => {
-                let basereg = writer_register(*basereg);
-                let indexreg = if indexreg.0 == 0 {
-                    None
-                } else {
-                    Some(writer_register(*indexreg))
-                };
-
-                // calculate base+index+displacement into x1
-                let displacement = displacement
-                    + if basereg == Aarch64Register::Sp {
-                        16 + gum_red_zone_size_i32()
-                    } else {
-                        0
-                    };
-
-                if indexreg.is_some() {
-                    if let Some(indexreg) = indexreg {
-                        match indexreg {
-                            Aarch64Register::X0 | Aarch64Register::W0 => {
-                                match basereg {
-                                    Aarch64Register::X1 | Aarch64Register::W1 => {
-                                        // x0 is overwritten indexreg by op1 value.
-                                        // x1 is basereg
-
-                                        // Preserve x2, x3:
-                                        writer.put_stp_reg_reg_reg_offset(
-                                            Aarch64Register::X2,
-                                            Aarch64Register::X3,
-                                            Aarch64Register::Sp,
-                                            i64::from(-(16 + gum_red_zone_size_i32())),
-                                            IndexMode::PreAdjust,
-                                        );
-
-                                        //reload indexreg to x2
-                                        writer.put_ldr_reg_reg_offset(
-                                            Aarch64Register::X2,
-                                            Aarch64Register::Sp,
-                                            0u64,
-                                        );
-                                        //add them into basereg==x1
-                                        writer.put_add_reg_reg_reg(
-                                            basereg,
-                                            basereg,
-                                            Aarch64Register::X2,
-                                        );
-
-                                        // Restore x2, x3
-                                        assert!(writer.put_ldp_reg_reg_reg_offset(
-                                            Aarch64Register::X2,
-                                            Aarch64Register::X3,
-                                            Aarch64Register::Sp,
-                                            16 + i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE),
-                                            IndexMode::PostAdjust,
-                                        ));
-                                    }
-                                    _ => {
-                                        // x0 is overwrittern indexreg by op1 value.
-                                        // basereg is not x1 nor x0
-
-                                        //reload indexreg to x1
-                                        writer.put_ldr_reg_reg_offset(
-                                            Aarch64Register::X1,
-                                            Aarch64Register::Sp,
-                                            0u64,
-                                        );
-                                        //add basereg into indexreg==x1
-                                        writer.put_add_reg_reg_reg(
-                                            Aarch64Register::X1,
-                                            basereg,
-                                            Aarch64Register::X1,
-                                        );
-                                    }
-                                }
-                            }
-                            Aarch64Register::X1 | Aarch64Register::W1 => {
-                                match basereg {
-                                    Aarch64Register::X0 | Aarch64Register::W0 => {
-                                        // x0 is overwritten basereg by op1 value.
-                                        // x1 is indexreg
-
-                                        // Preserve x2, x3:
-                                        writer.put_stp_reg_reg_reg_offset(
-                                            Aarch64Register::X2,
-                                            Aarch64Register::X3,
-                                            Aarch64Register::Sp,
-                                            i64::from(-(16 + gum_red_zone_size_i32())),
-                                            IndexMode::PreAdjust,
-                                        );
-
-                                        //reload basereg to x2
-                                        writer.put_ldr_reg_reg_offset(
-                                            Aarch64Register::X2,
-                                            Aarch64Register::Sp,
-                                            0u64,
-                                        );
-                                        //add basereg into indexreg==x1
-                                        writer.put_add_reg_reg_reg(
-                                            indexreg,
-                                            Aarch64Register::X2,
-                                            indexreg,
-                                        );
-
-                                        // Restore x2, x3
-                                        assert!(writer.put_ldp_reg_reg_reg_offset(
-                                            Aarch64Register::X2,
-                                            Aarch64Register::X3,
-                                            Aarch64Register::Sp,
-                                            16 + i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE),
-                                            IndexMode::PostAdjust,
-                                        ));
-                                    }
-                                    _ => {
-                                        // indexreg is x1
-                                        // basereg is not x0 and not x1
-
-                                        //add them into x1
-                                        writer.put_add_reg_reg_reg(indexreg, basereg, indexreg);
-                                    }
-                                }
-                            }
-                            _ => {
-                                match basereg {
-                                    Aarch64Register::X0 | Aarch64Register::W0 => {
-                                        //basereg is overwritten by op1 value
-                                        //index reg is not x0 nor x1
-
-                                        //reload basereg to x1
-                                        writer.put_ldr_reg_reg_offset(
-                                            Aarch64Register::X1,
-                                            Aarch64Register::Sp,
-                                            0u64,
-                                        );
-                                        //add indexreg to basereg==x1
-                                        writer.put_add_reg_reg_reg(
-                                            Aarch64Register::X1,
-                                            Aarch64Register::X1,
-                                            indexreg,
-                                        );
-                                    }
-                                    _ => {
-                                        //basereg is not x0, can be x1
-                                        //index reg is not x0 nor x1
-
-                                        //add them into x1
-                                        writer.put_add_reg_reg_reg(
-                                            Aarch64Register::X1,
-                                            basereg,
-                                            indexreg,
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    match basereg {
-                        Aarch64Register::X1 | Aarch64Register::W1 => {}
-                        Aarch64Register::X0 | Aarch64Register::W0 => {
-                            // x0 is overwrittern basereg by op1 value.
-                            //reload basereg to x1
-                            writer.put_ldr_reg_reg_offset(
-                                Aarch64Register::X1,
-                                Aarch64Register::Sp,
-                                0u64,
-                            );
-                        }
-                        _ => {
-                            writer.put_mov_reg_reg(Aarch64Register::W1, basereg);
-                        }
-                    }
-                }
-
-                // add displacement
-                #[allow(clippy::cast_sign_loss)]
-                writer.put_add_reg_reg_imm(
-                    Aarch64Register::X1,
-                    Aarch64Register::X1,
-                    displacement as u64,
-                );
-                //deref into x1 to get the real value
-                writer.put_ldr_reg_reg_offset(Aarch64Register::X1, Aarch64Register::X1, 0u64);
-            }
+            },
         }
 
         //call cmplog runtime to populate the values map
@@ -596,97 +353,122 @@ impl CmpLogRuntime {
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
     #[must_use]
     pub fn cmplog_is_interesting_instruction(
-        capstone: &Capstone,
+        decoder: InstDecoder,
         _address: u64,
         instr: &Insn,
     ) -> Option<(
         CmplogOperandType,
         CmplogOperandType,
+        Option<(ShiftStyle, u8)>, //possible shifts: everything except MSL
         Option<SpecialCmpLogCase>,
     )> {
-        // We need to re-decode frida-internal capstone values to upstream capstone
-        let cs_instr = frida_to_cs(capstone, instr);
-        let cs_instr = cs_instr.first().unwrap();
-
+        let mut instr = disas_count(&decoder, instr.bytes(), 1)[0];
+        let operands_len = instr
+            .operands
+            .iter()
+            .position(|item| *item == Operand::Nothing)
+            .unwrap_or_else(|| 4);
+        // "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cbz"
+        //    | "cbnz" | "tbz" | "tbnz" | "adcs" - yaxpeax aliases insns (i.e., cmp -> subs)
         // We only care for compare instructions - aka instructions which set the flags
-        match cs_instr.mnemonic().unwrap() {
-            "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cbz"
-            | "cbnz" | "tbz" | "tbnz" | "adcs" => (),
+        match instr.opcode {
+            Opcode::SUBS
+            | Opcode::ANDS
+            | Opcode::ADDS
+            | Opcode::SBCS
+            | Opcode::BICS
+            | Opcode::CBZ
+            | Opcode::CBNZ
+            | Opcode::TBZ
+            | Opcode::TBNZ
+            | Opcode::ADC => (),
             _ => return None,
         }
-        let mut operands = capstone
-            .insn_detail(cs_instr)
-            .unwrap()
-            .arch_detail()
-            .operands();
 
-        // cbz - 1 operand, tbz - 3 operands
+        // cbz - 1 operand, everything else - 3 operands
         let special_case = [
-            "cbz", "cbnz", "tbz", "tbnz", "subs", "adds", "ands", "sbcs", "bics", "adcs",
+            Opcode::CBZ,
+            Opcode::CBNZ,
+            Opcode::TBZ,
+            Opcode::TBNZ,
+            Opcode::SUBS,
+            Opcode::ADDS,
+            Opcode::ANDS,
+            Opcode::SBCS,
+            Opcode::BICS,
+            Opcode::ADCS,
         ]
-        .contains(&cs_instr.mnemonic().unwrap());
-        if operands.len() != 2 && !special_case {
+        .contains(&instr.opcode);
+        //this check is to ensure that there are the right number of operands
+        if operands_len != 2 && !special_case {
             return None;
         }
 
         // handle special opcodes case which have 3 operands, but the 1st(dest) is not important to us
-        if ["subs", "adds", "ands", "sbcs", "bics", "adcs"].contains(&cs_instr.mnemonic().unwrap())
+        ////subs", "adds", "ands", "sbcs", "bics", "adcs"
+        if [
+            Opcode::SUBS,
+            Opcode::ADDS,
+            Opcode::ANDS,
+            Opcode::SBCS,
+            Opcode::BICS,
+            Opcode::ADCS,
+        ]
+        .contains(&instr.opcode)
         {
             //remove the dest operand from the list
-            operands.remove(0);
+            instr.operands.rotate_left(1);
+            instr.operands[3] = Operand::Nothing;
         }
 
         // cbz marked as special since there is only 1 operand
         #[allow(clippy::cast_sign_loss)]
-        let special_case = matches!(cs_instr.mnemonic().unwrap(), "cbz" | "cbnz");
+        let special_case = matches!(instr.opcode, Opcode::CBZ | Opcode::CBNZ);
 
         #[allow(clippy::cast_sign_loss, clippy::similar_names)]
-        let operand1 = if let Arm64Operand(arm64operand) = operands.first().unwrap() {
-            match arm64operand.op_type {
-                Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
-                Arm64OperandType::Imm(val) => Some(CmplogOperandType::Imm(val as u64)),
-                Arm64OperandType::Mem(opmem) => Some(CmplogOperandType::Mem(
-                    opmem.base(),
-                    opmem.index(),
-                    opmem.disp(),
-                    instruction_width(cs_instr, &operands),
-                )),
-                Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
-                _ => return None,
-            }
-        } else {
-            None
+        let operand1 = match instr.operands[0] {
+            //the only possibilities are registers for the first operand
+            //precompute the aarch64 frida register because it is ambiguous if register=31 means xzr or sp in yaxpeax
+            Operand::Register(sizecode, reg) => Some(CmplogOperandType::Regid(writer_register(
+                reg, sizecode, true,
+            ))),
+            Operand::RegisterOrSP(sizecode, reg) => Some(CmplogOperandType::Regid(
+                writer_register(reg, sizecode, false),
+            )),
+            _ => panic!("First argument is not a register"), //this should never be possible in arm64
         };
 
         #[allow(clippy::cast_sign_loss)]
         let operand2 = if special_case {
-            Some(CmplogOperandType::Imm(0))
-        } else if let Arm64Operand(arm64operand2) = &operands[1] {
-            match arm64operand2.op_type {
-                Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
-                Arm64OperandType::Imm(val) => Some(CmplogOperandType::Imm(val as u64)),
-                Arm64OperandType::Mem(opmem) => Some(CmplogOperandType::Mem(
-                    opmem.base(),
-                    opmem.index(),
-                    opmem.disp(),
-                    instruction_width(cs_instr, &operands),
-                )),
-                Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
-                _ => return None,
-            }
+            Some((CmplogOperandType::Imm(0), None))
         } else {
-            None
+            match instr.operands[1] {
+                Operand::Register(sizecode, reg) => Some((
+                    CmplogOperandType::Regid(writer_register(reg, sizecode, true)),
+                    None,
+                )),
+                Operand::ImmShift(imm, shift) => {
+                    Some((CmplogOperandType::Imm((imm as u64) << shift), None))
+                } //precalculate the shift
+                Operand::RegShift(shiftstyle, amount, regsize, reg) => {
+                    let reg = CmplogOperandType::Regid(writer_register(reg, regsize, true));
+                    let shift = (shiftstyle, amount);
+                    Some((reg, Some(shift)))
+                }
+                Operand::Immediate(imm) => Some((CmplogOperandType::Imm(imm as u64), None)),
+                _ => panic!("Second argument could not be decoded"),
+            }
         };
 
         // tbz will need to have special handling at emit time(masking operand1 value with operand2)
-        let special_case = match cs_instr.mnemonic().unwrap() {
-            "tbz" => Some(SpecialCmpLogCase::Tbz),
-            "tbnz" => Some(SpecialCmpLogCase::Tbnz),
+        let special_case = match instr.opcode {
+            Opcode::TBZ => Some(SpecialCmpLogCase::Tbz),
+            Opcode::TBNZ => Some(SpecialCmpLogCase::Tbnz),
             _ => None,
         };
 
         if let Some(op1) = operand1 {
-            operand2.map(|op2| (op1, op2, special_case))
+            operand2.map(|op2| (op1, op2.0, op2.1, special_case))
         } else {
             None
         }

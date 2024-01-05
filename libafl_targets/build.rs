@@ -18,12 +18,6 @@ fn main() {
     let cmp_map_size: usize = option_env!("LIBAFL_CMP_MAP_SIZE")
         .map_or(Ok(65536), str::parse)
         .expect("Could not parse LIBAFL_CMP_MAP_SIZE");
-    let aflpp_cmplog_map_w: usize = option_env!("LIBAFL_AFLPP_CMPLOG_MAP_W")
-        .map_or(Ok(65536), str::parse)
-        .expect("Could not parse LIBAFL_AFLPP_CMPLOG_MAP_W");
-    let aflpp_cmplog_map_h: usize = option_env!("LIBAFL_AFLPP_CMPLOG_MAP_W")
-        .map_or(Ok(32), str::parse)
-        .expect("Could not parse LIBAFL_AFLPP_CMPLOG_MAP_W");
     let cmplog_map_w: usize = option_env!("LIBAFL_CMPLOG_MAP_W")
         .map_or(Ok(65536), str::parse)
         .expect("Could not parse LIBAFL_CMPLOG_MAP_W");
@@ -42,10 +36,6 @@ fn main() {
         pub const EDGES_MAP_SIZE: usize = {edges_map_size};
         /// The size of the cmps map
         pub const CMP_MAP_SIZE: usize = {cmp_map_size};
-        /// The width of the aflpp cmplog map
-        pub const AFLPP_CMPLOG_MAP_W: usize = {aflpp_cmplog_map_w};
-        /// The height of the aflpp cmplog map
-        pub const AFLPP_CMPLOG_MAP_H: usize = {aflpp_cmplog_map_h};
         /// The width of the `CmpLog` map
         pub const CMPLOG_MAP_W: usize = {cmplog_map_w};
         /// The height of the `CmpLog` map
@@ -58,11 +48,24 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMP_MAP_SIZE");
-    println!("cargo:rerun-if-env-changed=LIBAFL_AFLPP_CMPLOG_MAP_W");
-    println!("cargo:rerun-if-env-changed=LIBAFL_AFLPP_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
+
+    #[cfg(feature = "common")]
+    {
+        println!("cargo:rerun-if-changed=src/common.h");
+        println!("cargo:rerun-if-changed=src/common.c");
+
+        let mut common = cc::Build::new();
+
+        #[cfg(feature = "sanitizers_flags")]
+        {
+            common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
+        }
+
+        common.file(src_dir.join("common.c")).compile("common");
+    }
 
     #[cfg(any(feature = "sancov_value_profile", feature = "sancov_cmplog"))]
     {
@@ -92,14 +95,6 @@ fn main() {
 
         sancov_cmp
             .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-            .define(
-                "AFLPP_CMPLOG_MAP_W",
-                Some(&*format!("{aflpp_cmplog_map_w}")),
-            )
-            .define(
-                "AFLPP_CMPLOG_MAP_H",
-                Some(&*format!("{aflpp_cmplog_map_h}")),
-            )
             .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
             .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
             .file(src_dir.join("sancov_cmp.c"))
@@ -133,11 +128,73 @@ fn main() {
         libfuzzer.compile("libfuzzer");
     }
 
-    println!("cargo:rerun-if-changed=src/common.h");
-    println!("cargo:rerun-if-changed=src/common.c");
-
-    #[cfg(feature = "sanitizer_interfaces")]
+    #[cfg(feature = "coverage")]
     {
+        println!("cargo:rerun-if-changed=src/coverage.c");
+
+        cc::Build::new()
+            .file(src_dir.join("coverage.c"))
+            .define("EDGES_MAP_SIZE", Some(&*format!("{edges_map_size}")))
+            .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
+            .compile("coverage");
+    }
+
+    #[cfg(feature = "cmplog")]
+    {
+        println!("cargo:rerun-if-changed=src/cmplog.h");
+        println!("cargo:rerun-if-changed=src/cmplog.c");
+
+        #[cfg(unix)]
+        {
+            let mut cc = cc::Build::new();
+
+            #[cfg(feature = "cmplog_extended_instrumentation")]
+            cc.define("CMPLOG_EXTENDED", Some("1"));
+
+            cc.flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
+                .flag("-Wno-sign-compare")
+                .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+                .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+                .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+                .file(src_dir.join("cmplog.c"))
+                .compile("cmplog");
+        }
+
+        #[cfg(not(unix))]
+        {
+            cc::Build::new()
+                .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+                .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+                .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+                .file(src_dir.join("cmplog.c"))
+                .compile("cmplog");
+        }
+    }
+
+    #[cfg(feature = "forkserver")]
+    {
+        #[cfg(unix)]
+        {
+            println!("cargo:rerun-if-changed=src/forkserver.c");
+
+            cc::Build::new()
+                .file(src_dir.join("forkserver.c"))
+                .compile("forkserver");
+        }
+    }
+
+    #[cfg(all(feature = "windows_asan", windows))]
+    {
+        println!("cargo:rerun-if-changed=src/windows_asan.c");
+
+        cc::Build::new()
+            .file(src_dir.join("windows_asan.c"))
+            .compile("windows_asan");
+    }
+
+    // NOTE: Sanitizer interfaces doesn't require common
+    #[cfg(feature = "sanitizer_interfaces")]
+    if env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap() == "64" {
         println!("cargo:rerun-if-changed=src/sanitizer_interfaces.h");
 
         let build = bindgen::builder()
@@ -151,82 +208,10 @@ fn main() {
         build
             .write_to_file(Path::new(&out_dir).join("sanitizer_interfaces.rs"))
             .expect("Couldn't write the sanitizer headers!");
-    }
-
-    let mut common = cc::Build::new();
-
-    #[cfg(feature = "sanitizers_flags")]
-    {
-        common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
-    }
-
-    common.file(src_dir.join("common.c")).compile("common");
-
-    println!("cargo:rerun-if-changed=src/coverage.c");
-
-    cc::Build::new()
-        .file(src_dir.join("coverage.c"))
-        .define("EDGES_MAP_SIZE", Some(&*format!("{edges_map_size}")))
-        .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
-        .compile("coverage");
-
-    println!("cargo:rerun-if-changed=src/cmplog.h");
-    println!("cargo:rerun-if-changed=src/cmplog.c");
-
-    #[cfg(unix)]
-    {
-        cc::Build::new()
-            .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
-            .flag("-Wno-sign-compare")
-            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-            .define(
-                "AFLPP_CMPLOG_MAP_W",
-                Some(&*format!("{aflpp_cmplog_map_w}")),
-            )
-            .define(
-                "AFLPP_CMPLOG_MAP_H",
-                Some(&*format!("{aflpp_cmplog_map_h}")),
-            )
-            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-            .file(src_dir.join("cmplog.c"))
-            .compile("cmplog");
-    }
-
-    #[cfg(not(unix))]
-    {
-        cc::Build::new()
-            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-            .define(
-                "AFLPP_CMPLOG_MAP_W",
-                Some(&*format!("{aflpp_cmplog_map_w}")),
-            )
-            .define(
-                "AFLPP_CMPLOG_MAP_H",
-                Some(&*format!("{aflpp_cmplog_map_h}")),
-            )
-            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-            .file(src_dir.join("cmplog.c"))
-            .compile("cmplog");
-    }
-
-    #[cfg(unix)]
-    {
-        println!("cargo:rerun-if-changed=src/forkserver.c");
-
-        cc::Build::new()
-            .file(src_dir.join("forkserver.c"))
-            .compile("forkserver");
-    }
-
-    #[cfg(windows)]
-    {
-        println!("cargo:rerun-if-changed=src/windows_asan.c");
-
-        cc::Build::new()
-            .file(src_dir.join("windows_asan.c"))
-            .compile("windows_asan");
+    } else {
+        let mut file = File::create(Path::new(&out_dir).join("sanitizer_interfaces.rs"))
+            .expect("Could not create file");
+        write!(file, "").unwrap();
     }
 
     println!("cargo:rustc-link-search=native={}", &out_dir);

@@ -11,10 +11,12 @@ use core::{
 };
 use std::os::raw::{c_long, c_void};
 
+use log::info;
 use num_enum::TryFromPrimitive;
 pub use windows::Win32::{
-    Foundation::NTSTATUS,
+    Foundation::{BOOL, NTSTATUS},
     System::{
+        Console::{SetConsoleCtrlHandler, CTRL_BREAK_EVENT, CTRL_C_EVENT, PHANDLER_ROUTINE},
         Diagnostics::Debug::{
             AddVectoredExceptionHandler, UnhandledExceptionFilter, EXCEPTION_POINTERS,
         },
@@ -321,11 +323,21 @@ unsafe fn internal_handle_exception(
         .unwrap();
     match &EXCEPTION_HANDLERS[index] {
         Some(handler_holder) => {
+            info!(
+                "{:?}: Handling exception {}",
+                std::process::id(),
+                exception_code
+            );
             let handler = &mut **handler_holder.handler.get();
             handler.handle(exception_code, exception_pointers);
             EXCEPTION_CONTINUE_EXECUTION
         }
         None => {
+            info!(
+                "{:?}: No handler for exception {}",
+                std::process::id(),
+                exception_code
+            );
             // Go to Default one
             let handler_holder = &EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]
                 .as_ref()
@@ -351,7 +363,7 @@ pub unsafe extern "system" fn handle_exception(
         .unwrap()
         .ExceptionCode;
     let exception_code = ExceptionCode::try_from(code.0).unwrap();
-    // log::info!("Received exception; code: {}", exception_code);
+    log::info!("Received exception; code: {}", exception_code);
     internal_handle_exception(exception_code, exception_pointers)
 }
 
@@ -405,4 +417,60 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
         Some(core::mem::transmute(handle_exception as *const c_void)),
     );
     Ok(())
+}
+
+#[cfg(feature = "alloc")]
+pub(crate) trait CtrlHandler {
+    /// Handle an exception
+    fn handle(&mut self, ctrl_type: u32) -> bool;
+}
+
+struct CtrlHandlerHolder {
+    handler: UnsafeCell<*mut dyn CtrlHandler>,
+}
+
+/// Keep track of which handler is registered for which exception
+static mut CTRL_HANDLER: Option<CtrlHandlerHolder> = None;
+
+/// Set `ConsoleCtrlHandler` to catch Ctrl-C
+/// # Safety
+/// Same safety considerations as in `setup_exception_handler`
+pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
+    handler: &mut T,
+) -> Result<(), Error> {
+    write_volatile(
+        &mut CTRL_HANDLER,
+        Some(CtrlHandlerHolder {
+            handler: UnsafeCell::new(handler as *mut dyn CtrlHandler),
+        }),
+    );
+    compiler_fence(Ordering::SeqCst);
+
+    // Log the result of SetConsoleCtrlHandler
+    let result = SetConsoleCtrlHandler(Some(ctrl_handler), true);
+    match result {
+        Ok(()) => {
+            info!("SetConsoleCtrlHandler succeeded");
+            Ok(())
+        }
+        Err(err) => {
+            info!("SetConsoleCtrlHandler failed");
+            Err(Error::from(err))
+        }
+    }
+}
+
+unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> BOOL {
+    match &CTRL_HANDLER {
+        Some(handler_holder) => {
+            info!("{:?}: Handling ctrl {}", std::process::id(), ctrl_type);
+            let handler = &mut *handler_holder.handler.get();
+            if let Some(ctrl_handler) = handler.as_mut() {
+                (*ctrl_handler).handle(ctrl_type).into()
+            } else {
+                false.into()
+            }
+        }
+        None => false.into(),
+    }
 }

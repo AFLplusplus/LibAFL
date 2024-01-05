@@ -26,7 +26,7 @@ use serde_json::{self, Value};
 
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
-use crate::monitors::{ClientStats, Monitor, UserStats};
+use crate::monitors::{Aggregator, AggregatorOps, ClientStats, Monitor, UserStats, UserStatsValue};
 
 pub mod ui;
 use ui::TuiUI;
@@ -332,6 +332,7 @@ pub struct TuiMonitor {
 
     start_time: Duration,
     client_stats: Vec<ClientStats>,
+    aggregator: Aggregator,
 }
 
 impl Monitor for TuiMonitor {
@@ -346,8 +347,13 @@ impl Monitor for TuiMonitor {
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.start_time
+    }
+
+    /// Set creation time
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
     }
 
     #[allow(clippy::cast_sign_loss)]
@@ -376,6 +382,7 @@ impl Monitor for TuiMonitor {
             ctx.total_item_geometry = self.item_geometry();
         }
 
+        self.client_stats_insert(sender_id);
         let client = self.client_stats_mut_for(sender_id);
         let exec_sec = client.execs_per_sec_pretty(cur_time);
 
@@ -391,6 +398,10 @@ impl Monitor for TuiMonitor {
             head, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {
+            write!(fmt, ", {key}: {val}").unwrap();
+        }
+        write!(fmt, ", (Aggregated):").unwrap();
+        for (key, val) in &self.aggregator.aggregated {
             write!(fmt, ", {key}: {val}").unwrap();
         }
 
@@ -420,6 +431,10 @@ impl Monitor for TuiMonitor {
                     .grab_data(&client.introspection_monitor);
             }
         }
+    }
+
+    fn aggregate(&mut self, name: &str) {
+        self.aggregator.aggregate(name, &self.client_stats);
     }
 }
 
@@ -465,6 +480,7 @@ impl TuiMonitor {
             context,
             start_time,
             client_stats: vec![],
+            aggregator: Aggregator::new(),
         }
     }
 
@@ -501,9 +517,10 @@ impl TuiMonitor {
             let afl_stats = client
                 .get_user_stats("AflStats")
                 .map_or("None".to_string(), ToString::to_string);
-            let stability = client
-                .get_user_stats("stability")
-                .map_or(&UserStats::Ratio(0, 100), |x| x);
+            let stability = client.get_user_stats("stability").map_or(
+                UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
+                core::clone::Clone::clone,
+            );
 
             if afl_stats != "None" {
                 let default_json = serde_json::json!({
@@ -524,7 +541,7 @@ impl TuiMonitor {
                     afl_stats_json["imported"].as_u64().unwrap_or_default();
             }
 
-            if let UserStats::Ratio(a, b) = stability {
+            if let UserStatsValue::Ratio(a, b) = stability.value() {
                 ratio_a += a;
                 ratio_b += b;
             }

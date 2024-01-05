@@ -79,7 +79,9 @@ impl<'a> Harness<'a> {
         self.emu
             .write_function_argument(CallingConvention::Cdecl, 1, len)
             .map_err(|e| Error::unknown(format!("Failed to write argument 1: {e:}")))?;
-        unsafe { self.emu.run() };
+        unsafe {
+            let _ = self.emu.run();
+        };
         Ok(())
     }
 }

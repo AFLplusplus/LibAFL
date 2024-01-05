@@ -47,7 +47,7 @@ where
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer<S>: Named + Debug
+pub trait Observer<S>: Named
 where
     S: UsesInput,
 {
@@ -124,7 +124,7 @@ pub trait UsesObservers: UsesState {
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple<S>: MatchName + Debug
+pub trait ObserversTuple<S>: MatchName
 where
     S: UsesInput,
 {

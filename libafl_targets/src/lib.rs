@@ -1,6 +1,4 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
-//!
-//!
 #![no_std]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
@@ -102,7 +100,9 @@ pub mod sancov_8bit;
 #[cfg(feature = "sancov_8bit")]
 pub use sancov_8bit::*;
 
+#[cfg(feature = "coverage")]
 pub mod coverage;
+#[cfg(feature = "coverage")]
 pub use coverage::*;
 
 pub mod value_profile;
@@ -115,12 +115,12 @@ pub use cmps::*;
 #[cfg(feature = "std")]
 pub mod drcov;
 
-#[cfg(all(windows, feature = "std"))]
+#[cfg(all(windows, feature = "std", feture = "windows_asan"))]
 pub mod windows_asan;
-#[cfg(all(windows, feature = "std"))]
+#[cfg(all(windows, feature = "std", feture = "windows_asan"))]
 pub use windows_asan::*;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "forkserver"))]
 pub mod forkserver;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "forkserver"))]
 pub use forkserver::*;

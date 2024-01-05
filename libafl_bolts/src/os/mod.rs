@@ -1,9 +1,6 @@
 //! Operating System specific abstractions
 //!
 
-#[cfg(feature = "std")]
-use std::{env, process::Command};
-
 #[cfg(any(unix, all(windows, feature = "std")))]
 use crate::Error;
 
@@ -17,7 +14,15 @@ pub mod unix_signals;
 pub mod pipes;
 
 #[cfg(all(unix, feature = "std"))]
-use std::ffi::CString;
+use alloc::borrow::Cow;
+#[cfg(all(unix, feature = "std"))]
+use core::ffi::CStr;
+#[cfg(feature = "std")]
+use std::{env, process::Command};
+#[cfg(all(unix, feature = "std"))]
+use std::{ffi::CString, os::fd::RawFd};
+#[cfg(all(unix, feature = "std"))]
+use std::{fs::File, os::fd::AsRawFd, sync::OnceLock};
 
 // Allow a few extra features we need for the whole module
 #[cfg(all(windows, feature = "std"))]
@@ -26,6 +31,10 @@ pub mod windows_exceptions;
 
 #[cfg(unix)]
 use libc::pid_t;
+
+/// A file that we keep open, pointing to /dev/null
+#[cfg(all(feature = "std", unix))]
+static NULL_FILE: OnceLock<File> = OnceLock::new();
 
 /// Child Process Handle
 #[cfg(unix)]
@@ -91,11 +100,51 @@ pub fn startable_self() -> Result<Command, Error> {
     Ok(startable)
 }
 
-/// "Safe" wrapper around dup2
+/// "Safe" wrapper around `dup`, duplicating the given file descriptor
+///
+/// # Safety
+/// The fd need to be a legal fd.
 #[cfg(all(unix, feature = "std"))]
-pub fn dup2(fd: i32, device: i32) -> Result<(), Error> {
+pub fn dup(fd: RawFd) -> Result<RawFd, Error> {
+    match unsafe { libc::dup(fd) } {
+        -1 => Err(Error::file(std::io::Error::last_os_error())),
+        new_fd => Ok(new_fd),
+    }
+}
+
+/// "Safe" wrapper around dup2
+///
+/// # Safety
+/// The fds need to be legal fds.
+#[cfg(all(unix, feature = "std"))]
+pub fn dup2(fd: RawFd, device: RawFd) -> Result<(), Error> {
     match unsafe { libc::dup2(fd, device) } {
         -1 => Err(Error::file(std::io::Error::last_os_error())),
         _ => Ok(()),
+    }
+}
+
+/// Gets the stringified version of the last `errno`.
+/// This is roughly equivalent to `strerror(errno)` in C.
+#[cfg(all(unix, feature = "std"))]
+#[must_use]
+pub fn last_error_str<'a>() -> Option<Cow<'a, str>> {
+    std::io::Error::last_os_error().raw_os_error().map(|errno| {
+        // # Safety
+        //
+        // Calling the `strerror` libc functions with the correct `errno`
+        unsafe { CStr::from_ptr(libc::strerror(errno)).to_string_lossy() }
+    })
+}
+
+/// Get a file descriptor ([`RawFd`]) pointing to "/dev/null"
+#[cfg(all(unix, feature = "std"))]
+pub fn null_fd() -> Result<RawFd, Error> {
+    // We don't care about opening the file twice here - races are ok.
+    if let Some(file) = NULL_FILE.get() {
+        Ok(file.as_raw_fd())
+    } else {
+        let null_file = File::open("/dev/null")?;
+        Ok(NULL_FILE.get_or_init(move || null_file).as_raw_fd())
     }
 }

@@ -92,7 +92,7 @@ where
     fn schedule(&self, state: &mut S, input: &I) -> MutationId;
 
     /// New default implementation for mutate.
-    /// Implementations must forward mutate() to this method
+    /// Implementations must forward `mutate()` to this method
     fn scheduled_mutate(
         &mut self,
         state: &mut S,
@@ -258,10 +258,11 @@ pub type HavocMutationsNoCrossoverType = tuple_list_type!(
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator's crossover mutations
-pub type HavocCrossoverType = tuple_list_type!(CrossoverInsertMutator, CrossoverReplaceMutator);
+pub type HavocCrossoverType<I> =
+    tuple_list_type!(CrossoverInsertMutator<I>, CrossoverReplaceMutator<I>);
 
 /// Tuple type of the mutations that compose the Havoc mutator
-pub type HavocMutationsType = tuple_list_type!(
+pub type HavocMutationsType<I> = tuple_list_type!(
     BitFlipMutator,
     ByteFlipMutator,
     ByteIncMutator,
@@ -287,8 +288,8 @@ pub type HavocMutationsType = tuple_list_type!(
     BytesCopyMutator,
     BytesInsertCopyMutator,
     BytesSwapMutator,
-    CrossoverInsertMutator,
-    CrossoverReplaceMutator,
+    CrossoverInsertMutator<I>,
+    CrossoverReplaceMutator<I>,
 );
 
 /// Get the mutations that compose the Havoc mutator (only applied to single inputs)
@@ -325,7 +326,7 @@ pub fn havoc_mutations_no_crossover() -> HavocMutationsNoCrossoverType {
 
 /// Get the mutations that compose the Havoc mutator's crossover strategy
 #[must_use]
-pub fn havoc_crossover() -> HavocCrossoverType {
+pub fn havoc_crossover<I>() -> HavocCrossoverType<I> {
     tuple_list!(
         CrossoverInsertMutator::new(),
         CrossoverReplaceMutator::new(),
@@ -334,14 +335,14 @@ pub fn havoc_crossover() -> HavocCrossoverType {
 
 /// Get the mutations that compose the Havoc mutator
 #[must_use]
-pub fn havoc_mutations() -> HavocMutationsType {
+pub fn havoc_mutations<I>() -> HavocMutationsType<I> {
     havoc_mutations_no_crossover().merge(havoc_crossover())
 }
 
 /// Get the mutations that uses the Tokens metadata
 #[must_use]
 pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
-    tuple_list!(TokenInsert::new(), TokenReplace::new(),)
+    tuple_list!(TokenInsert::new(), TokenReplace::new())
 }
 
 /// A logging [`Mutator`] that wraps around a [`StdScheduledMutator`].
@@ -603,6 +604,7 @@ mod tests {
 /// `SchedulerMutator` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
+#[allow(clippy::unnecessary_fallible_conversions)]
 pub mod pybind {
     use pyo3::prelude::*;
 
@@ -616,7 +618,7 @@ pub mod pybind {
     /// Python class for StdHavocMutator
     pub struct PythonStdHavocMutator {
         /// Rust wrapped StdHavocMutator object
-        pub inner: StdScheduledMutator<BytesInput, HavocMutationsType, PythonStdState>,
+        pub inner: StdScheduledMutator<BytesInput, HavocMutationsType<BytesInput>, PythonStdState>,
     }
 
     #[pymethods]

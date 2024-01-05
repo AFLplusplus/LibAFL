@@ -44,9 +44,6 @@ pub enum LLVMPasses {
     #[cfg(unix)]
     /// The CmpLog Instruction pass
     CmpLogInstructions,
-    #[cfg(unix)]
-    /// The CmpLog Switch pass
-    CmpLogSwitches,
 }
 
 impl LLVMPasses {
@@ -69,9 +66,6 @@ impl LLVMPasses {
             #[cfg(unix)]
             LLVMPasses::CmpLogInstructions => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("cmplog-instructions-pass.{}", dll_extension())),
-            #[cfg(unix)]
-            LLVMPasses::CmpLogSwitches => PathBuf::from(env!("OUT_DIR"))
-                .join(format!("cmplog-switches-pass.{}", dll_extension())),
         }
     }
 }
@@ -345,7 +339,7 @@ impl ToolWrapper for ClangWrapper {
                         let extension = extension.to_str().unwrap();
                         let extension_lowercase = extension.to_lowercase();
                         match &extension_lowercase[..] {
-                            "a" | "la" => configuration.replace_extension(&arg_as_path),
+                            "a" | "la" | "pch" => configuration.replace_extension(&arg_as_path),
                             _ => arg_as_path,
                         }
                     } else {
