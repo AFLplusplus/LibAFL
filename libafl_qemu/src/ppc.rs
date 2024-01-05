@@ -157,7 +157,7 @@ impl crate::ArchExtras for crate::CPU {
             3 => Regs::R6,
             4 => Regs::R7,
             5 => Regs::R8,
-            r => return Err(format!("Unsupported argument with id: {r}")),
+            r => return Err(format!("Unsupported argument: {r:}")),
         };
 
         self.reg_read(reg_id)
