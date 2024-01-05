@@ -4,7 +4,7 @@ LibAFL CC provides the functionalities to write compiler wrappers for LibAFL, by
 
 The online documentation for this crate is available [here](https://docs.rs/crate/libafl_cc/latest).
 
-Currently, we support LLVM version 11 up to 18, but other versions may work.
+Currently, we support LLVM version 11 up to 17, but other versions may work.
 To install LLVM, use the official [download page](https://releases.llvm.org/download.html).
 
 The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 up to LLVM 17.0.0)

@@ -14,7 +14,7 @@ const SYMCC_RUNTIME_FUNCTION_NAME_PREFIX: &str = "_cpp_";
 
 thread_local! {
     static FUNCTION_NAME_REGEX: RefCell<Regex> = RefCell::new(Regex::new(r"pub fn (\w+)").unwrap());
-    static EXPORTED_FUNCTION_REGEX: RefCell<Regex> = RefCell::new(RegexBuilder::new(r"(pub fn \w+\([^\)]*\)[^;]*);")
+    static EXPORTED_FUNCTION_REGEX: RefCell<Regex> = RefCell::new(RegexBuilder::new(r"(pub fn \w+\s*\([^\)]*\)[^;]*);")
         .multi_line(true)
         .build()
         .unwrap());
