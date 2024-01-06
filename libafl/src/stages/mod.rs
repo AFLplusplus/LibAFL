@@ -4,66 +4,31 @@ A well-known [`Stage`], for example, is the mutational stage, running multiple [
 Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
-/// Mutational stage is the normal fuzzing stage.
-pub mod mutational;
-pub use mutational::{MutationalStage, StdMutationalStage};
+use core::{convert::From, marker::PhantomData};
 
-pub mod tmin;
-pub use tmin::{
-    MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
-};
-
-pub mod push;
-
-pub mod tracing;
-pub use tracing::{ShadowTracingStage, TracingStage};
-
-pub mod calibrate;
 pub use calibrate::CalibrationStage;
-
-pub mod power;
-pub use power::{PowerMutationalStage, StdPowerMutationalStage};
-
-pub mod generalization;
-pub use generalization::GeneralizationStage;
-
-pub mod stats;
-pub use stats::AflStatsStage;
-
-pub mod logics;
-pub use logics::*;
-
-pub mod tuneable;
-pub use tuneable::*;
-
-pub mod colorization;
 pub use colorization::*;
-
-#[cfg(feature = "std")]
-pub mod concolic;
 #[cfg(feature = "std")]
 pub use concolic::ConcolicTracingStage;
 #[cfg(feature = "std")]
 pub use concolic::SimpleConcolicMutationalStage;
-
-#[cfg(feature = "unicode")]
-pub mod string;
-#[cfg(feature = "unicode")]
-pub use string::*;
-
-#[cfg(feature = "std")]
-pub mod sync;
-#[cfg(feature = "std")]
-pub use sync::*;
-
-#[cfg(feature = "std")]
-pub mod dump;
-
-use core::{convert::From, marker::PhantomData};
-
 #[cfg(feature = "std")]
 pub use dump::*;
-use libafl_bolts::tuples::HasConstLen;
+pub use generalization::GeneralizationStage;
+use libafl_bolts::{tuples::HasConstLen, HasLen};
+pub use logics::*;
+pub use mutational::{MutationalStage, StdMutationalStage};
+pub use power::{PowerMutationalStage, StdPowerMutationalStage};
+pub use stats::AflStatsStage;
+#[cfg(feature = "unicode")]
+pub use string::*;
+#[cfg(feature = "std")]
+pub use sync::*;
+pub use tmin::{
+    MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
+};
+pub use tracing::{ShadowTracingStage, TracingStage};
+pub use tuneable::*;
 
 use self::push::PushStage;
 use crate::{
@@ -76,6 +41,28 @@ use crate::{
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasMetadata, HasRand, UsesState},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
+
+/// Mutational stage is the normal fuzzing stage.
+pub mod mutational;
+pub mod push;
+pub mod tmin;
+
+pub mod calibrate;
+pub mod colorization;
+#[cfg(feature = "std")]
+pub mod concolic;
+#[cfg(feature = "std")]
+pub mod dump;
+pub mod generalization;
+pub mod logics;
+pub mod power;
+pub mod stats;
+#[cfg(feature = "unicode")]
+pub mod string;
+#[cfg(feature = "std")]
+pub mod sync;
+pub mod tracing;
+pub mod tuneable;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -102,7 +89,7 @@ where
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
-pub trait StagesTuple<E, EM, S, Z>: HasConstLen
+pub trait StagesTuple<E, EM, S, Z>
 where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
@@ -134,7 +121,7 @@ where
 impl<Head, Tail, E, EM, Z> StagesTuple<E, EM, Head::State, Z> for (Head, Tail)
 where
     Head: Stage<E, EM, Z>,
-    Tail: StagesTuple<E, EM, Head::State, Z>,
+    Tail: StagesTuple<E, EM, Head::State, Z> + HasConstLen,
     E: UsesState<State = Head::State>,
     EM: UsesState<State = Head::State>,
     Z: UsesState<State = Head::State>,
@@ -336,11 +323,13 @@ pub mod pybind {
     use pyo3::prelude::*;
 
     use crate::{
-        corpus::CorpusId,
+        corpus::HasCorpusStatus,
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
-        stages::{mutational::pybind::PythonStdMutationalStage, Stage, StagesTuple},
+        stages::{
+            mutational::pybind::PythonStdMutationalStage, HasStageStatus, Stage, StagesTuple,
+        },
         state::{
             pybind::{PythonStdState, PythonStdStateWrapper},
             UsesState,
@@ -365,6 +354,8 @@ pub mod pybind {
     }
 
     impl Stage<PythonExecutor, PythonEventManager, PythonStdFuzzer> for PyObjectStage {
+        type Status = (); // we don't support resumption in python, and maybe can't?
+
         #[inline]
         fn perform(
             &mut self,
@@ -372,8 +363,11 @@ pub mod pybind {
             executor: &mut PythonExecutor,
             state: &mut PythonStdState,
             manager: &mut PythonEventManager,
-            corpus_idx: CorpusId,
         ) -> Result<(), Error> {
+            let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
+                Error::illegal_state("state is not currently processing a corpus index")
+            })?;
+
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
                     py,
@@ -453,6 +447,9 @@ pub mod pybind {
     }
 
     impl Stage<PythonExecutor, PythonEventManager, PythonStdFuzzer> for PythonStage {
+        // TODO if we implement resumption for StdMutational, we need to apply it here
+        type Status = ();
+
         #[inline]
         #[allow(clippy::let_and_return)]
         fn perform(
@@ -461,10 +458,9 @@ pub mod pybind {
             executor: &mut PythonExecutor,
             state: &mut PythonStdState,
             manager: &mut PythonEventManager,
-            corpus_idx: CorpusId,
         ) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, s, {
-                s.perform(fuzzer, executor, state, manager, corpus_idx)
+                s.perform(fuzzer, executor, state, manager)
             })
         }
     }
@@ -500,10 +496,18 @@ pub mod pybind {
             executor: &mut PythonExecutor,
             state: &mut PythonStdState,
             manager: &mut PythonEventManager,
-            corpus_idx: CorpusId,
         ) -> Result<(), Error> {
-            for s in &mut self.list {
-                s.perform(fuzzer, executor, state, manager, corpus_idx)?;
+            for (i, s) in self.list.iter_mut().enumerate() {
+                if let Some(continued) = state.current_stage()? {
+                    assert!(continued >= i);
+                    if continued > i {
+                        continue;
+                    }
+                } else {
+                    state.set_stage(i)?;
+                }
+                s.perform(fuzzer, executor, state, manager)?;
+                state.clear_stage()?;
             }
             Ok(())
         }

@@ -11,7 +11,7 @@ pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use crate::hash_std;
-use crate::Named;
+use crate::{HasLen, Named};
 
 /// Returns if the type `T` is equal to `U`
 /// From <https://stackoverflow.com/a/60138532/7658998>
@@ -103,6 +103,19 @@ where
     Tail: HasConstLen,
 {
     const LEN: usize = 1 + Tail::LEN;
+}
+
+impl<C> HasLen for C
+where
+    C: HasConstLen,
+{
+    fn len(&self) -> usize {
+        Self::LEN
+    }
+
+    fn is_empty(&self) -> bool {
+        Self::LEN != 0
+    }
 }
 
 /// Finds the `const_name` and `name_id`
