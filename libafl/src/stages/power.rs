@@ -71,7 +71,7 @@ where
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
-    type Status = (); // TODO should we resume this stage?
+    type Progress = (); // TODO should we resume this stage?
 
     #[inline]
     #[allow(clippy::let_and_return)]

@@ -38,7 +38,7 @@ where
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
-    type Status = (); // this stage cannot be resumed
+    type Progress = (); // this stage cannot be resumed
 
     #[inline]
     fn perform(
@@ -122,7 +122,7 @@ where
     Z: UsesState<State = E::State>,
     E::State: State + HasExecutions + HasCorpus + Debug,
 {
-    type Status = (); // this stage cannot be resumed
+    type Progress = (); // this stage cannot be resumed
 
     #[inline]
     fn perform(

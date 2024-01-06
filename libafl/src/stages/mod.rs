@@ -76,7 +76,7 @@ where
     // TODO: see RFC 2532: https://github.com/rust-lang/rust/issues/29661
     // type Status: ResumableStageStatus = ();
     /// The resumption data for this stage. Set to () if resuming is not necessary/possible.
-    type Status: ResumableStageStatus<Self::State>;
+    type Progress: ResumableStageStatus<Self::State>;
 
     /// Run the stage
     fn perform(
@@ -141,7 +141,7 @@ where
             Some(idx) if idx == Self::LEN => {
                 // perform the stage, but don't set it
                 self.0.perform(fuzzer, executor, state, manager)?;
-                Head::Status::clear_resume_status(state)?;
+                Head::Progress::clear_resume_status(state)?;
                 state.clear_stage()?;
             }
             Some(idx) if idx < Self::LEN => {
@@ -150,9 +150,9 @@ where
             // this is None, but the match can't deduce that
             _ => {
                 state.set_stage(Self::LEN)?;
-                Head::Status::initialize_resume_status(state)?;
+                Head::Progress::initialize_resume_status(state)?;
                 self.0.perform(fuzzer, executor, state, manager)?;
-                Head::Status::clear_resume_status(state)?;
+                Head::Progress::clear_resume_status(state)?;
                 state.clear_stage()?;
             }
         }
@@ -188,7 +188,7 @@ where
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
-    type Status = ();
+    type Progress = ();
 
     fn perform(
         &mut self,
@@ -272,7 +272,7 @@ where
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
-    type Status = (); // TODO implement resume
+    type Progress = (); // TODO implement resume
 
     fn perform(
         &mut self,
@@ -354,7 +354,7 @@ pub mod pybind {
     }
 
     impl Stage<PythonExecutor, PythonEventManager, PythonStdFuzzer> for PyObjectStage {
-        type Status = (); // we don't support resumption in python, and maybe can't?
+        type Progress = (); // we don't support resumption in python, and maybe can't?
 
         #[inline]
         fn perform(
@@ -448,7 +448,7 @@ pub mod pybind {
 
     impl Stage<PythonExecutor, PythonEventManager, PythonStdFuzzer> for PythonStage {
         // TODO if we implement resumption for StdMutational, we need to apply it here
-        type Status = ();
+        type Progress = ();
 
         #[inline]
         #[allow(clippy::let_and_return)]

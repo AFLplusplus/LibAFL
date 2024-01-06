@@ -67,7 +67,7 @@ where
     Z: Evaluator<E, EM>,
     Z::State: HasCorpus + HasRand + HasMetadata,
 {
-    type Status = (); // TODO load from directory should be resumed
+    type Progress = (); // TODO load from directory should be resumed
 
     #[inline]
     fn perform(
@@ -254,7 +254,7 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    type Status = (); // TODO this should be resumed in the case that a testcase causes a crash
+    type Progress = (); // TODO this should be resumed in the case that a testcase causes a crash
 
     #[inline]
     fn perform(

@@ -92,7 +92,7 @@ where
     E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
     Z: Evaluator<E, EM, State = E::State>,
 {
-    type Status = (); // TODO stage may be resumed, but how?
+    type Progress = (); // TODO stage may be resumed, but how?
 
     #[inline]
     #[allow(

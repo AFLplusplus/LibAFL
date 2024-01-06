@@ -40,7 +40,7 @@ where
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
-    type Status = (); // TODO this needs resumption
+    type Progress = (); // TODO this needs resumption
 
     #[inline]
     fn perform(

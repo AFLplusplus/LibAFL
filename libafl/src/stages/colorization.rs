@@ -77,7 +77,7 @@ where
     O: MapObserver,
     Z: UsesState<State = E::State>,
 {
-    type Status = (); // TODO this stage needs resume
+    type Progress = (); // TODO this stage needs resume
 
     #[inline]
     #[allow(clippy::let_and_return)]

@@ -42,7 +42,7 @@ where
     TE::State: HasExecutions + HasCorpus,
     Z: UsesState<State = TE::State>,
 {
-    type Status = (); // stage cannot be resumed
+    type Progress = (); // stage cannot be resumed
 
     #[inline]
     fn perform(
@@ -364,7 +364,7 @@ where
     Z::Input: HasBytesVec,
     Z::State: State + HasExecutions + HasCorpus,
 {
-    type Status = (); // TODO we need a resume for this type
+    type Progress = (); // TODO we need a resume for this type
 
     #[inline]
     fn perform(

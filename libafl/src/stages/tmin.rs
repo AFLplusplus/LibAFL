@@ -212,7 +212,7 @@ where
         + HasFeedback<Feedback = F1>
         + HasScheduler<Scheduler = CS>,
 {
-    type Status = (); // TODO this stage desperately needs a resume
+    type Progress = (); // TODO this stage desperately needs a resume
 
     fn perform(
         &mut self,

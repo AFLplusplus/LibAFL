@@ -104,7 +104,7 @@ where
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
-    type Status = (); // this stage does not need to be resumed
+    type Progress = (); // this stage does not need to be resumed
 
     fn perform(
         &mut self,

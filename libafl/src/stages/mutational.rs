@@ -214,7 +214,7 @@ where
     Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
-    type Status = (); // TODO should this stage be resumed?
+    type Progress = (); // TODO should this stage be resumed?
 
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -304,7 +304,7 @@ where
     Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
-    type Status = (); // TODO implement resume
+    type Progress = (); // TODO implement resume
 
     #[inline]
     #[allow(clippy::let_and_return)]

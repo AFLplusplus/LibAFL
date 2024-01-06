@@ -64,7 +64,7 @@ where
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
-    type Status = (); // TODO this stage needs a resume
+    type Progress = (); // TODO this stage needs a resume
 
     #[inline]
     #[allow(clippy::too_many_lines)]

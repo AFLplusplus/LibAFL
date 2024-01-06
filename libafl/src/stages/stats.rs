@@ -62,7 +62,7 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasImported + HasCorpus + HasMetadata,
 {
-    type Status = (); // this stage does not require resume
+    type Progress = (); // this stage does not require resume
 
     fn perform(
         &mut self,

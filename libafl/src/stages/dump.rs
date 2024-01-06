@@ -52,7 +52,7 @@ where
     Z: UsesState,
     Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
 {
-    type Status = (); // if this fails, we have bigger problems
+    type Progress = (); // if this fails, we have bigger problems
 
     #[inline]
     fn perform(

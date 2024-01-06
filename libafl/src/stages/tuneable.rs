@@ -272,7 +272,7 @@ where
     Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
-    type Status = (); // TODO should this stage be resumed?
+    type Progress = (); // TODO should this stage be resumed?
 
     #[inline]
     #[allow(clippy::let_and_return)]

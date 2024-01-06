@@ -42,7 +42,7 @@ where
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
-    type Status = (); // TODO we need to resume the inner stages
+    type Progress = (); // TODO we need to resume the inner stages
 
     fn perform(
         &mut self,
@@ -111,7 +111,7 @@ where
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
-    type Status = (); // TODO we need to resume the inner stages
+    type Progress = (); // TODO we need to resume the inner stages
 
     fn perform(
         &mut self,
@@ -185,7 +185,7 @@ where
     ST2: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
-    type Status = (); // TODO we need to resume the inner stages
+    type Progress = (); // TODO we need to resume the inner stages
 
     fn perform(
         &mut self,
@@ -255,7 +255,7 @@ where
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
-    type Status = (); // TODO we need to resume the inner stages
+    type Progress = (); // TODO we need to resume the inner stages
 
     fn perform(
         &mut self,
