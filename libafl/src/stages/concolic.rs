@@ -13,7 +13,7 @@ use crate::state::HasClientPerfMonitor;
 #[cfg(feature = "concolic_mutation")]
 use crate::state::State;
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::Corpus,
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
     state::{HasCorpus, HasExecutions, HasMetadata},
@@ -42,6 +42,8 @@ where
     TE::State: HasExecutions + HasCorpus,
     Z: UsesState<State = TE::State>,
 {
+    type Status = (); // stage cannot be resumed
+
     #[inline]
     fn perform(
         &mut self,
@@ -49,10 +51,12 @@ where
         executor: &mut E,
         state: &mut TE::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        self.inner
-            .perform(fuzzer, executor, state, manager, corpus_idx)?;
+        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
+            Error::illegal_state("state is not currently processing a corpus index")
+        })?;
+
+        self.inner.perform(fuzzer, executor, state, manager)?;
         if let Some(observer) = self
             .inner
             .executor()
@@ -86,7 +90,7 @@ use libafl_bolts::tuples::MatchName;
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
-use crate::state::UsesState;
+use crate::{corpus::HasCorpusStatus, state::UsesState};
 #[cfg(feature = "concolic_mutation")]
 use crate::{
     inputs::HasBytesVec,

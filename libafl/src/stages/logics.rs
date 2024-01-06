@@ -3,7 +3,6 @@
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::CorpusId,
     stages::{Stage, StagesTuple},
     state::UsesState,
     Error,
@@ -13,7 +12,7 @@ use crate::{
 /// Perform the stage while the closure evaluates to true
 pub struct WhileStage<CB, E, EM, ST, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
@@ -26,7 +25,7 @@ where
 
 impl<CB, E, EM, ST, Z> UsesState for WhileStage<CB, E, EM, ST, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
@@ -37,23 +36,23 @@ where
 
 impl<CB, E, EM, ST, Z> Stage<E, EM, Z> for WhileStage<CB, E, EM, ST, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
+    type Status = (); // TODO we need to resume the inner stages
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        while (self.closure)(fuzzer, executor, state, manager, corpus_idx)? {
-            self.stages
-                .perform_all(fuzzer, executor, state, manager, corpus_idx)?;
+        while (self.closure)(fuzzer, executor, state, manager)? {
+            self.stages.perform_all(fuzzer, executor, state, manager)?;
         }
         Ok(())
     }
@@ -61,7 +60,7 @@ where
 
 impl<CB, E, EM, ST, Z> WhileStage<CB, E, EM, ST, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
@@ -82,7 +81,7 @@ where
 #[derive(Debug)]
 pub struct IfStage<CB, E, EM, ST, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
@@ -95,7 +94,7 @@ where
 
 impl<CB, E, EM, ST, Z> UsesState for IfStage<CB, E, EM, ST, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
@@ -106,23 +105,24 @@ where
 
 impl<CB, E, EM, ST, Z> Stage<E, EM, Z> for IfStage<CB, E, EM, ST, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
+    type Status = (); // TODO we need to resume the inner stages
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        if (self.closure)(fuzzer, executor, state, manager, corpus_idx)? {
+        if (self.closure)(fuzzer, executor, state, manager)? {
             self.if_stages
-                .perform_all(fuzzer, executor, state, manager, corpus_idx)?;
+                .perform_all(fuzzer, executor, state, manager)?;
         }
         Ok(())
     }
@@ -130,7 +130,7 @@ where
 
 impl<CB, E, EM, ST, Z> IfStage<CB, E, EM, ST, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
@@ -151,7 +151,7 @@ where
 #[derive(Debug)]
 pub struct IfElseStage<CB, E, EM, ST1, ST2, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST1: StagesTuple<E, EM, E::State, Z>,
@@ -166,7 +166,7 @@ where
 
 impl<CB, E, EM, ST1, ST2, Z> UsesState for IfElseStage<CB, E, EM, ST1, ST2, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST1: StagesTuple<E, EM, E::State, Z>,
@@ -178,27 +178,28 @@ where
 
 impl<CB, E, EM, ST1, ST2, Z> Stage<E, EM, Z> for IfElseStage<CB, E, EM, ST1, ST2, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST1: StagesTuple<E, EM, E::State, Z>,
     ST2: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
+    type Status = (); // TODO we need to resume the inner stages
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        if (self.closure)(fuzzer, executor, state, manager, corpus_idx)? {
+        if (self.closure)(fuzzer, executor, state, manager)? {
             self.if_stages
-                .perform_all(fuzzer, executor, state, manager, corpus_idx)?;
+                .perform_all(fuzzer, executor, state, manager)?;
         } else {
             self.else_stages
-                .perform_all(fuzzer, executor, state, manager, corpus_idx)?;
+                .perform_all(fuzzer, executor, state, manager)?;
         }
         Ok(())
     }
@@ -206,7 +207,7 @@ where
 
 impl<CB, E, EM, ST1, ST2, Z> IfElseStage<CB, E, EM, ST1, ST2, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<bool, Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<bool, Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     ST1: StagesTuple<E, EM, E::State, Z>,
@@ -254,16 +255,17 @@ where
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
 {
+    type Status = (); // TODO we need to resume the inner stages
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         if let Some(stages) = &mut self.stages {
-            stages.perform_all(fuzzer, executor, state, manager, corpus_idx)
+            stages.perform_all(fuzzer, executor, state, manager)
         } else {
             Ok(())
         }

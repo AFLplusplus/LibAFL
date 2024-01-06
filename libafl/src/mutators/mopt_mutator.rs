@@ -392,7 +392,7 @@ where
         write!(
             f,
             "StdMOptMutator with {} mutations for Input type {}",
-            self.mutations.len(),
+            MT::LEN,
             core::any::type_name::<I>()
         )
     }
@@ -547,7 +547,7 @@ where
     ) -> Result<Self, Error> {
         if !state.has_metadata::<MOpt>() {
             let rand_seed = state.rand_mut().next();
-            state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num, rand_seed)?);
+            state.add_metadata::<MOpt>(MOpt::new(MT::LEN, swarm_num, rand_seed)?);
         }
         Ok(Self {
             name: format!("StdMOptMutator[{}]", mutations.names().join(",")),

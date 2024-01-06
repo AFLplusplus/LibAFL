@@ -92,21 +92,10 @@ where
 pub trait HasConstLen {
     /// The length as constant `usize`
     const LEN: usize;
-
-    /// The length
-    fn len(&self) -> usize;
-    /// Returns true, if empty
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 }
 
 impl HasConstLen for () {
     const LEN: usize = 0;
-
-    fn len(&self) -> usize {
-        0
-    }
 }
 
 impl<Head, Tail> HasConstLen for (Head, Tail)
@@ -114,10 +103,6 @@ where
     Tail: HasConstLen,
 {
     const LEN: usize = 1 + Tail::LEN;
-
-    fn len(&self) -> usize {
-        1 + self.1.len()
-    }
 }
 
 /// Finds the `const_name` and `name_id`

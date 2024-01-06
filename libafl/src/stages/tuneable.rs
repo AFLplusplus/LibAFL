@@ -7,7 +7,7 @@ use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasCorpusStatus},
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     stages::{
@@ -173,8 +173,11 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
+            Error::illegal_state("state is not currently processing a corpus index")
+        })?;
+
         let fuzz_time = self.seed_fuzz_time(state)?;
         let iters = self.fixed_iters(state)?;
 
@@ -269,6 +272,8 @@ where
     Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
+    type Status = (); // TODO should this stage be resumed?
+
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -277,9 +282,8 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+        let ret = self.perform_mutational(fuzzer, executor, state, manager);
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();

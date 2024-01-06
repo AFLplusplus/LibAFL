@@ -24,12 +24,13 @@ use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "scalability_introspection")]
 use crate::monitors::ScalabilityMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpusStatus, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
+    stages::HasStageStatus,
     Error,
 };
 
@@ -40,7 +41,13 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
 pub trait State:
-    UsesInput + Serialize + DeserializeOwned + MaybeHasClientPerfMonitor + MaybeHasScalabilityMonitor
+    UsesInput
+    + Serialize
+    + DeserializeOwned
+    + MaybeHasClientPerfMonitor
+    + MaybeHasScalabilityMonitor
+    + HasCorpusStatus
+    + HasStageStatus
 {
 }
 
@@ -321,6 +328,10 @@ pub struct StdState<I, C, R, SC> {
     /// The last time we reported progress (if available/used).
     /// This information is used by fuzzer `maybe_report_progress`.
     last_report_time: Option<Duration>,
+    /// The current index of the corpus; used to record for resumable fuzzing.
+    corpus_idx: Option<CorpusId>,
+    /// The current index of the stages; used to record for resumable fuzzing.
+    stage_idx: Option<usize>,
     phantom: PhantomData<I>,
 }
 
@@ -511,6 +522,38 @@ impl<I, C, R, SC> HasStartTime for StdState<I, C, R, SC> {
     #[inline]
     fn start_time_mut(&mut self) -> &mut Duration {
         &mut self.start_time
+    }
+}
+
+impl<I, C, R, SC> HasCorpusStatus for StdState<I, C, R, SC> {
+    fn set_corpus_idx(&mut self, idx: CorpusId) -> Result<(), Error> {
+        self.corpus_idx = Some(idx);
+        Ok(())
+    }
+
+    fn clear_corpus_idx(&mut self) -> Result<(), Error> {
+        self.corpus_idx = None;
+        Ok(())
+    }
+
+    fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error> {
+        Ok(self.corpus_idx)
+    }
+}
+
+impl<I, C, R, SC> HasStageStatus for StdState<I, C, R, SC> {
+    fn set_stage(&mut self, idx: usize) -> Result<(), Error> {
+        self.stage_idx = Some(idx);
+        Ok(())
+    }
+
+    fn clear_stage(&mut self) -> Result<(), Error> {
+        self.stage_idx = None;
+        Ok(())
+    }
+
+    fn current_stage(&self) -> Result<Option<usize>, Error> {
+        Ok(self.stage_idx)
     }
 }
 
@@ -897,6 +940,8 @@ where
             #[cfg(feature = "std")]
             dont_reenter: None,
             last_report_time: None,
+            corpus_idx: None,
+            stage_idx: None,
             phantom: PhantomData,
         };
         feedback.init_state(&mut state)?;
@@ -999,6 +1044,34 @@ impl<I> HasRand for NopState<I> {
 }
 
 impl<I> State for NopState<I> where I: Input {}
+
+impl<I> HasCorpusStatus for NopState<I> {
+    fn set_corpus_idx(&mut self, _idx: CorpusId) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn clear_corpus_idx(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error> {
+        Ok(None)
+    }
+}
+
+impl<I> HasStageStatus for NopState<I> {
+    fn set_stage(&mut self, _idx: usize) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn clear_stage(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn current_stage(&self) -> Result<Option<usize>, Error> {
+        Ok(None)
+    }
+}
 
 #[cfg(feature = "introspection")]
 impl<I> HasClientPerfMonitor for NopState<I> {

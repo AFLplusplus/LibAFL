@@ -11,7 +11,7 @@ use crate::inputs::Input;
 #[cfg(test)]
 use crate::state::NopState;
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCorpusStatus, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -19,7 +19,7 @@ use crate::{
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    stages::StagesTuple,
+    stages::{HasStageStatus, StagesTuple},
     start_timer,
     state::{
         HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasMetadata, HasSolutions,
@@ -152,7 +152,7 @@ where
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasStageStatus,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,
@@ -583,8 +583,14 @@ where
     EM: ProgressReporter + EventProcessor<E, Self, State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State:
-        HasExecutions + HasMetadata + HasCorpus + HasTestcase + HasImported + HasLastReportTime,
+    CS::State: HasExecutions
+        + HasMetadata
+        + HasCorpus
+        + HasTestcase
+        + HasImported
+        + HasLastReportTime
+        + HasCorpusStatus
+        + HasStageStatus,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
     fn fuzz_one(
@@ -599,7 +605,13 @@ where
         state.introspection_monitor_mut().start_timer();
 
         // Get the next index from the scheduler
-        let idx = self.scheduler.next(state)?;
+        let idx = if let Some(idx) = state.current_corpus_idx()? {
+            idx // we are resuming
+        } else {
+            let idx = self.scheduler.next(state)?;
+            state.set_corpus_idx(idx)?; // set up for resume
+            idx
+        };
 
         // Mark the elapsed time for the scheduler
         #[cfg(feature = "introspection")]
@@ -610,7 +622,7 @@ where
         state.introspection_monitor_mut().reset_stage_index();
 
         // Execute all stages
-        stages.perform_all(self, executor, state, manager, idx)?;
+        stages.perform_all(self, executor, state, manager)?;
 
         // Init timer for manager
         #[cfg(feature = "introspection")]
@@ -629,6 +641,9 @@ where
             // increase scheduled count, this was fuzz_level in afl
             testcase.set_scheduled_count(scheduled_count + 1);
         }
+
+        state.clear_corpus_idx()?;
+
         Ok(idx)
     }
 }

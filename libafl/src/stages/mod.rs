@@ -30,9 +30,6 @@ pub use generalization::GeneralizationStage;
 pub mod stats;
 pub use stats::AflStatsStage;
 
-pub mod owned;
-pub use owned::StagesOwnedList;
-
 pub mod logics;
 pub use logics::*;
 
@@ -66,10 +63,11 @@ use core::{convert::From, marker::PhantomData};
 
 #[cfg(feature = "std")]
 pub use dump::*;
+use libafl_bolts::tuples::HasConstLen;
 
 use self::push::PushStage;
 use crate::{
-    corpus::CorpusId,
+    corpus::HasCorpusStatus,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::UsesInput,
@@ -87,6 +85,12 @@ where
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
 {
+    // TODO: default this to () when associated_type_defaults is stable
+    // TODO: see RFC 2532: https://github.com/rust-lang/rust/issues/29661
+    // type Status: ResumableStageStatus = ();
+    /// The resumption data for this stage. Set to () if resuming is not necessary/possible.
+    type Status: ResumableStageStatus<Self::State>;
+
     /// Run the stage
     fn perform(
         &mut self,
@@ -94,17 +98,16 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error>;
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
-pub trait StagesTuple<E, EM, S, Z>
+pub trait StagesTuple<E, EM, S, Z>: HasConstLen
 where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
-    S: UsesInput,
+    S: UsesInput + HasStageStatus,
 {
     /// Performs all `Stages` in this tuple
     fn perform_all(
@@ -113,7 +116,6 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error>;
 }
 
@@ -122,16 +124,9 @@ where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
-    S: UsesInput,
+    S: UsesInput + HasStageStatus,
 {
-    fn perform_all(
-        &mut self,
-        _: &mut Z,
-        _: &mut E,
-        _: &mut S,
-        _: &mut EM,
-        _: CorpusId,
-    ) -> Result<(), Error> {
+    fn perform_all(&mut self, _: &mut Z, _: &mut E, _: &mut S, _: &mut EM) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -143,6 +138,7 @@ where
     E: UsesState<State = Head::State>,
     EM: UsesState<State = Head::State>,
     Z: UsesState<State = Head::State>,
+    Head::State: HasStageStatus,
 {
     fn perform_all(
         &mut self,
@@ -150,15 +146,32 @@ where
         executor: &mut E,
         state: &mut Head::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        // Perform the current stage
-        self.0
-            .perform(fuzzer, executor, state, manager, corpus_idx)?;
+        match state.current_stage()? {
+            Some(idx) if idx > Self::LEN => {
+                // do nothing; we are resuming
+            }
+            Some(idx) if idx == Self::LEN => {
+                // perform the stage, but don't set it
+                self.0.perform(fuzzer, executor, state, manager)?;
+                Head::Status::clear_resume_status(state)?;
+                state.clear_stage()?;
+            }
+            Some(idx) if idx < Self::LEN => {
+                unreachable!("We should clear the stage index before we get here...");
+            }
+            // this is None, but the match can't deduce that
+            _ => {
+                state.set_stage(Self::LEN)?;
+                Head::Status::initialize_resume_status(state)?;
+                self.0.perform(fuzzer, executor, state, manager)?;
+                Head::Status::clear_resume_status(state)?;
+                state.clear_stage()?;
+            }
+        }
 
         // Execute the remaining stages
-        self.1
-            .perform_all(fuzzer, executor, state, manager, corpus_idx)
+        self.1.perform_all(fuzzer, executor, state, manager)
     }
 }
 
@@ -166,7 +179,7 @@ where
 #[derive(Debug)]
 pub struct ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
 {
     closure: CB,
@@ -175,7 +188,7 @@ where
 
 impl<CB, E, EM, Z> UsesState for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
 {
     type State = E::State;
@@ -183,27 +196,28 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
+    type Status = ();
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        (self.closure)(fuzzer, executor, state, manager, corpus_idx)
+        (self.closure)(fuzzer, executor, state, manager)
     }
 }
 
 /// A stage that takes a closure
 impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
 {
     /// Create a new [`ClosureStage`]
@@ -218,7 +232,7 @@ where
 
 impl<CB, E, EM, Z> From<CB> for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM) -> Result<(), Error>,
     E: UsesState,
 {
     #[must_use]
@@ -257,7 +271,8 @@ where
 impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
 where
     CS: Scheduler,
-    CS::State: HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime,
+    CS::State:
+        HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime + HasCorpusStatus,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>
         + EventRestarter
@@ -270,17 +285,20 @@ where
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
+    type Status = (); // TODO implement resume
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut CS::State,
         event_mgr: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;
 
-        push_stage.set_current_corpus_idx(corpus_idx);
+        push_stage.set_current_corpus_idx(state.current_corpus_idx()?.ok_or_else(|| {
+            Error::illegal_state("state is not currently processing a corpus index")
+        })?);
 
         push_stage.init(fuzzer, state, event_mgr, executor.observers_mut())?;
 
@@ -497,4 +515,50 @@ pub mod pybind {
         m.add_class::<PythonStagesTuple>()?;
         Ok(())
     }
+}
+
+/// Trait for status tracking of stages which stash data to resume
+pub trait ResumableStageStatus<S> {
+    /// Initialize the current status tracking; stages using this status should "resume" to the
+    /// initial step
+    fn initialize_resume_status(state: &mut S) -> Result<(), Error>;
+
+    /// Clear the current status tracking of the associated stage
+    fn clear_resume_status(state: &mut S) -> Result<(), Error>;
+
+    /// Get the current status tracking of this stage
+    fn resume_status(state: &S) -> Result<&Self, Error>;
+
+    /// Get the current status tracking of this stage, mutably
+    fn resume_status_mut(state: &mut S) -> Result<&mut Self, Error>;
+}
+
+impl<S> ResumableStageStatus<S> for () {
+    fn initialize_resume_status(_state: &mut S) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn clear_resume_status(_state: &mut S) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn resume_status(_state: &S) -> Result<&Self, Error> {
+        unimplemented!("The empty tuple resumable stage status should never be queried")
+    }
+
+    fn resume_status_mut(_state: &mut S) -> Result<&mut Self, Error> {
+        unimplemented!("The empty tuple resumable stage status should never be queried")
+    }
+}
+
+/// Trait for types which track the current stage
+pub trait HasStageStatus {
+    /// Set the current stage; we have started processing this stage
+    fn set_stage(&mut self, idx: usize) -> Result<(), Error>;
+
+    /// Clear the current stage; we are done processing this stage
+    fn clear_stage(&mut self) -> Result<(), Error>;
+
+    /// Fetch the current stage -- typically used after a state recovery or transfer
+    fn current_stage(&self) -> Result<Option<usize>, Error>;
 }

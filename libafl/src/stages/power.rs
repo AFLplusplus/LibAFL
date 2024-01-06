@@ -71,6 +71,8 @@ where
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
+    type Status = (); // TODO should we resume this stage?
+
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -79,9 +81,8 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+        let ret = self.perform_mutational(fuzzer, executor, state, manager);
         ret
     }
 }
