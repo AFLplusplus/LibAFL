@@ -22,6 +22,61 @@ use crate::{
     QemuHelperTuple, QemuHooks, SYS_execve, SyscallHookResult,
 };
 
+/// Parses `injections.yaml`
+fn parse_yaml<P: AsRef<Path> + Display>(path: P) -> Result<Vec<YamlInjectionEntry>, Error> {
+    serde_yaml::from_str(&fs::read_to_string(&path)?)
+        .map_err(|e| Error::serialize(format!("Failed to deserialize yaml at {path}: {e}")))
+}
+
+/// Parses `injections.toml`
+fn parse_toml<P: AsRef<Path> + Display>(
+    path: P,
+) -> Result<HashMap<String, TomlInjectionDefinition>, Error> {
+    toml::from_str(&fs::read_to_string(&path)?)
+        .map_err(|e| Error::serialize(format!("Failed to deserialize toml at {path}: {e}")))
+}
+
+/// Converts the injects.yaml format to the internal toml-like format
+fn yaml_entries_to_definition(
+    yaml_entries: &Vec<YamlInjectionEntry>,
+) -> Result<HashMap<String, TomlInjectionDefinition>, Error> {
+    let mut ret = HashMap::new();
+
+    for entry in yaml_entries {
+        let mut functions = HashMap::new();
+        for function in &entry.functions {
+            functions.insert(
+                function.function.clone(),
+                FunctionDescription {
+                    param: function.parameter,
+                },
+            );
+        }
+
+        let mut matches = Vec::new();
+        let mut tokens = Vec::new();
+        for test in &entry.tests {
+            matches.push(test.match_value.clone());
+            tokens.push(test.input_value.clone());
+        }
+
+        if let Some(_) = ret.insert(
+            entry.name.clone(),
+            TomlInjectionDefinition {
+                tokens,
+                matches,
+                functions,
+            },
+        ) {
+            return Err(Error::illegal_argument(format!(
+                "Entry {} was multiply defined!",
+                entry.name
+            )));
+        }
+    }
+    Ok(ret)
+}
+
 #[derive(Debug, Clone)]
 struct LibInfo {
     name: String,
@@ -67,65 +122,9 @@ struct TomlInjectionDefinition {
     functions: HashMap<String, FunctionDescription>,
 }
 
-static INJECTIONS: OnceLock<Vec<YamlInjectionEntry>> = OnceLock::new();
-pub static TOKENS: OnceLock<Vec<String>> = OnceLock::new();
-
-fn parse_yaml<P: AsRef<Path> + Display>(path: P) -> Result<Vec<YamlInjectionEntry>, Error> {
-    serde_yaml::from_str(&fs::read_to_string(&path)?)
-        .map_err(|e| Error::serialize(format!("Failed to deserialize yaml at {path}: {e}")))
-}
-
-fn parse_toml<P: AsRef<Path> + Display>(
-    path: P,
-) -> Result<HashMap<String, TomlInjectionDefinition>, Error> {
-    toml::from_str(&fs::read_to_string(&path)?)
-        .map_err(|e| Error::serialize(format!("Failed to deserialize toml at {path}: {e}")))
-}
-
-fn yaml_entries_to_definition(
-    yaml_entries: &Vec<YamlInjectionEntry>,
-) -> Result<HashMap<String, TomlInjectionDefinition>, Error> {
-    let mut ret = HashMap::new();
-
-    for entry in yaml_entries {
-        let mut functions = HashMap::new();
-        for function in &entry.functions {
-            functions.insert(
-                function.function.clone(),
-                FunctionDescription {
-                    param: function.parameter,
-                },
-            );
-        }
-
-        let mut matches = Vec::new();
-        let mut tokens = Vec::new();
-        for test in &entry.tests {
-            matches.push(test.match_value.clone());
-            tokens.push(test.input_value.clone());
-        }
-
-        if let Some(_) = ret.insert(
-            entry.name.clone(),
-            TomlInjectionDefinition {
-                tokens,
-                matches,
-                functions,
-            },
-        ) {
-            return Err(Error::illegal_argument(format!(
-                "Entry {} was multiply defined!",
-                entry.name
-            )));
-        }
-    }
-    Ok(ret)
-}
-
-
 #[derive(Clone, Debug)]
 pub struct Match {
-    name: String,
+    lib_name: String,
     bytes_lower: Vec<u8>,
     original_value: String,
 }
@@ -164,9 +163,10 @@ impl QemuInjectionHelper {
         emu: &Emulator,
         definitions: HashMap<String, TomlInjectionDefinition>,
     ) -> Result<Self, Error> {
-        for (lib_name, definition) in definitions.iter() {
-
-        Ok(Self { tokens, definitions })
+        Ok(Self {
+            tokens,
+            definitions,
+        })
     }
 }
 
@@ -185,7 +185,6 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-
         let emu = hooks.emulator();
 
         let mut id: u64 = 0;
@@ -207,59 +206,54 @@ where
         }
 
         for (lib_name, definition) in definitions.iter() {
+            let matches = definition.matches.map(|match_str| {
+                let mut bytes_lower = match_str.as_bytes().clone();
+                bytes_lower.make_ascii_lowercase();
+
+                Match {
+                    lib_name: lib_name.clone(),
+                    original_value: match_str.clone(),
+                    bytes_lower,
+                }
+            });
+
             for (name, func_definition) in &definition.functions {
-                let mut found = 0;
-                if name.to_lowercase().starts_with(&"0x".to_string()) {
+                let hook_addrs = if name.to_lowercase().starts_with(&"0x".to_string()) {
                     let func_pc = u64::from_str_radix(&name[2..], 16).map_err(|e| {
                         Error::illegal_argument(format!(
                             "Failed to parse hex string {name} from definition for {lib_name}: {e}"
                         ))
                     })? as GuestAddr;
-                    if func_pc > 0 {
-                        // println!("Hooking hardcoded function {func_pc:#x}");
-                        let data: u64 = (id << 8) + u64::from(func_definition.param);
-
-                        let _hook_id = emu.set_hook(data, func_pc, on_call_check, false);
-                        found = 1;
-                    }
+                    log::info!("Injections: Hooking hardcoded function {func_pc:#x}");
+                    vec![func_pc];
                 } else {
-                    for lib in &libs {
-                        let func_pc =
-                            find_function(emu, &lib.name, &name, lib.off).unwrap_or_default();
-                        if func_pc > 0 {
-                            //println!("Function {} found at {func_pc:#x}", func.function);
-                            hooks.instruction(func_pc, Hook::Closure(on_call_check), false)
+                    &libs
+                        .iter()
+                        .filter_map(|lib| find_function(emu, &lib.name, &name, lib.off))
+                        .map(|func_pc| {
+                            log::info!(
+                                "Injections: Function {} found at {func_pc:#x}",
+                                func.function
+                            );
+                            func_pc
+                        })
+                        .collect();
+                };
 
-                            let data: u64 = (id << 8) + u64::from(func_definition.param);
-                            let _hook_id =
+                if func_pc.is_empty() {
+                    log::warn!(
+                        "Injections: Function not found for {lib_name}: {}",
+                        func.function
+                    );
+                }
 
-                             emu.set_hook(data, func_pc, on_call_check, false);
-                            found = 1;
-                        }
-                    }
-                }
-                if found > 0 {
-                    tokens.append(&mut definition.tokens.clone())
-                }
-                //else {
-                //println!("Function not found: {}", func.function);
-                //}
+                let matches_clone = matches.clone();
+                hooks.instruction(
+                    Hook::Closure(|| on_call_check(&matches_clone, func_definition.param)),
+                    true,
+                )
             }
-            id += 1;
         }
-
-
-        hooks.instruction(Hook::Closure(), true)
-        addr: GuestAddr,
-        hook: Hook<
-            fn(&mut Self, Option<&mut S>, GuestAddr),
-            Box<dyn for<'a> FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr)>,
-            extern "C" fn(*const (), pc: GuestAddr),
-        >,
-        invalidate_block: bool,
-
-
-
     }
 }
 
@@ -280,7 +274,7 @@ where
     QT: QemuHelperTuple<S>,
     S: UsesInput,
 {
-    //println!("syscall_hook {} {}", syscall, SYS_execve);
+    log::trace!("syscall_hook {syscall} {SYS_execve}");
     debug_assert!(i32::try_from(SYS_execve).is_ok());
     if syscall == SYS_execve as i32 {
         let _helper = hooks
@@ -294,7 +288,8 @@ where
                 CStr::from_ptr(c_str_ptr).to_string_lossy()
             };
             assert_ne!(
-                cmd.to_lowercase(), "fuzz",
+                cmd.to_lowercase(),
+                "fuzz",
                 "Found verified command injection!"
             );
             //println!("CMD {}", cmd);
@@ -331,7 +326,7 @@ fn find_function(
     file: &String,
     function: &str,
     loadaddr: GuestAddr,
-) -> Result<GuestAddr, Error> {
+) -> Option<GuestAddr> {
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(file, &mut elf_buffer)?;
     let offset = if loadaddr > 0 {
@@ -339,14 +334,16 @@ fn find_function(
     } else {
         emu.load_addr()
     };
-    let start_pc = elf
-        .resolve_symbol(function, offset)
-        .ok_or_else(|| Error::empty_optional(format!("Symbol {function} not found in {file}")))?;
-    println!("Found {function} in {file}");
-    Ok(start_pc)
+    elf.resolve_symbol(function, offset)
 }
 
-fn on_call_check(matches: &Vec<Vec<u8>>, parameter: u8) {
+fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
+}
+
+fn on_call_check(matches: &Vec<Matches>, parameter: u8) {
     let emu = Emulator::get().unwrap();
 
     let reg: GuestAddr = emu
@@ -361,17 +358,23 @@ fn on_call_check(matches: &Vec<Vec<u8>>, parameter: u8) {
         let query = unsafe {
             let c_str_ptr = reg as *const c_char;
             let c_str = CStr::from_ptr(c_str_ptr);
+            cstr.as_bytes().clone()
         };
+        query.make_ascii_lowercase();
 
         //println!("query={}", query);
-        //println!("Checking {}", injection.name);
-        for match in matches.iter() {
+        log::trace!("Checking {}", injection.name);
+
+        for match_value in matches.iter() {
+            if match_value.bytes_lower.len() > matches.len() {
+                continue;
+            }
+
             // "crash" if we found the right value
             assert!(
-                query.to_lowercase().contains(&test.match_value),
+                find_subsequence(query, match_value.bytes_lower).is_none(),
                 "Found value \"{}\" for {query} in {}",
                 test.match_value,
-                query,
                 injection.name
             );
         }
