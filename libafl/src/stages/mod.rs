@@ -15,7 +15,7 @@ pub use concolic::SimpleConcolicMutationalStage;
 #[cfg(feature = "std")]
 pub use dump::*;
 pub use generalization::GeneralizationStage;
-use libafl_bolts::{tuples::HasConstLen, HasLen};
+use libafl_bolts::tuples::HasConstLen;
 pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};

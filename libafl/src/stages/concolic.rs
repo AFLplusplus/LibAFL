@@ -364,6 +364,8 @@ where
     Z::Input: HasBytesVec,
     Z::State: State + HasExecutions + HasCorpus,
 {
+    type Status = (); // TODO we need a resume for this type
+
     #[inline]
     fn perform(
         &mut self,
@@ -371,8 +373,11 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
+            Error::illegal_state("state is not currently processing a corpus index")
+        })?;
+
         start_timer!(state);
         let testcase = state.corpus().get(corpus_idx)?.clone();
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
@@ -395,8 +400,7 @@ where
                     input_copy.bytes_mut()[index] = new_byte;
                 }
                 // Time is measured directly the `evaluate_input` function
-                let _: (crate::ExecuteInputResult, Option<CorpusId>) =
-                    fuzzer.evaluate_input(state, executor, manager, input_copy)?;
+                fuzzer.evaluate_input(state, executor, manager, input_copy)?;
             }
         }
         Ok(())
