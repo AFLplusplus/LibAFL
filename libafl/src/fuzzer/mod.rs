@@ -11,7 +11,7 @@ use crate::inputs::Input;
 #[cfg(test)]
 use crate::state::NopState;
 use crate::{
-    corpus::{Corpus, CorpusId, HasCorpusStatus, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -589,7 +589,7 @@ where
         + HasTestcase
         + HasImported
         + HasLastReportTime
-        + HasCorpusStatus
+        + HasCurrentCorpusIdx
         + HasStageStatus,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {

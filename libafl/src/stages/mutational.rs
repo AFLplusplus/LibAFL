@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use libafl_bolts::rands::Rand;
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCorpusStatus, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, Testcase},
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,

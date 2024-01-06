@@ -7,7 +7,7 @@ use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCorpusStatus},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx},
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     stages::{

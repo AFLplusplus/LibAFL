@@ -10,7 +10,7 @@ use libafl_bolts::{rands::Rand, tuples::MatchName};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasCorpusStatus},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     events::EventFirer,
     executors::{Executor, HasObservers},
     inputs::HasBytesVec,

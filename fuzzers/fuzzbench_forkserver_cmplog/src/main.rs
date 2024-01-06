@@ -9,7 +9,7 @@ use std::{
 
 use clap::{Arg, ArgAction, Command};
 use libafl::{
-    corpus::{Corpus, HasCorpusStatus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    corpus::{Corpus, HasCurrentCorpusIdx, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_or,

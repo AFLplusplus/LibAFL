@@ -24,7 +24,7 @@ use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "scalability_introspection")]
 use crate::monitors::ScalabilityMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId, HasCorpusStatus, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, HasTestcase, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
@@ -46,7 +46,7 @@ pub trait State:
     + DeserializeOwned
     + MaybeHasClientPerfMonitor
     + MaybeHasScalabilityMonitor
-    + HasCorpusStatus
+    + HasCurrentCorpusIdx
     + HasStageStatus
 {
 }
@@ -525,7 +525,7 @@ impl<I, C, R, SC> HasStartTime for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasCorpusStatus for StdState<I, C, R, SC> {
+impl<I, C, R, SC> HasCurrentCorpusIdx for StdState<I, C, R, SC> {
     fn set_corpus_idx(&mut self, idx: CorpusId) -> Result<(), Error> {
         self.corpus_idx = Some(idx);
         Ok(())
@@ -1045,7 +1045,7 @@ impl<I> HasRand for NopState<I> {
 
 impl<I> State for NopState<I> where I: Input {}
 
-impl<I> HasCorpusStatus for NopState<I> {
+impl<I> HasCurrentCorpusIdx for NopState<I> {
     fn set_corpus_idx(&mut self, _idx: CorpusId) -> Result<(), Error> {
         Ok(())
     }

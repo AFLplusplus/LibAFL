@@ -32,7 +32,7 @@ pub use tuneable::*;
 
 use self::push::PushStage;
 use crate::{
-    corpus::HasCorpusStatus,
+    corpus::HasCurrentCorpusIdx,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::UsesInput,
@@ -259,7 +259,7 @@ impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, 
 where
     CS: Scheduler,
     CS::State:
-        HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime + HasCorpusStatus,
+        HasExecutions + HasMetadata + HasRand + HasCorpus + HasLastReportTime + HasCurrentCorpusIdx,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>
         + EventRestarter
@@ -323,7 +323,7 @@ pub mod pybind {
     use pyo3::prelude::*;
 
     use crate::{
-        corpus::HasCorpusStatus,
+        corpus::HasCurrentCorpusIdx,
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},

@@ -7,7 +7,7 @@ use ahash::RandomState;
 use libafl_bolts::{HasLen, Named};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasCorpusStatus, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverName},

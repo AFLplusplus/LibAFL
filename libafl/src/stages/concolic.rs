@@ -90,7 +90,7 @@ use libafl_bolts::tuples::MatchName;
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
-use crate::{corpus::HasCorpusStatus, state::UsesState};
+use crate::{corpus::HasCurrentCorpusIdx, state::UsesState};
 #[cfg(feature = "concolic_mutation")]
 use crate::{
     inputs::HasBytesVec,

@@ -9,7 +9,7 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::AsSlice;
 
 use crate::{
-    corpus::{Corpus, HasCorpusStatus},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},

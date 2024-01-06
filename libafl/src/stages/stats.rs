@@ -9,7 +9,7 @@ use libafl_bolts::current_time;
 use serde_json::json;
 
 use crate::{
-    corpus::{Corpus, HasCorpusStatus},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     events::EventFirer,
     schedulers::minimizer::IsFavoredMetadata,
     stages::Stage,

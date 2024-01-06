@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 #[cfg(feature = "introspection")]
 use libafl::state::HasClientPerfMonitor;
 use libafl::{
-    corpus::{Corpus, HasCorpusStatus},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,

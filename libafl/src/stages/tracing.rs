@@ -3,7 +3,7 @@
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::{Corpus, HasCorpusStatus},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
