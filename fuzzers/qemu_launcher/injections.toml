@@ -33,7 +33,12 @@ mysql_send_query = {param = 1}
 # We do not need this as we watch the SYS_execve syscall, this is just an
 # example.
 [cmd]
-tokens = ["'\"FUZZ\"'"] # basically a dummy because we load the better ones at src/client.rs
+tokens = [
+    "'\"FUZZ\"'",
+    "\";FUZZ;\"",
+    "';FUZZ;'",
+    "$(FUZZ)",
+]
 matches = ["'\"FUZZ\"'"]
 
 [cmd.functions]

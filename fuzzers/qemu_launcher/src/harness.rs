@@ -24,7 +24,7 @@ impl<'a> Harness<'a> {
 
         let pc: GuestReg = emu
             .read_reg(Regs::Pc)
-            .map_err(|e| Error::unknown(format!("Failed to read PC: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to read PC: {e:}")))?;
 
         let stack_ptr: GuestAddr = emu
             .read_reg(Regs::Sp)

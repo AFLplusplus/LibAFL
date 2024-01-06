@@ -50,6 +50,12 @@
     # basically a dummy because we load the better ones at src/client.rs
     - input_value: "'\"FUZZ\"'"
       match_value: "'\"FUZZ\"'"
+    - input_value: "\";FUZZ;\""
+      match_value: "'\"FUZZ\"'"
+    - input_value: "';FUZZ;'"
+      match_value: "'\"FUZZ\"'"
+    - input_value: "$(FUZZ)"
+      match_value: "'\"FUZZ\"'"
 
 # LDAP injection tests
 - name: "ldap"
