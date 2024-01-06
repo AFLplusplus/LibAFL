@@ -1396,7 +1396,7 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
 mod tests {
     use libafl_bolts::{
         rands::StdRand,
-        tuples::{tuple_list, HasConstLen},
+        tuples::{tuple_list, tuple_list_type, HasConstLen},
     };
 
     use super::*;
@@ -1408,11 +1408,34 @@ mod tests {
         state::{HasMetadata, StdState},
     };
 
-    fn test_mutations<I, S>() -> impl MutatorsTuple<I, S>
-    where
-        S: HasRand + HasMetadata + HasMaxSize,
-        I: HasBytesVec,
-    {
+    type TestMutatorsTupleType = tuple_list_type!(
+        BitFlipMutator,
+        ByteFlipMutator,
+        ByteIncMutator,
+        ByteDecMutator,
+        ByteNegMutator,
+        ByteRandMutator,
+        ByteAddMutator,
+        WordAddMutator,
+        DwordAddMutator,
+        QwordAddMutator,
+        ByteInterestingMutator,
+        WordInterestingMutator,
+        DwordInterestingMutator,
+        BytesDeleteMutator,
+        BytesDeleteMutator,
+        BytesDeleteMutator,
+        BytesDeleteMutator,
+        BytesExpandMutator,
+        BytesInsertMutator,
+        BytesRandInsertMutator,
+        BytesSetMutator,
+        BytesRandSetMutator,
+        BytesCopyMutator,
+        BytesSwapMutator,
+    );
+
+    fn test_mutations() -> TestMutatorsTupleType {
         tuple_list!(
             BitFlipMutator::new(),
             ByteFlipMutator::new(),
@@ -1481,7 +1504,7 @@ mod tests {
 
         for _ in 0..2 {
             let mut new_testcases = vec![];
-            for idx in 0..(mutations.len()) {
+            for idx in 0..TestMutatorsTupleType::LEN {
                 for input in &inputs {
                     let mut mutant = input.clone();
                     match mutations
