@@ -386,6 +386,28 @@ mod test {
         test_resume(&completed, &mut state, tuple_list!(ifstage, resetstage));
     }
 
+    #[test]
+    fn check_resumability_if_deep() {
+        let (completed, stages) = test_resume_stages();
+        let ifstage = IfStage::new(
+            |_, _, _, _| Ok(true),
+            tuple_list!(IfStage::new(
+                |_, _, _, _| Ok(true),
+                tuple_list!(IfStage::new(
+                    |_, _, _, _| Ok(true),
+                    tuple_list!(IfStage::new(
+                        |_, _, _, _| Ok(true),
+                        tuple_list!(IfStage::new(|_, _, _, _| Ok(true), stages),),
+                    ),),
+                ))
+            )),
+        );
+
+        let mut state = test_std_state::<NopInput>();
+
+        test_resume(&completed, &mut state, tuple_list!(ifstage));
+    }
+
     #[derive(Debug)]
     pub struct PanicStage<S> {
         phantom: PhantomData<S>,
@@ -461,5 +483,35 @@ mod test {
         let mut state = test_std_state::<NopInput>();
 
         test_resume(&completed, &mut state, tuple_list!(ifstage, resetstage));
+    }
+
+    #[test]
+    fn check_resumability_if_else_else_deep() {
+        let (completed, stages) = test_resume_stages();
+        let ifstage = IfElseStage::new(
+            |_, _, _, _| Ok(false),
+            tuple_list!(PanicStage::new()),
+            tuple_list!(IfElseStage::new(
+                |_, _, _, _| Ok(false),
+                tuple_list!(PanicStage::new()),
+                tuple_list!(IfElseStage::new(
+                    |_, _, _, _| Ok(false),
+                    tuple_list!(PanicStage::new()),
+                    tuple_list!(IfElseStage::new(
+                        |_, _, _, _| Ok(false),
+                        tuple_list!(PanicStage::new()),
+                        tuple_list!(IfElseStage::new(
+                            |_, _, _, _| Ok(false),
+                            tuple_list!(PanicStage::new()),
+                            stages,
+                        )),
+                    )),
+                )),
+            )),
+        );
+
+        let mut state = test_std_state::<NopInput>();
+
+        test_resume(&completed, &mut state, tuple_list!(ifstage));
     }
 }
