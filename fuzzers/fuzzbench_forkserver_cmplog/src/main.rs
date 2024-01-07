@@ -376,9 +376,10 @@ fn fuzz(
                   state: &mut StdState<_, InMemoryOnDiskCorpus<_>, _, _>,
                   _event_manager: &mut _|
          -> Result<bool, Error> {
-            let corpus_id = state.current_corpus_idx()?.ok_or_else(|| {
-                Error::illegal_state("state is not currently processing a corpus index")
-            })?;
+            let Some(corpus_id) = state.current_corpus_idx()? else {
+                return Err(Error::illegal_state("state is not currently processing a corpus index"))
+            };
+
             let corpus = state.corpus().get(corpus_id)?.borrow();
             let res = corpus.scheduled_count() == 1; // let's try on the 2nd trial
 
