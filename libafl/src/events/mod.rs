@@ -548,8 +548,8 @@ where
 /// Restartable trait
 pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
-    /// You *must* ensure that [`State::on_restart`] will be invoked in this method, by you or an
-    /// internal [`EventRestarter`], before the state is saved for recovery.
+    /// You *must* ensure that [`HasStageStatus::on_restart`] will be invoked in this method, by you
+    /// or an internal [`EventRestarter`], before the state is saved for recovery.
     #[inline]
     fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
         state.on_restart()?;

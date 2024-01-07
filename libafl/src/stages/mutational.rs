@@ -115,9 +115,11 @@ where
         state: &mut Z::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
-            Error::illegal_state("state is not currently processing a corpus index")
-        })?;
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
 
         let num = self.iterations(state, corpus_idx)?;
 
@@ -316,9 +318,12 @@ where
         state: &mut Z::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
-            Error::illegal_state("state is not currently processing a corpus index")
-        })?;
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
             return Ok(());

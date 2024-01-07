@@ -296,9 +296,13 @@ where
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;
 
-        push_stage.set_current_corpus_idx(state.current_corpus_idx()?.ok_or_else(|| {
-            Error::illegal_state("state is not currently processing a corpus index")
-        })?);
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
+        push_stage.set_current_corpus_idx(corpus_idx);
 
         push_stage.init(fuzzer, state, event_mgr, executor.observers_mut())?;
 
@@ -377,9 +381,11 @@ pub mod pybind {
             state: &mut PythonStdState,
             manager: &mut PythonEventManager,
         ) -> Result<(), Error> {
-            let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
-                Error::illegal_state("state is not currently processing a corpus index")
-            })?;
+            let Some(corpus_idx) = state.current_corpus_idx()? else {
+                return Err(Error::illegal_state(
+                    "state is not currently processing a corpus index",
+                ));
+            };
 
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(

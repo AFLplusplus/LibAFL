@@ -52,9 +52,11 @@ where
         state: &mut TE::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
-            Error::illegal_state("state is not currently processing a corpus index")
-        })?;
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
 
         self.inner.perform(fuzzer, executor, state, manager)?;
         if let Some(observer) = self
@@ -374,9 +376,11 @@ where
         state: &mut Z::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
-            Error::illegal_state("state is not currently processing a corpus index")
-        })?;
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
 
         start_timer!(state);
         let testcase = state.corpus().get(corpus_idx)?.clone();

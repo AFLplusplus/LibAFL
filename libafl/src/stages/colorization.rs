@@ -152,9 +152,11 @@ where
         manager: &mut EM,
         name: &str,
     ) -> Result<E::Input, Error> {
-        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
-            Error::illegal_state("state is not currently processing a corpus index")
-        })?;
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
 
         let mut input = state.corpus().cloned_input_for_id(corpus_idx)?;
         // The backup of the input

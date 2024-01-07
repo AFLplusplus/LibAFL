@@ -71,9 +71,11 @@ where
         state: &mut E::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
-            Error::illegal_state("state is not currently processing a corpus index")
-        })?;
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
 
         // Report your stats every `STATS_REPORT_INTERVAL`
         // compute pending, pending_favored, imported, own_finds

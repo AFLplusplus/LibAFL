@@ -62,9 +62,11 @@ where
         state: &mut CS::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let base_corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
-            Error::illegal_state("state is not currently processing a corpus index")
-        })?;
+        let Some(base_corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
 
         let orig_max_size = state.max_size();
         // basically copy-pasted from mutational.rs
