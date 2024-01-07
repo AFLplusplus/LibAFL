@@ -3,10 +3,37 @@
 use core::marker::PhantomData;
 
 use crate::{
-    stages::{HasNestedStageStatus, HasStageStatus, Stage, StagesTuple},
+    stages::{HasNestedStageStatus, HasStageStatus, Stage, StageProgress, StagesTuple},
     state::UsesState,
     Error,
 };
+
+/// Progress for nested stages. This merely enters/exits the inner stage's scope.
+#[derive(Debug)]
+pub struct NestedStageProgress;
+
+impl<S> StageProgress<S> for NestedStageProgress
+where
+    S: HasNestedStageStatus,
+{
+    fn initialize_progress(state: &mut S) -> Result<(), Error> {
+        state.enter_inner_stage()?;
+        Ok(())
+    }
+
+    fn clear_progress(state: &mut S) -> Result<(), Error> {
+        state.exit_inner_stage()?;
+        Ok(())
+    }
+
+    fn progress(_state: &S) -> Result<&Self, Error> {
+        unimplemented!("NestedStageProgress should not be queried")
+    }
+
+    fn progress_mut(_state: &mut S) -> Result<&mut Self, Error> {
+        unimplemented!("NestedStageProgress should not be queried")
+    }
+}
 
 #[derive(Debug)]
 /// Perform the stage while the closure evaluates to true
@@ -43,7 +70,7 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasNestedStageStatus,
 {
-    type Progress = (); // we encode this in stage data
+    type Progress = NestedStageProgress;
 
     fn perform(
         &mut self,
@@ -52,14 +79,10 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        state.enter_inner_stage()?;
-
         while state.current_stage()?.is_some() || (self.closure)(fuzzer, executor, state, manager)?
         {
             self.stages.perform_all(fuzzer, executor, state, manager)?;
         }
-
-        state.exit_inner_stage()?;
 
         Ok(())
     }
@@ -119,7 +142,7 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasNestedStageStatus,
 {
-    type Progress = ();
+    type Progress = NestedStageProgress;
 
     fn perform(
         &mut self,
@@ -128,14 +151,10 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        state.enter_inner_stage()?;
-
         if state.current_stage()?.is_some() || (self.closure)(fuzzer, executor, state, manager)? {
             self.if_stages
                 .perform_all(fuzzer, executor, state, manager)?;
         }
-
-        state.exit_inner_stage()?;
         Ok(())
     }
 }
@@ -198,7 +217,7 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasNestedStageStatus,
 {
-    type Progress = (); // we track this by encoding this stage as a stage "tuple"
+    type Progress = NestedStageProgress;
 
     fn perform(
         &mut self,
@@ -207,8 +226,6 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        state.enter_inner_stage()?;
-
         let current = state.current_stage()?;
 
         let fresh = current.is_none();
@@ -232,7 +249,6 @@ where
 
         state.exit_inner_stage()?;
         state.clear_stage()?;
-        state.exit_inner_stage()?;
 
         Ok(())
     }

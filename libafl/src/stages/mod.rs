@@ -595,7 +595,7 @@ pub trait HasStageStatus {
 pub trait HasNestedStageStatus: HasStageStatus {
     /// Enter a stage scope, potentially resuming to an inner stage status. Returns Ok(true) if
     /// resumed.
-    fn enter_inner_stage(&mut self) -> Result<bool, Error>;
+    fn enter_inner_stage(&mut self) -> Result<(), Error>;
 
     /// Exit a stage scope
     fn exit_inner_stage(&mut self) -> Result<(), Error>;

@@ -571,9 +571,9 @@ impl<I, C, R, SC> HasStageStatus for StdState<I, C, R, SC> {
 }
 
 impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
-    fn enter_inner_stage(&mut self) -> Result<bool, Error> {
+    fn enter_inner_stage(&mut self) -> Result<(), Error> {
         self.stage_depth += 1;
-        Ok(self.stage_depth <= self.stage_idx_stack.len())
+        Ok(())
     }
 
     fn exit_inner_stage(&mut self) -> Result<(), Error> {
