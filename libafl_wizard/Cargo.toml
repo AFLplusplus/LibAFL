@@ -9,10 +9,7 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
-categories = ["TODO"]
-
-[features]
-ui = []
+categories = ["development-tools::testing"]
 
 [dependencies]
 toml = "0.7.6"

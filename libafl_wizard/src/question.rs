@@ -42,8 +42,8 @@ impl Question {
 
     /// Returns the id of the question, which is used to differentiate between
     /// questions.
-    pub fn id(&self) -> String {
-        self.id
+    pub fn id(&self) -> &String {
+        &self.id
     }
 
     /// Returns the title of the question, which in most cases is the questions
@@ -51,42 +51,48 @@ impl Question {
     ///
     /// The 'title' is also used as the text of the nodes in the flowchart
     /// image.
-    pub fn title(&self) -> String {
-        self.title
+    pub fn title(&self) -> &String {
+        &self.title
     }
 
     /// Returns the description of the question, usually some information to
     /// help the user understand the concepts associated with a particular
     /// question.
-    pub fn content(&self) -> String {
-        self.content
+    pub fn content(&self) -> &String {
+        &self.content
     }
 
     /// Returns the id of the question that skipped the one under consideration.
-    pub fn skipped_by(&self) -> String {
-        self.skipped_by
+    pub fn skipped_by(&self) -> &String {
+        &self.skipped_by
     }
 
     /// Sets that this particular question was skipped by the one with this id.
-    pub fn set_skipped_by(&self, id: String) {
+    pub fn set_skipped_by(&mut self, id: String) {
         self.skipped_by = id;
     }
 
     /// Returns the id of the question that led to the current one.
-    pub fn previous(&self) -> String {
-        self.previous
+    pub fn previous(&self) -> &String {
+        &self.previous
     }
 
     /// Sets that this particular question came after the one with this id was
     /// answered.
-    pub fn set_previous(&self, id: String) {
+    pub fn set_previous(&mut self, id: String) {
         self.previous = id;
     }
 
     /// Returns the set of possible answers for this question, excluding the
     /// Undo option.
-    pub fn answers(&self) -> Vec<Answer> {
-        self.answers
+    pub fn answers(&self) -> &Vec<Answer> {
+        &self.answers
+    }
+
+    /// Returns a mutable set of possible answers for this question, excluding
+    /// the Undo option.
+    pub fn mut_answers(&mut self) -> &mut Vec<Answer> {
+        &mut self.answers
     }
 
     /// Prints all the relevant information of this question.
@@ -99,7 +105,6 @@ impl Question {
         ));
         output.push_str(&format!("{}\n\n", self.title()));
         output.push_str(&format!("{}\n\n\t", self.content()));
-
         for ans in self.answers().iter() {
             output.push_str(&format!(
                 "{}{}|{}",
@@ -108,9 +113,7 @@ impl Question {
                 " ".repeat(4)
             ));
         }
-
         output.push_str("Undo\n");
-
         print!("{}", output);
     }
 
@@ -121,7 +124,6 @@ impl Question {
         } else if validate_input(&input, &String::from("Undo")) {
             return true;
         }
-
         for ans in self.answers().iter() {
             if validate_input(&input, &ans.answer()) {
                 return true;
@@ -135,7 +137,7 @@ impl Question {
     /// for this given question.
     pub fn chosen_answer(&self) -> usize {
         for (i, ans) in self.answers().iter().enumerate() {
-            if ans.was_chosen() {
+            if *ans.was_chosen() {
                 return i;
             }
         }
@@ -175,7 +177,7 @@ impl Question {
         for q_id in answers[ans_i].skip().iter() {
             let i = questions
                 .iter()
-                .position(|question| &question.id() == q_id)
+                .position(|question| question.id() == q_id)
                 .unwrap();
 
             questions[i].set_skipped_by(self.id().clone());
@@ -189,7 +191,7 @@ impl Question {
         for q_id in answers[ans_i].skip().iter() {
             let i = questions
                 .iter()
-                .position(|question| &question.id() == q_id)
+                .position(|question| question.id() == q_id)
                 .unwrap();
 
             questions[i].set_skipped_by("".to_string());
@@ -217,7 +219,7 @@ impl Question {
 pub fn find_question(questions: &Vec<Question>, q: &String) -> usize {
     questions
         .iter()
-        .position(|question| &question.id() == q)
+        .position(|question| question.id() == q)
         .unwrap()
 }
 
@@ -239,7 +241,7 @@ pub fn flowchart_image(questions: &Vec<Question>) {
 
                 // Yes or No questions that lead to the same next.
                 if q.answers().len() <= 2 {
-                    for ans in &q.answers() {
+                    for ans in q.answers() {
                         dot_string.push_str(&format!(
                             "\t\"{}\" -> \"{}\"\n[label=\"{}\"]",
                             q.title(),

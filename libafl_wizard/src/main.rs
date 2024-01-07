@@ -61,7 +61,7 @@ fn main() {
             // If the user chooses to undo a question that produced code, the associated code is removed.
             // Since the Undo option goes backwards, we can simply pop the last piece of code.
             for ans in questions[next_q].answers().iter() {
-                if ans.was_chosen() && !ans.code().is_empty() {
+                if *ans.was_chosen() && !ans.code().is_empty() {
                     code_content.pop();
                 }
             }
@@ -75,13 +75,12 @@ fn main() {
                     .clone()
                     .unskip_questions(&mut questions, ans_i);
             }
-
+            let answers = questions[next_q].mut_answers();
             answers[ans_i].set_was_chosen(false);
         } else {
             (next_q, ans_i) = questions[curr_q].resolve_answer(&questions, &input);
             let answers = questions[curr_q].answers();
 
-            answers[ans_i].set_was_chosen(true);
             // Adds the code associated to the user choice.
             if !answers[ans_i].code().is_empty() {
                 code_content.push(answers[ans_i].code().to_string());
@@ -97,6 +96,9 @@ fn main() {
             // Only updates the 'previous' field when going forward (not undoing) in the questions diagram.
             let q_id = questions[curr_q].id().clone();
             questions[next_q].set_previous(q_id);
+
+            let answers = questions[curr_q].mut_answers();
+            answers[ans_i].set_was_chosen(true);
         }
         input.clear();
         curr_q = next_q;

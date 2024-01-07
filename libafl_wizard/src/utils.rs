@@ -30,11 +30,15 @@ pub fn validate_input(input: &String, ans: &String) -> bool {
     let ans_low = ans.to_lowercase();
     let mut ans_chars = ans_low.chars();
 
-    // Basically, an aswer is valid if it is an acceptable variant of that given answer. Acceptable variants are strings that contain
+    // Basically, an answer is valid if it is an acceptable variant of that given answer. Acceptable variants are strings that contain
     // the characters in the same order as the answer, so for the answer "Yes", acceptable variants are: "y", "Ye", "yes", "YES", but
     // not "Yess", "yy", "Yhes", "yYess"...
-    while let (Some(input_c), Some(ans_c)) = (input_chars.next(), ans_chars.next()) {
-        if input_c != ans_c {
+    while let Some(input_c) = input_chars.next() {
+        if let Some(ans_c) = ans_chars.next() {
+            if input_c != ans_c {
+                return false;
+            }
+        } else {
             return false;
         }
     }
@@ -237,8 +241,8 @@ fn format_import(import: &String) -> String {
 /// Arranges all the imports by sorting them alphabetically and making
 /// insertions.
 ///
-/// For example, if there are two 'use libafl::' imports, then their code
-/// will be joined so that it becomes only one 'use libafl::' import.
+/// For example, if there are two 'use libafl::' imports their code
+/// will be joined, so that it becomes only one 'use libafl::' import.
 pub fn arrange_imports(imports_content: Vec<String>) -> Vec<String> {
     // Each field of 'result' will be a single import/use of a crate, after the insertions.
     let mut result: Vec<String> = Vec::new();
@@ -258,130 +262,22 @@ pub fn arrange_imports(imports_content: Vec<String>) -> Vec<String> {
         match i {
             Some(i) => {
                 let mut i_lines = import.lines();
-                let mut r_lines = result[i].lines().peekable();
 
                 while let Some(i_line) = i_lines.next() {
-                    if i_line != "};" {
-                        let mut i_chars = i_line.chars().peekable();
-                        let mut i_name_punct = next_module_name(&i_chars);
-
-                        if i_name_punct.starts_with("use ") {
-                            i_name_punct = next_module_name(&i_chars);
-                        }
-                        let i_name = rm_punct(&i_name_punct).trim();
+                    if (i_line.starts_with("use ") && i_line.ends_with(";"))
+                        || (!i_line.starts_with("use ") && i_line != "};")
+                    {
+                        let mut r_lines = result[i].lines().peekable();
 
                         while let Some(r_line) = r_lines.next() {
-                            if r_line != "};" {
-                                let mut r_chars = r_line.chars().peekable();
-                                let mut r_name_punct = next_module_name(&r_chars);
-
-                                if r_name_punct.starts_with("use ") {
-                                    r_name_punct = next_module_name(&r_chars);
-                                }
-                                let r_name = rm_punct(&r_name_punct).trim();
-
-                                if i_name == r_name {
-                                    // Iterate on this line.
-                                    loop {
-                                        i_name_punct = next_module_name(&i_chars); 
-                                        i_name = rm_punct(&i_name_punct).trim();
-                                        r_name_punct = next_module_name(&r_chars);
-                                        r_name = rm_punct(&r_name_punct).trim();
-
-                                        if i_name < r_name {
-                                            // Check if have to make it a multiple import here.
-                                        } else if i_name > r_name {
-                                            if let None = peek_next_module_name(&r_chars) {
-                                                // Insert at the end and check if have to make it a multiple import.
-                                            }
-                                        }
-                                    }
-                                } else if i_name < r_name {
-                                    if r_line.ends_with(";") {
-                                        // If inserting in a SL: then make it ML and insert at the beginning.
-                                        let (first, second) = r_line.split_inclusive("::");
-                                        let insert_line = i_line.trim().to_string();
-
-                                        first.push_str("{\n");
-                                        if insert_line.starts_with("use ") {
-                                            insert_line =
-                                                insert_line.split_once("::").skip(1).collect();
-                                        }
-                                        insert_line.insert_str(0, &" ".repeat(4));
-                                        insert_line.push('\n');
-                                        insert_line = insert_line.replace(";", ",");
-                                        second.insert_str(0, &" ".repeat(4));
-                                        second.push('\n');
-                                        second = second.replace(";", ",");
-                                        result[i] =
-                                            format!("{}{}{}{}", first, insert_line, second, "};");
-                                    } else {
-                                        // If inserting in ML, simply insert the line here.
-                                        let mut result_lines = result[i].lines().collect();
-
-                                        for (i, line) in result[i].lines().enumerate() {
-                                            if line.contains(r_name_punct) {
-                                                let insert_line = i_line.trim().to_string();
-
-                                                if insert_line.starts_with("use ") {
-                                                    insert_line = insert_line
-                                                        .split_once("::")
-                                                        .skip(1)
-                                                        .collect();
-                                                }
-                                                insert_line.insert_str(0, &" ".repeat(4));
-                                                insert_line.push('\n');
-                                                insert_line = insert_line.replace(";", ",");
-                                                result_lines.insert(i, insert_line);
-                                                break;
-                                            }
-                                        }
-                                        result[i] = result_lines.join("");
-                                        break;
-                                    }
-                                } else {
-                                    if r_line.ends_with(";") {
-                                        // If inserting in a SL: the make it ML and insert the line at the end.
-                                        let (first, second) = r_line.split_inclusive("::");
-                                        let insert_line = i_line.trim().to_string();
-
-                                        first.push_str("{\n");
-                                        second.insert_str(0, &" ".repeat(4));
-                                        second.push('\n');
-                                        second = second.replace(";", ",");
-                                        if insert_line.starts_with("use ") {
-                                            insert_line =
-                                                insert_line.split_once("::").skip(1).collect();
-                                        }
-                                        insert_line.insert_str(0, &" ".repeat(4));
-                                        insert_line.push('\n');
-                                        insert_line = insert_line.replace(";", ",");
-                                        result[i] =
-                                            format!("{}{}{}{}", first, second, insert_line, "};");
-                                        break;
-                                    } else {
-                                        // If inserting in ML, if there arent anymore lines: then insert the line at the end.
-                                        if let Some(end) = r_lines.peek() {
-                                            if end == "};" {
-                                                let mut result_lines = result[i].lines().collect();
-                                                let insert_line = i_line.trim().to_string();
-
-                                                if insert_line.starts_with("use ") {
-                                                    insert_line = insert_line
-                                                        .split_once("::")
-                                                        .skip(1)
-                                                        .collect();
-                                                }
-                                                insert_line.insert_str(0, &" ".repeat(4));
-                                                insert_line.push('\n');
-                                                insert_line = insert_line.replace(";", ",");
-                                                result_lines
-                                                    .insert(result_lines.len() - 2, insert_line);
-                                                result[i] = result_lines.join("");
-                                                break;
-                                            }
-                                        }
-                                    }
+                            if (r_line.starts_with("use ") && r_line.ends_with(";"))
+                                || (!r_line.starts_with("use ") && r_line != "};")
+                            {
+                                if let Some(new_result) =
+                                    insert_import(i_line, r_line, r_lines.clone(), &result[i])
+                                {
+                                    result[i] = new_result;
+                                    break;
                                 }
                             }
                         }
@@ -399,13 +295,11 @@ pub fn arrange_imports(imports_content: Vec<String>) -> Vec<String> {
     result
 }
 
-/// Returns the next module name for an iterator of characters of a line of an
-/// import.
-fn next_module_name<I>(chars: &mut std::iterator::Peekable<I>) -> String
-where
-    I: Iterator<Item = char>,
-{
+/// Returns a vector containing all the modules names in a line of an import.
+fn modules_names(line: &str) -> Vec<String> {
+    let mut chars = line.chars().peekable();
     let mut module_name = String::new();
+    let mut names: Vec<String> = Vec::new();
 
     while let Some(c) = chars.next() {
         module_name.push(c);
@@ -414,29 +308,301 @@ where
             if module_name.contains("::") {
                 if let Some(&next_char) = chars.peek() {
                     if next_char != '{' {
-                        break;
+                        names.push(module_name.clone());
+                        module_name.clear();
                     }
                 }
             }
         } else if module_name.contains(",") || module_name.contains("{") {
-            if let Some(&next_char) = chars.peek() {
-                if next_char != '\n' {
-                    break;
-                }
-            }
+            names.push(module_name.clone());
+            module_name.clear();
         } else if c == ';' {
-            break;
+            names.push(module_name.clone());
+            module_name.clear();
         }
     }
 
-    module_name
+    names
 }
 
-/// Removes the punctuation characters of the name of a module.
-fn rm_punct(input: &String) -> String {
-    // Removes the ';', '::', etc from the string.
-    input
-        .chars()
-        .filter(|&c| c != ':' && c != ';' && c != ',' && c != '{' && c != '}')
-        .collect()
+/// Removes the punctuation characters from the end of the name of a module.
+fn rm_punct(name: &String) -> String {
+    let chars_to_remove = [';', ':', ',', '{', '}'];
+
+    name.trim_end_matches(|c| chars_to_remove.contains(&c))
+        .to_string()
+}
+
+/// Checks which kind of insertion should be applied to the import, based on the
+/// name of the module.
+fn insert_import<'a, T>(
+    i_line: &str,
+    r_line: &str,
+    r_lines: std::iter::Peekable<T>,
+    curr_result: &String,
+) -> Option<String>
+where
+    T: Iterator<Item = &'a str>,
+{
+    let i_line_names = modules_names(i_line);
+    let mut i_line_names_iter = i_line_names.iter().peekable();
+    let mut i_name_punct = i_line_names_iter.next().unwrap().to_string();
+    if i_name_punct.starts_with("use ") {
+        i_name_punct = i_line_names_iter.next().unwrap().to_string();
+    }
+    let i_name = rm_punct(&i_name_punct);
+    let i_name = i_name.trim().to_string();
+
+    let r_line_names = modules_names(r_line);
+    let mut r_line_names_iter = r_line_names.iter().peekable();
+    let mut r_name_punct = r_line_names_iter.next().unwrap().to_string();
+    if r_name_punct.starts_with("use ") {
+        r_name_punct = r_line_names_iter.next().unwrap().to_string();
+    }
+    let r_name = rm_punct(&r_name_punct);
+    let r_name = r_name.trim().to_string();
+
+    if i_name == r_name {
+        insert_on_line(i_line_names_iter, r_line_names_iter, r_line, curr_result)
+    } else if i_name < r_name {
+        insert_before_line(i_line, r_line, r_name_punct, curr_result)
+    } else {
+        insert_after_line(i_line, r_line, r_lines, curr_result)
+    }
+}
+
+/// Inserts the import on the current line.
+///
+/// For example, "use libafl::feedback::CrashFeedback;" and
+/// "use libafl::feedback::TimeoutFeedback" will return:
+/// "use libafl::feedback::{CrashFeedback, TimeoutFeedback};"
+fn insert_on_line<'a, T>(
+    mut i_line_names_iter: std::iter::Peekable<T>,
+    mut r_line_names_iter: std::iter::Peekable<T>,
+    r_line: &str,
+    curr_result: &String,
+) -> Option<String>
+where
+    T: Iterator<Item = &'a String> + std::iter::DoubleEndedIterator,
+    T: Clone,
+{
+    let mut inserted = false;
+    let mut new_r_line = r_line.to_string();
+
+    while let Some(i_name_punct) = i_line_names_iter.peek() {
+        let i_name = rm_punct(&i_name_punct);
+
+        if let Some(r_name_punct) = r_line_names_iter.peek() {
+            let r_name = rm_punct(&r_name_punct);
+
+            if i_name < r_name {
+                if r_name_punct.ends_with(",") {
+                    // Make it a multiple import and insert here.
+                    let insert_string = rm_punct(&i_name_punct);
+                    let (first, second) =
+                        new_r_line.split_at(new_r_line.find(r_name_punct.as_str()).unwrap());
+                    let second = rm_punct(&second.to_string());
+                    let mut end = "},";
+
+                    if new_r_line.ends_with(";") {
+                        end = "};";
+                    }
+                    new_r_line = format!("{}{}{}, {}{}", first, "{", insert_string, second, end);
+                    inserted = true;
+                } else {
+                    let mut r_line_names_iter_rev = r_line_names_iter.clone().rev();
+
+                    if let Some(r_name_punct) = r_line_names_iter_rev.next() {
+                        let insert_string = rm_punct(&i_name_punct);
+                        let (first, second) =
+                            new_r_line.split_at(new_r_line.find(r_name_punct).unwrap());
+                        let second = rm_punct(&second.to_string());
+                        let mut end = "},";
+
+                        if new_r_line.ends_with(";") {
+                            end = "};";
+                        }
+                        new_r_line =
+                            format!("{}{}{}, {}{}", first, "{", insert_string, second, end);
+                        inserted = true;
+                    }
+                }
+            }
+        }
+        // Advance the iterators
+        if let Some(r_name_punct) = r_line_names_iter.next() {
+            if let Some(i_name_punct) = i_line_names_iter.next() {
+                let r_name = rm_punct(&r_name_punct);
+
+                if i_name > r_name {
+                    // If there are no more elements, insert at the end.
+                    if let None = r_line_names_iter.peek() {
+                        let mut insert_string = i_name_punct.to_string();
+
+                        while let Some(i_name_punct) = i_line_names_iter.next() {
+                            insert_string.push_str(i_name_punct);
+                        }
+                        insert_string = rm_punct(&insert_string).trim_end().to_string();
+                        if r_name_punct.ends_with("},") || r_name_punct.ends_with("};") {
+                            let (first, second) =
+                                new_r_line.split_at(new_r_line.rfind("}").unwrap());
+
+                            new_r_line = format!("{}, {}{}", first, insert_string, second);
+                        } else {
+                            let (first, second) =
+                                r_line.split_at(r_line.find(r_name_punct.as_str()).unwrap());
+                            let second = second.trim_end().replace(";", ",");
+                            let mut end = "},";
+
+                            if new_r_line.ends_with(";") {
+                                end = "};";
+                            }
+                            new_r_line =
+                                format!("{}{}{} {}{}", first, "{", second, insert_string, end);
+                        }
+                        let mut result_lines: Vec<String> =
+                            curr_result.lines().map(|line| line.to_string()).collect();
+
+                        for (i, line) in curr_result.lines().enumerate() {
+                            if line == r_line {
+                                result_lines.remove(i);
+                                result_lines.insert(i, new_r_line);
+                                break;
+                            }
+                        }
+
+                        return Some(result_lines.join("\n"));
+                    }
+                }
+            }
+        }
+    }
+    if inserted {
+        let mut result_lines: Vec<String> =
+            curr_result.lines().map(|line| line.to_string()).collect();
+
+        for (i, line) in curr_result.lines().enumerate() {
+            if line == r_line {
+                result_lines.remove(i);
+                result_lines.insert(i, new_r_line);
+                break;
+            }
+        }
+
+        return Some(result_lines.join("\n"));
+    }
+
+    None
+}
+
+/// Inserts the import before the current line.
+///
+/// For example, "use libafl::executor::InProcessExecutor;" and
+/// "use libafl::{
+///     feedback::TimeoutFeedback,
+///  };", will return:
+/// "use libafl::{
+///     executor::InProcessExecutor,
+///     feedback::TimeoutFeedback,
+///  };"
+fn insert_before_line(
+    i_line: &str,
+    r_line: &str,
+    r_name_punct: String,
+    curr_result: &String,
+) -> Option<String> {
+    let new_result: String;
+
+    if r_line.ends_with(";") {
+        // Change format to multiple import and insert as the first line.
+        let (first, second) = r_line.split_at(r_line.find("::").unwrap() + 2);
+        let insert_line = format_insert_line(i_line);
+        let mut first = first.to_string();
+        let second = format_insert_line(second);
+
+        first.push_str("{\n");
+        new_result = format!("{}{}{}{}", first, insert_line, second, "};");
+    } else {
+        // Simply insert the line here..
+        let mut result_lines: Vec<String> =
+            curr_result.lines().map(|line| line.to_string()).collect();
+
+        for (i, line) in curr_result.lines().enumerate() {
+            if line.contains(&r_name_punct) {
+                let insert_line = format_insert_line(i_line).replace("\n", "");
+
+                result_lines.insert(i, insert_line);
+                break;
+            }
+        }
+        new_result = result_lines.join("\n");
+    }
+
+    return Some(new_result);
+}
+
+/// Inserts the import before the current line.
+///
+/// For example, "use libafl::state::StdState;" and
+/// "use libafl::{
+///     feedback::TimeoutFeedback,
+///  };", will return:
+/// "use libafl::{
+///     feedback::TimeoutFeedback,
+///     state::StdState,
+///  };"
+fn insert_after_line<'a, T>(
+    i_line: &str,
+    r_line: &str,
+    mut r_lines: std::iter::Peekable<T>,
+    curr_result: &String,
+) -> Option<String>
+where
+    T: Iterator<Item = &'a str>,
+{
+    if r_line.ends_with(";") {
+        // Change format to multiple import and insert as the last line.
+        let new_result: String;
+        let (first, second) = r_line.split_at(r_line.find("::").unwrap() + 2);
+        let insert_line = format_insert_line(i_line);
+        let mut first = first.to_string();
+        let second = format_insert_line(second);
+
+        first.push_str("{\n");
+        new_result = format!("{}{}{}{}", first, second, insert_line, "};");
+
+        return Some(new_result);
+    } else {
+        if let Some(end) = r_lines.peek() {
+            if end == &"};" {
+                // If there are no more elements, insert as the last line.
+                let new_result: String;
+                let mut result_lines: Vec<String> =
+                    curr_result.lines().map(|line| line.to_string()).collect();
+                let insert_line = format_insert_line(i_line).replace("\n", "");
+
+                result_lines.insert(result_lines.len() - 1, insert_line);
+                new_result = result_lines.join("\n");
+
+                return Some(new_result);
+            }
+        }
+    }
+
+    None
+}
+
+/// Formats the import line for insertion.
+fn format_insert_line(line: &str) -> String {
+    let mut insert_line = line.trim().to_string();
+
+    if insert_line.starts_with("use ") {
+        let (_, second) = insert_line.split_once("::").unwrap();
+        insert_line = second.to_string();
+    }
+    insert_line.insert_str(0, &" ".repeat(4));
+    insert_line.push('\n');
+    insert_line = insert_line.replace(";", ",");
+
+    insert_line
 }
