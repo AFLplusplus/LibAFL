@@ -349,6 +349,7 @@ impl Default for FridaOptions {
 mod tests {
     use clap_builder::Parser;
     use frida_gum::Gum;
+    use lazy_static::lazy_static;
     use libafl::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
@@ -359,7 +360,7 @@ mod tests {
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         schedulers::StdScheduler,
         stages::StdMutationalStage,
-        state::{StdState, HasSolutions},
+        state::{HasSolutions, StdState},
         Fuzzer, StdFuzzer,
     };
     use libafl_bolts::{cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice};
@@ -373,7 +374,6 @@ mod tests {
         executor::FridaInProcessExecutor,
         helper::FridaInstrumentationHelper,
     };
-    use lazy_static::lazy_static;
     lazy_static! {
         static ref GUM: Gum = unsafe { Gum::obtain() };
     }
@@ -401,12 +401,12 @@ mod tests {
                 ExitKind::Ok
             };
 
-        // This actually should check for 1, but as of now we get 70
-        assert!(test_asan_with_harness(harness, options) > 0);
+            // This actually should check for 1, but as of now we get 70
+            assert!(test_asan_with_harness(harness, options) > 0);
         }
     }
 
-    unsafe fn test_asan_with_harness<F>(mut harness: F, options: &FuzzerOptions)->  usize
+    unsafe fn test_asan_with_harness<F>(mut harness: F, options: &FuzzerOptions) -> usize
     where
         F: FnMut(&BytesInput) -> ExitKind,
     {
@@ -454,7 +454,7 @@ mod tests {
         );
 
         let mut executor = FridaInProcessExecutor::new(
-            &GUM,/*&gum,*/
+            &GUM, /*&gum,*/
             InProcessExecutor::new(
                 &mut harness,
                 observers, // tuple_list!(),
