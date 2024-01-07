@@ -18,8 +18,8 @@ use libafl::{
     Error,
 };
 
-#[cfg(unix)]
-use crate::asan::errors::ASAN_ERRORS;
+// #[cfg(unix)]
+// use crate::asan::errors::ASAN_ERRORS;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
 use crate::windows_hooks::initialize;
@@ -102,13 +102,13 @@ where
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }
-        #[cfg(unix)]
-        unsafe {
-            if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
-                log::error!("Crashing target as it had ASAN errors");
-                libc::raise(libc::SIGABRT);
-            }
-        }
+        // #[cfg(unix)]
+        // unsafe {
+        //     if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
+        //         log::error!("Crashing target as it had ASAN errors");
+        //         libc::raise(libc::SIGABRT);
+        //     }
+        // }
         self.helper.post_exec(input)?;
         res
     }

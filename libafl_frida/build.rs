@@ -9,4 +9,17 @@ fn main() {
     // Force linking against libc++
     #[cfg(unix)]
     println!("cargo:rustc-link-lib=dylib=c++");
+
+    // Build the test harness 
+    // clang++ -shared -fPIC -o harness.so harness.cpp
+    #[cfg(unix)]
+    std::process::Command::new("clang++")
+    .arg("-shared")
+    .arg("-fPIC")
+    .arg("-o")
+    .arg("harness.so")
+    .arg("harness.cpp")
+    .status()
+    .expect("Failed to build runtime");
+
 }

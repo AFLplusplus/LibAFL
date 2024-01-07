@@ -81,6 +81,10 @@ log = "0.4.20"
 mmap-rs = "0.6.0"
 
 yaxpeax-arch = "0.2.7"
+clap_builder = "4.0"
+env_logger = "0.10.0"
+libloading = "0.7"
+lazy_static = "1.4"
 
 [dev-dependencies]
 serial_test = { version = "2", default-features = false, features = ["logging"] }
