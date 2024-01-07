@@ -163,7 +163,7 @@ mod tests {
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
         inputs::{BytesInput, UsesInput},
         observers::Observer,
-        state::{NopState, State, UsesState},
+        state::{test::NopState, State, UsesState},
     };
 
     #[derive(Debug)]

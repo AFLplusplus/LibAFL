@@ -3,7 +3,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    stages::{Stage, StagesTuple},
+    stages::{HasNestedStageStatus, HasStageStatus, Stage, StagesTuple},
     state::UsesState,
     Error,
 };
@@ -41,8 +41,9 @@ where
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
+    E::State: HasNestedStageStatus,
 {
-    type Progress = (); // TODO we need to resume the inner stages
+    type Progress = (); // we encode this in stage data
 
     fn perform(
         &mut self,
@@ -51,9 +52,15 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        while (self.closure)(fuzzer, executor, state, manager)? {
+        state.enter_inner_stage()?;
+
+        while state.current_stage()?.is_some() || (self.closure)(fuzzer, executor, state, manager)?
+        {
             self.stages.perform_all(fuzzer, executor, state, manager)?;
         }
+
+        state.exit_inner_stage()?;
+
         Ok(())
     }
 }
@@ -110,8 +117,9 @@ where
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
+    E::State: HasNestedStageStatus,
 {
-    type Progress = (); // TODO we need to resume the inner stages
+    type Progress = ();
 
     fn perform(
         &mut self,
@@ -120,10 +128,14 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if (self.closure)(fuzzer, executor, state, manager)? {
+        state.enter_inner_stage()?;
+
+        if state.current_stage()?.is_some() || (self.closure)(fuzzer, executor, state, manager)? {
             self.if_stages
                 .perform_all(fuzzer, executor, state, manager)?;
         }
+
+        state.exit_inner_stage()?;
         Ok(())
     }
 }
@@ -184,8 +196,9 @@ where
     ST1: StagesTuple<E, EM, E::State, Z>,
     ST2: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
+    E::State: HasNestedStageStatus,
 {
-    type Progress = (); // TODO we need to resume the inner stages
+    type Progress = (); // we track this by encoding this stage as a stage "tuple"
 
     fn perform(
         &mut self,
@@ -194,13 +207,33 @@ where
         state: &mut E::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if (self.closure)(fuzzer, executor, state, manager)? {
+        state.enter_inner_stage()?;
+
+        let current = state.current_stage()?;
+
+        let fresh = current.is_none();
+        let closure_return = fresh && (self.closure)(fuzzer, executor, state, manager)?;
+
+        if current == Some(0) || closure_return {
+            if fresh {
+                state.set_stage(0)?;
+            }
+            state.enter_inner_stage()?;
             self.if_stages
                 .perform_all(fuzzer, executor, state, manager)?;
         } else {
+            if fresh {
+                state.set_stage(1)?;
+            }
+            state.enter_inner_stage()?;
             self.else_stages
                 .perform_all(fuzzer, executor, state, manager)?;
         }
+
+        state.exit_inner_stage()?;
+        state.clear_stage()?;
+        state.exit_inner_stage()?;
+
         Ok(())
     }
 }
@@ -254,8 +287,9 @@ where
     EM: UsesState<State = E::State>,
     ST: StagesTuple<E, EM, E::State, Z>,
     Z: UsesState<State = E::State>,
+    E::State: HasNestedStageStatus,
 {
-    type Progress = (); // TODO we need to resume the inner stages
+    type Progress = ();
 
     fn perform(
         &mut self,
@@ -304,5 +338,128 @@ where
             stages: None,
             phantom: PhantomData,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use core::{cell::RefCell, marker::PhantomData};
+
+    use libafl_bolts::{tuples::tuple_list, Error};
+
+    use crate::{
+        inputs::NopInput,
+        stages::{
+            test::{test_resume, test_resume_stages},
+            ClosureStage, IfElseStage, IfStage, Stage, WhileStage,
+        },
+        state::{test::test_std_state, State, UsesState},
+    };
+
+    #[test]
+    fn check_resumability_while() {
+        let once = RefCell::new(true);
+        let (completed, stages) = test_resume_stages();
+        let whilestage = WhileStage::new(|_, _, _, _| Ok(once.replace(false)), stages);
+        let resetstage = ClosureStage::new(|_, _, _, _| {
+            once.replace(true);
+            Ok(())
+        });
+
+        let mut state = test_std_state::<NopInput>();
+
+        test_resume(&completed, &mut state, tuple_list!(whilestage, resetstage));
+    }
+
+    #[test]
+    fn check_resumability_if() {
+        let once = RefCell::new(true);
+        let (completed, stages) = test_resume_stages();
+        let ifstage = IfStage::new(|_, _, _, _| Ok(once.replace(false)), stages);
+        let resetstage = ClosureStage::new(|_, _, _, _| {
+            once.replace(true);
+            Ok(())
+        });
+
+        let mut state = test_std_state::<NopInput>();
+
+        test_resume(&completed, &mut state, tuple_list!(ifstage, resetstage));
+    }
+
+    #[derive(Debug)]
+    pub struct PanicStage<S> {
+        phantom: PhantomData<S>,
+    }
+
+    impl<S> PanicStage<S> {
+        pub fn new() -> Self {
+            Self {
+                phantom: PhantomData,
+            }
+        }
+    }
+
+    impl<S> UsesState for PanicStage<S>
+    where
+        S: State,
+    {
+        type State = S;
+    }
+
+    impl<E, EM, Z> Stage<E, EM, Z> for PanicStage<E::State>
+    where
+        E: UsesState,
+        EM: UsesState<State = E::State>,
+        Z: UsesState<State = E::State>,
+    {
+        type Progress = ();
+
+        fn perform(
+            &mut self,
+            _fuzzer: &mut Z,
+            _executor: &mut E,
+            _state: &mut Self::State,
+            _manager: &mut EM,
+        ) -> Result<(), Error> {
+            panic!("Test failed; panic stage should never be executed.");
+        }
+    }
+
+    #[test]
+    fn check_resumability_if_else_if() {
+        let once = RefCell::new(true);
+        let (completed, stages) = test_resume_stages();
+        let ifstage = IfElseStage::new(
+            |_, _, _, _| Ok(once.replace(false)),
+            stages,
+            tuple_list!(PanicStage::new()),
+        );
+        let resetstage = ClosureStage::new(|_, _, _, _| {
+            once.replace(true);
+            Ok(())
+        });
+
+        let mut state = test_std_state::<NopInput>();
+
+        test_resume(&completed, &mut state, tuple_list!(ifstage, resetstage));
+    }
+
+    #[test]
+    fn check_resumability_if_else_else() {
+        let once = RefCell::new(false);
+        let (completed, stages) = test_resume_stages();
+        let ifstage = IfElseStage::new(
+            |_, _, _, _| Ok(once.replace(true)),
+            tuple_list!(PanicStage::new()),
+            stages,
+        );
+        let resetstage = ClosureStage::new(|_, _, _, _| {
+            once.replace(false);
+            Ok(())
+        });
+
+        let mut state = test_std_state::<NopInput>();
+
+        test_resume(&completed, &mut state, tuple_list!(ifstage, resetstage));
     }
 }

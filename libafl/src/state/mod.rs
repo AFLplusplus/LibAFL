@@ -1,5 +1,6 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
+use alloc::vec::Vec;
 use core::{
     cell::{Ref, RefMut},
     fmt::Debug,
@@ -10,11 +11,10 @@ use core::{
 use std::{
     fs,
     path::{Path, PathBuf},
-    vec::Vec,
 };
 
 use libafl_bolts::{
-    rands::{Rand, StdRand},
+    rands::Rand,
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -30,7 +30,7 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
-    stages::HasStageStatus,
+    stages::{HasNestedStageStatus, HasStageStatus},
     Error,
 };
 
@@ -330,8 +330,10 @@ pub struct StdState<I, C, R, SC> {
     last_report_time: Option<Duration>,
     /// The current index of the corpus; used to record for resumable fuzzing.
     corpus_idx: Option<CorpusId>,
-    /// The current index of the stages; used to record for resumable fuzzing.
-    stage_idx: Option<usize>,
+    /// The stage indexes for each nesting of stages
+    stage_idx_stack: Vec<usize>,
+    /// The current stage depth
+    stage_depth: usize,
     phantom: PhantomData<I>,
 }
 
@@ -543,17 +545,40 @@ impl<I, C, R, SC> HasCurrentCorpusIdx for StdState<I, C, R, SC> {
 
 impl<I, C, R, SC> HasStageStatus for StdState<I, C, R, SC> {
     fn set_stage(&mut self, idx: usize) -> Result<(), Error> {
-        self.stage_idx = Some(idx);
+        // ensure we are in the right frame
+        if self.stage_depth != self.stage_idx_stack.len() {
+            return Err(Error::illegal_state(
+                "stage not resumed before setting stage",
+            ));
+        }
+        self.stage_idx_stack.push(idx);
         Ok(())
     }
 
     fn clear_stage(&mut self) -> Result<(), Error> {
-        self.stage_idx = None;
+        self.stage_idx_stack.truncate(self.stage_depth);
         Ok(())
     }
 
     fn current_stage(&self) -> Result<Option<usize>, Error> {
-        Ok(self.stage_idx)
+        Ok(self.stage_idx_stack.get(self.stage_depth).copied())
+    }
+
+    fn on_restart(&mut self) -> Result<(), Error> {
+        self.stage_depth = 0; // reset the stage depth so that we may resume inward
+        Ok(())
+    }
+}
+
+impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
+    fn enter_inner_stage(&mut self) -> Result<bool, Error> {
+        self.stage_depth += 1;
+        Ok(self.stage_depth <= self.stage_idx_stack.len())
+    }
+
+    fn exit_inner_stage(&mut self) -> Result<(), Error> {
+        self.stage_depth -= 1;
+        Ok(())
     }
 }
 
@@ -941,7 +966,8 @@ where
             dont_reenter: None,
             last_report_time: None,
             corpus_idx: None,
-            stage_idx: None,
+            stage_depth: 0,
+            stage_idx_stack: Vec::new(),
             phantom: PhantomData,
         };
         feedback.init_state(&mut state)?;
@@ -972,126 +998,168 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
     }
 }
 
-/// A very simple state without any bells or whistles, for testing.
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct NopState<I> {
-    metadata: SerdeAnyMap,
-    execution: usize,
-    rand: StdRand,
-    phantom: PhantomData<I>,
-}
+#[cfg(test)]
+pub mod test {
+    use core::{marker::PhantomData, time::Duration};
 
-impl<I> NopState<I> {
-    /// Create a new State that does nothing (for tests)
-    #[must_use]
-    pub fn new() -> Self {
-        NopState {
-            metadata: SerdeAnyMap::new(),
-            execution: 0,
-            rand: StdRand::default(),
-            phantom: PhantomData,
+    use libafl_bolts::{rands::StdRand, serdeany::SerdeAnyMap, Error};
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        corpus::{CorpusId, HasCurrentCorpusIdx, InMemoryCorpus},
+        inputs::{Input, NopInput, UsesInput},
+        stages::test::{test_resume, test_resume_stages},
+        state::{
+            HasExecutions, HasLastReportTime, HasMetadata, HasRand, HasStageStatus, State, StdState,
+        },
+    };
+    #[cfg(feature = "introspection")]
+    use crate::{monitors::ClientPerfMonitor, state::HasClientPerfMonitor};
+    #[cfg(feature = "scalability_introspection")]
+    use crate::{monitors::ScalabilityMonitor, state::HasScalabilityMonitor};
+
+    /// A very simple state without any bells or whistles, for testing.
+    #[derive(Debug, Serialize, Deserialize, Default)]
+    pub struct NopState<I> {
+        metadata: SerdeAnyMap,
+        execution: usize,
+        rand: StdRand,
+        phantom: PhantomData<I>,
+    }
+
+    impl<I> NopState<I> {
+        /// Create a new State that does nothing (for tests)
+        #[must_use]
+        pub fn new() -> Self {
+            NopState {
+                metadata: SerdeAnyMap::new(),
+                execution: 0,
+                rand: StdRand::default(),
+                phantom: PhantomData,
+            }
         }
     }
-}
 
-impl<I> UsesInput for NopState<I>
-where
-    I: Input,
-{
-    type Input = I;
-}
-
-impl<I> HasExecutions for NopState<I> {
-    fn executions(&self) -> &usize {
-        &self.execution
+    impl<I> UsesInput for NopState<I>
+    where
+        I: Input,
+    {
+        type Input = I;
     }
 
-    fn executions_mut(&mut self) -> &mut usize {
-        &mut self.execution
-    }
-}
+    impl<I> HasExecutions for NopState<I> {
+        fn executions(&self) -> &usize {
+            &self.execution
+        }
 
-impl<I> HasLastReportTime for NopState<I> {
-    fn last_report_time(&self) -> &Option<Duration> {
-        unimplemented!();
-    }
-
-    fn last_report_time_mut(&mut self) -> &mut Option<Duration> {
-        unimplemented!();
-    }
-}
-
-impl<I> HasMetadata for NopState<I> {
-    fn metadata_map(&self) -> &SerdeAnyMap {
-        &self.metadata
+        fn executions_mut(&mut self) -> &mut usize {
+            &mut self.execution
+        }
     }
 
-    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
-        &mut self.metadata
-    }
-}
+    impl<I> HasLastReportTime for NopState<I> {
+        fn last_report_time(&self) -> &Option<Duration> {
+            unimplemented!();
+        }
 
-impl<I> HasRand for NopState<I> {
-    type Rand = StdRand;
-
-    fn rand(&self) -> &Self::Rand {
-        &self.rand
+        fn last_report_time_mut(&mut self) -> &mut Option<Duration> {
+            unimplemented!();
+        }
     }
 
-    fn rand_mut(&mut self) -> &mut Self::Rand {
-        &mut self.rand
-    }
-}
+    impl<I> HasMetadata for NopState<I> {
+        fn metadata_map(&self) -> &SerdeAnyMap {
+            &self.metadata
+        }
 
-impl<I> State for NopState<I> where I: Input {}
-
-impl<I> HasCurrentCorpusIdx for NopState<I> {
-    fn set_corpus_idx(&mut self, _idx: CorpusId) -> Result<(), Error> {
-        Ok(())
+        fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
+            &mut self.metadata
+        }
     }
 
-    fn clear_corpus_idx(&mut self) -> Result<(), Error> {
-        Ok(())
+    impl<I> HasRand for NopState<I> {
+        type Rand = StdRand;
+
+        fn rand(&self) -> &Self::Rand {
+            &self.rand
+        }
+
+        fn rand_mut(&mut self) -> &mut Self::Rand {
+            &mut self.rand
+        }
     }
 
-    fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error> {
-        Ok(None)
-    }
-}
+    impl<I> State for NopState<I> where I: Input {}
 
-impl<I> HasStageStatus for NopState<I> {
-    fn set_stage(&mut self, _idx: usize) -> Result<(), Error> {
-        Ok(())
-    }
+    impl<I> HasCurrentCorpusIdx for NopState<I> {
+        fn set_corpus_idx(&mut self, _idx: CorpusId) -> Result<(), Error> {
+            Ok(())
+        }
 
-    fn clear_stage(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
+        fn clear_corpus_idx(&mut self) -> Result<(), Error> {
+            Ok(())
+        }
 
-    fn current_stage(&self) -> Result<Option<usize>, Error> {
-        Ok(None)
-    }
-}
-
-#[cfg(feature = "introspection")]
-impl<I> HasClientPerfMonitor for NopState<I> {
-    fn introspection_monitor(&self) -> &ClientPerfMonitor {
-        unimplemented!();
+        fn current_corpus_idx(&self) -> Result<Option<CorpusId>, Error> {
+            Ok(None)
+        }
     }
 
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!();
-    }
-}
+    impl<I> HasStageStatus for NopState<I> {
+        fn set_stage(&mut self, _idx: usize) -> Result<(), Error> {
+            Ok(())
+        }
 
-#[cfg(feature = "scalability_introspection")]
-impl<I> HasScalabilityMonitor for NopState<I> {
-    fn scalability_monitor(&self) -> &ScalabilityMonitor {
-        unimplemented!();
+        fn clear_stage(&mut self) -> Result<(), Error> {
+            Ok(())
+        }
+
+        fn current_stage(&self) -> Result<Option<usize>, Error> {
+            Ok(None)
+        }
     }
 
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
-        unimplemented!();
+    #[cfg(feature = "introspection")]
+    impl<I> HasClientPerfMonitor for NopState<I> {
+        fn introspection_monitor(&self) -> &ClientPerfMonitor {
+            unimplemented!();
+        }
+
+        fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
+            unimplemented!();
+        }
+    }
+
+    #[cfg(feature = "scalability_introspection")]
+    impl<I> HasScalabilityMonitor for NopState<I> {
+        fn scalability_monitor(&self) -> &ScalabilityMonitor {
+            unimplemented!();
+        }
+
+        fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
+            unimplemented!();
+        }
+    }
+
+    #[must_use]
+    pub fn test_std_state<I: Input>() -> StdState<I, InMemoryCorpus<I>, StdRand, InMemoryCorpus<I>>
+    {
+        StdState::new(
+            StdRand::with_seed(0),
+            InMemoryCorpus::<I>::new(),
+            InMemoryCorpus::new(),
+            &mut (),
+            &mut (),
+        )
+        .expect("couldn't instantiate the test state")
+    }
+
+    #[test]
+    fn resume_simple() {
+        let mut state = test_std_state::<NopInput>();
+        let (completed, stages) = test_resume_stages();
+
+        test_resume(&completed, &mut state, stages);
     }
 }
 

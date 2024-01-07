@@ -849,6 +849,8 @@ where
 
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        state.on_restart()?;
+
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(&if self.save_state {
@@ -856,6 +858,7 @@ where
         } else {
             None
         })?;
+
         self.await_restart_safe();
         Ok(())
     }

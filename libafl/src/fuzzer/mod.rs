@@ -6,10 +6,6 @@ use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use libafl_bolts::current_time;
 use serde::{de::DeserializeOwned, Serialize};
 
-#[cfg(test)]
-use crate::inputs::Input;
-#[cfg(test)]
-use crate::state::NopState;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
@@ -152,7 +148,7 @@ where
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasStageStatus,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
     E: UsesState<State = Self::State>,
     EM: ProgressReporter<State = Self::State>,
     ST: StagesTuple<E, EM, Self::State, Self>,
@@ -748,44 +744,62 @@ where
 }
 
 #[cfg(test)]
-#[derive(Clone, Debug, Default)]
-pub(crate) struct NopFuzzer<I> {
-    phantom: PhantomData<I>,
-}
+pub mod test {
+    use core::marker::PhantomData;
 
-#[cfg(test)]
-impl<I> NopFuzzer<I> {
-    pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
+    use libafl_bolts::Error;
+
+    use crate::{
+        corpus::CorpusId,
+        events::ProgressReporter,
+        stages::{HasStageStatus, StagesTuple},
+        state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
+        Fuzzer,
+    };
+
+    #[derive(Clone, Debug)]
+    pub struct NopFuzzer<S> {
+        phantom: PhantomData<S>,
+    }
+
+    impl<S> NopFuzzer<S> {
+        #[must_use]
+        pub fn new() -> Self {
+            Self {
+                phantom: PhantomData,
+            }
         }
     }
-}
 
-#[cfg(test)]
-impl<I> UsesState for NopFuzzer<I>
-where
-    I: Input,
-{
-    type State = NopState<I>;
-}
+    impl<S> Default for NopFuzzer<S> {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 
-#[cfg(test)]
-impl<ST, E, I, EM> Fuzzer<E, EM, ST> for NopFuzzer<I>
-where
-    E: UsesState<State = NopState<I>>,
-    EM: ProgressReporter<State = NopState<I>>,
-    I: Input,
-    ST: StagesTuple<E, EM, NopState<I>, Self>,
-{
-    fn fuzz_one(
-        &mut self,
-        _stages: &mut ST,
-        _executor: &mut E,
-        _state: &mut EM::State,
-        _manager: &mut EM,
-    ) -> Result<CorpusId, Error> {
-        unimplemented!()
+    impl<S> UsesState for NopFuzzer<S>
+    where
+        S: State,
+    {
+        type State = S;
+    }
+
+    impl<ST, E, EM> Fuzzer<E, EM, ST> for NopFuzzer<E::State>
+    where
+        E: UsesState,
+        EM: ProgressReporter<State = E::State>,
+        ST: StagesTuple<E, EM, E::State, Self>,
+        E::State: HasMetadata + HasExecutions + HasLastReportTime + HasStageStatus,
+    {
+        fn fuzz_one(
+            &mut self,
+            _stages: &mut ST,
+            _executor: &mut E,
+            _state: &mut EM::State,
+            _manager: &mut EM,
+        ) -> Result<CorpusId, Error> {
+            unimplemented!()
+        }
     }
 }
 

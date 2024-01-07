@@ -128,7 +128,7 @@ pub struct EventManagerId(
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-use crate::{inputs::UsesInput, state::UsesState};
+use crate::{inputs::UsesInput, stages::HasStageStatus, state::UsesState};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -548,8 +548,11 @@ where
 /// Restartable trait
 pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
+    /// You *must* ensure that [`State::on_restart`] will be invoked in this method, by you or an
+    /// internal [`EventRestarter`], before the state is saved for recovery.
     #[inline]
-    fn on_restart(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        state.on_restart()?;
         self.await_restart_safe();
         Ok(())
     }
@@ -605,7 +608,7 @@ pub trait HasCustomBufHandlers: UsesState {
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug)]
 pub struct NopEventManager<S> {
     phantom: PhantomData<S>,
 }
@@ -617,6 +620,12 @@ impl<S> NopEventManager<S> {
         NopEventManager {
             phantom: PhantomData,
         }
+    }
+}
+
+impl<S> Default for NopEventManager<S> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
