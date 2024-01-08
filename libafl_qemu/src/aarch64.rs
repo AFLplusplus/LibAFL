@@ -123,7 +123,7 @@ impl crate::ArchExtras for crate::CPU {
             r => return Err(format!("Unsupported argument: {r:}")),
         };
 
-        self.reg_read(reg_id)
+        self.read_reg(reg_id)
     }
 
     fn write_function_argument<T>(
