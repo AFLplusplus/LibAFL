@@ -11,14 +11,15 @@
  *
  */
 
-use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path, sync::OnceLock};
+use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path};
 
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper,
+    emu::ArchExtras,
+    elf::EasyElf, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper,
     QemuHelperTuple, QemuHooks, SYS_execve, SyscallHookResult,
 };
 
@@ -140,29 +141,30 @@ impl QemuInjectionHelper {
     /// vulnerability detection feature.
     #[must_use]
     pub fn from_yaml<P: AsRef<Path> + Display>(
-        emu: &Emulator,
         yaml_file: P,
     ) -> Result<Self, Error> {
         let yaml_entries = parse_yaml(yaml_file)?;
         let definition = yaml_entries_to_definition(&yaml_entries)?;
-        Self::new(emu, definition)
+        Self::new(definition)
     }
 
     /// `configure_injections` is the main function to activate the injection
     /// vulnerability detection feature.
     #[must_use]
     pub fn from_toml<P: AsRef<Path> + Display>(
-        emu: &Emulator,
         toml_file: P,
     ) -> Result<Self, Error> {
         let definition = parse_toml(toml_file)?;
-        Self::new(emu, definition)
+        Self::new(definition)
     }
 
     pub fn new(
-        emu: &Emulator,
         definitions: HashMap<String, TomlInjectionDefinition>,
     ) -> Result<Self, Error> {
+        let tokens = definitions.iter().map(|(_lib_name, definition)| {
+            &definition.tokens
+        }).flatten().map(|x| x.to_string()).collect();
+
         Ok(Self {
             tokens,
             definitions,
@@ -187,8 +189,6 @@ where
     {
         let emu = hooks.emulator();
 
-        let mut id: u64 = 0;
-        let mut tokens: Vec<String> = Vec::new();
         let mut libs: Vec<LibInfo> = Vec::new();
 
         for region in emu.mappings() {
@@ -205,9 +205,9 @@ where
             }
         }
 
-        for (lib_name, definition) in definitions.iter() {
-            let matches = definition.matches.map(|match_str| {
-                let mut bytes_lower = match_str.as_bytes().clone();
+        for (lib_name, definition) in self.definitions.iter() {
+            let matches: Vec<Match> = definition.matches.iter().map(|match_str| {
+                let mut bytes_lower = match_str.as_bytes().to_vec();
                 bytes_lower.make_ascii_lowercase();
 
                 Match {
@@ -215,7 +215,7 @@ where
                     original_value: match_str.clone(),
                     bytes_lower,
                 }
-            });
+            }).collect();
 
             for (name, func_definition) in &definition.functions {
                 let hook_addrs = if name.to_lowercase().starts_with(&"0x".to_string()) {
@@ -223,35 +223,36 @@ where
                         Error::illegal_argument(format!(
                             "Failed to parse hex string {name} from definition for {lib_name}: {e}"
                         ))
-                    })? as GuestAddr;
+                    }).unwrap() as GuestAddr;
                     log::info!("Injections: Hooking hardcoded function {func_pc:#x}");
-                    vec![func_pc];
+                    vec![func_pc]
                 } else {
-                    &libs
+                    libs
                         .iter()
-                        .filter_map(|lib| find_function(emu, &lib.name, &name, lib.off))
+                        .filter_map(|lib| find_function(emu, &lib.name, &name, lib.off).unwrap())
                         .map(|func_pc| {
                             log::info!(
-                                "Injections: Function {} found at {func_pc:#x}",
-                                func.function
+                                "Injections: Function {name} found at {func_pc:#x}",
                             );
                             func_pc
                         })
-                        .collect();
+                        .collect()
                 };
 
-                if func_pc.is_empty() {
+                if hook_addrs.is_empty() {
                     log::warn!(
-                        "Injections: Function not found for {lib_name}: {}",
-                        func.function
+                        "Injections: Function not found for {lib_name}: {name}",
                     );
                 }
 
-                let matches_clone = matches.clone();
-                hooks.instruction(
-                    Hook::Closure(|| on_call_check(&matches_clone, func_definition.param)),
-                    true,
-                )
+                for hook_addr in hook_addrs {
+                    let matches_clone = matches.clone();
+                    hooks.instruction(
+                        hook_addr,
+                        Hook::Closure(Box::new(move |hooks, _state, _guest_addr| on_call_check(hooks.emulator(), func_definition.param, &matches_clone))),
+                        true,
+                    );
+                }
             }
         }
     }
@@ -326,15 +327,15 @@ fn find_function(
     file: &String,
     function: &str,
     loadaddr: GuestAddr,
-) -> Option<GuestAddr> {
+) -> Result<Option<GuestAddr>, Error> {
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(file, &mut elf_buffer)?;
+    let elf = EasyElf::from_file(file, &mut elf_buffer).unwrap();
     let offset = if loadaddr > 0 {
         loadaddr
     } else {
         emu.load_addr()
     };
-    elf.resolve_symbol(function, offset)
+    Ok(elf.resolve_symbol(function, offset))
 }
 
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -343,9 +344,7 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         .position(|window| window == needle)
 }
 
-fn on_call_check(matches: &Vec<Matches>, parameter: u8) {
-    let emu = Emulator::get().unwrap();
-
+fn on_call_check(emu: &Emulator, parameter: u8, matches: &Vec<Match>) {
     let reg: GuestAddr = emu
         .current_cpu()
         .unwrap()
@@ -355,15 +354,15 @@ fn on_call_check(matches: &Vec<Matches>, parameter: u8) {
     //println!("reg value = {:x}", reg);
 
     if reg != 0x00 {
-        let query = unsafe {
+        let mut query = unsafe {
             let c_str_ptr = reg as *const c_char;
             let c_str = CStr::from_ptr(c_str_ptr);
-            cstr.as_bytes().clone()
+            c_str.to_bytes().clone()
         };
         query.make_ascii_lowercase();
 
         //println!("query={}", query);
-        log::trace!("Checking {}", injection.name);
+        log::trace!("Checking {}",  matches[0].lib_name);
 
         for match_value in matches.iter() {
             if match_value.bytes_lower.len() > matches.len() {
@@ -372,10 +371,8 @@ fn on_call_check(matches: &Vec<Matches>, parameter: u8) {
 
             // "crash" if we found the right value
             assert!(
-                find_subsequence(query, match_value.bytes_lower).is_none(),
-                "Found value \"{}\" for {query} in {}",
-                test.match_value,
-                injection.name
+                find_subsequence(query, &match_value.bytes_lower).is_none(),
+                "Found value \"{}\" for {query:?} in {}", match_value.original_value, match_value.lib_name
             );
         }
     }
@@ -383,8 +380,9 @@ fn on_call_check(matches: &Vec<Matches>, parameter: u8) {
 
 #[cfg(test)]
 mod tests {
-    use super::{yaml_entries_to_definition, TomlInjectionDefinition, YamlInjectionEntry};
     use hashbrown::HashMap;
+
+    use super::{yaml_entries_to_definition, TomlInjectionDefinition, YamlInjectionEntry};
 
     #[test]
     fn test_yaml_parsing() {
