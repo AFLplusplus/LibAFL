@@ -11,15 +11,15 @@ fn main() {
     println!("cargo:rustc-link-lib=dylib=c++");
 
     // Build the test harness
-    // clang++ -shared -fPIC -O0 -o test_harness.so test_harness.cpp
+    // clang++ -shared -fPIC -o harness.so harness.cpp
     #[cfg(unix)]
     std::process::Command::new("clang++")
         .arg("-shared")
         .arg("-fPIC")
         .arg("-O0")
         .arg("-o")
-        .arg("test_harness.so")
-        .arg("test_harness.cpp")
+        .arg("harness.so")
+        .arg("harness.cpp")
         .status()
         .expect("Failed to build runtime");
 }
