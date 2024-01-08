@@ -316,14 +316,6 @@ where
                         })),
                         true,
                     );
-                    let v = vec![1337_u32; 10];
-                    hooks.instruction(
-                        hook_addr,
-                        Hook::Closure(Box::new(move |hooks, _state, _guest_addr| {
-                            println!("{}", v[0]);
-                        })),
-                        true,
-                    );
                 }
             }
         }
