@@ -347,9 +347,10 @@ impl Default for FridaOptions {
 
 #[cfg(test)]
 mod tests {
-    use clap_builder::Parser;
+    use std::sync::OnceLock;
+
+    use clap::Parser;
     use frida_gum::Gum;
-    use lazy_static::lazy_static;
     use libafl::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
@@ -374,17 +375,15 @@ mod tests {
         executor::FridaInProcessExecutor,
         helper::FridaInstrumentationHelper,
     };
-    lazy_static! {
-        static ref GUM: Gum = unsafe { Gum::obtain() };
-    }
+
+    static GUM: OnceLock<Gum> = OnceLock::new();
 
     unsafe fn test_asan(options: &FuzzerOptions) {
-        // Gets seg fault as any other test involving Gum release
         // log::info!("Testing with bogus harness");
         // assert_eq!(test_asan_with_harness(|_buf: &BytesInput| ExitKind::Ok, options), 0);
 
         // The names of the functions to run
-        let tests = vec![/*"LLVMFuzzerTestOneInput",*/ "heap_uaf_write"]; //, "heap_uaf_read"];
+        let tests = vec![/*"LLVMFuzzerTestOneInput",*/ "malloc_heap_oob_read"]; //, "heap_uaf_read"];
 
         // Run the tests for each function
         for test in tests {
@@ -402,7 +401,7 @@ mod tests {
             };
 
             // This actually should check for 1, but as of now we get 70
-            assert!(test_asan_with_harness(harness, options) > 0);
+            assert_eq!(test_asan_with_harness(harness, options), 1);
         }
     }
 
@@ -421,7 +420,7 @@ mod tests {
         let coverage = CoverageRuntime::new();
         let asan = AsanRuntime::new(&options);
         let mut frida_helper = FridaInstrumentationHelper::new(
-            /*&gum*/ &GUM,
+            /*&gum*/ GUM.get().expect("Gum uninitialized"),
             &options,
             tuple_list!(coverage, asan),
         );
@@ -454,7 +453,7 @@ mod tests {
         );
 
         let mut executor = FridaInProcessExecutor::new(
-            &GUM, /*&gum,*/
+            GUM.get().expect("Gum uninitialized"), /*&gum,*/
             InProcessExecutor::new(
                 &mut harness,
                 observers, // tuple_list!(),
@@ -467,14 +466,14 @@ mod tests {
         );
 
         let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+        let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1));
 
         // log::info!("Starting fuzzing!");
         fuzzer
             .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
             .unwrap_or_else(|_| panic!("Error in fuzz_one"));
 
-        // log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
+        log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
         state.solutions().count()
     }
 
@@ -482,6 +481,8 @@ mod tests {
     #[cfg(unix)]
     fn run_test_asan() {
         env_logger::init();
+        GUM.set(unsafe { Gum::obtain() })
+            .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
         let simulated_args = vec![
             "libafl_frida_test",
             "-A",

@@ -16,6 +16,7 @@ fn main() {
     std::process::Command::new("clang++")
         .arg("-shared")
         .arg("-fPIC")
+        .arg("-O0")
         .arg("-o")
         .arg("harness.so")
         .arg("harness.cpp")
