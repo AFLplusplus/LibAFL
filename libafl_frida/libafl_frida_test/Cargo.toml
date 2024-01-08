@@ -1,0 +1,38 @@
+[package]
+name = "libafl_frida_test"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libafl = { path = "../../libafl", default-features = false, version = "0.11.1", features = [
+    "std",
+    "derive",
+    "frida_cli",
+] }
+libafl_bolts = { path = "../../libafl_bolts", version = "0.11.1", default-features = false, features = [
+    "std",
+    "derive",
+    "frida_cli"
+] }
+libafl_frida = { path = "..", features = ["cmplog"] }
+frida-gum = { version = "0.13.4", features = [
+    "auto-download",
+    "event-sink",
+    "invocation-listener",
+    "module-names",
+] }
+log = "0.4.20"
+clap_builder = "4.0"
+env_logger = "0.10.0"
+libloading = "0.7"
+lazy_static = "1.4"
