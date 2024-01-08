@@ -15,7 +15,7 @@ use crate::{
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    stages::{HasStageStatus, StagesTuple},
+    stages::{HasCurrentStage, StagesTuple},
     start_timer,
     state::{
         HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasMetadata, HasSolutions,
@@ -586,7 +586,7 @@ where
         + HasImported
         + HasLastReportTime
         + HasCurrentCorpusIdx
-        + HasStageStatus,
+        + HasCurrentStage,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
     fn fuzz_one(
@@ -752,7 +752,7 @@ pub mod test {
     use crate::{
         corpus::CorpusId,
         events::ProgressReporter,
-        stages::{HasStageStatus, StagesTuple},
+        stages::{HasCurrentStage, StagesTuple},
         state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
         Fuzzer,
     };
@@ -789,7 +789,7 @@ pub mod test {
         E: UsesState,
         EM: ProgressReporter<State = E::State>,
         ST: StagesTuple<E, EM, E::State, Self>,
-        E::State: HasMetadata + HasExecutions + HasLastReportTime + HasStageStatus,
+        E::State: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStage,
     {
         fn fuzz_one(
             &mut self,

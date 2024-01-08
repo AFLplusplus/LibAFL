@@ -128,7 +128,7 @@ pub struct EventManagerId(
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-use crate::{inputs::UsesInput, stages::HasStageStatus, state::UsesState};
+use crate::{inputs::UsesInput, stages::HasCurrentStage, state::UsesState};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -548,7 +548,7 @@ where
 /// Restartable trait
 pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
-    /// You *must* ensure that [`HasStageStatus::on_restart`] will be invoked in this method, by you
+    /// You *must* ensure that [`HasCurrentStage::on_restart`] will be invoked in this method, by you
     /// or an internal [`EventRestarter`], before the state is saved for recovery.
     #[inline]
     fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {

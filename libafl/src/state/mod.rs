@@ -30,7 +30,7 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, UsesInput},
-    stages::{HasNestedStageStatus, HasStageStatus},
+    stages::{HasCurrentStage, HasNestedStageStatus},
     Error,
 };
 
@@ -47,7 +47,7 @@ pub trait State:
     + MaybeHasClientPerfMonitor
     + MaybeHasScalabilityMonitor
     + HasCurrentCorpusIdx
-    + HasStageStatus
+    + HasCurrentStage
 {
 }
 
@@ -543,7 +543,7 @@ impl<I, C, R, SC> HasCurrentCorpusIdx for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasStageStatus for StdState<I, C, R, SC> {
+impl<I, C, R, SC> HasCurrentStage for StdState<I, C, R, SC> {
     fn set_stage(&mut self, idx: usize) -> Result<(), Error> {
         // ensure we are in the right frame
         if self.stage_depth != self.stage_idx_stack.len() {
@@ -556,7 +556,13 @@ impl<I, C, R, SC> HasStageStatus for StdState<I, C, R, SC> {
     }
 
     fn clear_stage(&mut self) -> Result<(), Error> {
-        self.stage_idx_stack.truncate(self.stage_depth);
+        self.stage_idx_stack.pop();
+        // ensure we are in the right frame
+        if self.stage_depth != self.stage_idx_stack.len() {
+            return Err(Error::illegal_state(
+                "we somehow cleared too many or too few states!",
+            ));
+        }
         Ok(())
     }
 
@@ -1010,7 +1016,8 @@ pub mod test {
         inputs::{Input, NopInput, UsesInput},
         stages::test::{test_resume, test_resume_stages},
         state::{
-            HasExecutions, HasLastReportTime, HasMetadata, HasRand, HasStageStatus, State, StdState,
+            HasCurrentStage, HasExecutions, HasLastReportTime, HasMetadata, HasRand, State,
+            StdState,
         },
     };
     #[cfg(feature = "introspection")]
@@ -1105,7 +1112,7 @@ pub mod test {
         }
     }
 
-    impl<I> HasStageStatus for NopState<I> {
+    impl<I> HasCurrentStage for NopState<I> {
         fn set_stage(&mut self, _idx: usize) -> Result<(), Error> {
             Ok(())
         }

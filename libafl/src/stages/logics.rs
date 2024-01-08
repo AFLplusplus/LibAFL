@@ -3,7 +3,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    stages::{HasNestedStageStatus, HasStageStatus, Stage, StageProgress, StagesTuple},
+    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageProgress, StagesTuple},
     state::UsesState,
     Error,
 };

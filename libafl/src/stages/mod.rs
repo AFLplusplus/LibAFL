@@ -94,7 +94,7 @@ where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
-    S: UsesInput + HasStageStatus,
+    S: UsesInput + HasCurrentStage,
 {
     /// Performs all `Stages` in this tuple
     fn perform_all(
@@ -111,7 +111,7 @@ where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
-    S: UsesInput + HasStageStatus,
+    S: UsesInput + HasCurrentStage,
 {
     fn perform_all(
         &mut self,
@@ -137,7 +137,7 @@ where
     E: UsesState<State = Head::State>,
     EM: UsesState<State = Head::State>,
     Z: UsesState<State = Head::State>,
-    Head::State: HasStageStatus,
+    Head::State: HasCurrentStage,
 {
     fn perform_all(
         &mut self,
@@ -345,7 +345,7 @@ pub mod pybind {
         executors::pybind::PythonExecutor,
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
         stages::{
-            mutational::pybind::PythonStdMutationalStage, HasStageStatus, Stage, StagesTuple,
+            mutational::pybind::PythonStdMutationalStage, HasCurrentStage, Stage, StagesTuple,
         },
         state::{
             pybind::{PythonStdState, PythonStdStateWrapper},
@@ -574,7 +574,7 @@ impl<S> StageProgress<S> for () {
 }
 
 /// Trait for types which track the current stage
-pub trait HasStageStatus {
+pub trait HasCurrentStage {
     /// Set the current stage; we have started processing this stage
     fn set_stage(&mut self, idx: usize) -> Result<(), Error>;
 
@@ -592,7 +592,7 @@ pub trait HasStageStatus {
 
 /// Trait for types which track nested stages. Stages which themselves contain stage tuples should
 /// ensure that they constrain the state with this trait accordingly.
-pub trait HasNestedStageStatus: HasStageStatus {
+pub trait HasNestedStageStatus: HasCurrentStage {
     /// Enter a stage scope, potentially resuming to an inner stage status. Returns Ok(true) if
     /// resumed.
     fn enter_inner_stage(&mut self) -> Result<(), Error>;
