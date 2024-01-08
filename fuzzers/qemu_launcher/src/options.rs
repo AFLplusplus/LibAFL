@@ -29,8 +29,12 @@ pub struct FuzzerOptions {
     pub tokens: Option<String>,
 
     #[cfg(feature = "injections")]
-    #[arg(short, long, help = "Injections YAML file")]
-    pub yaml_file: Option<String>,
+    #[arg(
+        short = 'j',
+        long,
+        help = "Injections TOML or YAML file definition. Filename must end in .toml or .yaml."
+    )]
+    pub injections: Option<String>,
 
     #[arg(long, help = "Log file")]
     pub log: Option<String>,

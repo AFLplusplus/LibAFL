@@ -18,8 +18,7 @@ use libafl::{inputs::UsesInput, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    emu::ArchExtras,
-    elf::EasyElf, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper,
+    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper,
     QemuHelperTuple, QemuHooks, SYS_execve, SyscallHookResult,
 };
 
@@ -32,7 +31,7 @@ fn parse_yaml<P: AsRef<Path> + Display>(path: P) -> Result<Vec<YamlInjectionEntr
 /// Parses `injections.toml`
 fn parse_toml<P: AsRef<Path> + Display>(
     path: P,
-) -> Result<HashMap<String, TomlInjectionDefinition>, Error> {
+) -> Result<HashMap<String, InjectionDefinition>, Error> {
     toml::from_str(&fs::read_to_string(&path)?)
         .map_err(|e| Error::serialize(format!("Failed to deserialize toml at {path}: {e}")))
 }
@@ -40,7 +39,7 @@ fn parse_toml<P: AsRef<Path> + Display>(
 /// Converts the injects.yaml format to the internal toml-like format
 fn yaml_entries_to_definition(
     yaml_entries: &Vec<YamlInjectionEntry>,
-) -> Result<HashMap<String, TomlInjectionDefinition>, Error> {
+) -> Result<HashMap<String, InjectionDefinition>, Error> {
     let mut ret = HashMap::new();
 
     for entry in yaml_entries {
@@ -61,14 +60,17 @@ fn yaml_entries_to_definition(
             tokens.push(test.input_value.clone());
         }
 
-        if let Some(_) = ret.insert(
-            entry.name.clone(),
-            TomlInjectionDefinition {
-                tokens,
-                matches,
-                functions,
-            },
-        ) {
+        if ret
+            .insert(
+                entry.name.clone(),
+                InjectionDefinition {
+                    tokens,
+                    matches,
+                    functions,
+                },
+            )
+            .is_some()
+        {
             return Err(Error::illegal_argument(format!(
                 "Entry {} was multiply defined!",
                 entry.name
@@ -117,32 +119,36 @@ struct FunctionDescription {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct TomlInjectionDefinition {
+pub struct InjectionDefinition {
     tokens: Vec<String>,
     matches: Vec<String>,
     functions: HashMap<String, FunctionDescription>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Match {
+pub struct Matches {
+    id: usize,
     lib_name: String,
+    matches: Vec<Match>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Match {
     bytes_lower: Vec<u8>,
     original_value: String,
 }
 
 #[derive(Debug)]
 pub struct QemuInjectionHelper {
-    tokens: Vec<String>,
-    definitions: HashMap<String, TomlInjectionDefinition>,
+    pub tokens: Vec<String>,
+    definitions: HashMap<String, InjectionDefinition>,
+    matches_list: Vec<Matches>,
 }
 
 impl QemuInjectionHelper {
     /// `configure_injections` is the main function to activate the injection
     /// vulnerability detection feature.
-    #[must_use]
-    pub fn from_yaml<P: AsRef<Path> + Display>(
-        yaml_file: P,
-    ) -> Result<Self, Error> {
+    pub fn from_yaml<P: AsRef<Path> + Display>(yaml_file: P) -> Result<Self, Error> {
         let yaml_entries = parse_yaml(yaml_file)?;
         let definition = yaml_entries_to_definition(&yaml_entries)?;
         Self::new(definition)
@@ -150,25 +156,92 @@ impl QemuInjectionHelper {
 
     /// `configure_injections` is the main function to activate the injection
     /// vulnerability detection feature.
-    #[must_use]
-    pub fn from_toml<P: AsRef<Path> + Display>(
-        toml_file: P,
-    ) -> Result<Self, Error> {
+    pub fn from_toml<P: AsRef<Path> + Display>(toml_file: P) -> Result<Self, Error> {
         let definition = parse_toml(toml_file)?;
         Self::new(definition)
     }
 
-    pub fn new(
-        definitions: HashMap<String, TomlInjectionDefinition>,
-    ) -> Result<Self, Error> {
-        let tokens = definitions.iter().map(|(_lib_name, definition)| {
-            &definition.tokens
-        }).flatten().map(|x| x.to_string()).collect();
+    pub fn new(definitions: HashMap<String, InjectionDefinition>) -> Result<Self, Error> {
+        let tokens = definitions
+            .iter()
+            .flat_map(|(_lib_name, definition)| &definition.tokens)
+            .map(|x| x.to_string())
+            .collect();
+
+        let mut matches_list = Vec::with_capacity(definitions.len());
+
+        for (lib_name, definition) in definitions.iter() {
+            let matches: Vec<Match> = definition
+                .matches
+                .iter()
+                .map(|match_str| {
+                    let mut bytes_lower = match_str.as_bytes().to_vec();
+                    bytes_lower.make_ascii_lowercase();
+
+                    Match {
+                        original_value: match_str.clone(),
+                        bytes_lower,
+                    }
+                })
+                .collect();
+
+            let id = matches_list.len();
+            matches_list.push(Matches {
+                lib_name: lib_name.clone(),
+                id,
+                matches,
+            });
+        }
 
         Ok(Self {
+            matches_list,
             tokens,
             definitions,
         })
+    }
+
+    fn on_call_check<S: UsesInput, QT: QemuHelperTuple<S>>(
+        hooks: &mut QemuHooks<QT, S>,
+        id: usize,
+        parameter: u8,
+    ) {
+        let emu = hooks.emulator();
+        let reg: GuestAddr = emu
+            .current_cpu()
+            .unwrap()
+            .read_function_argument(CallingConvention::Cdecl, parameter)
+            .unwrap_or_default();
+
+        let helper = hooks.helpers_mut().match_first_type_mut::<Self>().unwrap();
+        let matches = &helper.matches_list[id];
+
+        //println!("reg value = {:x}", reg);
+
+        if reg != 0x00 {
+            let mut query = unsafe {
+                let c_str_ptr = reg as *const c_char;
+                let c_str = CStr::from_ptr(c_str_ptr);
+                c_str.to_bytes().to_vec()
+            };
+            query.make_ascii_lowercase();
+
+            //println!("query={}", query);
+            log::trace!("Checking {}", matches.lib_name);
+
+            for match_value in matches.matches.iter() {
+                if match_value.bytes_lower.len() > matches.matches.len() {
+                    continue;
+                }
+
+                // "crash" if we found the right value
+                assert!(
+                    find_subsequence(&query, &match_value.bytes_lower).is_none(),
+                    "Found value \"{}\" for {query:?} in {}",
+                    match_value.original_value,
+                    matches.lib_name
+                );
+            }
+        }
     }
 }
 
@@ -188,7 +261,6 @@ where
         QT: QemuHelperTuple<S>,
     {
         let emu = hooks.emulator();
-
         let mut libs: Vec<LibInfo> = Vec::new();
 
         for region in emu.mappings() {
@@ -205,51 +277,43 @@ where
             }
         }
 
-        for (lib_name, definition) in self.definitions.iter() {
-            let matches: Vec<Match> = definition.matches.iter().map(|match_str| {
-                let mut bytes_lower = match_str.as_bytes().to_vec();
-                bytes_lower.make_ascii_lowercase();
+        for matches in self.matches_list.iter() {
+            let id = matches.id;
+            let lib_name = &matches.lib_name;
 
-                Match {
-                    lib_name: lib_name.clone(),
-                    original_value: match_str.clone(),
-                    bytes_lower,
-                }
-            }).collect();
-
-            for (name, func_definition) in &definition.functions {
+            for (name, func_definition) in &self.definitions[lib_name].functions {
                 let hook_addrs = if name.to_lowercase().starts_with(&"0x".to_string()) {
-                    let func_pc = u64::from_str_radix(&name[2..], 16).map_err(|e| {
-                        Error::illegal_argument(format!(
+                    let func_pc = u64::from_str_radix(&name[2..], 16)
+                        .map_err(|e| {
+                            Error::illegal_argument(format!(
                             "Failed to parse hex string {name} from definition for {lib_name}: {e}"
                         ))
-                    }).unwrap() as GuestAddr;
+                        })
+                        .unwrap() as GuestAddr;
                     log::info!("Injections: Hooking hardcoded function {func_pc:#x}");
                     vec![func_pc]
                 } else {
-                    libs
-                        .iter()
-                        .filter_map(|lib| find_function(emu, &lib.name, &name, lib.off).unwrap())
+                    libs.iter()
+                        .filter_map(|lib| find_function(emu, &lib.name, name, lib.off).unwrap())
                         .map(|func_pc| {
-                            log::info!(
-                                "Injections: Function {name} found at {func_pc:#x}",
-                            );
+                            log::info!("Injections: Function {name} found at {func_pc:#x}",);
                             func_pc
                         })
                         .collect()
                 };
 
                 if hook_addrs.is_empty() {
-                    log::warn!(
-                        "Injections: Function not found for {lib_name}: {name}",
-                    );
+                    log::warn!("Injections: Function not found for {lib_name}: {name}",);
                 }
 
+                let param = func_definition.param;
+
                 for hook_addr in hook_addrs {
-                    let matches_clone = matches.clone();
                     hooks.instruction(
                         hook_addr,
-                        Hook::Closure(Box::new(move |hooks, _state, _guest_addr| on_call_check(hooks.emulator(), func_definition.param, &matches_clone))),
+                        Hook::Closure(Box::new(move |hooks, _state, _guest_addr| {
+                            Self::on_call_check(hooks, id, param)
+                        })),
                         true,
                     );
                 }
@@ -344,45 +408,11 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         .position(|window| window == needle)
 }
 
-fn on_call_check(emu: &Emulator, parameter: u8, matches: &Vec<Match>) {
-    let reg: GuestAddr = emu
-        .current_cpu()
-        .unwrap()
-        .read_function_argument(CallingConvention::Cdecl, parameter)
-        .unwrap_or_default();
-
-    //println!("reg value = {:x}", reg);
-
-    if reg != 0x00 {
-        let mut query = unsafe {
-            let c_str_ptr = reg as *const c_char;
-            let c_str = CStr::from_ptr(c_str_ptr);
-            c_str.to_bytes().clone()
-        };
-        query.make_ascii_lowercase();
-
-        //println!("query={}", query);
-        log::trace!("Checking {}",  matches[0].lib_name);
-
-        for match_value in matches.iter() {
-            if match_value.bytes_lower.len() > matches.len() {
-                continue;
-            }
-
-            // "crash" if we found the right value
-            assert!(
-                find_subsequence(query, &match_value.bytes_lower).is_none(),
-                "Found value \"{}\" for {query:?} in {}", match_value.original_value, match_value.lib_name
-            );
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use hashbrown::HashMap;
 
-    use super::{yaml_entries_to_definition, TomlInjectionDefinition, YamlInjectionEntry};
+    use super::{yaml_entries_to_definition, InjectionDefinition, YamlInjectionEntry};
 
     #[test]
     fn test_yaml_parsing() {
@@ -424,7 +454,7 @@ mod tests {
 
     #[test]
     fn test_toml_parsing() {
-        let injections: HashMap<String, TomlInjectionDefinition> = toml::from_str(
+        let injections: HashMap<String, InjectionDefinition> = toml::from_str(
             r#"
             [ldap]
             tokens = ["*)(FUZZ=*))(|"]
