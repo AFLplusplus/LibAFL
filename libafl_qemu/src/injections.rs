@@ -165,12 +165,12 @@ impl QemuInjectionHelper {
         let tokens = definitions
             .iter()
             .flat_map(|(_lib_name, definition)| &definition.tokens)
-            .map(|x| x.to_string())
+            .map(ToString::to_string)
             .collect();
 
         let mut matches_list = Vec::with_capacity(definitions.len());
 
-        for (lib_name, definition) in definitions.iter() {
+        for (lib_name, definition) in &definitions {
             let matches: Vec<Match> = definition
                 .matches
                 .iter()
@@ -194,9 +194,9 @@ impl QemuInjectionHelper {
         }
 
         Ok(Self {
-            matches_list,
             tokens,
             definitions,
+            matches_list,
         })
     }
 
@@ -228,7 +228,7 @@ impl QemuInjectionHelper {
             //println!("query={}", query);
             log::trace!("Checking {}", matches.lib_name);
 
-            for match_value in matches.matches.iter() {
+            for match_value in &matches.matches {
                 if match_value.bytes_lower.len() > matches.matches.len() {
                     continue;
                 }
@@ -277,7 +277,7 @@ where
             }
         }
 
-        for matches in self.matches_list.iter() {
+        for matches in &self.matches_list {
             let id = matches.id;
             let lib_name = &matches.lib_name;
 
@@ -312,7 +312,7 @@ where
                     hooks.instruction(
                         hook_addr,
                         Hook::Closure(Box::new(move |hooks, _state, _guest_addr| {
-                            Self::on_call_check(hooks, id, param)
+                            Self::on_call_check(hooks, id, param);
                         })),
                         true,
                     );
@@ -393,7 +393,7 @@ fn find_function(
     loadaddr: GuestAddr,
 ) -> Result<Option<GuestAddr>, Error> {
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(file, &mut elf_buffer).unwrap();
+    let elf = EasyElf::from_file(file, &mut elf_buffer)?;
     let offset = if loadaddr > 0 {
         loadaddr
     } else {
