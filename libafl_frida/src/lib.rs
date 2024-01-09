@@ -397,7 +397,7 @@ mod tests {
         let lib = libloading::Library::new(options.clone().harness.unwrap()).unwrap();
 
         let coverage = CoverageRuntime::new();
-        let asan = AsanRuntime::new(&options);
+        let asan = AsanRuntime::new(options);
         let mut frida_helper = FridaInstrumentationHelper::new(
             GUM.get().expect("Gum uninitialized"),
             &options,

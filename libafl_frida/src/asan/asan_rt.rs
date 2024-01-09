@@ -10,7 +10,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{ffi::c_void, /*num::NonZeroUsize,*/ ptr::write_volatile, rc::Rc};
+use std::{ffi::c_void, num::NonZeroUsize, ptr::write_volatile, rc::Rc};
 
 use backtrace::Backtrace;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -25,8 +25,8 @@ use frida_gum::{
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
-// #[cfg(unix)]
-// use libc::RLIMIT_STACK;
+#[cfg(target_vendor = "apple")]
+use libc::RLIMIT_STACK;
 use libc::{c_char, wchar_t};
 #[cfg(target_vendor = "apple")]
 use libc::{getrlimit, rlimit};
@@ -1523,7 +1523,7 @@ impl AsanRuntime {
         unsafe {
             let mapping = mmap(
                 None,
-                std::num::NonZeroUsize::new_unchecked(0x1000),
+                NonZeroUsize::new_unchecked(0x1000),
                 ProtFlags::all(),
                 MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
                 -1,
