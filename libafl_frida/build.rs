@@ -22,15 +22,15 @@ fn main() {
         match clangpp {
             Ok(_) => {
                 std::process::Command::new("clang++")
-                .arg("-shared")
-                .arg("-fPIC")
-                .arg("-O0")
-                .arg("-o")
-                .arg("test_harness.so")
-                .arg("test_harness.cpp")
-                .status()
-                .expect("Failed to build test harness");
-                },
+                    .arg("-shared")
+                    .arg("-fPIC")
+                    .arg("-O0")
+                    .arg("-o")
+                    .arg("test_harness.so")
+                    .arg("test_harness.cpp")
+                    .status()
+                    .expect("Failed to build test harness");
+            }
             Err(_) => {
                 println!("cargo:warning=clang++ not found, skipping test harness build");
             }
