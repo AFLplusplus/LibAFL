@@ -32,7 +32,7 @@ where
     S::Input: HasTargetBytes,
     S: State,
     OT: ObserversTuple<S>,
-    'a: 'b,
+    'b: 'a,
 {
     base: InProcessExecutor<'a, H, OT, S>,
     // thread_id for the Stalker
