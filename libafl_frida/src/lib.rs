@@ -364,7 +364,9 @@ mod tests {
         state::{HasSolutions, StdState},
         Fuzzer, StdFuzzer,
     };
-    use libafl_bolts::{cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice};
+    use libafl_bolts::{
+        cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
+    };
 
     use crate::{
         asan::{
@@ -379,9 +381,6 @@ mod tests {
     static GUM: OnceLock<Gum> = OnceLock::new();
 
     unsafe fn test_asan(options: &FuzzerOptions) {
-        // log::info!("Testing with bogus harness");
-        // assert_eq!(test_asan_with_harness(|_buf: &BytesInput| ExitKind::Ok, options), 0);
-
         // The names of the functions to run
         let tests = vec![/*"LLVMFuzzerTestOneInput",*/ "malloc_heap_oob_read"]; //, "heap_uaf_read"];
 
@@ -400,7 +399,6 @@ mod tests {
                 ExitKind::Ok
             };
 
-            // This actually should check for 1, but as of now we get 70
             assert_eq!(test_asan_with_harness(harness, options), 1);
         }
     }
@@ -480,7 +478,23 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn run_test_asan() {
-        env_logger::init();
+        // Read RUST_LOG from the environment and set the log level accordingly (not using env_logger)
+        // Note that in cargo test, the output of successfull tests is suppressed by default,
+        // both those sent to stdout and stderr. To see the output, run `cargo test -- --nocapture`.
+        if let Ok(value) = std::env::var("RUST_LOG") {
+            match value.as_str() {
+                "off" => log::set_max_level(log::LevelFilter::Off),
+                "error" => log::set_max_level(log::LevelFilter::Error),
+                "warn" => log::set_max_level(log::LevelFilter::Warn),
+                "info" => log::set_max_level(log::LevelFilter::Info),
+                "debug" => log::set_max_level(log::LevelFilter::Debug),
+                "trace" => log::set_max_level(log::LevelFilter::Trace),
+                _ => panic!("Unknown RUST_LOG level: {}", value),
+            }
+        }
+
+        SimpleStdoutLogger::set_logger().unwrap();
+
         GUM.set(unsafe { Gum::obtain() })
             .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
         let simulated_args = vec![
@@ -489,7 +503,7 @@ mod tests {
             "--disable-excludes",
             "--continue-on-error",
             "-H",
-            "harness.so",
+            "test_harness.so",
         ];
         let options: FuzzerOptions = FuzzerOptions::try_parse_from(simulated_args).unwrap();
         unsafe { test_asan(&options) }
