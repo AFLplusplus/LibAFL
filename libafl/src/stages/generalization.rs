@@ -9,7 +9,7 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::AsSlice;
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
@@ -64,6 +64,8 @@ where
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
+    type Progress = (); // TODO this stage needs a resume
+
     #[inline]
     #[allow(clippy::too_many_lines)]
     fn perform(
@@ -72,8 +74,13 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let (mut payload, original, novelties) = {
             start_timer!(state);
             {

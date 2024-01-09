@@ -135,7 +135,7 @@ where
         write!(
             f,
             "StdScheduledMutator with {} mutations for Input type {}",
-            self.mutations.len(),
+            MT::LEN,
             core::any::type_name::<I>()
         )
     }
@@ -197,8 +197,8 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(!self.mutations().is_empty());
-        state.rand_mut().below(self.mutations().len() as u64).into()
+        debug_assert!(MT::LEN != 0);
+        state.rand_mut().below(MT::LEN as u64).into()
     }
 }
 
@@ -368,7 +368,7 @@ where
         write!(
             f,
             "LoggerScheduledMutator with {} mutations for Input type {}",
-            self.scheduled.mutations().len(),
+            MT::LEN,
             core::any::type_name::<I>()
         )
     }
@@ -452,11 +452,8 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(!self.scheduled.mutations().is_empty());
-        state
-            .rand_mut()
-            .below(self.scheduled.mutations().len() as u64)
-            .into()
+        debug_assert!(MT::LEN != 0);
+        state.rand_mut().below(MT::LEN as u64).into()
     }
 
     fn scheduled_mutate(

@@ -100,7 +100,7 @@ where
         write!(
             f,
             "TuneableScheduledMutator with {} mutations for Input type {}",
-            self.mutations.len(),
+            MT::LEN,
             core::any::type_name::<I>()
         )
     }
@@ -186,7 +186,7 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(!self.mutations().is_empty());
+        debug_assert!(MT::LEN != 0);
         // Assumption: we can not reach this code path without previously adding this metadatum.
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
 
@@ -199,7 +199,7 @@ where
                 metadata.next_id = 0.into();
             }
             debug_assert!(
-                self.mutations().len() > ret.0,
+                MT::LEN > ret.0,
                 "TuneableScheduler: next vec may not contain id larger than number of mutations!"
             );
             return ret;
@@ -214,7 +214,7 @@ where
 
             let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
             debug_assert_eq!(
-                self.mutations.len(),
+                MT::LEN,
                 metadata.mutation_probabilities_cumulative.len(),
                 "TuneableScheduler: mutation probabilities do not match with number of mutations"
             );
@@ -230,7 +230,7 @@ where
         }
 
         // fall back to random if no entries in either vec, the scheduling is not tuned.
-        state.rand_mut().below(self.mutations().len() as u64).into()
+        state.rand_mut().below(MT::LEN as u64).into()
     }
 }
 
@@ -376,7 +376,7 @@ mod test {
     use crate::{
         inputs::BytesInput,
         mutators::{ByteRandMutator, ScheduledMutator},
-        state::NopState,
+        state::test::NopState,
     };
 
     #[test]

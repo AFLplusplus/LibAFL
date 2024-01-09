@@ -2186,9 +2186,9 @@ mod tests {
     use crate::{
         events::NopEventManager,
         executors::{inprocess::InProcessHandlers, Executor, ExitKind, InProcessExecutor},
+        fuzzer::test::NopFuzzer,
         inputs::{NopInput, UsesInput},
-        state::NopState,
-        NopFuzzer,
+        state::test::NopState,
     };
 
     impl UsesInput for () {
@@ -2226,8 +2226,8 @@ mod tests {
         use crate::{
             events::SimpleEventManager,
             executors::{inprocess::InChildProcessHandlers, InProcessForkExecutor},
-            state::NopState,
-            NopFuzzer,
+            fuzzer::test::NopFuzzer,
+            state::test::NopState,
         };
 
         let provider = StdShMemProvider::new().unwrap();
