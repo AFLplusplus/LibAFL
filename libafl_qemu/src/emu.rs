@@ -491,7 +491,7 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), String>
     where
         T: Into<GuestReg>;
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>;
     fn write_function_argument<T>(
@@ -1004,7 +1004,7 @@ impl Emulator {
     /// Should not be used if `Emulator::new` has never been used before (otherwise QEMU will not be initialized).
     /// Prefer `Emulator::get` for a safe version of this method.
     #[must_use]
-    unsafe fn new_empty() -> Emulator {
+    pub unsafe fn new_empty() -> Emulator {
         Emulator { _private: () }
     }
 
@@ -1640,7 +1640,7 @@ impl ArchExtras for Emulator {
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>,
     {
@@ -1676,7 +1676,7 @@ pub mod pybind {
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
 
     extern "C" fn py_syscall_hook_wrapper(
-        data: u64,
+        _data: u64,
         sys_num: i32,
         a0: u64,
         a1: u64,
@@ -1774,7 +1774,7 @@ pub mod pybind {
 
         fn run(&self) {
             unsafe {
-                self.emu.run();
+                self.emu.run().unwrap();
             }
         }
 

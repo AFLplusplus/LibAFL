@@ -5,15 +5,23 @@ authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenuk
 edition = "2021"
 
 [features]
-default = ["std"]
+default = ["std", "injections"]
 std = []
+
+## Enable fuzzing for injections (where supported)
+injections = ["libafl_qemu/injections"]
+
+## Set emulator to big endian
 be = ["libafl_qemu/be"]
+
+#! ## Mutually exclusive architectures
 arm = ["libafl_qemu/arm"]
 x86_64 = ["libafl_qemu/x86_64"]
 i386 = ["libafl_qemu/i386"]
 aarch64 = ["libafl_qemu/aarch64"]
 mips = ["libafl_qemu/mips"]
 ppc = ["libafl_qemu/ppc", "be"]
+hexagon = ["libafl_qemu/hexagon"]
 
 [profile.release]
 lto = true

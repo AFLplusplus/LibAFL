@@ -12,17 +12,30 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [package.metadata.docs.rs]
+features = ["document-features"]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["fork", "build_libqasan", "serdeany_autoreg"]
+clippy = [] # special feature for clippy, don't use in normal projects§
+document-features = ["dep:document-features"]
+
+#! # Feature Flags
+#! ### General Features
+## Find injections during fuzzing
+injections = ["serde_yaml", "toml"]
+## Python bindings support
 python = ["pyo3", "pyo3-build-config"]
+## Fork support
 fork = ["libafl/fork"]
+## Build libqasan for address sanitization
 build_libqasan = []
 
-# The following architecture features are mutually exclusive.
-x86_64 = ["libafl_qemu_sys/x86_64"] # build qemu for x86_64 (default)
+#! ## The following architecture features are mutually exclusive.
+
+## build qemu for x86_64 (default)
+x86_64 = ["libafl_qemu_sys/x86_64"]
 i386 = ["libafl_qemu_sys/i386"] # build qemu for i386
 arm = ["libafl_qemu_sys/arm"] # build qemu for arm
 aarch64 = ["libafl_qemu_sys/aarch64"] # build qemu for aarch64
@@ -30,17 +43,21 @@ mips = ["libafl_qemu_sys/mips"] # build qemu for mips (el, use with the 'be' fea
 ppc = ["libafl_qemu_sys/ppc"] # build qemu for powerpc
 hexagon = ["libafl_qemu_sys/hexagon"] # build qemu for hexagon
 
+## Big Endian mode
 be = ["libafl_qemu_sys/be"]
 
+## Usermode (mutually exclusive to Systemmode)
 usermode = ["libafl_qemu_sys/usermode"]
+## Systemmode (mutually exclusive to Usermode)
 systemmode = ["libafl_qemu_sys/systemmode"]
 
-# SerdeAny features
-serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"] # Automatically register all `#[derive(SerdeAny)]` types at startup.
+#! ## SerdeAny features
 
+## Automatically register all `#[derive(SerdeAny)]` types at startup.
+serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
+
+## Automatically register all `#[derive(SerdeAny)]` types at startup.
 slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
-
-clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.11.2", default-features = false, features = ["std", "derive", "regex"] }
@@ -67,8 +84,11 @@ addr2line = "0.21"
 typed-arena = "2.0"
 paste = "1"
 enum-map = "2.7"
-
+serde_yaml = { version = "0.8", optional = true } # For parsing the injections yaml file
+toml = { version = "0.4.2", optional = true } # For parsing the injections toml file
 pyo3 = { version = "0.18", optional = true }
+# Document all features of this crate (for `cargo doc`)
+document-features = { version = "0.2", optional = true }
 
 [build-dependencies]
 pyo3-build-config = { version = "0.18", optional = true }

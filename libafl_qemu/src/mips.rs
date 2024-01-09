@@ -102,7 +102,7 @@ impl crate::ArchExtras for crate::CPU {
         self.write_reg(Regs::Ra, val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>,
     {
@@ -110,11 +110,16 @@ impl crate::ArchExtras for crate::CPU {
             return Err(format!("Unsupported calling convention: {conv:#?}"));
         }
 
-        match idx {
-            0 => self.read_reg(Regs::A0),
-            1 => self.read_reg(Regs::A1),
-            _ => Err(format!("Unsupported argument: {idx:}")),
-        }
+        let reg_id = match idx {
+            0 => Regs::A0,
+            1 => Regs::A1,
+            2 => Regs::A2,
+            3 => Regs::A3,
+            // 4.. would be on the stack, let's not do this for now
+            r => return Err(format!("Unsupported argument: {r:}")),
+        };
+
+        self.read_reg(reg_id)
     }
 
     fn write_function_argument<T>(

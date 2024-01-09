@@ -105,7 +105,7 @@ impl Tokens {
     ///
     /// # Safety
     /// The caller must ensure that the region between `token_start` and `token_stop`
-    /// is a valid region, containing autotokens in the exepcted format.
+    /// is a valid region, containing autotokens in the expected format.
     #[cfg(any(target_os = "linux", target_vendor = "apple"))]
     pub unsafe fn from_mut_ptrs(
         token_start: *const u8,

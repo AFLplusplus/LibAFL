@@ -221,7 +221,7 @@ where
         // If we would assume the fuzzer loop will always exit after this, we could do this here:
         // manager.on_restart(state)?;
         // But as the state may grow to a few megabytes,
-        // for now we won' and the user has to do it (unless we find a way to do this on `Drop`).
+        // for now we won't, and the user has to do it (unless we find a way to do this on `Drop`).
 
         Ok(ret.unwrap())
     }
