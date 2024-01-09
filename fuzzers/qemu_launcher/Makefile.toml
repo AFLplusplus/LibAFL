@@ -185,6 +185,7 @@ args = [
     "build",
     "--profile",
     "${PROFILE}",
+    "--release",
     "--features", "${FEATURE}",
     "--target-dir", "${TARGET_DIR}"
 ]
