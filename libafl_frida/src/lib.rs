@@ -495,6 +495,12 @@ mod tests {
 
         SimpleStdoutLogger::set_logger().unwrap();
 
+        // Check if the harness dynamic library is present, if not - skip the test
+        let test_harness = "test_harness.so";
+        if !std::path::Path::new(test_harness).exists() {
+            panic!("Skipping test, {} not found", test_harness);
+        }
+
         GUM.set(unsafe { Gum::obtain() })
             .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
         let simulated_args = vec![
@@ -503,7 +509,7 @@ mod tests {
             "--disable-excludes",
             "--continue-on-error",
             "-H",
-            "test_harness.so",
+            test_harness,
         ];
         let options: FuzzerOptions = FuzzerOptions::try_parse_from(simulated_args).unwrap();
         unsafe { test_asan(&options) }
