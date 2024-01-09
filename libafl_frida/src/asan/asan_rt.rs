@@ -403,17 +403,17 @@ impl AsanRuntime {
     }
 
     /// Get the maximum stack size for the current stack
-    #[must_use]
-    #[cfg(target_vendor = "apple")]
-    fn max_stack_size() -> usize {
-        let mut stack_rlimit = rlimit {
-            rlim_cur: 0,
-            rlim_max: 0,
-        };
-        assert!(unsafe { getrlimit(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
+    // #[must_use]
+    // #[cfg(target_vendor = "apple")]
+    // fn max_stack_size() -> usize {
+    //     let mut stack_rlimit = rlimit {
+    //         rlim_cur: 0,
+    //         rlim_max: 0,
+    //     };
+    //     assert!(unsafe { getrlimit(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
 
-        stack_rlimit.rlim_cur as usize
-    }
+    //     stack_rlimit.rlim_cur as usize
+    // }
 
     /// Get the maximum stack size for the current stack
     // #[must_use]
