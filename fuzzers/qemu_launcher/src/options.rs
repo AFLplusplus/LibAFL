@@ -32,7 +32,7 @@ pub struct FuzzerOptions {
     #[arg(
         short = 'j',
         long,
-        help = "Injections TOML or YAML file definition. Filename must end in .toml or .yaml."
+        help = "Injections TOML or YAML file definition. Filename must end in .toml or .yaml/.yml."
     )]
     pub injections: Option<String>,
 
