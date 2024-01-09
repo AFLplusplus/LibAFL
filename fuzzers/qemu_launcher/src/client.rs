@@ -134,9 +134,10 @@ impl<'a> Client<'a> {
             .injections
             .as_ref()
             .map(|injections_file| {
-                if injections_file.to_lowercase().ends_with("yaml") {
+                let lower = injections_file.to_lowercase();
+                if lower.ends_with("yaml") || lower.ends_with("yml") {
                     QemuInjectionHelper::from_yaml(injections_file)
-                } else if injections_file.to_lowercase().ends_with("toml") {
+                } else if lower.ends_with("toml") {
                     QemuInjectionHelper::from_toml(injections_file)
                 } else {
                     todo!("No injections given, what to do?");
