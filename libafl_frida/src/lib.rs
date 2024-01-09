@@ -400,7 +400,7 @@ mod tests {
         let asan = AsanRuntime::new(options);
         let mut frida_helper = FridaInstrumentationHelper::new(
             GUM.get().expect("Gum uninitialized"),
-            &options,
+            options,
             tuple_list!(coverage, asan),
         );
 
@@ -495,7 +495,7 @@ mod tests {
                 "info" => log::set_max_level(log::LevelFilter::Info),
                 "debug" => log::set_max_level(log::LevelFilter::Debug),
                 "trace" => log::set_max_level(log::LevelFilter::Trace),
-                _ => panic!("Unknown RUST_LOG level: {}", value),
+                _ => panic!("Unknown RUST_LOG level: {value}"),
             }
         }
 
@@ -503,9 +503,10 @@ mod tests {
 
         // Check if the harness dynamic library is present, if not - skip the test
         let test_harness = "test_harness.so";
-        if !std::path::Path::new(test_harness).exists() {
-            panic!("Skipping test, {} not found", test_harness);
-        }
+        assert!(
+            std::path::Path::new(test_harness).exists(),
+            "Skipping test, {test_harness} not found"
+        );
 
         GUM.set(unsafe { Gum::obtain() })
             .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
