@@ -183,8 +183,10 @@ windows_alias = "unsupported"
 command = "cargo"
 args = [
     "build",
+    "--release",
+    # TODO: Bring profiles back / understand them?
     #"--profile",
-    "--${PROFILE}",
+    #"${PROFILE}",
     "--features", "${FEATURE}",
     "--target-dir", "${TARGET_DIR}"
 ]
