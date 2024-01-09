@@ -25,11 +25,11 @@ use frida_gum::{
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
-#[cfg(target_vendor = "apple")]
-use libc::RLIMIT_STACK;
+// #[cfg(target_vendor = "apple")]
+// use libc::RLIMIT_STACK;
 use libc::{c_char, wchar_t};
-#[cfg(target_vendor = "apple")]
-use libc::{getrlimit, rlimit};
+// #[cfg(target_vendor = "apple")]
+// use libc::{getrlimit, rlimit};
 // #[cfg(all(unix, not(target_vendor = "apple")))]
 // use libc::{getrlimit64, rlimit64};
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
