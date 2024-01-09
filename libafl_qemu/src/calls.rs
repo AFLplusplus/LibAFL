@@ -278,6 +278,12 @@ where
         S: UsesInput,
         QT: QemuHelperTuple<S>,
     {
+        let mut cnt = 0;let yy = &mut cnt;
+        hooks.crash_closure(Box::new(|h, _| {
+            *yy += 1;
+        }));
+
+    
         if let Some(h) = hooks.helpers_mut().match_first_type_mut::<Self>() {
             if !h.must_instrument(pc) {
                 return None;
@@ -320,10 +326,10 @@ where
                 for detail in insn_detail.groups() {
                     match u32::from(detail.0) {
                         capstone::InsnGroupType::CS_GRP_CALL => {
-                            let call_len = insn.bytes().len();
+                            let call_len = insn.bytes().len();let mut cnt = 0;let mut yy = &mut cnt;
                             // TODO do not use a closure, find a more efficient way to pass call_len
                             let call_cb = Box::new(
-                                move |hooks: &mut QemuHooks<QT, S>, state: Option<&mut S>, pc| {
+                                move |hooks: &mut QemuHooks<QT, S>, state: Option<&mut S>, pc| {*yy+= 1;
                                     // eprintln!("CALL @ 0x{:#x}", pc + call_len);
                                     let mut collectors = if let Some(h) =
                                         hooks.helpers_mut().match_first_type_mut::<Self>()
