@@ -183,8 +183,8 @@ windows_alias = "unsupported"
 command = "cargo"
 args = [
     "build",
-    "--profile",
-    "${PROFILE}",
+    #"--profile",
+    "--${PROFILE}",
     "--features", "${FEATURE}",
     "--target-dir", "${TARGET_DIR}"
 ]
@@ -286,6 +286,7 @@ windows_alias = "unsupported"
 [tasks.test_unix]
 script_runner="@shell"
 script='''
+echo "Profile: ${PROFILE}"
 cd injection_test || exit 1
 make
 mkdir in || true
