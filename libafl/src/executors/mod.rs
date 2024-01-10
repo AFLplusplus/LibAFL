@@ -10,7 +10,7 @@ pub use differential::DiffExecutor;
 pub use forkserver::{Forkserver, ForkserverExecutor, TimeoutForkserverExecutor};
 pub use inprocess::InProcessExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
-pub use inprocess::InProcessForkExecutor;
+pub use inprocess_fork::InProcessForkExecutor;
 use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 #[cfg(any(unix, feature = "std"))]
@@ -30,12 +30,20 @@ pub mod differential;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub mod forkserver;
 pub mod inprocess;
+
+/// The module for inproc fork executor
+#[cfg(all(feature = "std", unix))]
+pub mod inprocess_fork;
+
 pub mod shadow;
 /// Timeout executor.
 /// Not possible on `no-std` Windows or `no-std`, but works for unix
 #[cfg(any(unix, feature = "std"))]
 pub mod timeout;
 pub mod with_observers;
+
+/// The module for all the hooks
+pub mod hooks;
 
 /// How an execution finished.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

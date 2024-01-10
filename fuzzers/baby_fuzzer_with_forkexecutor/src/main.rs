@@ -1,11 +1,11 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{path::PathBuf, ptr::write};
+use std::{path::PathBuf, ptr::write, time::Duration};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{ExitKind, InProcessForkExecutor},
+    executors::{ExitKind, InProcessForkExecutor, inprocess_fork::InChildProcessHooks},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
@@ -110,6 +110,8 @@ pub fn main() {
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        Duration::from_millis(5000),
+        tuple_list!(InChildProcessHooks::new().unwrap()),
         shmem_provider,
     )
     .expect("Failed to create the Executor");

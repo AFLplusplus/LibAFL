@@ -13,6 +13,7 @@ use libafl::{
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
+        hooks::ExecutorHooksTuple,
         inprocess::{InProcessExecutor, InProcessExecutorHandlerData},
         Executor, ExitKind, HasObservers,
     },
@@ -268,9 +269,10 @@ where
 }
 
 #[cfg(feature = "fork")]
-pub struct QemuForkExecutor<'a, H, OT, QT, S, SP>
+pub struct QemuForkExecutor<'a, H, HT, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
+    HT: ExecutorHooksTuple,
     S: UsesInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
@@ -278,13 +280,14 @@ where
 {
     first_exec: bool,
     hooks: &'a mut QemuHooks<QT, S>,
-    inner: InProcessForkExecutor<'a, H, OT, S, SP>,
+    inner: InProcessForkExecutor<'a, H, HT, OT, S, SP>,
 }
 
 #[cfg(feature = "fork")]
-impl<'a, H, OT, QT, S, SP> Debug for QemuForkExecutor<'a, H, OT, QT, S, SP>
+impl<'a, H, HT, OT, QT, S, SP> Debug for QemuForkExecutor<'a, H, HT, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
+    HT: ExecutorHooksTuple,
     S: UsesInput,
     OT: ObserversTuple<S> + Debug,
     QT: QemuHelperTuple<S> + Debug,
@@ -299,9 +302,10 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, H, OT, QT, S, SP> QemuForkExecutor<'a, H, OT, QT, S, SP>
+impl<'a, H, HT, OT, QT, S, SP> QemuForkExecutor<'a, H, HT, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
+    HT: ExecutorHooksTuple,
     S: State,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
@@ -314,7 +318,9 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         event_mgr: &mut EM,
+        executor_hooks: HT,
         shmem_provider: SP,
+        timeout: core::time::Duration,
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
@@ -333,16 +339,18 @@ where
                 fuzzer,
                 state,
                 event_mgr,
+                timeout,
+                executor_hooks,
                 shmem_provider,
             )?,
         })
     }
 
-    pub fn inner(&self) -> &InProcessForkExecutor<'a, H, OT, S, SP> {
+    pub fn inner(&self) -> &InProcessForkExecutor<'a, H, HT, OT, S, SP> {
         &self.inner
     }
 
-    pub fn inner_mut(&mut self) -> &mut InProcessForkExecutor<'a, H, OT, S, SP> {
+    pub fn inner_mut(&mut self) -> &mut InProcessForkExecutor<'a, H, HT, OT, S, SP> {
         &mut self.inner
     }
 
@@ -360,10 +368,11 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, EM, H, OT, QT, S, Z, SP> Executor<EM, Z> for QemuForkExecutor<'a, H, OT, QT, S, SP>
+impl<'a, EM, H, HT, OT, QT, S, Z, SP> Executor<EM, Z> for QemuForkExecutor<'a, H, HT, OT, QT, S, SP>
 where
-    EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, Z, State = S>,
+    EM: EventManager<InProcessForkExecutor<'a, H, HT, OT, S, SP>, Z, State = S>,
     H: FnMut(&S::Input) -> ExitKind,
+    HT: ExecutorHooksTuple,
     S: State + HasMetadata + HasExecutions + HasLastReportTime,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
@@ -395,9 +404,10 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, H, OT, QT, S, SP> UsesObservers for QemuForkExecutor<'a, H, OT, QT, S, SP>
+impl<'a, H, HT, OT, QT, S, SP> UsesObservers for QemuForkExecutor<'a, H, HT, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
+    HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     S: State,
@@ -407,9 +417,10 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, H, OT, QT, S, SP> UsesState for QemuForkExecutor<'a, H, OT, QT, S, SP>
+impl<'a, H, HT, OT, QT, S, SP> UsesState for QemuForkExecutor<'a, H, HT, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
+    HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     S: State,
@@ -419,9 +430,10 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, H, OT, QT, S, SP> HasObservers for QemuForkExecutor<'a, H, OT, QT, S, SP>
+impl<'a, H, HT, OT, QT, S, SP> HasObservers for QemuForkExecutor<'a, H, HT, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
+    HT: ExecutorHooksTuple,
     S: State,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
