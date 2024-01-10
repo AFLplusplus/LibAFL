@@ -1,9 +1,8 @@
 //! Monitor to display both cumulative and per-client monitor
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+#[cfg(feature = "introspection")]
+use alloc::string::ToString;
+use alloc::{string::String, vec::Vec};
 use core::{
     fmt::{Debug, Formatter, Write},
     time::Duration,
