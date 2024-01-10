@@ -521,16 +521,16 @@ where
         // If we are measuring scalability stuff..
         #[cfg(feature = "scalability_introspection")]
         {
-            let imported_with_observer = state.scalability_monitor().testcase_with_observers;
-            let imported_without_observer = state.scalability_monitor().testcase_without_observers;
+            let received_with_observer = state.scalability_monitor().testcase_with_observers;
+            let received_without_observer = state.scalability_monitor().testcase_without_observers;
 
             self.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: "total imported".to_string(),
+                    name: "total received".to_string(),
                     value: UserStats::new(
                         UserStatsValue::Number(
-                            (imported_with_observer + imported_without_observer) as u64,
+                            (received_with_observer + received_without_observer) as u64,
                         ),
                         AggregatorOps::Avg,
                     ),
