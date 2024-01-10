@@ -1,3 +1,8 @@
+## Prerequisites
+```bash
+sudo apt install libsqlite3-dev
+```
+
 # Injection test setup
 
 To build the injection test target:
