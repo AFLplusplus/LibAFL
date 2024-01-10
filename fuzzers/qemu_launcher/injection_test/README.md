@@ -1,3 +1,8 @@
+## Prerequisites
+```bash
+sudo apt install libsqlite3-dev
+```
+
 # Injection test setup
 
 To build the injection test target:
@@ -6,5 +11,5 @@ To build the injection test target:
 To run qemu_launcher with the injection detection activated:
 
 ```
-target/release/qemu_launcher -y injections.yaml -i in -o out -- injection_test/static
+target/x86_64/release/qemu_launcher -j injections.yaml -i in -o out -- injection_test/static
 ```

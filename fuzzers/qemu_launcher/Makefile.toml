@@ -211,6 +211,7 @@ ${CROSS_CXX} \
     "${TARGET_DIR}/build-png/.libs/libpng16.a" \
 	"${TARGET_DIR}/build-zlib/libz.a" \
     -I"${TARGET_DIR}/build-png" \
+    -I"${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/libpng-1.6.37" \
 	-I"${TARGET_DIR}/build-zlib/zlib/lib" \
 	-L"${TARGET_DIR}/build-zlib/zlib/lib" \
     -o"${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}" \
