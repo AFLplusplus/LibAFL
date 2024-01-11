@@ -8,6 +8,7 @@ use core::{
 use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
     shmem::ShMemProvider,
+    tuples::{tuple_list, Merge},
 };
 use libc::siginfo_t;
 use nix::{
@@ -19,7 +20,8 @@ use super::hooks::ExecutorHooksTuple;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
-        hooks::inprocess_fork::InProcessForkExecutorGlobalData, Executor, ExitKind, HasObservers,
+        hooks::inprocess_fork::{InChildProcessHooks, InProcessForkExecutorGlobalData},
+        Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -89,7 +91,7 @@ where
     harness_fn: &'a mut H,
     shmem_provider: SP,
     observers: OT,
-    hooks: HT,
+    hooks: (InChildProcessHooks, HT),
     #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_os = "linux")))]
@@ -250,7 +252,7 @@ where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
-    /// Creates a new [`InProcessForkExecutor`]
+    /// Creates a new [`InProcessForkExecutor`] with custom hooks
     #[cfg(target_os = "linux")]
     #[allow(clippy::too_many_arguments)]
     pub fn new<EM, OF, Z>(
@@ -260,7 +262,7 @@ where
         state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
-        mut hooks: HT,
+        userhooks: HT,
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
@@ -269,6 +271,8 @@ where
         S: HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
+        let default_hooks = InChildProcessHooks::new()?;
+        let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self, S>(state);
 
         let milli_sec = timeout.as_millis();
@@ -489,7 +493,9 @@ mod tests {
 
         use crate::{
             events::SimpleEventManager,
-            executors::{Executor, InProcessForkExecutor},
+            executors::{
+                hooks::inprocess_fork::InChildProcessHooks, Executor, InProcessForkExecutor,
+            },
             fuzzer::test::NopFuzzer,
             state::test::NopState,
         };
@@ -510,7 +516,7 @@ mod tests {
             harness_fn: &mut harness,
             shmem_provider: provider,
             observers: tuple_list!(),
-            hooks: tuple_list!(),
+            hooks: tuple_list!(InChildProcessHooks::new().unwrap()),
             itimerspec,
             phantom: PhantomData,
         };

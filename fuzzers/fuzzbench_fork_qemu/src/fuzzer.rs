@@ -341,6 +341,8 @@ fn fuzz(
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        Duration::from_millis(5000),
+        tuple_list!(),
         shmem_provider,
     )?;
 

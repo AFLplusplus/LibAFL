@@ -5,7 +5,7 @@ use std::{path::PathBuf, ptr::write, time::Duration};
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{ExitKind, InProcessForkExecutor, inprocess_fork::InChildProcessHooks},
+    executors::{ExitKind, InProcessForkExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
@@ -111,7 +111,7 @@ pub fn main() {
         &mut state,
         &mut mgr,
         Duration::from_millis(5000),
-        tuple_list!(InChildProcessHooks::new().unwrap()),
+        tuple_list!(),
         shmem_provider,
     )
     .expect("Failed to create the Executor");

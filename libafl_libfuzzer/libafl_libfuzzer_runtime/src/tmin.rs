@@ -6,7 +6,7 @@ use std::{
 use libafl::{
     corpus::{Corpus, HasTestcase, InMemoryCorpus, Testcase},
     events::SimpleEventManager,
-    executors::{inprocess_fork::{InProcessForkExecutor, InChildProcessHooks}, ExitKind},
+    executors::{inprocess_fork::InProcessForkExecutor, ExitKind},
     feedbacks::{CrashFeedbackFactory, TimeoutFeedbackFactory},
     inputs::{BytesInput, HasBytesVec, HasTargetBytes},
     mutators::{havoc_mutations_no_crossover, Mutator, StdScheduledMutator},
@@ -69,7 +69,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
         &mut state,
         &mut mgr,
         options.timeout(),
-        tuple_list!(InChildProcessHooks::new::<>()?),
+        tuple_list!(),
         shmem_provider,
     )?;
 
