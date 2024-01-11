@@ -1,6 +1,5 @@
 use alloc::rc::Rc;
 use core::{cell::RefCell, fmt::Debug};
-use std::path::PathBuf;
 
 use libafl::{
     alloc,
@@ -8,9 +7,9 @@ use libafl::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, MinMapFeedback},
-    inputs::{BytesInput, Input, UsesInput},
+    inputs::{BytesInput, Input},
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasMetadata},
+    state::{HasMetadata, State},
     Error,
 };
 use libafl_bolts::{impl_serdeany, Named};
@@ -44,7 +43,7 @@ impl Named for LibfuzzerKeepFeedback {
 
 impl<S> Feedback<S> for LibfuzzerKeepFeedback
 where
-    S: UsesInput + HasClientPerfMonitor,
+    S: State,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -77,12 +76,12 @@ impl LibfuzzerCrashCauseMetadata {
 
 #[derive(Debug)]
 pub struct LibfuzzerCrashCauseFeedback {
-    artifact_prefix: Option<ArtifactPrefix>,
+    artifact_prefix: ArtifactPrefix,
     exit_kind: ExitKind,
 }
 
 impl LibfuzzerCrashCauseFeedback {
-    pub fn new(artifact_prefix: Option<ArtifactPrefix>) -> Self {
+    pub fn new(artifact_prefix: ArtifactPrefix) -> Self {
         Self {
             artifact_prefix,
             exit_kind: ExitKind::Ok,
@@ -104,24 +103,17 @@ impl LibfuzzerCrashCauseFeedback {
             let name = testcase.input().as_ref().unwrap().generate_name(0);
             name
         };
-        let file_path = if let Some(artifact_prefix) = self.artifact_prefix.as_ref() {
-            if let Some(filename_prefix) = artifact_prefix.filename_prefix() {
-                artifact_prefix
-                    .dir()
-                    .join(format!("{filename_prefix}{prefix}-{base}"))
-            } else {
-                artifact_prefix.dir().join(format!("{prefix}-{base}"))
-            }
-        } else {
-            PathBuf::from(format!("{prefix}-{base}"))
-        };
+        let file_path = self.artifact_prefix.dir().join(format!(
+            "{}{prefix}-{base}",
+            self.artifact_prefix.filename_prefix()
+        ));
         *testcase.file_path_mut() = Some(file_path);
     }
 }
 
 impl<S> Feedback<S> for LibfuzzerCrashCauseFeedback
 where
-    S: UsesInput<Input = BytesInput> + HasClientPerfMonitor,
+    S: State<Input = BytesInput>,
 {
     fn is_interesting<EM, OT>(
         &mut self,

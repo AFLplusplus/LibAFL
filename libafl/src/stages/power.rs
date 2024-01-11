@@ -7,11 +7,9 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mutators::Mutator,
-    schedulers::{
-        ecofuzz::EcoTestcaseScore, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
-    },
+    schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{mutational::MutatedTransform, MutationalStage, Stage},
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -36,7 +34,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
@@ -69,10 +67,12 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
+    type Progress = (); // TODO should we resume this stage?
+
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -81,9 +81,8 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+        let ret = self.perform_mutational(fuzzer, executor, state, manager);
         ret
     }
 }
@@ -94,7 +93,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::Input, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
@@ -109,7 +108,7 @@ where
     EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<I, E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    E::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new transforming [`PowerMutationalStage`]
@@ -124,7 +123,3 @@ where
 /// The standard powerscheduling stage
 pub type StdPowerMutationalStage<E, EM, I, M, Z> =
     PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;
-
-/// Ecofuzz scheduling stage
-pub type EcoPowerMutationalStage<E, EM, I, M, Z> =
-    PowerMutationalStage<E, EcoTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;

@@ -8,11 +8,15 @@ use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
 use super::{Stage, TracingStage};
+#[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
+use crate::state::HasClientPerfMonitor;
+#[cfg(feature = "concolic_mutation")]
+use crate::state::State;
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::Corpus,
     executors::{Executor, HasObservers},
     observers::concolic::ConcolicObserver,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
+    state::{HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
 
@@ -35,9 +39,11 @@ where
     E: UsesState<State = TE::State>,
     EM: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    TE::State: HasExecutions + HasCorpus,
     Z: UsesState<State = TE::State>,
 {
+    type Progress = (); // stage cannot be resumed
+
     #[inline]
     fn perform(
         &mut self,
@@ -45,10 +51,14 @@ where
         executor: &mut E,
         state: &mut TE::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        self.inner
-            .perform(fuzzer, executor, state, manager, corpus_idx)?;
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
+        self.inner.perform(fuzzer, executor, state, manager)?;
         if let Some(observer) = self
             .inner
             .executor()
@@ -82,7 +92,7 @@ use libafl_bolts::tuples::MatchName;
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
-use crate::state::UsesState;
+use crate::{corpus::HasCurrentCorpusIdx, state::UsesState};
 #[cfg(feature = "concolic_mutation")]
 use crate::{
     inputs::HasBytesVec,
@@ -354,8 +364,10 @@ where
     EM: UsesState<State = Z::State>,
     Z: Evaluator<E, EM>,
     Z::Input: HasBytesVec,
-    Z::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    Z::State: State + HasExecutions + HasCorpus,
 {
+    type Progress = (); // TODO we need a resume for this type
+
     #[inline]
     fn perform(
         &mut self,
@@ -363,8 +375,13 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         start_timer!(state);
         let testcase = state.corpus().get(corpus_idx)?.clone();
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
@@ -387,8 +404,7 @@ where
                     input_copy.bytes_mut()[index] = new_byte;
                 }
                 // Time is measured directly the `evaluate_input` function
-                let _: (crate::ExecuteInputResult, Option<CorpusId>) =
-                    fuzzer.evaluate_input(state, executor, manager, input_copy)?;
+                fuzzer.evaluate_input(state, executor, manager, input_copy)?;
             }
         }
         Ok(())

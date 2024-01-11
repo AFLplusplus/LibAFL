@@ -465,7 +465,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         .run_client(&mut run_client)
         .cores(&options.cores)
         .broker_port(options.broker_port)
-        .stdout_file(Some(&options.stdout))
+        // .stdout_file(Some(&options.stdout))
         .remote_broker_addr(options.remote_broker_addr)
         .build()
         .launch()

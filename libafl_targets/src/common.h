@@ -6,6 +6,11 @@
 #define true 1
 #define false 0
 
+#if !defined(_WIN32) && defined(__SIZEOF_INT128__)
+typedef unsigned __int128 uint128_t;
+typedef uint128_t         u128;
+#endif
+
 #define STATIC_ASSERT(pred) \
   switch (0) {              \
     case 0:                 \

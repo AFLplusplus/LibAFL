@@ -21,9 +21,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{
-        AFLppCmpMap, HitcountsMapObserver, StdCmpValuesObserver, StdMapObserver, TimeObserver,
-    },
+    observers::{HitcountsMapObserver, StdCmpValuesObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -36,11 +34,13 @@ use libafl::{
 };
 use libafl_bolts::{
     current_nanos, current_time,
+    ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
     AsMutSlice,
 };
+use libafl_targets::cmps::AFLppCmpLogMap;
 use nix::sys::signal::Signal;
 
 pub fn main() {
@@ -205,6 +205,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
+#[allow(clippy::too_many_arguments)]
 fn fuzz(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
@@ -341,12 +342,10 @@ fn fuzz(
 
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
-        let mut cmplog_shmem = shmem_provider
-            .new_shmem(core::mem::size_of::<AFLppCmpMap>())
-            .unwrap();
+        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
         // let the forkserver know the shmid
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
-        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpMap>() };
+        let cmpmap = unsafe { OwnedRefMut::<AFLppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = StdCmpValuesObserver::new("cmplog", cmpmap, true);
 

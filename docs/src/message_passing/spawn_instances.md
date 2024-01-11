@@ -13,7 +13,7 @@ If the port is not yet bound, this instance becomes the broker, binding itself t
 If the port is already bound, the EventManager will try to connect to it.
 The instance becomes a client and can now communicate with all other nodes.
 
-Launching nodes manually has the benefit that you can have multiple nodes with different configurations, such as clients fuzzing with and without `ASan``.
+Launching nodes manually has the benefit that you can have multiple nodes with different configurations, such as clients fuzzing with and without `ASan`.
 
 While it's called "restarting" manager, it uses `fork` on Unix-like operating systems as optimization and only actually restarts from scratch on Windows.
 

@@ -6,10 +6,8 @@ use core::{marker::PhantomData, time::Duration};
 use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx},
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     stages::{
@@ -17,9 +15,11 @@ use crate::{
         MutationalStage, Stage,
     },
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasMetadata, HasNamedMetadata, HasRand, UsesState},
     Error, Evaluator,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
@@ -161,7 +161,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// Runs this (mutational) stage for the given `testcase`
@@ -173,8 +173,13 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let fuzz_time = self.seed_fuzz_time(state)?;
         let iters = self.fixed_iters(state)?;
 
@@ -254,7 +259,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     type State = Z::State;
@@ -266,9 +271,11 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
+    type Progress = (); // TODO should this stage be resumed?
+
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -277,9 +284,8 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+        let ret = self.perform_mutational(fuzzer, executor, state, manager);
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
@@ -294,7 +300,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata,
     I: MutatedTransform<Z::Input, Z::State> + Clone,
 {
     /// Creates a new default tuneable mutational stage
@@ -462,7 +468,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasNamedMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata,
 {
     /// Creates a new tranforming mutational stage
     #[must_use]

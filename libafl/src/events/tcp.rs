@@ -28,10 +28,10 @@ use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::{shmem::ShMemProvider, ClientId};
 #[cfg(feature = "std")]
 use libafl_bolts::{shmem::StdShMemProvider, staterestore::StateRestorer};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    sync::{broadcast, mpsc},
+    sync::{broadcast, broadcast::error::RecvError, mpsc},
     task::{spawn, JoinHandle},
 };
 #[cfg(feature = "std")]
@@ -39,7 +39,7 @@ use typed_builder::TypedBuilder;
 
 use super::{CustomBufEventResult, CustomBufHandlerFn};
 #[cfg(all(unix, feature = "std"))]
-use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
+use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
@@ -49,7 +49,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
-    state::{HasClientPerfMonitor, HasExecutions, HasLastReportTime, HasMetadata, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, State, UsesState},
     Error,
 };
 
@@ -111,8 +111,8 @@ where
     #[tokio::main(flavor = "current_thread")]
     #[allow(clippy::too_many_lines)]
     pub async fn broker_loop(&mut self) -> Result<(), Error> {
-        let (tx_bc, rx) = broadcast::channel(1024);
-        let (tx, mut rx_mpsc) = mpsc::channel(1024);
+        let (tx_bc, rx) = broadcast::channel(65536);
+        let (tx, mut rx_mpsc) = mpsc::channel(65536);
 
         let exit_cleanly_after = self.exit_cleanly_after;
 
@@ -224,13 +224,14 @@ where
                 spawn(async move {
                     // In a loop, read data from the socket and write the data back.
                     loop {
-                        let buf: Vec<u8> = rx_inner
-                            .lock()
-                            .await
-                            .recv()
-                            .await
-                            .expect("Could not receive");
-                        // TODO handle full capacity, Lagged https://docs.rs/tokio/latest/tokio/sync/broadcast/error/enum.RecvError.html
+                        let buf: Vec<u8> = match rx_inner.lock().await.recv().await {
+                            Ok(buf) => buf,
+                            Err(RecvError::Lagged(num)) => {
+                                log::error!("Receiver lagged, skipping {num} messages");
+                                continue;
+                            }
+                            _ => panic!("Could not receive"),
+                        };
 
                         #[cfg(feature = "tcp_debug")]
                         println!("{buf:?}");
@@ -330,6 +331,7 @@ where
                 } else {
                     client_id
                 };
+                monitor.client_stats_insert(id);
                 let client = monitor.client_stats_mut_for(id);
                 client.update_corpus_size(*corpus_size as u64);
                 client.update_executions(*executions as u64, *time);
@@ -342,6 +344,7 @@ where
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_executions(*executions as u64, *time);
                 monitor.display(event.name().to_string(), client_id);
@@ -352,8 +355,10 @@ where
                 value,
                 phantom: _,
             } => {
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_user_stats(name.clone(), value.clone());
+                monitor.aggregate(name);
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -367,6 +372,7 @@ where
                 // TODO: The monitor buffer should be added on client add.
 
                 // Get the client for the staterestorer ID
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
 
                 // Update the normal monitor for this client
@@ -382,6 +388,7 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
+                monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
                 monitor.display(event.name().to_string(), client_id);
@@ -406,7 +413,7 @@ where
 /// An [`EventManager`] that forwards all events to other attached via tcp.
 pub struct TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     /// The TCP stream for inter process communication
     tcp: TcpStream,
@@ -425,7 +432,7 @@ where
 
 impl<S> core::fmt::Debug for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("TcpEventManager");
@@ -442,7 +449,7 @@ where
 
 impl<S> Drop for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     /// TCP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
@@ -452,7 +459,7 @@ where
 
 impl<S> TcpEventManager<S>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: State + HasExecutions,
 {
     /// Create a manager from a raw TCP client specifying the client id
     pub fn existing<A: ToSocketAddrs>(
@@ -559,8 +566,16 @@ where
                 {
                     let observers: E::Observers =
                         postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_with_observers += 1;
+                    }
                     fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
                 } else {
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_without_observers += 1;
+                    }
                     fuzzer.evaluate_input_with_observers::<E, Self>(
                         state, executor, self, input, false,
                     )?
@@ -588,7 +603,7 @@ where
 
 impl<S> TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     /// Send information that this client is exiting.
     /// The other side may free up all allocated memory.
@@ -602,14 +617,14 @@ where
 
 impl<S> UsesState for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
 
 impl<S> EventFirer for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     #[cfg(feature = "tcp_compression")]
     fn fire(
@@ -656,7 +671,7 @@ where
 
 impl<S> EventRestarter for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     /// The TCP client needs to wait until a broker has mapped all pages before shutting down.
     /// Otherwise, the OS may already have removed the shared maps.
@@ -668,7 +683,7 @@ where
 
 impl<E, S, Z> EventProcessor<E, Z> for TcpEventManager<S>
 where
-    S: UsesInput + HasClientPerfMonitor + HasExecutions,
+    S: State + HasExecutions,
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
@@ -704,7 +719,7 @@ where
                     if self_id == other_client_id {
                         panic!("Own ID should never have been sent by the broker");
                     } else {
-                        println!("{self_id:?} (from {other_client_id:?}) Received: {buf:?}");
+                        log::info!("{self_id:?} (from {other_client_id:?}) Received: {buf:?}");
 
                         let event = postcard::from_bytes(&buf[4..])?;
                         self.handle_in_client(fuzzer, executor, state, other_client_id, event)?;
@@ -731,14 +746,14 @@ impl<E, S, Z> EventManager<E, Z> for TcpEventManager<S>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
 }
 
 impl<S> HasCustomBufHandlers for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     fn add_custom_buf_handler(
         &mut self,
@@ -749,13 +764,13 @@ where
 }
 
 impl<S> ProgressReporter for TcpEventManager<S> where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + HasLastReportTime
+    S: State + HasExecutions + HasMetadata + HasLastReportTime
 {
 }
 
 impl<S> HasEventManagerId for TcpEventManager<S>
 where
-    S: UsesInput,
+    S: State,
 {
     /// Gets the id assigned to this staterestorer.
     fn mgr_id(&self) -> EventManagerId {
@@ -768,7 +783,7 @@ where
 #[derive(Debug)]
 pub struct TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -783,7 +798,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> UsesState for TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
 {
     type State = S;
@@ -792,12 +807,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> ProgressReporter for TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + Serialize,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider,
 {
 }
@@ -806,7 +816,7 @@ where
 impl<S, SP> EventFirer for TcpRestartingEventManager<S, SP>
 where
     SP: ShMemProvider,
-    S: UsesInput,
+    S: State,
     //CE: CustomEvent<I>,
 {
     fn fire(
@@ -826,7 +836,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> EventRestarter for TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + Serialize,
+    S: State + HasExecutions,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -839,6 +849,8 @@ where
 
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        state.on_restart()?;
+
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(&if self.save_state {
@@ -846,6 +858,7 @@ where
         } else {
             None
         })?;
+
         self.await_restart_safe();
         Ok(())
     }
@@ -863,7 +876,7 @@ impl<E, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor,
+    S: State + HasExecutions,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -877,12 +890,7 @@ impl<E, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<TcpEventManager<S>, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    S: UsesInput
-        + HasExecutions
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasLastReportTime
-        + Serialize,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
 {
@@ -891,7 +899,7 @@ where
 #[cfg(feature = "std")]
 impl<S, SP> HasEventManagerId for TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput + Serialize,
+    S: State,
     SP: ShMemProvider + 'static,
 {
     fn mgr_id(&self) -> EventManagerId {
@@ -908,7 +916,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 #[cfg(feature = "std")]
 impl<S, SP> TcpRestartingEventManager<S, SP>
 where
-    S: UsesInput,
+    S: State,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -948,7 +956,7 @@ where
 /// The kind of manager we're creating right now
 #[cfg(feature = "std")]
 #[derive(Debug, Clone, Copy)]
-pub enum ManagerKind {
+pub enum TcpManagerKind {
     /// Any kind will do
     Any,
     /// A client, getting messages from a local broker.
@@ -972,9 +980,9 @@ pub fn setup_restarting_mgr_tcp<MT, S>(
 ) -> Result<(Option<S>, TcpRestartingEventManager<S, StdShMemProvider>), Error>
 where
     MT: Monitor + Clone,
-    S: DeserializeOwned + UsesInput + HasClientPerfMonitor + HasExecutions,
+    S: State + HasExecutions,
 {
-    RestartingMgr::builder()
+    TcpRestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
         .monitor(Some(monitor))
         .broker_port(broker_port)
@@ -983,13 +991,13 @@ where
         .launch()
 }
 
-/// Provides a `builder` which can be used to build a [`RestartingMgr`], which is a combination of a
+/// Provides a `builder` which can be used to build a [`TcpRestartingMgr`], which is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access, clippy::ignored_unit_patterns)]
 #[derive(TypedBuilder, Debug)]
-pub struct RestartingMgr<MT, S, SP>
+pub struct TcpRestartingMgr<MT, S, SP>
 where
     S: UsesInput + DeserializeOwned,
     SP: ShMemProvider + 'static,
@@ -1011,8 +1019,8 @@ where
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
     /// The type of manager to build
-    #[builder(default = ManagerKind::Any)]
-    kind: ManagerKind,
+    #[builder(default = TcpManagerKind::Any)]
+    kind: TcpManagerKind,
     /// The amount of external clients that should have connected (not counting our own tcp client)
     /// before this broker quits _after the last client exited_.
     /// If `None`, the broker will never quit when the last client exits, but run forever.
@@ -1030,12 +1038,25 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<MT, S, SP> RestartingMgr<MT, S, SP>
+impl<MT, S, SP> TcpRestartingMgr<MT, S, SP>
 where
     SP: ShMemProvider,
-    S: UsesInput + HasExecutions + HasClientPerfMonitor + DeserializeOwned,
+    S: State + HasExecutions,
     MT: Monitor + Clone,
 {
+    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
+    #[inline]
+    #[allow(clippy::unused_self)]
+    fn is_shutting_down() -> bool {
+        #[cfg(unix)]
+        unsafe {
+            core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
+        }
+
+        #[cfg(windows)]
+        false
+    }
+
     /// Launch the restarting manager
     pub fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<S, SP>), Error> {
         // We start ourself as child process to actually fuzz
@@ -1052,7 +1073,7 @@ where
 
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
-                ManagerKind::Any => {
+                TcpManagerKind::Any => {
                     let connection = create_nonblocking_listener(("127.0.0.1", self.broker_port));
                     match connection {
                         Ok(listener) => {
@@ -1083,7 +1104,7 @@ where
                         }
                     }
                 }
-                ManagerKind::Broker => {
+                TcpManagerKind::Broker => {
                     let event_broker = TcpEventBroker::<S::Input, MT>::new(
                         format!("127.0.0.1:{}", self.broker_port),
                         self.monitor.take().unwrap(),
@@ -1092,7 +1113,7 @@ where
                     broker_things(event_broker, self.remote_broker_addr)?;
                     unreachable!("The broker may never return normally, only on errors or when shutting down.");
                 }
-                ManagerKind::Client { cpu_core } => {
+                TcpManagerKind::Client { cpu_core } => {
                     // We are a client
                     let mgr = TcpEventManager::<S>::on_port(self.broker_port, self.configuration)?;
 
@@ -1111,7 +1132,7 @@ where
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]
-            let mut staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             #[cfg(not(unix))]
@@ -1120,21 +1141,9 @@ where
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
-            #[cfg(unix)]
-            unsafe {
-                let data = &mut SHUTDOWN_SIGHANDLER_DATA;
-                // Write the pointer to staterestorer so we can release its shmem later
-                core::ptr::write_volatile(
-                    &mut data.staterestorer_ptr,
-                    &mut staterestorer as *mut _ as *mut std::ffi::c_void,
-                );
-                data.allocator_pid = std::process::id() as usize;
-                data.shutdown_handler = shutdown_handler::<SP> as *const std::ffi::c_void;
-            }
-
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
+            if let Err(_e) = unsafe { setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE) } {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }
@@ -1151,6 +1160,9 @@ where
                     self.shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
+                            unsafe {
+                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                            }
                             self.shmem_provider.post_fork(false)?;
                             handle.status()
                         }
@@ -1160,6 +1172,11 @@ where
                         }
                     }
                 };
+
+                #[cfg(all(unix, not(feature = "fork")))]
+                unsafe {
+                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                }
 
                 // On Windows (or in any case without fork), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]
@@ -1182,7 +1199,7 @@ where
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
 
-                if staterestorer.wants_to_exit() {
+                if staterestorer.wants_to_exit() || Self::is_shutting_down() {
                     return Err(Error::shutting_down());
                 }
 

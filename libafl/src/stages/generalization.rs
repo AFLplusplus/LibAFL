@@ -8,10 +8,8 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::AsSlice;
 
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
@@ -19,9 +17,11 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, UsesState},
+    state::{HasCorpus, HasExecutions, HasMetadata, UsesState},
     Error,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 const MAX_GENERALIZED_LEN: usize = 8192;
 
@@ -60,14 +60,12 @@ where
     O: MapObserver,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
-    E::State: UsesInput<Input = BytesInput>
-        + HasClientPerfMonitor
-        + HasExecutions
-        + HasMetadata
-        + HasCorpus,
+    E::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {
+    type Progress = (); // TODO this stage needs a resume
+
     #[inline]
     #[allow(clippy::too_many_lines)]
     fn perform(
@@ -76,8 +74,13 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let (mut payload, original, novelties) = {
             start_timer!(state);
             {
@@ -316,11 +319,7 @@ where
     EM: UsesState,
     O: MapObserver,
     OT: ObserversTuple<EM::State>,
-    EM::State: UsesInput<Input = BytesInput>
-        + HasClientPerfMonitor
-        + HasExecutions
-        + HasMetadata
-        + HasCorpus,
+    EM::State: UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]

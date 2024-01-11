@@ -30,7 +30,7 @@ use crate::{inputs::Input, Error};
 use crate::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
-    state::{HasExecutions, UsesState},
+    state::{HasExecutions, State, UsesState},
     std::borrow::ToOwned,
 };
 
@@ -215,7 +215,7 @@ where
 
 impl<OT, S> CommandExecutor<OT, S, StdCommandConfigurator>
 where
-    OT: MatchName + Debug + ObserversTuple<S>,
+    OT: MatchName + ObserversTuple<S>,
     S: UsesInput,
 {
     /// Creates a new `CommandExecutor`.
@@ -313,9 +313,9 @@ where
 impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
-    S: UsesInput + HasExecutions,
+    S: State + HasExecutions,
     S::Input: HasTargetBytes,
-    T: CommandConfigurator + Debug,
+    T: CommandConfigurator,
     OT: Debug + MatchName + ObserversTuple<S>,
     Z: UsesState<State = S>,
 {
@@ -378,7 +378,7 @@ where
 
 impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -386,14 +386,14 @@ where
 impl<OT, S, T> UsesObservers for CommandExecutor<OT, S, T>
 where
     OT: ObserversTuple<S>,
-    S: UsesInput,
+    S: State,
 {
     type Observers = OT;
 }
 
 impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
 where
-    S: UsesInput,
+    S: State,
     T: Debug,
     OT: ObserversTuple<S>,
 {
@@ -565,7 +565,7 @@ impl CommandExecutorBuilder {
         observers: OT,
     ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
     where
-        OT: Debug + MatchName + ObserversTuple<S>,
+        OT: MatchName + ObserversTuple<S>,
         S: UsesInput,
     {
         let Some(program) = &self.program else {
@@ -660,7 +660,7 @@ impl CommandExecutorBuilder {
 /// ```
 
 #[cfg(all(feature = "std", any(unix, doc)))]
-pub trait CommandConfigurator: Sized + Debug {
+pub trait CommandConfigurator: Sized {
     /// Spawns a new process with the given configuration.
     fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
     where
@@ -672,7 +672,7 @@ pub trait CommandConfigurator: Sized + Debug {
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
     where
-        OT: Debug + MatchName,
+        OT: MatchName,
     {
         CommandExecutor {
             observers,
@@ -690,10 +690,10 @@ mod tests {
             command::{CommandExecutor, InputLocation},
             Executor,
         },
+        fuzzer::test::NopFuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
-        state::NopState,
-        NopFuzzer,
+        state::test::NopState,
     };
 
     #[test]

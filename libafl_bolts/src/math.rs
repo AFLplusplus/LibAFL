@@ -29,7 +29,7 @@ pub fn calculate_cumulative_distribution_in_place(probabilities: &mut [f32]) -> 
     }
 
     // Clamp the end of the vector to account for floating point errors.
-    *last = 1.0_f32;
+    *last = f32::INFINITY;
 
     Ok(())
 }

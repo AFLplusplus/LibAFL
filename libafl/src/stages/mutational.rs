@@ -5,19 +5,19 @@ use core::marker::PhantomData;
 
 use libafl_bolts::rands::Rand;
 
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 use crate::{
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, Testcase},
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
+    state::{HasCorpus, HasRand, UsesState},
     Error,
 };
+#[cfg(feature = "introspection")]
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 // TODO multi mutators stage
 
@@ -94,7 +94,7 @@ where
     M: Mutator<I, Self::State>,
     EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM, State = Self::State>,
-    Self::State: HasClientPerfMonitor + HasCorpus,
+    Self::State: HasCorpus,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     /// The mutator registered for this stage
@@ -114,8 +114,13 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let num = self.iterations(state, corpus_idx)?;
 
         start_timer!(state);
@@ -170,7 +175,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
     /// The mutator, added to this stage
@@ -197,7 +202,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     type State = Z::State;
 }
@@ -208,9 +213,11 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
+    type Progress = (); // TODO should this stage be resumed?
+
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -219,9 +226,8 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+        let ret = self.perform_mutational(fuzzer, executor, state, manager);
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
@@ -236,7 +242,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<Z::Input, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -255,7 +261,7 @@ where
     EM: UsesState<State = Z::State>,
     M: Mutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
@@ -286,7 +292,7 @@ where
     EM: UsesState<State = Z::State>,
     M: MultiMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     type State = Z::State;
 }
@@ -297,9 +303,11 @@ where
     EM: UsesState<State = Z::State>,
     M: MultiMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
+    type Progress = (); // TODO implement resume
+
     #[inline]
     #[allow(clippy::let_and_return)]
     #[allow(clippy::cast_possible_wrap)]
@@ -309,8 +317,13 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
             return Ok(());
@@ -338,7 +351,7 @@ where
     EM: UsesState<State = Z::State>,
     M: MultiMutator<Z::Input, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -352,7 +365,7 @@ where
     EM: UsesState<State = Z::State>,
     M: MultiMutator<I, Z::State>,
     Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z::State: HasCorpus + HasRand,
 {
     /// Creates a new transforming mutational stage
     pub fn transforming(mutator: M) -> Self {
@@ -365,6 +378,7 @@ where
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
+#[allow(clippy::unnecessary_fallible_conversions)]
 /// `StdMutationalStage` Python bindings
 pub mod pybind {
     use pyo3::prelude::*;

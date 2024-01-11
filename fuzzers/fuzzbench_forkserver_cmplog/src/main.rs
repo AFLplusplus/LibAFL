@@ -9,7 +9,7 @@ use std::{
 
 use clap::{Arg, ArgAction, Command};
 use libafl::{
-    corpus::{Corpus, CorpusId, InMemoryOnDiskCorpus, OnDiskCorpus},
+    corpus::{Corpus, HasCurrentCorpusIdx, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_or,
@@ -21,26 +21,28 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations,
         StdMOptMutator, Tokens,
     },
-    observers::{
-        AFLppCmpMap, AFLppCmpObserver, HitcountsMapObserver, StdMapObserver, TimeObserver,
-    },
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
         calibrate::CalibrationStage, mutational::MultiMutationalStage,
-        power::StdPowerMutationalStage, tracing::AFLppCmplogTracingStage, ColorizationStage,
-        IfStage,
+        power::StdPowerMutationalStage, ColorizationStage, IfStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
 use libafl_bolts::{
     current_nanos, current_time,
+    ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
     AsMutSlice,
+};
+use libafl_targets::{
+    cmps::{observers::AFLppCmpLogObserver, stages::AFLppCmplogTracingStage},
+    AFLppCmpLogMap,
 };
 use nix::sys::signal::Signal;
 
@@ -206,6 +208,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
+#[allow(clippy::too_many_arguments)]
 fn fuzz(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
@@ -343,14 +346,12 @@ fn fuzz(
 
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
-        let mut cmplog_shmem = shmem_provider
-            .new_shmem(core::mem::size_of::<AFLppCmpMap>())
-            .unwrap();
+        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
         // let the forkserver know the shmid
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
-        let cmpmap = unsafe { cmplog_shmem.as_object_mut::<AFLppCmpMap>() };
+        let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
-        let cmplog_observer = AFLppCmpObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
 
         let cmplog_forkserver = ForkserverExecutor::builder()
             .program(exec)
@@ -373,9 +374,14 @@ fn fuzz(
         let cb = |_fuzzer: &mut _,
                   _executor: &mut _,
                   state: &mut StdState<_, InMemoryOnDiskCorpus<_>, _, _>,
-                  _event_manager: &mut _,
-                  corpus_id: CorpusId|
-         -> Result<bool, libafl::Error> {
+                  _event_manager: &mut _|
+         -> Result<bool, Error> {
+            let Some(corpus_id) = state.current_corpus_idx()? else {
+                return Err(Error::illegal_state(
+                    "state is not currently processing a corpus index",
+                ));
+            };
+
             let corpus = state.corpus().get(corpus_id)?.borrow();
             let res = corpus.scheduled_count() == 1; // let's try on the 2nd trial
 

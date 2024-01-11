@@ -1,3 +1,8 @@
+//! Welcome to `LibAFL` QEMU
+//!
+#![doc = include_str!("../../README.md")]
+/*! */
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 // libafl_qemu only supports Linux currently
 #![cfg(target_os = "linux")]
 // This lint triggers too often on the current GuestAddr type when emulating 64-bit targets because
@@ -76,6 +81,11 @@ pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::QemuCmpLogHelper;
 
+#[cfg(feature = "injections")]
+pub mod injections;
+#[cfg(feature = "injections")]
+pub use injections::QemuInjectionHelper;
+
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
 pub mod snapshot;
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]
@@ -98,6 +108,8 @@ pub use executor::QemuForkExecutor;
 
 pub mod emu;
 pub use emu::*;
+
+pub mod sync_backdoor;
 
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {

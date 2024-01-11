@@ -41,6 +41,9 @@ pub enum LLVMPasses {
     CoverageAccounting,
     /// The dump cfg pass
     DumpCfg,
+    #[cfg(unix)]
+    /// The CmpLog Instruction pass
+    CmpLogInstructions,
 }
 
 impl LLVMPasses {
@@ -60,6 +63,9 @@ impl LLVMPasses {
             LLVMPasses::DumpCfg => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("dump-cfg-pass.{}", dll_extension()))
             }
+            #[cfg(unix)]
+            LLVMPasses::CmpLogInstructions => PathBuf::from(env!("OUT_DIR"))
+                .join(format!("cmplog-instructions-pass.{}", dll_extension())),
         }
     }
 }
@@ -248,8 +254,8 @@ impl ToolWrapper for ClangWrapper {
         self.linking = linking;
         self.shared = shared;
 
+        new_args.push("-g".into());
         if self.optimize {
-            new_args.push("-g".into());
             new_args.push("-O3".into());
             new_args.push("-funroll-loops".into());
         }
@@ -333,7 +339,7 @@ impl ToolWrapper for ClangWrapper {
                         let extension = extension.to_str().unwrap();
                         let extension_lowercase = extension.to_lowercase();
                         match &extension_lowercase[..] {
-                            "a" | "la" => configuration.replace_extension(&arg_as_path),
+                            "a" | "la" | "pch" => configuration.replace_extension(&arg_as_path),
                             _ => arg_as_path,
                         }
                     } else {
@@ -585,13 +591,13 @@ impl ClangWrapper {
         self
     }
 
-    /// Disable optimizations
+    /// Disable optimizations, call this before calling `parse_args`
     pub fn dont_optimize(&mut self) -> &'_ mut Self {
         self.optimize = false;
         self
     }
 
-    /// Set cpp mode
+    /// Set cpp mode, call this before calling `parse_args`
     pub fn cpp(&mut self, value: bool) -> &'_ mut Self {
         self.is_cpp = value;
         self

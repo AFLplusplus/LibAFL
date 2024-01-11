@@ -10,6 +10,7 @@ use core::{
 
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 
+use super::Aggregator;
 use crate::monitors::{ClientStats, Monitor};
 
 /// Tracking monitor during fuzzing and display both per-client and cumulative info.
@@ -21,6 +22,7 @@ where
     print_fn: F,
     start_time: Duration,
     client_stats: Vec<ClientStats>,
+    aggregator: Aggregator,
 }
 
 impl<F> Debug for MultiMonitor<F>
@@ -49,9 +51,18 @@ where
         &self.client_stats
     }
 
+    /// Set creation time
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
+    }
+
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
+    fn start_time(&self) -> Duration {
         self.start_time
+    }
+
+    fn aggregate(&mut self, name: &str) {
+        self.aggregator.aggregate(name, &self.client_stats);
     }
 
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
@@ -62,7 +73,7 @@ where
             String::new()
         };
         let head = format!("{event_msg}{pad} {sender}");
-        let global_fmt = format!(
+        let mut global_fmt = format!(
             "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
             format_duration_hms(&(current_time() - self.start_time)),
@@ -72,8 +83,13 @@ where
             self.total_execs(),
             self.execs_per_sec_pretty()
         );
+        for (key, val) in &self.aggregator.aggregated {
+            write!(global_fmt, ", {key}: {val}").unwrap();
+        }
+
         (self.print_fn)(global_fmt);
 
+        self.client_stats_insert(sender_id);
         let client = self.client_stats_mut_for(sender_id);
         let cur_time = current_time();
         let exec_sec = client.execs_per_sec_pretty(cur_time);
@@ -113,6 +129,7 @@ where
             print_fn,
             start_time: current_time(),
             client_stats: vec![],
+            aggregator: Aggregator::new(),
         }
     }
 
@@ -122,6 +139,7 @@ where
             print_fn,
             start_time,
             client_stats: vec![],
+            aggregator: Aggregator::new(),
         }
     }
 }

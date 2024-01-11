@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, fmt::Write};
 
 use clap::builder::Str;
 
@@ -21,8 +21,12 @@ impl From<Version> for Str {
             ("Cargo Target Triple", env!("VERGEN_CARGO_TARGET_TRIPLE")),
         ]
         .iter()
-        .map(|(k, v)| format!("{k:25}: {v}\n"))
-        .collect::<String>();
+        .fold(String::new(), |mut output, (k, v)| {
+            // Note that write!-ing into a String can never fail, despite the return type of write! being std::fmt::Result, so it can be safely ignored or unwrapped.
+            // See https://rust-lang.github.io/rust-clippy/master/index.html#/format_collect
+            let _ = writeln!(output, "{k:25}: {v}");
+            output
+        });
 
         format!("\n{version:}").into()
     }

@@ -22,13 +22,13 @@ use crate::helper::FridaRuntime;
 pub struct DrCovRuntime {
     /// The basic blocks of this execution
     pub drcov_basic_blocks: Vec<DrCovBasicBlock>,
-    /// The memory ragnes of this target
+    /// The memory ranges of this target
     ranges: RangeMap<usize, (u16, String)>,
     coverage_directory: PathBuf,
 }
 
 impl FridaRuntime for DrCovRuntime {
-    /// initializes this runtime wiith the given `ranges`
+    /// initializes this runtime with the given `ranges`
     fn init(
         &mut self,
         _gum: &frida_gum::Gum,
@@ -46,14 +46,27 @@ impl FridaRuntime for DrCovRuntime {
     }
 
     /// Called after execution, writes the trace to a unique `DrCov` file for this trace
-    /// into `./coverage/<trace_hash>.drcov`
+    /// into `./coverage/<input_hash>_<coverage_hash>.drcov`. Empty coverages will be skipped.
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-        hasher.write(input.target_bytes().as_slice());
+        // We don't need empty coverage files
+        if self.drcov_basic_blocks.is_empty() {
+            return Ok(());
+        }
+
+        let mut input_hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+        input_hasher.write(input.target_bytes().as_slice());
+        let input_hash = input_hasher.finish();
+
+        let mut coverage_hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+        for bb in &self.drcov_basic_blocks {
+            coverage_hasher.write_usize(bb.start);
+            coverage_hasher.write_usize(bb.end);
+        }
+        let coverage_hash = coverage_hasher.finish();
 
         let filename = self
             .coverage_directory
-            .join(format!("{:016x}.drcov", hasher.finish(),));
+            .join(format!("{input_hash:016x}_{coverage_hash:016x}.drcov"));
         DrCovWriter::new(&self.ranges).write(filename, &self.drcov_basic_blocks)?;
         self.drcov_basic_blocks.clear();
 

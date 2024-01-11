@@ -32,8 +32,8 @@ where
 
 impl<E, SOT> ShadowExecutor<E, SOT>
 where
-    E: HasObservers + Debug,
-    SOT: ObserversTuple<E::State> + Debug,
+    E: HasObservers,
+    SOT: ObserversTuple<E::State>,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
     pub fn new(executor: E, shadow_observers: SOT) -> Self {
@@ -70,7 +70,9 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.executor.run_target(fuzzer, state, mgr, input)
+        let ret = self.executor.run_target(fuzzer, state, mgr, input);
+        self.executor.post_run_reset();
+        ret
     }
 }
 

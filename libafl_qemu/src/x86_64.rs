@@ -1,13 +1,14 @@
-use std::mem::size_of;
+use std::{mem::size_of, sync::OnceLock};
 
 use capstone::arch::BuildsCapstone;
+use enum_map::{enum_map, EnumMap};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86_64::*;
 
-use crate::CallingConvention;
+use crate::{sync_backdoor::SyncBackdoorArgs, CallingConvention};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -30,6 +31,23 @@ pub enum Regs {
     R15 = 15,
     Rip = 16,
     Rflags = 17,
+}
+
+static SYNC_BACKDOOR_ARCH_REGS: OnceLock<EnumMap<SyncBackdoorArgs, Regs>> = OnceLock::new();
+
+pub fn get_sync_backdoor_arch_regs() -> &'static EnumMap<SyncBackdoorArgs, Regs> {
+    SYNC_BACKDOOR_ARCH_REGS.get_or_init(|| {
+        enum_map! {
+            SyncBackdoorArgs::Ret  => Regs::Rax,
+            SyncBackdoorArgs::Cmd  => Regs::Rax,
+            SyncBackdoorArgs::Arg1 => Regs::Rdi,
+            SyncBackdoorArgs::Arg2 => Regs::Rsi,
+            SyncBackdoorArgs::Arg3 => Regs::Rdx,
+            SyncBackdoorArgs::Arg4 => Regs::R10,
+            SyncBackdoorArgs::Arg5 => Regs::R8,
+            SyncBackdoorArgs::Arg6 => Regs::R9,
+        }
+    })
 }
 
 /// alias registers
@@ -77,6 +95,27 @@ impl crate::ArchExtras for crate::CPU {
         let ret_addr = val.to_le_bytes();
         unsafe { self.write_mem(stack_ptr, &ret_addr) };
         Ok(())
+    }
+
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        if conv != CallingConvention::Cdecl {
+            return Err(format!("Unsupported calling convention: {conv:#?}"));
+        }
+
+        let reg_id = match idx {
+            0 => Regs::Rdi,
+            1 => Regs::Rsi,
+            2 => Regs::Rdx,
+            3 => Regs::Rcx,
+            4 => Regs::R8,
+            5 => Regs::R9,
+            r => return Err(format!("Unsupported argument: {r:}")),
+        };
+
+        self.read_reg(reg_id)
     }
 
     fn write_function_argument<T>(

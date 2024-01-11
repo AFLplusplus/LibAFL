@@ -79,9 +79,14 @@ use libafl::{
     Error,
 };
 use libafl_bolts::AsSlice;
+use libc::_exit;
+use mimalloc::MiMalloc;
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
+mod corpus;
 mod feedbacks;
 mod fuzz;
 mod merge;
@@ -109,8 +114,6 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 #[cfg(feature = "mimalloc")]
 static GLOBAL: MiMalloc = MiMalloc;
-
-static mut BACKTRACE: Option<u64> = None;
 
 #[allow(clippy::struct_excessive_bools)]
 struct CustomMutationStatus {
@@ -152,7 +155,7 @@ macro_rules! fuzz_with {
                 AsSlice,
         };
         use libafl::{
-            corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
+            corpus::Corpus,
             executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
             feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,
             feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
@@ -161,7 +164,8 @@ macro_rules! fuzz_with {
             mutators::{
                 GrimoireExtensionMutator, GrimoireRecursiveReplacementMutator, GrimoireRandomDeleteMutator,
                 GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
-                I2SRandReplace, StdScheduledMutator, Tokens, tokens_mutations
+                I2SRandReplace, StdScheduledMutator, StringCategoryRandMutator, StringSubcategoryRandMutator,
+                StringCategoryTokenReplaceMutator, StringSubcategoryTokenReplaceMutator, Tokens, tokens_mutations
             },
             observers::{stacktrace::BacktraceObserver, TimeObserver},
             schedulers::{
@@ -169,7 +173,7 @@ macro_rules! fuzz_with {
             },
             stages::{
                 CalibrationStage, GeneralizationStage, IfStage, StdMutationalStage,
-                StdPowerMutationalStage, TracingStage,
+                StdPowerMutationalStage, StringIdentificationStage, TracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
@@ -178,10 +182,13 @@ macro_rules! fuzz_with {
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
 
-        use crate::{BACKTRACE, CustomMutationStatus};
-        use crate::feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback, ShrinkMapFeedback};
-        use crate::misc::should_use_grimoire;
-        use crate::observers::{MappedEdgeMapObserver, SizeValueObserver};
+        use crate::{
+            CustomMutationStatus,
+            corpus::{ArtifactCorpus, LibfuzzerCorpus},
+            feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback, ShrinkMapFeedback},
+            misc::should_use_grimoire,
+            observers::{MappedEdgeMapObserver, SizeValueObserver},
+        };
 
         let edge_maker = &$edge_maker;
 
@@ -206,9 +213,8 @@ macro_rules! fuzz_with {
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
             // Create a stacktrace observer
-            let backtrace_observer = BacktraceObserver::new(
+            let backtrace_observer = BacktraceObserver::owned(
                 "BacktraceObserver",
-                unsafe { &mut BACKTRACE },
                 if $options.forks().is_some() || $options.tui() { libafl::observers::HarnessType::Child } else { libafl::observers::HarnessType::InProcess }
             );
 
@@ -218,7 +224,7 @@ macro_rules! fuzz_with {
 
             // Set up a generalization stage for grimoire
             let generalization = GeneralizationStage::new(&edges_observer);
-            let generalization = IfStage::new(|_, _, _, _, _| Ok(grimoire.into()), (generalization, ()));
+            let generalization = IfStage::new(|_, _, _, _| Ok(grimoire.into()), tuple_list!(generalization));
 
             let calibration = CalibrationStage::new(&map_feedback);
 
@@ -243,7 +249,7 @@ macro_rules! fuzz_with {
 
             // A feedback to choose if an input is a solution or not
             let mut objective = feedback_or_fast!(
-                LibfuzzerCrashCauseFeedback::new($options.artifact_prefix().cloned()),
+                LibfuzzerCrashCauseFeedback::new($options.artifact_prefix().clone()),
                 OomFeedback,
                 feedback_and_fast!(
                     CrashFeedback::new(),
@@ -269,13 +275,7 @@ macro_rules! fuzz_with {
                 dir
             };
 
-            let crash_corpus = if let Some(prefix) = $options.artifact_prefix() {
-                OnDiskCorpus::with_meta_format_and_prefix(prefix.dir(), None, prefix.filename_prefix().clone(), false)
-                    .unwrap()
-            } else {
-                OnDiskCorpus::with_meta_format_and_prefix(&std::env::current_dir().unwrap(), None, None, false)
-                    .unwrap()
-            };
+            let crash_corpus = ArtifactCorpus::new();
 
             // If not restarting, create a State from scratch
             let mut state = state.unwrap_or_else(|| {
@@ -283,7 +283,7 @@ macro_rules! fuzz_with {
                     // RNG
                     StdRand::with_seed(current_nanos()),
                     // Corpus that will be evolved, we keep it in memory for performance
-                    CachedOnDiskCorpus::with_meta_format_and_prefix(corpus_dir.clone(), 4096, None, None, true).unwrap(),
+                    LibfuzzerCorpus::new(corpus_dir.clone(), 4096),
                     // Corpus in which we store solutions (crashes in this example),
                     // on disk so the user can get them after stopping the fuzzer
                     crash_corpus,
@@ -295,6 +295,32 @@ macro_rules! fuzz_with {
                 .expect("Failed to create state")
             });
             state.metadata_map_mut().insert_boxed(grimoire_metadata);
+
+            // Set up a string category analysis stage for unicode mutations
+            let unicode_used = $options.unicode();
+            let string_mutator = StdScheduledMutator::new(
+                tuple_list!(
+                    StringCategoryRandMutator,
+                    StringSubcategoryRandMutator,
+                    StringSubcategoryRandMutator,
+                    StringSubcategoryRandMutator,
+                    StringSubcategoryRandMutator,
+                )
+            );
+            let string_replace_mutator = StdScheduledMutator::new(
+                tuple_list!(
+                    StringCategoryTokenReplaceMutator,
+                    StringSubcategoryTokenReplaceMutator,
+                    StringSubcategoryTokenReplaceMutator,
+                    StringSubcategoryTokenReplaceMutator,
+                    StringSubcategoryTokenReplaceMutator,
+                )
+            );
+            let string_power = StdMutationalStage::transforming(string_mutator);
+            let string_replace_power = StdMutationalStage::transforming(string_replace_mutator);
+
+            let string_analysis = StringIdentificationStage::new();
+            let string_analysis = IfStage::new(|_, _, _, _| Ok((unicode_used && mutator_status.std_mutational).into()), tuple_list!(string_analysis, string_power, string_replace_power));
 
             // Attempt to use tokens from libfuzzer dicts
             if !state.has_metadata::<Tokens>() {
@@ -316,19 +342,19 @@ macro_rules! fuzz_with {
             // Setup a randomic Input2State stage, conditionally within a custom mutator
             let i2s =
                 StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
-            let i2s = IfStage::new(|_, _, _, _, _| Ok((!mutator_status.custom_mutation).into()), (i2s, ()));
+            let i2s = IfStage::new(|_, _, _, _| Ok((!mutator_status.custom_mutation).into()), (i2s, ()));
             let cm_i2s = StdMutationalStage::new(unsafe {
                 LLVMCustomMutator::mutate_unchecked(StdScheduledMutator::new(tuple_list!(
                     I2SRandReplace::new()
                 )))
             });
-            let cm_i2s = IfStage::new(|_, _, _, _, _| Ok(mutator_status.custom_mutation.into()), (cm_i2s, ()));
+            let cm_i2s = IfStage::new(|_, _, _, _| Ok(mutator_status.custom_mutation.into()), (cm_i2s, ()));
 
             // TODO configure with mutation stacking options from libfuzzer
             let std_mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
             let std_power = StdPowerMutationalStage::new(std_mutator);
-            let std_power = IfStage::new(|_, _, _, _, _| Ok(mutator_status.std_mutational.into()), (std_power, ()));
+            let std_power = IfStage::new(|_, _, _, _| Ok(mutator_status.std_mutational.into()), (std_power, ()));
 
             // for custom mutator and crossover, each have access to the LLVMFuzzerMutate -- but it appears
             // that this method doesn't normally offer stacked mutations where one may expect them
@@ -349,10 +375,10 @@ macro_rules! fuzz_with {
             let std_mutator_no_mutate = StdScheduledMutator::with_max_stack_pow(havoc_crossover(), 3);
 
             let cm_power = StdPowerMutationalStage::new(custom_mutator);
-            let cm_power = IfStage::new(|_, _, _, _, _| Ok(mutator_status.custom_mutation.into()), (cm_power, ()));
+            let cm_power = IfStage::new(|_, _, _, _| Ok(mutator_status.custom_mutation.into()), (cm_power, ()));
             let cm_std_power = StdMutationalStage::new(std_mutator_no_mutate);
             let cm_std_power =
-                IfStage::new(|_, _, _, _, _| Ok(mutator_status.std_no_mutate.into()), (cm_std_power, ()));
+                IfStage::new(|_, _, _, _| Ok(mutator_status.std_no_mutate.into()), (cm_std_power, ()));
 
             // a custom crossover is defined
             // while the scenario that a custom crossover is defined without a custom mutator is unlikely
@@ -366,10 +392,10 @@ macro_rules! fuzz_with {
             let std_mutator_no_crossover = StdScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations()));
 
             let cc_power = StdMutationalStage::new(custom_crossover);
-            let cc_power = IfStage::new(|_, _, _, _, _| Ok(mutator_status.custom_crossover.into()), (cc_power, ()));
+            let cc_power = IfStage::new(|_, _, _, _| Ok(mutator_status.custom_crossover.into()), (cc_power, ()));
             let cc_std_power = StdPowerMutationalStage::new(std_mutator_no_crossover);
             let cc_std_power =
-                IfStage::new(|_, _, _, _, _| Ok(mutator_status.std_no_crossover.into()), (cc_std_power, ()));
+                IfStage::new(|_, _, _, _| Ok(mutator_status.std_no_crossover.into()), (cc_std_power, ()));
 
             let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
                 tuple_list!(
@@ -382,7 +408,7 @@ macro_rules! fuzz_with {
                 ),
                 3,
             );
-            let grimoire = IfStage::new(|_, _, _, _, _| Ok(grimoire.into()), (StdMutationalStage::transforming(grimoire_mutator), ()));
+            let grimoire = IfStage::new(|_, _, _, _| Ok(grimoire.into()), (StdMutationalStage::transforming(grimoire_mutator), ()));
 
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST));
@@ -453,7 +479,7 @@ macro_rules! fuzz_with {
 
 
             // Setup a tracing stage in which we log comparisons
-            let tracing = IfStage::new(|_, _, _, _, _| Ok(!$options.skip_tracing()), (TracingStage::new(InProcessExecutor::new(
+            let tracing = IfStage::new(|_, _, _, _| Ok(!$options.skip_tracing()), (TracingStage::new(InProcessExecutor::new(
                 &mut tracing_harness,
                 tuple_list!(cmplog_observer),
                 &mut fuzzer,
@@ -466,6 +492,7 @@ macro_rules! fuzz_with {
                 calibration,
                 generalization,
                 tracing,
+                string_analysis,
                 i2s,
                 cm_i2s,
                 std_power,
@@ -591,7 +618,21 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
     .unwrap();
 
     if !options.unknown().is_empty() {
-        println!("Unrecognised options: {:?}", options.unknown());
+        eprintln!("Unrecognised options: {:?}", options.unknown());
+    }
+
+    for folder in options
+        .dirs()
+        .iter()
+        .chain(std::iter::once(options.artifact_prefix().dir()))
+    {
+        if !folder.try_exists().unwrap_or(false) {
+            eprintln!(
+                "Required folder {} did not exist; failing fast.",
+                folder.to_string_lossy()
+            );
+            _exit(1);
+        }
     }
 
     if *options.mode() != LibfuzzerMode::Tmin

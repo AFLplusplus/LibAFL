@@ -12,19 +12,16 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata},
+    corpus::{Corpus, HasCurrentCorpusIdx, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverName},
     fuzzer::Evaluator,
-    inputs::UsesInput,
-    monitors::UserStats,
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple, UsesObserver},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, UsesState,
-    },
+    state::{HasCorpus, HasExecutions, HasMetadata, HasNamedMetadata, State, UsesState},
     Error,
 };
 
@@ -80,7 +77,7 @@ const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
 impl<O, OT, S> UsesState for CalibrationStage<O, OT, S>
 where
-    S: UsesInput,
+    S: State,
 {
     type State = S;
 }
@@ -92,9 +89,11 @@ where
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<E::State>,
-    E::State: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata + HasExecutions,
+    E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
     Z: Evaluator<E, EM, State = E::State>,
 {
+    type Progress = (); // TODO stage may be resumed, but how?
+
     #[inline]
     #[allow(
         clippy::let_and_return,
@@ -107,8 +106,13 @@ where
         executor: &mut E,
         state: &mut E::State,
         mgr: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
             let corpus = state.corpus().get(corpus_idx)?.borrow();
@@ -307,9 +311,12 @@ where
                     state,
                     Event::UpdateUserStats {
                         name: "stability".to_string(),
-                        value: UserStats::Ratio(
-                            (map_len - unstable_entries) as u64,
-                            map_len as u64,
+                        value: UserStats::new(
+                            UserStatsValue::Ratio(
+                                (map_len - unstable_entries) as u64,
+                                map_len as u64,
+                            ),
+                            AggregatorOps::Avg,
                         ),
                         phantom: PhantomData,
                     },

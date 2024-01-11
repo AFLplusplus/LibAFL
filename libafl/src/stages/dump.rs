@@ -52,6 +52,8 @@ where
     Z: UsesState,
     Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
 {
+    type Progress = (); // if this fails, we have bigger problems
+
     #[inline]
     fn perform(
         &mut self,
@@ -59,7 +61,6 @@ where
         _executor: &mut E,
         state: &mut Z::State,
         _manager: &mut EM,
-        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let (mut corpus_idx, mut solutions_idx) =
             if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {

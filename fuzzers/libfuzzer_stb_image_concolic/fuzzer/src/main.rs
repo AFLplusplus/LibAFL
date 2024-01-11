@@ -60,13 +60,14 @@ struct Opt {
     concolic: bool,
 }
 
+use std::fs;
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
 
     let opt = Opt::parse();
-
+    let _ = fs::remove_file("cur_input");
     println!(
         "Workdir: {:?}",
         env::current_dir().unwrap().to_string_lossy().to_string()

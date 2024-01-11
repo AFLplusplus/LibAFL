@@ -556,7 +556,7 @@ where
                     return Err(Error::illegal_state("Received empty ShMemId from unix shmem client. Are the shmem limits set correctly? Did a client crash?"));
                 }
 
-                let description_id: i32 = description.id.try_into().unwrap();
+                let description_id: i32 = description.id.into();
 
                 if !self.all_shmems.contains_key(&description_id) {
                     // We should never get here, but it may happen if the OS ran out of shmem pages at some point//reached limits.

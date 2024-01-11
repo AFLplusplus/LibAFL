@@ -331,16 +331,6 @@ impl From<Signal> for nix::sys::signal::Signal {
     }
 }
 
-/// A list of crashing signals
-pub static CRASH_SIGNALS: &[Signal] = &[
-    Signal::SigAbort,
-    Signal::SigBus,
-    Signal::SigFloatingPointException,
-    Signal::SigIllegalInstruction,
-    Signal::SigPipe,
-    Signal::SigSegmentationFault,
-];
-
 impl PartialEq for Signal {
     fn eq(&self, other: &Self) -> bool {
         *self as i32 == *other as i32
@@ -378,7 +368,7 @@ impl Display for Signal {
 #[cfg(feature = "alloc")]
 pub trait Handler {
     /// Handle a signal
-    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, _context: &mut ucontext_t);
+    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, _context: Option<&mut ucontext_t>);
     /// Return a list of signals to handle
     fn signals(&self) -> Vec<Signal>;
 }
@@ -425,7 +415,7 @@ unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
     handler.handle(
         *signal,
         &mut ptr::read_unaligned(info),
-        &mut ptr::read_unaligned(void as *mut ucontext_t),
+        (void as *mut ucontext_t).as_mut(),
     );
 }
 

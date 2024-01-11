@@ -127,6 +127,7 @@ impl Runtime for TracingRuntime {
     binary_expression_builder!(build_fp_rem, FloatRem);
 
     unary_expression_builder!(build_fp_abs, FloatAbs);
+    unary_expression_builder!(build_fp_neg, FloatNeg);
 
     unary_expression_builder!(build_not, Not);
     binary_expression_builder!(build_equal, Equal);
@@ -135,6 +136,7 @@ impl Runtime for TracingRuntime {
     binary_expression_builder!(build_bool_or, BoolOr);
     binary_expression_builder!(build_bool_xor, BoolXor);
 
+    expression_builder!(build_ite(cond: RSymExpr, a: RSymExpr, b: RSymExpr) => Ite);
     expression_builder!(build_sext(op: RSymExpr, bits: u8) => Sext);
     expression_builder!(build_zext(op: RSymExpr, bits: u8) => Zext);
     expression_builder!(build_trunc(op: RSymExpr, bits: u8) => Trunc);

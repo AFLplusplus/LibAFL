@@ -1,10 +1,13 @@
+use std::sync::OnceLock;
+
+use enum_map::{enum_map, EnumMap};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::mips::*;
 
-use crate::CallingConvention;
+use crate::{sync_backdoor::SyncBackdoorArgs, CallingConvention};
 
 /// Registers for the MIPS instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
@@ -46,6 +49,23 @@ pub enum Regs {
     Pc = 37,
 }
 
+static SYNC_BACKDOOR_ARCH_REGS: OnceLock<EnumMap<SyncBackdoorArgs, Regs>> = OnceLock::new();
+
+pub fn get_sync_backdoor_arch_regs() -> &'static EnumMap<SyncBackdoorArgs, Regs> {
+    SYNC_BACKDOOR_ARCH_REGS.get_or_init(|| {
+        enum_map! {
+            SyncBackdoorArgs::Ret  => Regs::V0,
+            SyncBackdoorArgs::Cmd  => Regs::V0,
+            SyncBackdoorArgs::Arg1 => Regs::A0,
+            SyncBackdoorArgs::Arg2 => Regs::A1,
+            SyncBackdoorArgs::Arg3 => Regs::A2,
+            SyncBackdoorArgs::Arg4 => Regs::A3,
+            SyncBackdoorArgs::Arg5 => Regs::T0,
+            SyncBackdoorArgs::Arg6 => Regs::T1,
+        }
+    })
+}
+
 /// alias registers
 #[allow(non_upper_case_globals)]
 impl Regs {
@@ -80,6 +100,26 @@ impl crate::ArchExtras for crate::CPU {
         T: Into<GuestReg>,
     {
         self.write_reg(Regs::Ra, val)
+    }
+
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
+    where
+        T: From<GuestReg>,
+    {
+        if conv != CallingConvention::Cdecl {
+            return Err(format!("Unsupported calling convention: {conv:#?}"));
+        }
+
+        let reg_id = match idx {
+            0 => Regs::A0,
+            1 => Regs::A1,
+            2 => Regs::A2,
+            3 => Regs::A3,
+            // 4.. would be on the stack, let's not do this for now
+            r => return Err(format!("Unsupported argument: {r:}")),
+        };
+
+        self.read_reg(reg_id)
     }
 
     fn write_function_argument<T>(
