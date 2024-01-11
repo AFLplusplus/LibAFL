@@ -3,6 +3,9 @@ use crate::executors::HasObservers;
 #[cfg(windows)]
 pub mod windows;
 
+/// The hook for inprocess fork executor
+pub mod inprocess_fork;
+
 /// The hook that runs before and after the executor runs the target
 pub trait ExecutorHook {
     /// Init this hook
