@@ -25,7 +25,7 @@ use super::hooks::ExecutorHooksTuple;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
-        hooks::ExecutorHooks, inprocess::common_signals, Executor, ExitKind, HasObservers,
+        hooks::ExecutorHook, inprocess::common_signals, Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -51,11 +51,11 @@ pub struct InChildProcessHooks {
     pub timeout_handler: *const c_void,
 }
 
-impl ExecutorHooks for InChildProcessHooks {
+impl ExecutorHook for InChildProcessHooks {
     /// Init this hook
     fn init<E: HasObservers, S>(&mut self, _state: &mut S) {
         self.crash_handler = child_signal_handlers::child_crash_handler::<E> as *const c_void;
-        self.crash_handler = child_signal_handlers::child_timeout_handler::<E> as *const c_void;
+        self.timeout_handler = child_signal_handlers::child_timeout_handler::<E> as *const c_void;
     }
 
     /// Call before running a target.
