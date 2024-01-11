@@ -9,10 +9,7 @@ use core::{
     ptr::{self, addr_of},
 };
 
-use libafl::{
-    executors::{inprocess::inprocess_get_state, ExitKind},
-    inputs::UsesInput,
-};
+use libafl::{executors::inprocess::inprocess_get_state, inputs::UsesInput};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
@@ -337,7 +334,6 @@ where
 }
 
 static mut HOOKS_IS_INITIALIZED: bool = false;
-static mut FIRST_EXEC: bool = true;
 
 pub struct QemuHooks<QT, S>
 where

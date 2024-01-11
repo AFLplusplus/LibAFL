@@ -8,6 +8,9 @@ edition = "2021"
 default = ["std", "injections"]
 std = []
 
+## Build with a simple event manager instead of Launcher - don't fork, and crash after the first bug.
+simplemgr = []
+
 ## Enable fuzzing for injections (where supported)
 injections = ["libafl_qemu/injections"]
 
