@@ -33,7 +33,7 @@ use windows::Win32::System::Threading::PTP_TIMER;
 
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{hooks::windows::windows_exception_handler, Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
@@ -41,6 +41,9 @@ use crate::{
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
+
+#[cfg(windows)]
+use executors::hooks::windows_exception_handler;
 
 /// The process executor simply calls a target function, as mutable reference to a closure
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, OT, S>;
