@@ -25,6 +25,7 @@ use libafl_bolts::{
     AsSlice,
 };
 use libc::{c_int, c_uchar};
+use std::time::Duration;
 extern crate libc;
 
 extern "C" {

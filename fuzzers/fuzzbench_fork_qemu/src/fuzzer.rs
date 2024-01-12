@@ -9,6 +9,7 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     process,
+    time::Duration,
 };
 
 use clap::{Arg, Command};
@@ -341,9 +342,9 @@ fn fuzz(
         &mut fuzzer,
         &mut state,
         &mut mgr,
-        Duration::from_millis(5000),
         tuple_list!(),
         shmem_provider,
+        Duration::from_millis(5000),
     )?;
 
     // Show the cmplog observer

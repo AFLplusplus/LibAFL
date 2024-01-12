@@ -308,7 +308,7 @@ where
         _state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
-        hooks: HT,
+        userhooks: (InChildProcessHooks, HT),
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
@@ -317,7 +317,10 @@ where
         S: HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let hooks = InChildProcessHooks::new::<Self>()?;
+        let default_hooks = InChildProcessHooks::new()?;
+        let mut hooks = tuple_list!(default_hooks).merge(userhooks);
+        hooks.init_all::<Self, S>(state);
+
         let milli_sec = timeout.as_millis();
         let it_value = Timeval {
             tv_sec: (milli_sec / 1000) as i64,

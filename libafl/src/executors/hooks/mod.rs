@@ -3,6 +3,7 @@ use crate::executors::HasObservers;
 #[cfg(windows)]
 pub mod windows;
 
+#[cfg(all(feature = "std", unix))]
 /// The hook for inprocess fork executor
 pub mod inprocess_fork;
 
