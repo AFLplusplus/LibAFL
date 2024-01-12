@@ -31,6 +31,8 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::System::Threading::PTP_TIMER;
 
+#[cfg(windows)]
+use crate::executors::hooks::windows::windows_exception_handler;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
@@ -41,9 +43,6 @@ use crate::{
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
-
-#[cfg(windows)]
-use crate::executors::hooks::windows::windows_exception_handler;
 
 /// The process executor simply calls a target function, as mutable reference to a closure
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, OT, S>;

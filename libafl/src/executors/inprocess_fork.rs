@@ -40,7 +40,7 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
 
 #[repr(C)]
 #[cfg(all(feature = "std", unix, not(target_os = "linux")))]
-struct Timeval {
+pub(crate) struct Timeval {
     pub tv_sec: i64,
     pub tv_usec: i64,
 }
@@ -62,7 +62,7 @@ impl Debug for Timeval {
 #[repr(C)]
 #[cfg(all(feature = "std", unix, not(target_os = "linux")))]
 #[derive(Debug)]
-struct Itimerval {
+pub(crate) struct Itimerval {
     pub it_interval: Timeval,
     pub it_value: Timeval,
 }
@@ -492,8 +492,11 @@ mod tests {
         use core::marker::PhantomData;
 
         use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
+        #[cfg(target_os = "linux")]
         use libc::{itimerspec, timespec};
 
+        #[cfg(not(target_os = "linux"))]
+        use crate::executors::inprocess_fork::{Itimerval, Timeval};
         use crate::{
             events::SimpleEventManager,
             executors::{
@@ -505,11 +508,24 @@ mod tests {
 
         let provider = StdShMemProvider::new().unwrap();
 
+        #[cfg(target_os = "linux")]
         let timespec = timespec {
             tv_sec: 5,
             tv_nsec: 0,
         };
+        #[cfg(target_os = "linux")]
         let itimerspec = itimerspec {
+            it_interval: timespec,
+            it_value: timespec,
+        };
+
+        #[cfg(not(target_os = "linux"))]
+        let timespec = Timeval {
+            tv_sec: 5,
+            tv_usec: 0,
+        };
+        #[cfg(not(target_os = "linux"))]
+        let itimerspec = Itimerval {
             it_interval: timespec,
             it_value: timespec,
         };
