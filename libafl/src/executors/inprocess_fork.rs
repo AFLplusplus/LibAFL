@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+use core::ptr::addr_of_mut;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -5,8 +7,6 @@ use core::{
     time::Duration,
 };
 
-#[cfg(target_os = "linux")]
-use core::ptr::addr_of_mut;
 use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
     shmem::ShMemProvider,
@@ -63,7 +63,7 @@ impl Debug for Timeval {
 
 #[repr(C)]
 #[cfg(all(feature = "std", unix, not(target_os = "linux")))]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct Itimerval {
     pub it_interval: Timeval,
     pub it_value: Timeval,
