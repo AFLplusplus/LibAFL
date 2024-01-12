@@ -313,12 +313,12 @@ where
 {
     pub fn new<EM, OF, Z>(
         hooks: &'a mut QemuHooks<QT, S>,
+        executor_hooks: HT,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
         state: &mut S,
         event_mgr: &mut EM,
-        executor_hooks: HT,
         shmem_provider: SP,
         timeout: core::time::Duration,
     ) -> Result<Self, Error>
@@ -334,13 +334,13 @@ where
             first_exec: true,
             hooks,
             inner: InProcessForkExecutor::new(
+                executor_hooks,
                 harness_fn,
                 observers,
                 fuzzer,
                 state,
                 event_mgr,
                 timeout,
-                executor_hooks,
                 shmem_provider,
             )?,
         })

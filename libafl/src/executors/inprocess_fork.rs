@@ -91,10 +91,10 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
 {
+    hooks: (InChildProcessHooks, HT),
     harness_fn: &'a mut H,
     shmem_provider: SP,
     observers: OT,
-    hooks: (InChildProcessHooks, HT),
     #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_os = "linux")))]
@@ -259,13 +259,13 @@ where
     #[cfg(target_os = "linux")]
     #[allow(clippy::too_many_arguments)]
     pub fn new<EM, OF, Z>(
+        userhooks: HT,
         harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
         state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
-        userhooks: HT,
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
@@ -305,13 +305,13 @@ where
     /// Creates a new [`InProcessForkExecutor`], non linux
     #[cfg(not(target_os = "linux"))]
     pub fn new<EM, OF, Z>(
+        userhooks: HT,
         harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
         state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
-        userhooks: HT,
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
@@ -536,10 +536,10 @@ mod tests {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
         #[cfg(target_os = "linux")]
         let mut in_process_fork_executor = InProcessForkExecutor::<_, (), (), _, _> {
+            hooks: tuple_list!(InChildProcessHooks::new().unwrap()),
             harness_fn: &mut harness,
             shmem_provider: provider,
             observers: tuple_list!(),
-            hooks: tuple_list!(InChildProcessHooks::new().unwrap()),
             itimerspec,
             phantom: PhantomData,
         };

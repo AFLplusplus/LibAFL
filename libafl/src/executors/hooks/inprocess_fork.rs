@@ -13,8 +13,8 @@ use libc::siginfo_t;
 
 use crate::{
     executors::{
+        common_signals,
         hooks::ExecutorHook,
-        inprocess::common_signals,
         inprocess_fork::{child_signal_handlers, ForkHandlerFuncPtr},
         HasObservers,
     },

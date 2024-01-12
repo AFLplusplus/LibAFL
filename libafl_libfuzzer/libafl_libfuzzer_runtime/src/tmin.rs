@@ -63,13 +63,13 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
 
     let shmem_provider = StdShMemProvider::new()?;
     let mut executor = InProcessForkExecutor::new(
+        tuple_list!(),
         &mut harness,
         (),
         &mut fuzzer,
         &mut state,
         &mut mgr,
         options.timeout(),
-        tuple_list!(),
         shmem_provider,
     )?;
 

@@ -1,11 +1,19 @@
 use crate::executors::HasObservers;
 
+/// windows crash/timeout handler and asan death callback
 #[cfg(windows)]
 pub mod windows;
+
+/// *nix crash handler
+#[cfg(unix)]
+pub mod unix;
 
 #[cfg(all(feature = "std", unix))]
 /// The hook for inprocess fork executor
 pub mod inprocess_fork;
+
+/// The hook for inprocess executor
+pub mod inprocess;
 
 /// The hook that runs before and after the executor runs the target
 pub trait ExecutorHook {
