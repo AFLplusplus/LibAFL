@@ -1,10 +1,12 @@
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{addr_of_mut, null_mut},
+    ptr::null_mut,
     time::Duration,
 };
 
+#[cfg(target_os = "linux")]
+use core::ptr::addr_of_mut;
 use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
     shmem::ShMemProvider,
@@ -531,12 +533,22 @@ mod tests {
         };
 
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
+        #[cfg(target_os = "linux")]
         let mut in_process_fork_executor = InProcessForkExecutor::<_, (), (), _, _> {
             harness_fn: &mut harness,
             shmem_provider: provider,
             observers: tuple_list!(),
             hooks: tuple_list!(InChildProcessHooks::new().unwrap()),
             itimerspec,
+            phantom: PhantomData,
+        };
+        #[cfg(not(target_os = "linux"))]
+        let mut in_process_fork_executor = InProcessForkExecutor::<_, (), (), _, _> {
+            harness_fn: &mut harness,
+            shmem_provider: provider,
+            observers: tuple_list!(),
+            hooks: tuple_list!(InChildProcessHooks::new().unwrap()),
+            itimerval: itimerspec,
             phantom: PhantomData,
         };
         let input = NopInput {};

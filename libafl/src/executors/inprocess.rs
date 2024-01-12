@@ -392,15 +392,19 @@ impl InProcessHandlers {
     {
         unsafe {
             let data = &mut GLOBAL_STATE;
-            #[cfg(feature = "std")]
-            windows_exception_handler::setup_panic_hook::<E, EM, OF, Z>();
+            crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
+                E,
+                EM,
+                OF,
+                Z,
+            >();
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
 
             Ok(Self {
-                crash_handler: windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
+                crash_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
                     as *const _,
-                timeout_handler: windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
+                timeout_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
                     as *const c_void,
             })
         }
