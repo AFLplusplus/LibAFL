@@ -31,7 +31,7 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::System::Threading::PTP_TIMER;
 
-#[cfg(windows)]
+#[cfg(all(features = "std", windows))]
 use crate::executors::hooks::windows::windows_exception_handler;
 use crate::{
     events::{EventFirer, EventRestarter},
