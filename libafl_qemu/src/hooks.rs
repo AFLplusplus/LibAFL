@@ -10,7 +10,7 @@ use core::{
 };
 
 use libafl::{
-    executors::{inprocess::inprocess_get_state, ExitKind},
+    executors::hooks::inprocess::inprocess_get_state,
     inputs::UsesInput,
 };
 
