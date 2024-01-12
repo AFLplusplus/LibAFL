@@ -11,8 +11,8 @@ pub mod windows_asan_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{executors::hooks::inprocess::GLOBAL_STATE, run_observers_and_save_state},
-            Executor, ExitKind, HasObservers,
+            hook::inprocess::GLOBAL_STATE, inprocess::run_observers_and_save_state, Executor,
+            ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,

@@ -186,7 +186,7 @@ pub mod unix_signal_handler {
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
-        let _context = _context.map(|p| {
+        let _context = _context.as_ref().map(|p| {
             &mut *(((p as *mut _ as *mut libc::c_void as usize) + 128) as *mut libc::c_void
                 as *mut ucontext_t)
         });
