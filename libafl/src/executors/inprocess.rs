@@ -33,7 +33,7 @@ use windows::Win32::System::Threading::PTP_TIMER;
 
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{hooks::windows::windows_exception_handler, Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
@@ -435,10 +435,10 @@ pub struct InProcessExecutorHandlerData {
 
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
-    crash_handler: *const c_void,
+    pub(crate) crash_handler: *const c_void,
     /// The timeout handler
     #[cfg(any(unix, feature = "std"))]
-    timeout_handler: *const c_void,
+    pub(crate) timeout_handler: *const c_void,
 
     #[cfg(all(windows, feature = "std"))]
     pub(crate) ptp_timer: Option<PTP_TIMER>,
@@ -490,7 +490,9 @@ impl InProcessExecutorHandlerData {
     }
 
     #[cfg(any(unix, feature = "std"))]
-    pub(crate) fn timeout_executor_mut<'a, E>(&self) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
+    pub(crate) fn timeout_executor_mut<'a, E>(
+        &self,
+    ) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
         unsafe {
             (self.timeout_executor_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
                 .as_mut()
