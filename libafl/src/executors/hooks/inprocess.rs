@@ -13,7 +13,7 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::System::Threading::PTP_TIMER;
 
-#[cfg(feature = "std")]
+#[cfg(unix)]
 use crate::executors::hooks::unix::unix_signal_handler;
 use crate::{
     events::{EventFirer, EventRestarter},
