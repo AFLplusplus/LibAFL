@@ -43,7 +43,7 @@ use crate::{
 };
 
 #[cfg(windows)]
-use executors::hooks::windows_exception_handler;
+use crate::executors::hooks::windows_exception_handler;
 
 /// The process executor simply calls a target function, as mutable reference to a closure
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, OT, S>;
