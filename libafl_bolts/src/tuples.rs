@@ -559,6 +559,8 @@ where
     }
 }
 
+/// Count the number of instances of a certain type in a tuple list. Does not account for
+/// differences in lifetime specifiers.
 pub trait CountType<T> {
     const COUNT: usize;
 }
