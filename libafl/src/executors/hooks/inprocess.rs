@@ -1,14 +1,16 @@
 use core::{
     ffi::c_void,
-    ptr::{self, null_mut, write_volatile},
-    sync::atomic::{compiler_fence, Ordering},
+    ptr::{self, null_mut},
 };
+
+#[cfg(any(unix, all(windows, feature = "std")))]
+use core::{ptr::write_volatile, sync::atomic::{compiler_fence, Ordering}};
 
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 use windows::Win32::System::Threading::PTP_TIMER;
 
 #[cfg(unix)]
