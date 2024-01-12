@@ -25,6 +25,7 @@ use libafl_bolts::{
     AsSlice,
 };
 use libc::{c_int, c_uchar};
+use std::time::Duration;
 extern crate libc;
 
 extern "C" {
@@ -93,11 +94,13 @@ pub fn main() {
 
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessForkExecutor::new(
+        tuple_list!(),
         &mut harness,
         tuple_list!(observer, bt_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        Duration::from_millis(5000),
         shmem_provider,
     )
     .expect("Failed to create the Executor");

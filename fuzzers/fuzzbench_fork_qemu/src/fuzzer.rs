@@ -9,6 +9,7 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     process,
+    time::Duration,
 };
 
 use clap::{Arg, Command};
@@ -336,12 +337,14 @@ fn fuzz(
 
     let executor = QemuForkExecutor::new(
         &mut hooks,
+        tuple_list!(),
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
         shmem_provider,
+        Duration::from_millis(5000),
     )?;
 
     // Show the cmplog observer

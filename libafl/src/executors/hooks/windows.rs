@@ -11,8 +11,8 @@ pub mod windows_asan_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{run_observers_and_save_state, GLOBAL_STATE},
-            Executor, ExitKind, HasObservers,
+            hooks::inprocess::GLOBAL_STATE, inprocess::run_observers_and_save_state, Executor,
+            ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -121,10 +121,8 @@ pub mod windows_exception_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{
-                run_observers_and_save_state, HasInProcessHandlers, InProcessExecutorHandlerData,
-                GLOBAL_STATE,
-            },
+            hooks::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess::{run_observers_and_save_state, HasInProcessHandlers},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,

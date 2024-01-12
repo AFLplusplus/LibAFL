@@ -1,5 +1,7 @@
 //! Executors take input, and run it in the target.
 
+#[cfg(unix)]
+use alloc::vec::Vec;
 use core::fmt::Debug;
 
 pub use combined::CombinedExecutor;
@@ -11,6 +13,8 @@ pub use forkserver::{Forkserver, ForkserverExecutor, TimeoutForkserverExecutor};
 pub use inprocess::InProcessExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub use inprocess_fork::InProcessForkExecutor;
+#[cfg(unix)]
+use libafl_bolts::os::unix_signals::Signal;
 use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 #[cfg(any(unix, feature = "std"))]
@@ -147,6 +151,25 @@ where
     /// Custom Reset Handler, e.g., to reset timers
     #[inline]
     fn post_run_reset(&mut self) {}
+}
+
+/// The common signals we want to handle
+#[cfg(unix)]
+#[inline]
+#[must_use]
+pub fn common_signals() -> Vec<Signal> {
+    vec![
+        Signal::SigAlarm,
+        Signal::SigUser2,
+        Signal::SigAbort,
+        Signal::SigBus,
+        #[cfg(feature = "handle_sigpipe")]
+        Signal::SigPipe,
+        Signal::SigFloatingPointException,
+        Signal::SigIllegalInstruction,
+        Signal::SigSegmentationFault,
+        Signal::SigTrap,
+    ]
 }
 
 #[cfg(test)]

@@ -222,11 +222,13 @@ pub fn fuzz() -> Result<(), Error> {
 
     let mut executor = QemuForkExecutor::new(
         &mut hooks,
+        tuple_list!(),
         &mut harness,
         tuple_list!(edges_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        Duration::from_millis(5000),
         shmem_provider,
     )?;
 

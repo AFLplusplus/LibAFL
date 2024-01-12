@@ -5,7 +5,7 @@ use std::{path::PathBuf, ptr::write, time::Duration};
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{ExitKind, InProcessForkExecutor, inprocess_fork::InChildProcessHooks},
+    executors::{ExitKind, InProcessForkExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
@@ -105,13 +105,13 @@ pub fn main() {
 
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessForkExecutor::new(
+        tuple_list!(),
         &mut harness,
         tuple_list!(observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
         Duration::from_millis(5000),
-        tuple_list!(InChildProcessHooks::new().unwrap()),
         shmem_provider,
     )
     .expect("Failed to create the Executor");

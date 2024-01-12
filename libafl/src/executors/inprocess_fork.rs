@@ -1,19 +1,16 @@
-use alloc::vec::Vec;
+#[cfg(target_os = "linux")]
+use core::ptr::addr_of_mut;
 use core::{
-    ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{self, addr_of_mut, null_mut, write_volatile},
-    sync::atomic::{compiler_fence, Ordering},
+    ptr::null_mut,
     time::Duration,
 };
-use std::intrinsics::transmute;
 
-#[cfg(not(miri))]
-use libafl_bolts::os::unix_signals::setup_signal_handler;
 use libafl_bolts::{
-    os::unix_signals::{ucontext_t, Handler, Signal},
+    os::unix_signals::{ucontext_t, Signal},
     shmem::ShMemProvider,
+    tuples::{tuple_list, Merge},
 };
 use libc::siginfo_t;
 use nix::{
@@ -25,7 +22,8 @@ use super::hooks::ExecutorHooksTuple;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
-        hooks::ExecutorHooks, inprocess::common_signals, Executor, ExitKind, HasObservers,
+        hooks::inprocess_fork::{InChildProcessHooks, InProcessForkExecutorGlobalData},
+        Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -42,154 +40,10 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
     data: &mut InProcessForkExecutorGlobalData,
 );
 
-/// The inmem fork executor's hooks.
-#[derive(Debug)]
-pub struct InChildProcessHooks {
-    /// On crash C function pointer
-    pub crash_handler: *const c_void,
-    /// On timeout C function pointer
-    pub timeout_handler: *const c_void,
-}
-
-impl ExecutorHooks for InChildProcessHooks {
-    /// Init this hook
-    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {
-        self.crash_handler = child_signal_handlers::child_crash_handler::<E> as *const c_void;
-        self.crash_handler = child_signal_handlers::child_timeout_handler::<E> as *const c_void;
-    }
-
-    /// Call before running a target.
-    fn pre_exec<E, I, S>(&self, executor: &E, state: &mut S, input: &I) {
-        unsafe {
-            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
-            write_volatile(
-                &mut data.executor_ptr,
-                executor as *const _ as *const c_void,
-            );
-            write_volatile(
-                &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
-            );
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
-            compiler_fence(Ordering::SeqCst);
-        }
-    }
-
-    fn post_exec<E, I, S>(&self, _executor: &E, _state: &mut S, _input: &I) {}
-}
-
-impl InChildProcessHooks {
-    /// Create new [`InChildProcessHooks`].
-    pub fn new() -> Result<Self, Error> {
-        #[cfg_attr(miri, allow(unused_variables))]
-        unsafe {
-            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
-            // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
-            #[cfg(not(miri))]
-            setup_signal_handler(data)?;
-            compiler_fence(Ordering::SeqCst);
-            Ok(Self {
-                crash_handler: ptr::null(),
-                timeout_handler: ptr::null(),
-            })
-        }
-    }
-
-    /// Replace the hooks with `nop` hooks, deactivating the hooks
-    #[must_use]
-    pub fn nop() -> Self {
-        Self {
-            crash_handler: ptr::null(),
-            timeout_handler: ptr::null(),
-        }
-    }
-}
-
-/// The global state of the in-process-fork harness.
-
-#[derive(Debug)]
-pub(crate) struct InProcessForkExecutorGlobalData {
-    /// Stores a pointer to the fork executor struct
-    pub executor_ptr: *const c_void,
-    /// Stores a pointer to the state
-    pub state_ptr: *const c_void,
-    /// Stores a pointer to the current input
-    pub current_input_ptr: *const c_void,
-    /// Stores a pointer to the crash_handler function
-    pub crash_handler: *const c_void,
-    /// Stores a pointer to the timeout_handler function
-    pub timeout_handler: *const c_void,
-}
-
-unsafe impl Sync for InProcessForkExecutorGlobalData {}
-
-unsafe impl Send for InProcessForkExecutorGlobalData {}
-
-impl InProcessForkExecutorGlobalData {
-    fn executor_mut<'a, E>(&self) -> &'a mut E {
-        unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
-    }
-
-    fn state_mut<'a, S>(&self) -> &'a mut S {
-        unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
-    }
-
-    /*fn current_input<'a, I>(&self) -> &'a I {
-        unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
-    }*/
-
-    fn take_current_input<'a, I>(&mut self) -> &'a I {
-        let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
-        self.current_input_ptr = ptr::null();
-        r
-    }
-
-    fn is_valid(&self) -> bool {
-        !self.current_input_ptr.is_null()
-    }
-}
-
-/// a static variable storing the global state
-
-pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
-    InProcessForkExecutorGlobalData {
-        executor_ptr: ptr::null(),
-        state_ptr: ptr::null(),
-        current_input_ptr: ptr::null(),
-        crash_handler: ptr::null(),
-        timeout_handler: ptr::null(),
-    };
-
-impl Handler for InProcessForkExecutorGlobalData {
-    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: Option<&mut ucontext_t>) {
-        match signal {
-            Signal::SigUser2 | Signal::SigAlarm => unsafe {
-                if !FORK_EXECUTOR_GLOBAL_DATA.timeout_handler.is_null() {
-                    let func: ForkHandlerFuncPtr =
-                        transmute(FORK_EXECUTOR_GLOBAL_DATA.timeout_handler);
-                    (func)(signal, info, context, &mut FORK_EXECUTOR_GLOBAL_DATA);
-                }
-            },
-            _ => unsafe {
-                if !FORK_EXECUTOR_GLOBAL_DATA.crash_handler.is_null() {
-                    let func: ForkHandlerFuncPtr =
-                        transmute(FORK_EXECUTOR_GLOBAL_DATA.crash_handler);
-                    (func)(signal, info, context, &mut FORK_EXECUTOR_GLOBAL_DATA);
-                }
-            },
-        }
-    }
-
-    fn signals(&self) -> Vec<Signal> {
-        common_signals()
-    }
-}
-
 #[repr(C)]
+#[derive(Clone, Copy)]
 #[cfg(all(feature = "std", unix, not(target_os = "linux")))]
-struct Timeval {
+pub(crate) struct Timeval {
     pub tv_sec: i64,
     pub tv_usec: i64,
 }
@@ -210,8 +64,8 @@ impl Debug for Timeval {
 
 #[repr(C)]
 #[cfg(all(feature = "std", unix, not(target_os = "linux")))]
-#[derive(Debug)]
-struct Itimerval {
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Itimerval {
     pub it_interval: Timeval,
     pub it_value: Timeval,
 }
@@ -237,10 +91,10 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple,
 {
+    hooks: (InChildProcessHooks, HT),
     harness_fn: &'a mut H,
     shmem_provider: SP,
     observers: OT,
-    hooks: HT,
     #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_os = "linux")))]
@@ -401,17 +255,17 @@ where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
-    /// Creates a new [`InProcessForkExecutor`]
+    /// Creates a new [`InProcessForkExecutor`] with custom hooks
     #[cfg(target_os = "linux")]
     #[allow(clippy::too_many_arguments)]
     pub fn new<EM, OF, Z>(
+        userhooks: HT,
         harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
         state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
-        mut hooks: HT,
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
@@ -420,6 +274,8 @@ where
         S: HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
+        let default_hooks = InChildProcessHooks::new()?;
+        let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self, S>(state);
 
         let milli_sec = timeout.as_millis();
@@ -449,13 +305,13 @@ where
     /// Creates a new [`InProcessForkExecutor`], non linux
     #[cfg(not(target_os = "linux"))]
     pub fn new<EM, OF, Z>(
+        userhooks: HT,
         harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
-        hooks: HT,
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
@@ -464,7 +320,10 @@ where
         S: HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let hooks = InChildProcessHooks::new::<Self>()?;
+        let default_hooks = InChildProcessHooks::new()?;
+        let mut hooks = tuple_list!(default_hooks).merge(userhooks);
+        hooks.init_all::<Self, S>(state);
+
         let milli_sec = timeout.as_millis();
         let it_value = Timeval {
             tv_sec: (milli_sec / 1000) as i64,
@@ -540,9 +399,11 @@ pub mod child_signal_handlers {
     use libafl_bolts::os::unix_signals::{ucontext_t, Signal};
     use libc::siginfo_t;
 
-    use super::{InProcessForkExecutorGlobalData, FORK_EXECUTOR_GLOBAL_DATA};
     use crate::{
-        executors::{ExitKind, HasObservers},
+        executors::{
+            hooks::inprocess_fork::{InProcessForkExecutorGlobalData, FORK_EXECUTOR_GLOBAL_DATA},
+            ExitKind, HasObservers,
+        },
         inputs::UsesInput,
         observers::ObserversTuple,
     };
@@ -634,33 +495,61 @@ mod tests {
         use core::marker::PhantomData;
 
         use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
+        #[cfg(target_os = "linux")]
         use libc::{itimerspec, timespec};
 
+        #[cfg(not(target_os = "linux"))]
+        use crate::executors::inprocess_fork::{Itimerval, Timeval};
         use crate::{
             events::SimpleEventManager,
-            executors::{Executor, InProcessForkExecutor},
+            executors::{
+                hooks::inprocess_fork::InChildProcessHooks, Executor, InProcessForkExecutor,
+            },
             fuzzer::test::NopFuzzer,
             state::test::NopState,
         };
 
         let provider = StdShMemProvider::new().unwrap();
 
+        #[cfg(target_os = "linux")]
         let timespec = timespec {
             tv_sec: 5,
             tv_nsec: 0,
         };
+        #[cfg(target_os = "linux")]
         let itimerspec = itimerspec {
             it_interval: timespec,
             it_value: timespec,
         };
 
+        #[cfg(not(target_os = "linux"))]
+        let timespec = Timeval {
+            tv_sec: 5,
+            tv_usec: 0,
+        };
+        #[cfg(not(target_os = "linux"))]
+        let itimerspec = Itimerval {
+            it_interval: timespec,
+            it_value: timespec,
+        };
+
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
+        #[cfg(target_os = "linux")]
+        let mut in_process_fork_executor = InProcessForkExecutor::<_, (), (), _, _> {
+            hooks: tuple_list!(InChildProcessHooks::new().unwrap()),
+            harness_fn: &mut harness,
+            shmem_provider: provider,
+            observers: tuple_list!(),
+            itimerspec,
+            phantom: PhantomData,
+        };
+        #[cfg(not(target_os = "linux"))]
         let mut in_process_fork_executor = InProcessForkExecutor::<_, (), (), _, _> {
             harness_fn: &mut harness,
             shmem_provider: provider,
             observers: tuple_list!(),
-            hooks: tuple_list!(),
-            itimerspec,
+            hooks: tuple_list!(InChildProcessHooks::new().unwrap()),
+            itimerval: itimerspec,
             phantom: PhantomData,
         };
         let input = NopInput {};
