@@ -14,8 +14,6 @@ use core::{
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
-#[cfg(all(feature = "std", windows))]
-use crate::executors::hooks::windows::windows_exception_handler;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},

@@ -9,7 +9,7 @@ use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(windows)]
-use windows::Win32::System::Threading::{SetThreadStackGuarantee, PTP_TIMER};
+use windows::Win32::System::Threading::PTP_TIMER;
 
 #[cfg(unix)]
 use crate::executors::hooks::unix::unix_signal_handler;
