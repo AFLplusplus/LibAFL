@@ -41,6 +41,7 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
 );
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 #[cfg(all(feature = "std", unix, not(target_os = "linux")))]
 pub(crate) struct Timeval {
     pub tv_sec: i64,
