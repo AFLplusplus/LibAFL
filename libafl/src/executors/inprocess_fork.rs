@@ -305,7 +305,7 @@ where
         harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
         userhooks: HT,
