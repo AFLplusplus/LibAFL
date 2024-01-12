@@ -559,6 +559,21 @@ where
     }
 }
 
+pub trait CountType<T> {
+    const COUNT: usize;
+}
+
+impl<T> CountType<T> for () {
+    const COUNT: usize = 0;
+}
+
+impl<Head, Tail, T> CountType<T> for (Head, Tail)
+where
+    Tail: CountType<T>,
+{
+    const COUNT: usize = Tail::COUNT + if type_eq::<Head, T>() { 1 } else { 0 };
+}
+
 /// Iterate over a tuple, executing the given `expr` for each element.
 #[macro_export]
 #[allow(clippy::items_after_statements)]
@@ -628,22 +643,6 @@ macro_rules! tuple_for_each_mut {
     };
 }
 
-#[cfg(test)]
-#[cfg(feature = "std")]
-#[test]
-#[allow(clippy::items_after_statements)]
-pub fn test_macros() {
-    let mut t = tuple_list!(1, "a");
-
-    tuple_for_each!(f1, std::fmt::Display, t, |x| {
-        log::info!("{x}");
-    });
-
-    tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
-        log::info!("{x}");
-    });
-}
-
 /*
 
 // Define trait and implement it for several primitive types.
@@ -675,9 +674,28 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 #[cfg(test)]
 mod test {
+    use core::marker::PhantomData;
+
+    use tuple_list::{tuple_list, tuple_list_type};
+
     #[cfg(feature = "alloc")]
     use crate::ownedref::OwnedMutSlice;
-    use crate::tuples::type_eq;
+    use crate::tuples::{type_eq, CountType};
+
+    #[cfg(feature = "std")]
+    #[test]
+    #[allow(clippy::items_after_statements)]
+    pub fn test_macros() {
+        let mut t = tuple_list!(1, "a");
+
+        tuple_for_each!(f1, std::fmt::Display, t, |x| {
+            log::info!("{x}");
+        });
+
+        tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
+            log::info!("{x}");
+        });
+    }
 
     #[test]
     #[allow(unused_qualifications)] // for type name tests
@@ -720,5 +738,53 @@ mod test {
             OwnedMutSlice<u8>,
             crate::ownedref::OwnedMutSlice<u32>,
         >());
+    }
+
+    #[test]
+    fn test_type_count() {
+        struct Thing<'a, T> {
+            phantom: PhantomData<&'a T>,
+        }
+
+        const fn thing<'a, T>() -> Thing<'a, T> {
+            Thing {
+                phantom: PhantomData,
+            }
+        }
+
+        #[allow(clippy::extra_unused_lifetimes)]
+        fn test_lifetimes<'a, 'b>() {
+            assert_eq!(
+                2,
+                <tuple_list_type!(Thing<'a, ()>, Thing::<'b, ()>) as CountType<Thing<()>>>::COUNT
+            );
+        }
+
+        test_lifetimes();
+        assert_eq!(
+            2,
+            <tuple_list_type!(usize, (), usize) as CountType<usize>>::COUNT
+        );
+        assert_eq!(
+            0,
+            <tuple_list_type!(usize, (), usize) as CountType<u64>>::COUNT
+        );
+
+        const fn test_const_generics<L, const EXPECTED: usize>(_list: &L) -> bool
+        where
+            L: for<'a> CountType<Thing<'a, ()>>,
+        {
+            EXPECTED == L::COUNT
+        }
+
+        const VALID_ONCE: bool =
+            test_const_generics::<_, 1>(&tuple_list!(thing::<'static, ()>(), ()));
+        assert!(VALID_ONCE);
+        const VALID_TWICE: bool = test_const_generics::<_, 2>(&tuple_list!(
+            thing::<'static, ()>(),
+            (),
+            thing::<'static, ()>()
+        ));
+        assert!(VALID_TWICE);
     }
 }
