@@ -308,7 +308,7 @@ where
         _state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
-        userhooks: (InChildProcessHooks, HT),
+        userhooks: HT,
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
