@@ -121,10 +121,8 @@ pub mod windows_exception_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{
-                run_observers_and_save_state, HasInProcessHandlers, InProcessExecutorHandlerData,
-                GLOBAL_STATE,
-            },
+            hooks::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess::{run_observers_and_save_state, HasInProcessHandlers},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,

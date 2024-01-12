@@ -13,11 +13,8 @@ use libafl::{
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
+        hooks::{inprocess::InProcessExecutorHandlerData, ExecutorHooksTuple},
         inprocess::InProcessExecutor,
-        hooks::{
-            inprocess::InProcessExecutorHandlerData,
-            ExecutorHooksTuple,
-        },
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,

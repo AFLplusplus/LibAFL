@@ -6,14 +6,24 @@ use core::{
 
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
+#[cfg(all(windows, feature = "std"))]
+use libafl_bolts::os::windows_exceptions::setup_exception_handler;
+#[cfg(windows)]
+use windows::Win32::System::Threading::SetThreadStackGuarantee;
+#[cfg(all(windows, feature = "std"))]
+use windows::Win32::System::Threading::PTP_TIMER;
 
+#[cfg(feature = "std")]
+use crate::executors::hooks::unix::unix_signal_handler;
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{hooks::unix::unix_signal_handler, Executor, HasObservers},
+    executors::{Executor, HasObservers},
     feedbacks::Feedback,
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
+#[cfg(windows)]
+use crate::{executors::inprocess::HasInProcessHandlers, state::State};
 /// The inmem executor's handlers.
 #[derive(Debug)]
 pub struct InProcessHandlers {
