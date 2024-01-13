@@ -72,7 +72,7 @@ fn main() {
     /* ANCHOR: executor */
     // Create the executor for an in-process function
     let mut executor = InProcessExecutor::new(
-        tuple_list(),
+        tuple_list!(),
         &mut harness,
         (),
         &mut fuzzer,
