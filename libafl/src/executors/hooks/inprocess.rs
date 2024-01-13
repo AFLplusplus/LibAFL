@@ -42,6 +42,7 @@ impl ExecutorHook for InProcessHooks {
 
     /// Call before running a target.
     #[allow(clippy::unused_self)]
+    #[allow(unused_variables)]
     fn pre_exec<E, EM, I, S, Z>(
         &self,
         executor: &E,
