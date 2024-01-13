@@ -443,7 +443,7 @@ pub mod child_signal_handlers {
     pub(crate) unsafe fn child_crash_handler<E>(
         _signal: Signal,
         _info: &mut siginfo_t,
-        _context: &Option<&mut ucontext_t>,
+        _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
         E: HasObservers,
@@ -465,7 +465,7 @@ pub mod child_signal_handlers {
     pub(crate) unsafe fn child_timeout_handler<E>(
         _signal: Signal,
         _info: &mut siginfo_t,
-        _context: &Option<&mut ucontext_t>,
+        _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
         E: HasObservers,

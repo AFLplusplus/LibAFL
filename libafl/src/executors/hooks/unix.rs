@@ -126,7 +126,7 @@ pub mod unix_signal_handler {
     pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
         _signal: Signal,
         _info: &mut siginfo_t,
-        _context: &Option<&mut ucontext_t>,
+        _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: HasObservers,
@@ -176,7 +176,7 @@ pub mod unix_signal_handler {
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         signal: Signal,
         _info: &mut siginfo_t,
-        _context: &Option<&mut ucontext_t>,
+        _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: Executor<EM, Z> + HasObservers,
@@ -186,7 +186,7 @@ pub mod unix_signal_handler {
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
-        let _context = _context.as_ref().map(|p| {
+        let _context = _context.map(|p| {
             &mut *(((p as *mut _ as *mut libc::c_void as usize) + 128) as *mut libc::c_void
                 as *mut ucontext_t)
         });
