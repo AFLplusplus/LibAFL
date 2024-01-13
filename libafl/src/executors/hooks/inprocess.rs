@@ -75,19 +75,19 @@ impl ExecutorHook for InProcessHooks {
             let data = &mut GLOBAL_STATE;
             write_volatile(
                 &mut data.current_input_ptr,
-                _input as *const _ as *const c_void,
+                input as *const _ as *const c_void,
             );
             write_volatile(
                 &mut data.executor_ptr,
-                _executor as *const _ as *const c_void,
+                executor as *const _ as *const c_void,
             );
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
     }
