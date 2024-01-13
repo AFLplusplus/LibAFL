@@ -320,7 +320,7 @@ where
         S: HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let default_hooks = InChildProcessHooks::new()?;
+        let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self, S>(state);
 
