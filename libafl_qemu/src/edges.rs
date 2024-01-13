@@ -167,7 +167,7 @@ where
             let hook_id = hooks.edges(Hook::Function(gen_unique_edge_ids::<QT, S>), Hook::Empty);
             unsafe {
                 libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
-                    hook_id.0,
+                    hook_id.num,
                     Some(libafl_qemu_sys::libafl_jit_trace_edge_hitcount),
                 );
             }
@@ -179,7 +179,7 @@ where
             let hook_id = hooks.edges(Hook::Function(gen_unique_edge_ids::<QT, S>), Hook::Empty);
             unsafe {
                 libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(
-                    hook_id.0,
+                    hook_id.num,
                     Some(libafl_qemu_sys::libafl_jit_trace_edge_single),
                 );
             }

@@ -16,7 +16,7 @@ use libafl::{
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
-    emu::{Emulator, FatPtr, HookId, MemAccessInfo, SKIP_EXEC_HOOK},
+    emu::{Emulator, FatPtr, HookId, HookType, MemAccessInfo, SKIP_EXEC_HOOK},
     helper::QemuHelperTuple,
     GuestAddr, GuestUsize,
 };
@@ -434,7 +434,10 @@ where
                 let z: *const () = ptr::null::<()>();
                 self.emulator.set_hook(z, addr, r, invalidate_block)
             }
-            Hook::Empty => HookId(0), // TODO error type
+            Hook::Empty => HookId {
+                num: 0, // TODO error type
+                hook_type: HookType::Execution,
+            },
         }
     }
 
@@ -462,7 +465,11 @@ where
     ) -> HookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            GENERIC_HOOKS.push((HookId(0), fat));
+            let hook_id = HookId {
+                hook_type: HookType::Execution,
+                num: 0,
+            };
+            GENERIC_HOOKS.push((hook_id, fat));
             let id = self.emulator.set_hook(
                 &mut GENERIC_HOOKS.last_mut().unwrap().1,
                 addr,
@@ -505,8 +512,12 @@ where
                 edge_0_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<1>, id: u64)
             );
+            let id = HookId {
+                hook_type: HookType::Edge,
+                num: 0,
+            };
             EDGE_HOOKS.push(HookState {
-                id: HookId(0),
+                id,
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
                 execs: [hook_to_repr!(execution_hook)],
@@ -553,8 +564,12 @@ where
                 block_0_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<1>, id: u64)
             );
+            let id = HookId {
+                hook_type: HookType::Block,
+                num: 0,
+            };
             BLOCK_HOOKS.push(HookState {
-                id: HookId(0),
+                id,
                 gen: hook_to_repr!(generation_hook),
                 post_gen: hook_to_repr!(post_generation_hook),
                 execs: [hook_to_repr!(execution_hook)],
@@ -639,8 +654,12 @@ where
                 read_4_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr, size: usize)
             );
+            let id = HookId {
+                hook_type: HookType::Read,
+                num: 0,
+            };
             READ_HOOKS.push(HookState {
-                id: HookId(0),
+                id,
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
                 execs: [
@@ -737,8 +756,12 @@ where
                 write_4_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr, size: usize)
             );
+            let id = HookId {
+                hook_type: HookType::Write,
+                num: 0,
+            };
             WRITE_HOOKS.push(HookState {
-                id: HookId(0),
+                id,
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
                 execs: [
@@ -819,8 +842,12 @@ where
                 cmp_3_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<4>, id: u64, v0: u64, v1: u64)
             );
+            let id = HookId {
+                hook_type: HookType::Cmp,
+                num: 0,
+            };
             CMP_HOOKS.push(HookState {
-                id: HookId(0),
+                id,
                 gen: hook_to_repr!(generation_hook),
                 post_gen: HookRepr::Empty,
                 execs: [
@@ -858,7 +885,10 @@ where
                 let z: *const () = ptr::null::<()>();
                 self.emulator.add_backdoor_hook(z, r)
             }
-            Hook::Empty => HookId(0), // TODO error type
+            Hook::Empty => HookId {
+                hook_type: HookType::Execution,
+                num: 0, // TODO error type
+            },
         }
     }
 
@@ -875,7 +905,11 @@ where
     ) -> HookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            BACKDOOR_HOOKS.push((HookId(0), fat));
+            let id = HookId {
+                hook_type: HookType::Backdoor,
+                num: 0,
+            };
+            BACKDOOR_HOOKS.push((id, fat));
             let id = self.emulator.add_backdoor_hook(
                 &mut BACKDOOR_HOOKS.last_mut().unwrap().1,
                 closure_backdoor_hook_wrapper::<QT, S>,
@@ -939,7 +973,10 @@ where
                 let z: *const () = ptr::null::<()>();
                 self.emulator.add_pre_syscall_hook(z, r)
             }
-            Hook::Empty => HookId(0), // TODO error type
+            Hook::Empty => HookId {
+                hook_type: HookType::PreSyscall,
+                num: 0, // TODO error type
+            },
         }
     }
 
@@ -989,7 +1026,11 @@ where
     ) -> HookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            PRE_SYSCALL_HOOKS.push((HookId(0), fat));
+            let id = HookId {
+                hook_type: HookType::PreSyscall,
+                num: 0,
+            };
+            PRE_SYSCALL_HOOKS.push((id, fat));
             let id = self.emulator.add_pre_syscall_hook(
                 &mut PRE_SYSCALL_HOOKS.last_mut().unwrap().1,
                 closure_pre_syscall_hook_wrapper::<QT, S>,
@@ -1056,7 +1097,10 @@ where
                 let z: *const () = ptr::null::<()>();
                 self.emulator.add_post_syscall_hook(z, r)
             }
-            Hook::Empty => HookId(0), // TODO error type
+            Hook::Empty => HookId {
+                hook_type: HookType::PostSyscall,
+                num: 0, // TODO error type
+            },
         }
     }
 
@@ -1108,7 +1152,11 @@ where
     ) -> HookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            POST_SYSCALL_HOOKS.push((HookId(0), fat));
+            let id = HookId {
+                hook_type: HookType::PostSyscall,
+                num: 0,
+            };
+            POST_SYSCALL_HOOKS.push((id, fat));
             let id = self.emulator.add_post_syscall_hook(
                 &mut POST_SYSCALL_HOOKS.last_mut().unwrap().1,
                 closure_post_syscall_hook_wrapper::<QT, S>,
@@ -1134,7 +1182,10 @@ where
                 let z: *const () = ptr::null::<()>();
                 self.emulator.add_new_thread_hook(z, r)
             }
-            Hook::Empty => HookId(0), // TODO error type
+            Hook::Empty => HookId {
+                hook_type: HookType::NewThread,
+                num: 0, // TODO error type
+            },
         }
     }
 
@@ -1156,7 +1207,11 @@ where
     ) -> HookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            NEW_THREAD_HOOKS.push((HookId(0), fat));
+            let id = HookId {
+                hook_type: HookType::NewThread,
+                num: 0,
+            };
+            NEW_THREAD_HOOKS.push((id, fat));
             let id = self.emulator.add_new_thread_hook(
                 &mut NEW_THREAD_HOOKS.last_mut().unwrap().1,
                 closure_new_thread_hook_wrapper::<QT, S>,

@@ -772,7 +772,24 @@ impl CPU {
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct HookId(pub(crate) usize);
+pub struct HookId {
+    pub(crate) hook_type: HookType,
+    pub(crate) num: usize,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum HookType {
+    Execution,
+    Backdoor,
+    Edge,
+    Block,
+    Read,
+    Write,
+    Cmp,
+    PreSyscall,
+    PostSyscall,
+    NewThread,
+}
 
 use std::pin::Pin;
 
@@ -1296,13 +1313,49 @@ impl Emulator {
                 data,
                 i32::from(invalidate_block),
             );
-            HookId(num)
+            HookId {
+                hook_type: HookType::Execution,
+                num,
+            }
         }
     }
 
     #[must_use]
     pub fn remove_hook(&self, id: HookId, invalidate_block: bool) -> bool {
-        unsafe { libafl_qemu_sys::libafl_qemu_remove_hook(id.0, i32::from(invalidate_block)) != 0 }
+        let invalidate_block = i32::from(invalidate_block);
+        let remove_result = match id.hook_type {
+            HookType::Execution => unsafe {
+                libafl_qemu_sys::libafl_qemu_remove_hook(id.num, invalidate_block)
+            },
+            HookType::Backdoor => unsafe {
+                libafl_qemu_sys::libafl_qemu_remove_backdoor_hook(id.num, invalidate_block)
+            },
+            HookType::Edge => unsafe {
+                libafl_qemu_sys::libafl_qemu_remove_edge_hook(id.num, invalidate_block)
+            },
+            HookType::Block => unsafe {
+                libafl_qemu_sys::libafl_qemu_remove_block_hook(id.num, invalidate_block)
+            },
+            HookType::Read => unsafe {
+                libafl_qemu_sys::libafl_qemu_remove_read_hook(id.num, invalidate_block)
+            },
+            HookType::Write => unsafe {
+                libafl_qemu_sys::libafl_qemu_remove_write_hook(id.num, invalidate_block)
+            },
+            HookType::Cmp => unsafe {
+                libafl_qemu_sys::libafl_qemu_remove_cmp_hook(id.num, invalidate_block)
+            },
+            HookType::PreSyscall => unsafe {
+                libafl_qemu_sys::libafl_qemu_remove_pre_syscall_hook(id.num)
+            },
+            HookType::PostSyscall => unsafe {
+                libafl_qemu_sys::libafl_qemu_remove_post_syscall_hook(id.num)
+            },
+            HookType::NewThread => unsafe {
+                libafl_qemu_sys::libafl_qemu_remove_new_thread_hook(id.num)
+            },
+        };
+        remove_result != 0
     }
 
     #[must_use]
@@ -1324,7 +1377,10 @@ impl Emulator {
                 core::mem::transmute(gen);
             let exec: Option<extern "C" fn(u64, u64)> = core::mem::transmute(exec);
             let num = libafl_qemu_sys::libafl_add_edge_hook(gen, exec, data);
-            HookId(num)
+            HookId {
+                hook_type: HookType::Edge,
+                num,
+            }
         }
     }
 
@@ -1342,7 +1398,10 @@ impl Emulator {
                 core::mem::transmute(post_gen);
             let exec: Option<extern "C" fn(u64, u64)> = core::mem::transmute(exec);
             let num = libafl_qemu_sys::libafl_add_block_hook(gen, post_gen, exec, data);
-            HookId(num)
+            HookId {
+                hook_type: HookType::Block,
+                num,
+            }
         }
     }
 
@@ -1369,7 +1428,10 @@ impl Emulator {
             let num = libafl_qemu_sys::libafl_add_read_hook(
                 gen, exec1, exec2, exec4, exec8, exec_n, data,
             );
-            HookId(num)
+            HookId {
+                hook_type: HookType::Read,
+                num,
+            }
         }
     }
 
@@ -1397,7 +1459,10 @@ impl Emulator {
             let num = libafl_qemu_sys::libafl_add_write_hook(
                 gen, exec1, exec2, exec4, exec8, exec_n, data,
             );
-            HookId(num)
+            HookId {
+                hook_type: HookType::Write,
+                num,
+            }
         }
     }
 
@@ -1419,7 +1484,10 @@ impl Emulator {
             let exec4: Option<extern "C" fn(u64, u64, u32, u32)> = core::mem::transmute(exec4);
             let exec8: Option<extern "C" fn(u64, u64, u64, u64)> = core::mem::transmute(exec8);
             let num = libafl_qemu_sys::libafl_add_cmp_hook(gen, exec1, exec2, exec4, exec8, data);
-            HookId(num)
+            HookId {
+                hook_type: HookType::Cmp,
+                num,
+            }
         }
     }
 
@@ -1432,7 +1500,10 @@ impl Emulator {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(u64, GuestAddr) = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_backdoor_hook(Some(callback), data);
-            HookId(num)
+            HookId {
+                hook_type: HookType::Backdoor,
+                num,
+            }
         }
     }
 
@@ -1469,7 +1540,10 @@ impl Emulator {
                 GuestAddr,
             ) -> libafl_qemu_sys::syshook_ret = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_pre_syscall_hook(Some(callback), data);
-            HookId(num)
+            HookId {
+                hook_type: HookType::PreSyscall,
+                num,
+            }
         }
     }
 
@@ -1508,7 +1582,10 @@ impl Emulator {
                 GuestAddr,
             ) -> GuestAddr = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_post_syscall_hook(Some(callback), data);
-            HookId(num)
+            HookId {
+                hook_type: HookType::PostSyscall,
+                num,
+            }
         }
     }
 
@@ -1522,7 +1599,10 @@ impl Emulator {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(u64, u32) -> bool = core::mem::transmute(callback);
             let num = libafl_qemu_sys::libafl_add_new_thread_hook(Some(callback), data);
-            HookId(num)
+            HookId {
+                hook_type: HookType::NewThread,
+                num,
+            }
         }
     }
 
