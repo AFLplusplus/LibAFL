@@ -14,11 +14,14 @@ use core::{
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
+#[cfg(feature = "std")]
+use crate::executors::hooks::inprocess::GLOBAL_STATE;
+
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
     executors::{
-        hooks::inprocess::{InProcessHandlers, GLOBAL_STATE},
+        hooks::inprocess::InProcessHandlers,
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,

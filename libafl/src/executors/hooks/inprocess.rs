@@ -22,7 +22,7 @@ use crate::{
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 use crate::{executors::inprocess::HasInProcessHandlers, state::State};
 /// The inmem executor's handlers.
 #[derive(Debug)]
