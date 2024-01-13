@@ -18,7 +18,9 @@ fn main() {
     }
 
     if cfg!(target_os = "windows") {
-        println!("cargo:warning=The libafl_libfuzzer runtime may only be built for linux; failing fast.");
+        println!(
+            "cargo:warning=The libafl_libfuzzer runtime may only be built for linux; failing fast."
+        );
         return;
     }
 

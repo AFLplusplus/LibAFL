@@ -2,9 +2,11 @@ use core::{
     ffi::c_void,
     ptr::{self, null_mut},
 };
-
 #[cfg(any(unix, all(windows, feature = "std")))]
-use core::{ptr::write_volatile, sync::atomic::{compiler_fence, Ordering}};
+use core::{
+    ptr::write_volatile,
+    sync::atomic::{compiler_fence, Ordering},
+};
 
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
