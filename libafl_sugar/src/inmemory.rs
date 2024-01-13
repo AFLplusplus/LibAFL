@@ -203,6 +203,7 @@ where
             let mut executor = ShadowExecutor::new(
                 TimeoutExecutor::new(
                     InProcessExecutor::new(
+                        tuple_list!(),
                         &mut harness,
                         tuple_list!(edges_observer, time_observer),
                         &mut fuzzer,

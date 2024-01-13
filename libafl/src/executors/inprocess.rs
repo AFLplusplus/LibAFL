@@ -36,10 +36,10 @@ use crate::{
 pub type InProcessExecutor<'a, H, HT, OT, S> = GenericInProcessExecutor<H, &'a mut H, HT, OT, S>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
-pub type OwnedInProcessExecutor<HT, OT, S> = GenericInProcessExecutor<
+pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
     dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
     Box<dyn FnMut(&<S as UsesInput>::Input) -> ExitKind>,
-    HT,
+    (),
     OT,
     S,
 >;
@@ -229,24 +229,32 @@ where
 }
 
 /// The struct has [`InProcessHooks`].
-#[cfg(windows)]
 pub trait HasInProcessHooks {
     /// Get the in-process handlers.
     fn inprocess_hooks(&self) -> &InProcessHooks;
+
+    /// Get the mut in-process handlers.
+    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks;
 }
 
-#[cfg(windows)]
-impl<H, HB, OT, S> HasInProcessHooks for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, HT, OT, S> HasInProcessHooks for GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
+    HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
     /// the timeout handler
     #[inline]
     fn inprocess_hooks(&self) -> &InProcessHooks {
-        &self.handlers
+        &self.hooks.0
+    }
+
+    /// the timeout handler
+    #[inline]
+    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks {
+        &mut self.hooks.0
     }
 }
 
@@ -390,6 +398,7 @@ mod tests {
 pub mod pybind {
     use alloc::boxed::Box;
 
+    use libafl_bolts::tuples::tuple_list;
     use pyo3::{prelude::*, types::PyBytes};
 
     use crate::{
@@ -421,6 +430,7 @@ pub mod pybind {
         ) -> Self {
             Self {
                 inner: OwnedInProcessExecutor::new(
+                    tuple_list!(),
                     Box::new(move |input: &BytesInput| {
                         Python::with_gil(|py| -> PyResult<()> {
                             let args = (PyBytes::new(py, input.bytes()),);

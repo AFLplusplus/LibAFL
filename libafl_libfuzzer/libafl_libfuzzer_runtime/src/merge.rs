@@ -177,7 +177,7 @@ pub fn merge(
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = TimeoutExecutor::new(
-        InProcessExecutor::new(&mut harness, observers, &mut fuzzer, &mut state, &mut mgr)?,
+        InProcessExecutor::new(tuple_list!(), &mut harness, observers, &mut fuzzer, &mut state, &mut mgr)?,
         options.timeout(),
     );
 
