@@ -34,7 +34,7 @@ use windows::Win32::{
 #[cfg(any(windows, target_os = "linux"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 #[cfg(all(windows, feature = "std"))]
-use crate::executors::inprocess::HasInProcessHandlers;
+use crate::executors::inprocess::HasInProcessHooks;
 use crate::{
     executors::{hooks::inprocess::InProcessExecutorHandlerData, Executor, ExitKind, HasObservers},
     observers::UsesObservers,
@@ -320,12 +320,12 @@ impl<E> TimeoutExecutor<E> {
 }
 
 #[cfg(windows)]
-impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
+impl<E: HasInProcessHooks> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
         let timeout_handler: PTP_TIMER_CALLBACK =
-            unsafe { std::mem::transmute(executor.inprocess_handlers().timeout_handler) };
+            unsafe { std::mem::transmute(executor.inprocess_hooks().timeout_handler) };
         let ptp_timer = unsafe {
             CreateThreadpoolTimer(
                 Some(timeout_handler),
@@ -376,7 +376,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 #[cfg(windows)]
 impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, Z> + HasInProcessHandlers,
+    E: Executor<EM, Z> + HasInProcessHooks,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
 {

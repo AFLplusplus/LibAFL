@@ -7,7 +7,7 @@ use frida_gum::{
 };
 #[cfg(windows)]
 use libafl::{
-    executors::inprocess::{HasInProcessHandlers, InProcessHandlers},
+    executors::inprocess::{HasInProcessHooks, InProcessHooks},
     state::{HasCorpus, HasSolutions},
 };
 use libafl::{
@@ -230,7 +230,7 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHandlers
+impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHooks
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
@@ -241,7 +241,7 @@ where
 {
     /// the timeout handler
     #[inline]
-    fn inprocess_handlers(&self) -> &InProcessHandlers {
+    fn inprocess_hooks(&self) -> &InProcessHooks {
         &self.base.handlers()
     }
 }

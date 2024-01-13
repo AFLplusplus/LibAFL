@@ -156,9 +156,9 @@ where
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        _mgr: &mut EM,
+        mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
@@ -170,7 +170,7 @@ where
                     // Child
                     self.shmem_provider.post_fork(true)?;
 
-                    self.hooks.pre_exec_all(self, state, input);
+                    self.hooks.pre_exec_all(self, fuzzer, state, mgr, input);
 
                     self.observers
                         .pre_exec_child_all(state, input)
@@ -274,7 +274,7 @@ where
         S: HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let default_hooks = InChildProcessHooks::new()?;
+        let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self, S>(state);
 
@@ -534,9 +534,10 @@ mod tests {
         };
 
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
+        let default = InChildProcessHooks::nop();
         #[cfg(target_os = "linux")]
         let mut in_process_fork_executor = InProcessForkExecutor::<_, (), (), _, _> {
-            hooks: tuple_list!(InChildProcessHooks::new().unwrap()),
+            hooks: tuple_list!(default),
             harness_fn: &mut harness,
             shmem_provider: provider,
             observers: tuple_list!(),
@@ -548,7 +549,7 @@ mod tests {
             harness_fn: &mut harness,
             shmem_provider: provider,
             observers: tuple_list!(),
-            hooks: tuple_list!(InChildProcessHooks::new().unwrap()),
+            hooks: tuple_list!(default),
             itimerval: itimerspec,
             phantom: PhantomData,
         };

@@ -329,6 +329,7 @@ fn fuzz(
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = TimeoutExecutor::new(
         InProcessExecutor::new(
+            tuple_list!(),
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
@@ -341,6 +342,7 @@ fn fuzz(
     // Setup a tracing stage in which we log comparisons
     let tracing = TracingStage::new(TimeoutExecutor::new(
         InProcessExecutor::new(
+            tuple_list!(),
             &mut tracing_harness,
             tuple_list!(cmplog_observer),
             &mut fuzzer,

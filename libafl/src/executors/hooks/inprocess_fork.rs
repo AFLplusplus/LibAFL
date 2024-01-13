@@ -32,13 +32,17 @@ pub struct InChildProcessHooks {
 
 impl ExecutorHook for InChildProcessHooks {
     /// Init this hook
-    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {
-        self.crash_handler = child_signal_handlers::child_crash_handler::<E> as *const c_void;
-        self.timeout_handler = child_signal_handlers::child_timeout_handler::<E> as *const c_void;
-    }
+    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
 
     /// Call before running a target.
-    fn pre_exec<E, I, S>(&self, executor: &E, state: &mut S, input: &I) {
+    fn pre_exec<E, EM, I, S, Z>(
+        &self,
+        executor: &E,
+        _fuzzer: &mut Z,
+        state: &mut S,
+        _mgr: &mut EM,
+        input: &I,
+    ) {
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
             write_volatile(
@@ -56,12 +60,23 @@ impl ExecutorHook for InChildProcessHooks {
         }
     }
 
-    fn post_exec<E, I, S>(&self, _executor: &E, _state: &mut S, _input: &I) {}
+    fn post_exec<E, EM, I, S, Z>(
+        &self,
+        _executor: &E,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) {
+    }
 }
 
 impl InChildProcessHooks {
     /// Create new [`InChildProcessHooks`].
-    pub fn new() -> Result<Self, Error> {
+    pub fn new<E>() -> Result<Self, Error>
+    where
+        E: HasObservers,
+    {
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
@@ -70,8 +85,8 @@ impl InChildProcessHooks {
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
-                crash_handler: ptr::null(),
-                timeout_handler: ptr::null(),
+                crash_handler: child_signal_handlers::child_crash_handler::<E> as *const c_void,
+                timeout_handler: child_signal_handlers::child_timeout_handler::<E> as *const c_void,
             })
         }
     }

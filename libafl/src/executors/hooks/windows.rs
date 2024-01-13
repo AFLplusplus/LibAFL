@@ -122,7 +122,7 @@ pub mod windows_exception_handler {
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            inprocess::{run_observers_and_save_state, HasInProcessHandlers},
+            inprocess::{run_observers_and_save_state, HasInProcessHooks},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -233,7 +233,7 @@ pub mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers + HasInProcessHandlers,
+        E: HasObservers + HasInProcessHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,

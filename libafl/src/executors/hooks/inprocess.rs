@@ -19,16 +19,16 @@ use windows::Win32::System::Threading::PTP_TIMER;
 use crate::executors::hooks::unix::unix_signal_handler;
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{Executor, HasObservers},
+    executors::{hooks::ExecutorHook, Executor, HasObservers},
     feedbacks::Feedback,
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
 #[cfg(all(windows, feature = "std"))]
-use crate::{executors::inprocess::HasInProcessHandlers, state::State};
+use crate::{executors::inprocess::HasInProcessHooks, state::State};
 /// The inmem executor's handlers.
 #[derive(Debug)]
-pub struct InProcessHandlers {
+pub struct InProcessHooks {
     /// On crash C function pointer
     #[cfg(any(unix, feature = "std"))]
     pub crash_handler: *const c_void,
@@ -37,35 +37,37 @@ pub struct InProcessHandlers {
     pub timeout_handler: *const c_void,
 }
 
-impl InProcessHandlers {
+impl ExecutorHook for InProcessHooks {
+    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
+
     /// Call before running a target.
     #[allow(clippy::unused_self)]
-    pub fn pre_run_target<E, EM, I, S, Z>(
+    fn pre_exec<E, EM, I, S, Z>(
         &self,
-        _executor: &E,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
+        executor: &E,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
     ) {
         #[cfg(unix)]
         unsafe {
             let data = &mut GLOBAL_STATE;
             write_volatile(
                 &mut data.current_input_ptr,
-                _input as *const _ as *const c_void,
+                input as *const _ as *const c_void,
             );
             write_volatile(
                 &mut data.executor_ptr,
-                _executor as *const _ as *const c_void,
+                executor as *const _ as *const c_void,
             );
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
         #[cfg(all(windows, feature = "std"))]
@@ -92,7 +94,14 @@ impl InProcessHandlers {
 
     /// Call after running a target.
     #[allow(clippy::unused_self)]
-    pub fn post_run_target(&self) {
+    fn post_exec<E, EM, I, S, Z>(
+        &self,
+        _executor: &E,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
+    ) {
         #[cfg(unix)]
         unsafe {
             write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
@@ -104,8 +113,10 @@ impl InProcessHandlers {
             compiler_fence(Ordering::SeqCst);
         }
     }
+}
 
-    /// Create new [`InProcessHandlers`].
+impl InProcessHooks {
+    /// Create new [`InProcessHooks`].
     #[cfg(not(all(windows, feature = "std")))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
@@ -135,11 +146,11 @@ impl InProcessHandlers {
         Ok(Self {})
     }
 
-    /// Create new [`InProcessHandlers`].
+    /// Create new [`InProcessHooks`].
     #[cfg(all(windows, feature = "std"))]
     pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHandlers,
+        E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,

@@ -11,6 +11,7 @@ use core::{
     marker::PhantomData,
 };
 
+use libafl_bolts::tuples::{tuple_list, Merge};
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
@@ -19,7 +20,10 @@ use crate::executors::hooks::inprocess::GLOBAL_STATE;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
-    executors::{hooks::inprocess::InProcessHandlers, Executor, ExitKind, HasObservers},
+    executors::{
+        hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
+        Executor, ExitKind, HasObservers,
+    },
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
@@ -29,22 +33,24 @@ use crate::{
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure
-pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, OT, S>;
+pub type InProcessExecutor<'a, H, HT, OT, S> = GenericInProcessExecutor<H, &'a mut H, HT, OT, S>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
-pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
+pub type OwnedInProcessExecutor<HT, OT, S> = GenericInProcessExecutor<
     dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
     Box<dyn FnMut(&<S as UsesInput>::Input) -> ExitKind>,
+    HT,
     OT,
     S,
 >;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
-pub struct GenericInProcessExecutor<H, HB, OT, S>
+pub struct GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
+    HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State,
 {
@@ -53,14 +59,15 @@ where
     /// The observers, observing each run
     observers: OT,
     // Crash and timeout hah
-    handlers: InProcessHandlers,
+    hooks: (InProcessHooks, HT),
     phantom: PhantomData<(S, *const H)>,
 }
 
-impl<H, HB, OT, S> Debug for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, HT, OT, S> Debug for GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
+    HT: ExecutorHooksTuple,
     OT: ObserversTuple<S> + Debug,
     S: State,
 {
@@ -72,31 +79,34 @@ where
     }
 }
 
-impl<H, HB, OT, S> UsesState for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, HT, OT, S> UsesState for GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     HB: BorrowMut<H>,
+    HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State,
 {
     type State = S;
 }
 
-impl<H, HB, OT, S> UsesObservers for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, HT, OT, S> UsesObservers for GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     HB: BorrowMut<H>,
+    HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State,
 {
     type Observers = OT;
 }
 
-impl<EM, H, HB, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutor<H, HB, OT, S>
+impl<EM, H, HB, HT, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutor<H, HB, HT, OT, S>
 where
+    EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    EM: UsesState<State = S>,
+    HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State + HasExecutions,
     Z: UsesState<State = S>,
@@ -109,20 +119,20 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
-        self.handlers
-            .pre_run_target(self, fuzzer, state, mgr, input);
+        self.hooks.pre_exec_all(self, fuzzer, state, mgr, input);
 
         let ret = (self.harness_fn.borrow_mut())(input);
 
-        self.handlers.post_run_target();
+        self.hooks.post_exec_all(self, fuzzer, state, mgr, input);
         Ok(ret)
     }
 }
 
-impl<H, HB, OT, S> HasObservers for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, HT, OT, S> HasObservers for GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
+    HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: State,
 {
@@ -137,10 +147,11 @@ where
     }
 }
 
-impl<H, HB, OT, S> GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, HT, OT, S> GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
+    HT: ExecutorHooksTuple,
     OT: ObserversTuple<S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
@@ -151,10 +162,11 @@ where
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OF, Z>(
+        user_hooks: HT,
         harness_fn: HB,
         observers: OT,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        state: &mut S,
         _event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
@@ -164,7 +176,9 @@ where
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let handlers = InProcessHandlers::new::<Self, EM, OF, Z>()?;
+        let default = InProcessHooks::new::<Self, EM, OF, Z>()?;
+        let mut hooks = tuple_list!(default).merge(user_hooks);
+        hooks.init_all::<Self, S>(state);
         #[cfg(windows)]
         // Some initialization necessary for windows.
         unsafe {
@@ -184,7 +198,7 @@ where
         Ok(Self {
             harness_fn,
             observers,
-            handlers,
+            hooks,
             phantom: PhantomData,
         })
     }
@@ -203,26 +217,26 @@ where
 
     /// The inprocess handlers
     #[inline]
-    pub fn handlers(&self) -> &InProcessHandlers {
-        &self.handlers
+    pub fn hooks(&self) -> &(InProcessHooks, HT) {
+        &self.hooks
     }
 
     /// The inprocess handlers (mutable)
     #[inline]
-    pub fn handlers_mut(&mut self) -> &mut InProcessHandlers {
-        &mut self.handlers
+    pub fn hooks_mut(&mut self) -> &mut (InProcessHooks, HT) {
+        &mut self.hooks
     }
 }
 
-/// The struct has [`InProcessHandlers`].
+/// The struct has [`InProcessHooks`].
 #[cfg(windows)]
-pub trait HasInProcessHandlers {
+pub trait HasInProcessHooks {
     /// Get the in-process handlers.
-    fn inprocess_handlers(&self) -> &InProcessHandlers;
+    fn inprocess_hooks(&self) -> &InProcessHooks;
 }
 
 #[cfg(windows)]
-impl<H, HB, OT, S> HasInProcessHandlers for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, OT, S> HasInProcessHooks for GenericInProcessExecutor<H, HB, OT, S>
 where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
@@ -231,7 +245,7 @@ where
 {
     /// the timeout handler
     #[inline]
-    fn inprocess_handlers(&self) -> &InProcessHandlers {
+    fn inprocess_hooks(&self) -> &InProcessHooks {
         &self.handlers
     }
 }
@@ -332,11 +346,11 @@ where
 mod tests {
     use core::marker::PhantomData;
 
-    use libafl_bolts::tuples::tuple_list;
+    use libafl_bolts::tuples::{tuple_list, Merge};
 
     use crate::{
         events::NopEventManager,
-        executors::{inprocess::InProcessHandlers, Executor, ExitKind, InProcessExecutor},
+        executors::{inprocess::InProcessHooks, Executor, ExitKind, InProcessExecutor},
         fuzzer::test::NopFuzzer,
         inputs::{NopInput, UsesInput},
         state::test::NopState,
@@ -350,10 +364,11 @@ mod tests {
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
 
-        let mut in_process_executor = InProcessExecutor::<_, _, _> {
+        let default_hook = InProcessHooks::nop();
+        let mut in_process_executor = InProcessExecutor::<_, _, _, _> {
             harness_fn: &mut harness,
             observers: tuple_list!(),
-            handlers: InProcessHandlers::nop(),
+            hooks: tuple_list!(default_hook).merge(tuple_list!()),
             phantom: PhantomData,
         };
         let input = NopInput {};
