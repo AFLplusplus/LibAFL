@@ -304,6 +304,7 @@ where
 
     /// Creates a new [`InProcessForkExecutor`], non linux
     #[cfg(not(target_os = "linux"))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new<EM, OF, Z>(
         userhooks: HT,
         harness_fn: &'a mut H,

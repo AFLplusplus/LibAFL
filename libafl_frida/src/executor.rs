@@ -240,10 +240,11 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHooks
-    for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<'a, 'b, 'c, H, HT, OT, RT, S> HasInProcessHooks
+    for FridaInProcessExecutor<'a, 'b, 'c, H, HT, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
+    HT: ExecutorHooksTuple,
     S: State + HasSolutions + HasCorpus + HasExecutions,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
