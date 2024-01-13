@@ -202,6 +202,7 @@ pub extern "C" fn libafl_main() {
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
         let executor = InProcessExecutor::new(
+            tuple_list!(),
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

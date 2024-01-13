@@ -220,6 +220,7 @@ pub fn main() {
 
     // Create the executor for an in-process function with just one observer
     let first_executor = InProcessExecutor::new(
+        tuple_list!(),
         &mut first_harness,
         tuple_list!(first_map_observer),
         &mut fuzzer,
@@ -228,6 +229,7 @@ pub fn main() {
     )
     .expect("Failed to create the first executor");
     let second_executor = InProcessExecutor::new(
+        tuple_list!(),
         &mut second_harness,
         tuple_list!(second_map_observer),
         &mut fuzzer,

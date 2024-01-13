@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -25,7 +25,6 @@ use libafl_bolts::{
     AsSlice,
 };
 use libc::{c_int, c_uchar};
-use std::time::Duration;
 extern crate libc;
 
 extern "C" {

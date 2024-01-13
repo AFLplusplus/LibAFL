@@ -134,6 +134,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
+        tuple_list!(),
         &mut harness,
         tuple_list!(observer),
         &mut fuzzer,
