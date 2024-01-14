@@ -13,7 +13,7 @@ fn main() {
     let mut constants_file = File::create(dest_path).expect("Could not create file");
 
     let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(2621440), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
     let cmp_map_size: usize = option_env!("LIBAFL_CMP_MAP_SIZE")
         .map_or(Ok(65536), str::parse)
