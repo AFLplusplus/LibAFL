@@ -7,7 +7,7 @@ use frida_gum::{
 };
 #[cfg(windows)]
 use libafl::{
-    executors::inprocess::{HasInProcessHooks, InProcessHooks},
+    executors::{inprocess::HasInProcessHooks, hooks::inprocess::InProcessHooks},
     state::{HasCorpus, HasSolutions},
 };
 use libafl::{
@@ -253,6 +253,12 @@ where
     /// the timeout handler
     #[inline]
     fn inprocess_hooks(&self) -> &InProcessHooks {
-        &self.base.handlers()
+        &self.base.hooks().0
+    }
+
+    /// the timeout handler
+    #[inline]
+    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks {
+        &mut self.base.hooks_mut().0
     }
 }
