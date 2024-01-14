@@ -463,6 +463,7 @@ pub mod child_signal_handlers {
     }
 
     #[cfg(unix)]
+    #[allow(clippy::needless_pass_by_value)]
     pub(crate) unsafe fn child_timeout_handler<E>(
         _signal: Signal,
         _info: &mut siginfo_t,

@@ -123,6 +123,7 @@ pub mod unix_signal_handler {
     /// # Safety
     /// Well, signal handling is not safe
     #[cfg(unix)]
+    #[allow(clippy::needless_pass_by_value)]
     pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
         _signal: Signal,
         _info: &mut siginfo_t,
