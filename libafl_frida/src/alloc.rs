@@ -377,7 +377,7 @@ impl Allocator {
 
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
         let shadow_end = self.round_up_to_page((end - start) / 8 + self.page_size + shadow_start);
-        if !self.using_pre_allocated_shadow_mapping {
+        if self.using_pre_allocated_shadow_mapping {
             log::trace!(
                 "map_shadow_for_region start: {:x}, end {:x}, size {:x}, shadow {:x}-{:x}",
                 start,
