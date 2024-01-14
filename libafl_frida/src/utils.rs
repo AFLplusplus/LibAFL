@@ -122,7 +122,7 @@ pub fn writer_register(reg: u16, sizecode: SizeCode, zr: bool) -> Aarch64Registe
 }
 
 /// Translate from `RegSpec` to `X86Register`
-#[cfg(all(target_arch = "x86_64", unix))]
+#[cfg(target_arch = "x86_64")]
 const X86_64_REGS: [(RegSpec, X86Register); 34] = [
     (RegSpec::eax(), X86Register::Eax),
     (RegSpec::ecx(), X86Register::Ecx),
@@ -162,7 +162,7 @@ const X86_64_REGS: [(RegSpec, X86Register); 34] = [
 
 /// The writer registers
 /// frida registers: <https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html>
-#[cfg(all(target_arch = "x86_64", unix))]
+#[cfg(target_arch = "x86_64")]
 #[must_use]
 #[inline]
 #[allow(clippy::unused_self)]
