@@ -10,7 +10,6 @@
 use std::{collections::BTreeMap, ffi::c_void};
 
 use backtrace::Backtrace;
-use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
 use mmap_rs::Protection;
@@ -443,13 +442,13 @@ impl Allocator {
 
         // self.map_shadow_for_region(address, address + size, false);
 
-        log::info!(
-            "check_shadow: {:x}, {:x}, {:x}, {:x}",
-            address,
-            shadow_size,
-            shadow_addr,
-            size
-        );
+        // log::info!(
+        //     "check_shadow: {:x}, {:x}, {:x}, {:x}",
+        //     address,
+        //     shadow_size,
+        //     shadow_addr,
+        //     size
+        // );
         if address & 0x7 > 0 {
             let mask = !((1 << (address & 7)) - 1) as u8;
             if unsafe { (shadow_addr as *mut u8).read() } & mask != mask {
@@ -463,12 +462,12 @@ impl Allocator {
 
             let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
 
-            log::info!(
-                "prefix: {:?}, aligned: {:?}, suffix: {:?}",
-                prefix.len(),
-                aligned.len(),
-                suffix.len()
-            );
+            // log::info!(
+            //     "prefix: {:?}, aligned: {:?}, suffix: {:?}",
+            //     prefix.len(),
+            //     aligned.len(),
+            //     suffix.len()
+            // );
             // return true;
             if prefix.iter().all(|&x| x == 0xff)
                 && suffix.iter().all(|&x| x == 0xff)
@@ -479,7 +478,7 @@ impl Allocator {
                 let shadow_remainder = (size + 8) % 8;
                 if shadow_remainder > 0 {
                     let remainder = unsafe { ((shadow_addr + shadow_size - 1) as *mut u8).read() };
-                    log::info!("remainder: {:x}", remainder);
+                    // log::info!("remainder: {:x}", remainder);
                     let mask = !((1 << (8 - shadow_remainder)) - 1) as u8;
 
                     remainder & mask == mask
@@ -493,7 +492,7 @@ impl Allocator {
             let shadow_remainder = (size + 8) % 8;
             if shadow_remainder > 0 {
                 let remainder = unsafe { ((shadow_addr + shadow_size - 1) as *mut u8).read() };
-                log::info!("remainder 2: {:x}", remainder);
+                // log::info!("remainder 2: {:x}", remainder);
                 let mask = !((1 << (8 - shadow_remainder)) - 1) as u8;
 
                 remainder & mask == mask
@@ -535,7 +534,7 @@ impl Allocator {
                 .intersects(Protection::READ | Protection::WRITE)
                 && !self.is_managed(area.start() as *mut c_void)
             {
-                if !self.using_pre_allocated_shadow_mapping && area.start() == 1 << self.shadow_bit
+                if self.using_pre_allocated_shadow_mapping && area.start() == 1 << self.shadow_bit
                 {
                     continue;
                 }

@@ -10,8 +10,6 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-#[cfg(unix)]
-use std::num::NonZeroUsize;
 use std::{ffi::c_void, ptr::write_volatile, rc::Rc};
 
 use backtrace::Backtrace;
@@ -22,20 +20,11 @@ use frida_gum::instruction_writer::X86Register;
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
-    Module, ModuleDetails, ModuleMap, NativePointer, PageProtection, RangeDetails,
+    Module, ModuleDetails, ModuleMap, PageProtection, RangeDetails,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
-// #[cfg(target_vendor = "apple")]
-// use libc::RLIMIT_STACK;
-use libc::{c_char, wchar_t};
-#[cfg(target_vendor = "apple")]
-use libc::{getrlimit, rlimit};
-#[cfg(all(unix, not(target_vendor = "apple")))]
-use libc::{getrlimit64, rlimit64};
-#[cfg(unix)]
-use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -55,7 +44,7 @@ use crate::{
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::{FridaRuntime, SkipRange},
     hook_rt::HookRuntime,
-    utils::{disas_count, writer_register},
+    utils::disas_count,
 };
 
 extern "C" {
@@ -66,7 +55,6 @@ extern "C" {
 extern "C" {
     fn tls_ptr() -> *const c_void;
 }
-
 
 /// The count of registers that need to be saved by the asan runtime
 /// sixteen general purpose registers are put in this order, rax, rbx, rcx, rdx, rbp, rsp, rsi, rdi, r8-r15, plus instrumented rip, accessed memory addr and true rip
@@ -161,7 +149,7 @@ impl FridaRuntime for AsanRuntime {
     /// invalid!
     fn init(
         &mut self,
-        gum: &Gum,
+        _gum: &Gum,
         _ranges: &RangeMap<usize, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     ) {
@@ -186,7 +174,6 @@ impl FridaRuntime for AsanRuntime {
                 }
             }));
 
-        self.hook_functions(gum);
 
         /* unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
@@ -423,11 +410,11 @@ impl AsanRuntime {
     //         rlim_max: 0,
     //     };
     //     assert!(unsafe { getrlimit(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
-
+    //
     //     stack_rlimit.rlim_cur as usize
     // }
-
-    /// Get the maximum stack size for the current stack
+    //
+    // /// Get the maximum stack size for the current stack
     // #[must_use]
     // #[cfg(all(unix, not(target_vendor = "apple")))]
     // fn max_stack_size() -> usize {
@@ -436,7 +423,7 @@ impl AsanRuntime {
     //         rlim_max: 0,
     //     };
     //     assert!(unsafe { getrlimit64(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
-
+    //
     //     stack_rlimit.rlim_cur as usize
     // }
 
@@ -490,30 +477,30 @@ impl AsanRuntime {
             }
         }
         if let Some((start, end)) = range {
-            #[cfg(unix)]
-            {
-                let max_start = end - Self::max_stack_size();
-
-                let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
-                #[cfg(not(target_vendor = "apple"))]
-                let flags = flags | MapFlags::MAP_STACK;
-
-                if start != max_start {
-                    let mapping = unsafe {
-                        mmap(
-                            NonZeroUsize::new(max_start),
-                            NonZeroUsize::new(start - max_start).unwrap(),
-                            ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                            flags,
-                            -1,
-                            0,
-                        )
-                    };
-                    assert!(mapping.unwrap() as usize == max_start);
-                }
-                (max_start, end)
-            }
-            #[cfg(windows)]
+            //     #[cfg(unix)]
+            //     {
+            //         let max_start = end - Self::max_stack_size();
+            //
+            //         let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
+            //         #[cfg(not(target_vendor = "apple"))]
+            //         let flags = flags | MapFlags::MAP_STACK;
+            //
+            //         if start != max_start {
+            //             let mapping = unsafe {
+            //                 mmap(
+            //                     NonZeroUsize::new(max_start),
+            //                     NonZeroUsize::new(start - max_start).unwrap(),
+            //                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+            //                     flags,
+            //                     -1,
+            //                     0,
+            //                 )
+            //             };
+            //             assert!(mapping.unwrap() as usize == max_start);
+            //         }
+            //         (max_start, end)
+            //     }
+            //     #[cfg(windows)]
             (start, end)
         } else {
             panic!("Couldn't find stack mapping!");
@@ -555,122 +542,129 @@ impl AsanRuntime {
         Interceptor::current_invocation().cpu_context().rip() as usize
     }
 
-    pub fn register_hooks(hook_rt: &mut HookRuntime) {
-        let malloc_address = Module::find_export_by_name(Some("ucrtbased.dll"), "malloc")
-            .unwrap()
-            .0;
-        log::error!("malloc_address: {:?}", malloc_address);
-        #[cfg(windows)]
-        winsafe::OutputDebugString(&format!("malloc_address: {:?}", malloc_address));
-        hook_rt.register_hook(malloc_address as usize, |address, context| {
-            log::error!("in malloc!");
-        });
-
-        let free_address = Module::find_export_by_name(Some("ucrtbased.dll"), "free")
-            .unwrap()
-            .0;
-        log::error!("free: {:?}", free_address);
-        #[cfg(windows)]
-        winsafe::OutputDebugString(&format!("free_address: {:?}", free_address));
-        hook_rt.register_hook(free_address as usize, |address, context| {
-            log::error!("in free!");
-        });
-    }
-    /// Hook all functions required for ASAN to function, replacing them with our own
-    /// implementations.
-    #[allow(clippy::items_after_statements)]
-    #[allow(clippy::too_many_lines)]
-    fn hook_functions(&mut self, gum: &Gum) {
-        let mut interceptor = frida_gum::interceptor::Interceptor::obtain(gum);
+    pub fn register_hooks(hook_rt: &mut HookRuntime){
         macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-                    extern "system" {
-                        fn $name($($param: $param_type),*) -> $return_type;
-                    }
-                    #[allow(non_snake_case)]
-                    unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
-                        let mut invocation = Interceptor::current_invocation();
-                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-                        let real_address = this.real_address_for_stalked(invocation.return_addr());
-                        if this.hooks_enabled && !this.suppressed_addresses.contains(&real_address) /*&& this.module_map.as_ref().unwrap().find(real_address as u64).is_some()*/ {
-                            this.hooks_enabled = false;
-                            let result = this.[<hook_ $name>]($($param),*);
-                            this.hooks_enabled = true;
-                            result
-                        } else {
-                            $name($($param),*)
-                        }
-                    }
-                    interceptor.replace(
-                        Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
-                        NativePointer([<replacement_ $name>] as *mut c_void),
-                        NativePointer(self as *mut _ as *mut c_void)
-                    ).unwrap();
+                    // extern "system" {
+                    //     fn $name($($param: $param_type),*) -> $return_type;
+                    // }
+                    let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
+                    log::trace!("hooking {} at {:x}", stringify!($name), address);
+                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
+                        let mut index = 0;
+
+                        #[allow(trivial_numeric_casts)]
+                            #[allow(unused_assignments)]
+                        _context.set_return_value(_asan_rt.unwrap().[<hook_ $name>]($(_context.arg({
+                            let $param = index;
+                            index += 1;
+                            $param
+                        }) as _),*) as usize);
+
+                    });
                 }
             }
         }
 
-        macro_rules! hook_priv_func {
-            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
-                paste::paste! {
-
-                    #[allow(non_snake_case)]
-                    unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
-                        let mut invocation = Interceptor::current_invocation();
-                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-                        let real_address = this.real_address_for_stalked(invocation.return_addr());
-                        if this.hooks_enabled && !this.suppressed_addresses.contains(&real_address) /*&& this.module_map.as_ref().unwrap().find(real_address as u64).is_some()*/ {
-                            this.hooks_enabled = false;
-                            let result = this.[<hook_ $name>]($($param),*);
-                            this.hooks_enabled = true;
-                            result
-                        } else {
-                        let [<hooked_ $name>] = Module::find_symbol_by_name($lib, stringify!($name)).expect("Failed to find function");
-                        let [<original_ $name>]: extern "system" fn($($param_type),*) -> $return_type = unsafe { std::mem::transmute([<hooked_ $name>].0) };
-                            ([<original_ $name>])($($param),*)
-                        }
-                    }
-                    let [<hooked_ $name>] = Module::find_symbol_by_name($lib, stringify!($name)).expect("Failed to find function");
-                    interceptor.replace(
-                        [<hooked_ $name>],
-                        NativePointer([<replacement_ $name>] as *mut c_void),
-                        NativePointer(self as *mut _ as *mut c_void)
-                    ).unwrap();
-                }
-            }
-        }
-
+        // macro_rules! hook_priv_func {
+        //     ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+        //         paste::paste! {
+        //
+        //             #[allow(non_snake_case)]
+        //             unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+        //                 let mut invocation = Interceptor::current_invocation();
+        //                 let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+        //                 let real_address = this.real_address_for_stalked(invocation.return_addr());
+        //                 if this.hooks_enabled && !this.suppressed_addresses.contains(&real_address) /*&& this.module_map.as_ref().unwrap().find(real_address as u64).is_some()*/ {
+        //                     this.hooks_enabled = false;
+        //                     let result = this.[<hook_ $name>]($($param),*);
+        //                     this.hooks_enabled = true;
+        //                     result
+        //                 } else {
+        //                 let [<hooked_ $name>] = Module::find_symbol_by_name($lib, stringify!($name)).expect("Failed to find function");
+        //                 let [<original_ $name>]: extern "system" fn($($param_type),*) -> $return_type = unsafe { std::mem::transmute([<hooked_ $name>].0) };
+        //                     ([<original_ $name>])($($param),*)
+        //                 }
+        //             }
+        //             let [<hooked_ $name>] = Module::find_symbol_by_name($lib, stringify!($name)).expect("Failed to find function");
+        //             interceptor.replace(
+        //                 [<hooked_ $name>],
+        //                 NativePointer([<replacement_ $name>] as *mut c_void),
+        //                 NativePointer(self as *mut _ as *mut c_void)
+        //             ).unwrap();
+        //         }
+        //     }
+        // }
+        //
         macro_rules! hook_func_with_check {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     extern "system" {
                         fn $name($($param: $param_type),*) -> $return_type;
                     }
-                    #[allow(non_snake_case)]
-                    unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
-                        let mut invocation = Interceptor::current_invocation();
-                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-                        if this.[<hook_check_ $name>]($($param),*) {
-                            this.hooks_enabled = false;
-                            let result = this.[<hook_ $name>]($($param),*);
-                            this.hooks_enabled = true;
-                            result
+                    hook_rt.register_hook(Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize, move |_address, mut _context, _asan_rt| {
+                        let asan_rt = _asan_rt.unwrap();
+                        let mut index = 0;
+                        #[allow(trivial_numeric_casts)]
+                            #[allow(unused_assignments)]
+                        let result = if asan_rt.[<hook_check_ $name>]($(_context.arg({
+                            let $param = index;
+                            index += 1;
+                            $param
+                        }) as _),*) {
+                        let mut index = 0;
+                        #[allow(trivial_numeric_casts)]
+                            #[allow(unused_assignments)]
+                asan_rt.[<hook_ $name>]($(_context.arg({
+                            let $param = index;
+                            index += 1;
+                            $param
+                        }) as _),*)
                         } else {
-                            $name($($param),*)
-                        }
-                    }
-                    interceptor.replace(
-                        Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
-                        NativePointer([<replacement_ $name>] as *mut c_void),
-                        NativePointer(self as *mut _ as *mut c_void)
-                    ).ok();
+                            let mut index = 0;
+                        #[allow(trivial_numeric_casts)]
+                            #[allow(unused_assignments)]
+                         unsafe { $name($(_context.arg({
+                            let $param = index;
+                            index += 1;
+                            $param
+                        }) as _),*) }
+                        };
+                        #[allow(trivial_numeric_casts)]
+                        _context.set_return_value(result as usize);
+                    });
                 }
             }
         }
+        // macro_rules! hook_func_with_check {
+        //     ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+        //         paste::paste! {
+        //             extern "system" {
+        //                 fn $name($($param: $param_type),*) -> $return_type;
+        //             }
+        //             #[allow(non_snake_case)]
+        //             unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+        //                 let mut invocation = Interceptor::current_invocation();
+        //                 let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+        //                 if this.[<hook_check_ $name>]($($param),*) {
+        //                     this.hooks_enabled = false;
+        //                     let result = this.[<hook_ $name>]($($param),*);
+        //                     this.hooks_enabled = true;
+        //                     result
+        //                 } else {
+        //                     $name($($param),*)
+        //                 }
+        //             }
+        //             interceptor.replace(
+        //                 Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
+        //                 NativePointer([<replacement_ $name>] as *mut c_void),
+        //                 NativePointer(self as *mut _ as *mut c_void)
+        //             ).ok();
+        //         }
+        //     }
+        // }
 
-        self.disable_hooks();
-        interceptor.begin_transaction();
 
         // Hook the memory allocator functions
         #[cfg(unix)]
@@ -680,7 +674,7 @@ impl AsanRuntime {
         #[cfg(unix)]
         hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
         #[cfg(unix)]
-        hook_func_with_check!(None, free, (ptr: *mut c_void), ());
+        hook_func_with_check!(None, free, (ptr: *mut c_void), usize);
         #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(None, memalign, (size: usize, alignment: usize), *mut c_void);
         #[cfg(not(windows))]
@@ -771,11 +765,12 @@ impl AsanRuntime {
         );
 
         #[cfg(not(windows))]
-        for libname in ["libc++.so", "libc++.so.1", "libc++_shared.so"] {
+        for libname in ["libc++.so", "libc++.so.1", "libc++abi.so.1", "libc++_shared.so", "libstdc++.so", "libstdc++.so.6" ] {
             log::info!("Hooking c++ functions in {}", libname);
             for export in Module::enumerate_exports(libname) {
                 match &export.name[..] {
                     "_Znam" => {
+                        log::info!("hooking new");
                         hook_func!(Some(libname), _Znam, (size: usize), *mut c_void);
                     }
                     "_ZnamRKSt9nothrow_t" => {
@@ -830,17 +825,17 @@ impl AsanRuntime {
                         );
                     }
                     "_ZdaPv" => {
-                        hook_func!(Some(libname), _ZdaPv, (ptr: *mut c_void), ());
+                        hook_func!(Some(libname), _ZdaPv, (ptr: *mut c_void), usize);
                     }
                     "_ZdaPvm" => {
-                        hook_func!(Some(libname), _ZdaPvm, (ptr: *mut c_void, _ulong: u64), ());
+                        hook_func!(Some(libname), _ZdaPvm, (ptr: *mut c_void, _ulong: u64), usize);
                     }
                     "_ZdaPvmSt11align_val_t" => {
                         hook_func!(
                             Some(libname),
                             _ZdaPvmSt11align_val_t,
                             (ptr: *mut c_void, _ulong: u64, _alignment: usize),
-                            ()
+                            usize
                         );
                     }
                     "_ZdaPvRKSt9nothrow_t" => {
@@ -848,7 +843,7 @@ impl AsanRuntime {
                             Some(libname),
                             _ZdaPvRKSt9nothrow_t,
                             (ptr: *mut c_void, _nothrow: *const c_void),
-                            ()
+                            usize
                         );
                     }
                     "_ZdaPvSt11align_val_t" => {
@@ -856,7 +851,7 @@ impl AsanRuntime {
                             Some(libname),
                             _ZdaPvSt11align_val_t,
                             (ptr: *mut c_void, _alignment: usize),
-                            ()
+                            usize
                         );
                     }
                     "_ZdaPvSt11align_val_tRKSt9nothrow_t" => {
@@ -864,21 +859,21 @@ impl AsanRuntime {
                             Some(libname),
                             _ZdaPvSt11align_val_tRKSt9nothrow_t,
                             (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
-                            ()
+                            usize
                         );
                     }
                     "_ZdlPv" => {
-                        hook_func!(Some(libname), _ZdlPv, (ptr: *mut c_void), ());
+                        hook_func!(Some(libname), _ZdlPv, (ptr: *mut c_void), usize);
                     }
                     "_ZdlPvm" => {
-                        hook_func!(Some(libname), _ZdlPvm, (ptr: *mut c_void, _ulong: u64), ());
+                        hook_func!(Some(libname), _ZdlPvm, (ptr: *mut c_void, _ulong: u64), usize);
                     }
                     "_ZdlPvmSt11align_val_t" => {
                         hook_func!(
                             Some(libname),
                             _ZdlPvmSt11align_val_t,
                             (ptr: *mut c_void, _ulong: u64, _alignment: usize),
-                            ()
+                            usize
                         );
                     }
                     "_ZdlPvRKSt9nothrow_t" => {
@@ -886,7 +881,7 @@ impl AsanRuntime {
                             Some(libname),
                             _ZdlPvRKSt9nothrow_t,
                             (ptr: *mut c_void, _nothrow: *const c_void),
-                            ()
+                            usize
                         );
                     }
                     "_ZdlPvSt11align_val_t" => {
@@ -894,7 +889,7 @@ impl AsanRuntime {
                             Some(libname),
                             _ZdlPvSt11align_val_t,
                             (ptr: *mut c_void, _alignment: usize),
-                            ()
+                            usize
                         );
                     }
                     "_ZdlPvSt11align_val_tRKSt9nothrow_t" => {
@@ -902,7 +897,7 @@ impl AsanRuntime {
                             Some(libname),
                             _ZdlPvSt11align_val_tRKSt9nothrow_t,
                             (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
-                            ()
+                            usize
                         );
                     }
                     _ => {}
@@ -970,13 +965,13 @@ impl AsanRuntime {
             (dest: *mut c_void, src: *const c_void, n: usize),
             *mut c_void
         );
-        #[cfg(not(windows))]
-        hook_func!(
-            None,
-            memmove,
-            (dest: *mut c_void, src: *const c_void, n: usize),
-            *mut c_void
-        );
+        // #[cfg(not(windows))]
+        // hook_func!(
+        //     None,
+        //     memmove,
+        //     (dest: *mut c_void, src: *const c_void, n: usize),
+        //     *mut c_void
+        // );
         hook_func!(
             None,
             memset,
@@ -1009,16 +1004,16 @@ impl AsanRuntime {
             *mut c_void
         );
         #[cfg(not(any(target_os = "android", windows)))]
-        hook_func!(None, bzero, (s: *mut c_void, n: usize), ());
+        hook_func!(None, bzero, (s: *mut c_void, n: usize), usize);
         #[cfg(not(any(target_os = "android", target_vendor = "apple", windows)))]
-        hook_func!(None, explicit_bzero, (s: *mut c_void, n: usize), ());
-        #[cfg(not(any(target_os = "android", windows)))]
-        hook_func!(
-            None,
-            bcmp,
-            (s1: *const c_void, s2: *const c_void, n: usize),
-            i32
-        );
+        hook_func!(None, explicit_bzero, (s: *mut c_void, n: usize),usize);
+        // #[cfg(not(any(target_os = "android", windows)))]
+        // hook_func!(
+        //     None,
+        //     bcmp,
+        //     (s1: *const c_void, s2: *const c_void, n: usize),
+        //     i32
+        // );
         hook_func!(None, strchr, (s: *mut c_char, c: i32), *mut c_char);
         hook_func!(None, strrchr, (s: *mut c_char, c: i32), *mut c_char);
         #[cfg(not(windows))]
@@ -1102,24 +1097,23 @@ impl AsanRuntime {
             None,
             memset_pattern4,
             (s: *mut c_void, c: *const c_void, n: usize),
-            ()
+            usize
         );
         #[cfg(target_vendor = "apple")]
         hook_func!(
             None,
             memset_pattern8,
             (s: *mut c_void, c: *const c_void, n: usize),
-            ()
+            usize
         );
         #[cfg(target_vendor = "apple")]
         hook_func!(
             None,
             memset_pattern16,
             (s: *mut c_void, c: *const c_void, n: usize),
-            ()
+            usize
         );
 
-        interceptor.end_transaction();
     }
 
     #[cfg(target_arch = "x86_64")]

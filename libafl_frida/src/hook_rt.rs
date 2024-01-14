@@ -1,9 +1,8 @@
 //! Functionality implementing hooks for instrumented code
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, rc::Rc, cell::RefCell};
 
 use frida_gum::{
-    instruction_writer::X86Register,
-    stalker::{Instruction, StalkerIterator},
+    stalker::Instruction,
     CpuContext, ModuleMap,
 };
 use frida_gum_sys::Insn;
@@ -12,13 +11,13 @@ use yaxpeax_arch::LengthedInstruction;
 use yaxpeax_x86::long_mode::{InstDecoder, Opcode};
 
 use crate::{
-    helper::FridaRuntime,
-    utils::{frida_to_cs, operand_details, writer_register},
+    helper::{FridaRuntime, FridaRuntimeTuple},
+    utils::{frida_to_cs, operand_details, immediate_value}, asan::asan_rt::AsanRuntime,
 };
 
 /// Frida hooks for instrumented code
 pub struct HookRuntime {
-    hooks: HashMap<usize, Box<dyn FnMut(usize, CpuContext) + 'static>>,
+    hooks: HashMap<usize, Box<dyn FnMut(usize, CpuContext, Option<&mut AsanRuntime>) + 'static>>,
 }
 
 impl Default for HookRuntime {
@@ -73,7 +72,7 @@ impl HookRuntime {
     pub fn register_hook(
         &mut self,
         address: usize,
-        callback: impl FnMut(usize, CpuContext) + 'static,
+        callback: impl FnMut(usize, CpuContext, Option<&mut AsanRuntime>) + 'static,
     ) {
         self.hooks.insert(address, Box::new(callback));
     }
@@ -83,17 +82,24 @@ impl HookRuntime {
     pub fn is_interesting(&self, decoder: InstDecoder, instr: &Insn) -> Option<usize> {
         let instruction = frida_to_cs(decoder, instr);
 
-        if instruction.opcode() == Opcode::CALL || instruction.opcode() == Opcode::CALLF {
-            let operand = instruction.operand(0);
-            if operand.is_memory() {
-                if let Some((basereg, indexreg, scale, disp)) = operand_details(&operand) {
-                    let target_address = unsafe {
-                        ((instr.address() + instruction.len() + disp as u64) as *const usize).read()
-                    };
-                    if self.hooks.contains_key(&target_address) {
-                        return Some(target_address);
+        if instruction.opcode() == Opcode::CALL && !instruction.operand(0).is_memory() {
+            let inner_address = instr.address() as i64 + instr.bytes().len() as i64 + immediate_value(&instruction.operand(0)).unwrap();            
+            let slice = unsafe { std::slice::from_raw_parts(inner_address as usize as *const u8, 32) };
+            if let Ok(instruction) = decoder.decode_slice(slice) {
+                if instruction.opcode() == Opcode::JMP || instruction.opcode() == Opcode::JMPF {
+                    let operand = instruction.operand(0);
+                    if operand.is_memory() {
+                        if let Some((_basereg, _indexreg, _scale, disp)) = operand_details(&operand) {
+                            let target_address = unsafe {
+                                (((inner_address  as u64 + instruction.len()) as i64 + disp as i64) as *const usize).read()
+                            };
+                            if self.hooks.contains_key(&target_address) {
+                                return Some(target_address);
+                            }
+                        }
                     }
                 }
+
             }
         }
         None
@@ -101,8 +107,8 @@ impl HookRuntime {
 
     /// Emits a callout to the hook
     #[inline]
-    pub fn emit_callout(&mut self, address: usize, insn: &Instruction) {
+    pub fn emit_callout<RT : FridaRuntimeTuple> (&mut self, address: usize, insn: &Instruction, runtimes: Rc<RefCell<RT>>) {
         log::trace!("emit_callout: {:x}", address);
-        insn.put_callout(move |context| (self.hooks.get_mut(&address).unwrap())(address, context));
+        insn.put_callout(move |context| (self.hooks.get_mut(&address).unwrap())(address, context, runtimes.borrow_mut().match_first_type_mut::<AsanRuntime>()))
     }
 }

@@ -27,8 +27,6 @@ use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
 
-#[cfg(unix)]
-use crate::asan::asan_rt::AsanRuntime;
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
 use crate::{
@@ -476,7 +474,7 @@ where
         basic_block: StalkerIterator,
         output: &StalkerOutput,
         ranges: &Rc<RefCell<RangeMap<usize, (u16, String)>>>,
-        runtimes: &Rc<RefCell<RT>>,
+        runtimes_unborrowed: &Rc<RefCell<RT>>,
         decoder: InstDecoder,
     ) {
         let mut first = true;
@@ -490,7 +488,7 @@ where
             // log::trace!("block @ {:x} transformed to {:x}", address, output.writer().pc());
 
             if ranges.borrow().contains_key(&(address as usize)) {
-                let mut runtimes = (*runtimes).borrow_mut();
+                let mut runtimes = (*runtimes_unborrowed).borrow_mut();
                 if first {
                     first = false;
                     log::info!(
@@ -508,7 +506,7 @@ where
 
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
                     if let Some(call_target) = rt.is_interesting(decoder, instr) {
-                        rt.emit_callout(call_target, &instruction);
+                        rt.emit_callout(call_target, &instruction, runtimes_unborrowed.clone());
                         keep_instr = false;
                     }
                 }
@@ -576,7 +574,7 @@ where
             }
         }
         if basic_block_size != 0 {
-            if let Some(rt) = runtimes.borrow_mut().match_first_type_mut::<DrCovRuntime>() {
+            if let Some(rt) = runtimes_unborrowed.borrow_mut().match_first_type_mut::<DrCovRuntime>() {
                 log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
                 rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
                     basic_block_start as usize,

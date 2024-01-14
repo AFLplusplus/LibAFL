@@ -373,6 +373,7 @@ mod tests {
             asan_rt::AsanRuntime,
             errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
         },
+        hook_rt::HookRuntime,
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
         helper::FridaInstrumentationHelper,
@@ -383,15 +384,15 @@ mod tests {
     unsafe fn test_asan(options: &FuzzerOptions) {
         // The names of the functions to run
         let tests = vec![
-            ("LLVMFuzzerTestOneInput", 0),
-            ("heap_oob_read", 1),
-            ("heap_oob_write", 1),
-            ("heap_uaf_write", 1),
-            ("heap_uaf_read", 1),
-            ("malloc_heap_oob_read", 1),
-            ("malloc_heap_oob_write", 1),
-            ("malloc_heap_uaf_write", 1),
-            ("malloc_heap_uaf_read", 1),
+            ("LLVMFuzzerTestOneInput", None),
+            ("heap_oob_read", Some("heap out-of-bounds read")),
+            ("heap_oob_write", Some("heap out-of-bounds write")),
+            ("heap_uaf_write", Some("heap use-after-free write")),
+            ("heap_uaf_read", Some("heap use-after-free read")),
+            ("malloc_heap_oob_read", Some("heap out-of-bounds read")),
+            ("malloc_heap_oob_write", Some("heap out-of-bounds write")),
+            ("malloc_heap_uaf_write", Some("heap use-after-free write")),
+            ("malloc_heap_uaf_read", Some("heap use-after-free read")),
         ];
 
         let lib = libloading::Library::new(options.clone().harness.unwrap()).unwrap();
@@ -401,12 +402,12 @@ mod tests {
         let mut frida_helper = FridaInstrumentationHelper::new(
             GUM.get().expect("Gum uninitialized"),
             options,
-            tuple_list!(coverage, asan),
+            tuple_list!(coverage, asan, HookRuntime::new()),
         );
 
         // Run the tests for each function
         for test in tests {
-            let (function_name, err_cnt) = test;
+            let (function_name, expected_error) = test;
             log::info!("Testing with harness function {}", function_name);
 
             let mut corpus = InMemoryCorpus::<BytesInput>::new();
@@ -417,7 +418,7 @@ mod tests {
 
             let rand = StdRand::with_seed(0);
 
-            let mut feedback = ConstFeedback::new(false);
+            let mut feedback = ConstFeedback::new(true);
 
             // Feedbacks to recognize an input as solution
             let mut objective = feedback_or_fast!(
@@ -470,14 +471,22 @@ mod tests {
                 let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
                 let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1));
 
-                // log::info!("Starting fuzzing!");
+                log::info!("Starting fuzzing!");
                 fuzzer
                     .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
                     .unwrap_or_else(|_| panic!("Error in fuzz_one"));
 
                 log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
+                if let Some(expected_error) =  expected_error {
+                assert_eq!(state.solutions().count(), 1);
+                if let Some(error) = unsafe { ASAN_ERRORS.as_ref().unwrap()}.errors.first() {
+                    assert_eq!(error.description(),expected_error);
+                }
+                } else {
+                    assert_eq!(state.solutions().count() , 0);
+
+                }
             }
-            assert_eq!(state.solutions().count(), err_cnt);
         }
     }
 
@@ -502,7 +511,7 @@ mod tests {
         SimpleStdoutLogger::set_logger().unwrap();
 
         // Check if the harness dynamic library is present, if not - skip the test
-        let test_harness = "test_harness.so";
+        let test_harness = "./test_harness.so";
         assert!(
             std::path::Path::new(test_harness).exists(),
             "Skipping test, {test_harness} not found"

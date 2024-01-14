@@ -278,6 +278,7 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[inline]
     pub fn hook__Znam(&mut self, size: usize) -> *mut c_void {
+        log::trace!("hook: new({:x})", size);
         unsafe { self.allocator_mut().alloc(size, 8) }
     }
 
@@ -397,11 +398,12 @@ impl AsanRuntime {
 
     #[inline]
     #[allow(clippy::cmp_null)]
-    pub fn hook_free(&mut self, ptr: *mut c_void) {
+    pub fn hook_free(&mut self, ptr: *mut c_void) -> usize {
         // log::trace!("hook: free({:x})", ptr as usize);
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[cfg(not(target_vendor = "apple"))]
@@ -432,19 +434,21 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[allow(clippy::cmp_null)]
     #[inline]
-    pub fn hook__ZdaPv(&mut self, ptr: *mut c_void) {
+    pub fn hook__ZdaPv(&mut self, ptr: *mut c_void) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
     #[allow(clippy::cmp_null)]
     #[inline]
-    pub fn hook__ZdaPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
+    pub fn hook__ZdaPvm(&mut self, ptr: *mut c_void, _ulong: u64) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
@@ -455,19 +459,21 @@ impl AsanRuntime {
         ptr: *mut c_void,
         _ulong: u64,
         _alignment: usize,
-    ) {
+    ) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
     #[allow(clippy::cmp_null)]
     #[inline]
-    pub fn hook__ZdaPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
+    pub fn hook__ZdaPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) -> usize{
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
@@ -478,37 +484,41 @@ impl AsanRuntime {
         ptr: *mut c_void,
         _alignment: usize,
         _nothrow: *const c_void,
-    ) {
+    ) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
     #[allow(clippy::cmp_null)]
     #[inline]
-    pub fn hook__ZdaPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
+    pub fn hook__ZdaPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
     #[allow(clippy::cmp_null)]
     #[inline]
-    pub fn hook__ZdlPv(&mut self, ptr: *mut c_void) {
+    pub fn hook__ZdlPv(&mut self, ptr: *mut c_void) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
     #[allow(clippy::cmp_null)]
     #[inline]
-    pub fn hook__ZdlPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
+    pub fn hook__ZdlPvm(&mut self, ptr: *mut c_void, _ulong: u64) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
@@ -519,19 +529,21 @@ impl AsanRuntime {
         ptr: *mut c_void,
         _ulong: u64,
         _alignment: usize,
-    ) {
+    ) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
     #[allow(clippy::cmp_null)]
     #[inline]
-    pub fn hook__ZdlPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
+    pub fn hook__ZdlPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
@@ -542,19 +554,21 @@ impl AsanRuntime {
         ptr: *mut c_void,
         _alignment: usize,
         _nothrow: *const c_void,
-    ) {
+    ) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[allow(non_snake_case)]
     #[allow(clippy::cmp_null)]
     #[inline]
-    pub fn hook__ZdlPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
+    pub fn hook__ZdlPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
+        0
     }
 
     #[inline]
@@ -854,9 +868,9 @@ impl AsanRuntime {
 
     #[cfg(not(target_os = "android"))]
     #[inline]
-    pub fn hook_bzero(&mut self, s: *mut c_void, n: usize) {
+    pub fn hook_bzero(&mut self, s: *mut c_void, n: usize) -> usize {
         extern "system" {
-            fn bzero(s: *mut c_void, n: usize);
+            fn bzero(s: *mut c_void, n: usize) -> usize;
         }
         if !self.allocator_mut().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
@@ -872,9 +886,9 @@ impl AsanRuntime {
 
     #[cfg(all(not(target_os = "android"), not(target_vendor = "apple")))]
     #[inline]
-    pub fn hook_explicit_bzero(&mut self, s: *mut c_void, n: usize) {
+    pub fn hook_explicit_bzero(&mut self, s: *mut c_void, n: usize) -> usize {
         extern "system" {
-            fn explicit_bzero(s: *mut c_void, n: usize);
+            fn explicit_bzero(s: *mut c_void, n: usize) -> usize;
         }
         if !self.allocator_mut().check_shadow(s, n) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
