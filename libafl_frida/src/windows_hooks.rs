@@ -28,14 +28,16 @@ pub fn initialize(gum: &Gum) {
             is_processor_feature_present,
             NativePointer(is_processor_feature_present_detour as *mut c_void),
             NativePointer(std::ptr::null_mut()),
-        ).unwrap_or_else(|_| NativePointer(std::ptr::null_mut()));
+        )
+        .unwrap_or_else(|_| NativePointer(std::ptr::null_mut()));
 
     interceptor
         .replace(
             unhandled_exception_filter,
             NativePointer(unhandled_exception_filter_detour as *mut c_void),
             NativePointer(std::ptr::null_mut()),
-        ).unwrap_or_else(|_| NativePointer(std::ptr::null_mut()));
+        )
+        .unwrap_or_else(|_| NativePointer(std::ptr::null_mut()));
 
     unsafe extern "C" fn is_processor_feature_present_detour(feature: u32) -> bool {
         let result = match feature {

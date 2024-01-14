@@ -25,25 +25,32 @@ fn main() {
             .file("test_harness.a")
             .get_compiler();
         let mut cmd = std::process::Command::new(compiler.path());
-        cmd    
-        .args(compiler.args())
+        cmd.args(compiler.args())
             .arg("test_harness.cpp")
-        .arg("/link")
-            .arg(format!("/libpath:{}/.cache/cargo-xwin/xwin/crt/lib/x86_64/", std::env::var("HOME").unwrap()))
-            .arg(format!("/libpath:{}/.cache/cargo-xwin/xwin/sdk/lib/ucrt/x86_64/", std::env::var("HOME").unwrap()))
-            .arg(format!("/libpath:{}/.cache/cargo-xwin/xwin/sdk/lib/um/x86_64/", std::env::var("HOME").unwrap()))
-        .arg("/dll")
-        .arg("/OUT:test_harness.dll");
+            .arg("/link")
+            .arg(format!(
+                "/libpath:{}/.cache/cargo-xwin/xwin/crt/lib/x86_64/",
+                std::env::var("HOME").unwrap()
+            ))
+            .arg(format!(
+                "/libpath:{}/.cache/cargo-xwin/xwin/sdk/lib/ucrt/x86_64/",
+                std::env::var("HOME").unwrap()
+            ))
+            .arg(format!(
+                "/libpath:{}/.cache/cargo-xwin/xwin/sdk/lib/um/x86_64/",
+                std::env::var("HOME").unwrap()
+            ))
+            .arg("/dll")
+            .arg("/OUT:test_harness.dll");
 
-
-
-    println!("cargo:warning={:?}", cmd);
-    println!("cargo:warning={:?}", cmd.output());
+        println!("cargo:warning={:?}", cmd);
+        println!("cargo:warning={:?}", cmd.output());
     } else {
-    let compiler = cc::Build::new()
-        .cpp(true)
-        .opt_level(0)
-            .shared_flag(true).get_compiler();
+        let compiler = cc::Build::new()
+            .cpp(true)
+            .opt_level(0)
+            .shared_flag(true)
+            .get_compiler();
         let clangpp = compiler.path();
         let mut cmd = std::process::Command::new(clangpp);
         cmd.args(compiler.args())
@@ -53,5 +60,4 @@ fn main() {
             .status()
             .expect("Failed to link test_harness");
     }
-
 }

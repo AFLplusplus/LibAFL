@@ -1,13 +1,11 @@
 //! Functionality implementing hooks for instrumented code
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use frida_gum::{stalker::Instruction, CpuContext, ModuleMap, instruction_writer::X86Register};
+use frida_gum::{instruction_writer::X86Register, stalker::Instruction, CpuContext, ModuleMap};
 use frida_gum_sys::Insn;
 use rangemap::RangeMap;
 use yaxpeax_arch::LengthedInstruction;
-use yaxpeax_x86::{
-    long_mode::{InstDecoder, Opcode},
-};
+use yaxpeax_x86::long_mode::{InstDecoder, Opcode};
 
 use crate::{
     asan::asan_rt::AsanRuntime,
@@ -145,7 +143,7 @@ impl HookRuntime {
                             target_address
                         };
                         if self.hooks.contains_key(&address) {
-                            return Some(address)
+                            return Some(address);
                         };
                     }
                 }
