@@ -732,7 +732,7 @@ impl CPU {
         #[cfg(emulation_mode = "usermode")]
         {
             thread_local! {
-                static PAGE_SIZE: OnceCell<usize> = OnceCell::new();
+                static PAGE_SIZE: OnceCell<usize> = const { OnceCell::new() };
             }
 
             PAGE_SIZE.with(|s| {
