@@ -174,7 +174,6 @@ impl FridaRuntime for AsanRuntime {
                 }
             }));
 
-
         /* unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
             log::info!("Test0");
@@ -542,7 +541,7 @@ impl AsanRuntime {
         Interceptor::current_invocation().cpu_context().rip() as usize
     }
 
-    pub fn register_hooks(hook_rt: &mut HookRuntime){
+    pub fn register_hooks(hook_rt: &mut HookRuntime) {
         macro_rules! hook_func {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
@@ -665,7 +664,6 @@ impl AsanRuntime {
         //     }
         // }
 
-
         // Hook the memory allocator functions
         #[cfg(unix)]
         hook_func!(None, malloc, (size: usize), *mut c_void);
@@ -765,7 +763,14 @@ impl AsanRuntime {
         );
 
         #[cfg(not(windows))]
-        for libname in ["libc++.so", "libc++.so.1", "libc++abi.so.1", "libc++_shared.so", "libstdc++.so", "libstdc++.so.6" ] {
+        for libname in [
+            "libc++.so",
+            "libc++.so.1",
+            "libc++abi.so.1",
+            "libc++_shared.so",
+            "libstdc++.so",
+            "libstdc++.so.6",
+        ] {
             log::info!("Hooking c++ functions in {}", libname);
             for export in Module::enumerate_exports(libname) {
                 match &export.name[..] {
@@ -1113,7 +1118,6 @@ impl AsanRuntime {
             (s: *mut c_void, c: *const c_void, n: usize),
             usize
         );
-
     }
 
     #[cfg(target_arch = "x86_64")]

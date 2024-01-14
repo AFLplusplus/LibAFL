@@ -469,7 +469,11 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[allow(clippy::cmp_null)]
     #[inline]
-    pub fn hook__ZdaPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) -> usize{
+    pub fn hook__ZdaPvRKSt9nothrow_t(
+        &mut self,
+        ptr: *mut c_void,
+        _nothrow: *const c_void,
+    ) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
@@ -539,7 +543,11 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[allow(clippy::cmp_null)]
     #[inline]
-    pub fn hook__ZdlPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) -> usize {
+    pub fn hook__ZdlPvRKSt9nothrow_t(
+        &mut self,
+        ptr: *mut c_void,
+        _nothrow: *const c_void,
+    ) -> usize {
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }

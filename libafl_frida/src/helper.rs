@@ -574,7 +574,10 @@ where
             }
         }
         if basic_block_size != 0 {
-            if let Some(rt) = runtimes_unborrowed.borrow_mut().match_first_type_mut::<DrCovRuntime>() {
+            if let Some(rt) = runtimes_unborrowed
+                .borrow_mut()
+                .match_first_type_mut::<DrCovRuntime>()
+            {
                 log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
                 rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
                     basic_block_start as usize,

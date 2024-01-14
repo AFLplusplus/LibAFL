@@ -378,14 +378,14 @@ impl Allocator {
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
         let shadow_end = self.round_up_to_page((end - start) / 8 + self.page_size + shadow_start);
         if !self.using_pre_allocated_shadow_mapping {
-        log::trace!(
-            "map_shadow_for_region start: {:x}, end {:x}, size {:x}, shadow {:x}-{:x}",
-            start,
-            end,
-            end - start,
-            shadow_start,
-            shadow_end
-        );
+            log::trace!(
+                "map_shadow_for_region start: {:x}, end {:x}, size {:x}, shadow {:x}-{:x}",
+                start,
+                end,
+                end - start,
+                shadow_start,
+                shadow_end
+            );
             let mut newly_committed_regions = Vec::new();
             for gap in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
                 let mut new_reserved_region = None;
@@ -534,8 +534,7 @@ impl Allocator {
                 .intersects(Protection::READ | Protection::WRITE)
                 && !self.is_managed(area.start() as *mut c_void)
             {
-                if self.using_pre_allocated_shadow_mapping && area.start() == 1 << self.shadow_bit
-                {
+                if self.using_pre_allocated_shadow_mapping && area.start() == 1 << self.shadow_bit {
                     continue;
                 }
                 self.map_shadow_for_region(area.start(), area.end(), true);
@@ -631,10 +630,10 @@ impl Allocator {
                     {
                         shadow_bit = (*try_shadow_bit).try_into().unwrap();
 
-                    log::warn!("shadow_bit {shadow_bit:x} is suitable");
-                    self.pre_allocated_shadow_mappings.push(mapping);
-                    self.using_pre_allocated_shadow_mapping = true;
-                    break;
+                        log::warn!("shadow_bit {shadow_bit:x} is suitable");
+                        self.pre_allocated_shadow_mappings.push(mapping);
+                        self.using_pre_allocated_shadow_mapping = true;
+                        break;
                     }
                     log::warn!("shadow_bit {try_shadow_bit:x} is not suitable - failed to allocate shadow memory");
                 }

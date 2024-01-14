@@ -1,18 +1,16 @@
 //! Functionality implementing hooks for instrumented code
-use std::{collections::HashMap, rc::Rc, cell::RefCell};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use frida_gum::{
-    stalker::Instruction,
-    CpuContext, ModuleMap,
-};
+use frida_gum::{stalker::Instruction, CpuContext, ModuleMap};
 use frida_gum_sys::Insn;
 use rangemap::RangeMap;
 use yaxpeax_arch::LengthedInstruction;
 use yaxpeax_x86::long_mode::{InstDecoder, Opcode};
 
 use crate::{
+    asan::asan_rt::AsanRuntime,
     helper::{FridaRuntime, FridaRuntimeTuple},
-    utils::{frida_to_cs, operand_details, immediate_value}, asan::asan_rt::AsanRuntime,
+    utils::{frida_to_cs, immediate_value, operand_details},
 };
 
 /// Frida hooks for instrumented code
@@ -83,15 +81,21 @@ impl HookRuntime {
         let instruction = frida_to_cs(decoder, instr);
 
         if instruction.opcode() == Opcode::CALL && !instruction.operand(0).is_memory() {
-            let inner_address = instr.address() as i64 + instr.bytes().len() as i64 + immediate_value(&instruction.operand(0)).unwrap();            
-            let slice = unsafe { std::slice::from_raw_parts(inner_address as usize as *const u8, 32) };
+            let inner_address = instr.address() as i64
+                + instr.bytes().len() as i64
+                + immediate_value(&instruction.operand(0)).unwrap();
+            let slice =
+                unsafe { std::slice::from_raw_parts(inner_address as usize as *const u8, 32) };
             if let Ok(instruction) = decoder.decode_slice(slice) {
                 if instruction.opcode() == Opcode::JMP || instruction.opcode() == Opcode::JMPF {
                     let operand = instruction.operand(0);
                     if operand.is_memory() {
-                        if let Some((_basereg, _indexreg, _scale, disp)) = operand_details(&operand) {
+                        if let Some((_basereg, _indexreg, _scale, disp)) = operand_details(&operand)
+                        {
                             let target_address = unsafe {
-                                (((inner_address  as u64 + instruction.len()) as i64 + disp as i64) as *const usize).read()
+                                (((inner_address as u64 + instruction.len()) as i64 + disp as i64)
+                                    as *const usize)
+                                    .read()
                             };
                             if self.hooks.contains_key(&target_address) {
                                 return Some(target_address);
@@ -99,7 +103,6 @@ impl HookRuntime {
                         }
                     }
                 }
-
             }
         }
         None
@@ -107,8 +110,19 @@ impl HookRuntime {
 
     /// Emits a callout to the hook
     #[inline]
-    pub fn emit_callout<RT : FridaRuntimeTuple> (&mut self, address: usize, insn: &Instruction, runtimes: Rc<RefCell<RT>>) {
+    pub fn emit_callout<RT: FridaRuntimeTuple>(
+        &mut self,
+        address: usize,
+        insn: &Instruction,
+        runtimes: Rc<RefCell<RT>>,
+    ) {
         log::trace!("emit_callout: {:x}", address);
-        insn.put_callout(move |context| (self.hooks.get_mut(&address).unwrap())(address, context, runtimes.borrow_mut().match_first_type_mut::<AsanRuntime>()))
+        insn.put_callout(move |context| {
+            (self.hooks.get_mut(&address).unwrap())(
+                address,
+                context,
+                runtimes.borrow_mut().match_first_type_mut::<AsanRuntime>(),
+            )
+        })
     }
 }

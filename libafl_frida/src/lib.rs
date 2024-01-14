@@ -373,10 +373,10 @@ mod tests {
             asan_rt::AsanRuntime,
             errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
         },
-        hook_rt::HookRuntime,
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
         helper::FridaInstrumentationHelper,
+        hook_rt::HookRuntime,
     };
 
     static GUM: OnceLock<Gum> = OnceLock::new();
@@ -477,14 +477,13 @@ mod tests {
                     .unwrap_or_else(|_| panic!("Error in fuzz_one"));
 
                 log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
-                if let Some(expected_error) =  expected_error {
-                assert_eq!(state.solutions().count(), 1);
-                if let Some(error) = unsafe { ASAN_ERRORS.as_ref().unwrap()}.errors.first() {
-                    assert_eq!(error.description(),expected_error);
-                }
+                if let Some(expected_error) = expected_error {
+                    assert_eq!(state.solutions().count(), 1);
+                    if let Some(error) = unsafe { ASAN_ERRORS.as_ref().unwrap() }.errors.first() {
+                        assert_eq!(error.description(), expected_error);
+                    }
                 } else {
-                    assert_eq!(state.solutions().count() , 0);
-
+                    assert_eq!(state.solutions().count(), 0);
                 }
             }
         }

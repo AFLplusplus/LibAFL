@@ -242,7 +242,6 @@ pub fn immediate_value(operand: &Operand) -> Option<i64> {
     }
 }
 
-
 #[derive(Debug, Clone, Copy)]
 #[cfg(target_arch = "x86_64")]
 /// What kind of memory access this instruction has
