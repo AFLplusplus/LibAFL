@@ -226,6 +226,23 @@ pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+/// Get the immediate value of the operand
+pub fn immediate_value(operand: &Operand) -> Option<i64> {
+    match operand {
+        Operand::ImmediateI8(v) => Some(*v as i64),
+        Operand::ImmediateU8(v) => Some(*v as i64),
+        Operand::ImmediateI16(v) => Some(*v as i64),
+        Operand::ImmediateI32(v) => Some(*v as i64),
+        Operand::ImmediateU16(v) => Some(*v as i64),
+        Operand::ImmediateU32(v) => Some(*v as i64),
+        Operand::ImmediateI64(v) => Some(*v),
+        Operand::ImmediateU64(v) => Some(*v as i64),
+        _ => None,
+    }
+}
+
+
 #[derive(Debug, Clone, Copy)]
 #[cfg(target_arch = "x86_64")]
 /// What kind of memory access this instruction has
