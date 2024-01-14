@@ -16,26 +16,18 @@ fn main() {
         #[cfg(unix)]
         {
             // Check if we have clang++ installed
-            let clangpp = std::process::Command::new("clang++")
-                .arg("--version")
-                .output();
-
-            match clangpp {
-                Ok(_) => {
-                    std::process::Command::new("clang++")
-                        .arg("-shared")
-                        .arg("-fPIC")
-                        .arg("-O0")
-                        .arg("-o")
-                        .arg("test_harness.so")
-                        .arg("test_harness.cpp")
-                        .status()
-                        .expect("Failed to build test harness");
-                }
-                Err(_) => {
-                    println!("cargo:warning=clang++ not found, skipping test harness build");
-                }
-            }
+            let compiler = cc::Build::new().cpp(true).get_compiler();
+            let clangpp = compiler.path();
+            std::process::Command::new(clangpp)
+                .args(compiler.args())
+                .arg("-shared")
+                .arg("-fPIC")
+                .arg("-O0")
+                .arg("-o")
+                .arg("test_harness.so")
+                .arg("test_harness.cpp")
+                .status()
+                .expect("Failed to build test harness");
         }
     }
 }
