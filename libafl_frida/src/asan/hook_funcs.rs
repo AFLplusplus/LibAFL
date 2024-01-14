@@ -104,10 +104,10 @@ impl AsanRuntime {
     #[cfg(windows)]
     pub fn hook_LdrpCallInitRoutine(
         &mut self,
-        base_address: *const c_void,
-        reason: usize,
-        context: usize,
-        entry_point: usize,
+        _base_address: *const c_void,
+        _reason: usize,
+        _context: usize,
+        _entry_point: usize,
     ) -> usize {
         winsafe::OutputDebugString("LdrpCallInitRoutine");
         // let result = unsafe { LdrLoadDll(path, file, flags,x )};
@@ -393,13 +393,13 @@ impl AsanRuntime {
 
     #[inline]
     pub fn hook_check_free(&mut self, ptr: *mut c_void) -> bool {
+        log::trace!("hook: free({:x})", ptr as usize);
         self.allocator_mut().is_managed(ptr)
     }
 
     #[inline]
     #[allow(clippy::cmp_null)]
     pub fn hook_free(&mut self, ptr: *mut c_void) -> usize {
-        // log::trace!("hook: free({:x})", ptr as usize);
         if ptr != std::ptr::null_mut() {
             unsafe { self.allocator_mut().release(ptr) }
         }
