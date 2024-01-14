@@ -81,7 +81,7 @@ pub(crate) enum AsanError {
 }
 
 impl AsanError {
-    fn description(&self) -> &str {
+    pub fn description(&self) -> &str {
         match self {
             AsanError::OobRead(_) => "heap out-of-bounds read",
             AsanError::OobWrite(_) => "heap out-of-bounds write",
@@ -104,7 +104,7 @@ impl AsanError {
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
     continue_on_error: bool,
-    errors: Vec<AsanError>,
+    pub(crate) errors: Vec<AsanError>,
 }
 
 impl AsanErrors {
