@@ -277,6 +277,14 @@ impl UserStatsValue {
                 let second = *y as f64 / *b as f64;
                 Some(Self::Percent(first + second))
             }
+            (Self::Percent(x), Self::Ratio(y, b)) => {
+                let ratio = *y as f64 / *b as f64;
+                Some(Self::Percent(*x + ratio))
+            }
+            (Self::Ratio(x, a), Self::Percent(y)) => {
+                let ratio = *x as f64 / *a as f64;
+                Some(Self::Percent(ratio + *y))
+            }
             _ => None,
         }
     }

@@ -3,7 +3,7 @@
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
@@ -38,6 +38,8 @@ where
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
+    type Progress = (); // this stage cannot be resumed
+
     #[inline]
     fn perform(
         &mut self,
@@ -45,8 +47,13 @@ where
         _executor: &mut E,
         state: &mut TE::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         start_timer!(state);
         let input = state.corpus().cloned_input_for_id(corpus_idx)?;
 
@@ -117,6 +124,8 @@ where
     Z: UsesState<State = E::State>,
     E::State: State + HasExecutions + HasCorpus + Debug,
 {
+    type Progress = (); // this stage cannot be resumed
+
     #[inline]
     fn perform(
         &mut self,
@@ -124,8 +133,13 @@ where
         executor: &mut ShadowExecutor<E, SOT>,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         start_timer!(state);
         let input = state.corpus().cloned_input_for_id(corpus_idx)?;
 

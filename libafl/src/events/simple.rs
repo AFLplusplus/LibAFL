@@ -353,6 +353,8 @@ where
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        state.on_restart()?;
+
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(&(
@@ -499,6 +501,11 @@ where
                     shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
+                            unsafe {
+                                // The parent will later exit through is_shutting down below
+                                // if the process exits gracefully, it cleans up the shmem.
+                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                            }
                             shmem_provider.post_fork(false)?;
                             handle.status()
                         }
@@ -508,6 +515,14 @@ where
                         }
                     }
                 };
+
+                // Same, as fork version, mark this main thread as the shmem allocator
+                // then it will not call exit or exitprocess in the sigint handler
+                // so that it exits after cleaning up the shmem segments
+                #[cfg(all(unix, not(feature = "fork")))]
+                unsafe {
+                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                }
 
                 // On Windows (or in any case without forks), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]

@@ -212,7 +212,7 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        let emu = Emulator::new_empty();
+        let emu = Emulator::get().unwrap();
         if self.first_exec {
             self.hooks.helpers().first_exec_all(self.hooks);
             self.first_exec = false;
@@ -377,7 +377,7 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        let emu = Emulator::new_empty();
+        let emu = Emulator::get().unwrap();
         if self.first_exec {
             self.hooks.helpers().first_exec_all(self.hooks);
             self.first_exec = false;

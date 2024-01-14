@@ -22,7 +22,7 @@ fn main() {
         .emit()
         .unwrap();
 
-    assert_unique_feature!("arm", "aarch64", "i386", "x86_64", "mips", "ppc");
+    assert_unique_feature!("arm", "aarch64", "i386", "x86_64", "mips", "ppc", "hexagon");
 
     let cpu_target = if cfg!(feature = "x86_64") {
         "x86_64".to_string()
@@ -36,6 +36,8 @@ fn main() {
         "mips".to_string()
     } else if cfg!(feature = "ppc") {
         "ppc".to_string()
+    } else if cfg!(feature = "hexagon") {
+        "hexagon".to_string()
     } else {
         println!("cargo:warning=No architecture specified defaulting to x86_64...");
         println!("cargo:rustc-cfg=feature=\"x86_64\"");

@@ -10,11 +10,8 @@ use core::{
 #[cfg(emulation_mode = "usermode")]
 use std::cell::OnceCell;
 #[cfg(emulation_mode = "systemmode")]
-use std::{
-    ffi::{CStr, CString},
-    ptr::null_mut,
-};
-use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{ffi::CStr, ptr::null_mut};
+use std::{ffi::CString, ptr, slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
@@ -393,6 +390,9 @@ extern "C" {
         data: *const (),
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn libafl_qemu_current_paging_id(cpu: CPUStatePtr) -> GuestPhysAddr;
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -491,7 +491,7 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), String>
     where
         T: Into<GuestReg>;
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>;
     fn write_function_argument<T>(
@@ -508,7 +508,7 @@ pub trait ArchExtras {
 impl CPU {
     #[must_use]
     pub fn emulator(&self) -> Emulator {
-        Emulator::new_empty()
+        unsafe { Emulator::new_empty() }
     }
 
     #[must_use]
@@ -586,6 +586,18 @@ impl CPU {
             } else {
                 Some(libafl_qemu_sys::qemu_plugin_hwaddr_phys_addr(phwaddr) as GuestPhysAddr)
             }
+        }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    #[must_use]
+    pub fn get_current_paging_id(&self) -> Option<GuestPhysAddr> {
+        let paging_id = unsafe { libafl_qemu_current_paging_id(self.ptr) };
+
+        if paging_id == 0 {
+            None
+        } else {
+            Some(paging_id)
         }
     }
 
@@ -720,7 +732,7 @@ impl CPU {
         #[cfg(emulation_mode = "usermode")]
         {
             thread_local! {
-                static PAGE_SIZE: OnceCell<usize> = OnceCell::new();
+                static PAGE_SIZE: OnceCell<usize> = const { OnceCell::new() };
             }
 
             PAGE_SIZE.with(|s| {
@@ -945,8 +957,12 @@ impl Emulator {
         #[allow(clippy::cast_possible_wrap)]
         let argc = argc as i32;
 
-        let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
-        let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
+        let args: Vec<CString> = args
+            .iter()
+            .map(|x| CString::new(x.clone()).unwrap())
+            .collect();
+        let mut argv: Vec<*const u8> = args.iter().map(|x| x.as_ptr() as *const u8).collect();
+        argv.push(ptr::null()); // argv is always null terminated.
         let env_strs: Vec<String> = env
             .iter()
             .map(|(k, v)| format!("{}={}\0", &k, &v))
@@ -964,7 +980,7 @@ impl Emulator {
                     envp.as_ptr() as *const *const u8,
                 );
                 libc::atexit(qemu_cleanup_atexit);
-                libafl_qemu_sys::syx_snapshot_init();
+                libafl_qemu_sys::syx_snapshot_init(true);
             }
         }
         Ok(Emulator { _private: () })
@@ -981,8 +997,14 @@ impl Emulator {
         }
     }
 
+    /// Get an empty emulator.
+    ///
+    /// # Safety
+    ///
+    /// Should not be used if `Emulator::new` has never been used before (otherwise QEMU will not be initialized).
+    /// Prefer `Emulator::get` for a safe version of this method.
     #[must_use]
-    pub(crate) fn new_empty() -> Emulator {
+    pub unsafe fn new_empty() -> Emulator {
         Emulator { _private: () }
     }
 
@@ -1522,6 +1544,7 @@ impl Emulator {
         unsafe {
             libafl_qemu_sys::syx_snapshot_new(
                 track,
+                true,
                 libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_ALL,
                 null_mut(),
             )
@@ -1539,6 +1562,7 @@ impl Emulator {
         unsafe {
             libafl_qemu_sys::syx_snapshot_new(
                 track,
+                true,
                 device_filter.enum_id(),
                 device_filter.devices(&mut v),
             )
@@ -1616,7 +1640,7 @@ impl ArchExtras for Emulator {
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>,
     {
@@ -1652,7 +1676,7 @@ pub mod pybind {
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
 
     extern "C" fn py_syscall_hook_wrapper(
-        data: u64,
+        _data: u64,
         sys_num: i32,
         a0: u64,
         a1: u64,
@@ -1750,7 +1774,7 @@ pub mod pybind {
 
         fn run(&self) {
             unsafe {
-                self.emu.run();
+                self.emu.run().unwrap();
             }
         }
 

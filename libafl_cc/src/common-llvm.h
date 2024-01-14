@@ -33,6 +33,8 @@ constexpr std::nullopt_t None = std::nullopt;
   #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #endif
 
+#include "llvm/IR/Function.h"
+
 #define FATAL(...)                          \
   do {                                      \
     fprintf(stderr, "FATAL: " __VA_ARGS__); \
@@ -99,7 +101,11 @@ static inline bool isIgnoreFunction(const llvm::Function *F) {
   };
 
   for (auto const &ignoreListFunc : ignoreList) {
+#if LLVM_VERSION_MAJOR >= 18
+    if (F->getName().starts_with(ignoreListFunc)) { return true; }
+#else
     if (F->getName().startswith(ignoreListFunc)) { return true; }
+#endif
   }
   static constexpr const char *ignoreSubstringList[] = {
 

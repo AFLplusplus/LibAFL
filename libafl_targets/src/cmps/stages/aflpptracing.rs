@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 #[cfg(feature = "introspection")]
 use libafl::state::HasClientPerfMonitor;
 use libafl::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, HasCurrentCorpusIdx},
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
@@ -40,6 +40,8 @@ where
     EM: UsesState<State = TE::State>,
     Z: UsesState<State = TE::State>,
 {
+    type Progress = (); // TODO this needs resumption
+
     #[inline]
     fn perform(
         &mut self,
@@ -47,9 +49,11 @@ where
         _executor: &mut E,
         state: &mut TE::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         // First run with the un-mutated input
+        let corpus_idx = state.current_corpus_idx()?.ok_or_else(|| {
+            Error::illegal_state("state is not currently processing a corpus index")
+        })?;
 
         let unmutated_input = state.corpus().cloned_input_for_id(corpus_idx)?;
 

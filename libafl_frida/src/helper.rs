@@ -27,6 +27,8 @@ use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
 
+#[cfg(unix)]
+use crate::asan::asan_rt::AsanRuntime;
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
 use crate::{
@@ -405,7 +407,8 @@ where
 
         path == Path::new(&module_name)
             || path == module_path
-            || fs::canonicalize(path).ok() == canonicalized_module_path
+            || (canonicalized_module_path.is_some()
+                && fs::canonicalize(path).ok() == canonicalized_module_path)
     })
 }
 

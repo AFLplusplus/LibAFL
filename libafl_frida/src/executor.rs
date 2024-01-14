@@ -18,6 +18,7 @@ use libafl::{
     Error,
 };
 
+#[cfg(not(test))]
 #[cfg(unix)]
 use crate::asan::errors::ASAN_ERRORS;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
@@ -31,7 +32,7 @@ where
     S::Input: HasTargetBytes,
     S: State,
     OT: ObserversTuple<S>,
-    'a: 'b,
+    'b: 'a,
 {
     base: InProcessExecutor<'a, H, OT, S>,
     // thread_id for the Stalker
@@ -102,6 +103,8 @@ where
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }
+
+        #[cfg(not(test))]
         #[cfg(unix)]
         unsafe {
             if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {

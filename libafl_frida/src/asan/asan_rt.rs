@@ -22,13 +22,13 @@ use frida_gum::instruction_writer::X86Register;
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
-    Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails,
+    Module, ModuleDetails, ModuleMap, NativePointer, PageProtection, RangeDetails,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
-#[cfg(unix)]
-use libc::RLIMIT_STACK;
+// #[cfg(target_vendor = "apple")]
+// use libc::RLIMIT_STACK;
 use libc::{c_char, wchar_t};
 #[cfg(target_vendor = "apple")]
 use libc::{getrlimit, rlimit};
@@ -67,10 +67,6 @@ extern "C" {
     fn tls_ptr() -> *const c_void;
 }
 
-#[cfg(target_vendor = "apple")]
-const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
-#[cfg(all(not(windows), not(target_vendor = "apple")))]
-const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// The count of registers that need to be saved by the asan runtime
 /// sixteen general purpose registers are put in this order, rax, rbx, rcx, rdx, rbp, rsp, rsi, rdi, r8-r15, plus instrumented rip, accessed memory addr and true rip
@@ -419,29 +415,57 @@ impl AsanRuntime {
     }
 
     /// Get the maximum stack size for the current stack
-    #[must_use]
-    #[cfg(target_vendor = "apple")]
-    fn max_stack_size() -> usize {
-        let mut stack_rlimit = rlimit {
-            rlim_cur: 0,
-            rlim_max: 0,
-        };
-        assert!(unsafe { getrlimit(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
+    // #[must_use]
+    // #[cfg(target_vendor = "apple")]
+    // fn max_stack_size() -> usize {
+    //     let mut stack_rlimit = rlimit {
+    //         rlim_cur: 0,
+    //         rlim_max: 0,
+    //     };
+    //     assert!(unsafe { getrlimit(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
 
-        stack_rlimit.rlim_cur as usize
-    }
+    //     stack_rlimit.rlim_cur as usize
+    // }
 
     /// Get the maximum stack size for the current stack
-    #[must_use]
-    #[cfg(all(unix, not(target_vendor = "apple")))]
-    fn max_stack_size() -> usize {
-        let mut stack_rlimit = rlimit64 {
-            rlim_cur: 0,
-            rlim_max: 0,
-        };
-        assert!(unsafe { getrlimit64(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
+    // #[must_use]
+    // #[cfg(all(unix, not(target_vendor = "apple")))]
+    // fn max_stack_size() -> usize {
+    //     let mut stack_rlimit = rlimit64 {
+    //         rlim_cur: 0,
+    //         rlim_max: 0,
+    //     };
+    //     assert!(unsafe { getrlimit64(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
 
-        stack_rlimit.rlim_cur as usize
+    //     stack_rlimit.rlim_cur as usize
+    // }
+
+    /// Get the start and end of the memory region containing the given address
+    /// Uses `RangeDetails::enumerate_with_prot` as `RangeDetails::with_address` has
+    /// a [bug](https://github.com/frida/frida-rust/issues/120)
+    /// Returns (start, end)
+    fn range_for_address(address: usize) -> (usize, usize) {
+        let mut start = 0;
+        let mut end = 0;
+        RangeDetails::enumerate_with_prot(PageProtection::NoAccess, &mut |range: &RangeDetails| {
+            let range_start = range.memory_range().base_address().0 as usize;
+            let range_end = range_start + range.memory_range().size();
+            if range_start <= address && range_end >= address {
+                start = range_start;
+                end = range_end;
+                // I want to stop iteration here
+                return false;
+            }
+            true
+        });
+
+        if start == 0 {
+            log::error!(
+                "range_for_address: no range found for address {:#x}",
+                address
+            );
+        }
+        (start, end)
     }
 
     /// Determine the stack start, end for the currently running thread
@@ -452,6 +476,7 @@ impl AsanRuntime {
     pub fn current_stack() -> (usize, usize) {
         let mut stack_var = 0xeadbeef;
         let stack_address = addr_of_mut!(stack_var) as usize;
+        // let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
         // Write something to (hopefully) make sure the val isn't optimized out
         unsafe {
             write_volatile(&mut stack_var, 0xfadbeef);
@@ -505,10 +530,13 @@ impl AsanRuntime {
         // Strip off the top byte, as scudo allocates buffers with top-byte set to 0xb4
         let tls_address = tls_address & 0xffffffffffffff;
 
-        let range_details = RangeDetails::with_address(tls_address as u64).unwrap();
-        let start = range_details.memory_range().base_address().0 as usize;
-        let end = start + range_details.memory_range().size();
-        (start, end)
+        // let range_details = RangeDetails::with_address(tls_address as u64).unwrap();
+        // log::info!("tls address: {:#x}, range_details {:x} size {:x}", tls_address,
+        //     range_details.memory_range().base_address().0 as usize, range_details.memory_range().size());
+        // let start = range_details.memory_range().base_address().0 as usize;
+        // let end = start + range_details.memory_range().size();
+        // (start, end)
+        Self::range_for_address(tls_address)
     }
 
     /// Gets the current instruction pointer
@@ -744,6 +772,7 @@ impl AsanRuntime {
 
         #[cfg(not(windows))]
         for libname in ["libc++.so", "libc++.so.1", "libc++_shared.so"] {
+            log::info!("Hooking c++ functions in {}", libname);
             for export in Module::enumerate_exports(libname) {
                 match &export.name[..] {
                     "_Znam" => {
@@ -1120,10 +1149,14 @@ impl AsanRuntime {
         for operand_idx in 0..operand_count {
             let operand = insn.operand(operand_idx);
             if operand.is_memory() {
+                // The order is like in Intel, not AT&T
+                // So a memory read looks like
+                //      mov    edx,DWORD PTR [rax+0x14]
+                // not  mov    0x14(%rax),%edx
                 access_type = if operand_idx == 0 {
-                    Some(AccessType::Read)
-                } else {
                     Some(AccessType::Write)
+                } else {
+                    Some(AccessType::Read)
                 };
                 if let Some((basereg, indexreg, _, disp)) = operand_details(&operand) {
                     regs = Some((basereg, indexreg, disp));
@@ -1246,6 +1279,10 @@ impl AsanRuntime {
                 backtrace,
             )));
         }
+
+        // log::info!("ASAN Error, attach the debugger!");
+        // // Sleep for 1 minute to give the user time to attach a debugger
+        // std::thread::sleep(std::time::Duration::from_secs(60));
 
         // self.dump_registers();
     }

@@ -1,9 +1,8 @@
 //! Monitor to display both cumulative and per-client monitor
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+#[cfg(feature = "introspection")]
+use alloc::string::ToString;
+use alloc::{string::String, vec::Vec};
 use core::{
     fmt::{Debug, Formatter, Write},
     time::Duration,
@@ -84,11 +83,9 @@ where
             self.total_execs(),
             self.execs_per_sec_pretty()
         );
-        let mut aggregated_fmt = " (Aggregated):".to_string();
         for (key, val) in &self.aggregator.aggregated {
-            write!(aggregated_fmt, " {key}: {val}").unwrap();
+            write!(global_fmt, ", {key}: {val}").unwrap();
         }
-        write!(global_fmt, "{aggregated_fmt}").unwrap();
 
         (self.print_fn)(global_fmt);
 

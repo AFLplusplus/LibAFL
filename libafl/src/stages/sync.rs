@@ -67,6 +67,8 @@ where
     Z: Evaluator<E, EM>,
     Z::State: HasCorpus + HasRand + HasMetadata,
 {
+    type Progress = (); // TODO load from directory should be resumed
+
     #[inline]
     fn perform(
         &mut self,
@@ -74,7 +76,6 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let last = state
             .metadata_map()
@@ -253,6 +254,8 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
+    type Progress = (); // TODO this should be resumed in the case that a testcase causes a crash
+
     #[inline]
     fn perform(
         &mut self,
@@ -260,7 +263,6 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         if self.client.can_convert() {
             let last_id = state

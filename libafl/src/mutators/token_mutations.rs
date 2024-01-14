@@ -105,7 +105,7 @@ impl Tokens {
     ///
     /// # Safety
     /// The caller must ensure that the region between `token_start` and `token_stop`
-    /// is a valid region, containing autotokens in the exepcted format.
+    /// is a valid region, containing autotokens in the expected format.
     #[cfg(any(target_os = "linux", target_vendor = "apple"))]
     pub unsafe fn from_mut_ptrs(
         token_start: *const u8,
@@ -715,8 +715,8 @@ impl AFLppRedQueen {
             };
 
             // Try arith
-            let diff: i64 = (pattern - b_val) as i64;
-            let new_diff: i64 = (another_pattern - o_b_val) as i64;
+            let diff = pattern as i64 - b_val as i64;
+            let new_diff = another_pattern as i64 - o_b_val as i64;
 
             if diff == new_diff && diff != 0 {
                 let new_repl: u64 = (repl as i64 - diff) as u64;

@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use libafl_bolts::rands::Rand;
 
 use crate::{
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, Testcase},
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
@@ -114,8 +114,13 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let num = self.iterations(state, corpus_idx)?;
 
         start_timer!(state);
@@ -211,6 +216,8 @@ where
     Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
+    type Progress = (); // TODO should this stage be resumed?
+
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -219,9 +226,8 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+        let ret = self.perform_mutational(fuzzer, executor, state, manager);
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();
@@ -300,6 +306,8 @@ where
     Z::State: HasCorpus + HasRand,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
 {
+    type Progress = (); // TODO implement resume
+
     #[inline]
     #[allow(clippy::let_and_return)]
     #[allow(clippy::cast_possible_wrap)]
@@ -309,8 +317,13 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let Ok(input) = I::try_transform_from(&mut testcase, state, corpus_idx) else {
             return Ok(());

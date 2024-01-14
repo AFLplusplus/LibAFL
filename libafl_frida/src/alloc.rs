@@ -374,25 +374,19 @@ impl Allocator {
         end: usize,
         unpoison: bool,
     ) -> (usize, usize) {
-        // log::trace!("start: {:x}, end {:x}, size {:x}", start, end, end - start);
-
         let shadow_mapping_start = map_to_shadow!(self, start);
 
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
         let shadow_end = self.round_up_to_page((end - start) / 8 + self.page_size + shadow_start);
         if !self.using_pre_allocated_shadow_mapping {
-            for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
-                let mapping = MmapOptions::new(range.end - range.start - 1)
-                    .unwrap()
-                    .with_address(range.start)
-                    .map_mut()
-                    .expect("An error occurred while mapping shadow memory");
-
-                self.mappings.insert(range.start, mapping);
-            }
-
-            self.shadow_pages.insert(shadow_start..shadow_end);
-        } else {
+        log::trace!(
+            "map_shadow_for_region start: {:x}, end {:x}, size {:x}, shadow {:x}-{:x}",
+            start,
+            end,
+            end - start,
+            shadow_start,
+            shadow_end
+        );
             let mut newly_committed_regions = Vec::new();
             for gap in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
                 let mut new_reserved_region = None;
@@ -601,28 +595,49 @@ impl Allocator {
                 let addr: usize = 1 << try_shadow_bit;
                 let shadow_start = addr;
                 let shadow_end = addr + addr + addr;
-
+                let mut good_candidate = true;
                 // check if the proposed shadow bit overlaps with occupied ranges.
                 for (start, end) in &occupied_ranges {
+                    // log::trace!("{:x} {:x}, {:x} {:x} -> {:x} - {:x}", shadow_start, shadow_end, start, end,
+                    //     shadow_start + ((start >> 3) & ((1 << (try_shadow_bit + 1)) - 1)),
+                    //     shadow_start + ((end >> 3) & ((1 << (try_shadow_bit + 1)) - 1))
+                    // );
                     if (shadow_start <= *end) && (*start <= shadow_end) {
                         // log::trace!("{:x} {:x}, {:x} {:x}", shadow_start, shadow_end, start, end);
                         log::warn!("shadow_bit {try_shadow_bit:x} is not suitable");
+                        good_candidate = false;
+                        break;
+                    }
+                    //check that the entire range's shadow is within the candidate shadow memory space
+                    if (shadow_start + ((start >> 3) & ((1 << (try_shadow_bit + 1)) - 1))
+                        > shadow_end)
+                        || (shadow_start + (((end >> 3) & ((1 << (try_shadow_bit + 1)) - 1)) + 1)
+                            > shadow_end)
+                    {
+                        log::warn!(
+                            "shadow_bit {try_shadow_bit:x} is not suitable (shadow out of range)"
+                        );
+                        good_candidate = false;
                         break;
                     }
                 }
 
-                if let Ok(mapping) = MmapOptions::new(1 << (*try_shadow_bit + 1))
-                    .unwrap()
-                    .with_flags(MmapFlags::NO_RESERVE)
-                    .with_address(addr)
-                    .reserve_mut()
-                {
-                    shadow_bit = (*try_shadow_bit).try_into().unwrap();
+                if good_candidate {
+                    // We reserve the shadow memory space of size addr*2, but don't commit it.
+                    if let Ok(mapping) = MmapOptions::new(1 << (*try_shadow_bit + 1))
+                        .unwrap()
+                        .with_flags(MmapFlags::NO_RESERVE)
+                        .with_address(addr)
+                        .reserve_mut()
+                    {
+                        shadow_bit = (*try_shadow_bit).try_into().unwrap();
 
                     log::warn!("shadow_bit {shadow_bit:x} is suitable");
                     self.pre_allocated_shadow_mappings.push(mapping);
                     self.using_pre_allocated_shadow_mapping = true;
                     break;
+                    }
+                    log::warn!("shadow_bit {try_shadow_bit:x} is not suitable - failed to allocate shadow memory");
                 }
             }
         }
