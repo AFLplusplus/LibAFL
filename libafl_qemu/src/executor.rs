@@ -109,7 +109,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     if BREAK_ON_TMOUT {
         qemu_system_debug_request();
     } else {
-        libafl::executors::inprocess::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
+        libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
             signal, info, context, data,
         );
     }
@@ -170,8 +170,8 @@ where
         }
         #[cfg(emulation_mode = "systemmode")]
         {
-            inner.handlers_mut().timeout_handler =
-                inproc_qemu_timeout_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
+            inner.inprocess_hooks_mut().timeout_handler =
+                inproc_qemu_timeout_handler::<InProcessExecutor<'a, H, HT, OT, S>, EM, OF, Z>
                     as *const c_void;
         }
         Ok(Self {

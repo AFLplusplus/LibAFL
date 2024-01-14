@@ -7,7 +7,7 @@ use frida_gum::{
 };
 #[cfg(windows)]
 use libafl::{
-    executors::{inprocess::HasInProcessHooks, hooks::inprocess::InProcessHooks},
+    executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
     state::{HasCorpus, HasSolutions},
 };
 use libafl::{
