@@ -602,7 +602,9 @@ impl AsanRuntime {
                     extern "system" {
                         fn $name($($param: $param_type),*) -> $return_type;
                     }
-                    hook_rt.register_hook(Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize, move |_address, mut _context, _asan_rt| {
+                    let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
+                    log::trace!("hooking {} at {:x}", stringify!($name), address);
+                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
                         let asan_rt = _asan_rt.unwrap();
                         let mut index = 0;
                         #[allow(trivial_numeric_casts)]
@@ -665,13 +667,9 @@ impl AsanRuntime {
         // }
 
         // Hook the memory allocator functions
-        #[cfg(unix)]
         hook_func!(None, malloc, (size: usize), *mut c_void);
-        #[cfg(unix)]
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
-        #[cfg(unix)]
         hook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
-        #[cfg(unix)]
         hook_func_with_check!(None, free, (ptr: *mut c_void), usize);
         #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(None, memalign, (size: usize, alignment: usize), *mut c_void);
