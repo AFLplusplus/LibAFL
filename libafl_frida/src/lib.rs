@@ -490,7 +490,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(unix)]
     fn run_test_asan() {
         // Read RUST_LOG from the environment and set the log level accordingly (not using env_logger)
         // Note that in cargo test, the output of successfull tests is suppressed by default,
@@ -510,7 +509,10 @@ mod tests {
         SimpleStdoutLogger::set_logger().unwrap();
 
         // Check if the harness dynamic library is present, if not - skip the test
+        #[cfg(unix)]
         let test_harness = "./test_harness.so";
+        #[cfg(windows)]
+        let test_harness = ".\\test_harness.dll";
         assert!(
             std::path::Path::new(test_harness).exists(),
             "Skipping test, {test_harness} not found"
