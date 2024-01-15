@@ -2,21 +2,17 @@
 #include <stdlib.h>
 #include <string>
 
+#ifdef _MSC_VER
+  #include <windows.h>
 
-#ifdef _MSC_VER 
-#include <windows.h>
-
-BOOL APIENTRY DllMain( HANDLE hModule, 
-                   DWORD  ul_reason_for_call, 
-                   LPVOID lpReserved
-                 )
-{
-    return TRUE;
+BOOL APIENTRY DllMain(HANDLE hModule, DWORD ul_reason_for_call,
+                      LPVOID lpReserved) {
+  return TRUE;
 }
 
-#define EXTERN __declspec(dllexport) extern "C"
-#else 
-#define EXTERN
+  #define EXTERN __declspec(dllexport) extern "C"
+#else
+  #define EXTERN
 extern "C" {
 #endif
 

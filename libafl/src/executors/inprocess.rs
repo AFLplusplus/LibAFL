@@ -1309,7 +1309,7 @@ pub mod windows_exception_handler {
             let exception_list = data.exceptions();
             if exception_list.contains(&code) {
                 log::error!("Crashed with {code}");
-                #[cfg(all(feature = "std"))]
+                #[cfg(feature = "std")]
                 {
                     let mut bsod = Vec::new();
                     {

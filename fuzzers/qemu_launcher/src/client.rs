@@ -10,6 +10,8 @@ use libafl::{
 use libafl_bolts::{
     core_affinity::CoreId, rands::StdRand, shmem::StdShMemProvider, tuples::tuple_list,
 };
+#[cfg(feature = "injections")]
+use libafl_qemu::injections::QemuInjectionHelper;
 use libafl_qemu::{
     asan::{init_with_asan, QemuAsanHelper},
     cmplog::QemuCmpLogHelper,
@@ -17,9 +19,6 @@ use libafl_qemu::{
     elf::EasyElf,
     ArchExtras, Emulator, GuestAddr, QemuInstrumentationAddressRangeFilter,
 };
-
-#[cfg(feature = "injections")]
-use libafl_qemu::injections::QemuInjectionHelper;
 
 use crate::{instance::Instance, options::FuzzerOptions};
 
