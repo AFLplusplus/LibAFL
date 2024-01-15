@@ -321,6 +321,7 @@ impl<E> TimeoutExecutor<E> {
 
 #[cfg(windows)]
 impl<E: HasInProcessHooks> TimeoutExecutor<E> {
+    /*
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
@@ -355,6 +356,7 @@ impl<E: HasInProcessHooks> TimeoutExecutor<E> {
             tmout_start_time: Duration::ZERO,
         }
     }
+    */
 
     /// Set the timeout for this executor
     pub fn set_timeout(&mut self, exec_tmout: Duration) {
@@ -388,6 +390,7 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        /*
         unsafe {
             let data = &mut GLOBAL_STATE;
             write_volatile(
@@ -437,7 +440,9 @@ where
             ret
         }
     }
+    */
 
+    /*
     /// Deletes this timer queue
     /// # Safety
     /// Will dereference the given `tp_timer` pointer, unchecked.
@@ -447,6 +452,7 @@ where
         }
         self.executor.post_run_reset();
     }
+    */
 }
 
 #[cfg(target_os = "linux")]

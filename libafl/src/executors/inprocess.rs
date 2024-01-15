@@ -21,6 +21,9 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
+
+#[cfg(all(windows, feature = "std"))]
+use crate::executors::hooks::inprocess::HasTimeout;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
@@ -260,7 +263,7 @@ where
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let default = InProcessHooks::new::<Self, EM, OF, Z>()?;
+        let default = InProcessHooks::new::<Self, EM, OF, Z>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
         hooks.init_all::<Self, S>(state);
 

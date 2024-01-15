@@ -15,6 +15,9 @@ pub mod inprocess_fork;
 /// The hook for inprocess executor
 pub mod inprocess;
 
+/// Timer-related stuff
+pub mod timer;
+
 /// The hook that runs before and after the executor runs the target
 pub trait ExecutorHook {
     /// Init this hook

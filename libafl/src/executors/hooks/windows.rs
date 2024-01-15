@@ -121,7 +121,7 @@ pub mod windows_exception_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            hooks::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            hooks::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE, HasTimeout},
             inprocess::{run_observers_and_save_state, HasInProcessHooks},
             Executor, ExitKind, HasObservers,
         },
@@ -245,8 +245,8 @@ pub mod windows_exception_handler {
         EnterCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
         compiler_fence(Ordering::SeqCst);
 
-        if !data.timeout_executor_ptr.is_null()
-            && data.timeout_executor_mut::<E>().handle_timeout(data)
+        if !data.executor_ptr.is_null()
+            && data.executor_mut::<E>().inprocess_hooks_mut().handle_timeout()
         {
             compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
@@ -261,15 +261,15 @@ pub mod windows_exception_handler {
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
 
-            if data.timeout_input_ptr.is_null() {
+            if data.current_input_ptr.is_null() {
                 log::error!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
             } else {
                 log::error!("Timeout in fuzz run.");
 
-                let input = (data.timeout_input_ptr as *const <E::State as UsesInput>::Input)
+                let input = (data.current_input_ptr as *const <E::State as UsesInput>::Input)
                     .as_ref()
                     .unwrap();
-                data.timeout_input_ptr = ptr::null_mut();
+                data.current_input_ptr = ptr::null_mut();
 
                 run_observers_and_save_state::<E, EM, OF, Z>(
                     executor,
