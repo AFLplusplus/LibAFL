@@ -1,11 +1,8 @@
+#[cfg(any(unix, all(windows, feature = "std")))]
+use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
     ffi::c_void,
     ptr::{self, null_mut},
-};
-#[cfg(any(unix, all(windows, feature = "std")))]
-use core::{
-    ptr::{addr_of_mut, write_volatile},
-    sync::atomic::{compiler_fence, Ordering},
 };
 
 #[cfg(all(unix, not(miri)))]
@@ -51,6 +48,7 @@ pub struct InProcessHooks {
     critical: CRITICAL_SECTION,
 }
 
+/// Any hooks that is about timeout
 pub trait HasTimeout {
     #[cfg(all(feature = "std", windows))]
     fn ptp_timer(&self) -> &PTP_TIMER;
@@ -131,54 +129,12 @@ impl ExecutorHook for InProcessHooks {
     /// Call before running a target.
     #[allow(clippy::unused_self)]
     #[allow(unused_variables)]
-    fn pre_exec<E, EM, I, S, Z>(
-        &mut self,
-        executor: &E,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) {
+    fn pre_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I) {
         let data = unsafe { &mut GLOBAL_STATE };
-
-        #[cfg(unix)]
-        unsafe {
-            write_volatile(
-                &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
-            );
-            write_volatile(
-                &mut data.executor_ptr,
-                executor as *const _ as *const c_void,
-            );
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
-            // Direct raw pointers access /aliasing is pretty undefined behavior.
-            // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
-            compiler_fence(Ordering::SeqCst);
-        }
+        data.crash_handler = self.crash_handler;
+        data.timeout_handler = self.timeout_handler;
         #[cfg(all(windows, feature = "std"))]
         unsafe {
-            write_volatile(
-                &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
-            );
-            write_volatile(
-                &mut data.executor_ptr,
-                executor as *const _ as *const c_void,
-            );
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
-            // Direct raw pointers access /aliasing is pretty undefined behavior.
-            // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
-            compiler_fence(Ordering::SeqCst);
-
             //timeout stuff
             #[cfg(feature = "std")]
             {
@@ -218,21 +174,14 @@ impl ExecutorHook for InProcessHooks {
 
     /// Call after running a target.
     #[allow(clippy::unused_self)]
-    fn post_exec<E, EM, I, S, Z>(
+    fn post_exec<EM, I, S, Z>(
         &mut self,
-        executor: &E,
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
         _input: &I,
     ) {
         let data = unsafe { &mut GLOBAL_STATE };
-
-        #[cfg(unix)]
-        unsafe {
-            write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
-            compiler_fence(Ordering::SeqCst);
-        }
 
         //timeout stuff
         #[cfg(all(windows, feature = "std"))]
@@ -250,12 +199,6 @@ impl ExecutorHook for InProcessHooks {
 
             // previous post_run_reset
             SetThreadpoolTimer(*self.ptp_timer(), None, 0, 0);
-        }
-
-        #[cfg(windows)]
-        unsafe {
-            write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
-            compiler_fence(Ordering::SeqCst);
         }
     }
 }
@@ -367,6 +310,13 @@ impl InProcessHooks {
                 };
             }
         }
+        #[cfg(unix)]
+        {
+            ret = Self {
+                crash_handler: ptr::null(),
+                timeout_handler: ptr::null(),
+            }
+        }
         ret
     }
 }
@@ -374,10 +324,14 @@ impl InProcessHooks {
 /// The global state of the in-process harness.
 #[derive(Debug)]
 pub struct InProcessExecutorHandlerData {
-    state_ptr: *mut c_void,
-    event_mgr_ptr: *mut c_void,
-    fuzzer_ptr: *mut c_void,
-    executor_ptr: *const c_void,
+    /// the pointer to the state
+    pub state_ptr: *mut c_void,
+    /// the pointer to the event mgr
+    pub event_mgr_ptr: *mut c_void,
+    /// the pointer to the fuzzer
+    pub fuzzer_ptr: *mut c_void,
+    /// the pointer to the executor
+    pub executor_ptr: *const c_void,
     pub(crate) current_input_ptr: *const c_void,
     pub(crate) in_handler: bool,
 

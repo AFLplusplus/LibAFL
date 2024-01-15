@@ -1,9 +1,11 @@
 #[cfg(target_os = "linux")]
 use core::ptr::addr_of_mut;
 use core::{
+    ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::null_mut,
+    ptr::{null_mut, write_volatile},
+    sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
 
@@ -22,7 +24,9 @@ use super::hooks::ExecutorHooksTuple;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
-        hooks::inprocess_fork::{InChildProcessHooks, InProcessForkExecutorGlobalData},
+        hooks::inprocess_fork::{
+            InChildProcessHooks, InProcessForkExecutorGlobalData, FORK_EXECUTOR_GLOBAL_DATA,
+        },
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
@@ -170,7 +174,8 @@ where
                     // Child
                     self.shmem_provider.post_fork(true)?;
 
-                    self.hooks.pre_exec_all(self, fuzzer, state, mgr, input);
+                    self.enter_target(fuzzer, state, mgr, input);
+                    self.hooks.pre_exec_all(fuzzer, state, mgr, input);
 
                     self.observers
                         .pre_exec_child_all(state, input)
@@ -205,6 +210,9 @@ where
                     self.observers
                         .post_exec_child_all(state, input, &ExitKind::Ok)
                         .expect("Failed to run post_exec on observers");
+
+                    self.hooks.post_exec_all(fuzzer, state, mgr, input);
+                    self.leave_target(fuzzer, state, mgr, input);
 
                     libc::_exit(0);
 
@@ -255,6 +263,39 @@ where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
+    #[inline]
+    /// This function marks the boundary between the fuzzer and the target.
+    pub fn enter_target<EM, Z>(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut <Self as UsesState>::State,
+        _event_mgr: &mut EM,
+        input: &<Self as UsesInput>::Input,
+    ) {
+        unsafe {
+            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
+            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
+            write_volatile(
+                &mut data.current_input_ptr,
+                input as *const _ as *const c_void,
+            );
+            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            compiler_fence(Ordering::SeqCst);
+        }
+    }
+
+    #[inline]
+    /// This function marks the boundary between the fuzzer and the target.
+    pub fn leave_target<EM, Z>(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut <Self as UsesState>::State,
+        _event_mgr: &mut EM,
+        _input: &<Self as UsesInput>::Input,
+    ) {
+        // do nothing
+    }
+
     /// Creates a new [`InProcessForkExecutor`] with custom hooks
     #[cfg(target_os = "linux")]
     #[allow(clippy::too_many_arguments)]

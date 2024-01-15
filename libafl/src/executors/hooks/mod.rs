@@ -20,23 +20,9 @@ pub trait ExecutorHook {
     /// Init this hook
     fn init<E: HasObservers, S>(&mut self, state: &mut S);
     /// The hook that runs before runs the target
-    fn pre_exec<E, EM, I, S, Z>(
-        &mut self,
-        executor: &E,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    );
+    fn pre_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I);
     /// The hook that runs before runs the target
-    fn post_exec<E, EM, I, S, Z>(
-        &mut self,
-        executor: &E,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    );
+    fn post_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I);
 }
 
 /// The hook that runs before and after the executor runs the target
@@ -44,18 +30,10 @@ pub trait ExecutorHooksTuple {
     /// Init these hooks
     fn init_all<E: HasObservers, S>(&mut self, state: &mut S);
     /// The hooks that runs before runs the target
-    fn pre_exec_all<E, EM, I, S, Z>(
-        &mut self,
-        executor: &E,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    );
+    fn pre_exec_all<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I);
     /// The hooks that runs after runs the target
-    fn post_exec_all<E, EM, I, S, Z>(
+    fn post_exec_all<EM, I, S, Z>(
         &mut self,
-        executor: &E,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
@@ -65,18 +43,16 @@ pub trait ExecutorHooksTuple {
 
 impl ExecutorHooksTuple for () {
     fn init_all<E, S>(&mut self, _state: &mut S) {}
-    fn pre_exec_all<E, EM, I, S, Z>(
+    fn pre_exec_all<EM, I, S, Z>(
         &mut self,
-        _executor: &E,
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
         _input: &I,
     ) {
     }
-    fn post_exec_all<E, EM, I, S, Z>(
+    fn post_exec_all<EM, I, S, Z>(
         &mut self,
-        _executor: &E,
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
@@ -95,27 +71,25 @@ where
         self.1.init_all::<E, S>(state);
     }
 
-    fn pre_exec_all<E, EM, I, S, Z>(
+    fn pre_exec_all<EM, I, S, Z>(
         &mut self,
-        executor: &E,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
     ) {
-        self.0.pre_exec(executor, fuzzer, state, mgr, input);
-        self.1.pre_exec_all(executor, fuzzer, state, mgr, input);
+        self.0.pre_exec(fuzzer, state, mgr, input);
+        self.1.pre_exec_all(fuzzer, state, mgr, input);
     }
 
-    fn post_exec_all<E, EM, I, S, Z>(
+    fn post_exec_all<EM, I, S, Z>(
         &mut self,
-        executor: &E,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
     ) {
-        self.0.post_exec(executor, fuzzer, state, mgr, input);
-        self.1.post_exec_all(executor, fuzzer, state, mgr, input);
+        self.0.post_exec(fuzzer, state, mgr, input);
+        self.1.post_exec_all(fuzzer, state, mgr, input);
     }
 }

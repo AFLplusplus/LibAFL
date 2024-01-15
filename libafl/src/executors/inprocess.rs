@@ -7,8 +7,11 @@
 use alloc::boxed::Box;
 use core::{
     borrow::BorrowMut,
+    ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    ptr::{null, write_volatile},
+    sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
 
@@ -22,10 +25,7 @@ use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
     executors::{
-        hooks::{
-            inprocess::{HasTimeout, InProcessHooks},
-            ExecutorHooksTuple,
-        },
+        hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
@@ -123,11 +123,13 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
-        self.hooks.pre_exec_all(self, fuzzer, state, mgr, input);
+        self.enter_target(fuzzer, state, mgr, input);
+        self.hooks.pre_exec_all(fuzzer, state, mgr, input);
 
         let ret = (self.harness_fn.borrow_mut())(input);
 
-        self.hooks.post_exec_all(self, fuzzer, state, mgr, input);
+        self.hooks.post_exec_all(fuzzer, state, mgr, input);
+        self.leave_target(fuzzer, state, mgr, input);
         Ok(ret)
     }
 }
@@ -148,6 +150,56 @@ where
     #[inline]
     fn observers_mut(&mut self) -> &mut OT {
         &mut self.observers
+    }
+}
+impl<H, HB, HT, OT, S> GenericInProcessExecutor<H, HB, HT, OT, S>
+where
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
+    HT: ExecutorHooksTuple,
+    OT: ObserversTuple<S>,
+    S: State,
+{
+    /// This function marks the boundary between the fuzzer and the target
+    #[inline]
+    pub fn enter_target<EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut <Self as UsesState>::State,
+        mgr: &mut EM,
+        input: &<Self as UsesInput>::Input,
+    ) {
+        unsafe {
+            let data = &mut GLOBAL_STATE;
+            write_volatile(
+                &mut data.current_input_ptr,
+                input as *const _ as *const c_void,
+            );
+            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
+            // Direct raw pointers access /aliasing is pretty undefined behavior.
+            // Since the state and event may have moved in memory, refresh them right before the signal may happen
+            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            compiler_fence(Ordering::SeqCst);
+        }
+    }
+
+    /// This function marks the boundary between the fuzzer and the target
+    #[inline]
+    pub fn leave_target<EM, Z>(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut <Self as UsesState>::State,
+        _mgr: &mut EM,
+        _input: &<Self as UsesInput>::Input,
+    ) {
+        unsafe {
+            let data = &mut GLOBAL_STATE;
+
+            write_volatile(&mut data.current_input_ptr, null());
+            compiler_fence(Ordering::SeqCst);
+        }
     }
 }
 
@@ -421,7 +473,12 @@ mod tests {
         };
         let input = NopInput {};
         in_process_executor
-            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
+            .run_target(
+                &mut NopFuzzer::new(),
+                &mut NopState::new(),
+                &mut NopEventManager::new(),
+                &input,
+            )
             .unwrap();
     }
 }
