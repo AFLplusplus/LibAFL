@@ -56,7 +56,7 @@ void __cmplog_ins_hook8(uint64_t arg1, uint64_t arg2) {
   (void)arg2;
 }
 
-#if !defined(_WIN32) && defined(__SIZEOF_INT128__)
+#ifndef _WIN32
 void __cmplog_ins_hook16_extended(uint128_t arg1, uint128_t arg2,
                                   uint8_t attr) {
   (void)attr;
@@ -86,9 +86,19 @@ void __cmplog_rtn_hook(uint8_t *ptr1, uint8_t *ptr2) {
   (void)ptr1;
   (void)ptr2;
 }
+void __cmplog_rtn_hook_extended(uint8_t *ptr1, uint8_t *ptr2) {
+  (void)ptr1;
+  (void)ptr2;
+}
 
 void __cmplog_rtn_hook_n(const uint8_t *ptr1, const uint8_t *ptr2,
                          uint64_t len) {
+  (void)ptr1;
+  (void)ptr2;
+  (void)len;
+}
+void __cmplog_rtn_hook_n_extended(const uint8_t *ptr1, const uint8_t *ptr2,
+                                  uint64_t len) {
   (void)ptr1;
   (void)ptr2;
   (void)len;
@@ -98,8 +108,18 @@ void __cmplog_rtn_hook_str(const uint8_t *ptr1, uint8_t *ptr2) {
   (void)ptr1;
   (void)ptr2;
 }
+void __cmplog_rtn_hook_str_extended(const uint8_t *ptr1, uint8_t *ptr2) {
+  (void)ptr1;
+  (void)ptr2;
+}
 
 void __cmplog_rtn_hook_strn(uint8_t *ptr1, uint8_t *ptr2, uint64_t len) {
+  (void)ptr1;
+  (void)ptr2;
+  (void)len;
+}
+void __cmplog_rtn_hook_strn_extended(uint8_t *ptr1, uint8_t *ptr2,
+                                     uint64_t len) {
   (void)ptr1;
   (void)ptr2;
   (void)len;
@@ -109,9 +129,19 @@ void __cmplog_rtn_gcc_stdstring_cstring(uint8_t *stdstring, uint8_t *cstring) {
   (void)stdstring;
   (void)cstring;
 }
+void __cmplog_rtn_gcc_stdstring_cstring_extended(uint8_t *stdstring,
+                                                 uint8_t *cstring) {
+  (void)stdstring;
+  (void)cstring;
+}
 
 void __cmplog_rtn_gcc_stdstring_stdstring(uint8_t *stdstring1,
                                           uint8_t *stdstring2) {
+  (void)stdstring1;
+  (void)stdstring2;
+}
+void __cmplog_rtn_gcc_stdstring_stdstring_extended(uint8_t *stdstring1,
+                                                   uint8_t *stdstring2) {
   (void)stdstring1;
   (void)stdstring2;
 }
@@ -120,9 +150,19 @@ void __cmplog_rtn_llvm_stdstring_cstring(uint8_t *stdstring, uint8_t *cstring) {
   (void)stdstring;
   (void)cstring;
 }
+void __cmplog_rtn_llvm_stdstring_cstring_extended(uint8_t *stdstring,
+                                                  uint8_t *cstring) {
+  (void)stdstring;
+  (void)cstring;
+}
 
 void __cmplog_rtn_llvm_stdstring_stdstring(uint8_t *stdstring1,
                                            uint8_t *stdstring2) {
+  (void)stdstring1;
+  (void)stdstring2;
+}
+void __cmplog_rtn_llvm_stdstring_stdstring_extended(uint8_t *stdstring1,
+                                                    uint8_t *stdstring2) {
   (void)stdstring1;
   (void)stdstring2;
 }

@@ -5,7 +5,7 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use alloc::boxed::Box;
-#[cfg(all(unix, feature = "std"))]
+#[cfg(unix)]
 use alloc::vec::Vec;
 #[cfg(all(feature = "std", unix, target_os = "linux"))]
 use core::ptr::addr_of_mut;
@@ -28,8 +28,10 @@ use std::intrinsics::transmute;
 
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
+#[cfg(unix)]
+use libafl_bolts::os::unix_signals::Signal;
 #[cfg(all(feature = "std", unix))]
-use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
+use libafl_bolts::os::unix_signals::{ucontext_t, Handler};
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
@@ -274,6 +276,24 @@ pub struct InProcessHandlers {
     /// On timeout C function pointer
     #[cfg(any(unix, feature = "std"))]
     pub timeout_handler: *const c_void,
+}
+
+/// The common signals we want to handle
+#[cfg(unix)]
+#[inline]
+fn common_signals() -> Vec<Signal> {
+    vec![
+        Signal::SigAlarm,
+        Signal::SigUser2,
+        Signal::SigAbort,
+        Signal::SigBus,
+        #[cfg(feature = "handle_sigpipe")]
+        Signal::SigPipe,
+        Signal::SigFloatingPointException,
+        Signal::SigIllegalInstruction,
+        Signal::SigSegmentationFault,
+        Signal::SigTrap,
+    ]
 }
 
 impl InProcessHandlers {
@@ -683,6 +703,7 @@ pub mod unix_signal_handler {
     use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
     use libc::siginfo_t;
 
+    use super::common_signals;
     #[cfg(feature = "std")]
     use crate::inputs::Input;
     use crate::{
@@ -743,17 +764,7 @@ pub mod unix_signal_handler {
         }
 
         fn signals(&self) -> Vec<Signal> {
-            vec![
-                Signal::SigAlarm,
-                Signal::SigUser2,
-                Signal::SigAbort,
-                Signal::SigBus,
-                Signal::SigPipe,
-                Signal::SigFloatingPointException,
-                Signal::SigIllegalInstruction,
-                Signal::SigSegmentationFault,
-                Signal::SigTrap,
-            ]
+            common_signals()
         }
     }
 
@@ -1541,17 +1552,7 @@ impl Handler for InProcessForkExecutorGlobalData {
     }
 
     fn signals(&self) -> Vec<Signal> {
-        vec![
-            Signal::SigAlarm,
-            Signal::SigUser2,
-            Signal::SigAbort,
-            Signal::SigBus,
-            Signal::SigPipe,
-            Signal::SigFloatingPointException,
-            Signal::SigIllegalInstruction,
-            Signal::SigSegmentationFault,
-            Signal::SigTrap,
-        ]
+        common_signals()
     }
 }
 
@@ -2185,9 +2186,9 @@ mod tests {
     use crate::{
         events::NopEventManager,
         executors::{inprocess::InProcessHandlers, Executor, ExitKind, InProcessExecutor},
+        fuzzer::test::NopFuzzer,
         inputs::{NopInput, UsesInput},
-        state::NopState,
-        NopFuzzer,
+        state::test::NopState,
     };
 
     impl UsesInput for () {
@@ -2225,8 +2226,8 @@ mod tests {
         use crate::{
             events::SimpleEventManager,
             executors::{inprocess::InChildProcessHandlers, InProcessForkExecutor},
-            state::NopState,
-            NopFuzzer,
+            fuzzer::test::NopFuzzer,
+            state::test::NopState,
         };
 
         let provider = StdShMemProvider::new().unwrap();

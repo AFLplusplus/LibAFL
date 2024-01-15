@@ -448,7 +448,7 @@ fn fuzz_binary(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Remove target ouput (logs still survive)
+    // Remove target output (logs still survive)
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
@@ -675,7 +675,7 @@ fn fuzz_text(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Remove target ouput (logs still survive)
+    // Remove target output (logs still survive)
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();

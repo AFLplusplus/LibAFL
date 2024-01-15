@@ -378,12 +378,20 @@ impl Allocator {
         end: usize,
         unpoison: bool,
     ) -> (usize, usize) {
-        // log::trace!("start: {:x}, end {:x}, size {:x}", start, end, end - start);
-
         let shadow_mapping_start = map_to_shadow!(self, start);
 
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
+        // I'm not sure this works as planned. The same address appearing as start and end is mapped to
+        // different addresses.
         let shadow_end = self.round_up_to_page((end - start) / 8) + self.page_size + shadow_start;
+        log::trace!(
+            "map_shadow_for_region start: {:x}, end {:x}, size {:x}, shadow {:x}-{:x}",
+            start,
+            end,
+            end - start,
+            shadow_start,
+            shadow_end
+        );
         if self.pre_allocated_shadow_mappings.is_empty() {
             for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
                 /*
@@ -401,28 +409,46 @@ impl Allocator {
                 self.mappings.insert(range.start, mapping);
             }
 
+            log::trace!("adding shadow pages {:x} - {:x}", shadow_start, shadow_end);
             self.shadow_pages.insert(shadow_start..shadow_end);
         } else {
             let mut new_shadow_mappings = Vec::new();
-            for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
-                for ((start, end), shadow_mapping) in &mut self.pre_allocated_shadow_mappings {
-                    if *start <= range.start && range.start < *start + shadow_mapping.len() {
+            for gap in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
+                for ((pa_start, pa_end), shadow_mapping) in &mut self.pre_allocated_shadow_mappings
+                {
+                    if *pa_start <= gap.start && gap.start < *pa_start + shadow_mapping.len() {
+                        log::trace!("pa_start: {:x}, pa_end {:x}, gap.start {:x}, shadow_mapping.ptr {:x}, shadow_mapping.len {:x}",
+                         *pa_start, *pa_end, gap.start, shadow_mapping.as_ptr() as usize, shadow_mapping.len());
+
+                        // Split the preallocated mapping into two parts, keeping the
+                        // part before the gap and returning the part starting with the gap as a new mapping
                         let mut start_mapping =
-                            shadow_mapping.split_off(range.start - *start).unwrap();
-                        let end_mapping = start_mapping
-                            .split_off(range.end - (range.start - *start))
-                            .unwrap();
-                        new_shadow_mappings.push(((range.end, *end), end_mapping));
+                            shadow_mapping.split_off(gap.start - *pa_start).unwrap();
+
+                        // Split the new mapping into two parts,
+                        // keeping the part holding the gap and returning the part starting after the gap as a new mapping
+                        let end_mapping = start_mapping.split_off(gap.end - gap.start).unwrap();
+
+                        //Push the new after-the-gap mapping to the list of mappings to be added
+                        new_shadow_mappings.push(((gap.end, *pa_end), end_mapping));
+
+                        // Insert the new gap mapping into the list of mappings
                         self.mappings
-                            .insert(range.start, start_mapping.try_into().unwrap());
+                            .insert(gap.start, start_mapping.try_into().unwrap());
 
                         break;
                     }
                 }
             }
             for new_shadow_mapping in new_shadow_mappings {
+                log::trace!(
+                    "adding pre_allocated_shadow_mappings and shadow pages {:x} - {:x}",
+                    new_shadow_mapping.0 .0,
+                    new_shadow_mapping.0 .1
+                );
                 self.pre_allocated_shadow_mappings
                     .insert(new_shadow_mapping.0, new_shadow_mapping.1);
+
                 self.shadow_pages
                     .insert(new_shadow_mapping.0 .0..new_shadow_mapping.0 .1);
             }
@@ -493,7 +519,7 @@ impl Allocator {
             let start = area.as_ref().unwrap().start();
             let end = area.unwrap().end();
             occupied_ranges.push((start, end));
-            log::trace!("{:x} {:x}", start, end);
+            // log::trace!("Occupied {:x} {:x}", start, end);
             let base: usize = 2;
             // On x64, if end > 2**48, then that's in vsyscall or something.
             #[cfg(all(unix, target_arch = "x86_64"))]
@@ -527,28 +553,56 @@ impl Allocator {
                 let addr: usize = 1 << try_shadow_bit;
                 let shadow_start = addr;
                 let shadow_end = addr + addr + addr;
-
+                let mut good_candidate = true;
                 // check if the proposed shadow bit overlaps with occupied ranges.
                 for (start, end) in &occupied_ranges {
+                    // log::trace!("{:x} {:x}, {:x} {:x} -> {:x} - {:x}", shadow_start, shadow_end, start, end,
+                    //     shadow_start + ((start >> 3) & ((1 << (try_shadow_bit + 1)) - 1)),
+                    //     shadow_start + ((end >> 3) & ((1 << (try_shadow_bit + 1)) - 1))
+                    // );
                     if (shadow_start <= *end) && (*start <= shadow_end) {
                         log::trace!("{:x} {:x}, {:x} {:x}", shadow_start, shadow_end, start, end);
                         log::warn!("shadow_bit {try_shadow_bit:x} is not suitable");
+                        good_candidate = false;
+                        break;
+                    }
+                    //check that the entire range's shadow is within the candidate shadow memory space
+                    if (shadow_start + ((start >> 3) & ((1 << (try_shadow_bit + 1)) - 1))
+                        > shadow_end)
+                        || (shadow_start + (((end >> 3) & ((1 << (try_shadow_bit + 1)) - 1)) + 1)
+                            > shadow_end)
+                    {
+                        log::warn!(
+                            "shadow_bit {try_shadow_bit:x} is not suitable (shadow out of range)"
+                        );
+                        good_candidate = false;
                         break;
                     }
                 }
 
-                if let Ok(mapping) = MmapOptions::new(1 << (*try_shadow_bit + 1))
-                    .unwrap()
-                    .with_flags(MmapFlags::NO_RESERVE)
-                    .with_address(addr)
-                    .reserve_mut()
-                {
-                    shadow_bit = (*try_shadow_bit).try_into().unwrap();
+                if good_candidate {
+                    // We reserve the shadow memory space of size addr*2, but don't commit it.
+                    if let Ok(mapping) = MmapOptions::new(1 << (*try_shadow_bit + 1))
+                        .unwrap()
+                        .with_flags(MmapFlags::NO_RESERVE)
+                        .with_address(addr)
+                        .reserve_mut()
+                    {
+                        shadow_bit = (*try_shadow_bit).try_into().unwrap();
 
-                    log::warn!("shadow_bit {shadow_bit:x} is suitable");
-                    self.pre_allocated_shadow_mappings
-                        .insert((addr, (addr + (1 << shadow_bit))), mapping);
-                    break;
+                        log::warn!("shadow_bit {shadow_bit:x} is suitable");
+                        log::trace!(
+                            "adding pre_allocated_shadow_mappings {:x} - {:x} with size {:}",
+                            addr,
+                            (addr + (1 << (shadow_bit + 1))),
+                            mapping.len()
+                        );
+
+                        self.pre_allocated_shadow_mappings
+                            .insert((addr, (addr + (1 << (shadow_bit + 1)))), mapping);
+                        break;
+                    }
+                    log::warn!("shadow_bit {try_shadow_bit:x} is not suitable - failed to allocate shadow memory");
                 }
             }
         }

@@ -12,7 +12,6 @@ use core::{
 use libafl::{
     executors::{inprocess::inprocess_get_state, ExitKind},
     inputs::UsesInput,
-    state::NopState,
 };
 
 pub use crate::emu::SyscallHookResult;
@@ -363,36 +362,6 @@ where
     }
 }
 
-impl<I, QT> QemuHooks<QT, NopState<I>>
-where
-    QT: QemuHelperTuple<NopState<I>>,
-    NopState<I>: UsesInput<Input = I>,
-{
-    pub fn reproducer(emulator: Emulator, helpers: QT) -> Box<Self> {
-        Self::new(emulator, helpers)
-    }
-
-    pub fn repro_run<H>(&mut self, harness: &mut H, input: &I) -> ExitKind
-    where
-        H: FnMut(&I) -> ExitKind,
-    {
-        unsafe {
-            if FIRST_EXEC {
-                self.helpers.first_exec_all(self);
-                FIRST_EXEC = false;
-            }
-        }
-        self.helpers.pre_exec_all(&self.emulator, input);
-
-        let mut exit_kind = harness(input);
-
-        self.helpers
-            .post_exec_all(&self.emulator, input, &mut (), &mut exit_kind);
-
-        exit_kind
-    }
-}
-
 impl<QT, S> QemuHooks<QT, S>
 where
     QT: QemuHelperTuple<S>,
@@ -598,6 +567,7 @@ where
         }
     }
 
+    #[allow(clippy::similar_names)]
     pub fn reads(
         &self,
         generation_hook: Hook<
@@ -761,6 +731,7 @@ where
                 write_3_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr)
             );
+            #[allow(clippy::similar_names)]
             let execn = get_raw_hook!(
                 execution_hook_n,
                 write_4_exec_hook_wrapper::<QT, S>,

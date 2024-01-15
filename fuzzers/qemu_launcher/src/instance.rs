@@ -52,6 +52,7 @@ pub struct Instance<'a> {
     emu: &'a Emulator,
     mgr: ClientMgr,
     core_id: CoreId,
+    extra_tokens: Option<Vec<String>>,
 }
 
 impl<'a> Instance<'a> {
@@ -119,11 +120,20 @@ impl<'a> Instance<'a> {
 
         let observers = tuple_list!(edges_observer, time_observer);
 
-        if let Some(tokenfile) = &self.options.tokens {
-            if state.metadata_map().get::<Tokens>().is_none() {
-                state.add_metadata(Tokens::from_file(tokenfile)?);
+        let mut tokens = Tokens::new();
+
+        if let Some(extra_tokens) = &self.extra_tokens {
+            for token in extra_tokens {
+                let bytes = token.as_bytes().to_vec();
+                let _ = tokens.add_token(&bytes);
             }
         }
+
+        if let Some(tokenfile) = &self.options.tokens {
+            tokens.add_from_file(tokenfile)?;
+        }
+
+        state.add_metadata(tokens);
 
         let harness = Harness::new(self.emu)?;
         let mut harness = |input: &BytesInput| harness.run(input);
@@ -213,7 +223,7 @@ impl<'a> Instance<'a> {
             state
                 .load_initial_inputs(fuzzer, executor, &mut self.mgr, &corpus_dirs)
                 .unwrap_or_else(|_| {
-                    println!("Failed to load initial corpus at {:?}", corpus_dirs);
+                    println!("Failed to load initial corpus at {corpus_dirs:?}");
                     process::exit(0);
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());

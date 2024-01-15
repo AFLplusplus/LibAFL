@@ -84,3 +84,5 @@ yaxpeax-arch = "0.2.7"
 
 [dev-dependencies]
 serial_test = { version = "2", default-features = false, features = ["logging"] }
+clap = {version = "4.0", features = ["derive"]}
+libloading = "0.7"

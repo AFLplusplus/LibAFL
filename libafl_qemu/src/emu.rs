@@ -491,7 +491,7 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), String>
     where
         T: Into<GuestReg>;
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>;
     fn write_function_argument<T>(
@@ -508,7 +508,7 @@ pub trait ArchExtras {
 impl CPU {
     #[must_use]
     pub fn emulator(&self) -> Emulator {
-        Emulator::new_empty()
+        unsafe { Emulator::new_empty() }
     }
 
     #[must_use]
@@ -732,7 +732,7 @@ impl CPU {
         #[cfg(emulation_mode = "usermode")]
         {
             thread_local! {
-                static PAGE_SIZE: OnceCell<usize> = OnceCell::new();
+                static PAGE_SIZE: OnceCell<usize> = const { OnceCell::new() };
             }
 
             PAGE_SIZE.with(|s| {
@@ -980,7 +980,7 @@ impl Emulator {
                     envp.as_ptr() as *const *const u8,
                 );
                 libc::atexit(qemu_cleanup_atexit);
-                libafl_qemu_sys::syx_snapshot_init();
+                libafl_qemu_sys::syx_snapshot_init(true);
             }
         }
         Ok(Emulator { _private: () })
@@ -997,8 +997,14 @@ impl Emulator {
         }
     }
 
+    /// Get an empty emulator.
+    ///
+    /// # Safety
+    ///
+    /// Should not be used if `Emulator::new` has never been used before (otherwise QEMU will not be initialized).
+    /// Prefer `Emulator::get` for a safe version of this method.
     #[must_use]
-    pub fn new_empty() -> Emulator {
+    pub unsafe fn new_empty() -> Emulator {
         Emulator { _private: () }
     }
 
@@ -1538,6 +1544,7 @@ impl Emulator {
         unsafe {
             libafl_qemu_sys::syx_snapshot_new(
                 track,
+                true,
                 libafl_qemu_sys::DeviceSnapshotKind_DEVICE_SNAPSHOT_ALL,
                 null_mut(),
             )
@@ -1555,6 +1562,7 @@ impl Emulator {
         unsafe {
             libafl_qemu_sys::syx_snapshot_new(
                 track,
+                true,
                 device_filter.enum_id(),
                 device_filter.devices(&mut v),
             )
@@ -1632,7 +1640,7 @@ impl ArchExtras for Emulator {
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>,
     {
@@ -1668,7 +1676,7 @@ pub mod pybind {
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
 
     extern "C" fn py_syscall_hook_wrapper(
-        data: u64,
+        _data: u64,
         sys_num: i32,
         a0: u64,
         a1: u64,
@@ -1766,7 +1774,7 @@ pub mod pybind {
 
         fn run(&self) {
             unsafe {
-                self.emu.run();
+                self.emu.run().unwrap();
             }
         }
 

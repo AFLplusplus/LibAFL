@@ -50,7 +50,9 @@
 #include <set>
 
 using namespace llvm;
-
+static cl::opt<bool> CmplogExtended("cmplog_routines_extended",
+                                    cl::desc("Uses extended header"),
+                                    cl::init(false), cl::NotHidden);
 namespace {
 
 #if USE_NEW_PM
@@ -114,150 +116,85 @@ bool CmpLogRoutines::hookRtns(Module &M) {
   // PointerType *VoidPtrTy = PointerType::get(VoidTy, 0);
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
   IntegerType *Int64Ty = IntegerType::getInt64Ty(C);
+  IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
   PointerType *i8PtrTy = PointerType::get(Int8Ty, 0);
 
-#if LLVM_VERSION_MAJOR < 9
-  Constant *
-#else
-  FunctionCallee
-#endif
-      c = M.getOrInsertFunction("__cmplog_rtn_hook", VoidTy, i8PtrTy, i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                ,
-                                NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR < 9
-  Function *cmplogHookFn = cast<Function>(c);
-#else
-  FunctionCallee cmplogHookFn = c;
-#endif
+  FunctionCallee cmplogHookFn;
+  FunctionCallee cmplogLlvmStdStd;
+  FunctionCallee cmplogLlvmStdC;
+  FunctionCallee cmplogGccStdStd;
+  FunctionCallee cmplogGccStdC;
+  FunctionCallee cmplogHookFnN;
+  FunctionCallee cmplogHookFnStrN;
+  FunctionCallee cmplogHookFnStr;
 
-#if LLVM_VERSION_MAJOR < 9
-  Constant *
-#else
-  FunctionCallee
-#endif
-      c1 = M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_stdstring",
-                                 VoidTy, i8PtrTy, i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR < 9
-  Function *cmplogLlvmStdStd = cast<Function>(c1);
-#else
-  FunctionCallee cmplogLlvmStdStd = c1;
-#endif
+  if (CmplogExtended) {
+    cmplogHookFn = M.getOrInsertFunction("__cmplog_rtn_hook_extended", VoidTy,
+                                         i8PtrTy, i8PtrTy);
+  } else {
+    cmplogHookFn =
+        M.getOrInsertFunction("__cmplog_rtn_hook", VoidTy, i8PtrTy, i8PtrTy);
+  }
 
-#if LLVM_VERSION_MAJOR < 9
-  Constant *
-#else
-  FunctionCallee
-#endif
-      c2 = M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_cstring", VoidTy,
-                                 i8PtrTy, i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR < 9
-  Function *cmplogLlvmStdC = cast<Function>(c2);
-#else
-  FunctionCallee cmplogLlvmStdC = c2;
-#endif
+  if (CmplogExtended) {
+    cmplogLlvmStdStd =
+        M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_stdstring_extended",
+                              VoidTy, i8PtrTy, i8PtrTy);
+  } else {
+    cmplogLlvmStdStd = M.getOrInsertFunction(
+        "__cmplog_rtn_llvm_stdstring_stdstring", VoidTy, i8PtrTy, i8PtrTy);
+  }
 
-#if LLVM_VERSION_MAJOR < 9
-  Constant *
-#else
-  FunctionCallee
-#endif
-      c3 = M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_stdstring", VoidTy,
-                                 i8PtrTy, i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR < 9
-  Function *cmplogGccStdStd = cast<Function>(c3);
-#else
-  FunctionCallee cmplogGccStdStd = c3;
-#endif
+  if (CmplogExtended) {
+    cmplogLlvmStdC =
+        M.getOrInsertFunction("__cmplog_rtn_llvm_stdstring_cstring_extended",
+                              VoidTy, i8PtrTy, i8PtrTy);
+  } else {
+    cmplogLlvmStdC = M.getOrInsertFunction(
+        "__cmplog_rtn_llvm_stdstring_cstring", VoidTy, i8PtrTy, i8PtrTy);
+  }
 
-#if LLVM_VERSION_MAJOR < 9
-  Constant *
-#else
-  FunctionCallee
-#endif
-      c4 = M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_cstring", VoidTy,
-                                 i8PtrTy, i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR < 9
-  Function *cmplogGccStdC = cast<Function>(c4);
-#else
-  FunctionCallee cmplogGccStdC = c4;
-#endif
+  if (CmplogExtended) {
+    cmplogGccStdStd =
+        M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_stdstring_extended",
+                              VoidTy, i8PtrTy, i8PtrTy);
+  } else {
+    cmplogGccStdStd = M.getOrInsertFunction(
+        "__cmplog_rtn_gcc_stdstring_stdstring", VoidTy, i8PtrTy, i8PtrTy);
+  }
 
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee
-#else
-  Constant *
-#endif
-      c5 = M.getOrInsertFunction("__cmplog_rtn_hook_n", VoidTy, i8PtrTy,
-                                 i8PtrTy, Int64Ty
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee cmplogHookFnN = c5;
-#else
-  Function *cmplogHookFnN = cast<Function>(c5);
-#endif
+  if (CmplogExtended) {
+    cmplogGccStdC =
+        M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_cstring_extended",
+                              VoidTy, i8PtrTy, i8PtrTy);
+  } else {
+    cmplogGccStdC = M.getOrInsertFunction("__cmplog_rtn_gcc_stdstring_cstring",
+                                          VoidTy, i8PtrTy, i8PtrTy);
+  }
 
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee
-#else
-  Constant *
-#endif
-      c6 = M.getOrInsertFunction("__cmplog_rtn_hook_strn", VoidTy, i8PtrTy,
-                                 i8PtrTy, Int64Ty
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee cmplogHookFnStrN = c6;
-#else
-  Function *cmplogHookFnStrN = cast<Function>(c6);
-#endif
+  if (CmplogExtended) {
+    cmplogHookFnN = M.getOrInsertFunction("__cmplog_rtn_hook_n_extended",
+                                          VoidTy, i8PtrTy, i8PtrTy, Int64Ty);
+  } else {
+    cmplogHookFnN = M.getOrInsertFunction("__cmplog_rtn_hook_n", VoidTy,
+                                          i8PtrTy, i8PtrTy, Int64Ty);
+  }
 
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee
-#else
-  Constant *
-#endif
-      c7 = M.getOrInsertFunction("__cmplog_rtn_hook_str", VoidTy, i8PtrTy,
-                                 i8PtrTy
-#if LLVM_VERSION_MAJOR < 5
-                                 ,
-                                 NULL
-#endif
-      );
-#if LLVM_VERSION_MAJOR >= 9
-  FunctionCallee cmplogHookFnStr = c7;
-#else
-  Function *cmplogHookFnStr = cast<Function>(c7);
-#endif
+  if (CmplogExtended) {
+    cmplogHookFnStrN = M.getOrInsertFunction("__cmplog_rtn_hook_strn_extended",
+                                             VoidTy, i8PtrTy, i8PtrTy, Int64Ty);
+  } else {
+    cmplogHookFnStrN = M.getOrInsertFunction("__cmplog_rtn_hook_strn", VoidTy,
+                                             i8PtrTy, i8PtrTy, Int64Ty);
+  }
+
+  if (CmplogExtended) {
+    cmplogHookFnStr = M.getOrInsertFunction("__cmplog_rtn_hook_str_extended",
+                                            VoidTy, i8PtrTy, i8PtrTy);
+  } else {
+    cmplogHookFnStr = M.getOrInsertFunction("__cmplog_rtn_hook_str", VoidTy,
+                                            i8PtrTy, i8PtrTy);
+  }
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {
@@ -334,7 +271,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
           isStrcmp &=
               FT->getNumParams() == 2 && FT->getReturnType()->isIntegerTy(32) &&
               FT->getParamType(0) == FT->getParamType(1) &&
-              FT->getParamType(0) == IntegerType::getInt8PtrTy(M.getContext());
+              FT->getParamType(0) ==
+                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0);
 
           bool isStrncmp = (!FuncName.compare("strncmp") ||
                             !FuncName.compare("xmlStrncmp") ||
@@ -347,12 +285,12 @@ bool CmpLogRoutines::hookRtns(Module &M) {
                             !FuncName.compare("g_ascii_strncasecmp") ||
                             !FuncName.compare("Curl_strncasecompare") ||
                             !FuncName.compare("g_strncasecmp"));
-          isStrncmp &= FT->getNumParams() == 3 &&
-                       FT->getReturnType()->isIntegerTy(32) &&
-                       FT->getParamType(0) == FT->getParamType(1) &&
-                       FT->getParamType(0) ==
-                           IntegerType::getInt8PtrTy(M.getContext()) &&
-                       FT->getParamType(2)->isIntegerTy();
+          isStrncmp &=
+              FT->getNumParams() == 3 && FT->getReturnType()->isIntegerTy(32) &&
+              FT->getParamType(0) == FT->getParamType(1) &&
+              FT->getParamType(0) ==
+                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0) &&
+              FT->getParamType(2)->isIntegerTy();
 
           bool isGccStdStringStdString =
               Callee->getName().find("__is_charIT_EE7__value") !=
@@ -454,7 +392,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
     Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     Value               *v3Pbitcast = IRB.CreateBitCast(
-                      v3P, IntegerType::get(C, v3P->getType()->getPrimitiveSizeInBits()));
+        v3P, IntegerType::get(C, v3P->getType()->getPrimitiveSizeInBits()));
     Value *v3Pcasted =
         IRB.CreateIntCast(v3Pbitcast, IntegerType::get(C, 64), false);
     args.push_back(v1Pcasted);
@@ -492,7 +430,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
     Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
     Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     Value               *v3Pbitcast = IRB.CreateBitCast(
-                      v3P, IntegerType::get(C, v3P->getType()->getPrimitiveSizeInBits()));
+        v3P, IntegerType::get(C, v3P->getType()->getPrimitiveSizeInBits()));
     Value *v3Pcasted =
         IRB.CreateIntCast(v3Pbitcast, IntegerType::get(C, 64), false);
     args.push_back(v1Pcasted);

@@ -6,10 +6,8 @@ use libafl::{
     feedbacks::{MapFeedbackMetadata, MAPFEEDBACK_PREFIX},
     inputs::UsesInput,
     monitors::SimpleMonitor,
-    stages::StagesTuple,
-    state::{
-        HasExecutions, HasLastReportTime, HasMetadata, HasNamedMetadata,
-    },
+    stages::{HasCurrentStage, StagesTuple},
+    state::{HasExecutions, HasLastReportTime, HasMetadata, HasNamedMetadata},
     Error, Fuzzer,
 };
 
@@ -30,7 +28,8 @@ where
         + HasNamedMetadata
         + HasExecutions
         + UsesInput
-        + HasLastReportTime,
+        + HasLastReportTime
+        + HasCurrentStage,
     E: HasObservers<State = S>,
     EM: ProgressReporter<State = S>,
     ST: StagesTuple<E, EM, S, F>,
