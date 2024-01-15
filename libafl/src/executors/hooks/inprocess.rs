@@ -4,7 +4,7 @@ use core::{
 };
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
-    ptr::write_volatile,
+    ptr::{addr_of_mut, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
 
@@ -13,7 +13,14 @@ use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(windows, feature = "std"))]
-use windows::Win32::System::Threading::PTP_TIMER;
+use windows::Win32::{
+    Foundation::FILETIME,
+    System::Threading::{
+        CreateThreadpoolTimer, EnterCriticalSection, InitializeCriticalSection,
+        LeaveCriticalSection, SetThreadpoolTimer, CRITICAL_SECTION, PTP_CALLBACK_INSTANCE,
+        PTP_TIMER, TP_CALLBACK_ENVIRON_V3,
+    },
+};
 
 #[cfg(unix)]
 use crate::executors::hooks::unix::unix_signal_handler;
@@ -35,25 +42,107 @@ pub struct InProcessHooks {
     /// On timeout C function pointer
     #[cfg(any(unix, feature = "std"))]
     pub timeout_handler: *const c_void,
+    // timeout time (windows)
+    #[cfg(all(windows, feature = "std"))]
+    milli_sec: i64,
+    #[cfg(all(windows, feature = "std"))]
+    ptp_timer: PTP_TIMER,
+    #[cfg(all(windows, feature = "std"))]
+    critical: CRITICAL_SECTION,
 }
 
+pub trait HasTimeout {
+    #[cfg(all(feature = "std", windows))]
+    fn ptp_timer(&self) -> &PTP_TIMER;
+    #[cfg(all(feature = "std", windows))]
+    fn critical(&self) -> &CRITICAL_SECTION;
+    #[cfg(all(feature = "std", windows))]
+    fn critical_mut(&mut self) -> &mut CRITICAL_SECTION;
+    #[cfg(all(feature = "std", windows))]
+    fn milli_sec(&self) -> i64;
+    #[cfg(all(feature = "std", windows))]
+    fn millis_sec_mut(&mut self) -> &mut i64;
+}
+
+impl HasTimeout for InProcessHooks {
+    #[cfg(all(feature = "std", windows))]
+    fn ptp_timer(&self) -> &PTP_TIMER {
+        &self.ptp_timer
+    }
+
+    #[cfg(all(feature = "std", windows))]
+    fn critical(&self) -> &CRITICAL_SECTION {
+        &self.critical
+    }
+
+    #[cfg(all(feature = "std", windows))]
+    fn critical_mut(&mut self) -> &mut CRITICAL_SECTION {
+        &mut self.critical
+    }
+
+    #[cfg(all(feature = "std", windows))]
+    fn milli_sec(&self) -> i64 {
+        self.milli_sec
+    }
+
+    #[cfg(all(feature = "std", windows))]
+    fn millis_sec_mut(&mut self) -> &mut i64 {
+        &mut self.milli_sec
+    }
+}
+
+#[cfg(windows)]
+#[allow(non_camel_case_types)]
+type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
+    param0: PTP_CALLBACK_INSTANCE,
+    param1: *mut c_void,
+    param2: PTP_TIMER,
+);
+
 impl ExecutorHook for InProcessHooks {
-    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
+    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {
+        // init timeout
+        #[cfg(windows)]
+        {
+            #[cfg(feature = "std")]
+            {
+                let timeout_handler: PTP_TIMER_CALLBACK =
+                    unsafe { std::mem::transmute(self.timeout_handler) };
+                let ptp_timer = unsafe {
+                    CreateThreadpoolTimer(
+                        Some(timeout_handler),
+                        Some(addr_of_mut!(GLOBAL_STATE) as *mut c_void),
+                        Some(&TP_CALLBACK_ENVIRON_V3::default()),
+                    )
+                }
+                .expect("CreateThreadpoolTimer failed!");
+                let mut critical = CRITICAL_SECTION::default();
+
+                unsafe {
+                    InitializeCriticalSection(&mut critical);
+                }
+
+                self.ptp_timer = ptp_timer;
+                self.critical = critical;
+            }
+        }
+    }
 
     /// Call before running a target.
     #[allow(clippy::unused_self)]
     #[allow(unused_variables)]
     fn pre_exec<E, EM, I, S, Z>(
-        &self,
+        &mut self,
         executor: &E,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
     ) {
+        let data = unsafe { &mut GLOBAL_STATE };
+
         #[cfg(unix)]
         unsafe {
-            let data = &mut GLOBAL_STATE;
             write_volatile(
                 &mut data.current_input_ptr,
                 input as *const _ as *const c_void,
@@ -73,7 +162,6 @@ impl ExecutorHook for InProcessHooks {
         }
         #[cfg(all(windows, feature = "std"))]
         unsafe {
-            let data = &mut GLOBAL_STATE;
             write_volatile(
                 &mut data.current_input_ptr,
                 input as *const _ as *const c_void,
@@ -90,25 +178,81 @@ impl ExecutorHook for InProcessHooks {
             write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
             write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
+
+            //timeout stuff
+            #[cfg(feature = "std")]
+            {
+                write_volatile(
+                    &mut data.timeout_executor_ptr,
+                    executor as *const _ as *mut c_void,
+                );
+
+                write_volatile(&mut data.ptp_timer, Some(*self.ptp_timer()));
+                write_volatile(
+                    &mut data.critical,
+                    addr_of_mut!(*self.critical_mut()) as *mut c_void,
+                );
+                write_volatile(
+                    &mut data.timeout_input_ptr,
+                    addr_of_mut!(data.current_input_ptr) as *mut c_void,
+                );
+                let tm: i64 = -self.milli_sec() * 10 * 1000;
+                let ft = FILETIME {
+                    dwLowDateTime: (tm & 0xffffffff) as u32,
+                    dwHighDateTime: (tm >> 32) as u32,
+                };
+
+                // enter critical section then set timer
+                compiler_fence(Ordering::SeqCst);
+                EnterCriticalSection(self.critical_mut());
+                compiler_fence(Ordering::SeqCst);
+                data.in_target = 1;
+                compiler_fence(Ordering::SeqCst);
+                LeaveCriticalSection(self.critical_mut());
+                compiler_fence(Ordering::SeqCst);
+
+                SetThreadpoolTimer(*self.ptp_timer(), Some(&ft), 0, 0);
+            }
         }
     }
 
     /// Call after running a target.
     #[allow(clippy::unused_self)]
     fn post_exec<E, EM, I, S, Z>(
-        &self,
-        _executor: &E,
+        &mut self,
+        executor: &E,
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
         _input: &I,
     ) {
+        let data = unsafe { &mut GLOBAL_STATE };
+
         #[cfg(unix)]
         unsafe {
             write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
             compiler_fence(Ordering::SeqCst);
         }
+
+        //timeout stuff
         #[cfg(all(windows, feature = "std"))]
+        unsafe {
+            compiler_fence(Ordering::SeqCst);
+            EnterCriticalSection(self.critical_mut());
+            compiler_fence(Ordering::SeqCst);
+            // Timeout handler will do nothing after we increment in_target value.
+            data.in_target = 0;
+            compiler_fence(Ordering::SeqCst);
+            LeaveCriticalSection(self.critical_mut());
+            compiler_fence(Ordering::SeqCst);
+
+            write_volatile(&mut data.timeout_input_ptr, null_mut());
+
+            // previous post_run_reset
+            SetThreadpoolTimer(*self.ptp_timer(), None, 0, 0);
+        }
+
+        #[cfg(windows)]
         unsafe {
             write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
             compiler_fence(Ordering::SeqCst);
@@ -168,12 +312,33 @@ impl InProcessHooks {
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
 
-            Ok(Self {
-                crash_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
-                    as *const _,
-                timeout_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
-                    as *const c_void,
-            })
+            let ret;
+            #[cfg(windows)]
+            {
+                #[cfg(feature = "std")]
+                {
+                    ret = Ok(Self {
+                        crash_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
+                            as *const _,
+                        timeout_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
+                            as *const c_void,
+                        milli_sec: 0,
+                        ptp_timer: PTP_TIMER::default(),
+                        critical: CRITICAL_SECTION::default()
+                    });
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    ret =  Ok(Self {
+                        crash_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
+                            as *const _,
+                        timeout_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
+                            as *const c_void,
+                    }) ;
+                }
+            }
+
+            ret
         }
     }
 
@@ -181,16 +346,26 @@ impl InProcessHooks {
     #[must_use]
     pub fn nop() -> Self {
         let ret;
-        #[cfg(any(unix, feature = "std"))]
+
+        #[cfg(windows)]
         {
-            ret = Self {
-                crash_handler: ptr::null(),
-                timeout_handler: ptr::null(),
-            };
-        }
-        #[cfg(not(any(unix, feature = "std")))]
-        {
-            ret = Self {};
+            #[cfg(feature = "std")]
+            {
+                ret = Self {
+                    crash_handler: ptr::null(),
+                    timeout_handler: ptr::null(),
+                    milli_sec: 0,
+                    ptp_timer: PTP_TIMER::default(),
+                    critical: CRITICAL_SECTION::default(),
+                };
+            }
+            #[cfg(not(feature = "std"))]
+            {
+                ret = Self {
+                    crash_handler: ptr::null(),
+                    timeout_handler: ptr::null(),
+                };
+            }
         }
         ret
     }

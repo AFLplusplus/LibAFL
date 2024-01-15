@@ -9,6 +9,7 @@ use core::{
     borrow::BorrowMut,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    time::Duration,
 };
 
 use libafl_bolts::tuples::{tuple_list, Merge};
@@ -21,7 +22,10 @@ use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
     executors::{
-        hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
+        hooks::{
+            inprocess::{HasTimeout, InProcessHooks},
+            ExecutorHooksTuple,
+        },
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
@@ -155,19 +159,47 @@ where
     OT: ObserversTuple<S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
+    /// Create a new in mem executor with the default timeout (5 sec)
+    pub fn new<EM, OF, Z>(
+        user_hooks: HT,
+        harness_fn: HB,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+    ) -> Result<Self, Error>
+    where
+        Self: Executor<EM, Z, State = S>,
+        EM: EventFirer<State = S> + EventRestarter,
+        OF: Feedback<S>,
+        S: State,
+        Z: HasObjective<Objective = OF, State = S>,
+    {
+        Self::with_timeout(
+            user_hooks,
+            harness_fn,
+            observers,
+            fuzzer,
+            state,
+            event_mgr,
+            Duration::from_millis(5000),
+        )
+    }
+
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
-    pub fn new<EM, OF, Z>(
+    pub fn with_timeout<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
         observers: OT,
         _fuzzer: &mut Z,
         state: &mut S,
         _event_mgr: &mut EM,
+        timeout: Duration,
     ) -> Result<Self, Error>
     where
         Self: Executor<EM, Z, State = S>,
@@ -179,6 +211,7 @@ where
         let default = InProcessHooks::new::<Self, EM, OF, Z>()?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
         hooks.init_all::<Self, S>(state);
+
         #[cfg(windows)]
         // Some initialization necessary for windows.
         unsafe {
@@ -195,6 +228,13 @@ where
             let mut stack_reserved = 0x20000;
             SetThreadStackGuarantee(&mut stack_reserved)?;
         }
+
+        #[cfg(all(feature = "std", windows))]
+        {
+            // set timeout for the handler
+            *hooks.0.millis_sec_mut() = timeout.as_millis() as i64;
+        }
+
         Ok(Self {
             harness_fn,
             observers,
@@ -381,12 +421,7 @@ mod tests {
         };
         let input = NopInput {};
         in_process_executor
-            .run_target(
-                &mut NopFuzzer::new(),
-                &mut NopState::new(),
-                &mut NopEventManager::new(),
-                &input,
-            )
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
     }
 }
