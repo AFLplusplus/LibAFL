@@ -20,7 +20,7 @@ use libafl_bolts::cli::FuzzerOptions;
         target_os = "android"
     )
 ))]
-use mmap_rs::{MemoryAreas, MmapFlags, MmapMut, MmapOptions, ReservedMut};
+use mmap_rs::{MmapFlags, MmapMut, MmapOptions, ReservedMut};
 use nix::libc::memset;
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
@@ -495,6 +495,13 @@ impl Allocator {
                 if !self.pre_allocated_shadow_mappings.is_empty() && start == 1 << self.shadow_bit {
                     return true;
                 }
+
+                #[cfg(target_vendor = "apple")]
+                //https://opensource.apple.com/source/libmalloc/libmalloc-53.1.1/src/nano_malloc.c.auto.html - Ignore the NANO_MALLOC region in darwin
+                if start >= 600000000000 {
+                    return false;
+                }
+
                 self.map_shadow_for_region(start, end, true);
             }
             true
@@ -515,29 +522,40 @@ impl Allocator {
         let mut userspace_max: usize = 0;
 
         // Enumerate memory ranges that are already occupied.
-        for area in MemoryAreas::open(None).unwrap() {
-            let start = area.as_ref().unwrap().start();
-            let end = area.unwrap().end();
-            occupied_ranges.push((start, end));
-            // log::trace!("Occupied {:x} {:x}", start, end);
-            let base: usize = 2;
-            // On x64, if end > 2**48, then that's in vsyscall or something.
-            #[cfg(all(unix, target_arch = "x86_64"))]
-            if end <= base.pow(48) && end > userspace_max {
-                userspace_max = end;
-            }
+        RangeDetails::enumerate_with_prot(
+            PageProtection::NoAccess,
+            &mut (|range: &RangeDetails| -> bool {
+                let start = range.memory_range().base_address().0 as usize;
+                let end = start + range.memory_range().size();
+                occupied_ranges.push((start, end));
+                //log::trace!("Occupied {:x} {:x}", start, end);
+                let base: usize = 2;
+                //https://opensource.apple.com/source/libmalloc/libmalloc-53.1.1/src/nano_malloc.c.auto.html - Ignore the NANO_MALLOC region in darwin as we create our own malloc implementation
+                #[cfg(target_vendor = "apple")]
+                if start >= 0x600000000000 {
+                    return false;
+                }
 
-            #[cfg(all(not(unix), target_arch = "x86_64"))]
-            if (end >> 3) <= base.pow(44) && (end >> 3) > userspace_max {
-                userspace_max = end >> 3;
-            }
+                // On x64, if end > 2**48, then that's in vsyscall or something.
+                #[cfg(all(unix, target_arch = "x86_64"))]
+                if end <= base.pow(48) && end > userspace_max {
+                    userspace_max = end;
+                }
 
-            // On aarch64, if end > 2**52, then range is not in userspace
-            #[cfg(target_arch = "aarch64")]
-            if end <= base.pow(52) && end > userspace_max {
-                userspace_max = end;
-            }
-        }
+                #[cfg(all(not(unix), target_arch = "x86_64"))]
+                if (end >> 3) <= base.pow(44) && (end >> 3) > userspace_max {
+                    userspace_max = end >> 3;
+                }
+
+                // On aarch64, if end > 2**52, then range is not in userspace
+                #[cfg(target_arch = "aarch64")]
+                if end <= base.pow(52) && end > userspace_max {
+                    userspace_max = end;
+                }
+
+                true
+            }),
+        );
 
         let mut maxbit = 0;
         for power in 1..64 {

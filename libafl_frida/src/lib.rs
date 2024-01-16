@@ -368,6 +368,8 @@ mod tests {
         cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
     };
 
+    use inline_c::assert_cxx;
+
     use crate::{
         asan::{
             asan_rt::AsanRuntime,
@@ -378,9 +380,80 @@ mod tests {
         helper::FridaInstrumentationHelper,
     };
 
+
+
     static GUM: OnceLock<Gum> = OnceLock::new();
 
     unsafe fn test_asan(options: &FuzzerOptions) {
+
+        let compiled_lib = assert_cxx!{
+            #inline_c_rs CFLAGS: "-shared"
+            #include <stdint.h>
+            #include <stdlib.h>
+            #include <string>
+    
+            extern "C" int heap_uaf_read() {
+                int *array = new int[100];
+                delete[] array;
+                fprintf(stdout, "%d\n", array[5]);
+                return 0;
+            }
+    
+            extern "C" int heap_uaf_write() {
+                int *array = new int[100];
+                delete[] array;
+                array[5] = 1;
+                return 0;
+            }
+    
+            extern "C" int heap_oob_read() {
+                int *array = new int[100];
+                fprintf(stdout, "%d\n", array[100]);
+                delete[] array;
+                return 0;
+            }
+    
+            extern "C" int heap_oob_write() {
+                int *array = new int[100];
+                array[100] = 1;
+                delete[] array;
+                 return 0;
+            }
+            extern "C" int malloc_heap_uaf_read() {
+                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                free(array);
+                fprintf(stdout, "%d\n", array[5]);
+                return 0;
+            }
+    
+            extern "C" int malloc_heap_uaf_write() {
+                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                free(array);
+                array[5] = 1;
+                return 0;
+            }
+    
+            extern "C" int malloc_heap_oob_read() {
+                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                fprintf(stdout, "%d\n", array[100]);
+                free(array);
+                return 0;
+            }
+    
+            extern "C" int malloc_heap_oob_write() {
+                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                array[100] = 1;
+                free(array);
+                return 0;
+            }
+    
+            extern "C" int LLVMFuzzerTestOneInput() {
+                // abort();
+                return 0;
+            }
+        };
+        
+
         // The names of the functions to run
         let tests = vec![
             ("LLVMFuzzerTestOneInput", 0),
@@ -393,8 +466,8 @@ mod tests {
             ("malloc_heap_uaf_write", 1),
             ("malloc_heap_uaf_read", 1),
         ];
-
-        let lib = libloading::Library::new(options.clone().harness.unwrap()).unwrap();
+        
+        let lib = libloading::Library::new(compiled_lib.output_path()).unwrap();
 
         let coverage = CoverageRuntime::new();
         let asan = AsanRuntime::new(options);
@@ -475,6 +548,7 @@ mod tests {
                     .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
                     .unwrap_or_else(|_| panic!("Error in fuzz_one"));
 
+
                 log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
             }
             assert_eq!(state.solutions().count(), err_cnt);
@@ -502,11 +576,6 @@ mod tests {
         SimpleStdoutLogger::set_logger().unwrap();
 
         // Check if the harness dynamic library is present, if not - skip the test
-        let test_harness = "test_harness.so";
-        assert!(
-            std::path::Path::new(test_harness).exists(),
-            "Skipping test, {test_harness} not found"
-        );
 
         GUM.set(unsafe { Gum::obtain() })
             .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
@@ -515,8 +584,6 @@ mod tests {
             "-A",
             "--disable-excludes",
             "--continue-on-error",
-            "-H",
-            test_harness,
         ];
         let options: FuzzerOptions = FuzzerOptions::try_parse_from(simulated_args).unwrap();
         unsafe { test_asan(&options) }
