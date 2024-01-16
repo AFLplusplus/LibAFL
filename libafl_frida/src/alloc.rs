@@ -342,13 +342,13 @@ impl Allocator {
     }
 
     fn unpoison(start: usize, size: usize) {
-        // log::trace!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
+        // log::trace!("unpoisoning {:x} for {:x}", start, size / 8);
         unsafe {
             std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0xff);
 
             let remainder = size % 8;
             if remainder > 0 {
-                ((start + size / 8) as *mut u8).write(0xff << (8 - remainder));
+                ((start + size / 8) as *mut u8).write((1 << remainder) - 1);
             }
         }
     }

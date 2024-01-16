@@ -517,10 +517,11 @@ where
                     None
                 };
 
+
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
-                            address, output, details.0, details.1, details.2, details.3, details.4,
+                            address, output, instr.bytes().len(), details.0, details.1, details.2, details.3, details.4,
                         );
                     }
                 }

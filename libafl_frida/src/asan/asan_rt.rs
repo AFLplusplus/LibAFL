@@ -1470,7 +1470,7 @@ impl AsanRuntime {
         log::info!("actual rip: {:x}", self.regs[18]);
     }
 
-    // https://godbolt.org/z/ah8vG8sWo
+    // https://godbolt.org/z/qWWae3PE1
     /*
     #include <stdio.h>
     #include <stdint.h>
@@ -1485,11 +1485,6 @@ impl AsanRuntime {
 
         uint8_t remainder = start & 0b111;
         uint16_t val = *(uint16_t *)addr;
-        val = (val & 0xff00) >> 8 | (val & 0x00ff) << 8;
-        val = (val & 0xf0f0) >> 4 | (val & 0x0f0f) << 4;
-        val = (val & 0xcccc) >> 2 | (val & 0x3333) << 2;
-        val = (val & 0xaaaa) >> 1 | (val & 0x5555) << 1;
-        val = (val >> 8) | (val << 8); // swap the byte
         val = (val >> remainder);
 
         uint8_t mask2 = (1 << bit) - 1;
@@ -1511,46 +1506,28 @@ impl AsanRuntime {
         macro_rules! shadow_check{
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ;   .arch x64
-                ;   mov     cl, BYTE shadow_bit as i8
-                ;   mov     rax, -2
-                ;   shl     rax, cl
-                ;   mov     rdx, rdi
-                ;   shr     rdx, 3
-                ;   not     rax
-                ;   and     rax, rdx
-                ;   mov     edx, 1
-                ;   shl     rdx, cl
-                ;   movzx   eax, WORD [rax + rdx]
-                ;   rol     ax, 8
-                ;   mov     ecx, eax
-                ;   shr     ecx, 4
-                ;   and     ecx, 3855
-                ;   shl     eax, 4
-                ;   and     eax, -3856
-                ;   or      eax, ecx
-                ;   mov     ecx, eax
-                ;   shr     ecx, 2
-                ;   and     ecx, 13107
-                ;   and     eax, -3277
-                ;   lea     eax, [rcx + 4*rax]
-                ;   mov     ecx, eax
-                ;   shr     ecx, 1
-                ;   and     ecx, 21845
-                ;   and     eax, -10923
-                ;   lea     eax, [rcx + 2*rax]
-                ;   rol     ax, 8
-                ;   movzx   edx, ax
-                ;   and     dil, 7
-                ;   mov     ecx, edi
-                ;   shr     edx, cl
-                ;   mov     cl, BYTE bit as i8
-                ;   mov     eax, -1
-                ;   shl     eax, cl
-                ;   not     eax
-                ;   movzx   ecx, al
-                ;   and     edx, ecx
-                ;   xor     eax, eax
-                ;   cmp     edx, ecx
+                // ; int3
+        ;    mov     rax, rdi
+        ;    shr     rax, 3
+        ;    mov     cl, BYTE shadow_bit as i8
+        ;    mov     rdx, -2
+        ;    shl     rdx, cl
+        ;    mov     esi, 1
+        ;    shl     rsi, cl
+        ;    not     rdx
+        ;    and     rdx, rax
+        ;    movzx   edx, WORD [rdx + rsi]
+        ;    and     dil, 7
+        ;    mov     ecx, edi
+        ;    shr     edx, cl
+        ;    mov     cl, BYTE bit as i8
+        ;    mov     eax, -1
+        ;    shl     eax, cl
+        ;    not     eax
+        ;    movzx   ecx, al
+        ;    and     edx, ecx
+        ;    xor     eax, eax
+        ;    cmp     edx, ecx
                 ;   je      >done
                 ;   lea     rsi, [>done] // leap 10 bytes forward
                 ;   nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)
@@ -1733,9 +1710,9 @@ impl AsanRuntime {
 
         self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(1));
         self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(2));
-        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(3));
-        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(4));
-        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(5));
+        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(4));
+        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(8));
+        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(16));
     }
 
     ///
@@ -2116,6 +2093,7 @@ impl AsanRuntime {
         &mut self,
         address: u64,
         output: &StalkerOutput,
+        instruction_size: usize,
         width: u8,
         basereg: X86Register,
         indexreg: X86Register,
@@ -2190,7 +2168,7 @@ impl AsanRuntime {
         match basereg {
             Some(reg) => match reg {
                 X86Register::Rip => {
-                    writer.put_mov_reg_address(X86Register::Rdi, true_rip);
+                    writer.put_mov_reg_address(X86Register::Rdi, true_rip + instruction_size as u64);
                 }
                 X86Register::Rsp => {
                     // In this case rsp clobbered
@@ -2212,7 +2190,7 @@ impl AsanRuntime {
         match indexreg {
             Some(reg) => match reg {
                 X86Register::Rip => {
-                    writer.put_mov_reg_address(X86Register::Rsi, true_rip);
+                    writer.put_mov_reg_address(X86Register::Rsi, true_rip + instruction_size as u64);
                 }
                 X86Register::Rdi => {
                     // In this case rdi is already clobbered, so we want it from the stack (we pushed rdi onto stack before!)
