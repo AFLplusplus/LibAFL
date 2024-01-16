@@ -116,20 +116,12 @@ __attribute__((noinline)) void func1() {
   #define HARNESS_EXPORTS
 #endif
 
-char *g_p = NULL;
-
 // Entry point for LibFuzzer.
 // Roughly follows the libpng book example:
 // http://www.libpng.org/pub/png/book/chapter13.html
 HARNESS_EXPORTS extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data,
                                                       size_t         size) {
   if (size >= 8 && *(uint64_t *)data == 0xABCDEFAA8F1324AA) { abort(); }
-
-  // cmplog tests
-  if (size >= 8 && *(uint64_t *)data == 0x3131313131313131) { *g_p = 0; }
-  if (size >= 4 && *(uint32_t *)data == 0x32323232) { *g_p = 0; }
-  if (size >= 2 && *(uint16_t *)data == 0x3333) { *g_p = 0; }
-
   if (size < kPngHeaderSize) { return 0; }
 
 #ifdef TEST_ASAN
