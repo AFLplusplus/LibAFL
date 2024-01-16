@@ -16,7 +16,7 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{self, null_mut},
+    ptr::{self, null_mut, addr_of_mut},
 };
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
@@ -309,22 +309,22 @@ impl InProcessHandlers {
     ) {
         #[cfg(unix)]
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
             write_volatile(
-                &mut data.current_input_ptr,
+                addr_of_mut!((*data).current_input_ptr),
                 _input as *const _ as *const c_void,
             );
             write_volatile(
-                &mut data.executor_ptr,
+                addr_of_mut!((*data).executor_ptr),
                 _executor as *const _ as *const c_void,
             );
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
+            (*data).crash_handler = self.crash_handler;
+            (*data).timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
+            write_volatile(addr_of_mut!((*data).state_ptr), _state as *mut _ as *mut c_void);
+            write_volatile(addr_of_mut!((*data).event_mgr_ptr), _mgr as *mut _ as *mut c_void);
+            write_volatile(addr_of_mut!((*data).fuzzer_ptr), _fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
         #[cfg(all(windows, feature = "std"))]
@@ -377,7 +377,7 @@ impl InProcessHandlers {
         #[cfg(unix)]
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
             #[cfg(feature = "std")]
             unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
             #[cfg(not(miri))]
@@ -656,8 +656,12 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
 // TODO remove this after executor refactor and libafl qemu new executor
 /// Expose a version of the crash handler that can be called from e.g. an emulator
+/// 
+/// # Safety
+/// Will dereference the `GLOBAL_STATE` static variable.
+/// Will be safe unless called concurrently.
 #[cfg(any(unix, feature = "std"))]
-pub fn generic_inproc_crash_handler<E, EM, OF, Z>()
+pub unsafe fn generic_inproc_crash_handler<E, EM, OF, Z>()
 where
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -665,17 +669,17 @@ where
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
-    let data = unsafe { &mut GLOBAL_STATE };
-    let in_handler = data.set_in_handler(true);
+    let data = unsafe { addr_of_mut!(GLOBAL_STATE) };
+    let in_handler = (*data).set_in_handler(true);
 
-    if data.is_valid() {
-        let executor = data.executor_mut::<E>();
+    if (*data).is_valid() {
+        let executor = (*data).executor_mut::<E>();
         // disarms timeout in case of TimeoutExecutor
         executor.post_run_reset();
-        let state = data.state_mut::<E::State>();
-        let event_mgr = data.event_mgr_mut::<EM>();
-        let fuzzer = data.fuzzer_mut::<Z>();
-        let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+        let state = (*data).state_mut::<E::State>();
+        let event_mgr = (*data).event_mgr_mut::<EM>();
+        let fuzzer = (*data).fuzzer_mut::<Z>();
+        let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
 
         run_observers_and_save_state::<E, EM, OF, Z>(
             executor,
@@ -687,7 +691,7 @@ where
         );
     }
 
-    data.set_in_handler(in_handler);
+    (*data).set_in_handler(in_handler);
 }
 
 /// The inprocess executor singal handling code for unix
@@ -769,8 +773,12 @@ pub mod unix_signal_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
+    /// 
+    /// # Safety
+    /// Will dereference the static `GLOBAL_STATE`.
+    /// Will be safe unless if called concurrently.
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, OF, Z>()
+    pub unsafe fn setup_panic_hook<E, EM, OF, Z>()
     where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -778,10 +786,12 @@ pub mod unix_signal_handler {
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
+        use core::ptr::addr_of_mut;
+
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
             old_hook(panic_info);
-            let data = unsafe { &mut GLOBAL_STATE };
+            let data = unsafe { &mut addr_of_mut!(GLOBAL_STATE) };
             let in_handler = data.set_in_handler(true);
             if data.is_valid() {
                 // We are fuzzing!
@@ -1135,9 +1145,10 @@ pub mod windows_exception_handler {
     /// invokes the `post_exec` hook on all observer in case of panic
     ///
     /// # Safety
-    /// Well, exception handling is not safe
+    /// Well, exception handling is not safe.
+    /// Will dereference `GLOBAL_STATE`.
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, OF, Z>()
+    pub unsafe fn setup_panic_hook<E, EM, OF, Z>()
     where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -1147,7 +1158,7 @@ pub mod windows_exception_handler {
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
-            let data = unsafe { &mut GLOBAL_STATE };
+            let data = unsafe { &mut addr_of_mut!(GLOBAL_STATE) };
             let in_handler = data.set_in_handler(true);
             // Have we set a timer_before?
             unsafe {
@@ -1408,17 +1419,19 @@ pub struct InChildProcessHandlers {
 impl InChildProcessHandlers {
     /// Call before running a target.
     pub fn pre_run_target<E, I, S>(&self, executor: &E, state: &mut S, input: &I) {
+        // # Safety
+        // This is generally not called concurrently.
         unsafe {
-            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
+            let data = &mut *addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             write_volatile(
-                &mut data.executor_ptr,
+                addr_of_mut!(data.executor_ptr),
                 executor as *const _ as *const c_void,
             );
             write_volatile(
-                &mut data.current_input_ptr,
+                addr_of_mut!(data.current_input_ptr),
                 input as *const _ as *const c_void,
             );
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            write_volatile(addr_of_mut!(data.state_ptr), state as *mut _ as *mut c_void);
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
             compiler_fence(Ordering::SeqCst);
@@ -1432,7 +1445,7 @@ impl InChildProcessHandlers {
     {
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
-            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
+            let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
             #[cfg(not(miri))]
             setup_signal_handler(data)?;
@@ -1451,7 +1464,7 @@ impl InChildProcessHandlers {
     {
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
-            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
+            let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
             #[cfg(not(miri))]
             setup_signal_handler(data)?;
@@ -2089,6 +2102,7 @@ where
 #[cfg(all(feature = "std", unix))]
 pub mod child_signal_handlers {
     use alloc::boxed::Box;
+    use core::ptr::addr_of_mut;
     use std::panic;
 
     use libafl_bolts::os::unix_signals::{ucontext_t, Signal};
@@ -2109,7 +2123,7 @@ pub mod child_signal_handlers {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
             old_hook(panic_info);
-            let data = unsafe { &mut FORK_EXECUTOR_GLOBAL_DATA };
+            let data = unsafe { &mut *addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA) };
             if data.is_valid() {
                 let executor = data.executor_mut::<E>();
                 let observers = executor.observers_mut();

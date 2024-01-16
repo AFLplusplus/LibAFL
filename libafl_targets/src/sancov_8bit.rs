@@ -30,7 +30,7 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
-        for existing in &mut COUNTERS_MAPS {
+        for existing in &mut *addr_of_mut!(COUNTERS_MAPS) {
             let range = existing.as_mut_slice().as_mut_ptr()
                 ..=existing
                     .as_mut_slice()
@@ -209,7 +209,7 @@ mod observers {
 
         fn reset_map(&mut self) -> Result<(), Error> {
             let initial = self.initial();
-            for map in unsafe { &mut COUNTERS_MAPS } {
+            for map in unsafe { &mut *addr_of_mut(COUNTERS_MAPS) } {
                 for x in map.as_mut_slice() {
                     *x = initial;
                 }
