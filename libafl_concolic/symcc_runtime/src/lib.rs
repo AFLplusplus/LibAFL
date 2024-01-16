@@ -28,6 +28,7 @@
 //! name = "SymRuntime"
 //! ```
 #![allow(clippy::module_name_repetitions, clippy::missing_panics_doc)]
+#![allow(clippy::pub_underscore_fields)]
 pub mod filter;
 pub mod tracing;
 
