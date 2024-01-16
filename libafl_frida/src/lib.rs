@@ -391,6 +391,13 @@ mod tests {
             ("heap_uaf_read", Some("heap use-after-free read")),
             ("malloc_heap_oob_read", Some("heap out-of-bounds read")),
             ("malloc_heap_oob_write", Some("heap out-of-bounds write")),
+            ("malloc_heap_oob_write_0x12", Some("heap out-of-bounds write")),
+            ("malloc_heap_oob_write_0x14", Some("heap out-of-bounds write")),
+            ("malloc_heap_oob_write_0x17", Some("heap out-of-bounds write")),
+            ("malloc_heap_oob_write_0x17_int_at_0x16", Some("heap out-of-bounds write")),
+            ("malloc_heap_oob_write_0x17_int_at_0x15", Some("heap out-of-bounds write")),
+            ("malloc_heap_oob_write_0x17_int_at_0x13", None),
+            ("malloc_heap_oob_write_0x17_int_at_0x14", Some("heap out-of-bounds write")),
             ("malloc_heap_uaf_write", Some("heap use-after-free write")),
             ("malloc_heap_uaf_read", Some("heap use-after-free read")),
         ];
