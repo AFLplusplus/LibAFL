@@ -15,13 +15,13 @@ else
     export PROFILE_DIR=debug
 fi
 
-if [[ ! -z "${RUN_QEMU_FUZZER}" ]]; then
+if [[ -n "${RUN_QEMU_FUZZER}" ]]; then
     fuzzers=$(echo "$fuzzers" | tr ' ' '\n' | grep "qemu")
     backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n' | grep "qemu")
-elif [[ ! -z "${RUN_BABY_FUZZER}" ]]; then
+elif [[ -n "${RUN_BABY_FUZZER}" ]]; then
     fuzzers=$(echo "$fuzzers" | tr ' ' '\n' | grep "baby")
     backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n' | grep "baby")
-elif [[ ! -z "${RUN_LIBPNG_FUZZER}" ]]; then
+elif [[ -n "${RUN_LIBPNG_FUZZER}" ]]; then
     fuzzers=$(echo "$fuzzers" | tr ' ' '\n' | grep "libpng")
     backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n' | grep "libpng")
 else
