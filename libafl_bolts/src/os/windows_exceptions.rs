@@ -439,7 +439,7 @@ static mut CTRL_HANDLER: Option<CtrlHandlerHolder> = None;
 /// # Safety
 /// Same safety considerations as in `setup_exception_handler`
 pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
-    handler: &mut T,
+    handler: *mut T,
 ) -> Result<(), Error> {
     write_volatile(
         &mut CTRL_HANDLER,

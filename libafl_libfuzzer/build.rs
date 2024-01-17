@@ -16,10 +16,13 @@ fn main() {
     if cfg!(any(feature = "cargo-clippy", docsrs)) {
         return; // skip when clippy or docs is running
     }
-    assert!(
-        cfg!(target_os = "linux"),
-        "The libafl_libfuzzer runtime may only be built for linux; failing fast."
-    );
+
+    if cfg!(target_os = "windows") {
+        println!(
+            "cargo:warning=The libafl_libfuzzer runtime may only be built for linux; failing fast."
+        );
+        return;
+    }
 
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/src");
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/Cargo.toml");
