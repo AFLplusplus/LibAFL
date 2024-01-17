@@ -362,7 +362,10 @@ pub unsafe extern "system" fn handle_exception(
         .as_mut()
         .unwrap()
         .ExceptionCode;
-    let exception_code = ExceptionCode::try_from(code.0).unwrap();
+    let exception_code = match ExceptionCode::try_from(code.0) {
+        Ok(x) => x,
+        Err(_) => ExceptionCode::Other,
+    };
     log::info!("Received exception; code: {}", exception_code);
     internal_handle_exception(exception_code, exception_pointers)
 }
