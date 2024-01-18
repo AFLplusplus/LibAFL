@@ -61,7 +61,7 @@ pub(crate) struct Itimerval {
 
 /// The strcut about all the internals of the timer.
 /// This struct absorb all platform specific differences about timer.
-#[allow(missing_debug_implementations,)]
+#[allow(missing_debug_implementations)]
 pub struct TimerStruct {
     // timeout time (windows)
     #[cfg(all(windows, feature = "std"))]

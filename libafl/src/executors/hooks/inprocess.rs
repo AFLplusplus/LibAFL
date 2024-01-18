@@ -38,7 +38,7 @@ use crate::{
 #[cfg(all(windows, feature = "std"))]
 use crate::{executors::inprocess::HasInProcessHooks, state::State};
 /// The inmem executor's handlers.
-#[allow(missing_debug_implementations,)]
+#[allow(missing_debug_implementations)]
 pub struct InProcessHooks {
     /// On crash C function pointer
     #[cfg(any(unix, feature = "std"))]
