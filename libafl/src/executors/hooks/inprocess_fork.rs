@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::{
     ffi::c_void,
-    ptr::{self, write_volatile},
+    ptr::null,
     sync::atomic::{compiler_fence, Ordering},
 };
 use std::intrinsics::transmute;
@@ -35,34 +35,23 @@ impl ExecutorHook for InChildProcessHooks {
     fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
 
     /// Call before running a target.
-    fn pre_exec<E, EM, I, S, Z>(
-        &self,
-        executor: &E,
+    fn pre_exec<EM, I, S, Z>(
+        &mut self,
         _fuzzer: &mut Z,
-        state: &mut S,
+        _state: &mut S,
         _mgr: &mut EM,
-        input: &I,
+        _input: &I,
     ) {
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
-            write_volatile(
-                &mut data.executor_ptr,
-                executor as *const _ as *const c_void,
-            );
-            write_volatile(
-                &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
-            );
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
             compiler_fence(Ordering::SeqCst);
         }
     }
 
-    fn post_exec<E, EM, I, S, Z>(
-        &self,
-        _executor: &E,
+    fn post_exec<EM, I, S, Z>(
+        &mut self,
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
@@ -95,8 +84,8 @@ impl InChildProcessHooks {
     #[must_use]
     pub fn nop() -> Self {
         Self {
-            crash_handler: ptr::null(),
-            timeout_handler: ptr::null(),
+            crash_handler: null(),
+            timeout_handler: null(),
         }
     }
 }
@@ -136,7 +125,7 @@ impl InProcessForkExecutorGlobalData {
 
     pub(crate) fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
-        self.current_input_ptr = ptr::null();
+        self.current_input_ptr = null();
         r
     }
 
@@ -149,11 +138,11 @@ impl InProcessForkExecutorGlobalData {
 
 pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
     InProcessForkExecutorGlobalData {
-        executor_ptr: ptr::null(),
-        state_ptr: ptr::null(),
-        current_input_ptr: ptr::null(),
-        crash_handler: ptr::null(),
-        timeout_handler: ptr::null(),
+        executor_ptr: null(),
+        state_ptr: null(),
+        current_input_ptr: null(),
+        crash_handler: null(),
+        timeout_handler: null(),
     };
 
 impl Handler for InProcessForkExecutorGlobalData {

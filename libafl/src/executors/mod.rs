@@ -17,8 +17,6 @@ pub use inprocess_fork::InProcessForkExecutor;
 use libafl_bolts::os::unix_signals::Signal;
 use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
-#[cfg(any(unix, feature = "std"))]
-pub use timeout::TimeoutExecutor;
 pub use with_observers::WithObservers;
 
 use crate::{
@@ -40,10 +38,7 @@ pub mod inprocess;
 pub mod inprocess_fork;
 
 pub mod shadow;
-/// Timeout executor.
-/// Not possible on `no-std` Windows or `no-std`, but works for unix
-#[cfg(any(unix, feature = "std"))]
-pub mod timeout;
+
 pub mod with_observers;
 
 /// The module for all the hooks

@@ -7,21 +7,28 @@
 use alloc::boxed::Box;
 use core::{
     borrow::BorrowMut,
+    ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    ptr::{null, write_volatile},
+    sync::atomic::{compiler_fence, Ordering},
+    time::Duration,
 };
 
 use libafl_bolts::tuples::{tuple_list, Merge};
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
-#[cfg(any(unix, feature = "std"))]
-use crate::executors::hooks::inprocess::GLOBAL_STATE;
+#[cfg(all(windows, feature = "std"))]
+use crate::executors::hooks::inprocess::HasTimeout;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
     executors::{
-        hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
+        hooks::{
+            inprocess::{InProcessHooks, GLOBAL_STATE},
+            ExecutorHooksTuple,
+        },
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
@@ -119,11 +126,13 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
-        self.hooks.pre_exec_all(self, fuzzer, state, mgr, input);
+        self.enter_target(fuzzer, state, mgr, input);
+        self.hooks.pre_exec_all(fuzzer, state, mgr, input);
 
         let ret = (self.harness_fn.borrow_mut())(input);
 
-        self.hooks.post_exec_all(self, fuzzer, state, mgr, input);
+        self.hooks.post_exec_all(fuzzer, state, mgr, input);
+        self.leave_target(fuzzer, state, mgr, input);
         Ok(ret)
     }
 }
@@ -146,6 +155,56 @@ where
         &mut self.observers
     }
 }
+impl<H, HB, HT, OT, S> GenericInProcessExecutor<H, HB, HT, OT, S>
+where
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
+    HT: ExecutorHooksTuple,
+    OT: ObserversTuple<S>,
+    S: State,
+{
+    /// This function marks the boundary between the fuzzer and the target
+    #[inline]
+    pub fn enter_target<EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut <Self as UsesState>::State,
+        mgr: &mut EM,
+        input: &<Self as UsesInput>::Input,
+    ) {
+        unsafe {
+            let data = &mut GLOBAL_STATE;
+            write_volatile(
+                &mut data.current_input_ptr,
+                input as *const _ as *const c_void,
+            );
+            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
+            // Direct raw pointers access /aliasing is pretty undefined behavior.
+            // Since the state and event may have moved in memory, refresh them right before the signal may happen
+            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            compiler_fence(Ordering::SeqCst);
+        }
+    }
+
+    /// This function marks the boundary between the fuzzer and the target
+    #[inline]
+    pub fn leave_target<EM, Z>(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut <Self as UsesState>::State,
+        _mgr: &mut EM,
+        _input: &<Self as UsesInput>::Input,
+    ) {
+        unsafe {
+            let data = &mut GLOBAL_STATE;
+
+            write_volatile(&mut data.current_input_ptr, null());
+            compiler_fence(Ordering::SeqCst);
+        }
+    }
+}
 
 impl<H, HB, HT, OT, S> GenericInProcessExecutor<H, HB, HT, OT, S>
 where
@@ -155,19 +214,14 @@ where
     OT: ObserversTuple<S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
-    /// Create a new in mem executor.
-    /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
-    /// depending on different corpus or state.
-    /// * `harness_fn` - the harness, executing the function
-    /// * `observers` - the observers observing the target during execution
-    /// This may return an error on unix, if signal handler setup fails
+    /// Create a new in mem executor with the default timeout (5 sec)
     pub fn new<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
         observers: OT,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         state: &mut S,
-        _event_mgr: &mut EM,
+        event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
         Self: Executor<EM, Z, State = S>,
@@ -176,9 +230,43 @@ where
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let default = InProcessHooks::new::<Self, EM, OF, Z>()?;
+        Self::with_timeout(
+            user_hooks,
+            harness_fn,
+            observers,
+            fuzzer,
+            state,
+            event_mgr,
+            Duration::from_millis(5000),
+        )
+    }
+
+    /// Create a new in mem executor.
+    /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
+    /// depending on different corpus or state.
+    /// * `harness_fn` - the harness, executing the function
+    /// * `observers` - the observers observing the target during execution
+    /// This may return an error on unix, if signal handler setup fails
+    pub fn with_timeout<EM, OF, Z>(
+        user_hooks: HT,
+        harness_fn: HB,
+        observers: OT,
+        _fuzzer: &mut Z,
+        state: &mut S,
+        _event_mgr: &mut EM,
+        timeout: Duration,
+    ) -> Result<Self, Error>
+    where
+        Self: Executor<EM, Z, State = S>,
+        EM: EventFirer<State = S> + EventRestarter,
+        OF: Feedback<S>,
+        S: State,
+        Z: HasObjective<Objective = OF, State = S>,
+    {
+        let default = InProcessHooks::new::<Self, EM, OF, Z>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
         hooks.init_all::<Self, S>(state);
+
         #[cfg(windows)]
         // Some initialization necessary for windows.
         unsafe {
@@ -195,6 +283,13 @@ where
             let mut stack_reserved = 0x20000;
             SetThreadStackGuarantee(&mut stack_reserved)?;
         }
+
+        #[cfg(all(feature = "std", windows))]
+        {
+            // set timeout for the handler
+            *hooks.0.millis_sec_mut() = timeout.as_millis() as i64;
+        }
+
         Ok(Self {
             harness_fn,
             observers,

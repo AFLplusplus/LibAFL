@@ -1,22 +1,33 @@
+#[cfg(all(windows, feature = "std"))]
+use core::ptr::addr_of_mut;
+#[cfg(any(unix, all(windows, feature = "std")))]
+use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
     ffi::c_void,
     ptr::{self, null_mut},
+    time::Duration,
 };
-#[cfg(any(unix, all(windows, feature = "std")))]
-use core::{
-    ptr::write_volatile,
-    sync::atomic::{compiler_fence, Ordering},
-};
+#[cfg(all(unix, feature = "std"))]
+use core::{mem::zeroed, ptr::addr_of};
 
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::current_time;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(windows, feature = "std"))]
-use windows::Win32::System::Threading::PTP_TIMER;
+use windows::Win32::System::Threading::{
+    CreateThreadpoolTimer, InitializeCriticalSection, CRITICAL_SECTION, PTP_CALLBACK_INSTANCE,
+    PTP_TIMER, TP_CALLBACK_ENVIRON_V3,
+};
 
+#[cfg(feature = "std")]
+use crate::executors::hooks::timer::TimerStruct;
 #[cfg(unix)]
 use crate::executors::hooks::unix::unix_signal_handler;
+#[cfg(unix)]
+use crate::executors::inprocess::HasInProcessHooks;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, Executor, HasObservers},
@@ -27,7 +38,7 @@ use crate::{
 #[cfg(all(windows, feature = "std"))]
 use crate::{executors::inprocess::HasInProcessHooks, state::State};
 /// The inmem executor's handlers.
-#[derive(Debug)]
+#[allow(missing_debug_implementations)]
 pub struct InProcessHooks {
     /// On crash C function pointer
     #[cfg(any(unix, feature = "std"))]
@@ -35,99 +46,222 @@ pub struct InProcessHooks {
     /// On timeout C function pointer
     #[cfg(any(unix, feature = "std"))]
     pub timeout_handler: *const c_void,
+    /// TImer struct
+    #[cfg(feature = "std")]
+    pub timer: TimerStruct,
 }
 
+/// Any hooks that is about timeout
+pub trait HasTimeout {
+    /// Return ref to timer
+    #[cfg(feature = "std")]
+    fn timer(&self) -> &TimerStruct;
+    /// Return mut ref to timer
+    #[cfg(feature = "std")]
+    fn timer_mut(&mut self) -> &mut TimerStruct;
+    #[cfg(all(feature = "std", windows))]
+    /// The timer object
+    fn ptp_timer(&self) -> &PTP_TIMER;
+    #[cfg(all(feature = "std", windows))]
+    /// The critical section
+    fn critical(&self) -> &CRITICAL_SECTION;
+    #[cfg(all(feature = "std", windows))]
+    /// The critical section (mut)
+    fn critical_mut(&mut self) -> &mut CRITICAL_SECTION;
+    #[cfg(all(feature = "std", windows))]
+    /// The timeout in milli sec
+    fn milli_sec(&self) -> i64;
+    #[cfg(all(feature = "std", windows))]
+    /// The timeout in milli sec (mut ref)
+    fn millis_sec_mut(&mut self) -> &mut i64;
+    #[cfg(not(all(unix, feature = "std")))]
+    /// Handle timeout for batch mode timeout
+    fn handle_timeout(&mut self) -> bool;
+    #[cfg(all(unix, feature = "std"))]
+    /// Handle timeout for batch mode timeout
+    fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool;
+}
+
+impl HasTimeout for InProcessHooks {
+    #[cfg(feature = "std")]
+    fn timer(&self) -> &TimerStruct {
+        &self.timer
+    }
+    #[cfg(feature = "std")]
+    fn timer_mut(&mut self) -> &mut TimerStruct {
+        &mut self.timer
+    }
+
+    #[cfg(all(feature = "std", windows))]
+    fn ptp_timer(&self) -> &PTP_TIMER {
+        &self.timer().ptp_timer()
+    }
+
+    #[cfg(all(feature = "std", windows))]
+    fn critical(&self) -> &CRITICAL_SECTION {
+        &self.timer().critical()
+    }
+
+    #[cfg(all(feature = "std", windows))]
+    fn critical_mut(&mut self) -> &mut CRITICAL_SECTION {
+        self.timer_mut().critical_mut()
+    }
+
+    #[cfg(all(feature = "std", windows))]
+    fn milli_sec(&self) -> i64 {
+        self.timer().milli_sec()
+    }
+
+    #[cfg(all(feature = "std", windows))]
+    fn millis_sec_mut(&mut self) -> &mut i64 {
+        self.timer_mut().milli_sec_mut()
+    }
+
+    #[cfg(not(all(unix, feature = "std")))]
+    fn handle_timeout(&mut self) -> bool {
+        false
+    }
+
+    #[cfg(all(unix, feature = "std"))]
+    fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool {
+        #[cfg(not(target_os = "linux"))]
+        {
+            return false;
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            if !self.timer().batch_mode {
+                return false;
+            }
+            //eprintln!("handle_timeout {:?} {}", self.avg_exec_time, self.avg_mul_k);
+            let cur_time = current_time();
+            if !data.is_valid() {
+                // outside the target
+                unsafe {
+                    let disarmed: libc::itimerspec = zeroed();
+                    libc::timer_settime(
+                        self.timer_mut().timerid,
+                        0,
+                        addr_of!(disarmed),
+                        null_mut(),
+                    );
+                }
+                let elapsed = cur_time - self.timer().tmout_start_time;
+                // set timer the next exec
+                if self.timer().executions > 0 {
+                    self.timer_mut().avg_exec_time = elapsed / self.timer().executions;
+                    self.timer_mut().executions = 0;
+                }
+                self.timer_mut().avg_mul_k += 1;
+                self.timer_mut().last_signal_time = cur_time;
+                return true;
+            }
+
+            let elapsed_run = cur_time - self.timer_mut().start_time;
+            if elapsed_run < self.timer_mut().exec_tmout {
+                // fp, reset timeout
+                unsafe {
+                    libc::timer_settime(
+                        self.timer_mut().timerid,
+                        0,
+                        addr_of!(self.timer_mut().itimerspec),
+                        null_mut(),
+                    );
+                }
+                if self.timer().executions > 0 {
+                    let elapsed = cur_time - self.timer_mut().tmout_start_time;
+                    self.timer_mut().avg_exec_time = elapsed / self.timer().executions;
+                    self.timer_mut().executions = 0; // It will be 1 when the exec finish
+                }
+                self.timer_mut().tmout_start_time = current_time();
+                self.timer_mut().avg_mul_k += 1;
+                self.timer_mut().last_signal_time = cur_time;
+                true
+            } else {
+                false
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+#[allow(non_camel_case_types)]
+type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
+    param0: PTP_CALLBACK_INSTANCE,
+    param1: *mut c_void,
+    param2: PTP_TIMER,
+);
+
 impl ExecutorHook for InProcessHooks {
-    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
+    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {
+        // init timeout
+        #[cfg(windows)]
+        {
+            #[cfg(feature = "std")]
+            {
+                let timeout_handler: PTP_TIMER_CALLBACK =
+                    unsafe { std::mem::transmute(self.timeout_handler) };
+                let ptp_timer = unsafe {
+                    CreateThreadpoolTimer(
+                        Some(timeout_handler),
+                        Some(addr_of_mut!(GLOBAL_STATE) as *mut c_void),
+                        Some(&TP_CALLBACK_ENVIRON_V3::default()),
+                    )
+                }
+                .expect("CreateThreadpoolTimer failed!");
+                let mut critical = CRITICAL_SECTION::default();
+
+                unsafe {
+                    InitializeCriticalSection(&mut critical);
+                }
+
+                *self.timer_mut().ptp_timer_mut() = ptp_timer;
+                *self.timer_mut().critical_mut() = critical;
+            }
+        }
+    }
 
     /// Call before running a target.
     #[allow(clippy::unused_self)]
     #[allow(unused_variables)]
-    fn pre_exec<E, EM, I, S, Z>(
-        &self,
-        executor: &E,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) {
-        #[cfg(unix)]
-        unsafe {
-            let data = &mut GLOBAL_STATE;
-            write_volatile(
-                &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
-            );
-            write_volatile(
-                &mut data.executor_ptr,
-                executor as *const _ as *const c_void,
-            );
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
-            // Direct raw pointers access /aliasing is pretty undefined behavior.
-            // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
-            compiler_fence(Ordering::SeqCst);
-        }
-        #[cfg(all(windows, feature = "std"))]
-        unsafe {
-            let data = &mut GLOBAL_STATE;
-            write_volatile(
-                &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
-            );
-            write_volatile(
-                &mut data.executor_ptr,
-                executor as *const _ as *const c_void,
-            );
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
-            // Direct raw pointers access /aliasing is pretty undefined behavior.
-            // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
-            compiler_fence(Ordering::SeqCst);
-        }
+    fn pre_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I) {
+        let data = unsafe { &mut GLOBAL_STATE };
+        data.crash_handler = self.crash_handler;
+        data.timeout_handler = self.timeout_handler;
+
+        #[cfg(feature = "std")]
+        self.timer_mut().set_timer();
     }
 
     /// Call after running a target.
     #[allow(clippy::unused_self)]
-    fn post_exec<E, EM, I, S, Z>(
-        &self,
-        _executor: &E,
+    fn post_exec<EM, I, S, Z>(
+        &mut self,
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
         _input: &I,
     ) {
-        #[cfg(unix)]
-        unsafe {
-            write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
-            compiler_fence(Ordering::SeqCst);
-        }
-        #[cfg(all(windows, feature = "std"))]
-        unsafe {
-            write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
-            compiler_fence(Ordering::SeqCst);
-        }
+        // let _data = unsafe { &mut GLOBAL_STATE };
+        // timeout stuff
+        #[cfg(feature = "std")]
+        self.timer_mut().unset_timer();
     }
 }
 
 impl InProcessHooks {
     /// Create new [`InProcessHooks`].
-    #[cfg(not(all(windows, feature = "std")))]
-    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
+    #[cfg(unix)]
+    #[allow(unused_variables)]
+    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers,
+        E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        #[cfg(unix)]
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut GLOBAL_STATE;
@@ -141,15 +275,15 @@ impl InProcessHooks {
                     as *const c_void,
                 timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>
                     as *const _,
+                #[cfg(feature = "std")]
+                timer: TimerStruct::new(exec_tmout),
             })
         }
-        #[cfg(not(any(unix, feature = "std")))]
-        Ok(Self {})
     }
 
     /// Create new [`InProcessHooks`].
     #[cfg(all(windows, feature = "std"))]
-    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -168,12 +302,31 @@ impl InProcessHooks {
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
 
-            Ok(Self {
-                crash_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
-                    as *const _,
-                timeout_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
-                    as *const c_void,
-            })
+            let ret;
+            #[cfg(windows)]
+            {
+                #[cfg(feature = "std")]
+                {
+                    ret = Ok(Self {
+                        crash_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
+                            as *const _,
+                        timeout_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
+                            as *const c_void,
+                        timer: TimerStruct::new(exec_tmout),
+                    });
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    ret =  Ok(Self {
+                        crash_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
+                            as *const _,
+                        timeout_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
+                            as *const c_void,
+                    }) ;
+                }
+            }
+
+            ret
         }
     }
 
@@ -181,16 +334,33 @@ impl InProcessHooks {
     #[must_use]
     pub fn nop() -> Self {
         let ret;
-        #[cfg(any(unix, feature = "std"))]
+
+        #[cfg(windows)]
+        {
+            #[cfg(feature = "std")]
+            {
+                ret = Self {
+                    crash_handler: ptr::null(),
+                    timeout_handler: ptr::null(),
+                    timer: TimerStruct::new(Duration::from_millis(5000)),
+                };
+            }
+            #[cfg(not(feature = "std"))]
+            {
+                ret = Self {
+                    crash_handler: ptr::null(),
+                    timeout_handler: ptr::null(),
+                };
+            }
+        }
+        #[cfg(unix)]
         {
             ret = Self {
                 crash_handler: ptr::null(),
                 timeout_handler: ptr::null(),
-            };
-        }
-        #[cfg(not(any(unix, feature = "std")))]
-        {
-            ret = Self {};
+                #[cfg(feature = "std")]
+                timer: TimerStruct::new(Duration::from_millis(5000)),
+            }
         }
         ret
     }
@@ -199,10 +369,14 @@ impl InProcessHooks {
 /// The global state of the in-process harness.
 #[derive(Debug)]
 pub struct InProcessExecutorHandlerData {
-    state_ptr: *mut c_void,
-    event_mgr_ptr: *mut c_void,
-    fuzzer_ptr: *mut c_void,
-    executor_ptr: *const c_void,
+    /// the pointer to the state
+    pub state_ptr: *mut c_void,
+    /// the pointer to the event mgr
+    pub event_mgr_ptr: *mut c_void,
+    /// the pointer to the fuzzer
+    pub fuzzer_ptr: *mut c_void,
+    /// the pointer to the executor
+    pub executor_ptr: *const c_void,
     pub(crate) current_input_ptr: *const c_void,
     pub(crate) in_handler: bool,
 
@@ -219,11 +393,6 @@ pub struct InProcessExecutorHandlerData {
     pub(crate) in_target: u64,
     #[cfg(all(windows, feature = "std"))]
     pub(crate) critical: *mut c_void,
-    #[cfg(all(windows, feature = "std"))]
-    pub(crate) timeout_input_ptr: *mut c_void,
-
-    #[cfg(any(unix, feature = "std"))]
-    pub(crate) timeout_executor_ptr: *mut c_void,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
@@ -263,17 +432,6 @@ impl InProcessExecutorHandlerData {
     }
 
     #[cfg(any(unix, feature = "std"))]
-    pub(crate) fn timeout_executor_mut<'a, E>(
-        &self,
-    ) -> &'a mut crate::executors::timeout::TimeoutExecutor<E> {
-        unsafe {
-            (self.timeout_executor_ptr as *mut crate::executors::timeout::TimeoutExecutor<E>)
-                .as_mut()
-                .unwrap()
-        }
-    }
-
-    #[cfg(any(unix, feature = "std"))]
     pub(crate) fn set_in_handler(&mut self, v: bool) -> bool {
         let old = self.in_handler;
         self.in_handler = v;
@@ -308,11 +466,6 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     in_target: 0,
     #[cfg(all(windows, feature = "std"))]
     critical: null_mut(),
-    #[cfg(all(windows, feature = "std"))]
-    timeout_input_ptr: null_mut(),
-
-    #[cfg(any(unix, feature = "std"))]
-    timeout_executor_ptr: null_mut(),
 };
 
 /// Get the inprocess [`crate::state::State`]

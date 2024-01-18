@@ -11,14 +11,12 @@ pub mod unix_signal_handler {
     use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
     use libc::siginfo_t;
 
-    #[cfg(feature = "std")]
-    use crate::inputs::Input;
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
             common_signals,
             hooks::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            inprocess::run_observers_and_save_state,
+            inprocess::{run_observers_and_save_state, HasInProcessHooks},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -26,6 +24,8 @@ pub mod unix_signal_handler {
         inputs::UsesInput,
         state::{HasCorpus, HasExecutions, HasSolutions},
     };
+    #[cfg(feature = "std")]
+    use crate::{executors::hooks::inprocess::HasTimeout, inputs::Input};
 
     pub(crate) type HandlerFuncPtr = unsafe fn(
         Signal,
@@ -130,14 +130,19 @@ pub mod unix_signal_handler {
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers,
+        E: HasObservers + HasInProcessHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        if !data.timeout_executor_ptr.is_null()
-            && data.timeout_executor_mut::<E>().handle_timeout(data)
+        // this stuff is for batch timeout
+        #[cfg(all(feature = "std", unix))]
+        if !data.executor_ptr.is_null()
+            && data
+                .executor_mut::<E>()
+                .inprocess_hooks_mut()
+                .handle_timeout(data)
         {
             return;
         }
@@ -163,7 +168,7 @@ pub mod unix_signal_handler {
             event_mgr,
             ExitKind::Timeout,
         );
-
+        log::info!("Exiting");
         libc::_exit(55);
     }
 

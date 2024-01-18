@@ -7,7 +7,7 @@ use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -201,17 +201,15 @@ where
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = ShadowExecutor::new(
-                TimeoutExecutor::new(
-                    InProcessExecutor::new(
-                        tuple_list!(),
-                        &mut harness,
-                        tuple_list!(edges_observer, time_observer),
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                    )?,
+                InProcessExecutor::with_timeout(
+                    tuple_list!(),
+                    &mut harness,
+                    tuple_list!(edges_observer, time_observer),
+                    &mut fuzzer,
+                    &mut state,
+                    &mut mgr,
                     timeout,
-                ),
+                )?,
                 tuple_list!(cmplog_observer),
             );
 
