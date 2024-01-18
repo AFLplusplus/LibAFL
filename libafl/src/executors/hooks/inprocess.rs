@@ -94,12 +94,12 @@ impl HasTimeout for InProcessHooks {
 
     #[cfg(all(feature = "std", windows))]
     fn ptp_timer(&self) -> &PTP_TIMER {
-        &self.timer().ptp_timer()
+        self.timer().ptp_timer()
     }
 
     #[cfg(all(feature = "std", windows))]
     fn critical(&self) -> &CRITICAL_SECTION {
-        &self.timer().critical()
+        self.timer().critical()
     }
 
     #[cfg(all(feature = "std", windows))]

@@ -91,8 +91,9 @@ pub struct TimerStruct {
 }
 
 impl TimerStruct {
-    #[cfg(all(windows, feature = "std"))]
     /// Timeout value in milli seconds
+    #[cfg(all(windows, feature = "std"))]
+    #[must_use]
     pub fn milli_sec(&self) -> i64 {
         self.milli_sec
     }
@@ -103,8 +104,9 @@ impl TimerStruct {
         &mut self.milli_sec
     }
 
-    #[cfg(all(windows, feature = "std"))]
     /// The timer object for windows
+    #[cfg(all(windows, feature = "std"))]
+    #[must_use]
     pub fn ptp_timer(&self) -> &PTP_TIMER {
         &self.ptp_timer
     }
@@ -115,8 +117,9 @@ impl TimerStruct {
         &mut self.ptp_timer
     }
 
-    #[cfg(all(windows, feature = "std"))]
     /// The critical section, we need to use critical section to access the globals
+    #[cfg(all(windows, feature = "std"))]
+    #[must_use]
     pub fn critical(&self) -> &CRITICAL_SECTION {
         &self.critical
     }
@@ -156,8 +159,9 @@ impl TimerStruct {
         }
     }
 
-    #[cfg(windows)]
     /// Constructor
+    #[cfg(windows)]
+    #[must_use]
     pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
         Self {
@@ -222,6 +226,7 @@ impl TimerStruct {
     }
 
     #[cfg(all(windows, feature = "std"))]
+    #[allow(clippy::cast_sign_loss)]
     /// Set timer
     pub fn set_timer(&mut self) {
         unsafe {
