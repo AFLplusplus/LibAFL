@@ -1,10 +1,20 @@
+#[cfg(all(unix, target_os = "linux"))]
+use core::ptr::null_mut;
 use core::{
+    ffi::c_void,
     ptr::{addr_of_mut, write_volatile},
     time::Duration,
-    sync::atomic::{compiler_fence, Ordering},
-    ffi::c_void,
 };
+#[cfg(target_os = "linux")]
+use core::{mem::zeroed, ptr::addr_of};
 
+#[cfg(all(unix, not(target_os = "linux")))]
+const ITIMER_REAL: c_int = 0;
+
+#[cfg(target_os = "linux")]
+use libafl_bolts::current_time;
+#[cfg(all(feature = "std", windows))]
+use sync::atomic::{compiler_fence, Ordering};
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::{
     Foundation::FILETIME,
@@ -13,8 +23,42 @@ use windows::Win32::{
     },
 };
 
+#[cfg(target_os = "linux")]
+use crate::executors::hooks::inprocess::GLOBAL_STATE;
+#[cfg(all(feature = "std", windows))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 
+#[repr(C)]
+#[cfg(all(unix, not(target_os = "linux")))]
+pub(crate) struct Timeval {
+    pub tv_sec: i64,
+    pub tv_usec: i64,
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+impl Debug for Timeval {
+    #[allow(clippy::cast_sign_loss)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Timeval {{ tv_sec: {:?}, tv_usec: {:?} (tv: {:?}) }}",
+            self.tv_sec,
+            self.tv_usec,
+            Duration::new(self.tv_sec as _, (self.tv_usec * 1000) as _)
+        )
+    }
+}
+
+#[repr(C)]
+#[cfg(all(unix, not(target_os = "linux")))]
+#[derive(Debug)]
+pub(crate) struct Itimerval {
+    pub it_interval: Timeval,
+    pub it_value: Timeval,
+}
+
+/// The strcut about all the internals of the timer.
+/// This struct absorb all platform specific differences about timer.
 #[derive(Debug)]
 pub struct TimerStruct {
     // timeout time (windows)
@@ -24,6 +68,26 @@ pub struct TimerStruct {
     ptp_timer: PTP_TIMER,
     #[cfg(all(windows, feature = "std"))]
     critical: CRITICAL_SECTION,
+    #[cfg(unix)]
+    pub(crate) batch_mode: bool,
+    #[cfg(unix)]
+    pub(crate) exec_tmout: Duration,
+    #[cfg(target_os = "linux")]
+    pub(crate) timerid: libc::timer_t,
+    #[cfg(target_os = "linux")]
+    pub(crate) itimerspec: libc::itimerspec,
+    #[cfg(unix)]
+    pub(crate) executions: u32,
+    #[cfg(unix)]
+    pub(crate) avg_mul_k: u32,
+    #[cfg(unix)]
+    pub(crate) last_signal_time: Duration,
+    #[cfg(unix)]
+    pub(crate) avg_exec_time: Duration,
+    #[cfg(unix)]
+    pub(crate) start_time: Duration,
+    #[cfg(unix)]
+    pub(crate) tmout_start_time: Duration,
 }
 
 impl TimerStruct {
@@ -57,6 +121,36 @@ impl TimerStruct {
         &mut self.critical
     }
 
+    #[cfg(all(unix, not(target_os = "linux")))]
+    pub fn new(executor: E, exec_tmout: Duration) -> Self {
+        let milli_sec = exec_tmout.as_millis();
+        let it_value = Timeval {
+            tv_sec: (milli_sec / 1000) as i64,
+            tv_usec: (milli_sec % 1000) as i64,
+        };
+        let it_interval = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let itimerval = Itimerval {
+            it_interval,
+            it_value,
+        };
+        Self {
+            executor,
+            itimerval,
+            exec_tmout,
+            batch_mode: false,
+            executions: 0,
+            avg_mul_k: 1,
+            last_signal_time: Duration::ZERO,
+            avg_exec_time: Duration::ZERO,
+            start_time: Duration::ZERO,
+            tmout_start_time: Duration::ZERO,
+        }
+    }
+
+    #[cfg(windows)]
     pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
         Self {
@@ -64,6 +158,57 @@ impl TimerStruct {
             milli_sec,
             critical: CRITICAL_SECTION::default(),
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[must_use]
+    /// Constructor for linux
+    pub fn new(exec_tmout: Duration) -> Self {
+        let milli_sec = exec_tmout.as_millis();
+        let it_value = libc::timespec {
+            tv_sec: (milli_sec / 1000) as _,
+            tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
+        };
+        let it_interval = libc::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+        let itimerspec = libc::itimerspec {
+            it_interval,
+            it_value,
+        };
+        let mut timerid: libc::timer_t = null_mut();
+        unsafe {
+            // creates a new per-process interval timer
+            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
+        }
+
+        Self {
+            batch_mode: false,
+            itimerspec,
+            timerid,
+            exec_tmout,
+            executions: 0,
+            avg_mul_k: 1,
+            last_signal_time: Duration::ZERO,
+            avg_exec_time: Duration::ZERO,
+            start_time: Duration::ZERO,
+            tmout_start_time: Duration::ZERO,
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[must_use]
+    /// Constructor but batch mode
+    pub fn batch_mode(exec_tmout: Duration) -> Self {
+        let mut me = Self::new(exec_tmout);
+        me.batch_mode = true;
+        me
+    }
+
+    #[cfg(all(unix, not(target_os = "linux")))]
+    pub fn set_timer(&mut self) {
+        setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
     }
 
     #[cfg(all(windows, feature = "std"))]
@@ -95,6 +240,68 @@ impl TimerStruct {
         }
     }
 
+    /// Set up timer
+    #[cfg(target_os = "linux")]
+    pub fn set_timer(&mut self) {
+        unsafe {
+            if self.batch_mode {
+                let data = &mut GLOBAL_STATE;
+                write_volatile(&mut data.executor_ptr, self as *mut _ as *mut c_void);
+
+                if self.executions == 0 {
+                    libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
+                    self.tmout_start_time = current_time();
+                }
+                self.start_time = current_time();
+            } else {
+                libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
+            }
+        }
+    }
+
+    #[cfg(all(unix, not(target_os = "linux")))]
+    pub fn unset_timer(&mut self) {
+        unsafe {
+            let mut itimerval_zero: Itimerval = zeroed();
+            setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
+        }
+    }
+
+    /// Disalarm timer
+    #[cfg(target_os = "linux")]
+    pub fn unset_timer(&mut self) {
+        if self.batch_mode {
+            unsafe {
+                let elapsed = current_time() - self.tmout_start_time;
+                // elapsed may be > than tmout in case of received but ingored signal
+                if elapsed > self.exec_tmout
+                    || self.exec_tmout - elapsed < self.avg_exec_time * self.avg_mul_k
+                {
+                    let disarmed: libc::itimerspec = zeroed();
+                    libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
+                    // set timer the next exec
+                    if self.executions > 0 {
+                        self.avg_exec_time = elapsed / self.executions;
+                        self.executions = 0;
+                    }
+                    // readjust K
+                    if self.last_signal_time > self.exec_tmout * self.avg_mul_k
+                        && self.avg_mul_k > 1
+                    {
+                        self.avg_mul_k -= 1;
+                    }
+                } else {
+                    self.executions += 1;
+                }
+            }
+        } else {
+            unsafe {
+                let disarmed: libc::itimerspec = zeroed();
+                libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
+            }
+        }
+    }
+
     #[cfg(all(windows, feature = "std"))]
     pub fn unset_timer(&mut self) {
         unsafe {
@@ -108,7 +315,7 @@ impl TimerStruct {
             compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(self.critical_mut());
             compiler_fence(Ordering::SeqCst);
-    
+
             // previously this wa post_run_reset
             SetThreadpoolTimer(*self.ptp_timer(), None, 0, 0);
         }

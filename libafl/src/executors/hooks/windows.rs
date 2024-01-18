@@ -121,7 +121,7 @@ pub mod windows_exception_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            hooks::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE, HasTimeout},
+            hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
             inprocess::{run_observers_and_save_state, HasInProcessHooks},
             Executor, ExitKind, HasObservers,
         },
@@ -246,7 +246,10 @@ pub mod windows_exception_handler {
         compiler_fence(Ordering::SeqCst);
 
         if !data.executor_ptr.is_null()
-            && data.executor_mut::<E>().inprocess_hooks_mut().handle_timeout()
+            && data
+                .executor_mut::<E>()
+                .inprocess_hooks_mut()
+                .handle_timeout()
         {
             compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());

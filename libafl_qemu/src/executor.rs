@@ -2,6 +2,7 @@
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
+    time::Duration,
 };
 
 #[cfg(feature = "fork")]
@@ -131,6 +132,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         event_mgr: &mut EM,
+        timeout: Duration,
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
@@ -139,13 +141,14 @@ where
         S: State + HasExecutions + HasCorpus + HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let mut inner = InProcessExecutor::new(
+        let mut inner = InProcessExecutor::with_timeout(
             executor_hooks,
             harness_fn,
             observers,
             fuzzer,
             state,
             event_mgr,
+            timeout,
         )?;
         #[cfg(emulation_mode = "usermode")]
         {

@@ -46,7 +46,7 @@ impl ExecutorHook for InChildProcessHooks {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
-            compiler_fence(Ordering::SeqCst)
+            compiler_fence(Ordering::SeqCst);
         }
     }
 

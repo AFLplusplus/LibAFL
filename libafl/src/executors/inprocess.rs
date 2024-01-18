@@ -19,11 +19,10 @@ use libafl_bolts::tuples::{tuple_list, Merge};
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
-#[cfg(any(unix, feature = "std"))]
-use crate::executors::hooks::inprocess::GLOBAL_STATE;
-
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::hooks::inprocess::HasTimeout;
+#[cfg(any(unix, feature = "std"))]
+use crate::executors::hooks::inprocess::GLOBAL_STATE;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},

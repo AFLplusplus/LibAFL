@@ -1,11 +1,17 @@
+#[cfg(all(windows, feature = "std"))]
+use core::ptr::addr_of_mut;
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
     ffi::c_void,
-    ptr::{self, addr_of_mut, null_mut},
+    ptr::{self, null_mut},
     time::Duration,
 };
+#[cfg(all(unix, feature = "std"))]
+use core::{mem::zeroed, ptr::addr_of};
 
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::current_time;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
@@ -20,6 +26,8 @@ use windows::Win32::System::Threading::{
 use crate::executors::hooks::timer::TimerStruct;
 #[cfg(unix)]
 use crate::executors::hooks::unix::unix_signal_handler;
+#[cfg(unix)]
+use crate::executors::inprocess::HasInProcessHooks;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, Executor, HasObservers},
@@ -39,12 +47,17 @@ pub struct InProcessHooks {
     #[cfg(any(unix, feature = "std"))]
     pub timeout_handler: *const c_void,
     /// TImer struct
+    #[cfg(feature = "std")]
     pub timer: TimerStruct,
 }
 
 /// Any hooks that is about timeout
 pub trait HasTimeout {
+    /// Return ref to timer
+    #[cfg(feature = "std")]
     fn timer(&self) -> &TimerStruct;
+    /// Return mut ref to timer
+    #[cfg(feature = "std")]
     fn timer_mut(&mut self) -> &mut TimerStruct;
     #[cfg(all(feature = "std", windows))]
     fn ptp_timer(&self) -> &PTP_TIMER;
@@ -56,15 +69,20 @@ pub trait HasTimeout {
     fn milli_sec(&self) -> i64;
     #[cfg(all(feature = "std", windows))]
     fn millis_sec_mut(&mut self) -> &mut i64;
-
+    #[cfg(not(all(unix, feature = "std")))]
+    /// Handle timeout for batch mode timeout
     fn handle_timeout(&mut self) -> bool;
+    #[cfg(all(unix, feature = "std"))]
+    /// Handle timeout for batch mode timeout
+    fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool;
 }
 
 impl HasTimeout for InProcessHooks {
+    #[cfg(feature = "std")]
     fn timer(&self) -> &TimerStruct {
         &self.timer
     }
-
+    #[cfg(feature = "std")]
     fn timer_mut(&mut self) -> &mut TimerStruct {
         &mut self.timer
     }
@@ -94,15 +112,58 @@ impl HasTimeout for InProcessHooks {
         self.timer_mut().milli_sec_mut()
     }
 
-    #[cfg(windows)]
+    #[cfg(not(all(unix, feature = "std")))]
     fn handle_timeout(&mut self) -> bool {
         false
     }
 
-    #[cfg(unix)]
-    fn handle_timeout(&mut self) {
-        true
-        // TODO!
+    #[cfg(all(unix, feature = "std"))]
+    fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool {
+        if !self.timer().batch_mode {
+            return false;
+        }
+        //eprintln!("handle_timeout {:?} {}", self.avg_exec_time, self.avg_mul_k);
+        let cur_time = current_time();
+        if !data.is_valid() {
+            // outside the target
+            unsafe {
+                let disarmed: libc::itimerspec = zeroed();
+                libc::timer_settime(self.timer_mut().timerid, 0, addr_of!(disarmed), null_mut());
+            }
+            let elapsed = cur_time - self.timer().tmout_start_time;
+            // set timer the next exec
+            if self.timer().executions > 0 {
+                self.timer_mut().avg_exec_time = elapsed / self.timer().executions;
+                self.timer_mut().executions = 0;
+            }
+            self.timer_mut().avg_mul_k += 1;
+            self.timer_mut().last_signal_time = cur_time;
+            return true;
+        }
+
+        let elapsed_run = cur_time - self.timer_mut().start_time;
+        if elapsed_run < self.timer_mut().exec_tmout {
+            // fp, reset timeout
+            unsafe {
+                libc::timer_settime(
+                    self.timer_mut().timerid,
+                    0,
+                    addr_of!(self.timer_mut().itimerspec),
+                    null_mut(),
+                );
+            }
+            if self.timer().executions > 0 {
+                let elapsed = cur_time - self.timer_mut().tmout_start_time;
+                self.timer_mut().avg_exec_time = elapsed / self.timer().executions;
+                self.timer_mut().executions = 0; // It will be 1 when the exec finish
+            }
+            self.timer_mut().tmout_start_time = current_time();
+            self.timer_mut().avg_mul_k += 1;
+            self.timer_mut().last_signal_time = cur_time;
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -150,6 +211,8 @@ impl ExecutorHook for InProcessHooks {
         let data = unsafe { &mut GLOBAL_STATE };
         data.crash_handler = self.crash_handler;
         data.timeout_handler = self.timeout_handler;
+
+        #[cfg(feature = "std")]
         self.timer_mut().set_timer();
     }
 
@@ -162,24 +225,25 @@ impl ExecutorHook for InProcessHooks {
         _mgr: &mut EM,
         _input: &I,
     ) {
-        let data = unsafe { &mut GLOBAL_STATE };
-        //timeout stuff
+        // let _data = unsafe { &mut GLOBAL_STATE };
+        // timeout stuff
+        #[cfg(feature = "std")]
         self.timer_mut().unset_timer();
     }
 }
 
 impl InProcessHooks {
     /// Create new [`InProcessHooks`].
-    #[cfg(not(all(windows, feature = "std")))]
-    pub fn new<E, EM, OF, Z>() -> Result<Self, Error>
+    #[cfg(unix)]
+    #[allow(unused_variables)]
+    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers,
+        E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        #[cfg(unix)]
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
             let data = &mut GLOBAL_STATE;
@@ -193,10 +257,10 @@ impl InProcessHooks {
                     as *const c_void,
                 timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>
                     as *const _,
+                #[cfg(feature = "std")]
+                timer: TimerStruct::new(exec_tmout),
             })
         }
-        #[cfg(not(any(unix, feature = "std")))]
-        Ok(Self {})
     }
 
     /// Create new [`InProcessHooks`].
@@ -276,6 +340,8 @@ impl InProcessHooks {
             ret = Self {
                 crash_handler: ptr::null(),
                 timeout_handler: ptr::null(),
+                #[cfg(feature = "std")]
+                timer: TimerStruct::new(Duration::from_millis(5000)),
             }
         }
         ret
