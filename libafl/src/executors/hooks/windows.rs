@@ -98,6 +98,7 @@ pub mod windows_asan_handler {
 }
 
 #[cfg(all(windows, feature = "std"))]
+/// The module to take care of windows crash or timeouts
 pub mod windows_exception_handler {
     #[cfg(feature = "std")]
     use alloc::boxed::Box;

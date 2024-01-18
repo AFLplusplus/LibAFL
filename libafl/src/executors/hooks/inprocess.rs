@@ -60,14 +60,19 @@ pub trait HasTimeout {
     #[cfg(feature = "std")]
     fn timer_mut(&mut self) -> &mut TimerStruct;
     #[cfg(all(feature = "std", windows))]
+    /// The timer object
     fn ptp_timer(&self) -> &PTP_TIMER;
     #[cfg(all(feature = "std", windows))]
+    /// The critical section
     fn critical(&self) -> &CRITICAL_SECTION;
     #[cfg(all(feature = "std", windows))]
+    /// The critical section (mut)
     fn critical_mut(&mut self) -> &mut CRITICAL_SECTION;
     #[cfg(all(feature = "std", windows))]
+    /// The timeout in milli sec
     fn milli_sec(&self) -> i64;
     #[cfg(all(feature = "std", windows))]
+    /// The timeout in milli sec (mut ref)
     fn millis_sec_mut(&mut self) -> &mut i64;
     #[cfg(not(all(unix, feature = "std")))]
     /// Handle timeout for batch mode timeout

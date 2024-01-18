@@ -16,7 +16,8 @@ const ITIMER_REAL: core::ffi::c_int = 0;
 #[cfg(target_os = "linux")]
 use libafl_bolts::current_time;
 #[cfg(all(feature = "std", windows))]
-use sync::atomic::{compiler_fence, Ordering};
+use core::sync::atomic::{compiler_fence, Ordering};
+
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::{
     Foundation::FILETIME,
@@ -91,31 +92,37 @@ pub struct TimerStruct {
 
 impl TimerStruct {
     #[cfg(all(windows, feature = "std"))]
+    /// Timeout value in milli seconds
     pub fn milli_sec(&self) -> i64 {
         self.milli_sec
     }
 
     #[cfg(all(windows, feature = "std"))]
+    /// Timeout value in milli seconds (mut ref)
     pub fn milli_sec_mut(&mut self) -> &mut i64 {
         &mut self.milli_sec
     }
 
     #[cfg(all(windows, feature = "std"))]
+    /// The timer object for windows
     pub fn ptp_timer(&self) -> &PTP_TIMER {
         &self.ptp_timer
     }
 
     #[cfg(all(windows, feature = "std"))]
+    /// The timer object for windows
     pub fn ptp_timer_mut(&mut self) -> &mut PTP_TIMER {
         &mut self.ptp_timer
     }
 
     #[cfg(all(windows, feature = "std"))]
+    /// The critical section, we need to use critical section to access the globals
     pub fn critical(&self) -> &CRITICAL_SECTION {
         &self.critical
     }
 
     #[cfg(all(windows, feature = "std"))]
+    /// The critical section (mut ref), we need to use critical section to access the globals
     pub fn critical_mut(&mut self) -> &mut CRITICAL_SECTION {
         &mut self.critical
     }
@@ -150,6 +157,7 @@ impl TimerStruct {
     }
 
     #[cfg(windows)]
+    /// Constructor
     pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
         Self {
@@ -214,6 +222,7 @@ impl TimerStruct {
     }
 
     #[cfg(all(windows, feature = "std"))]
+    /// Set timer
     pub fn set_timer(&mut self) {
         unsafe {
             let data = &mut GLOBAL_STATE;
@@ -308,6 +317,7 @@ impl TimerStruct {
     }
 
     #[cfg(all(windows, feature = "std"))]
+    /// Disalarm
     pub fn unset_timer(&mut self) {
         unsafe {
             let data = &mut GLOBAL_STATE;
