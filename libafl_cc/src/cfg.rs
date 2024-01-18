@@ -96,7 +96,7 @@ where
     #[must_use]
     pub fn new() -> Self {
         let map_size = option_env!("LIBAFL_EDGES_MAP_SIZE")
-            .map_or(Ok(2621440), str::parse)
+            .map_or(Ok(65536), str::parse)
             .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
         Self {
             edges: (0..map_size).map(|_| None).collect(),
