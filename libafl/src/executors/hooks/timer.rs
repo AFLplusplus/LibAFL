@@ -1,15 +1,17 @@
-#[cfg(all(unix, target_os = "linux"))]
-use core::ptr::null_mut;
+use core::time::Duration;
+#[cfg(any(all(feature = "std", windows), target_os = "linux"))]
 use core::{
     ffi::c_void,
     ptr::{addr_of_mut, write_volatile},
-    time::Duration,
 };
 #[cfg(target_os = "linux")]
-use core::{mem::zeroed, ptr::addr_of};
+use core::{
+    mem::zeroed,
+    ptr::{addr_of, null_mut},
+};
 
 #[cfg(all(unix, not(target_os = "linux")))]
-const ITIMER_REAL: c_int = 0;
+const ITIMER_REAL: core::ffi::c_int = 0;
 
 #[cfg(target_os = "linux")]
 use libafl_bolts::current_time;
@@ -36,9 +38,9 @@ pub(crate) struct Timeval {
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl Debug for Timeval {
+impl core::fmt::Debug for Timeval {
     #[allow(clippy::cast_sign_loss)]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
             "Timeval {{ tv_sec: {:?}, tv_usec: {:?} (tv: {:?}) }}",
@@ -59,7 +61,7 @@ pub(crate) struct Itimerval {
 
 /// The strcut about all the internals of the timer.
 /// This struct absorb all platform specific differences about timer.
-#[derive(Debug)]
+#[allow(missing_debug_implementations,)]
 pub struct TimerStruct {
     // timeout time (windows)
     #[cfg(all(windows, feature = "std"))]
@@ -122,7 +124,7 @@ impl TimerStruct {
     }
 
     #[cfg(all(unix, not(target_os = "linux")))]
-    pub fn new(executor: E, exec_tmout: Duration) -> Self {
+    pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
         let it_value = Timeval {
             tv_sec: (milli_sec / 1000) as i64,
@@ -208,7 +210,7 @@ impl TimerStruct {
 
     #[cfg(all(unix, not(target_os = "linux")))]
     pub fn set_timer(&mut self) {
-        setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+        libc::setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
     }
 
     #[cfg(all(windows, feature = "std"))]
@@ -262,8 +264,8 @@ impl TimerStruct {
     #[cfg(all(unix, not(target_os = "linux")))]
     pub fn unset_timer(&mut self) {
         unsafe {
-            let mut itimerval_zero: Itimerval = zeroed();
-            setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
+            let mut itimerval_zero: Itimerval = core::mem::zeroed();
+            libc::ABDAY_4setitimer(ITIMER_REAL, &mut itimerval_zero, core::ptr::null_mut());
         }
     }
 

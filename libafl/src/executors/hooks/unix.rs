@@ -168,7 +168,7 @@ pub mod unix_signal_handler {
             event_mgr,
             ExitKind::Timeout,
         );
-
+        log::info!("Exiting");
         libc::_exit(55);
     }
 

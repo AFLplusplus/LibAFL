@@ -38,7 +38,7 @@ use crate::{
 #[cfg(all(windows, feature = "std"))]
 use crate::{executors::inprocess::HasInProcessHooks, state::State};
 /// The inmem executor's handlers.
-#[derive(Debug)]
+#[allow(missing_debug_implementations,)]
 pub struct InProcessHooks {
     /// On crash C function pointer
     #[cfg(any(unix, feature = "std"))]
@@ -119,50 +119,63 @@ impl HasTimeout for InProcessHooks {
 
     #[cfg(all(unix, feature = "std"))]
     fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool {
-        if !self.timer().batch_mode {
+        #[cfg(not(target_os = "linux"))]
+        {
             return false;
         }
-        //eprintln!("handle_timeout {:?} {}", self.avg_exec_time, self.avg_mul_k);
-        let cur_time = current_time();
-        if !data.is_valid() {
-            // outside the target
-            unsafe {
-                let disarmed: libc::itimerspec = zeroed();
-                libc::timer_settime(self.timer_mut().timerid, 0, addr_of!(disarmed), null_mut());
-            }
-            let elapsed = cur_time - self.timer().tmout_start_time;
-            // set timer the next exec
-            if self.timer().executions > 0 {
-                self.timer_mut().avg_exec_time = elapsed / self.timer().executions;
-                self.timer_mut().executions = 0;
-            }
-            self.timer_mut().avg_mul_k += 1;
-            self.timer_mut().last_signal_time = cur_time;
-            return true;
-        }
 
-        let elapsed_run = cur_time - self.timer_mut().start_time;
-        if elapsed_run < self.timer_mut().exec_tmout {
-            // fp, reset timeout
-            unsafe {
-                libc::timer_settime(
-                    self.timer_mut().timerid,
-                    0,
-                    addr_of!(self.timer_mut().itimerspec),
-                    null_mut(),
-                );
+        #[cfg(target_os = "linux")]
+        {
+            if !self.timer().batch_mode {
+                return false;
             }
-            if self.timer().executions > 0 {
-                let elapsed = cur_time - self.timer_mut().tmout_start_time;
-                self.timer_mut().avg_exec_time = elapsed / self.timer().executions;
-                self.timer_mut().executions = 0; // It will be 1 when the exec finish
+            //eprintln!("handle_timeout {:?} {}", self.avg_exec_time, self.avg_mul_k);
+            let cur_time = current_time();
+            if !data.is_valid() {
+                // outside the target
+                unsafe {
+                    let disarmed: libc::itimerspec = zeroed();
+                    libc::timer_settime(
+                        self.timer_mut().timerid,
+                        0,
+                        addr_of!(disarmed),
+                        null_mut(),
+                    );
+                }
+                let elapsed = cur_time - self.timer().tmout_start_time;
+                // set timer the next exec
+                if self.timer().executions > 0 {
+                    self.timer_mut().avg_exec_time = elapsed / self.timer().executions;
+                    self.timer_mut().executions = 0;
+                }
+                self.timer_mut().avg_mul_k += 1;
+                self.timer_mut().last_signal_time = cur_time;
+                return true;
             }
-            self.timer_mut().tmout_start_time = current_time();
-            self.timer_mut().avg_mul_k += 1;
-            self.timer_mut().last_signal_time = cur_time;
-            true
-        } else {
-            false
+
+            let elapsed_run = cur_time - self.timer_mut().start_time;
+            if elapsed_run < self.timer_mut().exec_tmout {
+                // fp, reset timeout
+                unsafe {
+                    libc::timer_settime(
+                        self.timer_mut().timerid,
+                        0,
+                        addr_of!(self.timer_mut().itimerspec),
+                        null_mut(),
+                    );
+                }
+                if self.timer().executions > 0 {
+                    let elapsed = cur_time - self.timer_mut().tmout_start_time;
+                    self.timer_mut().avg_exec_time = elapsed / self.timer().executions;
+                    self.timer_mut().executions = 0; // It will be 1 when the exec finish
+                }
+                self.timer_mut().tmout_start_time = current_time();
+                self.timer_mut().avg_mul_k += 1;
+                self.timer_mut().last_signal_time = cur_time;
+                true
+            } else {
+                false
+            }
         }
     }
 }
