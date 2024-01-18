@@ -25,9 +25,6 @@ use windows::Win32::{
     },
 };
 
-#[cfg(target_os = "linux")]
-use crate::executors::hooks::inprocess::GLOBAL_STATE;
-#[cfg(all(feature = "std", windows))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 
 #[repr(C)]

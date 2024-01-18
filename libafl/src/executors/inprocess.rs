@@ -21,13 +21,14 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::hooks::inprocess::HasTimeout;
-#[cfg(any(unix, feature = "std"))]
-use crate::executors::hooks::inprocess::GLOBAL_STATE;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
     executors::{
-        hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
+        hooks::{
+            inprocess::{InProcessHooks, GLOBAL_STATE},
+            ExecutorHooksTuple,
+        },
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
