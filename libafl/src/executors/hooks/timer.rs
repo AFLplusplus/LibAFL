@@ -164,6 +164,8 @@ impl TimerStruct {
 
     #[cfg(target_os = "linux")]
     #[must_use]
+    #[allow(unused_unsafe)]
+    #[allow(unused_mut)]
     /// Constructor for linux
     pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
@@ -181,6 +183,7 @@ impl TimerStruct {
         };
         let mut timerid: libc::timer_t = null_mut();
         unsafe {
+            #[cfg(not(miri))]
             // creates a new per-process interval timer
             libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
         }
@@ -256,6 +259,7 @@ impl TimerStruct {
                 }
                 self.start_time = current_time();
             } else {
+                #[cfg(not(miri))]
                 libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
             }
         }
@@ -271,6 +275,7 @@ impl TimerStruct {
 
     /// Disalarm timer
     #[cfg(target_os = "linux")]
+    #[allow(unused_variables)]
     pub fn unset_timer(&mut self) {
         if self.batch_mode {
             unsafe {
@@ -299,6 +304,7 @@ impl TimerStruct {
         } else {
             unsafe {
                 let disarmed: libc::itimerspec = zeroed();
+                #[cfg(not(miri))]
                 libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
             }
         }
