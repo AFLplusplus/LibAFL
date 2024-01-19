@@ -233,7 +233,9 @@ impl TimerStruct {
 
     #[cfg(all(unix, not(target_os = "linux")))]
     pub fn set_timer(&mut self) {
-        setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
+        unsafe {
+            setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
+        }
     }
 
     #[cfg(windows)]
