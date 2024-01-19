@@ -472,7 +472,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::{rands::RandomSeed, tuples::tuple_list};
+    use libafl_bolts::tuples::tuple_list;
 
     use crate::{
         corpus::InMemoryCorpus,
@@ -480,7 +480,8 @@ mod tests {
         executors::{Executor, ExitKind, InProcessExecutor},
         feedbacks::CrashFeedback,
         inputs::{NopInput, UsesInput},
-        prelude::{RandScheduler, StdState},
+        schedulers::RandScheduler,
+        state::StdState,
         StdFuzzer,
     };
 
@@ -491,7 +492,7 @@ mod tests {
     #[test]
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
-        let rand = libafl_bolts::rands::StdRand::new();
+        let rand = libafl_bolts::rands::XkcdRand::new();
         let corpus = InMemoryCorpus::<NopInput>::new();
         let solutions = InMemoryCorpus::new();
         let mut objective = CrashFeedback::new();
