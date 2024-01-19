@@ -22,7 +22,8 @@ use libafl_bolts::current_time;
 use windows::Win32::{
     Foundation::FILETIME,
     System::Threading::{
-        EnterCriticalSection, LeaveCriticalSection, SetThreadpoolTimer, CRITICAL_SECTION, PTP_TIMER,
+        EnterCriticalSection, InitializeCriticalSection, LeaveCriticalSection, SetThreadpoolTimer,
+        CRITICAL_SECTION, PTP_TIMER,
     },
 };
 
@@ -166,10 +167,15 @@ impl TimerStruct {
     #[must_use]
     pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
+
+        let mut critical = CRITICAL_SECTION::default();
+        unsafe {
+            InitializeCriticalSection(&mut critical);
+        }
         Self {
-            ptp_timer: PTP_TIMER::default(),
+            ptp_timer: PTP_TIMER::default(), // we'll initialize this later in init()
             milli_sec,
-            critical: CRITICAL_SECTION::default(),
+            critical: critical,
         }
     }
 

@@ -18,8 +18,8 @@ use libafl_bolts::os::unix_signals::setup_signal_handler;
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::System::Threading::{
-    CreateThreadpoolTimer, InitializeCriticalSection, CRITICAL_SECTION, PTP_CALLBACK_INSTANCE,
-    PTP_TIMER, TP_CALLBACK_ENVIRON_V3,
+    CreateThreadpoolTimer, CRITICAL_SECTION, PTP_CALLBACK_INSTANCE, PTP_TIMER,
+    TP_CALLBACK_ENVIRON_V3,
 };
 
 #[cfg(feature = "std")]
@@ -197,6 +197,9 @@ type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
 impl ExecutorHook for InProcessHooks {
     fn init<E: HasObservers, S>(&mut self, _state: &mut S) {
         // init timeout
+        // for windows the hook needs to be initialized in this function not in timer.rs
+        // as it has to know
+        // the pointer to timeout_handler
         #[cfg(windows)]
         {
             #[cfg(feature = "std")]
@@ -211,14 +214,7 @@ impl ExecutorHook for InProcessHooks {
                     )
                 }
                 .expect("CreateThreadpoolTimer failed!");
-                let mut critical = CRITICAL_SECTION::default();
-
-                unsafe {
-                    InitializeCriticalSection(&mut critical);
-                }
-
                 *self.timer_mut().ptp_timer_mut() = ptp_timer;
-                *self.timer_mut().critical_mut() = critical;
             }
         }
     }
