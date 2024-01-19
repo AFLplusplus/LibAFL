@@ -7,7 +7,7 @@ use core::{
     ptr::{self, null_mut},
     time::Duration,
 };
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(target_os = "linux", feature = "std"))]
 use core::{mem::zeroed, ptr::addr_of};
 
 #[cfg(all(target_os = "linux", feature = "std"))]
