@@ -436,7 +436,7 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), String>
     where
         T: Into<GuestReg>;
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>;
     fn write_function_argument<T>(
@@ -567,28 +567,6 @@ impl CPU {
     #[must_use]
     pub fn raw_ptr(&self) -> CPUStatePtr {
         self.ptr
-    }
-
-    #[must_use]
-    pub fn page_size(&self) -> usize {
-        #[cfg(emulation_mode = "usermode")]
-        {
-            thread_local! {
-                static PAGE_SIZE: OnceCell<usize> = const { OnceCell::new() };
-            }
-
-            PAGE_SIZE.with(|s| {
-                *s.get_or_init(|| {
-                    unsafe { libc::sysconf(libc::_SC_PAGE_SIZE) }
-                        .try_into()
-                        .expect("Invalid page size")
-                })
-            })
-        }
-        #[cfg(emulation_mode = "systemmode")]
-        {
-            unsafe { libafl_qemu_sys::qemu_target_page_size() }
-        }
     }
 
     #[must_use]

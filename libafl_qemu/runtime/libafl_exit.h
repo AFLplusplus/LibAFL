@@ -40,6 +40,7 @@ typedef enum LibaflExit {
   LIBAFL_EXIT_SAVE = 5,
   LIBAFL_EXIT_LOAD = 6,
   LIBAFL_EXIT_VERSION = 7,
+  LIBAFL_EXIT_VADDR_FILTER_ALLOW = 8,
 } LibaflExit;
 
 typedef enum LibaflExitEndStatus {
