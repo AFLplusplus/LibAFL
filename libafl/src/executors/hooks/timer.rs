@@ -11,7 +11,7 @@ use core::{
 };
 
 #[cfg(all(unix, not(target_os = "linux")))]
-const ITIMER_REAL: core::ffi::c_int = 0;
+pub const ITIMER_REAL: core::ffi::c_int = 0;
 
 #[cfg(windows)]
 use core::sync::atomic::{compiler_fence, Ordering};

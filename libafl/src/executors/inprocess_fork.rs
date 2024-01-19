@@ -45,7 +45,7 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
 );
 
 #[cfg(all(unix, not(target_os = "linux")))]
-use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval};
+use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval, ITIMER_REAL};
 
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 pub struct InProcessForkExecutor<'a, H, HT, OT, S, SP>
