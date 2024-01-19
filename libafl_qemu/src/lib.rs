@@ -99,6 +99,7 @@ pub use executor::QemuForkExecutor;
 pub mod emu;
 pub use emu::*;
 
+pub mod sync_backdoor;
 pub mod breakpoint;
 pub mod sync_exit;
 

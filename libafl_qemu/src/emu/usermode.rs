@@ -11,7 +11,7 @@ use crate::{
         libafl_get_brk, libafl_load_addr, libafl_maps_next, libafl_qemu_run, libafl_set_brk,
         mmap_next_start, read_self_maps, strlen,
     },
-    sync_exit::SyncExitError,
+    sync_backdoor::SyncBackdoorError,
     EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestUsize, HookData, HookId,
     IsEmuExitHandler, MapInfo, MmapPerms, NopEmuExitHandler, SyscallHookResult, VerifyAccess, CPU,
 };
@@ -19,7 +19,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum HandlerError {
     EmuExitReasonError(EmuExitReasonError),
-    SyncExitError(SyncExitError),
+    SyncBackdoorError(SyncBackdoorError),
     MultipleInputDefinition,
 }
 

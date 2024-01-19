@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86::*;
 
-use crate::{sync_exit::BackdoorArgs, CallingConvention, GuestAddr};
+use crate::{sync_backdoor::BackdoorArgs, CallingConvention, GuestAddr};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]

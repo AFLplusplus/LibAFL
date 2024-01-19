@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::arm::*;
 
-use crate::{sync_exit::BackdoorArgs, CallingConvention};
+use crate::{sync_backdoor::BackdoorArgs, CallingConvention};
 
 /// Registers for the ARM instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]

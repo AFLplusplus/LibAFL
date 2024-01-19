@@ -73,7 +73,7 @@ pub fn build() {
     target_dir.pop();
     target_dir.pop();
 
-    let binding_file = out_dir_path_buf.join("sync_exit_bindings.rs");
+    let binding_file = out_dir_path_buf.join("backdoor_bindings.rs");
     bindgen::Builder::default()
         .derive_debug(true)
         .derive_default(true)

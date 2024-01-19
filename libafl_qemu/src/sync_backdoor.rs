@@ -5,39 +5,27 @@ use std::{
 
 use enum_map::{enum_map, Enum, EnumMap};
 use libafl::executors::ExitKind;
-use num_enum::{TryFromPrimitive, TryFromPrimitiveError};
+use num_enum::TryFromPrimitiveError;
 
 use crate::{
-    get_backdoor_arch_regs, Command, CommandInput, Emulator, GuestPhysAddr, GuestReg,
-    GuestVirtAddr, IsEmuExitHandler, Regs, CPU,
+    command::{
+        Command, EmulatorMemoryChunk, EndCommand, FilterCommand, InputCommand, LoadCommand,
+        NativeBackdoorCommand, NativeExitKind, SaveCommand, StartCommand, VersionCommand,
+    },
+    get_backdoor_arch_regs, Emulator, GuestAddr, GuestPhysAddr, GuestReg, GuestVirtAddr,
+    IsEmuExitHandler, QemuInstrumentationAddressRangeFilter, Regs, CPU,
 };
 
-mod bindings {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(improper_ctypes)]
-    #![allow(unused_mut)]
-    #![allow(unused)]
-    #![allow(unused_variables)]
-    #![allow(clippy::all)]
-    #![allow(clippy::pedantic)]
-
-    include!(concat!(env!("OUT_DIR"), "/sync_exit_bindings.rs"));
-}
-
-pub const VERSION: u64 = bindings::LIBAFL_EXIT_VERSION_NUMBER as u64;
-
 #[derive(Debug, Clone)]
-pub enum SyncExitError {
+pub enum SyncBackdoorError {
     UnknownCommand(GuestReg),
     RegError(String),
     VersionDifference(u64),
 }
 
-impl From<String> for SyncExitError {
+impl From<String> for SyncBackdoorError {
     fn from(error_string: String) -> Self {
-        SyncExitError::RegError(error_string)
+        SyncBackdoorError::RegError(error_string)
     }
 }
 
@@ -53,104 +41,87 @@ pub enum BackdoorArgs {
     Arg6,
 }
 
-#[derive(Debug, Clone, TryFromPrimitive)]
-#[repr(u64)]
-pub enum NativeSyncExitCommand {
-    StartVirt = bindings::LibaflExit_LIBAFL_EXIT_START_VIRT.0 as u64, // Shortcut for Save + InputVirt
-    StartPhys = bindings::LibaflExit_LIBAFL_EXIT_START_PHYS.0 as u64, // Shortcut for Save + InputPhys
-    InputVirt = bindings::LibaflExit_LIBAFL_EXIT_INPUT_VIRT.0 as u64, // The address is a virtual address using the paging currently running in the VM.
-    InputPhys = bindings::LibaflExit_LIBAFL_EXIT_INPUT_PHYS.0 as u64, // The address is a physical address
-    End = bindings::LibaflExit_LIBAFL_EXIT_END.0 as u64, // Implies reloading of the target. The first argument gives the exit status.
-    Save = bindings::LibaflExit_LIBAFL_EXIT_SAVE.0 as u64, // Save the VM
-    Load = bindings::LibaflExit_LIBAFL_EXIT_LOAD.0 as u64, // Reload the target without ending the run?
-    Version = bindings::LibaflExit_LIBAFL_EXIT_VERSION.0 as u64, // Version of the bindings used in the target
-}
-
-#[derive(Debug, Clone, Enum, TryFromPrimitive)]
-#[repr(u64)]
-pub enum NativeExitKind {
-    Unknown = bindings::LibaflExitEndStatus_LIBAFL_EXIT_END_UNKNOWN.0 as u64, // Should not be used
-    Ok = bindings::LibaflExitEndStatus_LIBAFL_EXIT_END_OK.0 as u64,           // Normal exit
-    Crash = bindings::LibaflExitEndStatus_LIBAFL_EXIT_END_CRASH.0 as u64, // Crash reported in the VM
-}
-
 static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
-impl From<TryFromPrimitiveError<NativeSyncExitCommand>> for SyncExitError {
-    fn from(error: TryFromPrimitiveError<NativeSyncExitCommand>) -> Self {
-        SyncExitError::UnknownCommand(error.number.try_into().unwrap())
+impl From<TryFromPrimitiveError<NativeBackdoorCommand>> for SyncBackdoorError {
+    fn from(error: TryFromPrimitiveError<NativeBackdoorCommand>) -> Self {
+        SyncBackdoorError::UnknownCommand(error.number.try_into().unwrap())
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct SyncExit {
+pub struct SyncBackdoor {
     command: Command,
     arch_regs_map: &'static EnumMap<BackdoorArgs, Regs>,
 }
 
-impl SyncExit {
+impl SyncBackdoor {
     #[must_use]
     pub fn command(&self) -> &Command {
         &self.command
     }
 
-    pub fn ret(&self, cpu: &CPU, value: GuestReg) -> Result<(), SyncExitError> {
+    pub fn ret(&self, cpu: &CPU, value: GuestReg) -> Result<(), SyncBackdoorError> {
         Ok(cpu.write_reg(self.arch_regs_map[BackdoorArgs::Ret], value)?)
+    }
+
+    pub fn ret_reg(&self) -> Regs {
+        self.arch_regs_map[BackdoorArgs::Ret]
     }
 }
 
-impl Display for SyncExit {
+impl Display for SyncBackdoor {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.command)
     }
 }
 
-impl<E> TryFrom<&Emulator<E>> for SyncExit
+impl<E> TryFrom<&Emulator<E>> for SyncBackdoor
 where
     E: IsEmuExitHandler,
 {
-    type Error = SyncExitError;
+    type Error = SyncBackdoorError;
 
     fn try_from(emu: &Emulator<E>) -> Result<Self, Self::Error> {
         let arch_regs_map: &'static EnumMap<BackdoorArgs, Regs> = get_backdoor_arch_regs();
         let cmd_id: GuestReg = emu.read_reg::<Regs, GuestReg>(arch_regs_map[BackdoorArgs::Cmd])?;
 
         Ok(match u64::from(cmd_id).try_into()? {
-            NativeSyncExitCommand::Save => SyncExit {
-                command: Command::Save,
+            NativeBackdoorCommand::Save => SyncBackdoor {
+                command: Command::SaveCommand(SaveCommand),
                 arch_regs_map,
             },
-            NativeSyncExitCommand::Load => SyncExit {
-                command: Command::Load,
+            NativeBackdoorCommand::Load => SyncBackdoor {
+                command: Command::LoadCommand(LoadCommand),
                 arch_regs_map,
             },
-            NativeSyncExitCommand::InputVirt => {
+            NativeBackdoorCommand::InputVirt => {
                 let virt_addr: GuestVirtAddr = emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
                 let max_input_size: GuestReg = emu.read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
-                SyncExit {
-                    command: Command::Input(CommandInput::virt(
+                SyncBackdoor {
+                    command: Command::InputCommand(InputCommand::new(EmulatorMemoryChunk::virt(
                         virt_addr,
                         max_input_size,
                         emu.current_cpu().unwrap().clone(),
-                    )),
+                    ))),
                     arch_regs_map,
                 }
             }
-            NativeSyncExitCommand::InputPhys => {
+            NativeBackdoorCommand::InputPhys => {
                 let phys_addr: GuestPhysAddr = emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
                 let max_input_size: GuestReg = emu.read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
-                SyncExit {
-                    command: Command::Input(CommandInput::phys(
+                SyncBackdoor {
+                    command: Command::InputCommand(InputCommand::new(EmulatorMemoryChunk::phys(
                         phys_addr,
                         max_input_size,
                         Some(emu.current_cpu().unwrap().clone()),
-                    )),
+                    ))),
                     arch_regs_map,
                 }
             }
-            NativeSyncExitCommand::End => {
+            NativeBackdoorCommand::End => {
                 let native_exit_kind: GuestReg = emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
                 let native_exit_kind: Result<NativeExitKind, _> =
                     u64::from(native_exit_kind).try_into();
@@ -165,44 +136,57 @@ where
                     })[k]
                 });
 
-                SyncExit {
-                    command: Command::Exit(exit_kind),
+                SyncBackdoor {
+                    command: Command::EndCommand(EndCommand::new(exit_kind)),
                     arch_regs_map,
                 }
             }
-            NativeSyncExitCommand::StartPhys => {
+            NativeBackdoorCommand::StartPhys => {
                 let input_phys_addr: GuestPhysAddr =
                     emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
                 let max_input_size: GuestReg = emu.read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
-                SyncExit {
-                    command: Command::Start(CommandInput::phys(
+                SyncBackdoor {
+                    command: Command::StartCommand(StartCommand::new(EmulatorMemoryChunk::phys(
                         input_phys_addr,
                         max_input_size,
                         Some(emu.current_cpu().unwrap().clone()),
-                    )),
+                    ))),
                     arch_regs_map,
                 }
             }
-            NativeSyncExitCommand::StartVirt => {
+            NativeBackdoorCommand::StartVirt => {
                 let input_virt_addr: GuestVirtAddr =
                     emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
                 let max_input_size: GuestReg = emu.read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
 
-                SyncExit {
-                    command: Command::Start(CommandInput::virt(
+                SyncBackdoor {
+                    command: Command::StartCommand(StartCommand::new(EmulatorMemoryChunk::virt(
                         input_virt_addr,
                         max_input_size,
                         emu.current_cpu().unwrap().clone(),
-                    )),
+                    ))),
                     arch_regs_map,
                 }
             }
-            NativeSyncExitCommand::Version => {
+            NativeBackdoorCommand::Version => {
                 let client_version = emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
 
-                SyncExit {
-                    command: Command::Version(client_version),
+                SyncBackdoor {
+                    command: Command::VersionCommand(VersionCommand::new(client_version)),
+                    arch_regs_map,
+                }
+            }
+            NativeBackdoorCommand::VaddrFilterAllowRange => {
+                let vaddr_start: GuestAddr = emu.read_reg(arch_regs_map[BackdoorArgs::Arg1])?;
+                let vaddr_end: GuestAddr = emu.read_reg(arch_regs_map[BackdoorArgs::Arg2])?;
+
+                SyncBackdoor {
+                    command: Command::AddressRangeFilterCommand(FilterCommand::new(
+                        QemuInstrumentationAddressRangeFilter::AllowList(vec![
+                            vaddr_start..vaddr_end,
+                        ]),
+                    )),
                     arch_regs_map,
                 }
             }

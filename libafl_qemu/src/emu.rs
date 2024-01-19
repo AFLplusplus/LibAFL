@@ -274,7 +274,7 @@ pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
 pub use libafl_qemu_sys::{CPUArchState, CPUState};
 
-use crate::sync_exit::{SyncExit, SyncExitError};
+use crate::sync_backdoor::{SyncBackdoor, SyncBackdoorError};
 
 pub type CPUStatePtr = *mut libafl_qemu_sys::CPUState;
 pub type CPUArchStatePtr = *mut libafl_qemu_sys::CPUArchState;
@@ -772,9 +772,9 @@ pub enum EmuError {
 
 #[derive(Debug, Clone)]
 pub enum EmuExitReason {
-    End(QemuShutdownCause), // QEMU ended for some reason.
-    Breakpoint(Breakpoint), // Breakpoint triggered. Contains the address of the trigger.
-    SyncBackdoor(SyncExit), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    End(QemuShutdownCause),     // QEMU ended for some reason.
+    Breakpoint(Breakpoint),     // Breakpoint triggered. Contains the address of the trigger.
+    SyncBackdoor(SyncBackdoor), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
 }
 
 /// High level result when finishing to handle requests
@@ -791,9 +791,9 @@ impl From<EmuExitReasonError> for HandlerError {
     }
 }
 
-impl From<SyncExitError> for HandlerError {
-    fn from(error: SyncExitError) -> Self {
-        HandlerError::SyncExitError(error)
+impl From<SyncBackdoorError> for HandlerError {
+    fn from(error: SyncBackdoorError) -> Self {
+        HandlerError::SyncBackdoorError(error)
     }
 }
 
@@ -813,12 +813,12 @@ impl fmt::Display for EmuExitReason {
 pub enum EmuExitReasonError {
     UnknownKind,
     UnexpectedExit,
-    SyncBackdoorError(SyncExitError),
+    SyncBackdoorError(SyncBackdoorError),
     BreakpointNotFound(GuestAddr),
 }
 
-impl From<SyncExitError> for EmuExitReasonError {
-    fn from(sync_backdoor_error: SyncExitError) -> Self {
+impl From<SyncBackdoorError> for EmuExitReasonError {
+    fn from(sync_backdoor_error: SyncBackdoorError) -> Self {
         EmuExitReasonError::SyncBackdoorError(sync_backdoor_error)
     }
 }

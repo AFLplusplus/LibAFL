@@ -18,6 +18,7 @@ use libafl::{
 use libafl_bolts::{os::unix_signals::Signal, rands::RomuDuoJrRand, AsSlice};
 
 use crate::{
+    sync_backdoor::SyncBackdoorError,
     emu::{libafl_page_from_addr, BytesInput, ExitKind},
     get_qemu_hooks,
     sync_exit::{SyncExit, SyncExitError, VERSION},
@@ -31,7 +32,7 @@ use crate::{
 pub enum HandlerError {
     EmuExitReasonError(EmuExitReasonError),
     SMError(SnapshotManagerError),
-    SyncExitError(SyncExitError),
+    SyncBackdoorError(SyncBackdoorError),
     MultipleSnapshotDefinition,
     MultipleInputDefinition,
     SnapshotNotFound,
@@ -273,11 +274,10 @@ where
                 }
                 _ => panic!("Unhandled QEMU shutdown cause: {:?}.", shutdown_cause),
             },
-            EmuExitReason::Breakpoint(bp) => bp.trigger(emu).cloned(),
-            EmuExitReason::SyncBackdoor(sync_exit) => {
-                let command = sync_exit.command().clone();
-                is_sync_exit = Some(sync_exit.clone());
-                Some(command)
+            EmuExitReason::Breakpoint(bp) => (bp.trigger(emu).cloned(), None),
+            EmuExitReason::SyncBackdoor(sync_backdoor) => {
+                let command = sync_backdoor.command().clone();
+                (Some(command), Some(sync_backdoor.ret_reg()))
             }
         };
 
