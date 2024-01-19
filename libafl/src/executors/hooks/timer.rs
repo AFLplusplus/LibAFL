@@ -31,6 +31,7 @@ use crate::executors::hooks::inprocess::GLOBAL_STATE;
 
 #[repr(C)]
 #[cfg(all(unix, not(target_os = "linux")))]
+#[derive(Debug, Copy, Clone)]
 pub(crate) struct Timeval {
     pub tv_sec: i64,
     pub tv_usec: i64,
@@ -52,7 +53,7 @@ impl core::fmt::Debug for Timeval {
 
 #[repr(C)]
 #[cfg(all(unix, not(target_os = "linux")))]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub(crate) struct Itimerval {
     pub it_interval: Timeval,
     pub it_value: Timeval,

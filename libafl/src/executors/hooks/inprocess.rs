@@ -123,6 +123,7 @@ impl HasTimeout for InProcessHooks {
     }
 
     #[cfg(all(unix, feature = "std"))]
+    #[allow(unused)]
     fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool {
         #[cfg(not(target_os = "linux"))]
         {
