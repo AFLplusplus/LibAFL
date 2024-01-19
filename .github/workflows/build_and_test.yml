@@ -48,6 +48,8 @@ jobs:
         # TODO: fix books test fail with updated windows-rs
         if: runner.os != 'Windows'
         run: cd docs && mdbook test -L ../target/debug/deps
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Run tests
         run: cargo test
       - name: Test libafl no_std
