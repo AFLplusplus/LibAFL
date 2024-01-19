@@ -28,12 +28,12 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     breakpoint::Breakpoint,
+    command::{Command, EmulatorMemoryChunk, EndCommand, StartCommand},
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
-    command::{Command, StartCommand, EmulatorMemoryChunk, EndCommand},
     elf::EasyElf,
     emu::Emulator,
-    EmuExitReasonError, FastSnapshotBuilder, GuestPhysAddr, GuestReg,
-    HandlerError, HandlerResult, QemuExecutor, QemuHooks, StdEmuExitHandler,
+    EmuExitReasonError, FastSnapshotBuilder, GuestPhysAddr, GuestReg, HandlerError, HandlerResult,
+    QemuExecutor, QemuHooks, StdEmuExitHandler,
 };
 
 // use libafl_qemu::QemuSnapshotBuilder; // for normal qemu snapshot
@@ -100,8 +100,7 @@ pub fn fuzz() {
         emu.add_breakpoint(
             Breakpoint::with_command(
                 main_addr,
-                Command::StartCommand(StartCommand::new(
-                    EmulatorMemoryChunk::phys(
+                Command::StartCommand(StartCommand::new(EmulatorMemoryChunk::phys(
                     input_addr,
                     unsafe { MAX_INPUT_SIZE } as GuestReg,
                     None,
@@ -111,7 +110,11 @@ pub fn fuzz() {
             true,
         );
         emu.add_breakpoint(
-            Breakpoint::with_command(breakpoint, Command::EndCommand(EndCommand::new(Some(ExitKind::Ok))), false),
+            Breakpoint::with_command(
+                breakpoint,
+                Command::EndCommand(EndCommand::new(Some(ExitKind::Ok))),
+                false,
+            ),
             true,
         );
 
