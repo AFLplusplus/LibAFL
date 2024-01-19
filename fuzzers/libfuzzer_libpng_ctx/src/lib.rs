@@ -196,7 +196,7 @@ pub extern "C" fn libafl_main() {
         };
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        let mut executor = InProcessExecutor::new(
+        let mut executor = InProcessExecutor::with_timeout(
             tuple_list!(),
             &mut harness,
             tuple_list!(edges_observer, time_observer),

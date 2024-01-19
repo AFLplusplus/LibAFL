@@ -142,7 +142,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::new(
+    let mut executor = InProcessExecutor::with_timeout(
         tuple_list!(),
         &mut harness,
         tuple_list!(edges_observer, time_observer),

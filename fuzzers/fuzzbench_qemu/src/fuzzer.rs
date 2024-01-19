@@ -354,6 +354,7 @@ fn fuzz(
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = QemuExecutor::new(
         &mut hooks,
+        tuple_list!(),
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,

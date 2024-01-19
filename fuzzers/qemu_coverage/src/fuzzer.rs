@@ -247,6 +247,7 @@ pub fn fuzz() {
 
         let mut executor = QemuExecutor::new(
             &mut hooks,
+            tuple_list!(),
             &mut harness,
             (),
             &mut fuzzer,

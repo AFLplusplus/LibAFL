@@ -394,7 +394,7 @@ fn fuzz_binary(
     let mut tracing_harness = harness;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::new(
+    let mut executor = InProcessExecutor::with_timeout(
         tuple_list!(),
         &mut harness,
         tuple_list!(edges_observer, time_observer),
@@ -405,7 +405,7 @@ fn fuzz_binary(
     )?;
 
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(InProcessExecutor::new(
+    let tracing = TracingStage::new(InProcessExecutor::with_timeout(
         tuple_list!(),
         &mut tracing_harness,
         tuple_list!(cmplog_observer),
@@ -618,7 +618,7 @@ fn fuzz_text(
     let generalization = GeneralizationStage::new(&edges_observer);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::new(
+    let mut executor = InProcessExecutor::with_timeout(
         tuple_list!(),
         &mut harness,
         tuple_list!(edges_observer, time_observer),
@@ -628,7 +628,7 @@ fn fuzz_text(
         timeout,
     )?;
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(InProcessExecutor::new(
+    let tracing = TracingStage::new(InProcessExecutor::with_timeout(
         tuple_list!(),
         &mut tracing_harness,
         tuple_list!(cmplog_observer),
