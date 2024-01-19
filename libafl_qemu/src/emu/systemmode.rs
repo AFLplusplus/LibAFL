@@ -12,9 +12,9 @@ use std::{
 use libafl_bolts::os::unix_signals::Signal;
 
 use crate::{
-    sync_backdoor::SyncBackdoorError,
-    emu::{libafl_page_from_addr, BytesInput, ExitKind},
     command::{Command, EmulatorMemoryChunk, InputCommand, IsCommand},
+    emu::{libafl_page_from_addr, BytesInput, ExitKind},
+    sync_backdoor::SyncBackdoorError,
     CPUStatePtr, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestPhysAddr,
     GuestVirtAddr, InnerHandlerResult, IsEmuExitHandler, MemAccessInfo, QemuShutdownCause, Regs,
     CPU,

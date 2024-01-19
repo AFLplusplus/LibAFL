@@ -14,9 +14,9 @@ use libafl_bolts::rands::RomuDuoJrRand;
 use num_enum::TryFromPrimitive;
 
 use crate::{
-    get_qemu_hooks, sync_backdoor::SyncBackdoorError, Emulator, GuestAddrKind, GuestPhysAddr, GuestReg,
-    GuestVirtAddr, HandlerError, HasInstrumentationFilter, InnerHandlerResult, IsEmuExitHandler,
-    IsFilter, IsSnapshotManager, QemuEdgeCoverageHelper, QemuHooks,
+    get_qemu_hooks, sync_backdoor::SyncBackdoorError, Emulator, GuestAddrKind, GuestPhysAddr,
+    GuestReg, GuestVirtAddr, HandlerError, HasInstrumentationFilter, InnerHandlerResult,
+    IsEmuExitHandler, IsFilter, IsSnapshotManager, QemuEdgeCoverageHelper, QemuHooks,
     QemuInstrumentationAddressRangeFilter, QemuInstrumentationPagingFilter, Regs,
     StdEmuExitHandler, CPU,
 };
