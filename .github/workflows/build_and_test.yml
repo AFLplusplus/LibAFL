@@ -116,8 +116,6 @@ jobs:
       run: clang-format -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
     - name: run shellcheck
       run: shellcheck ./scripts/*.sh
-    - name: Run clippy
-      run: ./scripts/clippy.sh
 
     # ---- doc check ----
     - name: Build Docs

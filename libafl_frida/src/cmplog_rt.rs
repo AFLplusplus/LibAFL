@@ -729,18 +729,20 @@ impl CmpLogRuntime {
             }
         };
 
-        // Debug print, uncomment if you want to see all the cmp instrumented instructions
-        // use iced_x86::{Formatter, NasmFormatter};
-        // let mut formatter = NasmFormatter::new();
-        // let mut output = String::new();
-        // formatter.format(&instruction, &mut output);
-        // println!(
-        //     "inst: {:x} {:?}, {:?} {:?}",
-        //     instruction.ip(),
-        //     output,
-        //     op1,
-        //     op2
-        // );
+        // debug print, shows all the cmp instrumented instructions
+        if log::log_enabled!(log::Level::Debug) {
+            use iced_x86::{Formatter, NasmFormatter};
+            let mut formatter = NasmFormatter::new();
+            let mut output = String::new();
+            formatter.format(&instruction, &mut output);
+            log::debug!(
+                "inst: {:x} {:?}, {:?} {:?}",
+                instruction.ip(),
+                output,
+                op1,
+                op2
+            );
+        }
 
         Some((op1, op2, None, None))
     }
@@ -879,4 +881,3 @@ impl Default for CmpLogRuntime {
         Self::new()
     }
 }
-
