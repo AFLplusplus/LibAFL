@@ -57,10 +57,7 @@ where
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
-        let ret = self.primary.run_target(fuzzer, state, mgr, input);
-        self.primary.post_run_reset();
-        self.secondary.post_run_reset();
-        ret
+        self.primary.run_target(fuzzer, state, mgr, input)
     }
 }
 

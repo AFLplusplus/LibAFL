@@ -195,7 +195,6 @@ pub mod unix_signal_handler {
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor
-            executor.post_run_reset();
             let state = data.state_mut::<E::State>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let fuzzer = data.fuzzer_mut::<Z>();

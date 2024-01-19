@@ -70,7 +70,6 @@ pub mod windows_asan_handler {
             let executor = data.executor_mut::<E>();
             // reset timer
             if data.ptp_timer.is_some() {
-                executor.post_run_reset();
                 data.ptp_timer = None;
             }
 
@@ -380,7 +379,6 @@ pub mod windows_exception_handler {
             let executor = data.executor_mut::<E>();
             // reset timer
             if data.ptp_timer.is_some() {
-                executor.post_run_reset();
                 data.ptp_timer = None;
             }
 
