@@ -1065,6 +1065,7 @@ pub mod windows_asan_handler {
     }
 }
 
+/// Handles exceptions on Windows
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_exception_handler {
     #[cfg(feature = "std")]
