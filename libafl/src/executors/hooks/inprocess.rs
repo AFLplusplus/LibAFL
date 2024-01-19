@@ -190,7 +190,7 @@ impl ExecutorHook for InProcessHooks {
     fn pre_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I) {
         #[cfg(feature = "std")]
         {
-            let data = unsafe { addr_of_mut!(GLOBAL_STATE) };
+            let data = unsafe { &mut GLOBAL_STATE };
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
         }
@@ -262,7 +262,7 @@ impl InProcessHooks {
         let ret;
         #[cfg(feature = "std")]
         unsafe {
-            let data = addr_of_mut!(GLOBAL_STATE);
+            let data = &mut GLOBAL_STATE;
             crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
                 E,
                 EM,
