@@ -472,16 +472,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::marker::PhantomData;
-
-    use libafl_bolts::tuples::{tuple_list, Merge};
+    use libafl_bolts::{rands::RandomSeed, tuples::tuple_list};
 
     use crate::{
+        corpus::InMemoryCorpus,
         events::NopEventManager,
-        executors::{inprocess::InProcessHooks, Executor, ExitKind, InProcessExecutor},
-        fuzzer::test::NopFuzzer,
+        executors::{Executor, ExitKind, InProcessExecutor},
+        feedbacks::CrashFeedback,
         inputs::{NopInput, UsesInput},
-        state::test::NopState,
+        prelude::{RandScheduler, StdState},
+        StdFuzzer,
     };
 
     impl UsesInput for () {
@@ -491,22 +491,29 @@ mod tests {
     #[test]
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
+        let rand = libafl_bolts::rands::StdRand::new();
+        let corpus = InMemoryCorpus::<NopInput>::new();
+        let solutions = InMemoryCorpus::new();
+        let mut objective = CrashFeedback::new();
+        let mut feedback = tuple_list!();
+        let sche = RandScheduler::new();
+        let mut mgr = NopEventManager::new();
+        let mut state =
+            StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
+        let mut fuzzer = StdFuzzer::<_, _, _, ()>::new(sche, feedback, objective);
 
-        let default_hook = InProcessHooks::nop();
-        let mut in_process_executor = InProcessExecutor::<_, _, _, _> {
-            harness_fn: &mut harness,
-            observers: tuple_list!(),
-            hooks: tuple_list!(default_hook).merge(tuple_list!()),
-            phantom: PhantomData,
-        };
+        let mut in_process_executor = InProcessExecutor::new(
+            tuple_list!(),
+            &mut harness,
+            tuple_list!(),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+        )
+        .unwrap();
         let input = NopInput {};
         in_process_executor
-            .run_target(
-                &mut NopFuzzer::new(),
-                &mut NopState::new(),
-                &mut NopEventManager::new(),
-                &input,
-            )
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
     }
 }

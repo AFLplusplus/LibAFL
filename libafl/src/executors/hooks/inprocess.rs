@@ -1,5 +1,3 @@
-#[cfg(all(windows, feature = "std"))]
-use core::ptr::addr_of_mut;
 #[cfg(any(unix, windows))]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
@@ -192,7 +190,7 @@ impl ExecutorHook for InProcessHooks {
     fn pre_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I) {
         #[cfg(feature = "std")]
         {
-            let data = unsafe { &mut GLOBAL_STATE };
+            let data = unsafe { addr_of_mut!(GLOBAL_STATE) };
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
         }
@@ -264,7 +262,7 @@ impl InProcessHooks {
         let ret;
         #[cfg(feature = "std")]
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
             crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
                 E,
                 EM,
@@ -320,35 +318,16 @@ impl InProcessHooks {
 
     /// Replace the handlers with `nop` handlers, deactivating the handlers
     #[must_use]
+    #[cfg(not(windows))]
     pub fn nop() -> Self {
-        let ret;
-
-        #[cfg(windows)]
-        {
+        let ret = Self {
             #[cfg(feature = "std")]
-            {
-                ret = Self {
-                    crash_handler: ptr::null(),
-                    timeout_handler: ptr::null(),
-                    timer: TimerStruct::new(Duration::from_millis(5000)),
-                };
-            }
-            #[cfg(not(feature = "std"))]
-            {
-                ret = Self {};
-            }
-        }
-        #[cfg(not(windows))]
-        {
-            ret = Self {
-                #[cfg(feature = "std")]
-                crash_handler: ptr::null(),
-                #[cfg(feature = "std")]
-                timeout_handler: ptr::null(),
-                #[cfg(feature = "std")]
-                timer: TimerStruct::new(Duration::from_millis(5000)),
-            }
-        }
+            crash_handler: ptr::null(),
+            #[cfg(feature = "std")]
+            timeout_handler: ptr::null(),
+            #[cfg(feature = "std")]
+            timer: TimerStruct::new(Duration::from_millis(5000)),
+        };
         ret
     }
 }
