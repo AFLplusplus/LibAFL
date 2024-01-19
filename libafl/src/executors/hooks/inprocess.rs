@@ -12,7 +12,7 @@ use core::{mem::zeroed, ptr::addr_of};
 
 #[cfg(all(target_os = "linux", feature = "std"))]
 use libafl_bolts::current_time;
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
