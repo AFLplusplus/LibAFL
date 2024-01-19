@@ -320,15 +320,14 @@ impl InProcessHooks {
     #[must_use]
     #[cfg(not(windows))]
     pub fn nop() -> Self {
-        let ret = Self {
+        Self {
             #[cfg(feature = "std")]
             crash_handler: ptr::null(),
             #[cfg(feature = "std")]
             timeout_handler: ptr::null(),
             #[cfg(feature = "std")]
             timer: TimerStruct::new(Duration::from_millis(5000)),
-        };
-        ret
+        }
     }
 }
 
