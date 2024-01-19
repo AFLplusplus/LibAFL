@@ -1,5 +1,5 @@
 use core::time::Duration;
-#[cfg(any(all(feature = "std", windows), target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux"))]
 use core::{
     ffi::c_void,
     ptr::{addr_of_mut, write_volatile},
@@ -13,12 +13,12 @@ use core::{
 #[cfg(all(unix, not(target_os = "linux")))]
 const ITIMER_REAL: core::ffi::c_int = 0;
 
-#[cfg(all(feature = "std", windows))]
+#[cfg(all(windows))]
 use core::sync::atomic::{compiler_fence, Ordering};
 
 #[cfg(target_os = "linux")]
 use libafl_bolts::current_time;
-#[cfg(all(windows, feature = "std"))]
+#[cfg(windows)]
 use windows::Win32::{
     Foundation::FILETIME,
     System::Threading::{
@@ -26,6 +26,7 @@ use windows::Win32::{
     },
 };
 
+#[cfg(any(all(windows), target_os = "linux"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 
 #[repr(C)]
@@ -62,16 +63,18 @@ pub(crate) struct Itimerval {
 #[allow(missing_debug_implementations)]
 pub struct TimerStruct {
     // timeout time (windows)
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     milli_sec: i64,
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     ptp_timer: PTP_TIMER,
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     critical: CRITICAL_SECTION,
     #[cfg(unix)]
     pub(crate) batch_mode: bool,
     #[cfg(unix)]
     pub(crate) exec_tmout: Duration,
+    #[cfg(not(target_os = "linux"))]
+    itimerval: Itimerval,
     #[cfg(target_os = "linux")]
     pub(crate) timerid: libc::timer_t,
     #[cfg(target_os = "linux")]
@@ -92,39 +95,39 @@ pub struct TimerStruct {
 
 impl TimerStruct {
     /// Timeout value in milli seconds
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     #[must_use]
     pub fn milli_sec(&self) -> i64 {
         self.milli_sec
     }
 
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     /// Timeout value in milli seconds (mut ref)
     pub fn milli_sec_mut(&mut self) -> &mut i64 {
         &mut self.milli_sec
     }
 
     /// The timer object for windows
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     #[must_use]
     pub fn ptp_timer(&self) -> &PTP_TIMER {
         &self.ptp_timer
     }
 
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     /// The timer object for windows
     pub fn ptp_timer_mut(&mut self) -> &mut PTP_TIMER {
         &mut self.ptp_timer
     }
 
     /// The critical section, we need to use critical section to access the globals
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     #[must_use]
     pub fn critical(&self) -> &CRITICAL_SECTION {
         &self.critical
     }
 
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     /// The critical section (mut ref), we need to use critical section to access the globals
     pub fn critical_mut(&mut self) -> &mut CRITICAL_SECTION {
         &mut self.critical
@@ -146,7 +149,6 @@ impl TimerStruct {
             it_value,
         };
         Self {
-            executor,
             itimerval,
             exec_tmout,
             batch_mode: false,
@@ -225,7 +227,7 @@ impl TimerStruct {
         libc::setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
     }
 
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     #[allow(clippy::cast_sign_loss)]
     /// Set timer
     pub fn set_timer(&mut self) {
@@ -280,7 +282,7 @@ impl TimerStruct {
     pub fn unset_timer(&mut self) {
         unsafe {
             let mut itimerval_zero: Itimerval = core::mem::zeroed();
-            libc::ABDAY_4setitimer(ITIMER_REAL, &mut itimerval_zero, core::ptr::null_mut());
+            libc::setitimer(ITIMER_REAL, &mut itimerval_zero, core::ptr::null_mut());
         }
     }
 
@@ -321,7 +323,7 @@ impl TimerStruct {
         }
     }
 
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
     /// Disalarm
     pub fn unset_timer(&mut self) {
         unsafe {

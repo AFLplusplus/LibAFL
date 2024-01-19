@@ -10,7 +10,7 @@ use core::{
 #[cfg(all(unix, feature = "std"))]
 use core::{mem::zeroed, ptr::addr_of};
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(target_os = "linux", feature = "std"))]
 use libafl_bolts::current_time;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;

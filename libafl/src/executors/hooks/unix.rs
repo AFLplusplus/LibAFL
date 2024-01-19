@@ -1,11 +1,8 @@
 /// The inprocess executor singal handling code for unix
 #[cfg(unix)]
 pub mod unix_signal_handler {
-    use alloc::vec::Vec;
-    #[cfg(feature = "std")]
-    use alloc::{boxed::Box, string::String};
+    use alloc::{boxed::Box, string::String, vec::Vec};
     use core::mem::transmute;
-    #[cfg(feature = "std")]
     use std::{io::Write, panic};
 
     use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
@@ -15,17 +12,15 @@ pub mod unix_signal_handler {
         events::{EventFirer, EventRestarter},
         executors::{
             common_signals,
-            hooks::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
             inprocess::{run_observers_and_save_state, HasInProcessHooks},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::UsesInput,
+        inputs::{Input, UsesInput},
         state::{HasCorpus, HasExecutions, HasSolutions},
     };
-    #[cfg(feature = "std")]
-    use crate::{executors::hooks::inprocess::HasTimeout, inputs::Input};
 
     pub(crate) type HandlerFuncPtr = unsafe fn(
         Signal,
@@ -78,7 +73,6 @@ pub mod unix_signal_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
-    #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, OF, Z>()
     where
         E: HasObservers,
@@ -137,7 +131,6 @@ pub mod unix_signal_handler {
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         // this stuff is for batch timeout
-        #[cfg(all(feature = "std", unix))]
         if !data.executor_ptr.is_null()
             && data
                 .executor_mut::<E>()
@@ -210,7 +203,6 @@ pub mod unix_signal_handler {
 
             log::error!("Child crashed!");
 
-            #[cfg(all(feature = "std", unix))]
             {
                 let mut bsod = Vec::new();
                 {
@@ -248,7 +240,6 @@ pub mod unix_signal_handler {
                     "We crashed at addr 0x{si_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
                 );
 
-                #[cfg(all(feature = "std", unix))]
                 {
                     let mut bsod = Vec::new();
                     {
@@ -266,7 +257,6 @@ pub mod unix_signal_handler {
                 }
             }
 
-            #[cfg(feature = "std")]
             {
                 log::error!("Type QUIT to restart the child");
                 let mut line = String::new();
