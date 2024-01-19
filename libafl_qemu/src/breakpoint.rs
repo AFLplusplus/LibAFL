@@ -4,10 +4,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use crate::{
-    emu::{Command, Emulator},
-    GuestAddr, IsEmuExitHandler,
-};
+use crate::{command::Command, emu::Emulator, GuestAddr, IsEmuExitHandler};
 
 // TODO: distinguish breakpoints with IDs instead of addresses to avoid collisions.
 #[derive(Debug, Clone)]

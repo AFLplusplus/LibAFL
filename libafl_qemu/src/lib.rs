@@ -101,7 +101,7 @@ pub use emu::*;
 
 pub mod sync_backdoor;
 pub mod breakpoint;
-pub mod sync_exit;
+pub mod command;
 
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {

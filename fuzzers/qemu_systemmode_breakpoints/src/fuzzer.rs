@@ -29,9 +29,10 @@ use libafl_bolts::{
 use libafl_qemu::{
     breakpoint::Breakpoint,
     edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
+    command::{Command, StartCommand, EmulatorMemoryChunk, EndCommand},
     elf::EasyElf,
     emu::Emulator,
-    Command, CommandInput, EmuExitReasonError, FastSnapshotBuilder, GuestPhysAddr, GuestReg,
+    EmuExitReasonError, FastSnapshotBuilder, GuestPhysAddr, GuestReg,
     HandlerError, HandlerResult, QemuExecutor, QemuHooks, StdEmuExitHandler,
 };
 
@@ -99,17 +100,18 @@ pub fn fuzz() {
         emu.add_breakpoint(
             Breakpoint::with_command(
                 main_addr,
-                Command::Start(CommandInput::phys(
+                Command::StartCommand(StartCommand::new(
+                    EmulatorMemoryChunk::phys(
                     input_addr,
                     unsafe { MAX_INPUT_SIZE } as GuestReg,
                     None,
-                )),
+                ))),
                 true,
             ),
             true,
         );
         emu.add_breakpoint(
-            Breakpoint::with_command(breakpoint, Command::Exit(Some(ExitKind::Ok)), false),
+            Breakpoint::with_command(breakpoint, Command::EndCommand(EndCommand::new(Some(ExitKind::Ok))), false),
             true,
         );
 

@@ -64,7 +64,7 @@ pub enum QemuShutdownCause {
     SnapshotLoad,
 }
 
-impl fmt::Display for GuestAddrKind {
+impl Display for GuestAddrKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GuestAddrKind::Physical(phys_addr) => write!(f, "hwaddr 0x{phys_addr:x}"),
@@ -73,108 +73,8 @@ impl fmt::Display for GuestAddrKind {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Command {
-    Save,
-    Load,
-    Input(CommandInput),
-    Start(CommandInput),
-    Exit(Option<ExitKind>),
-    Version(u64),
-}
-
-impl Display for Command {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Command::Save => write!(f, "Save VM"),
-            Command::Load => write!(f, "Reload VM"),
-            Command::Input(command_input) => write!(f, "Set fuzzing input @{command_input}"),
-            Command::Start(command_input) => {
-                write!(f, "Start fuzzing with input @{command_input}")
-            }
-            Command::Exit(exit_kind) => write!(f, "Exit of kind {exit_kind:?}"),
-            Command::Version(version) => write!(f, "Client version: {version}"),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CommandInput {
-    addr: GuestAddrKind,
-    max_input_size: GuestReg,
-    cpu: Option<CPU>,
-}
-
-impl CommandInput {
-    #[must_use]
-    pub fn phys(addr: GuestPhysAddr, max_input_size: GuestReg, cpu: Option<CPU>) -> Self {
-        Self {
-            addr: GuestAddrKind::Physical(addr),
-            max_input_size,
-            cpu,
-        }
-    }
-
-    #[must_use]
-    pub fn virt(addr: GuestVirtAddr, max_input_size: GuestReg, cpu: CPU) -> Self {
-        Self {
-            addr: GuestAddrKind::Virtual(addr),
-            max_input_size,
-            cpu: Some(cpu),
-        }
-    }
-
-    pub fn exec<E>(&self, emu: &Emulator<E>, backdoor: Option<&SyncExit>, input: &[u8])
-    where
-        E: IsEmuExitHandler,
-    {
-        let max_len: usize = self.max_input_size.try_into().unwrap();
-
-        let input_sliced = if input.len() > max_len {
-            &input[0..max_len]
-        } else {
-            input
-        };
-
-        match self.addr {
-            GuestAddrKind::Physical(hwaddr) => unsafe {
-                #[cfg(emulation_mode = "usermode")]
-                {
-                    // For now the default behaviour is to fall back to virtual addresses
-                    emu.write_mem(hwaddr.try_into().unwrap(), input_sliced);
-                }
-                #[cfg(emulation_mode = "systemmode")]
-                {
-                    emu.write_phys_mem(hwaddr, input_sliced);
-                }
-            },
-            GuestAddrKind::Virtual(vaddr) => unsafe {
-                self.cpu
-                    .as_ref()
-                    .unwrap()
-                    .write_mem(vaddr.try_into().unwrap(), input_sliced);
-            },
-        };
-
-        if let Some(backdoor) = backdoor {
-            backdoor
-                .ret(
-                    self.cpu.as_ref().unwrap(),
-                    input_sliced.len().try_into().unwrap(),
-                )
-                .unwrap();
-        }
-    }
-}
-
-impl Display for CommandInput {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({:x} max nb bytes)", self.addr, self.max_input_size)
-    }
-}
-
 // TODO: Rework with generics for command handlers?
-pub trait IsEmuExitHandler: Sized + Debug {
+pub trait IsEmuExitHandler: Sized + Debug + Clone {
     fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput);
 
     fn handle(
@@ -797,7 +697,7 @@ impl From<SyncBackdoorError> for HandlerError {
     }
 }
 
-impl fmt::Display for EmuExitReason {
+impl Display for EmuExitReason {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             EmuExitReason::End(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
@@ -901,7 +801,7 @@ where
 
 impl std::error::Error for EmuError {}
 
-impl fmt::Display for EmuError {
+impl Display for EmuError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             EmuError::MultipleInstances => {
@@ -1012,14 +912,14 @@ where
         }
     }
 
-    /// Get an empty emulator.
+    // Get an empty emulator.
     ///
     /// # Safety
     ///
     /// Should not be used if `Emulator::new` has never been used before (otherwise QEMU will not be initialized).
     /// Prefer `Emulator::get` for a safe version of this method.
     #[must_use]
-    pub(crate) fn new_empty() -> Emulator<NopEmuExitHandler> {
+    pub(crate) unsafe fn new_empty() -> Emulator<NopEmuExitHandler> {
         Emulator {
             exit_handler: RefCell::new(NopEmuExitHandler),
             breakpoints: RefCell::new(HashSet::new()),

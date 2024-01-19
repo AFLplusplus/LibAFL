@@ -149,8 +149,8 @@ where
     }
 }
 
-#[derive(Debug)]
-pub enum QemuFilterList<T: IsFilter + Debug> {
+#[derive(Debug, Clone)]
+pub enum QemuFilterList<T: IsFilter + Debug + Clone> {
     AllowList(T),
     DenyList(T),
     None,
@@ -158,7 +158,7 @@ pub enum QemuFilterList<T: IsFilter + Debug> {
 
 impl<T> IsFilter for QemuFilterList<T>
 where
-    T: IsFilter,
+    T: IsFilter + Clone,
 {
     type FilterParameter = T::FilterParameter;
 

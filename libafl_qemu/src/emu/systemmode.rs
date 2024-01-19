@@ -1,31 +1,23 @@
 use std::{
     borrow::BorrowMut,
     cell::OnceCell,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     ffi::{c_void, CStr, CString},
     fmt::Debug,
-    marker::PhantomData,
     mem::MaybeUninit,
     ptr::null_mut,
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use libafl::{
-    corpus::{InMemoryCorpus, OnDiskCorpus},
-    inputs::HasTargetBytes,
-    state::StdState,
-};
-use libafl_bolts::{os::unix_signals::Signal, rands::RomuDuoJrRand, AsSlice};
+use libafl_bolts::os::unix_signals::Signal;
 
 use crate::{
     sync_backdoor::SyncBackdoorError,
     emu::{libafl_page_from_addr, BytesInput, ExitKind},
-    get_qemu_hooks,
-    sync_exit::{SyncExit, SyncExitError, VERSION},
-    CPUStatePtr, Command, CommandInput, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr,
-    GuestPhysAddr, GuestVirtAddr, HasInstrumentationFilter, InnerHandlerResult, IsEmuExitHandler,
-    MemAccessInfo, QemuEdgeCoverageHelper, QemuHooks, QemuInstrumentationPagingFilter,
-    QemuShutdownCause, CPU,
+    command::{Command, EmulatorMemoryChunk, InputCommand, IsCommand},
+    CPUStatePtr, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestPhysAddr,
+    GuestVirtAddr, InnerHandlerResult, IsEmuExitHandler, MemAccessInfo, QemuShutdownCause, Regs,
+    CPU,
 };
 
 #[derive(Debug, Clone)]
@@ -73,7 +65,7 @@ impl SnapshotId {
 
 pub type FastSnapshotPtr = *mut libafl_qemu_sys::SyxSnapshot;
 
-pub trait IsSnapshotManager: Debug {
+pub trait IsSnapshotManager: Debug + Clone {
     fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
     where
         E: IsEmuExitHandler;
@@ -104,6 +96,10 @@ impl FastSnapshotBuilder {
             snapshots: HashMap::new(),
             check_memory_consistency,
         }
+    }
+
+    pub unsafe fn get(&self, id: &SnapshotId) -> FastSnapshotPtr {
+        self.snapshots.get(id).unwrap().clone()
     }
 }
 
@@ -195,12 +191,11 @@ impl IsSnapshotManager for FastSnapshotBuilder {
 #[derive(Debug, Clone)]
 pub struct StdEmuExitHandler<SM>
 where
-    SM: IsSnapshotManager,
+    SM: IsSnapshotManager + Clone,
 {
     snapshot_manager: SM,
     snapshot_id: OnceCell<SnapshotId>,
-    input_backdoor: OnceCell<SyncExit>,
-    input_command: OnceCell<CommandInput>,
+    input_location: OnceCell<(EmulatorMemoryChunk, Option<Regs>)>,
 }
 
 impl<SM> StdEmuExitHandler<SM>
@@ -211,9 +206,28 @@ where
         Self {
             snapshot_manager,
             snapshot_id: OnceCell::new(),
-            input_backdoor: OnceCell::new(),
-            input_command: OnceCell::new(),
+            input_location: OnceCell::new(),
         }
+    }
+
+    pub fn set_input_location(
+        &self,
+        input_location: EmulatorMemoryChunk,
+        ret_reg: Option<Regs>,
+    ) -> Result<(), (EmulatorMemoryChunk, Option<Regs>)> {
+        self.input_location.set((input_location, ret_reg))
+    }
+
+    pub fn snapshot_id(&self) -> &OnceCell<SnapshotId> {
+        &self.snapshot_id
+    }
+
+    pub fn snapshot_manager(&self) -> &SM {
+        &self.snapshot_manager
+    }
+
+    pub fn snapshot_manager_mut(&mut self) -> &mut SM {
+        &mut self.snapshot_manager
     }
 }
 
@@ -223,19 +237,11 @@ where
     SM: IsSnapshotManager,
 {
     fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput) {
-        let target = input.target_bytes();
-        let buf = target.as_slice();
-
-        if let Some(input_command) = self.input_command.get() {
-            input_command.exec(emu, None, buf)
-        }
-
-        if let Some(input_sync_exit) = self.input_backdoor.get() {
-            match input_sync_exit.command() {
-                Command::Input(cmd_input) => cmd_input.exec(emu, Some(input_sync_exit), buf),
-                Command::Start(cmd_input) => cmd_input.exec(emu, Some(input_sync_exit), buf),
-                _ => panic!("Unexpected command: {}", input_sync_exit),
-            }
+        if let Some((input_location, ret_register)) = self.input_location.get() {
+            let input_command = InputCommand::new(input_location.clone());
+            input_command
+                .run(emu, self, input, ret_register.clone())
+                .unwrap();
         }
     }
 
@@ -245,9 +251,6 @@ where
         emu: &Emulator<Self>,
         input: &BytesInput,
     ) -> Result<InnerHandlerResult, HandlerError> {
-        let target = input.target_bytes();
-        let buf = target.as_slice();
-
         let mut exit_reason = match exit_reason {
             Ok(exit_reason) => exit_reason,
             Err(exit_error) => match exit_error {
@@ -263,8 +266,7 @@ where
             },
         };
 
-        let mut is_sync_exit: Option<SyncExit> = None;
-        let command = match &mut exit_reason {
+        let (command, ret_reg): (Option<Command>, Option<Regs>) = match &mut exit_reason {
             EmuExitReason::End(shutdown_cause) => match shutdown_cause {
                 QemuShutdownCause::HostSignal(Signal::SigInterrupt) => {
                     return Ok(InnerHandlerResult::Interrupt)
@@ -281,118 +283,12 @@ where
             }
         };
 
-        Ok(if let Some(cmd) = command {
-            match cmd {
-                Command::Save => {
-                    self.snapshot_id
-                        .set(self.snapshot_manager.save(emu))
-                        .map_err(|_| HandlerError::MultipleSnapshotDefinition)?;
-
-                    // TODO: get helpers from harness cleanly. Find a way to use generics without trait overflow.
-                    let qemu_helpers: &mut QemuHooks<
-                        (QemuEdgeCoverageHelper, ()),
-                        StdState<
-                            BytesInput,
-                            InMemoryCorpus<BytesInput>,
-                            RomuDuoJrRand,
-                            OnDiskCorpus<BytesInput>,
-                        >,
-                        Self,
-                    > = unsafe {
-                        get_qemu_hooks::<
-                            (QemuEdgeCoverageHelper, ()),
-                            StdState<
-                                BytesInput,
-                                InMemoryCorpus<BytesInput>,
-                                RomuDuoJrRand,
-                                OnDiskCorpus<BytesInput>,
-                            >,
-                            Self,
-                        >()
-                    };
-
-                    // TODO: Improve this part used to perform paging filtering
-                    let helpers = qemu_helpers.helpers_mut();
-
-                    let mut allowed_paging_ids = HashSet::new();
-
-                    let current_paging_id =
-                        emu.current_cpu().unwrap().get_current_paging_id().unwrap();
-                    allowed_paging_ids.insert(current_paging_id);
-
-                    let paging_filter =
-                        HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(
-                            helpers,
-                        );
-
-                    *paging_filter = QemuInstrumentationPagingFilter::AllowList(allowed_paging_ids);
-
-                    InnerHandlerResult::Continue
-                }
-
-                Command::Load => {
-                    self.snapshot_manager.restore(
-                        self.snapshot_id
-                            .get()
-                            .ok_or(HandlerError::SnapshotNotFound)?,
-                        emu,
-                    )?;
-                    InnerHandlerResult::Continue
-                }
-                Command::Input(command_input) => {
-                    if let Some(sync_exit) = &is_sync_exit {
-                        self.input_backdoor
-                            .set(sync_exit.clone())
-                            .map_err(|_| HandlerError::MultipleInputDefinition)?;
-                    } else {
-                        self.input_command
-                            .set(command_input.clone())
-                            .map_err(|_| HandlerError::MultipleInputDefinition)?;
-                    }
-
-                    command_input.exec(emu, is_sync_exit.as_ref(), buf);
-
-                    InnerHandlerResult::Continue
-                }
-                Command::Start(command_input) => {
-                    self.snapshot_id
-                        .set(self.snapshot_manager.save(emu))
-                        .map_err(|_| HandlerError::MultipleSnapshotDefinition)?;
-
-                    if let Some(sync_exit) = &is_sync_exit {
-                        self.input_backdoor
-                            .set(sync_exit.clone())
-                            .map_err(|_| HandlerError::MultipleInputDefinition)?;
-                    } else {
-                        self.input_command
-                            .set(command_input.clone())
-                            .map_err(|_| HandlerError::MultipleInputDefinition)?;
-                    }
-
-                    command_input.exec(emu, is_sync_exit.as_ref(), buf);
-
-                    InnerHandlerResult::Continue
-                }
-                Command::Exit(exit_kind) => {
-                    self.snapshot_manager.restore(
-                        self.snapshot_id
-                            .get()
-                            .ok_or(HandlerError::SnapshotNotFound)?,
-                        emu,
-                    )?;
-                    InnerHandlerResult::EndOfRun(exit_kind.unwrap())
-                }
-                Command::Version(version) => {
-                    if VERSION != version {
-                        return Err(SyncExitError::VersionDifference(version))?;
-                    }
-
-                    InnerHandlerResult::Continue
-                }
-            }
+        if let Some(cmd) = command {
+            let res = cmd.run(emu, self, input, ret_reg);
+            res
         } else {
-            InnerHandlerResult::ReturnToHarness(exit_reason)
-        })
+            Ok(InnerHandlerResult::ReturnToHarness(exit_reason))
+        }
     }
 }
 
