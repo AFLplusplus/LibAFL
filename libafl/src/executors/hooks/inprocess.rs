@@ -26,7 +26,7 @@ use windows::Win32::System::Threading::{
 use crate::executors::hooks::timer::TimerStruct;
 #[cfg(all(unix, feature = "std"))]
 use crate::executors::hooks::unix::unix_signal_handler;
-#[cfg(all(windows, feature = "std"))]
+#[cfg(windows)]
 use crate::state::State;
 use crate::{
     events::{EventFirer, EventRestarter},
@@ -59,6 +59,7 @@ pub trait HasTimeout {
     fn timer_mut(&mut self) -> &mut TimerStruct;
     #[cfg(all(feature = "std", windows))]
     /// The timer object
+    #[cfg(all(feature = "std", windows))]
     fn ptp_timer(&self) -> &PTP_TIMER;
     #[cfg(all(feature = "std", windows))]
     /// The critical section
@@ -68,6 +69,7 @@ pub trait HasTimeout {
     fn critical_mut(&mut self) -> &mut CRITICAL_SECTION;
     #[cfg(all(feature = "std", windows))]
     /// The timeout in milli sec
+    #[cfg(all(feature = "std", windows))]
     fn milli_sec(&self) -> i64;
     #[cfg(all(feature = "std", windows))]
     /// The timeout in milli sec (mut ref)
@@ -183,7 +185,7 @@ impl HasTimeout for InProcessHooks {
     }
 }
 
-#[cfg(windows)]
+#[cfg(all(feature = "std", windows))]
 #[allow(non_camel_case_types)]
 type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
     param0: PTP_CALLBACK_INSTANCE,
@@ -285,7 +287,8 @@ impl InProcessHooks {
     }
 
     /// Create new [`InProcessHooks`].
-    #[cfg(all(windows, feature = "std"))]
+    #[cfg(windows)]
+    #[allow(unused)]
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
@@ -294,6 +297,8 @@ impl InProcessHooks {
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
+        let ret;
+        #[cfg(feature = "std")]
         unsafe {
             let data = &mut GLOBAL_STATE;
             crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
@@ -304,28 +309,20 @@ impl InProcessHooks {
             >();
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
-
-            let ret;
-            #[cfg(windows)]
-            {
-                #[cfg(feature = "std")]
-                {
-                    ret = Ok(Self {
-                        crash_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
-                            as *const _,
-                        timeout_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
-                            as *const c_void,
-                        timer: TimerStruct::new(exec_tmout),
-                    });
-                }
-                #[cfg(not(feature = "std"))]
-                {
-                    ret = Ok(Self {});
-                }
-            }
-
-            ret
+            ret = Ok(Self {
+                    crash_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
+                        as *const _,
+                    timeout_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
+                        as *const c_void,
+                    timer: TimerStruct::new(exec_tmout),
+                });
         }
+        #[cfg(not(feature = "std"))]
+        {
+            ret = Ok(Self {});
+        }
+
+        ret
     }
 
     /// Create a new [`InProcessHooks`]
@@ -361,10 +358,7 @@ impl InProcessHooks {
             }
             #[cfg(not(feature = "std"))]
             {
-                ret = Self {
-                    crash_handler: ptr::null(),
-                    timeout_handler: ptr::null(),
-                };
+                ret = Self {};
             }
         }
         #[cfg(not(windows))]
