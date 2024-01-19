@@ -17,10 +17,7 @@ use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(windows, feature = "std"))]
-use windows::Win32::System::Threading::{
-    CreateThreadpoolTimer, CRITICAL_SECTION, PTP_CALLBACK_INSTANCE, PTP_TIMER,
-    TP_CALLBACK_ENVIRON_V3,
-};
+use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 
 #[cfg(feature = "std")]
 use crate::executors::hooks::timer::TimerStruct;
@@ -186,38 +183,8 @@ impl HasTimeout for InProcessHooks {
     }
 }
 
-#[cfg(all(feature = "std", windows))]
-#[allow(non_camel_case_types)]
-type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
-    param0: PTP_CALLBACK_INSTANCE,
-    param1: *mut c_void,
-    param2: PTP_TIMER,
-);
-
 impl ExecutorHook for InProcessHooks {
-    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {
-        // init timeout
-        // for windows the hook needs to be initialized in this function not in timer.rs
-        // as it has to know
-        // the pointer to timeout_handler
-        #[cfg(windows)]
-        {
-            #[cfg(feature = "std")]
-            {
-                let timeout_handler: PTP_TIMER_CALLBACK =
-                    unsafe { std::mem::transmute(self.timeout_handler) };
-                let ptp_timer = unsafe {
-                    CreateThreadpoolTimer(
-                        Some(timeout_handler),
-                        Some(addr_of_mut!(GLOBAL_STATE) as *mut c_void),
-                        Some(&TP_CALLBACK_ENVIRON_V3::default()),
-                    )
-                }
-                .expect("CreateThreadpoolTimer failed!");
-                *self.timer_mut().ptp_timer_mut() = ptp_timer;
-            }
-        }
-    }
+    fn init<E: HasObservers, S>(&mut self, _state: &mut S) {}
 
     /// Call before running a target.
     #[allow(clippy::unused_self)]
@@ -306,13 +273,26 @@ impl InProcessHooks {
             >();
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
+            let crash_handler =
+                crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<
+                    E,
+                    EM,
+                    OF,
+                    Z,
+                > as *const _;
+            let timeout_handler =
+                crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<
+                    E,
+                    EM,
+                    OF,
+                    Z,
+                > as *const c_void;
+            let timer = TimerStruct::new(exec_tmout, timeout_handler);
             ret = Ok(Self {
-                    crash_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
-                        as *const _,
-                    timeout_handler: crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
-                        as *const c_void,
-                    timer: TimerStruct::new(exec_tmout),
-                });
+                crash_handler,
+                timeout_handler,
+                timer,
+            });
         }
         #[cfg(not(feature = "std"))]
         {

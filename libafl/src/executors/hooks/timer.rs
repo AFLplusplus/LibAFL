@@ -22,8 +22,9 @@ use libafl_bolts::current_time;
 use windows::Win32::{
     Foundation::FILETIME,
     System::Threading::{
-        EnterCriticalSection, InitializeCriticalSection, LeaveCriticalSection, SetThreadpoolTimer,
-        CRITICAL_SECTION, PTP_TIMER,
+        CreateThreadpoolTimer, EnterCriticalSection, InitializeCriticalSection,
+        LeaveCriticalSection, SetThreadpoolTimer, CRITICAL_SECTION, PTP_CALLBACK_INSTANCE,
+        PTP_TIMER, TP_CALLBACK_ENVIRON_V3,
     },
 };
 
@@ -104,6 +105,14 @@ pub struct TimerStruct {
     pub(crate) tmout_start_time: Duration,
 }
 
+#[cfg(all(feature = "std", windows))]
+#[allow(non_camel_case_types)]
+type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
+    param0: PTP_CALLBACK_INSTANCE,
+    param1: *mut c_void,
+    param2: PTP_TIMER,
+);
+
 impl TimerStruct {
     /// Timeout value in milli seconds
     #[cfg(windows)]
@@ -165,17 +174,28 @@ impl TimerStruct {
     /// Constructor
     #[cfg(windows)]
     #[must_use]
-    pub fn new(exec_tmout: Duration) -> Self {
+    pub fn new(exec_tmout: Duration, timeout_handler: *const c_void) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
+
+        let timeout_handler: PTP_TIMER_CALLBACK =
+            unsafe { std::mem::transmute(self.timeout_handler) };
+        let ptp_timer = unsafe {
+            CreateThreadpoolTimer(
+                Some(timeout_handler),
+                Some(addr_of_mut!(GLOBAL_STATE) as *mut c_void),
+                Some(&TP_CALLBACK_ENVIRON_V3::default()),
+            )
+        }
+        .expect("CreateThreadpoolTimer failed!");
 
         let mut critical = CRITICAL_SECTION::default();
         unsafe {
             InitializeCriticalSection(&mut critical);
         }
         Self {
-            ptp_timer: PTP_TIMER::default(), // we'll initialize this later in init()
+            ptp_timer,
             milli_sec,
-            critical: critical,
+            critical,
         }
     }
 

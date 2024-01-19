@@ -253,7 +253,7 @@ pub fn fuzz() {
             &mut fuzzer,
             &mut state,
             &mut mgr,
-            options.timeout,
+            core::time::Duration::from_secs(options.timeout),
         )
         .expect("Failed to create QemuExecutor");
 
