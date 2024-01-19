@@ -4,7 +4,7 @@ use std::process;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{EventRestarter, LlmpRestartingEventManager},
-    executors::{ShadowExecutor, TimeoutExecutor},
+    executors::ShadowExecutor,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},

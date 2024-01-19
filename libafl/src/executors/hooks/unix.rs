@@ -194,7 +194,7 @@ pub mod unix_signal_handler {
         log::error!("Crashed with {signal}");
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
-            // disarms timeout in case of TimeoutExecutor
+            // disarms timeout in case of timeout
             let state = data.state_mut::<E::State>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let fuzzer = data.fuzzer_mut::<Z>();
