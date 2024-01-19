@@ -5,7 +5,7 @@ use crate::executors::HasObservers;
 pub mod windows;
 
 /// *nix crash handler
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 pub mod unix;
 
 #[cfg(all(feature = "std", unix))]
@@ -16,6 +16,7 @@ pub mod inprocess_fork;
 pub mod inprocess;
 
 /// Timer-related stuff
+#[cfg(feature = "std")]
 pub mod timer;
 
 /// The hook that runs before and after the executor runs the target

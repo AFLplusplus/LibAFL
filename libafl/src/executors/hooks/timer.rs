@@ -13,11 +13,11 @@ use core::{
 #[cfg(all(unix, not(target_os = "linux")))]
 const ITIMER_REAL: core::ffi::c_int = 0;
 
-#[cfg(target_os = "linux")]
-use libafl_bolts::current_time;
 #[cfg(all(feature = "std", windows))]
 use core::sync::atomic::{compiler_fence, Ordering};
 
+#[cfg(target_os = "linux")]
+use libafl_bolts::current_time;
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::{
     Foundation::FILETIME,
