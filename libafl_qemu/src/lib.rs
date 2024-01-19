@@ -109,9 +109,9 @@ pub use executor::QemuForkExecutor;
 pub mod emu;
 pub use emu::*;
 
-pub mod sync_backdoor;
 pub mod breakpoint;
 pub mod command;
+pub mod sync_backdoor;
 
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
