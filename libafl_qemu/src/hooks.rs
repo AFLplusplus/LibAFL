@@ -611,6 +611,7 @@ where
         }
     }
 
+    #[allow(clippy::similar_names)]
     pub fn reads(
         &self,
         generation_hook: Hook<
@@ -774,6 +775,7 @@ where
                 write_3_exec_hook_wrapper::<QT, S, E>,
                 extern "C" fn(&mut HookState<5>, id: u64, addr: GuestAddr)
             );
+            #[allow(clippy::similar_names)]
             let execn = get_raw_hook!(
                 execution_hook_n,
                 write_4_exec_hook_wrapper::<QT, S, E>,

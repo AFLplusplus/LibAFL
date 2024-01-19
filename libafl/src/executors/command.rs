@@ -690,10 +690,10 @@ mod tests {
             command::{CommandExecutor, InputLocation},
             Executor,
         },
+        fuzzer::test::NopFuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
-        state::NopState,
-        NopFuzzer,
+        state::test::NopState,
     };
 
     #[test]

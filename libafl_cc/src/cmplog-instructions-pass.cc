@@ -72,7 +72,7 @@ class CmpLogInstructions : public ModulePass {
 #if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 #else
-  bool        runOnModule(Module &M) override;
+  bool runOnModule(Module &M) override;
 
   #if LLVM_VERSION_MAJOR < 4
   const char *getPassName() const override {
@@ -98,7 +98,11 @@ llvmGetPassPluginInfo() {
   #if LLVM_VERSION_MAJOR <= 13
             using OptimizationLevel = typename PassBuilder::OptimizationLevel;
   #endif
+  #if LLVM_VERSION_MAJOR >= 16
+            PB.registerOptimizerEarlyEPCallback(
+  #else
             PB.registerOptimizerLastEPCallback(
+  #endif
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
                   MPM.addPass(CmpLogInstructions());
                 });
@@ -121,6 +125,7 @@ Iterator Unique(Iterator first, Iterator last) {
 
 bool CmpLogInstructions::hookInstrs(Module &M) {
   std::vector<Instruction *> icomps;
+  std::vector<SwitchInst *>  switches;
   LLVMContext               &C = M.getContext();
 
   Type        *VoidTy = Type::getVoidTy(C);
@@ -202,8 +207,16 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
         }
       }
     }
+
+    for (auto &BB : F) {
+      SwitchInst *switchInst = nullptr;
+      if ((switchInst = dyn_cast<SwitchInst>(BB.getTerminator()))) {
+        if (switchInst->getNumCases() > 1) { switches.push_back(switchInst); }
+      }
+    }
   }
 
+  switches.erase(Unique(switches.begin(), switches.end()), switches.end());
   if (icomps.size()) {
     // if (!be_quiet) errs() << "Hooking " << icomps.size() <<
     //                          " cmp instructions\n";
@@ -500,11 +513,114 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
     }
   }
 
-  if (icomps.size()) {
-    return true;
-  } else {
-    return false;
+  if (switches.size()) {
+    for (auto &SI : switches) {
+      Value        *Val = SI->getCondition();
+      unsigned int  max_size = Val->getType()->getIntegerBitWidth();
+      unsigned int  cast_size;
+      unsigned char do_cast = 0;
+
+      if (!SI->getNumCases() || max_size < 16) {
+        // skipping trivial switch
+        continue;
+      }
+
+      if (max_size % 8) {
+        max_size = (((max_size / 8) + 1) * 8);
+        do_cast = 1;
+      }
+
+      if (max_size > 128) {
+        // can't handle this
+
+        max_size = 128;
+        do_cast = 1;
+      }
+
+      IRBuilder<> IRB(SI->getParent());
+      IRB.SetInsertPoint(SI);
+
+      switch (max_size) {
+        case 8:
+        case 16:
+        case 32:
+        case 64:
+        case 128:
+          cast_size = max_size;
+          break;
+        default:
+          cast_size = 128;
+          do_cast = 1;
+      }
+
+      // The predicate of the switch clause
+      Value *CompareTo = Val;
+      if (do_cast) {
+        CompareTo =
+            IRB.CreateIntCast(CompareTo, IntegerType::get(C, cast_size), false);
+      }
+
+      for (SwitchInst::CaseIt i = SI->case_begin(), e = SI->case_end(); i != e;
+           ++i) {
+        // Who uses LLVM Major < 5?? :p
+        ConstantInt *cint = i->getCaseValue();
+
+        if (cint) {
+          std::vector<Value *> args;
+          args.push_back(CompareTo);
+
+          Value *new_param = cint;
+          if (do_cast) {
+            new_param =
+                IRB.CreateIntCast(cint, IntegerType::get(C, cast_size), false);
+          }
+
+          if (new_param) {
+            args.push_back(new_param);
+            if (CmplogExtended) {
+              ConstantInt *attribute = ConstantInt::get(Int8Ty, 1);
+              args.push_back(attribute);
+            }
+            if (cast_size != max_size) {
+              // not 8, 16, 32, 64, 128.
+              ConstantInt *bitsize =
+                  ConstantInt::get(Int8Ty, (max_size / 8) - 1);
+              args.push_back(bitsize);  // we have the arg for size in hookinsN
+            }
+
+            switch (cast_size) {
+              case 8:
+                IRB.CreateCall(cmplogHookIns1, args);
+                break;
+              case 16:
+                IRB.CreateCall(cmplogHookIns2, args);
+                break;
+              case 32:
+                IRB.CreateCall(cmplogHookIns4, args);
+                break;
+              case 64:
+                IRB.CreateCall(cmplogHookIns8, args);
+                break;
+              case 128:
+#ifdef WORD_SIZE_64
+                if (max_size == 128) {
+                  IRB.CreateCall(cmplogHookIns16, args);
+
+                } else {
+                  IRB.CreateCall(cmplogHookInsN, args);
+                }
+
+#endif
+                break;
+              default:
+                break;
+            }
+          }
+        }
+      }
+    }
   }
+  return true;
 }
 
 #if USE_NEW_PM

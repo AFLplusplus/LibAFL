@@ -216,6 +216,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let coverage = CoverageRuntime::new();
                 let cmplog = CmpLogRuntime::new();
+                println!("cmplog runtime created");
 
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog));

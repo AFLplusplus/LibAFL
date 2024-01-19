@@ -48,6 +48,10 @@ where
         self.base.set_start_time(time);
     }
 
+    fn aggregate(&mut self, name: &str) {
+        self.base.aggregate(name);
+    }
+
     fn display(&mut self, event_msg: String, sender_id: ClientId) {
         let cur_time = current_time();
 

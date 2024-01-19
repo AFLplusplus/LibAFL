@@ -25,8 +25,14 @@ pub mod string;
 #[cfg(feature = "unicode")]
 pub use string::*;
 
+#[cfg(feature = "multipart_inputs")]
+pub mod multi;
+#[cfg(feature = "multipart_inputs")]
+pub use multi::*;
+
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+
 use alloc::vec::Vec;
 
 use libafl_bolts::{tuples::HasConstLen, Named};

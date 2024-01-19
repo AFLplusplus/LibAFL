@@ -8,7 +8,7 @@ use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{CorpusId, HasTestcase},
+    corpus::HasTestcase,
     inputs::{BytesInput, HasBytesVec},
     stages::Stage,
     state::{HasCorpus, HasMetadata, State, UsesState},
@@ -104,14 +104,21 @@ where
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
+    type Progress = (); // this stage does not need to be resumed
+
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
         state: &mut Self::State,
         _manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let mut tc = state.testcase_mut(corpus_idx)?;
         if tc.has_metadata::<StringIdentificationMetadata>() {
             return Ok(()); // skip recompute

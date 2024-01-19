@@ -1,0 +1,79 @@
+# The YAML Structure:
+#
+# You can specify multiple different injection types if you want.
+# -name: "name"  # any name you want, it is not important
+#  functions:
+#     # multiple function targets to hook can be defined
+#     - function: "function_name"  # name of the function you want to hook.
+#                                  # if the function name starts with 0x then
+#                                  # this is the QEMU Guest address of a
+#                                  # function you want to hook that does not
+#                                  # have a symbol.
+#       parameter: number  # which parameter to the function contains the string
+#                          # 0 = first, 1 = second, ... 0-5 are supported (depending on architecture)
+#  tests:
+#     # multiple tests can be defined.
+#     - input_value: "a string"  # the injection string to add to the tokens list
+#       match_value: "a string"  # if this substring (case insensitive) is found
+#                                # in the parameter of the function then crash!
+#                                # note that this is not a regex.
+#
+- name: "sql"
+  functions:
+    - function: "sqlite3_exec"
+      parameter: 1
+    - function: "PQexec"
+      parameter: 1
+    - function: "PQexecParams"
+      parameter: 1
+    - function: "mysql_query"
+      parameter: 1
+    - function: "mysql_send_query"
+      parameter: 1
+  tests:
+    - input_value: "'\"\"'"
+      match_value: "'\"\"'"
+    # this one is not needed, just to show you can have many entries:
+    - input_value: "1\" OR '1'=\"1"
+      match_value: "1\" OR '1'=\"1"
+
+# Command injection. Note that for most you will need a libc with debug symbols
+# We do not need this as we watch the SYS_execve syscall, this is just an
+# example.
+- name: "cmd"
+  functions:
+    - function: "popen"
+      parameter: 0
+    - function: "system"
+      parameter: 0
+  tests:
+    # basically a dummy because we load the better ones at src/client.rs
+    - input_value: "'\"FUZZ\"'"
+      match_value: "'\"FUZZ\"'"
+    - input_value: "\";FUZZ;\""
+      match_value: "'\"FUZZ\"'"
+    - input_value: "';FUZZ;'"
+      match_value: "'\"FUZZ\"'"
+    - input_value: "$(FUZZ)"
+      match_value: "'\"FUZZ\"'"
+
+# LDAP injection tests
+- name: "ldap"
+  functions:
+    - function: "ldap_search_ext"
+      parameter: 3
+    - function: "ldap_search_ext_s"
+      parameter: 3
+  tests:
+    - input_value: "*)(FUZZ=*))(|"
+      match_value: "*)(FUZZ=*))(|"
+
+# XSS injection tests
+# This is a minimal example that only checks for libxml2
+- name: "xss"
+  functions:
+    - function: "htmlReadMemory"
+      parameter: 0
+  tests:
+    - input_value: "'\"><FUZZ"
+      match_value: "'\"><FUZZ"

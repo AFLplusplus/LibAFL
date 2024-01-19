@@ -19,7 +19,7 @@ where
     ret_addr: GuestAddr,
 }
 
-pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
+pub const MAX_INPUT_SIZE: usize = 1_048_576; // 1MB
 
 impl<'a, E> Harness<'a, E>
 where
@@ -32,7 +32,7 @@ where
 
         let pc: GuestReg = emu
             .read_reg(Regs::Pc)
-            .map_err(|e| Error::unknown(format!("Failed to read PC: {e:}")))?;
+            .map_err(|e| Error::unknown(format!("Failed to read PC: {e:}")))?;
 
         let stack_ptr: GuestAddr = emu
             .read_reg(Regs::Sp)

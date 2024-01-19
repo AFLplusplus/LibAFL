@@ -570,6 +570,28 @@ impl CPU {
     }
 
     #[must_use]
+    pub fn page_size(&self) -> usize {
+        #[cfg(emulation_mode = "usermode")]
+        {
+            thread_local! {
+                static PAGE_SIZE: OnceCell<usize> = const { OnceCell::new() };
+            }
+
+            PAGE_SIZE.with(|s| {
+                *s.get_or_init(|| {
+                    unsafe { libc::sysconf(libc::_SC_PAGE_SIZE) }
+                        .try_into()
+                        .expect("Invalid page size")
+                })
+            })
+        }
+        #[cfg(emulation_mode = "systemmode")]
+        {
+            unsafe { libafl_qemu_sys::qemu_target_page_size() }
+        }
+    }
+
+    #[must_use]
     pub fn display_context(&self) -> String {
         let mut display = String::new();
         let mut maxl = 0;
@@ -919,7 +941,7 @@ where
     /// Should not be used if `Emulator::new` has never been used before (otherwise QEMU will not be initialized).
     /// Prefer `Emulator::get` for a safe version of this method.
     #[must_use]
-    pub(crate) unsafe fn new_empty() -> Emulator<NopEmuExitHandler> {
+    pub unsafe fn new_empty() -> Emulator<NopEmuExitHandler> {
         Emulator {
             exit_handler: RefCell::new(NopEmuExitHandler),
             breakpoints: RefCell::new(HashSet::new()),
@@ -1263,7 +1285,7 @@ where
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: i32) -> Result<T, String>
+    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, String>
     where
         T: From<GuestReg>,
     {
@@ -1300,7 +1322,7 @@ pub mod pybind {
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
 
     extern "C" fn py_syscall_hook_wrapper(
-        data: u64,
+        _data: u64,
         sys_num: i32,
         a0: u64,
         a1: u64,
@@ -1398,7 +1420,7 @@ pub mod pybind {
 
         fn run(&self) {
             unsafe {
-                let _ = self.emu.run();
+                self.emu.run().unwrap();
             }
         }
 

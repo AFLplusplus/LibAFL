@@ -135,7 +135,7 @@ where
         write!(
             f,
             "StdScheduledMutator with {} mutations for Input type {}",
-            self.mutations.len(),
+            MT::LEN,
             core::any::type_name::<I>()
         )
     }
@@ -197,8 +197,8 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(!self.mutations().is_empty());
-        state.rand_mut().below(self.mutations().len() as u64).into()
+        debug_assert!(MT::LEN != 0);
+        state.rand_mut().below(MT::LEN as u64).into()
     }
 }
 
@@ -258,10 +258,11 @@ pub type HavocMutationsNoCrossoverType = tuple_list_type!(
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator's crossover mutations
-pub type HavocCrossoverType = tuple_list_type!(CrossoverInsertMutator, CrossoverReplaceMutator);
+pub type HavocCrossoverType<I> =
+    tuple_list_type!(CrossoverInsertMutator<I>, CrossoverReplaceMutator<I>);
 
 /// Tuple type of the mutations that compose the Havoc mutator
-pub type HavocMutationsType = tuple_list_type!(
+pub type HavocMutationsType<I> = tuple_list_type!(
     BitFlipMutator,
     ByteFlipMutator,
     ByteIncMutator,
@@ -287,8 +288,8 @@ pub type HavocMutationsType = tuple_list_type!(
     BytesCopyMutator,
     BytesInsertCopyMutator,
     BytesSwapMutator,
-    CrossoverInsertMutator,
-    CrossoverReplaceMutator,
+    CrossoverInsertMutator<I>,
+    CrossoverReplaceMutator<I>,
 );
 
 /// Get the mutations that compose the Havoc mutator (only applied to single inputs)
@@ -325,7 +326,7 @@ pub fn havoc_mutations_no_crossover() -> HavocMutationsNoCrossoverType {
 
 /// Get the mutations that compose the Havoc mutator's crossover strategy
 #[must_use]
-pub fn havoc_crossover() -> HavocCrossoverType {
+pub fn havoc_crossover<I>() -> HavocCrossoverType<I> {
     tuple_list!(
         CrossoverInsertMutator::new(),
         CrossoverReplaceMutator::new(),
@@ -334,14 +335,14 @@ pub fn havoc_crossover() -> HavocCrossoverType {
 
 /// Get the mutations that compose the Havoc mutator
 #[must_use]
-pub fn havoc_mutations() -> HavocMutationsType {
+pub fn havoc_mutations<I>() -> HavocMutationsType<I> {
     havoc_mutations_no_crossover().merge(havoc_crossover())
 }
 
 /// Get the mutations that uses the Tokens metadata
 #[must_use]
 pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
-    tuple_list!(TokenInsert::new(), TokenReplace::new(),)
+    tuple_list!(TokenInsert::new(), TokenReplace::new())
 }
 
 /// A logging [`Mutator`] that wraps around a [`StdScheduledMutator`].
@@ -367,7 +368,7 @@ where
         write!(
             f,
             "LoggerScheduledMutator with {} mutations for Input type {}",
-            self.scheduled.mutations().len(),
+            MT::LEN,
             core::any::type_name::<I>()
         )
     }
@@ -451,11 +452,8 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(!self.scheduled.mutations().is_empty());
-        state
-            .rand_mut()
-            .below(self.scheduled.mutations().len() as u64)
-            .into()
+        debug_assert!(MT::LEN != 0);
+        state.rand_mut().below(MT::LEN as u64).into()
     }
 
     fn scheduled_mutate(
@@ -617,7 +615,7 @@ pub mod pybind {
     /// Python class for StdHavocMutator
     pub struct PythonStdHavocMutator {
         /// Rust wrapped StdHavocMutator object
-        pub inner: StdScheduledMutator<BytesInput, HavocMutationsType, PythonStdState>,
+        pub inner: StdScheduledMutator<BytesInput, HavocMutationsType<BytesInput>, PythonStdState>,
     }
 
     #[pymethods]

@@ -56,6 +56,7 @@ use crate::{
 #[cfg(all(unix, feature = "std"))]
 pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {
     shutting_down: false,
+    exit_from_main: false,
 };
 
 /// A signal handler for releasing `StateRestore` `ShMem`
@@ -64,6 +65,17 @@ pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalDat
 #[derive(Debug, Clone)]
 pub struct ShutdownSignalData {
     shutting_down: bool,
+    exit_from_main: bool,
+}
+
+#[cfg(all(unix, feature = "std"))]
+impl ShutdownSignalData {
+    /// Set the flag to true, indicating that this process has allocated shmem
+    pub fn set_exit_from_main(&mut self) {
+        unsafe {
+            core::ptr::write_volatile(core::ptr::addr_of_mut!(self.exit_from_main), true);
+        }
+    }
 }
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
@@ -76,6 +88,25 @@ impl Handler for ShutdownSignalData {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
+        /*
+        println!(
+            "in handler! {} {}",
+            self.exit_from_main,
+            std::process::id()
+        );
+        */
+        // if this process has not allocated any shmem. then simply exit()
+        if !self.exit_from_main {
+            unsafe {
+                #[cfg(unix)]
+                libc::_exit(0);
+
+                #[cfg(windows)]
+                windows::Win32::System::Threading::ExitProcess(1);
+            }
+        }
+
+        // else wait till the next is_shutting_down() is called. then the process will exit throught main().
         unsafe {
             core::ptr::write_volatile(core::ptr::addr_of_mut!(self.shutting_down), true);
         }
@@ -97,7 +128,7 @@ pub struct EventManagerId(
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-use crate::{inputs::UsesInput, state::UsesState};
+use crate::{inputs::UsesInput, stages::HasCurrentStage, state::UsesState};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -490,16 +521,16 @@ where
         // If we are measuring scalability stuff..
         #[cfg(feature = "scalability_introspection")]
         {
-            let imported_with_observer = state.scalability_monitor().testcase_with_observers;
-            let imported_without_observer = state.scalability_monitor().testcase_without_observers;
+            let received_with_observer = state.scalability_monitor().testcase_with_observers;
+            let received_without_observer = state.scalability_monitor().testcase_without_observers;
 
             self.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: "total imported".to_string(),
+                    name: "total received".to_string(),
                     value: UserStats::new(
                         UserStatsValue::Number(
-                            (imported_with_observer + imported_without_observer) as u64,
+                            (received_with_observer + received_without_observer) as u64,
                         ),
                         AggregatorOps::Avg,
                     ),
@@ -517,8 +548,11 @@ where
 /// Restartable trait
 pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
+    /// You *must* ensure that [`HasCurrentStage::on_restart`] will be invoked in this method, by you
+    /// or an internal [`EventRestarter`], before the state is saved for recovery.
     #[inline]
-    fn on_restart(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        state.on_restart()?;
         self.await_restart_safe();
         Ok(())
     }
@@ -574,7 +608,7 @@ pub trait HasCustomBufHandlers: UsesState {
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug)]
 pub struct NopEventManager<S> {
     phantom: PhantomData<S>,
 }
@@ -586,6 +620,12 @@ impl<S> NopEventManager<S> {
         NopEventManager {
             phantom: PhantomData,
         }
+    }
+}
+
+impl<S> Default for NopEventManager<S> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

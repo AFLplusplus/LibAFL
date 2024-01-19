@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "20dea26e910c8b1869674bf4f552899b7947bf62";
+const QEMU_REVISION: &str = "51abe6fbcc34a7a8f6a19f4dea219e6a05ccb15f";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -64,29 +64,7 @@ pub fn build(
     let cpp_compiler = cc::Build::new().cpp(true).get_compiler();
 
     let qemu_path = if let Some(qemu_dir) = custom_qemu_dir.as_ref() {
-        let qemu_path = Path::new(&qemu_dir).to_path_buf();
-        let qemu_rev = target_dir.join("QEMU_REVISION");
-
-        if !qemu_path.join("configure").exists() {
-            Command::new("git")
-                .current_dir(&qemu_path)
-                .arg("fetch")
-                .arg("--depth")
-                .arg("1")
-                .arg("origin")
-                .arg(QEMU_REVISION)
-                .status()
-                .unwrap();
-            Command::new("git")
-                .current_dir(&qemu_path)
-                .arg("checkout")
-                .arg("FETCH_HEAD")
-                .status()
-                .unwrap();
-            fs::write(qemu_rev, QEMU_REVISION).unwrap();
-        }
-
-        qemu_path
+        Path::new(&qemu_dir).to_path_buf()
     } else {
         let qemu_path = target_dir.join(QEMU_DIRNAME);
 
@@ -316,7 +294,6 @@ pub fn build(
                 .arg("--disable-tests");
             if cfg!(feature = "debug_assertions") {
                 cmd.arg("--enable-debug");
-                cmd.arg("--enable-sanitizers");
             }
             cmd.status().expect("Configure failed");
         }

@@ -9,7 +9,7 @@ use std::{
 
 use clap::{Arg, ArgAction, Command};
 use libafl::{
-    corpus::{Corpus, CorpusId, InMemoryOnDiskCorpus, OnDiskCorpus},
+    corpus::{Corpus, HasCurrentCorpusIdx, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_or,
@@ -374,9 +374,14 @@ fn fuzz(
         let cb = |_fuzzer: &mut _,
                   _executor: &mut _,
                   state: &mut StdState<_, InMemoryOnDiskCorpus<_>, _, _>,
-                  _event_manager: &mut _,
-                  corpus_id: CorpusId|
-         -> Result<bool, libafl::Error> {
+                  _event_manager: &mut _|
+         -> Result<bool, Error> {
+            let Some(corpus_id) = state.current_corpus_idx()? else {
+                return Err(Error::illegal_state(
+                    "state is not currently processing a corpus index",
+                ));
+            };
+
             let corpus = state.corpus().get(corpus_id)?.borrow();
             let res = corpus.scheduled_count() == 1; // let's try on the 2nd trial
 

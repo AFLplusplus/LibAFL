@@ -849,6 +849,8 @@ where
 
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        state.on_restart()?;
+
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(&if self.save_state {
@@ -856,6 +858,7 @@ where
         } else {
             None
         })?;
+
         self.await_restart_safe();
         Ok(())
     }
@@ -1045,9 +1048,13 @@ where
     #[inline]
     #[allow(clippy::unused_self)]
     fn is_shutting_down() -> bool {
+        #[cfg(unix)]
         unsafe {
             core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
         }
+
+        #[cfg(windows)]
+        false
     }
 
     /// Launch the restarting manager
@@ -1153,6 +1160,9 @@ where
                     self.shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
+                            unsafe {
+                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                            }
                             self.shmem_provider.post_fork(false)?;
                             handle.status()
                         }
@@ -1162,6 +1172,11 @@ where
                         }
                     }
                 };
+
+                #[cfg(all(unix, not(feature = "fork")))]
+                unsafe {
+                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                }
 
                 // On Windows (or in any case without fork), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]

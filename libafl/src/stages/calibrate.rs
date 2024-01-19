@@ -12,7 +12,7 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, SchedulerTestcaseMetadata},
+    corpus::{Corpus, HasCurrentCorpusIdx, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverName},
@@ -92,6 +92,8 @@ where
     E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
     Z: Evaluator<E, EM, State = E::State>,
 {
+    type Progress = (); // TODO stage may be resumed, but how?
+
     #[inline]
     #[allow(
         clippy::let_and_return,
@@ -104,8 +106,13 @@ where
         executor: &mut E,
         state: &mut E::State,
         mgr: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
         {
             let corpus = state.corpus().get(corpus_idx)?.borrow();

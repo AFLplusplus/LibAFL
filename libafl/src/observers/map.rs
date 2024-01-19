@@ -542,6 +542,11 @@ where
         )
     }
 
+    /// Gets the initial value for this map, mutably
+    pub fn initial_mut(&mut self) -> &mut T {
+        &mut self.initial
+    }
+
     /// Gets the backing for this map
     pub fn map(&self) -> &OwnedMutSlice<'a, T> {
         &self.map
