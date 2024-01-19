@@ -252,6 +252,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         event_mgr: &mut EM,
+        exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
         Self: Executor<EM, Z, State = S>,
@@ -261,13 +262,7 @@ where
         Z: HasObjective<Objective = OF, State = S>,
     {
         let mut me = Self::with_timeout(
-            user_hooks,
-            harness_fn,
-            observers,
-            fuzzer,
-            state,
-            event_mgr,
-            Duration::from_millis(5000),
+            user_hooks, harness_fn, observers, fuzzer, state, event_mgr, exec_tmout,
         )?;
         me.hooks_mut().0.timer_mut().batch_mode = true;
         Ok(me)

@@ -209,16 +209,18 @@ pub extern "C" fn libafl_main() {
             &mut fuzzer,
             &mut state,
             &mut restarting_mgr,
+            opt.timeout,
         )?;
 
         #[cfg(not(target_os = "linux"))]
-        let mut executor = InProcessExecutor::new(
+        let mut executor = InProcessExecutor::with_timeout(
             tuple_list!(),
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
             &mut state,
             &mut restarting_mgr,
+            opt.timeout,
         )?;
 
         // The actual target run starts here.

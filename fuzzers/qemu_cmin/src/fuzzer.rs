@@ -228,8 +228,8 @@ pub fn fuzz() -> Result<(), Error> {
         &mut fuzzer,
         &mut state,
         &mut mgr,
-        core::time::Duration::from_millis(5000),
         shmem_provider,
+        core::time::Duration::from_millis(5000),
     )?;
 
     println!("Importing {} seeds...", files.len());

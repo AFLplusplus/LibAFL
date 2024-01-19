@@ -36,8 +36,6 @@ jobs:
         with:
           crate: mdbook-linkcheck
       - uses: actions/checkout@v3
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
       - uses: Swatinem/rust-cache@v2
       - name: Check for binary blobs
         if: runner.os == 'Linux'
