@@ -192,6 +192,7 @@ pub fn build(
                 .arg("--disable-dbus-display")
                 .arg("--disable-bochs")
                 .arg("--disable-bpf")
+                .arg("--disable-af-xdp")
                 .arg("--disable-brlapi")
                 .arg("--disable-bsd-user")
                 .arg("--disable-bzip2")
