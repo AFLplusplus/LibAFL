@@ -188,7 +188,7 @@ impl<'a> Instance<'a> {
                 &mut fuzzer,
                 &mut state,
                 &mut self.mgr,
-                self.options.timeout
+                self.options.timeout,
             )?;
 
             // Setup an havoc mutator with a mutational stage

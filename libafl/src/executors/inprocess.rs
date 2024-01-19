@@ -26,7 +26,7 @@ use crate::{
     events::{Event, EventFirer, EventRestarter},
     executors::{
         hooks::{
-            inprocess::{InProcessHooks, GLOBAL_STATE},
+            inprocess::{HasTimeout, InProcessHooks, GLOBAL_STATE},
             ExecutorHooksTuple,
         },
         Executor, ExitKind, HasObservers,
@@ -239,6 +239,35 @@ where
             event_mgr,
             Duration::from_millis(5000),
         )
+    }
+
+    /// Create a new in mem executor with the default timeout (5 sec)
+    pub fn batch_mode<EM, OF, Z>(
+        user_hooks: HT,
+        harness_fn: HB,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+    ) -> Result<Self, Error>
+    where
+        Self: Executor<EM, Z, State = S>,
+        EM: EventFirer<State = S> + EventRestarter,
+        OF: Feedback<S>,
+        S: State,
+        Z: HasObjective<Objective = OF, State = S>,
+    {
+        let mut me = Self::with_timeout(
+            user_hooks,
+            harness_fn,
+            observers,
+            fuzzer,
+            state,
+            event_mgr,
+            Duration::from_millis(5000),
+        )?;
+        me.hooks_mut().0.timer_mut().batch_mode = true;
+        Ok(me)
     }
 
     /// Create a new in mem executor.
