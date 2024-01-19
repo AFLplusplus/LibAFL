@@ -228,7 +228,7 @@ pub fn fuzz() -> Result<(), Error> {
         &mut fuzzer,
         &mut state,
         &mut mgr,
-        Duration::from_millis(5000),
+        core::time::Duration::from_millis(5000),
         shmem_provider,
     )?;
 
