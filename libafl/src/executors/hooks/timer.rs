@@ -79,9 +79,9 @@ pub struct TimerStruct {
     ptp_timer: PTP_TIMER,
     #[cfg(windows)]
     critical: CRITICAL_SECTION,
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     pub(crate) batch_mode: bool,
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     pub(crate) exec_tmout: Duration,
     #[cfg(all(unix, not(target_os = "linux")))]
     itimerval: Itimerval,
@@ -89,17 +89,17 @@ pub struct TimerStruct {
     pub(crate) timerid: libc::timer_t,
     #[cfg(target_os = "linux")]
     pub(crate) itimerspec: libc::itimerspec,
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     pub(crate) executions: u32,
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     pub(crate) avg_mul_k: u32,
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     pub(crate) last_signal_time: Duration,
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     pub(crate) avg_exec_time: Duration,
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     pub(crate) start_time: Duration,
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     pub(crate) tmout_start_time: Duration,
 }
 
@@ -158,17 +158,7 @@ impl TimerStruct {
             it_interval,
             it_value,
         };
-        Self {
-            itimerval,
-            exec_tmout,
-            batch_mode: false,
-            executions: 0,
-            avg_mul_k: 1,
-            last_signal_time: Duration::ZERO,
-            avg_exec_time: Duration::ZERO,
-            start_time: Duration::ZERO,
-            tmout_start_time: Duration::ZERO,
-        }
+        Self { itimerval }
     }
 
     /// Constructor

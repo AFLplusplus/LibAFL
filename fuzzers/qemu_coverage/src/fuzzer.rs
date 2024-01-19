@@ -245,17 +245,16 @@ pub fn fuzz() {
             )),
         );
 
-        let executor = QemuExecutor::new(
+        let mut executor = QemuExecutor::new(
             &mut hooks,
             &mut harness,
             (),
             &mut fuzzer,
             &mut state,
             &mut mgr,
+            options.timeout,
         )
         .expect("Failed to create QemuExecutor");
-
-        let mut executor = TimeoutExecutor::new(executor, Duration::from_secs(options.timeout));
 
         if state.must_load_initial_inputs() {
             state
