@@ -13,7 +13,7 @@ use core::{
 #[cfg(all(unix, not(target_os = "linux")))]
 const ITIMER_REAL: core::ffi::c_int = 0;
 
-#[cfg(all(windows))]
+#[cfg(windows)]
 use core::sync::atomic::{compiler_fence, Ordering};
 
 #[cfg(target_os = "linux")]
@@ -26,7 +26,7 @@ use windows::Win32::{
     },
 };
 
-#[cfg(any(all(windows), target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 
 #[repr(C)]
@@ -58,6 +58,15 @@ pub(crate) struct Itimerval {
     pub it_value: Timeval,
 }
 
+#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+extern "C" {
+    pub fn setitimer(
+        which: libc::c_int,
+        new_value: *mut Itimerval,
+        old_value: *mut Itimerval,
+    ) -> libc::c_int;
+}
+
 /// The strcut about all the internals of the timer.
 /// This struct absorb all platform specific differences about timer.
 #[allow(missing_debug_implementations)]
@@ -73,7 +82,7 @@ pub struct TimerStruct {
     pub(crate) batch_mode: bool,
     #[cfg(unix)]
     pub(crate) exec_tmout: Duration,
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(all(unix, not(target_os = "linux")))]
     itimerval: Itimerval,
     #[cfg(target_os = "linux")]
     pub(crate) timerid: libc::timer_t,
@@ -224,7 +233,7 @@ impl TimerStruct {
 
     #[cfg(all(unix, not(target_os = "linux")))]
     pub fn set_timer(&mut self) {
-        libc::setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
+        setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
     }
 
     #[cfg(windows)]
@@ -282,7 +291,7 @@ impl TimerStruct {
     pub fn unset_timer(&mut self) {
         unsafe {
             let mut itimerval_zero: Itimerval = core::mem::zeroed();
-            libc::setitimer(ITIMER_REAL, &mut itimerval_zero, core::ptr::null_mut());
+            setitimer(ITIMER_REAL, &mut itimerval_zero, core::ptr::null_mut());
         }
     }
 

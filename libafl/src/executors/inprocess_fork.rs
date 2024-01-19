@@ -44,47 +44,8 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
     data: &mut InProcessForkExecutorGlobalData,
 );
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
-pub(crate) struct Timeval {
-    pub tv_sec: i64,
-    pub tv_usec: i64,
-}
-
-#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
-impl Debug for Timeval {
-    #[allow(clippy::cast_sign_loss)]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Timeval {{ tv_sec: {:?}, tv_usec: {:?} (tv: {:?}) }}",
-            self.tv_sec,
-            self.tv_usec,
-            Duration::new(self.tv_sec as _, (self.tv_usec * 1000) as _)
-        )
-    }
-}
-
-#[repr(C)]
-#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Itimerval {
-    pub it_interval: Timeval,
-    pub it_value: Timeval,
-}
-
-#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
-extern "C" {
-    fn setitimer(
-        which: libc::c_int,
-        new_value: *mut Itimerval,
-        old_value: *mut Itimerval,
-    ) -> libc::c_int;
-}
-
-#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
-const ITIMER_REAL: libc::c_int = 0;
+#[cfg(all(unix, not(target_os = "linux")))]
+use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval};
 
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 pub struct InProcessForkExecutor<'a, H, HT, OT, S, SP>
@@ -543,7 +504,7 @@ mod tests {
         use libc::{itimerspec, timespec};
 
         #[cfg(not(target_os = "linux"))]
-        use crate::executors::inprocess_fork::{Itimerval, Timeval};
+        use crate::executors::hooks::timer::{Itimerval, Timeval};
         use crate::{
             events::SimpleEventManager,
             executors::{
