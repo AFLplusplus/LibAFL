@@ -242,6 +242,7 @@ where
     }
 
     /// Create a new in mem executor with the default timeout (5 sec)
+    #[cfg(all(feature = "std", target_os = "linux"))]
     pub fn batch_mode<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
