@@ -73,8 +73,8 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Input directory")]
     input: String,
 
-    #[arg(long, help = "Timeout in seconds", default_value_t = 1_u64)]
-    timeout: u64,
+    #[arg(long, help = "Timeout in seconds", default_value_t = 1_u64, value_parser = core::time::Duration::from_secs)]
+    timeout: Duration,
 
     #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]
     port: u16,
@@ -253,7 +253,7 @@ pub fn fuzz() {
             &mut fuzzer,
             &mut state,
             &mut mgr,
-            core::time::Duration::from_secs(options.timeout),
+            options.timeout,
         )
         .expect("Failed to create QemuExecutor");
 
