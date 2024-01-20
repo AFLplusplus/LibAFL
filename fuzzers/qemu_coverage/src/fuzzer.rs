@@ -35,6 +35,11 @@ use rangemap::RangeMap;
 #[derive(Default)]
 pub struct Version;
 
+/// Parse a millis string to a [`Duration`]. Used for arg parsing.
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
+}
+
 impl From<Version> for Str {
     fn from(_: Version) -> Str {
         let version = [
@@ -73,7 +78,7 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Input directory")]
     input: String,
 
-    #[arg(long, help = "Timeout in seconds", default_value_t = 1_u64, value_parser = core::time::Duration::from_secs)]
+    #[arg(long, help = "Timeout in seconds", default_value_t = 1_u64, value_parser = timeout_from_millis_str)]
     timeout: Duration,
 
     #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]

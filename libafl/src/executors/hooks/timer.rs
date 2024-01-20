@@ -172,6 +172,8 @@ impl TimerStruct {
     }
 
     /// Constructor
+    /// # Safety
+    /// This function calls transmute to setup the timeout handler for windows
     #[cfg(windows)]
     #[must_use]
     pub unsafe fn new(exec_tmout: Duration, timeout_handler: *const c_void) -> Self {
