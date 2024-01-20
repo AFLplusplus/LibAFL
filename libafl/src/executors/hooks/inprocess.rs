@@ -1,4 +1,4 @@
-#[cfg(any(unix, windows))]
+#[cfg(any(unix, all(windows, feature = "std")))]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
     ffi::c_void,
