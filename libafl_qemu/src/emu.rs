@@ -8,7 +8,8 @@ use core::{
     ptr::{addr_of, copy_nonoverlapping, null},
 };
 use std::{
-    cell::RefCell,
+    borrow::BorrowMut,
+    cell::{OnceCell, RefCell},
     collections::HashSet,
     ffi::CString,
     fmt::{Debug, Display, Formatter},
@@ -23,7 +24,7 @@ use num_traits::Num;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::{GuestReg, Regs};
+use crate::{command::IsCommand, GuestReg, Regs};
 
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;
@@ -73,6 +74,62 @@ impl Display for GuestAddrKind {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum HandlerError {
+    EmuExitReasonError(EmuExitReasonError),
+    SMError(SnapshotManagerError),
+    SyncBackdoorError(SyncBackdoorError),
+    MultipleSnapshotDefinition,
+    MultipleInputDefinition,
+    SnapshotNotFound,
+}
+
+impl From<SnapshotManagerError> for HandlerError {
+    fn from(sm_error: SnapshotManagerError) -> Self {
+        HandlerError::SMError(sm_error)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SnapshotManagerError {
+    SnapshotIdNotFound(SnapshotId),
+    MemoryInconsistencies(u64),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub struct SnapshotId {
+    id: u64,
+}
+
+impl SnapshotId {
+    fn get_fresh_id() -> SnapshotId {
+        static UNIQUE_ID: AtomicU64 = AtomicU64::new(0);
+
+        let unique_id = UNIQUE_ID.fetch_add(1, Ordering::SeqCst);
+
+        SnapshotId {
+            id: unique_id.clone(),
+        }
+    }
+
+    fn inner(&self) -> u64 {
+        self.id
+    }
+}
+
+pub trait IsSnapshotManager: Debug + Clone {
+    fn save<E>(&mut self, emu: &Emulator<E>) -> SnapshotId
+    where
+        E: IsEmuExitHandler;
+    fn restore<E>(
+        &mut self,
+        snapshot_id: &SnapshotId,
+        emu: &Emulator<E>,
+    ) -> Result<(), SnapshotManagerError>
+    where
+        E: IsEmuExitHandler;
+}
+
 // TODO: Rework with generics for command handlers?
 pub trait IsEmuExitHandler: Sized + Debug + Clone {
     fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput);
@@ -107,6 +164,111 @@ impl IsEmuExitHandler for NopEmuExitHandler {
         match exit_reason {
             Ok(reason) => Ok(InnerHandlerResult::ReturnToHarness(reason)),
             Err(error) => Err(error)?,
+        }
+    }
+}
+
+/// Synchronous Exit handler maintaining only one snapshot.
+#[derive(Debug, Clone)]
+pub struct StdEmuExitHandler<SM>
+where
+    SM: IsSnapshotManager + Clone,
+{
+    snapshot_manager: SM,
+    snapshot_id: OnceCell<SnapshotId>,
+    input_location: OnceCell<(EmulatorMemoryChunk, Option<Regs>)>,
+}
+
+impl<SM> StdEmuExitHandler<SM>
+where
+    SM: IsSnapshotManager,
+{
+    pub fn new(snapshot_manager: SM) -> Self {
+        Self {
+            snapshot_manager,
+            snapshot_id: OnceCell::new(),
+            input_location: OnceCell::new(),
+        }
+    }
+
+    pub fn set_input_location(
+        &self,
+        input_location: EmulatorMemoryChunk,
+        ret_reg: Option<Regs>,
+    ) -> Result<(), (EmulatorMemoryChunk, Option<Regs>)> {
+        self.input_location.set((input_location, ret_reg))
+    }
+
+    pub fn snapshot_id(&self) -> &OnceCell<SnapshotId> {
+        &self.snapshot_id
+    }
+
+    pub fn snapshot_manager(&self) -> &SM {
+        &self.snapshot_manager
+    }
+
+    pub fn snapshot_manager_mut(&mut self) -> &mut SM {
+        &mut self.snapshot_manager
+    }
+}
+
+// TODO: replace handlers with generics to permit compile-time customization of handlers
+impl<SM> IsEmuExitHandler for StdEmuExitHandler<SM>
+where
+    SM: IsSnapshotManager,
+{
+    fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput) {
+        if let Some((input_location, ret_register)) = self.input_location.get() {
+            let input_command = InputCommand::new(input_location.clone());
+            input_command
+                .run(emu, self, input, ret_register.clone())
+                .unwrap();
+        }
+    }
+
+    fn handle(
+        &mut self,
+        exit_reason: Result<EmuExitReason, EmuExitReasonError>,
+        emu: &Emulator<Self>,
+        input: &BytesInput,
+    ) -> Result<InnerHandlerResult, HandlerError> {
+        let mut exit_reason = match exit_reason {
+            Ok(exit_reason) => exit_reason,
+            Err(exit_error) => match exit_error {
+                EmuExitReasonError::UnexpectedExit => {
+                    if let Some(snapshot_id) = self.snapshot_id.get() {
+                        self.snapshot_manager
+                            .borrow_mut()
+                            .restore(snapshot_id, emu)?;
+                    }
+                    return Ok(InnerHandlerResult::EndOfRun(ExitKind::Crash));
+                }
+                _ => Err(exit_error)?,
+            },
+        };
+
+        let (command, ret_reg): (Option<Command>, Option<Regs>) = match &mut exit_reason {
+            EmuExitReason::End(shutdown_cause) => match shutdown_cause {
+                QemuShutdownCause::HostSignal(Signal::SigInterrupt) => {
+                    return Ok(InnerHandlerResult::Interrupt)
+                }
+                QemuShutdownCause::GuestPanic => {
+                    return Ok(InnerHandlerResult::EndOfRun(ExitKind::Crash))
+                }
+                _ => panic!("Unhandled QEMU shutdown cause: {:?}.", shutdown_cause),
+            },
+            EmuExitReason::Breakpoint(bp) => (bp.trigger(emu).cloned(), None),
+            EmuExitReason::SyncBackdoor(sync_backdoor) => {
+                let command = sync_backdoor.command().clone();
+                (Some(command), Some(sync_backdoor.ret_reg()))
+            }
+        };
+
+        if let Some(cmd) = command {
+            let res = cmd.run(emu, self, input, ret_reg);
+            res
+        } else {
+            Ok(InnerHandlerResult::ReturnToHarness(exit_reason))
         }
     }
 }
@@ -594,11 +756,17 @@ impl CPU {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct HookId(pub(crate) usize);
 
-use std::pin::Pin;
+use std::{
+    pin::Pin,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use libafl_bolts::os::unix_signals::Signal;
 
-use crate::breakpoint::Breakpoint;
+use crate::{
+    breakpoint::Breakpoint,
+    command::{Command, EmulatorMemoryChunk, InputCommand},
+};
 
 #[derive(Debug)]
 pub struct HookData(u64);

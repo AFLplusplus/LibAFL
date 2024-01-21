@@ -83,7 +83,9 @@ where
     ) -> Result<InnerHandlerResult, HandlerError>;
 }
 
+#[cfg(emulation_mode = "systemmode")]
 pub type PagingFilterCommand = FilterCommand<QemuInstrumentationPagingFilter>;
+
 pub type AddressRangeFilterCommand = FilterCommand<QemuInstrumentationAddressRangeFilter>;
 
 #[derive(Debug, Clone)]
@@ -94,6 +96,7 @@ pub enum Command {
     StartCommand(StartCommand),
     EndCommand(EndCommand),
     VersionCommand(VersionCommand),
+    #[cfg(emulation_mode = "systemmode")]
     PagingFilterCommand(PagingFilterCommand),
     AddressRangeFilterCommand(AddressRangeFilterCommand),
 }
@@ -123,6 +126,7 @@ where
             Command::VersionCommand(cmd) => {
                 <VersionCommand as IsCommand<StdEmuExitHandler<SM>>>::usable_at_runtime(cmd)
             }
+            #[cfg(emulation_mode = "systemmode")]
             Command::PagingFilterCommand(cmd) => {
                 <PagingFilterCommand as IsCommand<StdEmuExitHandler<SM>>>::usable_at_runtime(cmd)
             }
@@ -184,6 +188,7 @@ where
                     ret_reg,
                 )
             }
+            #[cfg(emulation_mode = "systemmode")]
             Command::PagingFilterCommand(cmd) => <PagingFilterCommand as IsCommand<
                 StdEmuExitHandler<SM>,
             >>::run(
@@ -227,17 +232,9 @@ where
         emu_exit_handler.snapshot_id().set(snapshot_id).unwrap();
 
         // TODO: get helpers from harness cleanly. Find a way to use generics without trait overflow.
-        let qemu_helpers: &mut QemuHooks<
-            (QemuEdgeCoverageHelper, ()),
-            StdState<
-                BytesInput,
-                InMemoryCorpus<BytesInput>,
-                RomuDuoJrRand,
-                OnDiskCorpus<BytesInput>,
-            >,
-            StdEmuExitHandler<SM>,
-        > = unsafe {
-            get_qemu_hooks::<
+        #[cfg(emulation_mode = "systemmode")]
+        {
+            let qemu_helpers: &mut QemuHooks<
                 (QemuEdgeCoverageHelper, ()),
                 StdState<
                     BytesInput,
@@ -246,21 +243,32 @@ where
                     OnDiskCorpus<BytesInput>,
                 >,
                 StdEmuExitHandler<SM>,
-            >()
-        };
+            > = unsafe {
+                get_qemu_hooks::<
+                    (QemuEdgeCoverageHelper, ()),
+                    StdState<
+                        BytesInput,
+                        InMemoryCorpus<BytesInput>,
+                        RomuDuoJrRand,
+                        OnDiskCorpus<BytesInput>,
+                    >,
+                    StdEmuExitHandler<SM>,
+                >()
+            };
 
-        // TODO: Improve this part used to perform paging filtering
-        let helpers = qemu_helpers.helpers_mut();
+            // TODO: Improve this part used to perform paging filtering
+            let helpers = qemu_helpers.helpers_mut();
 
-        let mut allowed_paging_ids = HashSet::new();
+            let mut allowed_paging_ids = HashSet::new();
 
-        let current_paging_id = emu.current_cpu().unwrap().get_current_paging_id().unwrap();
-        allowed_paging_ids.insert(current_paging_id);
+            let current_paging_id = emu.current_cpu().unwrap().get_current_paging_id().unwrap();
+            allowed_paging_ids.insert(current_paging_id);
 
-        let paging_filter =
-            HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(helpers);
+            let paging_filter =
+                HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(helpers);
 
-        *paging_filter = QemuInstrumentationPagingFilter::AllowList(allowed_paging_ids);
+            *paging_filter = QemuInstrumentationPagingFilter::AllowList(allowed_paging_ids);
+        }
 
         Ok(InnerHandlerResult::Continue)
     }
@@ -439,6 +447,7 @@ where
     filter: T,
 }
 
+#[cfg(emulation_mode = "systemmode")]
 impl<SM> IsCommand<StdEmuExitHandler<SM>> for PagingFilterCommand
 where
     SM: IsSnapshotManager,
@@ -577,6 +586,7 @@ impl Display for Command {
             Command::AddressRangeFilterCommand(addr_range_filter) => {
                 write!(f, "Addr range filter: {:?}", addr_range_filter.filter,)
             }
+            #[cfg(emulation_mode = "systemmode")]
             Command::PagingFilterCommand(paging_filter) => {
                 write!(f, "Addr range filter: {:?}", paging_filter.filter,)
             }
