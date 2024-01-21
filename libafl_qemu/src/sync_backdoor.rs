@@ -65,6 +65,7 @@ impl SyncBackdoor {
         Ok(cpu.write_reg(self.arch_regs_map[BackdoorArgs::Ret], value)?)
     }
 
+    #[must_use]
     pub fn ret_reg(&self) -> Regs {
         self.arch_regs_map[BackdoorArgs::Ret]
     }

@@ -595,6 +595,7 @@ impl Display for Command {
 }
 
 impl StartCommand {
+    #[must_use]
     pub fn new(input_location: EmulatorMemoryChunk) -> Self {
         Self { input_location }
     }

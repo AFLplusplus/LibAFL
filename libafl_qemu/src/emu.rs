@@ -204,9 +204,7 @@ where
     fn try_put_input(&mut self, emu: &Emulator<Self>, input: &BytesInput) {
         if let Some((input_location, ret_register)) = self.input_location.get() {
             let input_command = InputCommand::new(input_location.clone());
-            input_command
-                .run(emu, self, input, *ret_register)
-                .unwrap();
+            input_command.run(emu, self, input, *ret_register).unwrap();
         }
     }
 
