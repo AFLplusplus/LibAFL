@@ -17,10 +17,7 @@ use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper,
-    QemuHelperTuple, QemuHooks, SYS_execve, SyscallHookResult,
-};
+use crate::{elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper, QemuHelperTuple, QemuHooks, SYS_execve, SyscallHookResult, IsEmuExitHandler};
 
 /// Parses `injections.yaml`
 fn parse_yaml<P: AsRef<Path> + Display>(path: P) -> Result<Vec<YamlInjectionEntry>, Error> {
@@ -200,8 +197,8 @@ impl QemuInjectionHelper {
         })
     }
 
-    fn on_call_check<S: UsesInput, QT: QemuHelperTuple<S>>(
-        hooks: &mut QemuHooks<QT, S>,
+    fn on_call_check<S: UsesInput, QT: QemuHelperTuple<S, E>, E: IsEmuExitHandler>(
+        hooks: &mut QemuHooks<QT, S, E>,
         id: usize,
         parameter: u8,
     ) {
@@ -245,20 +242,21 @@ impl QemuInjectionHelper {
     }
 }
 
-impl<S> QemuHelper<S> for QemuInjectionHelper
+impl<S, E> QemuHelper<S, E> for QemuInjectionHelper
 where
     S: UsesInput,
+    E: IsEmuExitHandler,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<QT, S, E>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
     {
-        hooks.syscalls(Hook::Function(syscall_hook::<QT, S>));
+        hooks.syscalls(Hook::Function(syscall_hook::<QT, S, E>));
     }
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<QT, S, E>)
     where
-        QT: QemuHelperTuple<S>,
+        QT: QemuHelperTuple<S, E>,
     {
         let emu = hooks.emulator();
         let mut libs: Vec<LibInfo> = Vec::new();
@@ -322,8 +320,8 @@ where
     }
 }
 
-fn syscall_hook<QT, S>(
-    hooks: &mut QemuHooks<QT, S>, // our instantiated QemuHooks
+fn syscall_hook<QT, S, E>(
+    hooks: &mut QemuHooks<QT, S, E>, // our instantiated QemuHooks
     _state: Option<&mut S>,
     syscall: i32,  // syscall number
     x0: GuestAddr, // registers ...
@@ -336,8 +334,9 @@ fn syscall_hook<QT, S>(
     _x7: GuestAddr,
 ) -> SyscallHookResult
 where
-    QT: QemuHelperTuple<S>,
+    QT: QemuHelperTuple<S, E>,
     S: UsesInput,
+    E: IsEmuExitHandler
 {
     log::trace!("syscall_hook {syscall} {SYS_execve}");
     debug_assert!(i32::try_from(SYS_execve).is_ok());
@@ -386,12 +385,15 @@ where
     }
 }
 
-fn find_function(
-    emu: &Emulator,
+fn find_function<E>(
+    emu: &Emulator<E>,
     file: &String,
     function: &str,
     loadaddr: GuestAddr,
-) -> Result<Option<GuestAddr>, Error> {
+) -> Result<Option<GuestAddr>, Error>
+where
+    E: IsEmuExitHandler
+{
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(file, &mut elf_buffer)?;
     let offset = if loadaddr > 0 {

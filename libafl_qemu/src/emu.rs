@@ -101,6 +101,7 @@ pub struct SnapshotId {
     id: u64,
 }
 
+#[cfg(emulation_mode = "systemmode")]
 impl SnapshotId {
     fn get_fresh_id() -> SnapshotId {
         static UNIQUE_ID: AtomicU64 = AtomicU64::new(0);
@@ -758,7 +759,6 @@ pub struct HookId(pub(crate) usize);
 
 use std::{
     pin::Pin,
-    sync::atomic::{AtomicU64, Ordering},
 };
 
 use libafl_bolts::os::unix_signals::Signal;
