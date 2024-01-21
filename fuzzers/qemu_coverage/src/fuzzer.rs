@@ -78,7 +78,7 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Input directory")]
     input: String,
 
-    #[arg(long, help = "Timeout in seconds", default_value_t = core::time::Duration::from_millis(5000), value_parser = timeout_from_millis_str)]
+    #[arg(long, help = "Timeout in seconds", default_value = "5000", value_parser = timeout_from_millis_str)]
     timeout: Duration,
 
     #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]
