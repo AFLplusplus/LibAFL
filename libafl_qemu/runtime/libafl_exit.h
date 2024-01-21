@@ -23,7 +23,7 @@ typedef uint64_t libafl_word;
   #ifdef __arm__
     #include <stdint.h>
 
-typedef uint32_t                      libafl_word;
+typedef uint32_t libafl_word;
     #define LIBAFL_CALLING_CONVENTION __attribute__(())
   #endif
 #endif
