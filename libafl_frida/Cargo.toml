@@ -86,4 +86,4 @@ yaxpeax-arch = "0.2.7"
 serial_test = { version = "2", default-features = false, features = ["logging"] }
 clap = {version = "4.0", features = ["derive"]}
 libloading = "0.7"
-inline-c = {git = 'https://github.com/mineo333/inline-c-rs' }
+inline-c = {git = 'https://github.com/mineo333/libafl-inline-c-rs' }
