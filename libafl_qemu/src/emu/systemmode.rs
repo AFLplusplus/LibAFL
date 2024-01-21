@@ -1,6 +1,4 @@
 use std::{
-    borrow::BorrowMut,
-    cell::OnceCell,
     collections::HashMap,
     ffi::{c_void, CStr, CString},
     fmt::Debug,
@@ -9,16 +7,27 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use libafl_bolts::os::unix_signals::Signal;
-
 use crate::{
-    command::{Command, EmulatorMemoryChunk, InputCommand, IsCommand},
-    emu::{libafl_page_from_addr, BytesInput, ExitKind, IsSnapshotManager},
-    sync_backdoor::SyncBackdoorError,
+    emu::{libafl_page_from_addr, IsSnapshotManager},
     CPUStatePtr, EmuExitReason, EmuExitReasonError, Emulator, GuestAddr, GuestPhysAddr,
-    GuestVirtAddr, InnerHandlerResult, IsEmuExitHandler, MemAccessInfo, QemuShutdownCause, Regs,
-    CPU,
+    GuestVirtAddr, IsEmuExitHandler, MemAccessInfo, SnapshotId, SnapshotManagerError, CPU,
 };
+
+impl SnapshotId {
+    fn get_fresh_id() -> SnapshotId {
+        static UNIQUE_ID: AtomicU64 = AtomicU64::new(0);
+
+        let unique_id = UNIQUE_ID.fetch_add(1, Ordering::SeqCst);
+
+        SnapshotId {
+            id: unique_id.clone(),
+        }
+    }
+
+    fn inner(&self) -> u64 {
+        self.id
+    }
+}
 
 pub type FastSnapshotPtr = *mut libafl_qemu_sys::SyxSnapshot;
 

@@ -17,7 +17,10 @@ use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
 use serde::{Deserialize, Serialize};
 
-use crate::{elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, QemuHelper, QemuHelperTuple, QemuHooks, SYS_execve, SyscallHookResult, IsEmuExitHandler};
+use crate::{
+    elf::EasyElf, emu::ArchExtras, CallingConvention, Emulator, GuestAddr, Hook, IsEmuExitHandler,
+    QemuHelper, QemuHelperTuple, QemuHooks, SYS_execve, SyscallHookResult,
+};
 
 /// Parses `injections.yaml`
 fn parse_yaml<P: AsRef<Path> + Display>(path: P) -> Result<Vec<YamlInjectionEntry>, Error> {
@@ -336,7 +339,7 @@ fn syscall_hook<QT, S, E>(
 where
     QT: QemuHelperTuple<S, E>,
     S: UsesInput,
-    E: IsEmuExitHandler
+    E: IsEmuExitHandler,
 {
     log::trace!("syscall_hook {syscall} {SYS_execve}");
     debug_assert!(i32::try_from(SYS_execve).is_ok());
@@ -392,7 +395,7 @@ fn find_function<E>(
     loadaddr: GuestAddr,
 ) -> Result<Option<GuestAddr>, Error>
 where
-    E: IsEmuExitHandler
+    E: IsEmuExitHandler,
 {
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(file, &mut elf_buffer)?;

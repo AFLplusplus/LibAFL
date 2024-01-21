@@ -1,6 +1,6 @@
-use std::{
-    fmt::{Debug, Display, Formatter},
-};
+#[cfg(emulation_mode = "systemmode")]
+use std::collections::HashSet;
+use std::fmt::{Debug, Display, Formatter};
 
 use enum_map::Enum;
 use libafl::{
@@ -12,19 +12,14 @@ use libafl::{
 use libafl_bolts::rands::RomuDuoJrRand;
 use num_enum::TryFromPrimitive;
 
+#[cfg(emulation_mode = "systemmode")]
+use crate::QemuInstrumentationPagingFilter;
 use crate::{
     get_qemu_hooks, sync_backdoor::SyncBackdoorError, Emulator, GuestAddrKind, GuestPhysAddr,
     GuestReg, GuestVirtAddr, HandlerError, HasInstrumentationFilter, InnerHandlerResult,
     IsEmuExitHandler, IsFilter, IsSnapshotManager, QemuEdgeCoverageHelper, QemuHooks,
-    QemuInstrumentationAddressRangeFilter, Regs,
-    StdEmuExitHandler, CPU,
+    QemuInstrumentationAddressRangeFilter, Regs, StdEmuExitHandler, CPU,
 };
-
-#[cfg(emulation_mode = "systemmode")]
-use std::collections::HashSet;
-
-#[cfg(emulation_mode = "systemmode")]
-use crate::{QemuInstrumentationPagingFilter};
 
 pub const VERSION: u64 = bindings::LIBAFL_EXIT_VERSION_NUMBER as u64;
 
