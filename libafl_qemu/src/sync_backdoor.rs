@@ -183,6 +183,7 @@ where
 
                 SyncBackdoor {
                     command: Command::AddressRangeFilterCommand(FilterCommand::new(
+                        #[allow(clippy::single_range_in_vec_init)]
                         QemuInstrumentationAddressRangeFilter::AllowList(vec![
                             vaddr_start..vaddr_end,
                         ]),

@@ -108,7 +108,7 @@ impl CPU {
     #[must_use]
     pub fn page_size(&self) -> usize {
         thread_local! {
-            static PAGE_SIZE: OnceCell<usize> = OnceCell::new();
+            static PAGE_SIZE: OnceCell<usize> = const { OnceCell::new() };
         }
 
         PAGE_SIZE.with(|s| {

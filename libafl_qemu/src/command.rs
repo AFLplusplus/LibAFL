@@ -70,10 +70,10 @@ where
     fn usable_at_runtime(&self) -> bool;
 
     /// Command handler.
-    ///     input: The input for the current emulator run.
-    ///     ret_reg: The register in which the guest return value should be written, if any.
+    ///     - `input`: The input for the current emulator run.
+    ///     - `ret_reg`: The register in which the guest return value should be written, if any.
     /// Returns
-    ///     - InnerHandlerResult: How the high-level handler should behave
+    ///     - `InnerHandlerResult`: How the high-level handler should behave
     fn run(
         &self,
         emu: &Emulator<E>,
@@ -292,11 +292,10 @@ where
         _input: &BytesInput,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
-        let snapshot_id = emu_exit_handler
+        let snapshot_id = *emu_exit_handler
             .snapshot_id()
             .get()
-            .ok_or(HandlerError::SnapshotNotFound)?
-            .clone();
+            .ok_or(HandlerError::SnapshotNotFound)?;
 
         emu_exit_handler
             .snapshot_manager_mut()
@@ -395,11 +394,10 @@ where
         _input: &BytesInput,
         _ret_reg: Option<Regs>,
     ) -> Result<InnerHandlerResult, HandlerError> {
-        let snapshot_id = emu_exit_handler
+        let snapshot_id = *emu_exit_handler
             .snapshot_id()
             .get()
-            .ok_or(HandlerError::SnapshotNotFound)?
-            .clone();
+            .ok_or(HandlerError::SnapshotNotFound)?;
 
         emu_exit_handler
             .snapshot_manager_mut()
@@ -429,12 +427,12 @@ where
     ) -> Result<InnerHandlerResult, HandlerError> {
         let guest_version = self.0;
 
-        if VERSION != guest_version {
+        if VERSION == guest_version {
+            Ok(InnerHandlerResult::Continue)
+        } else {
             Err(HandlerError::SyncBackdoorError(
                 SyncBackdoorError::VersionDifference(guest_version),
             ))
-        } else {
-            Ok(InnerHandlerResult::Continue)
         }
     }
 }
@@ -506,6 +504,7 @@ where
         true
     }
 
+    #[allow(clippy::type_complexity)] // TODO: refactor with correct type.
     fn run(
         &self,
         _emu: &Emulator<StdEmuExitHandler<SM>>,
@@ -549,6 +548,7 @@ where
 }
 
 impl VersionCommand {
+    #[must_use]
     pub fn new(version: u64) -> Self {
         Self(version)
     }
@@ -601,12 +601,14 @@ impl StartCommand {
 }
 
 impl EndCommand {
+    #[must_use]
     pub fn new(exit_kind: Option<ExitKind>) -> Self {
         Self(exit_kind)
     }
 }
 
 impl InputCommand {
+    #[must_use]
     pub fn new(location: EmulatorMemoryChunk) -> Self {
         Self { location }
     }

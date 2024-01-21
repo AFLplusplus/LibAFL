@@ -23,7 +23,7 @@ impl Hash for Breakpoint {
 
 impl PartialEq for Breakpoint {
     fn eq(&self, other: &Self) -> bool {
-        self.addr.eq(&other.addr)
+        self.addr == other.addr
     }
 }
 

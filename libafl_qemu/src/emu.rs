@@ -205,7 +205,7 @@ where
         if let Some((input_location, ret_register)) = self.input_location.get() {
             let input_command = InputCommand::new(input_location.clone());
             input_command
-                .run(emu, self, input, ret_register.clone())
+                .run(emu, self, input, *ret_register)
                 .unwrap();
         }
     }
@@ -239,7 +239,7 @@ where
                 QemuShutdownCause::GuestPanic => {
                     return Ok(InnerHandlerResult::EndOfRun(ExitKind::Crash))
                 }
-                _ => panic!("Unhandled QEMU shutdown cause: {:?}.", shutdown_cause),
+                _ => panic!("Unhandled QEMU shutdown cause: {shutdown_cause:?}."),
             },
             EmuExitReason::Breakpoint(bp) => (bp.trigger(emu).cloned(), None),
             EmuExitReason::SyncBackdoor(sync_backdoor) => {
@@ -249,8 +249,7 @@ where
         };
 
         if let Some(cmd) = command {
-            let res = cmd.run(emu, self, input, ret_reg);
-            res
+            cmd.run(emu, self, input, ret_reg)
         } else {
             Ok(InnerHandlerResult::ReturnToHarness(exit_reason))
         }
