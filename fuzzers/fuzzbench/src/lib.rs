@@ -19,8 +19,8 @@ use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedback_and, feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedback_or,
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -61,7 +61,7 @@ pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
-    env_logger::init();
+
     let res = match Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author("AFLplusplus team")
@@ -263,7 +263,7 @@ fn fuzz(
     );
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_or!(CrashFeedback::new(), TimeoutFeedback::new());
+    let mut objective = CrashFeedback::new();
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -338,14 +338,18 @@ fn fuzz(
     )?;
 
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(InProcessExecutor::new(
-        tuple_list!(),
-        &mut tracing_harness,
-        tuple_list!(cmplog_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )?);
+    let tracing = TracingStage::new(
+        InProcessExecutor::with_timeout(
+            tuple_list!(),
+            &mut tracing_harness,
+            tuple_list!(cmplog_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+            timeout * 10,
+        )?,
+        // Give it more time!
+    );
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
@@ -369,7 +373,7 @@ fn fuzz(
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
         state
-            .load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
+            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
             .unwrap_or_else(|_| {
                 println!("Failed to load initial corpus at {:?}", &seed_dir);
                 process::exit(0);

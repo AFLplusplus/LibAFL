@@ -243,7 +243,7 @@ where
         )
     }
 
-    /// Create a new in mem executor with the default timeout (5 sec)
+    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
     pub fn batch_mode<EM, OF, Z>(
         user_hooks: HT,
@@ -271,6 +271,7 @@ where
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
+    /// * `user_hooks` - the hooks run before and after the harness's execution
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails

@@ -1,3 +1,4 @@
+//! The hook for `InProcessExecutor`
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{

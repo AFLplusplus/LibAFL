@@ -1,3 +1,4 @@
+//! The struct `TimerStruct` will absorb all the difference in timeout implementation in various system.
 use core::time::Duration;
 #[cfg(any(windows, target_os = "linux"))]
 use core::{
@@ -153,6 +154,7 @@ impl TimerStruct {
         &mut self.critical
     }
 
+    /// Create a `TimerStruct` with the specified timeout
     #[cfg(all(unix, not(target_os = "linux")))]
     pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
@@ -204,7 +206,7 @@ impl TimerStruct {
     #[must_use]
     #[allow(unused_unsafe)]
     #[allow(unused_mut)]
-    /// Constructor for linux
+    /// Create a `TimerStruct` with the specified timeout
     pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
         let it_value = libc::timespec {
@@ -242,7 +244,7 @@ impl TimerStruct {
 
     #[cfg(target_os = "linux")]
     #[must_use]
-    /// Constructor but batch mode
+    /// Constructor but use batch mode
     pub fn batch_mode(exec_tmout: Duration) -> Self {
         let mut me = Self::new(exec_tmout);
         me.batch_mode = true;
@@ -250,6 +252,7 @@ impl TimerStruct {
     }
 
     #[cfg(all(unix, not(target_os = "linux")))]
+    /// Set up timer
     pub fn set_timer(&mut self) {
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
@@ -308,6 +311,7 @@ impl TimerStruct {
     }
 
     #[cfg(all(unix, not(target_os = "linux")))]
+    /// Disalarm timer
     pub fn unset_timer(&mut self) {
         unsafe {
             let mut itimerval_zero: Itimerval = core::mem::zeroed();

@@ -1,3 +1,4 @@
+//! The `InProcessForkExecutor` to do forking before executing the harness in-processly
 #[cfg(target_os = "linux")]
 use core::ptr::addr_of_mut;
 use core::{
