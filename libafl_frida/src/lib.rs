@@ -383,13 +383,17 @@ mod tests {
 
     macro_rules! frida_test {
     
-    ($fuzz_code:expr; $helper:expr; $state:expr; $observers:expr; $feedback:expr; $objective:expr; $function_to_test:expr; $($assert:expr),*) => {
-        let compiled_lib = &$fuzz_code;
+    ($fuzz_code:expr; $helper:expr; $state:expr; $observers:expr; $feedback:expr; $objective:expr; $function_to_test:expr; $($assert:expr),*) => { 
 
+        static LIB: OnceLock<libloading::Library> = OnceLock::new();
+        
+        let lib = LIB.get_or_init(move || -> libloading::Library {
+            let compiled_lib = &$fuzz_code;
+            libloading::Library::new(compiled_lib.output_path().clone()).expect("Failed to load library")
+        });
     //    static 
-        let lib = libloading::Library::new(compiled_lib.output_path().clone()).unwrap();
+        
         let mut event_manager = NopEventManager::new();
-
 
         let target_func: libloading::Symbol<
                     unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
@@ -454,79 +458,12 @@ mod tests {
             runtimes,
         );
 
-        let compiled_lib = assert_cxx!{
-            #inline_c_rs SHARED
-            #include <stdint.h>
-            #include <stdlib.h>
-            #include <string>
-    
-            extern "C" int heap_uaf_read() {
-                int *array = new int[100];
-                delete[] array;
-                fprintf(stdout, "%d\n", array[5]);
-                return 0;
-            }
-    
-            extern "C" int heap_uaf_write() {
-                int *array = new int[100];
-                delete[] array;
-                array[5] = 1;
-                return 0;
-            }
-    
-            extern "C" int heap_oob_read() {
-                int *array = new int[100];
-                fprintf(stdout, "%d\n", array[100]);
-                delete[] array;
-                return 0;
-            }
-    
-            extern "C" int heap_oob_write() {
-                int *array = new int[100];
-                array[100] = 1;
-                delete[] array;
-                 return 0;
-            }
-            extern "C" int malloc_heap_uaf_read() {
-                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
-                free(array);
-                fprintf(stdout, "%d\n", array[5]);
-                return 0;
-            }
-    
-            extern "C" int malloc_heap_uaf_write() {
-                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
-                free(array);
-                array[5] = 1;
-                return 0;
-            }
-    
-            extern "C" int malloc_heap_oob_read() {
-                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
-                fprintf(stdout, "%d\n", array[100]);
-                free(array);
-                return 0;
-            }
-    
-            extern "C" int malloc_heap_oob_write() {
-                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
-                array[100] = 1;
-                free(array);
-                return 0;
-            }
-    
-            extern "C" int LLVMFuzzerTestOneInput() {
-                // abort();
-                return 0;
-            }
-        };
+        //let compiled_lib = 
 
         // Run the tests for each function
         for test in tests {
 
           //  let compiled_lib = assert_cxx!;
-
-
             let (function_name, err_cnt) = test;
             log::info!("Testing with harness function {}", function_name);
 
@@ -550,13 +487,73 @@ mod tests {
 
             let observers = tuple_list!(
                 AsanErrorsObserver::new(&ASAN_ERRORS) //,
-            );  
-
-
-
-            log::trace!("Called: {}", function_name);
-
-            frida_test!(compiled_lib; frida_helper; state; observers; feedback; objective; function_name; assert_eq!(state.solutions().count(), err_cnt), assert_eq!(1, 1)); 
+            );
+            frida_test!(assert_cxx!{
+                #inline_c_rs SHARED
+                #include <stdint.h>
+                #include <stdlib.h>
+                #include <string>
+        
+                extern "C" int heap_uaf_read() {
+                    int *array = new int[100];
+                    delete[] array;
+                    fprintf(stdout, "%d\n", array[5]);
+                    return 0;
+                }
+        
+                extern "C" int heap_uaf_write() {
+                    int *array = new int[100];
+                    delete[] array;
+                    array[5] = 1;
+                    return 0;
+                }
+        
+                extern "C" int heap_oob_read() {
+                    int *array = new int[100];
+                    fprintf(stdout, "%d\n", array[100]);
+                    delete[] array;
+                    return 0;
+                }
+        
+                extern "C" int heap_oob_write() {
+                    int *array = new int[100];
+                    array[100] = 1;
+                    delete[] array;
+                     return 0;
+                }
+                extern "C" int malloc_heap_uaf_read() {
+                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                    free(array);
+                    fprintf(stdout, "%d\n", array[5]);
+                    return 0;
+                }
+        
+                extern "C" int malloc_heap_uaf_write() {
+                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                    free(array);
+                    array[5] = 1;
+                    return 0;
+                }
+        
+                extern "C" int malloc_heap_oob_read() {
+                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                    fprintf(stdout, "%d\n", array[100]);
+                    free(array);
+                    return 0;
+                }
+        
+                extern "C" int malloc_heap_oob_write() {
+                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                    array[100] = 1;
+                    free(array);
+                    return 0;
+                }
+        
+                extern "C" int LLVMFuzzerTestOneInput() {
+                    // abort();
+                    return 0;
+                }
+            }; frida_helper; state; observers; feedback; objective; function_name; assert_eq!(state.solutions().count(), err_cnt), assert_eq!(1, 1)); 
             
             //assert_eq!(state.solutions().count(), err_cnt);
         }
