@@ -47,6 +47,8 @@ macro_rules! extern_c_checked {
 
     ($visibility:vis static $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
         paste! {
+            #[allow(non_camel_case_types)]
+            #[allow(unused)]
             struct [<__ $c_var:upper _STRUCT__>] { member: &'static $c_var_ty }
 
             unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
@@ -64,6 +66,8 @@ macro_rules! extern_c_checked {
 
     ($visibility:vis static mut $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
         paste! {
+            #[allow(non_camel_case_types)]
+            #[allow(unused)]
             struct [<__ $c_var:upper _STRUCT__>] { member: &'static $c_var_ty }
 
             unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
