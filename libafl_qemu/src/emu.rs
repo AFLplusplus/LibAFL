@@ -32,14 +32,14 @@ use crate::{GuestReg, Regs};
 macro_rules! extern_c_checked {
     () => {};
 
-    (fn $c_fn:ident($($param_ident:ident : $param_ty:ty),*) $( -> $ret_ty:ty )?; $($tail:tt)*) =>  {
+    ($visibility:vis fn $c_fn:ident($($param_ident:ident : $param_ty:ty),*) $( -> $ret_ty:ty )?; $($tail:tt)*) =>  {
         paste! {
             #[rustversion::attr(nightly, used(linker))]
             static [<__ $c_fn:upper __>]: unsafe extern "C" fn($($param_ty),*) $( -> $ret_ty )? = $c_fn;
         }
 
         extern "C" {
-            fn $c_fn($($param_ident : $param_ty),*) $( -> $ret_ty )?;
+            $visibility fn $c_fn($($param_ident : $param_ty),*) $( -> $ret_ty )?;
         }
 
         extern_c_checked!($($tail)*);
