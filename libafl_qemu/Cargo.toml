@@ -87,11 +87,13 @@ enum-map = "2.7"
 serde_yaml = { version = "0.8", optional = true } # For parsing the injections yaml file
 toml = { version = "0.4.2", optional = true } # For parsing the injections toml file
 pyo3 = { version = "0.18", optional = true }
+rustversion = "1.0"
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
 
 [build-dependencies]
 pyo3-build-config = { version = "0.18", optional = true }
+rustversion = "1.0"
 
 [lib]
 name = "libafl_qemu"
