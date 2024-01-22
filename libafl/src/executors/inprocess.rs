@@ -490,6 +490,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::let_unit_value)]
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
         let rand = libafl_bolts::rands::XkcdRand::new();
