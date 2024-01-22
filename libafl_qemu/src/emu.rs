@@ -46,10 +46,17 @@ macro_rules! extern_c_checked {
         extern_c_checked!($($tail)*);
     };
 
-    (static $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
+    ($visibility:vis static $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
         extern "C" {
-            #[rustversion::attr(nightly, used(linker))]
-            static $c_var: $c_var_ty;
+            $visibility static $c_var: $c_var_ty;
+        }
+
+        extern_c_checked!($($tail)*);
+    };
+
+    ($visibility:vis static mut $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
+        extern "C" {
+            $visibility static mut $c_var: $c_var_ty;
         }
 
         extern_c_checked!($($tail)*);
