@@ -145,7 +145,6 @@ impl<'a> Instance<'a> {
             // Create a QEMU in-process executor
             let executor = QemuExecutor::new(
                 &mut hooks,
-                tuple_list!(),
                 &mut harness,
                 observers,
                 &mut fuzzer,
@@ -184,7 +183,6 @@ impl<'a> Instance<'a> {
             // Create a QEMU in-process executor
             let mut executor = QemuExecutor::new(
                 &mut hooks,
-                tuple_list!(),
                 &mut harness,
                 observers,
                 &mut fuzzer,
