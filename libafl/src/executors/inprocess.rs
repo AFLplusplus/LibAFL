@@ -242,7 +242,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn with_batch_mode<EM, OF, Z>(
+    pub fn batched_timeouts<EM, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -365,7 +365,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn with_batch_mode_generic<EM, OF, Z>(
+    pub fn batched_timeout_generic<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
         observers: OT,
