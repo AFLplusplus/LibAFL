@@ -214,7 +214,6 @@ pub extern "C" fn libafl_main() {
 
         #[cfg(not(target_os = "linux"))]
         let mut executor = InProcessExecutor::with_timeout(
-            tuple_list!(),
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

@@ -134,13 +134,7 @@ pub fn main() -> Result<(), Error> {
     let mut fuzzer = StdFuzzer::new(scheduler, (), ());
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        (),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )?;
+    let mut executor = InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut mgr)?;
 
     state.load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &[solution_dir])?;
 
