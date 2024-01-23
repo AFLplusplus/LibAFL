@@ -1170,13 +1170,12 @@ where
     }
 
     pub fn entry_break(&self, addr: GuestAddr) {
-        let mut bp = Breakpoint::without_command(addr, false);
-        self.add_breakpoint(bp.clone(), true);
+        self.set_breakpoint_addr(addr);
         unsafe {
             // TODO: decide what to do with sync exit here: ignore or check for bp exit?
-            self.run().unwrap();
+            let _ = self.run();
         }
-        self.remove_breakpoint(&mut bp);
+        self.unset_breakpoint_addr(addr);
     }
 
     /// This function will run the emulator until the exit handler decides to stop the execution for
