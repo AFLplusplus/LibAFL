@@ -8,6 +8,10 @@
 use std::collections::HashMap;
 
 use dynasmrt::dynasm;
+
+#[cfg(target_arch = "aarch64")]
+use dynasmrt::{DynasmLabelApi, DynasmApi};
+
 use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
@@ -31,6 +35,10 @@ use frida_gum::{
     instruction_writer::{Aarch64Register, IndexMode, InstructionWriter},
     stalker::StalkerOutput,
 };
+
+#[cfg(target_arch = "aarch64")]
+use core::ffi::c_void;
+
 use frida_gum_sys::Insn;
 #[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
 use iced_x86::{
@@ -105,9 +113,9 @@ pub enum CmplogOperandType {
 #[derive(Debug)]
 #[cfg(target_arch = "aarch64")]
 pub struct CmpLogRuntime {
-    save_register_and_blr_to_populate: Option<Box<[u8]>>,
-    handle_tbz_masking: Option<Box<[u8]>>,
-    handle_tbnz_masking: Option<Box<[u8]>>,
+    ops_save_register_and_blr_to_populate: Option<Box<[u8]>>,
+    ops_handle_tbz_masking: Option<Box<[u8]>>,
+    ops_handle_tbnz_masking: Option<Box<[u8]>>,
 }
 
 /// `Frida`-based binary-only innstrumentation that logs compares to the fuzzer
@@ -384,7 +392,7 @@ impl CmpLogRuntime {
     /// Get the blob which saves the context, jumps to the populate function and restores the context
     #[inline]
     #[must_use]
-    #[cfg(target_arch = "aaarch64")]
+    #[cfg(target_arch = "aarch64")]
     pub fn ops_save_register_and_blr_to_populate(&self) -> &[u8] {
         self.ops_save_register_and_blr_to_populate.as_ref().unwrap()
     }
@@ -392,7 +400,7 @@ impl CmpLogRuntime {
     /// Get the blob which handles the tbz opcode masking
     #[inline]
     #[must_use]
-    #[cfg(target_arch = "aaarch64")]
+    #[cfg(target_arch = "aarch64")]
     pub fn ops_handle_tbz_masking(&self) -> &[u8] {
         self.ops_handle_tbz_masking.as_ref().unwrap()
     }
@@ -400,7 +408,7 @@ impl CmpLogRuntime {
     /// Get the blob which handles the tbnz opcode masking
     #[inline]
     #[must_use]
-    #[cfg(target_arch = "aaarch64")]
+    #[cfg(target_arch = "aarch64")]
     pub fn ops_handle_tbnz_masking(&self) -> &[u8] {
         self.ops_handle_tbnz_masking.as_ref().unwrap()
     }
@@ -557,6 +565,8 @@ impl CmpLogRuntime {
         writer.put_bytes(&self.restore_registers.clone().unwrap());
     }
 
+
+    /// Emit the instrumentation code which is responsible for operands value extraction and cmplog map population
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
     #[allow(clippy::too_many_lines)]
     #[inline]
