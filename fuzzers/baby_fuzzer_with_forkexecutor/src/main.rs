@@ -1,6 +1,6 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{path::PathBuf, ptr::write};
+use std::{path::PathBuf, ptr::write, time::Duration};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -110,6 +110,7 @@ pub fn main() {
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        core::time::Duration::from_millis(5000),
         shmem_provider,
     )
     .expect("Failed to create the Executor");

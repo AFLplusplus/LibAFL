@@ -6,7 +6,7 @@ use std::{env, path::PathBuf, process};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
-    executors::{ExitKind, TimeoutExecutor},
+    executors::ExitKind,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -202,14 +202,12 @@ pub fn fuzz() {
             &mut fuzzer,
             &mut state,
             &mut mgr,
+            timeout,
         )
         .expect("Failed to create QemuExecutor");
 
         // Instead of calling the timeout handler and restart the process, trigger a breakpoint ASAP
         executor.break_on_timeout();
-
-        // Wrap the executor to keep track of the timeout
-        let mut executor = TimeoutExecutor::new(executor, timeout);
 
         if state.must_load_initial_inputs() {
             state

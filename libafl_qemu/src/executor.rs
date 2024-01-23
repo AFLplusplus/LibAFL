@@ -2,6 +2,7 @@
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
+    time::Duration,
 };
 
 #[cfg(feature = "fork")]
@@ -13,7 +14,8 @@ use libafl::{
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
-        inprocess::{InProcessExecutor, InProcessExecutorHandlerData},
+        hooks::{inprocess::InProcessExecutorHandlerData, ExecutorHooksTuple},
+        inprocess::{HasInProcessHooks, InProcessExecutor},
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
@@ -97,7 +99,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     context: Option<&mut ucontext_t>,
     data: &mut InProcessExecutorHandlerData,
 ) where
-    E: Executor<EM, Z> + HasObservers,
+    E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasSolutions + HasCorpus + HasExecutions,
@@ -106,7 +108,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     if BREAK_ON_TMOUT {
         qemu_system_debug_request();
     } else {
-        libafl::executors::inprocess::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
+        libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
             signal, info, context, data,
         );
     }
@@ -126,6 +128,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         event_mgr: &mut EM,
+        timeout: Duration,
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
@@ -133,10 +136,12 @@ where
         S: State + HasExecutions + HasCorpus + HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let mut inner = InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?;
+        let mut inner = InProcessExecutor::with_timeout(
+            harness_fn, observers, fuzzer, state, event_mgr, timeout,
+        )?;
         #[cfg(emulation_mode = "usermode")]
         {
-            inner.handlers_mut().crash_handler =
+            inner.inprocess_hooks_mut().crash_handler =
                 inproc_qemu_crash_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
                     as *const c_void;
 
@@ -157,7 +162,7 @@ where
         }
         #[cfg(emulation_mode = "systemmode")]
         {
-            inner.handlers_mut().timeout_handler =
+            inner.inprocess_hooks_mut().timeout_handler =
                 inproc_qemu_timeout_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
                     as *const c_void;
         }
@@ -315,6 +320,7 @@ where
         state: &mut S,
         event_mgr: &mut EM,
         shmem_provider: SP,
+        timeout: core::time::Duration,
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
@@ -333,6 +339,7 @@ where
                 fuzzer,
                 state,
                 event_mgr,
+                timeout,
                 shmem_provider,
             )?,
         })
