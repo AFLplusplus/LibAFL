@@ -42,7 +42,7 @@ use crate::{
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure
-pub type InProcessExecutor<'a, H, HT, OT, S> = GenericInProcessExecutor<H, &'a mut H, HT, OT, S>;
+pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, (), OT, S>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
@@ -208,6 +208,126 @@ where
     }
 }
 
+impl<'a, H, OT, S> InProcessExecutor<'a, H, OT, S>
+where
+    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
+    OT: ObserversTuple<S>,
+    S: HasExecutions + HasSolutions + HasCorpus + State,
+{
+    /// Create a new in mem executor with the default timeout (5 sec)
+    pub fn new<EM, OF, Z>(
+        harness_fn: &'a mut H,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+    ) -> Result<Self, Error>
+    where
+        Self: Executor<EM, Z, State = S>,
+        EM: EventFirer<State = S> + EventRestarter,
+        OF: Feedback<S>,
+        S: State,
+        Z: HasObjective<Objective = OF, State = S>,
+    {
+        Self::with_timeout_generic(
+            tuple_list!(),
+            harness_fn,
+            observers,
+            fuzzer,
+            state,
+            event_mgr,
+            Duration::from_millis(5000),
+        )
+    }
+
+    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
+    #[cfg(all(feature = "std", target_os = "linux"))]
+    pub fn with_batch_mode<EM, OF, Z>(
+        harness_fn: &'a mut H,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        exec_tmout: Duration,
+    ) -> Result<Self, Error>
+    where
+        Self: Executor<EM, Z, State = S>,
+        EM: EventFirer<State = S> + EventRestarter,
+        OF: Feedback<S>,
+        S: State,
+        Z: HasObjective<Objective = OF, State = S>,
+    {
+        let mut me = Self::with_timeout_generic(
+            tuple_list!(),
+            harness_fn,
+            observers,
+            fuzzer,
+            state,
+            event_mgr,
+            exec_tmout,
+        )?;
+        me.hooks_mut().0.timer_mut().batch_mode = true;
+        Ok(me)
+    }
+
+    /// Create a new in mem executor.
+    /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
+    /// depending on different corpus or state.
+    /// * `user_hooks` - the hooks run before and after the harness's execution
+    /// * `harness_fn` - the harness, executing the function
+    /// * `observers` - the observers observing the target during execution
+    /// This may return an error on unix, if signal handler setup fails
+    pub fn with_timeout<EM, OF, Z>(
+        harness_fn: &'a mut H,
+        observers: OT,
+        _fuzzer: &mut Z,
+        state: &mut S,
+        _event_mgr: &mut EM,
+        timeout: Duration,
+    ) -> Result<Self, Error>
+    where
+        Self: Executor<EM, Z, State = S>,
+        EM: EventFirer<State = S> + EventRestarter,
+        OF: Feedback<S>,
+        S: State,
+        Z: HasObjective<Objective = OF, State = S>,
+    {
+        let default = InProcessHooks::new::<Self, EM, OF, Z>(timeout)?;
+        let mut hooks = tuple_list!(default).merge(tuple_list!());
+        hooks.init_all::<Self, S>(state);
+
+        #[cfg(windows)]
+        // Some initialization necessary for windows.
+        unsafe {
+            /*
+                See https://github.com/AFLplusplus/LibAFL/pull/403
+                This one reserves certain amount of memory for the stack.
+                If stack overflow happens during fuzzing on windows, the program is transferred to our exception handler for windows.
+                However, if we run out of the stack memory again in this exception handler, we'll crash with STATUS_ACCESS_VIOLATION.
+                We need this API call because with the llmp_compression
+                feature enabled, the exception handler uses a lot of stack memory (in the compression lib code) on release build.
+                As far as I have observed, the compression uses around 0x10000 bytes, but for safety let's just reserve 0x20000 bytes for our exception handlers.
+                This number 0x20000 could vary depending on the compilers optimization for future compression library changes.
+            */
+            let mut stack_reserved = 0x20000;
+            SetThreadStackGuarantee(&mut stack_reserved)?;
+        }
+
+        #[cfg(all(feature = "std", windows))]
+        {
+            // set timeout for the handler
+            *hooks.0.millis_sec_mut() = timeout.as_millis() as i64;
+        }
+
+        Ok(Self {
+            harness_fn,
+            observers,
+            hooks,
+            phantom: PhantomData,
+        })
+    }
+}
+
 impl<H, HB, HT, OT, S> GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
@@ -217,7 +337,7 @@ where
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn new<EM, OF, Z>(
+    pub fn generic<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
         observers: OT,
@@ -232,7 +352,7 @@ where
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        Self::with_timeout(
+        Self::with_timeout_generic(
             user_hooks,
             harness_fn,
             observers,
@@ -245,7 +365,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batch_mode<EM, OF, Z>(
+    pub fn with_batch_mode_generic<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
         observers: OT,
@@ -261,7 +381,7 @@ where
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let mut me = Self::with_timeout(
+        let mut me = Self::with_timeout_generic(
             user_hooks, harness_fn, observers, fuzzer, state, event_mgr, exec_tmout,
         )?;
         me.hooks_mut().0.timer_mut().batch_mode = true;
@@ -275,7 +395,7 @@ where
     /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
-    pub fn with_timeout<EM, OF, Z>(
+    pub fn with_timeout_generic<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
         observers: OT,
@@ -506,7 +626,6 @@ mod tests {
         let mut fuzzer = StdFuzzer::<_, _, _, ()>::new(sche, feedback, objective);
 
         let mut in_process_executor = InProcessExecutor::new(
-            tuple_list!(),
             &mut harness,
             tuple_list!(),
             &mut fuzzer,
@@ -559,7 +678,7 @@ pub mod pybind {
             py_event_manager: &mut PythonEventManager,
         ) -> Self {
             Self {
-                inner: OwnedInProcessExecutor::new(
+                inner: OwnedInProcessExecutor::generic(
                     tuple_list!(),
                     Box::new(move |input: &BytesInput| {
                         Python::with_gil(|py| -> PyResult<()> {

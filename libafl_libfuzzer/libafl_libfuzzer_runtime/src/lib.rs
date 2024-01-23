@@ -435,7 +435,6 @@ macro_rules! fuzz_with {
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = InProcessExecutor::with_timeout(
-                    tuple_list!(),
                     &mut harness,
                     tuple_list!(edges_observer, size_edges_observer, time_observer, backtrace_observer, oom_observer),
                     &mut fuzzer,
@@ -479,7 +478,6 @@ macro_rules! fuzz_with {
 
             // Setup a tracing stage in which we log comparisons
             let tracing = IfStage::new(|_, _, _, _| Ok(!$options.skip_tracing()), (TracingStage::new(InProcessExecutor::new(
-                tuple_list!(),
                 &mut tracing_harness,
                 tuple_list!(cmplog_observer),
                 &mut fuzzer,

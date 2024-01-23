@@ -1805,7 +1805,6 @@ mod tests {
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
-            tuple_list!(),
             &mut harness,
             tuple_list!(),
             &mut fuzzer,

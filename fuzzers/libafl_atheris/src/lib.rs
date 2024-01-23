@@ -217,7 +217,6 @@ pub extern "C" fn LLVMFuzzerRunDriver(
 
         // Setup a tracing stage in which we log comparisons
         let tracing = TracingStage::new(InProcessExecutor::new(
-            tuple_list!(),
             &mut harness,
             tuple_list!(cmplog_observer),
             &mut fuzzer,

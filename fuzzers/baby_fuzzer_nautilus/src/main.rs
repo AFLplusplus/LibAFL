@@ -98,7 +98,6 @@ pub fn main() {
 
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
-        tuple_list!(),
         &mut harness,
         tuple_list!(observer),
         &mut fuzzer,

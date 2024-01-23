@@ -1,4 +1,4 @@
-//! The `InProcessForkExecutor` to do forking before executing the harness in-processly
+//! The `GenericInProcessForkExecutor` to do forking before executing the harness in-processly
 #[cfg(target_os = "linux")]
 use core::ptr::addr_of_mut;
 use core::{
@@ -48,8 +48,49 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
 #[cfg(all(unix, not(target_os = "linux")))]
 use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval, ITIMER_REAL};
 
-/// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
-pub struct InProcessForkExecutor<'a, H, HT, OT, S, SP>
+/// The `InProcessForkExecutor` with no user hooks
+pub type InProcessForkExecutor<'a, H, OT, S, SP> =
+    GenericInProcessForkExecutor<'a, H, (), OT, S, SP>;
+
+impl<'a, H, OT, S, SP> InProcessForkExecutor<'a, H, OT, S, SP>
+where
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    S: State,
+    OT: ObserversTuple<S>,
+    SP: ShMemProvider,
+{
+    #[allow(clippy::too_many_arguments)]
+    /// The constructor for `InProcessForkExecutor`
+    pub fn new<EM, OF, Z>(
+        harness_fn: &'a mut H,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        timeout: Duration,
+        shmem_provider: SP,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<S>,
+        S: HasSolutions,
+        Z: HasObjective<Objective = OF, State = S>,
+    {
+        Self::with_hooks(
+            tuple_list!(),
+            harness_fn,
+            observers,
+            fuzzer,
+            state,
+            event_mgr,
+            timeout,
+            shmem_provider,
+        )
+    }
+}
+
+/// [`GenericInProcessForkExecutor`] is an executor that forks the current process before each execution.
+pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
@@ -68,7 +109,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl<'a, H, HT, OT, S, SP> Debug for InProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, H, HT, OT, S, SP> Debug for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S> + Debug,
@@ -78,7 +119,7 @@ where
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("InProcessForkExecutor")
+        f.debug_struct("GenericInProcessForkExecutor")
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerspec", &self.itimerspec)
@@ -89,7 +130,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         #[cfg(not(target_os = "linux"))]
         return f
-            .debug_struct("InProcessForkExecutor")
+            .debug_struct("GenericInProcessForkExecutor")
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .field("itimerval", &self.itimerval)
@@ -97,7 +138,7 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP> UsesState for InProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, H, HT, OT, S, SP> UsesState for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
@@ -108,7 +149,8 @@ where
     type State = S;
 }
 
-impl<'a, EM, H, HT, OT, S, SP, Z> Executor<EM, Z> for InProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, EM, H, HT, OT, S, SP, Z> Executor<EM, Z>
+    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
 where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -217,7 +259,7 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP> InProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, H, HT, OT, S, SP> GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple,
@@ -258,10 +300,10 @@ where
         // do nothing
     }
 
-    /// Creates a new [`InProcessForkExecutor`] with custom hooks
+    /// Creates a new [`GenericInProcessForkExecutor`] with custom hooks
     #[cfg(target_os = "linux")]
     #[allow(clippy::too_many_arguments)]
-    pub fn new<EM, OF, Z>(
+    pub fn with_hooks<EM, OF, Z>(
         userhooks: HT,
         harness_fn: &'a mut H,
         observers: OT,
@@ -305,10 +347,10 @@ where
         })
     }
 
-    /// Creates a new [`InProcessForkExecutor`], non linux
+    /// Creates a new [`GenericInProcessForkExecutor`], non linux
     #[cfg(not(target_os = "linux"))]
     #[allow(clippy::too_many_arguments)]
-    pub fn new<EM, OF, Z>(
+    pub fn with_hooks<EM, OF, Z>(
         userhooks: HT,
         harness_fn: &'a mut H,
         observers: OT,
@@ -365,7 +407,7 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP> UsesObservers for InProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, H, HT, OT, S, SP> UsesObservers for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     HT: ExecutorHooksTuple,
@@ -376,7 +418,7 @@ where
     type Observers = OT;
 }
 
-impl<'a, H, HT, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, HT, OT, S, SP>
+impl<'a, H, HT, OT, S, SP> HasObservers for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple,
@@ -509,7 +551,8 @@ mod tests {
         use crate::{
             events::SimpleEventManager,
             executors::{
-                hooks::inprocess_fork::InChildProcessHooks, Executor, InProcessForkExecutor,
+                hooks::inprocess_fork::InChildProcessHooks,
+                inprocess_fork::GenericInProcessForkExecutor, Executor,
             },
             fuzzer::test::NopFuzzer,
             state::test::NopState,
@@ -542,7 +585,7 @@ mod tests {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
         let default = InChildProcessHooks::nop();
         #[cfg(target_os = "linux")]
-        let mut in_process_fork_executor = InProcessForkExecutor::<_, (), (), _, _> {
+        let mut in_process_fork_executor = GenericInProcessForkExecutor::<_, (), (), _, _> {
             hooks: tuple_list!(default),
             harness_fn: &mut harness,
             shmem_provider: provider,
@@ -551,7 +594,7 @@ mod tests {
             phantom: PhantomData,
         };
         #[cfg(not(target_os = "linux"))]
-        let mut in_process_fork_executor = InProcessForkExecutor::<_, (), (), _, _> {
+        let mut in_process_fork_executor = GenericInProcessForkExecutor::<_, (), (), _, _> {
             harness_fn: &mut harness,
             shmem_provider: provider,
             observers: tuple_list!(),

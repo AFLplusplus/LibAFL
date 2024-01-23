@@ -176,7 +176,14 @@ pub fn merge(
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::with_timeout(tuple_list!(), &mut harness, observers, &mut fuzzer, &mut state, &mut mgr, options.timeout())?;
+    let mut executor = InProcessExecutor::with_timeout(
+        &mut harness,
+        observers,
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+        options.timeout(),
+    )?;
 
     // In case the corpus is empty (on first run) or crashed while loading, reset
     if state.must_load_initial_inputs() && !options.dirs().is_empty() {

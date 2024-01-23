@@ -69,7 +69,6 @@ You can then link this observer to `FridaInProcessExecutor` as follows:
         let mut executor = FridaInProcessExecutor::new(
             &gum,
             InProcessExecutor::new(
-                tuple_list!(),
                 &mut frida_harness,
                 tuple_list!(
                     edges_observer,

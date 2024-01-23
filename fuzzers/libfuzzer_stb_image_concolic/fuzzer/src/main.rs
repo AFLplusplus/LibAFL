@@ -164,7 +164,6 @@ fn fuzz(
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = ShadowExecutor::new(
         InProcessExecutor::new(
-            tuple_list!(),
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

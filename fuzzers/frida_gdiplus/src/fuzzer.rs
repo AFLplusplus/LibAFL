@@ -189,7 +189,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
                     InProcessExecutor::new(
-                        tuple_list!(),
                         &mut frida_harness,
                         observers,
                         &mut fuzzer,
@@ -305,7 +304,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
                     InProcessExecutor::new(
-                        tuple_list!(),
                         &mut frida_harness,
                         observers,
                         &mut fuzzer,
@@ -437,7 +435,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
                     InProcessExecutor::new(
-                        tuple_list!(),
                         &mut frida_harness,
                         observers,
                         &mut fuzzer,
