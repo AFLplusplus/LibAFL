@@ -399,6 +399,7 @@ pub mod serdeany_registry {
         #[must_use]
         #[allow(unused_qualifications)]
         #[inline]
+        #[allow(clippy::type_complexity)]
         pub fn get_all<T>(
             &self,
         ) -> Option<
@@ -421,6 +422,7 @@ pub mod serdeany_registry {
         #[must_use]
         #[allow(unused_qualifications)]
         #[inline]
+        #[allow(clippy::type_complexity)]
         pub fn all_by_typeid(
             &self,
             typeid: &TypeId,
@@ -440,6 +442,7 @@ pub mod serdeany_registry {
         /// Get all elements contained in this map, as mut.
         #[inline]
         #[allow(unused_qualifications)]
+        #[allow(clippy::type_complexity)]
         pub fn get_all_mut<T>(
             &mut self,
         ) -> Option<
@@ -464,6 +467,7 @@ pub mod serdeany_registry {
         /// Get all [`TypeId`]`s` contained in this map, as mut.
         #[inline]
         #[allow(unused_qualifications)]
+        #[allow(clippy::type_complexity)]
         pub fn all_by_typeid_mut(
             &mut self,
             typeid: &TypeId,
@@ -483,6 +487,7 @@ pub mod serdeany_registry {
         /// Get all [`TypeId`]`s` contained in this map.
         #[inline]
         #[allow(unused_qualifications)]
+        #[allow(clippy::type_complexity)]
         pub fn all_typeids(
             &self,
         ) -> core::iter::Map<
@@ -501,7 +506,7 @@ pub mod serdeany_registry {
             &self,
             func: &mut F,
         ) -> Result<(), Error> {
-            for (id, h) in self.map.iter() {
+            for (id, h) in &self.map {
                 for x in h.values() {
                     func(&pack_type_id(*id), x)?;
                 }
@@ -517,7 +522,7 @@ pub mod serdeany_registry {
             &mut self,
             func: &mut F,
         ) -> Result<(), Error> {
-            for (id, h) in self.map.iter_mut() {
+            for (id, h) in &mut self.map {
                 for x in h.values_mut() {
                     func(&pack_type_id(*id), x)?;
                 }
