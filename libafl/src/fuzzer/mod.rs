@@ -636,6 +636,8 @@ where
                 let scheduled_count = testcase.scheduled_count();
                 // increase scheduled count, this was fuzz_level in afl
                 testcase.set_scheduled_count(scheduled_count + 1);
+            } else {
+                log::warn!("Tetcase for idx {idx} no longer in corpus. Removed?");
             }
         }
 
