@@ -12,7 +12,7 @@ use core::{
 };
 
 #[cfg(all(unix, not(target_os = "linux")))]
-pub const ITIMER_REAL: core::ffi::c_int = 0;
+pub(crate) const ITIMER_REAL: core::ffi::c_int = 0;
 
 #[cfg(windows)]
 use core::sync::atomic::{compiler_fence, Ordering};
@@ -64,7 +64,7 @@ pub(crate) struct Itimerval {
 
 #[cfg(all(feature = "std", unix, not(target_os = "linux")))]
 extern "C" {
-    pub fn setitimer(
+    pub(crate) fn setitimer(
         which: libc::c_int,
         new_value: *mut Itimerval,
         old_value: *mut Itimerval,
