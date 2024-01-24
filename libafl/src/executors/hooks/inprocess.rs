@@ -209,7 +209,6 @@ impl ExecutorHook for InProcessHooks {
         _mgr: &mut EM,
         _input: &I,
     ) {
-        // let _data = unsafe { &mut GLOBAL_STATE };
         // timeout stuff
         #[cfg(feature = "std")]
         self.timer_mut().unset_timer();
