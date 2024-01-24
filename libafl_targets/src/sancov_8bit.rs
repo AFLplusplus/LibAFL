@@ -1,5 +1,6 @@
 //! [`LLVM` `8-bit-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
+use core::ptr::addr_of_mut;
 
 use libafl_bolts::{ownedref::OwnedMutSlice, AsMutSlice, AsSlice};
 
@@ -66,7 +67,7 @@ mod observers {
         fmt::Debug,
         hash::{BuildHasher, Hasher},
         iter::Flatten,
-        ptr::addr_of,
+        ptr::addr_of_mut,
         slice::{from_raw_parts, Iter, IterMut},
     };
 
@@ -174,7 +175,7 @@ mod observers {
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { (&mut *addr_of_mut!(COUNTERS_MAPS[*i])).as_mut_slice()[j] }
+            unsafe { &mut (*addr_of_mut!(COUNTERS_MAPS[*i])).as_mut_slice()[j] }
         }
 
         #[inline]
@@ -210,7 +211,7 @@ mod observers {
 
         fn reset_map(&mut self) -> Result<(), Error> {
             let initial = self.initial();
-            for map in unsafe { &mut *addr_of_mut(COUNTERS_MAPS) } {
+            for map in unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) } {
                 for x in map.as_mut_slice() {
                     *x = initial;
                 }

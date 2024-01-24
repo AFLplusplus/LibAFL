@@ -5,6 +5,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, feature = "std", not(miri)))]
+use core::ptr::addr_of_mut;
 use core::{
     marker::PhantomData,
     num::NonZeroUsize,

@@ -6,7 +6,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     mem::transmute,
-    ptr::{self, addr_of},
+    ptr::{self, addr_of, addr_of_mut},
 };
 
 use libafl::{executors::hooks::inprocess::inprocess_get_state, inputs::UsesInput};
@@ -315,8 +315,6 @@ where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    use std::ptr::addr_of_mut;
-
     unsafe {
         let hooks: &mut QemuHooks<QT, S> = get_qemu_hooks::<QT, S>();
         for hook in &mut *addr_of_mut!(CRASH_HOOKS) {
@@ -1105,6 +1103,8 @@ where
             ) -> GuestAddr,
         >,
     ) -> HookId {
+        use std::ptr::addr_of_mut;
+
         unsafe {
             let fat: FatPtr = transmute(hook);
             POST_SYSCALL_HOOKS.push((HookId(0), fat));
