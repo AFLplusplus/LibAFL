@@ -1401,7 +1401,7 @@ mod tests {
         let obv = tuple_list!(TimeObserver::new("time"), unsafe {
             StdMapObserver::from_ownedref(
                 "map",
-                OwnedMutSlice::from_raw_parts_mut(addr_of_mut!(MAP), MAP.len()),
+                OwnedMutSlice::from_raw_parts_mut(addr_of_mut!(MAP) as *mut u32, MAP.len()),
             )
         });
         let vec = postcard::to_allocvec(&obv).unwrap();
