@@ -1387,8 +1387,9 @@ mod tests {
     use core::ptr::addr_of_mut;
 
     use libafl_bolts::{
+        ownedref::OwnedMutSlice,
         tuples::{tuple_list, tuple_list_type},
-        Named, ownedref::OwnedMutSlice,
+        Named,
     };
 
     use crate::observers::{StdMapObserver, TimeObserver};
@@ -1398,7 +1399,10 @@ mod tests {
     #[test]
     fn test_observer_serde() {
         let obv = tuple_list!(TimeObserver::new("time"), unsafe {
-            StdMapObserver::from_ownedref("map", OwnedMutSlice::from_raw_parts_mut(addr_of_mut!(MAP), MAP.len()))
+            StdMapObserver::from_ownedref(
+                "map",
+                OwnedMutSlice::from_raw_parts_mut(addr_of_mut!(MAP), MAP.len()),
+            )
         });
         let vec = postcard::to_allocvec(&obv).unwrap();
         log::info!("{vec:?}");
