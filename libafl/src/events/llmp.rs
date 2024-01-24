@@ -5,9 +5,12 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 #[cfg(feature = "std")]
-use core::sync::atomic::{compiler_fence, Ordering};
-use core::{marker::PhantomData, num::NonZeroUsize, ptr::addr_of_mut, time::Duration};
+use core::{
+    ptr::addr_of_mut,
+    sync::atomic::{compiler_fence, Ordering},
+};
 #[cfg(feature = "std")]
 use std::net::{SocketAddr, ToSocketAddrs};
 
