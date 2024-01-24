@@ -6,6 +6,8 @@ use core::{
 };
 
 #[cfg(feature = "fork")]
+use libafl::inputs::UsesInput;
+#[cfg(feature = "fork")]
 use libafl::{
     events::EventManager,
     executors::InProcessForkExecutor,
@@ -14,13 +16,12 @@ use libafl::{
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
-        hooks::{inprocess::InProcessExecutorHandlerData, ExecutorHooksTuple},
+        hooks::inprocess::InProcessExecutorHandlerData,
         inprocess::{HasInProcessHooks, InProcessExecutor},
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
@@ -147,12 +148,14 @@ where
 
             let handler = |hooks: &mut QemuHooks<QT, S>, host_sig| {
                 eprintln!("Crashed with signal {host_sig}");
-                libafl::executors::inprocess::generic_inproc_crash_handler::<
-                    InProcessExecutor<'a, H, OT, S>,
-                    EM,
-                    OF,
-                    Z,
-                >();
+                unsafe {
+                    libafl::executors::inprocess::generic_inproc_crash_handler::<
+                        InProcessExecutor<'a, H, OT, S>,
+                        EM,
+                        OF,
+                        Z,
+                    >();
+                }
                 if let Some(cpu) = hooks.emulator().current_cpu() {
                     eprint!("Context:\n{}", cpu.display_context());
                 }

@@ -5,7 +5,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
