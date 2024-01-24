@@ -120,7 +120,7 @@ where
     F: FnMut(&O1, &O2) -> DiffResult,
     I: Input,
     S: HasMetadata + State<Input = I>,
-    O1: Observer<S> + PartialEq<O2>,
+    O1: Observer<S>,
     O2: Observer<S>,
 {
     #[allow(clippy::wrong_self_convention)]

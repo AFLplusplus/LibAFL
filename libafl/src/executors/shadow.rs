@@ -70,9 +70,7 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        let ret = self.executor.run_target(fuzzer, state, mgr, input);
-        self.executor.post_run_reset();
-        ret
+        self.executor.run_target(fuzzer, state, mgr, input)
     }
 }
 

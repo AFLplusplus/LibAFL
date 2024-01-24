@@ -18,7 +18,6 @@ int LLVMFuzzerTestOneInput(char *data, size_t len) {
   char    *err_msg = 0, query[1024];
 
   if (data[0] % 2) {
-
     int rc = sqlite3_open_v2("example.db", &db, SQLITE_OPEN_READONLY, 0);
     if (rc != SQLITE_OK) {
       fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
@@ -33,9 +32,7 @@ int LLVMFuzzerTestOneInput(char *data, size_t len) {
 
     rc = sqlite3_exec(db, query, callback, 0, &err_msg);
 
-    if (rc != SQLITE_OK) {
-      sqlite3_free(err_msg);
-    }
+    if (rc != SQLITE_OK) { sqlite3_free(err_msg); }
 
     sqlite3_close(db);
 

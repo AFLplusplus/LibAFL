@@ -13,8 +13,6 @@ In Rust, we bind this concept to the [`Executor`](https://docs.rs/libafl/latest/
 
 By default, we implement some commonly used Executors such as [`InProcessExecutor`](https://docs.rs/libafl/latest/libafl/executors/inprocess/type.InProcessExecutor.html) in which the target is a harness function providing in-process crash detection. Another Executor is the [`ForkserverExecutor`](https://docs.rs/libafl/latest/libafl/executors/forkserver/struct.ForkserverExecutor.html) that implements an AFL-like mechanism to spawn child processes to fuzz.
 
-A common pattern when creating an Executor is wrapping an existing one, for instance [`TimeoutExecutor`](https://docs.rs/libafl/latest/libafl/executors/timeout/struct.TimeoutExecutor.html) wraps an executor and installs a timeout callback before calling the original `run` function of the wrapped executor.
-
 ## InProcessExecutor
 Let's begin with the base case; `InProcessExecutor`.
 This executor executes the harness program (function) inside the fuzzer process.

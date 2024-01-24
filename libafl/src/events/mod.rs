@@ -694,8 +694,8 @@ impl<S> HasEventManagerId for NopEventManager<S> {
     }
 }
 
-/// An [`EventManager`] type that wraps another manager, but captures a [`Monitor`] type as well.
-/// This is useful to keep the same API between managers with and without an internal [`Monitor`].
+/// An [`EventManager`] type that wraps another manager, but captures a `monitor` type as well.
+/// This is useful to keep the same API between managers with and without an internal `monitor`.
 #[derive(Copy, Clone, Debug)]
 pub struct MonitorTypedEventManager<EM, M> {
     inner: EM,
@@ -703,7 +703,7 @@ pub struct MonitorTypedEventManager<EM, M> {
 }
 
 impl<EM, M> MonitorTypedEventManager<EM, M> {
-    /// Creates a new [`EventManager`] that wraps another manager, but captures a [`Monitor`] type as well.
+    /// Creates a new [`EventManager`] that wraps another manager, but captures a `monitor` type as well.
     #[must_use]
     pub fn new(inner: EM) -> Self {
         MonitorTypedEventManager {
@@ -773,7 +773,7 @@ where
 
     #[inline]
     fn await_restart_safe(&mut self) {
-        self.inner.await_restart_safe()
+        self.inner.await_restart_safe();
     }
 }
 
@@ -811,7 +811,7 @@ where
             dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
         >,
     ) {
-        self.inner.add_custom_buf_handler(handler)
+        self.inner.add_custom_buf_handler(handler);
     }
 }
 

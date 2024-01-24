@@ -22,7 +22,7 @@ all-features = true
 
 [features]
 default = ["serdeany_autoreg"]
-cmplog = []
+cmplog = ["iced-x86"]
 serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 
 [build-dependencies]
@@ -33,6 +33,7 @@ yaxpeax-arm = "0.2.4"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 yaxpeax-x86 = "1.2.2"
+iced-x86 = { version = "1.20.0", features = ["code_asm"], optional = true }
 
 [dependencies]
 libafl = { path = "../libafl", default-features = false, version = "0.11.2", features = [
@@ -84,3 +85,5 @@ yaxpeax-arch = "0.2.7"
 
 [dev-dependencies]
 serial_test = { version = "2", default-features = false, features = ["logging"] }
+clap = {version = "4.0", features = ["derive"]}
+libloading = "0.7"

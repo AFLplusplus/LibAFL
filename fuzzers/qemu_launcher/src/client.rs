@@ -8,6 +8,8 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
+#[cfg(feature = "injections")]
+use libafl_qemu::injections::QemuInjectionHelper;
 use libafl_qemu::{
     asan::{init_with_asan, QemuAsanHelper},
     cmplog::QemuCmpLogHelper,
@@ -15,9 +17,6 @@ use libafl_qemu::{
     elf::EasyElf,
     ArchExtras, Emulator, GuestAddr, QemuInstrumentationAddressRangeFilter,
 };
-
-#[cfg(feature = "injections")]
-use libafl_qemu::injections::QemuInjectionHelper;
 
 use crate::{
     instance::{ClientMgr, Instance},
@@ -127,27 +126,25 @@ impl<'a> Client<'a> {
         log::debug!("start_pc @ {start_pc:#x}");
 
         #[cfg(not(feature = "injections"))]
-        let extra_tokens = None;
+        let injection_helper = None;
 
         #[cfg(feature = "injections")]
         let injection_helper = self
             .options
             .injections
             .as_ref()
-            .map(|injections_file| {
+            .and_then(|injections_file| {
                 let lower = injections_file.to_lowercase();
                 if lower.ends_with("yaml") || lower.ends_with("yml") {
-                    QemuInjectionHelper::from_yaml(injections_file)
+                    Some(QemuInjectionHelper::from_yaml(injections_file).unwrap())
                 } else if lower.ends_with("toml") {
-                    QemuInjectionHelper::from_toml(injections_file)
+                    Some(QemuInjectionHelper::from_toml(injections_file).unwrap())
                 } else {
-                    todo!("No injections given, what to do?");
+                    None
                 }
-            })
-            .unwrap()
-            .unwrap();
-        #[cfg(feature = "injections")]
-        let extra_tokens = Some(injection_helper.tokens.clone());
+            });
+
+        let extra_tokens = injection_helper.as_ref().map(|h| h.tokens.clone());
 
         emu.entry_break(start_pc);
 
@@ -168,50 +165,71 @@ impl<'a> Client<'a> {
             .mgr(mgr)
             .core_id(core_id)
             .extra_tokens(extra_tokens);
+
         if is_asan && is_cmplog {
-            #[cfg(not(feature = "injections"))]
-            let helpers = tuple_list!(
-                edge_coverage_helper,
-                QemuCmpLogHelper::default(),
-                QemuAsanHelper::default(asan.take().unwrap()),
-            );
-            #[cfg(feature = "injections")]
-            let helpers = tuple_list!(
-                edge_coverage_helper,
-                QemuCmpLogHelper::default(),
-                QemuAsanHelper::default(asan.take().unwrap()),
-                injection_helper,
-            );
-            instance.build().run(helpers, state)
+            if let Some(injection_helper) = injection_helper {
+                instance.build().run(
+                    tuple_list!(
+                        edge_coverage_helper,
+                        QemuCmpLogHelper::default(),
+                        QemuAsanHelper::default(asan.take().unwrap()),
+                        injection_helper,
+                    ),
+                    state,
+                )
+            } else {
+                instance.build().run(
+                    tuple_list!(
+                        edge_coverage_helper,
+                        QemuCmpLogHelper::default(),
+                        QemuAsanHelper::default(asan.take().unwrap()),
+                    ),
+                    state,
+                )
+            }
         } else if is_asan {
-            #[cfg(not(feature = "injections"))]
-            let helpers = tuple_list!(
-                edge_coverage_helper,
-                QemuAsanHelper::default(asan.take().unwrap()),
-            );
-            #[cfg(feature = "injections")]
-            let helpers = tuple_list!(
-                edge_coverage_helper,
-                QemuAsanHelper::default(asan.take().unwrap()),
-                injection_helper,
-            );
-            instance.build().run(helpers, state)
+            if let Some(injection_helper) = injection_helper {
+                instance.build().run(
+                    tuple_list!(
+                        edge_coverage_helper,
+                        QemuAsanHelper::default(asan.take().unwrap()),
+                        injection_helper
+                    ),
+                    state,
+                )
+            } else {
+                instance.build().run(
+                    tuple_list!(
+                        edge_coverage_helper,
+                        QemuAsanHelper::default(asan.take().unwrap()),
+                    ),
+                    state,
+                )
+            }
         } else if is_cmplog {
-            #[cfg(not(feature = "injections"))]
-            let helpers = tuple_list!(edge_coverage_helper, QemuCmpLogHelper::default(),);
-            #[cfg(feature = "injections")]
-            let helpers = tuple_list!(
-                edge_coverage_helper,
-                QemuCmpLogHelper::default(),
-                injection_helper,
-            );
-            instance.build().run(helpers, state)
+            if let Some(injection_helper) = injection_helper {
+                instance.build().run(
+                    tuple_list!(
+                        edge_coverage_helper,
+                        QemuCmpLogHelper::default(),
+                        injection_helper
+                    ),
+                    state,
+                )
+            } else {
+                instance.build().run(
+                    tuple_list!(edge_coverage_helper, QemuCmpLogHelper::default()),
+                    state,
+                )
+            }
+        } else if let Some(injection_helper) = injection_helper {
+            instance
+                .build()
+                .run(tuple_list!(edge_coverage_helper, injection_helper), state)
         } else {
-            #[cfg(not(feature = "injections"))]
-            let helpers = tuple_list!(edge_coverage_helper,);
-            #[cfg(feature = "injections")]
-            let helpers = tuple_list!(edge_coverage_helper, injection_helper,);
-            instance.build().run(helpers, state)
+            instance
+                .build()
+                .run(tuple_list!(edge_coverage_helper), state)
         }
     }
 }

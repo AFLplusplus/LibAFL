@@ -45,7 +45,7 @@ fn find_llvm_config_brew() -> Result<PathBuf, String> {
                 return Err("Empty return from brew --cellar".to_string());
             }
             let location_suffix = "*/bin/llvm-config";
-            let cellar_glob = vec![
+            let cellar_glob = [
                 // location for explicitly versioned brew formulae
                 format!("{brew_cellar_location}/llvm@*/{location_suffix}"),
                 // location for current release brew formulae
@@ -311,7 +311,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
     let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(2621440), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
     cxxflags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={edges_map_size}"));
 

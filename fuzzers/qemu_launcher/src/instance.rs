@@ -8,7 +8,7 @@ use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::EventRestarter,
-    executors::{ShadowExecutor, TimeoutExecutor},
+    executors::ShadowExecutor,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
@@ -162,10 +162,8 @@ impl<'a, M: Monitor> Instance<'a, M> {
                 &mut fuzzer,
                 &mut state,
                 &mut self.mgr,
+                self.options.timeout,
             )?;
-
-            // Wrap the executor to keep track of the timeout
-            let executor = TimeoutExecutor::new(executor, self.options.timeout);
 
             // Create an observation channel using cmplog map
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
@@ -195,17 +193,15 @@ impl<'a, M: Monitor> Instance<'a, M> {
             self.fuzz(&mut state, &mut fuzzer, &mut executor, &mut stages)
         } else {
             // Create a QEMU in-process executor
-            let executor = QemuExecutor::new(
+            let mut executor = QemuExecutor::new(
                 &mut hooks,
                 &mut harness,
                 observers,
                 &mut fuzzer,
                 &mut state,
                 &mut self.mgr,
+                self.options.timeout,
             )?;
-
-            // Wrap the executor to keep track of the timeout
-            let mut executor = TimeoutExecutor::new(executor, self.options.timeout);
 
             // Setup an havoc mutator with a mutational stage
             let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
