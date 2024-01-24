@@ -2,8 +2,6 @@
 use frida_gum::instruction_writer::Aarch64Register;
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
-#[cfg(target_arch = "x86_64")]
-use frida_gum_sys;
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 #[cfg(target_arch = "x86_64")]
@@ -122,7 +120,7 @@ pub fn writer_register(reg: u16, sizecode: SizeCode, zr: bool) -> Aarch64Registe
 }
 
 /// Translate from `RegSpec` to `X86Register`
-#[cfg(all(target_arch = "x86_64", unix))]
+#[cfg(target_arch = "x86_64")]
 const X86_64_REGS: [(RegSpec, X86Register); 34] = [
     (RegSpec::eax(), X86Register::Eax),
     (RegSpec::ecx(), X86Register::Ecx),
@@ -162,7 +160,8 @@ const X86_64_REGS: [(RegSpec, X86Register); 34] = [
 
 /// The writer registers
 /// frida registers: <https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html>
-#[cfg(all(target_arch = "x86_64", unix))]
+/// capstone registers: <https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html>
+#[cfg(target_arch = "x86_64")]
 #[must_use]
 #[inline]
 #[allow(clippy::unused_self)]
@@ -177,7 +176,7 @@ pub fn writer_register(reg: RegSpec) -> X86Register {
 }
 
 /// Translates a frida instruction to a disassembled instruction.
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", unix))]
 pub(crate) fn frida_to_cs(decoder: InstDecoder, frida_insn: &frida_gum_sys::Insn) -> Instruction {
     decoder.decode_slice(frida_insn.bytes()).unwrap()
 }

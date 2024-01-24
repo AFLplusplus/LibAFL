@@ -3,11 +3,13 @@
 //! This allows the fuzzer to potentially solve the compares, if a compare value is directly
 //! related to the input.
 //! Read the [`RedQueen`](https://www.ndss-symposium.org/ndss-paper/redqueen-fuzzing-with-input-to-state-correspondence/) paper for the general concepts.
-use std::ffi::c_void;
 
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+#[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
+use std::collections::HashMap;
+
+use dynasmrt::dynasm;
 #[cfg(target_arch = "aarch64")]
-use frida_gum_sys::Insn;
+use dynasmrt::{DynasmApi, DynasmLabelApi};
 use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
@@ -21,13 +23,23 @@ extern "C" {
     pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);
 }
 
+#[cfg(target_arch = "aarch64")]
+use core::ffi::c_void;
 use std::rc::Rc;
 
 use frida_gum::ModuleMap;
+#[cfg(target_arch = "x86_64")]
+use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::{
     instruction_writer::{Aarch64Register, IndexMode, InstructionWriter},
     stalker::StalkerOutput,
+};
+use frida_gum_sys::Insn;
+#[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
+use iced_x86::{
+    BlockEncoder, Code, DecoderOptions, Instruction, InstructionBlock, MemoryOperand, MemorySize,
+    OpKind, Register,
 };
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
@@ -43,8 +55,15 @@ pub enum SpecialCmpLogCase {
     Tbnz,
 }
 
+#[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
+/// Speciial `CmpLog` Cases for `aarch64`
+#[derive(Debug)]
+pub enum SpecialCmpLogCase {}
+
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{InstDecoder, Opcode, Operand, ShiftStyle};
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_x86::long_mode::InstDecoder;
 
 /// The [`frida_gum_sys::GUM_RED_ZONE_SIZE`] casted to [`i32`]
 ///
@@ -73,13 +92,35 @@ pub enum CmplogOperandType {
     // We don't need a memory type because you cannot directly compare with memory
 }
 
+/// The type of an operand loggged during `CmpLog`
+#[derive(Debug, Clone, Copy)]
+#[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
+pub enum CmplogOperandType {
+    /// A Register
+    Reg(Register),
+    /// An immediate value
+    Imm(u64),
+    /// A memory operand
+    Mem(Register, Register, i64, u32, MemorySize), // base, index, disp, scale, mem_size
+}
+
 /// `Frida`-based binary-only innstrumentation that logs compares to the fuzzer
 /// `LibAFL` can use this knowledge for powerful mutations.
 #[derive(Debug)]
+#[cfg(target_arch = "aarch64")]
 pub struct CmpLogRuntime {
     ops_save_register_and_blr_to_populate: Option<Box<[u8]>>,
     ops_handle_tbz_masking: Option<Box<[u8]>>,
     ops_handle_tbnz_masking: Option<Box<[u8]>>,
+}
+
+/// `Frida`-based binary-only innstrumentation that logs compares to the fuzzer
+/// `LibAFL` can use this knowledge for powerful mutations.
+#[derive(Debug)]
+#[cfg(target_arch = "x86_64")]
+pub struct CmpLogRuntime {
+    save_registers: Option<Box<[u8]>>,
+    restore_registers: Option<Box<[u8]>>,
 }
 
 impl FridaRuntime for CmpLogRuntime {
@@ -106,6 +147,7 @@ impl FridaRuntime for CmpLogRuntime {
 impl CmpLogRuntime {
     /// Create a new [`CmpLogRuntime`]
     #[must_use]
+    #[cfg(target_arch = "aarch64")]
     pub fn new() -> CmpLogRuntime {
         Self {
             ops_save_register_and_blr_to_populate: None,
@@ -114,8 +156,19 @@ impl CmpLogRuntime {
         }
     }
 
+    /// Create a new [`CmpLogRuntime`]
+    #[must_use]
+    #[cfg(target_arch = "x86_64")]
+    pub fn new() -> CmpLogRuntime {
+        Self {
+            save_registers: None,
+            restore_registers: None,
+        }
+    }
+
     /// Call the external function that populates the `cmplog_map` with the relevant values
     #[allow(clippy::unused_self)]
+    #[cfg(target_arch = "aarch64")]
     extern "C" fn populate_lists(&mut self, op1: u64, op2: u64, retaddr: u64) {
         // log::trace!(
         //     "entered populate_lists with: {:#02x}, {:#02x}, {:#02x}",
@@ -130,8 +183,25 @@ impl CmpLogRuntime {
         }
     }
 
+    #[allow(clippy::unused_self)]
+    #[cfg(target_arch = "x86_64")]
+    extern "C" fn populate_lists(size: u8, op1: u64, op2: u64, retaddr: u64) {
+        // log::trace!(
+        //     "entered populate_lists with: {:#02x}, {:#02x}, {:#02x}",
+        //     op1, op2, retaddr
+        // );
+        let mut k = (retaddr >> 4) ^ (retaddr << 8);
+
+        k &= (CMPLOG_MAP_W as u64) - 1;
+
+        unsafe {
+            __libafl_targets_cmplog_instructions(k, size, op1, op2);
+        }
+    }
+
     /// Generate the instrumentation blobs for the current arch.
     #[allow(clippy::similar_names)]
+    #[cfg(target_arch = "aarch64")]
     fn generate_instrumentation_blobs(&mut self) {
         macro_rules! blr_to_populate {
             ($ops:ident) => {dynasm!($ops
@@ -243,9 +313,82 @@ impl CmpLogRuntime {
         );
     }
 
+    #[allow(clippy::similar_names)]
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    fn generate_instrumentation_blobs(&mut self) {
+        macro_rules! save_registers {
+            ($ops:ident) => {dynasm!($ops
+                ; .arch x64
+                ; push rcx
+                ; push rdx
+                ; push r8
+                ; push r9
+                ; push r10
+                ; push r11
+                ; push rax
+            );};
+        }
+        let mut save_registers = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        save_registers!(save_registers);
+        self.save_registers = Some(save_registers.finalize().unwrap().into_boxed_slice());
+
+        macro_rules! restore_registers {
+            ($ops:ident) => {dynasm!($ops
+                ; .arch x64
+                ; pop rax
+                ; pop r11
+                ; pop r10
+                ; pop r9
+                ; pop r8
+                ; pop rdx
+                ; pop rcx
+            );};
+        }
+        let mut restore_registers = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        restore_registers!(restore_registers);
+        self.restore_registers = Some(restore_registers.finalize().unwrap().into_boxed_slice());
+    }
+
+    #[allow(clippy::similar_names)]
+    #[cfg(all(unix, target_arch = "x86_64"))]
+    fn generate_instrumentation_blobs(&mut self) {
+        macro_rules! save_registers {
+            ($ops:ident) => {dynasm!($ops
+                ; .arch x64
+                ; push rax
+                ; push rdi
+                ; push rsi
+                ; push rdx
+                ; push rcx
+                ; push r8
+                ; push r9
+            );};
+        }
+        let mut save_registers = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        save_registers!(save_registers);
+        self.save_registers = Some(save_registers.finalize().unwrap().into_boxed_slice());
+
+        macro_rules! restore_registers {
+            ($ops:ident) => {dynasm!($ops
+                ; .arch x64
+                ; pop r9
+                ; pop r8
+                ; pop rcx
+                ; pop rdx
+                ; pop rsi
+                ; pop rdi
+                ; pop rax
+            );};
+        }
+        let mut restore_registers = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        restore_registers!(restore_registers);
+        self.restore_registers = Some(restore_registers.finalize().unwrap().into_boxed_slice());
+    }
+
     /// Get the blob which saves the context, jumps to the populate function and restores the context
     #[inline]
     #[must_use]
+    #[cfg(target_arch = "aarch64")]
     pub fn ops_save_register_and_blr_to_populate(&self) -> &[u8] {
         self.ops_save_register_and_blr_to_populate.as_ref().unwrap()
     }
@@ -253,6 +396,7 @@ impl CmpLogRuntime {
     /// Get the blob which handles the tbz opcode masking
     #[inline]
     #[must_use]
+    #[cfg(target_arch = "aarch64")]
     pub fn ops_handle_tbz_masking(&self) -> &[u8] {
         self.ops_handle_tbz_masking.as_ref().unwrap()
     }
@@ -260,8 +404,161 @@ impl CmpLogRuntime {
     /// Get the blob which handles the tbnz opcode masking
     #[inline]
     #[must_use]
+    #[cfg(target_arch = "aarch64")]
     pub fn ops_handle_tbnz_masking(&self) -> &[u8] {
         self.ops_handle_tbnz_masking.as_ref().unwrap()
+    }
+
+    /// Emit the instrumentation code which is responsible for operands value extraction and cmplog map population
+    #[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
+    #[allow(clippy::too_many_lines)]
+    #[inline]
+    pub fn emit_comparison_handling(
+        &self,
+        address: u64,
+        output: &StalkerOutput,
+        op1: &CmplogOperandType, //first operand of the comparsion
+        op2: &CmplogOperandType, //second operand of the comparsion
+        _shift: &Option<SpecialCmpLogCase>,
+        _special_case: &Option<SpecialCmpLogCase>,
+    ) {
+        let writer = output.writer();
+
+        writer.put_bytes(&self.save_registers.clone().unwrap());
+
+        // let int3 = [0xcc];
+        // writer.put_bytes(&int3);
+
+        let mut insts = vec![];
+        // self ptr is not used so far
+        let mut size_op = 0;
+
+        let arg_reg_1;
+        let arg_reg_2;
+        let arg_reg_3;
+        let arg_reg_4;
+        let mut tmp_reg = HashMap::new();
+        tmp_reg.insert(8, Register::RAX);
+        tmp_reg.insert(4, Register::EAX);
+        tmp_reg.insert(2, Register::AX);
+
+        #[cfg(windows)]
+        {
+            arg_reg_1 = Register::CL;
+            arg_reg_2 = Register::RDX;
+            arg_reg_3 = Register::R8;
+            arg_reg_4 = Register::R9;
+        }
+        #[cfg(unix)]
+        {
+            arg_reg_1 = Register::DL;
+            arg_reg_2 = Register::RSI;
+            arg_reg_3 = Register::RDX;
+            arg_reg_4 = Register::RCX;
+        }
+        let mut set_size = |s: usize| {
+            if size_op == 0 {
+                size_op = s;
+            } else {
+                assert_eq!(size_op, s);
+            }
+        };
+        // we put the operand value into rax and than push it on stack, so the
+        // only clobbered register is rax, and if actual operand value uses it,
+        // we simply restore it from stack
+        for (op_num, op) in [op1, op2].iter().enumerate() {
+            let op_num: i64 = op_num.try_into().unwrap();
+            match op {
+                CmplogOperandType::Reg(reg) => {
+                    let info = reg.info();
+                    set_size(info.size());
+                    let reg_largest = reg.full_register();
+                    if reg_largest == Register::RAX {
+                        insts.push(
+                            // we rely on the fact that latest saved register on stack is rax
+                            Instruction::with1(
+                                Code::Push_rm64,
+                                MemoryOperand::with_base_displ(Register::RSP, op_num * 8),
+                            )
+                            .unwrap(),
+                        );
+                    } else {
+                        insts.push(Instruction::with1(Code::Push_rm64, reg_largest).unwrap());
+                    }
+                }
+                CmplogOperandType::Mem(reg_base, reg_index, disp, scale, mem_size) => {
+                    let size;
+                    let inst;
+                    match *mem_size {
+                        MemorySize::UInt64 | MemorySize::Int64 => {
+                            size = 8;
+                            inst = Code::Mov_r64_rm64;
+                        }
+                        MemorySize::UInt32 | MemorySize::Int32 => {
+                            size = 4;
+                            inst = Code::Mov_r32_rm32;
+                        }
+                        MemorySize::UInt16 | MemorySize::Int16 => {
+                            size = 2;
+                            inst = Code::Mov_r16_rm16;
+                        }
+                        _ => {
+                            println!("Invalid memory size");
+                            size = 4;
+                            inst = Code::Push_rm32;
+                        }
+                    }
+                    set_size(size);
+                    let mut disp_adjusted = *disp;
+                    let mut reg_base = *reg_base;
+                    if reg_base == Register::RSP {
+                        // 0x38 is an amount of bytes used by save_registers()
+                        disp_adjusted = disp_adjusted + 0x38 + 8_i64 * op_num;
+                    }
+                    let tmp_reg_adjusted = *tmp_reg.get(&size).unwrap();
+                    // in case of RIP, disp is an absolute address already calculated
+                    // by iced, we can simply load it to rax (but in this case index register must
+                    // be not rax)
+                    if reg_base == Register::RIP {
+                        insts.push(
+                            Instruction::with2(Code::Mov_r64_imm64, Register::RAX, disp_adjusted)
+                                .unwrap(),
+                        );
+                        reg_base = Register::RAX;
+                        disp_adjusted = 0;
+                    }
+                    insts.push(
+                        Instruction::with2(
+                            inst,
+                            tmp_reg_adjusted,
+                            MemoryOperand::with_base_index_scale_displ_size(
+                                reg_base,
+                                *reg_index,
+                                *scale,
+                                disp_adjusted,
+                                1,
+                            ),
+                        )
+                        .unwrap(),
+                    );
+                    insts.push(Instruction::with1(Code::Push_rm64, Register::RAX).unwrap());
+                }
+                CmplogOperandType::Imm(imm) => {
+                    insts.push(Instruction::with1(Code::Pushq_imm32, *imm as i32).unwrap());
+                }
+            }
+        }
+
+        insts.push(Instruction::with2(Code::Mov_r8_imm8, arg_reg_1, size_op as u64).unwrap());
+        insts.push(Instruction::with1(Code::Pop_r64, arg_reg_2).unwrap());
+        insts.push(Instruction::with1(Code::Pop_r64, arg_reg_3).unwrap());
+        insts.push(Instruction::with2(Code::Mov_r64_imm64, arg_reg_4, address).unwrap());
+        let block = InstructionBlock::new(&insts, 0);
+        let block = BlockEncoder::encode(64, block, DecoderOptions::NONE).unwrap();
+        writer.put_bytes(block.code_buffer.as_slice());
+        writer.put_call_address((CmpLogRuntime::populate_lists as usize).try_into().unwrap());
+
+        writer.put_bytes(&self.restore_registers.clone().unwrap());
     }
 
     /// Emit the instrumentation code which is responsible for operands value extraction and cmplog map population
@@ -274,8 +571,8 @@ impl CmpLogRuntime {
         output: &StalkerOutput,
         op1: &CmplogOperandType, //first operand of the comparsion
         op2: &CmplogOperandType, //second operand of the comparsion
-        _shift: Option<(ShiftStyle, u8)>,
-        special_case: Option<SpecialCmpLogCase>,
+        _shift: &Option<(ShiftStyle, u8)>,
+        special_case: &Option<SpecialCmpLogCase>,
     ) {
         let writer = output.writer();
 
@@ -345,6 +642,114 @@ impl CmpLogRuntime {
             16 + i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE),
             IndexMode::PostAdjust,
         ));
+    }
+
+    #[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
+    #[allow(clippy::similar_names)]
+    #[inline]
+    /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
+    #[must_use]
+    pub fn cmplog_is_interesting_instruction(
+        _decoder: InstDecoder,
+        _address: u64,
+        instr: &Insn,
+    ) -> Option<(
+        CmplogOperandType,
+        CmplogOperandType,
+        Option<SpecialCmpLogCase>,
+        Option<SpecialCmpLogCase>,
+    )> {
+        let bytes = instr.bytes();
+        let mut decoder =
+            iced_x86::Decoder::with_ip(64, bytes, instr.address(), iced_x86::DecoderOptions::NONE);
+        if !decoder.can_decode() {
+            return None;
+        }
+        let mut instruction = iced_x86::Instruction::default();
+        decoder.decode_out(&mut instruction);
+        match instruction.mnemonic() {
+            iced_x86::Mnemonic::Cmp | iced_x86::Mnemonic::Sub => {} // continue
+            _ => return None,
+        }
+
+        if instruction.op_count() != 2 {
+            return None;
+        }
+
+        // we don't support rip related reference with index register yet
+        if instruction.memory_base() == Register::RIP
+            && instruction.memory_index() != Register::None
+        {
+            return None;
+        }
+
+        if instruction.memory_size() == MemorySize::UInt8
+            || instruction.memory_size() == MemorySize::Int8
+        {
+            return None;
+        }
+
+        let op1 = match instruction.op0_kind() {
+            OpKind::Register => CmplogOperandType::Reg(instruction.op0_register()),
+            OpKind::Immediate16
+            | OpKind::Immediate32
+            | OpKind::Immediate64
+            | OpKind::Immediate32to64 => CmplogOperandType::Imm(instruction.immediate(0)),
+            OpKind::Memory => {
+                // can't use try_into here, since we need to cast u64 to i64
+                // which is fine in this case
+                #[allow(clippy::cast_possible_wrap)]
+                CmplogOperandType::Mem(
+                    instruction.memory_base(),
+                    instruction.memory_index(),
+                    instruction.memory_displacement64() as i64,
+                    instruction.memory_index_scale(),
+                    instruction.memory_size(),
+                )
+            }
+            _ => {
+                return None;
+            }
+        };
+
+        let op2 = match instruction.op1_kind() {
+            OpKind::Register => CmplogOperandType::Reg(instruction.op1_register()),
+            OpKind::Immediate16
+            | OpKind::Immediate32
+            | OpKind::Immediate64
+            | OpKind::Immediate32to64 => CmplogOperandType::Imm(instruction.immediate(1)),
+            OpKind::Memory =>
+            {
+                #[allow(clippy::cast_possible_wrap)]
+                CmplogOperandType::Mem(
+                    instruction.memory_base(),
+                    instruction.memory_index(),
+                    instruction.memory_displacement64() as i64,
+                    instruction.memory_index_scale(),
+                    instruction.memory_size(),
+                )
+            }
+            _ => {
+                return None;
+            }
+        };
+
+        // debug print, shows all the cmp instrumented instructions
+        if log::log_enabled!(log::Level::Debug) {
+            use iced_x86::{Formatter, NasmFormatter};
+            let mut formatter = NasmFormatter::new();
+            let mut output = String::new();
+            formatter.format(&instruction, &mut output);
+            log::debug!(
+                "inst: {:x} {:?}, {:?} {:?}",
+                instruction.ip(),
+                output,
+                op1,
+                op2
+            );
+        }
+
+        Some((op1, op2, None, None))
     }
 
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
