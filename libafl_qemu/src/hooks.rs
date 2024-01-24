@@ -1154,7 +1154,7 @@ where
             let fat: FatPtr = transmute(hook);
             NEW_THREAD_HOOKS.push((HookId(0), fat));
             let id = self.emulator.add_new_thread_hook(
-                &mut (*addr_of_mut!(NEW_THREAD_HOOKS).last_mut().unwrap().1),
+                &mut (*addr_of_mut!(NEW_THREAD_HOOKS)).last_mut().unwrap().1,
                 closure_new_thread_hook_wrapper::<QT, S>,
             );
             NEW_THREAD_HOOKS.last_mut().unwrap().0 = id;

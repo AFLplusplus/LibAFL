@@ -346,7 +346,7 @@ impl Default for FridaOptions {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::OnceLock;
+    use std::{ptr::addr_of, sync::OnceLock};
 
     use clap::Parser;
     use frida_gum::Gum;
@@ -438,7 +438,7 @@ mod tests {
             let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
 
             let observers = tuple_list!(
-                AsanErrorsObserver::new(&ASAN_ERRORS) //,
+                AsanErrorsObserver::new(addr_of!(ASAN_ERRORS)) //,
             );
 
             {

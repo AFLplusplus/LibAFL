@@ -67,7 +67,7 @@ mod observers {
         fmt::Debug,
         hash::{BuildHasher, Hasher},
         iter::Flatten,
-        ptr::addr_of_mut,
+        ptr::{addr_of, addr_of_mut},
         slice::{from_raw_parts, Iter, IterMut},
     };
 
@@ -167,7 +167,7 @@ mod observers {
             let elem = self.intervals.query(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { &COUNTERS_MAPS[*i].as_slice()[j] }
+            unsafe { &(*addr_of!(COUNTERS_MAPS[*i])).as_slice()[j] }
         }
 
         #[inline]
@@ -186,7 +186,7 @@ mod observers {
         fn count_bytes(&self) -> u64 {
             let initial = self.initial();
             let mut res = 0;
-            for map in unsafe { &COUNTERS_MAPS } {
+            for map in unsafe { &*addr_of!(COUNTERS_MAPS) } {
                 for x in map.as_slice() {
                     if *x != initial {
                         res += 1;
@@ -198,7 +198,7 @@ mod observers {
 
         fn hash(&self) -> u64 {
             let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-            for map in unsafe { &COUNTERS_MAPS } {
+            for map in unsafe { &*addr_of!(COUNTERS_MAPS) } {
                 let slice = map.as_slice();
                 let ptr = slice.as_ptr();
                 let map_size = slice.len() / core::mem::size_of::<u8>();
@@ -252,7 +252,7 @@ mod observers {
         fn maybe_differential(name: &'static str) -> Self {
             let mut idx = 0;
             let mut intervals = IntervalTree::new();
-            for (v, x) in unsafe { &COUNTERS_MAPS }.iter().enumerate() {
+            for (v, x) in unsafe { &*addr_of!(COUNTERS_MAPS) }.iter().enumerate() {
                 let l = x.as_slice().len();
                 intervals.insert(idx..(idx + l), v);
                 idx += l;
@@ -329,7 +329,7 @@ mod observers {
         type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'static, u8>>>;
 
         fn into_iter(self) -> Self::IntoIter {
-            unsafe { &COUNTERS_MAPS }.iter().flatten()
+            unsafe { &*addr_of!(COUNTERS_MAPS) }.iter().flatten()
         }
     }
 

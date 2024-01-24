@@ -338,7 +338,7 @@ impl AsanRuntime {
     /// Returns the `AsanErrors` from the recent run
     #[allow(clippy::unused_self)]
     pub fn errors(&mut self) -> &Option<AsanErrors> {
-        unsafe { &ASAN_ERRORS }
+        unsafe { &*addr_of!(ASAN_ERRORS) }
     }
 
     /// Make sure the specified memory is unpoisoned
