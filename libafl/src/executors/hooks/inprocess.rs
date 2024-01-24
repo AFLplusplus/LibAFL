@@ -3,7 +3,7 @@
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
     ffi::c_void,
-    ptr::{self, null_mut},
+    ptr::{self, addr_of_mut, null_mut},
     time::Duration,
 };
 #[cfg(all(target_os = "linux", feature = "std"))]
@@ -190,10 +190,10 @@ impl ExecutorHook for InProcessHooks {
     #[allow(unused_variables)]
     fn pre_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I) {
         #[cfg(feature = "std")]
-        {
-            let data = unsafe { &mut GLOBAL_STATE };
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
+        unsafe {
+            let data = addr_of_mut!(GLOBAL_STATE);
+            (*data).crash_handler = self.crash_handler;
+            (*data).timeout_handler = self.timeout_handler;
         }
 
         #[cfg(feature = "std")]
@@ -230,7 +230,7 @@ impl InProcessHooks {
     {
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
             #[cfg(feature = "std")]
             unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
             #[cfg(all(not(miri), unix, feature = "std"))]

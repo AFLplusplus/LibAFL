@@ -101,6 +101,7 @@ pub struct ucontext_t {
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
 #[repr(C)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct arm_exception_state64 {
     /// Virtual Fault Address
     pub __far: u64,
@@ -125,6 +126,7 @@ pub struct arm_exception_state64 {
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
 #[repr(C)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct arm_thread_state64 {
     /// General purpose registers x0-x28
     pub __x: [u64; 29],
@@ -170,6 +172,7 @@ pub struct arm_neon_state64 {
 #[allow(non_camel_case_types)]
 #[derive(Debug)]
 #[repr(C)]
+#[allow(clippy::pub_underscore_fields)]
 pub struct mcontext64 {
     /// _STRUCT_ARM_EXCEPTION_STATE64
     pub __es: arm_exception_state64,
