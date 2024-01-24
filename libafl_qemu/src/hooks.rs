@@ -315,9 +315,11 @@ where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
+    use std::ptr::addr_of_mut;
+
     unsafe {
-        let hooks = get_qemu_hooks::<QT, S>();
-        for hook in &mut CRASH_HOOKS {
+        let hooks: &mut QemuHooks<QT, S> = get_qemu_hooks::<QT, S>();
+        for hook in &mut *addr_of_mut!(CRASH_HOOKS) {
             match hook {
                 HookRepr::Function(ptr) => {
                     let func: fn(&mut QemuHooks<QT, S>, i32) = transmute(*ptr);
@@ -461,7 +463,7 @@ where
             let fat: FatPtr = transmute(hook);
             GENERIC_HOOKS.push((HookId(0), fat));
             let id = self.emulator.set_hook(
-                &mut GENERIC_HOOKS.last_mut().unwrap().1,
+                (&mut *addr_of_mut!(GENERIC_HOOKS)).last_mut().unwrap().1,
                 addr,
                 closure_generic_hook_wrapper::<QT, S>,
                 invalidate_block,
@@ -874,7 +876,7 @@ where
             let fat: FatPtr = transmute(hook);
             BACKDOOR_HOOKS.push((HookId(0), fat));
             let id = self.emulator.add_backdoor_hook(
-                &mut BACKDOOR_HOOKS.last_mut().unwrap().1,
+                (&mut *addr_of_mut!(BACKDOOR_HOOKS)).last_mut().unwrap().1,
                 closure_backdoor_hook_wrapper::<QT, S>,
             );
             BACKDOOR_HOOKS.last_mut().unwrap().0 = id;
@@ -1107,7 +1109,7 @@ where
             let fat: FatPtr = transmute(hook);
             POST_SYSCALL_HOOKS.push((HookId(0), fat));
             let id = self.emulator.add_post_syscall_hook(
-                &mut POST_SYSCALL_HOOKS.last_mut().unwrap().1,
+                (&mut *addr_of_mut!(POST_SYSCALL_HOOKS)).last_mut().unwrap().1,
                 closure_post_syscall_hook_wrapper::<QT, S>,
             );
             POST_SYSCALL_HOOKS.last_mut().unwrap().0 = id;

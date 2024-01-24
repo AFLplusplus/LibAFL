@@ -457,7 +457,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: *mut T) -> Res
     let signals = unsafe { (*handler).signals() };
     for sig in signals {
         write_volatile(
-            &mut SIGNAL_HANDLERS[sig as usize],
+            addr_of_mut!(SIGNAL_HANDLERS[sig as usize]),
             Some(HandlerHolder {
                 handler: UnsafeCell::new(handler as *mut dyn Handler),
             }),

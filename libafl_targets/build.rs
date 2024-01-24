@@ -7,7 +7,8 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     //let out_dir_path = Path::new(&out_dir);
-    let _src_dir = Path::new("src");
+    #[allow(unused_variables)]
+    let src_dir = Path::new("src");
 
     let dest_path = Path::new(&out_dir).join("constants.rs");
     let mut constants_file = File::create(dest_path).expect("Could not create file");
@@ -64,7 +65,7 @@ fn main() {
             common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
         }
 
-        common.file(_src_dir.join("common.c")).compile("common");
+        common.file(src_dir.join("common.c")).compile("common");
     }
 
     #[cfg(any(feature = "sancov_value_profile", feature = "sancov_cmplog"))]
@@ -97,7 +98,7 @@ fn main() {
             .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
             .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
             .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-            .file(_src_dir.join("sancov_cmp.c"))
+            .file(src_dir.join("sancov_cmp.c"))
             .compile("sancov_cmp");
 
         println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_cmp1");
@@ -118,7 +119,7 @@ fn main() {
         println!("cargo:rerun-if-changed=src/libfuzzer.c");
 
         let mut libfuzzer = cc::Build::new();
-        libfuzzer.file(_src_dir.join("libfuzzer.c"));
+        libfuzzer.file(src_dir.join("libfuzzer.c"));
 
         #[cfg(feature = "libfuzzer_no_link_main")]
         libfuzzer.define("FUZZER_NO_LINK_MAIN", "1");
@@ -133,7 +134,7 @@ fn main() {
         println!("cargo:rerun-if-changed=src/coverage.c");
 
         cc::Build::new()
-            .file(_src_dir.join("coverage.c"))
+            .file(src_dir.join("coverage.c"))
             .define("EDGES_MAP_SIZE", Some(&*format!("{edges_map_size}")))
             .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
             .compile("coverage");
@@ -156,7 +157,7 @@ fn main() {
                 .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
                 .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
                 .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-                .file(_src_dir.join("cmplog.c"))
+                .file(src_dir.join("cmplog.c"))
                 .compile("cmplog");
         }
 
@@ -166,7 +167,7 @@ fn main() {
                 .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
                 .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
                 .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-                .file(_src_dir.join("cmplog.c"))
+                .file(src_dir.join("cmplog.c"))
                 .compile("cmplog");
         }
     }
@@ -178,7 +179,7 @@ fn main() {
             println!("cargo:rerun-if-changed=src/forkserver.c");
 
             cc::Build::new()
-                .file(_src_dir.join("forkserver.c"))
+                .file(src_dir.join("forkserver.c"))
                 .compile("forkserver");
         }
     }
@@ -188,7 +189,7 @@ fn main() {
         println!("cargo:rerun-if-changed=src/windows_asan.c");
 
         cc::Build::new()
-            .file(_src_dir.join("windows_asan.c"))
+            .file(src_dir.join("windows_asan.c"))
             .compile("windows_asan");
     }
 

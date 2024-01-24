@@ -66,7 +66,7 @@ mod observers {
         fmt::Debug,
         hash::{BuildHasher, Hasher},
         iter::Flatten,
-        slice::{from_raw_parts, Iter, IterMut},
+        slice::{from_raw_parts, Iter, IterMut}, ptr::addr_of,
     };
 
     use ahash::RandomState;
@@ -173,7 +173,7 @@ mod observers {
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { &mut COUNTERS_MAPS[*i].as_mut_slice()[j] }
+            unsafe { (&mut *addr_of_mut!(COUNTERS_MAPS[*i])).as_mut_slice()[j] }
         }
 
         #[inline]
@@ -286,7 +286,7 @@ mod observers {
             let mut idx = 0;
             let mut v = 0;
             let mut intervals = IntervalTree::new();
-            unsafe { &mut COUNTERS_MAPS }.iter_mut().for_each(|m| {
+            unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) }.iter_mut().for_each(|m| {
                 let l = m.as_mut_slice().len();
                 intervals.insert(idx..(idx + l), v);
                 idx += l;
@@ -336,7 +336,7 @@ mod observers {
         type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
         fn into_iter(self) -> Self::IntoIter {
-            unsafe { &mut COUNTERS_MAPS }.iter_mut().flatten()
+            unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) }.iter_mut().flatten()
         }
     }
 

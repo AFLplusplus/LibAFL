@@ -1,9 +1,11 @@
 //! The hook for `InProcessExecutor`
+#[cfg(any(unix, feature = "std"))]
+use core::ptr::addr_of_mut;
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
     ffi::c_void,
-    ptr::{self, addr_of_mut, null_mut},
+    ptr::{self, null_mut},
     time::Duration,
 };
 #[cfg(all(target_os = "linux", feature = "std"))]
@@ -262,7 +264,7 @@ impl InProcessHooks {
         let ret;
         #[cfg(feature = "std")]
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
             crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
                 E,
                 EM,

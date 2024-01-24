@@ -5,10 +5,11 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, feature = "std"))]
+use core::ptr::addr_of_mut;
 use core::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
 use core::{
-    ptr::addr_of_mut,
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
