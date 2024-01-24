@@ -66,7 +66,8 @@ mod observers {
         fmt::Debug,
         hash::{BuildHasher, Hasher},
         iter::Flatten,
-        slice::{from_raw_parts, Iter, IterMut}, ptr::addr_of,
+        ptr::addr_of,
+        slice::{from_raw_parts, Iter, IterMut},
     };
 
     use ahash::RandomState;
@@ -286,12 +287,14 @@ mod observers {
             let mut idx = 0;
             let mut v = 0;
             let mut intervals = IntervalTree::new();
-            unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) }.iter_mut().for_each(|m| {
-                let l = m.as_mut_slice().len();
-                intervals.insert(idx..(idx + l), v);
-                idx += l;
-                v += 1;
-            });
+            unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) }
+                .iter_mut()
+                .for_each(|m| {
+                    let l = m.as_mut_slice().len();
+                    intervals.insert(idx..(idx + l), v);
+                    idx += l;
+                    v += 1;
+                });
             Self {
                 intervals,
                 len: idx,
@@ -336,7 +339,9 @@ mod observers {
         type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
         fn into_iter(self) -> Self::IntoIter {
-            unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) }.iter_mut().flatten()
+            unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) }
+                .iter_mut()
+                .flatten()
         }
     }
 

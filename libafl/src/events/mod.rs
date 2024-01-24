@@ -713,7 +713,7 @@ mod tests {
 
     #[test]
     fn test_event_serde() {
-        let obv = unsafe { StdMapObserver::new("test", addr_of_mut!(MAP)) };
+        let obv = unsafe { StdMapObserver::new("test", &mut MAP) };
         let map = tuple_list!(obv);
         let observers_buf = postcard::to_allocvec(&map).unwrap();
 

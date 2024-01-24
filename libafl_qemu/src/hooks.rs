@@ -1109,7 +1109,10 @@ where
             let fat: FatPtr = transmute(hook);
             POST_SYSCALL_HOOKS.push((HookId(0), fat));
             let id = self.emulator.add_post_syscall_hook(
-                (&mut *addr_of_mut!(POST_SYSCALL_HOOKS)).last_mut().unwrap().1,
+                (&mut *addr_of_mut!(POST_SYSCALL_HOOKS))
+                    .last_mut()
+                    .unwrap()
+                    .1,
                 closure_post_syscall_hook_wrapper::<QT, S>,
             );
             POST_SYSCALL_HOOKS.last_mut().unwrap().0 = id;
