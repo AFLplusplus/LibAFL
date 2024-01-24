@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use core::{
     ffi::c_void,
-    ptr::null,
+    ptr::{addr_of_mut, null},
     sync::atomic::{compiler_fence, Ordering},
 };
 use std::intrinsics::transmute;
@@ -44,9 +44,9 @@ impl ExecutorHook for InChildProcessHooks {
         _input: &I,
     ) {
         unsafe {
-            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
+            let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
+            (*data).crash_handler = self.crash_handler;
+            (*data).timeout_handler = self.timeout_handler;
             compiler_fence(Ordering::SeqCst);
         }
     }
@@ -69,7 +69,7 @@ impl InChildProcessHooks {
     {
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
-            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
+            let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
             #[cfg(not(miri))]
             setup_signal_handler(data)?;
@@ -153,14 +153,24 @@ impl Handler for InProcessForkExecutorGlobalData {
                 if !FORK_EXECUTOR_GLOBAL_DATA.timeout_handler.is_null() {
                     let func: ForkHandlerFuncPtr =
                         transmute(FORK_EXECUTOR_GLOBAL_DATA.timeout_handler);
-                    (func)(signal, info, context, &mut FORK_EXECUTOR_GLOBAL_DATA);
+                    (func)(
+                        signal,
+                        info,
+                        context,
+                        addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA),
+                    );
                 }
             },
             _ => unsafe {
                 if !FORK_EXECUTOR_GLOBAL_DATA.crash_handler.is_null() {
                     let func: ForkHandlerFuncPtr =
                         transmute(FORK_EXECUTOR_GLOBAL_DATA.crash_handler);
-                    (func)(signal, info, context, &mut FORK_EXECUTOR_GLOBAL_DATA);
+                    (func)(
+                        signal,
+                        info,
+                        context,
+                        addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA),
+                    );
                 }
             },
         }

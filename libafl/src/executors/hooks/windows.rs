@@ -2,7 +2,10 @@
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_asan_handler {
     use alloc::string::String;
-    use core::sync::atomic::{compiler_fence, Ordering};
+    use core::{
+        ptr::addr_of_mut,
+        sync::atomic::{compiler_fence, Ordering},
+    };
 
     use windows::Win32::System::Threading::{
         EnterCriticalSection, LeaveCriticalSection, CRITICAL_SECTION,
@@ -30,26 +33,26 @@ pub mod windows_asan_handler {
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
     {
-        let data = &mut GLOBAL_STATE;
-        data.set_in_handler(true);
+        let data = addr_of_mut!(GLOBAL_STATE);
+        (*data).set_in_handler(true);
         // Have we set a timer_before?
-        if data.ptp_timer.is_some() {
+        if (*data).ptp_timer.is_some() {
             /*
                 We want to prevent the timeout handler being run while the main thread is executing the crash handler
                 Timeout handler runs if it has access to the critical section or data.in_target == 0
                 Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
             */
             compiler_fence(Ordering::SeqCst);
-            EnterCriticalSection(data.critical as *mut CRITICAL_SECTION);
+            EnterCriticalSection((*data).critical as *mut CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
-            data.in_target = 0;
+            (*data).in_target = 0;
             compiler_fence(Ordering::SeqCst);
-            LeaveCriticalSection(data.critical as *mut CRITICAL_SECTION);
+            LeaveCriticalSection((*data).critical as *mut CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
         }
 
         log::error!("ASAN detected crash!");
-        if data.current_input_ptr.is_null() {
+        if (*data).current_input_ptr.is_null() {
             {
                 log::error!("Double crash\n");
                 log::error!(
@@ -67,20 +70,20 @@ pub mod windows_asan_handler {
 
             // TODO tell the parent to not restart
         } else {
-            let executor = data.executor_mut::<E>();
+            let executor = (*data).executor_mut::<E>();
             // reset timer
-            if data.ptp_timer.is_some() {
-                data.ptp_timer = None;
+            if (*data).ptp_timer.is_some() {
+                (*data).ptp_timer = None;
             }
 
-            let state = data.state_mut::<E::State>();
-            let fuzzer = data.fuzzer_mut::<Z>();
-            let event_mgr = data.event_mgr_mut::<EM>();
+            let state = (*data).state_mut::<E::State>();
+            let fuzzer = (*data).fuzzer_mut::<Z>();
+            let event_mgr = (*data).event_mgr_mut::<EM>();
 
             log::error!("Child crashed!");
 
             // Make sure we don't crash in the crash handler forever.
-            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+            let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
 
             run_observers_and_save_state::<E, EM, OF, Z>(
                 executor,
@@ -106,6 +109,7 @@ pub mod windows_exception_handler {
         ffi::c_void,
         mem::transmute,
         ptr,
+        ptr::addr_of_mut,
         sync::atomic::{compiler_fence, Ordering},
     };
     #[cfg(feature = "std")]
@@ -132,7 +136,7 @@ pub mod windows_exception_handler {
     };
 
     pub(crate) type HandlerFuncPtr =
-        unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
+        unsafe fn(*mut EXCEPTION_POINTERS, *mut InProcessExecutorHandlerData);
 
     /*pub unsafe fn nop_handler(
         _code: ExceptionCode,
@@ -145,13 +149,13 @@ pub mod windows_exception_handler {
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
             unsafe {
-                let data = &mut GLOBAL_STATE;
-                let in_handler = data.set_in_handler(true);
-                if !data.crash_handler.is_null() {
-                    let func: HandlerFuncPtr = transmute(data.crash_handler);
+                let data = addr_of_mut!(GLOBAL_STATE);
+                let in_handler = (*data).set_in_handler(true);
+                if !(*data).crash_handler.is_null() {
+                    let func: HandlerFuncPtr = transmute((*data).crash_handler);
                     (func)(exception_pointers, data);
                 }
-                data.set_in_handler(in_handler);
+                (*data).set_in_handler(in_handler);
             }
         }
 
@@ -176,35 +180,33 @@ pub mod windows_exception_handler {
         Z: HasObjective<Objective = OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
-        panic::set_hook(Box::new(move |panic_info| {
-            let data = unsafe { &mut GLOBAL_STATE };
-            let in_handler = data.set_in_handler(true);
+        panic::set_hook(Box::new(move |panic_info| unsafe {
+            let data = addr_of_mut!(GLOBAL_STATE);
+            let in_handler = (*data).set_in_handler(true);
             // Have we set a timer_before?
-            unsafe {
-                if data.ptp_timer.is_some() {
-                    /*
-                        We want to prevent the timeout handler being run while the main thread is executing the crash handler
-                        Timeout handler runs if it has access to the critical section or data.in_target == 0
-                        Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
-                    */
-                    compiler_fence(Ordering::SeqCst);
-                    EnterCriticalSection(data.critical as *mut CRITICAL_SECTION);
-                    compiler_fence(Ordering::SeqCst);
-                    data.in_target = 0;
-                    compiler_fence(Ordering::SeqCst);
-                    LeaveCriticalSection(data.critical as *mut CRITICAL_SECTION);
-                    compiler_fence(Ordering::SeqCst);
-                }
+            if (*data).ptp_timer.is_some() {
+                /*
+                    We want to prevent the timeout handler being run while the main thread is executing the crash handler
+                    Timeout handler runs if it has access to the critical section or data.in_target == 0
+                    Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
+                */
+                compiler_fence(Ordering::SeqCst);
+                EnterCriticalSection((*data).critical as *mut CRITICAL_SECTION);
+                compiler_fence(Ordering::SeqCst);
+                (*data).in_target = 0;
+                compiler_fence(Ordering::SeqCst);
+                LeaveCriticalSection((*data).critical as *mut CRITICAL_SECTION);
+                compiler_fence(Ordering::SeqCst);
             }
 
-            if data.is_valid() {
+            if (*data).is_valid() {
                 // We are fuzzing!
-                let executor = data.executor_mut::<E>();
-                let state = data.state_mut::<E::State>();
-                let fuzzer = data.fuzzer_mut::<Z>();
-                let event_mgr = data.event_mgr_mut::<EM>();
+                let executor = (*data).executor_mut::<E>();
+                let state = (*data).state_mut::<E::State>();
+                let fuzzer = (*data).fuzzer_mut::<Z>();
+                let event_mgr = (*data).event_mgr_mut::<EM>();
 
-                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+                let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
 
                 run_observers_and_save_state::<E, EM, OF, Z>(
                     executor,
@@ -215,12 +217,10 @@ pub mod windows_exception_handler {
                     ExitKind::Crash,
                 );
 
-                unsafe {
-                    ExitProcess(1);
-                }
+                ExitProcess(1);
             }
             old_hook(panic_info);
-            data.set_in_handler(in_handler);
+            (*data).set_in_handler(in_handler);
         }));
     }
 

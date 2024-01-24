@@ -1,11 +1,9 @@
 //! The `GenericInProcessForkExecutor` to do forking before executing the harness in-processly
-#[cfg(target_os = "linux")]
-use core::ptr::addr_of_mut;
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{null_mut, write_volatile},
+    ptr::{addr_of_mut, null_mut, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
@@ -42,7 +40,7 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
     Signal,
     &mut siginfo_t,
     Option<&mut ucontext_t>,
-    data: &mut InProcessForkExecutorGlobalData,
+    data: *mut InProcessForkExecutorGlobalData,
 );
 
 #[cfg(all(unix, not(target_os = "linux")))]
@@ -277,13 +275,19 @@ where
         input: &<Self as UsesInput>::Input,
     ) {
         unsafe {
-            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
-            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
+            let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             write_volatile(
-                &mut data.current_input_ptr,
+                addr_of_mut!((*data).executor_ptr),
+                self as *const _ as *const c_void,
+            );
+            write_volatile(
+                addr_of_mut!((*data).current_input_ptr),
                 input as *const _ as *const c_void,
             );
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
+            write_volatile(
+                addr_of_mut!((*data).state_ptr),
+                state as *mut _ as *mut c_void,
+            );
             compiler_fence(Ordering::SeqCst);
         }
     }
@@ -440,6 +444,7 @@ where
 
 pub mod child_signal_handlers {
     use alloc::boxed::Box;
+    use core::ptr::addr_of_mut;
     use std::panic;
 
     use libafl_bolts::os::unix_signals::{ucontext_t, Signal};
@@ -460,21 +465,21 @@ pub mod child_signal_handlers {
         E: HasObservers,
     {
         let old_hook = panic::take_hook();
-        panic::set_hook(Box::new(move |panic_info| {
+        panic::set_hook(Box::new(move |panic_info| unsafe {
             old_hook(panic_info);
-            let data = unsafe { &mut FORK_EXECUTOR_GLOBAL_DATA };
-            if data.is_valid() {
-                let executor = data.executor_mut::<E>();
+            let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
+            if !data.is_null() && (*data).is_valid() {
+                let executor = (*data).executor_mut::<E>();
                 let observers = executor.observers_mut();
-                let state = data.state_mut::<E::State>();
+                let state = (*data).state_mut::<E::State>();
                 // Invalidate data to not execute again the observer hooks in the crash handler
-                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+                let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
                 observers
                     .post_exec_child_all(state, input, &ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
 
                 // std::process::abort();
-                unsafe { libc::_exit(128 + 6) }; // ABORT exit code
+                libc::_exit(128 + 6); // ABORT exit code
             }
         }));
     }

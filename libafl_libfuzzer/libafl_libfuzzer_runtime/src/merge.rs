@@ -4,7 +4,7 @@ use std::{
     fs::{rename, File},
     io::Write,
     os::fd::{AsRawFd, FromRawFd},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH}, ptr::addr_of_mut,
 };
 
 use libafl::{
@@ -97,7 +97,7 @@ pub fn merge(
         }
     }
 
-    let edges = unsafe { core::mem::take(&mut COUNTERS_MAPS) };
+    let edges = unsafe { core::mem::take(&mut *addr_of_mut!(COUNTERS_MAPS)) };
     let edges_observer = MultiMapObserver::new("edges", edges);
 
     let time = TimeObserver::new("time");

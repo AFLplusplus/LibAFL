@@ -5,6 +5,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, feature = "std", not(miri)))]
+use core::ptr::addr_of_mut;
 use core::{
     marker::PhantomData,
     num::NonZeroUsize,
@@ -1143,7 +1145,9 @@ where
 
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut EVENTMGR_SIGHANDLER_STATE) } {
+            if let Err(_e) =
+                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
+            {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }

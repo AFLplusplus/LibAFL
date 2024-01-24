@@ -10,7 +10,7 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{null, write_volatile},
+    ptr::{addr_of_mut, null, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
@@ -175,17 +175,29 @@ where
         input: &<Self as UsesInput>::Input,
     ) {
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
             write_volatile(
-                &mut data.current_input_ptr,
+                addr_of_mut!((*data).current_input_ptr),
                 input as *const _ as *const c_void,
             );
-            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
+            write_volatile(
+                addr_of_mut!((*data).executor_ptr),
+                self as *const _ as *const c_void,
+            );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            write_volatile(
+                addr_of_mut!((*data).state_ptr),
+                state as *mut _ as *mut c_void,
+            );
+            write_volatile(
+                addr_of_mut!((*data).event_mgr_ptr),
+                mgr as *mut _ as *mut c_void,
+            );
+            write_volatile(
+                addr_of_mut!((*data).fuzzer_ptr),
+                fuzzer as *mut _ as *mut c_void,
+            );
             compiler_fence(Ordering::SeqCst);
         }
     }
@@ -200,9 +212,9 @@ where
         _input: &<Self as UsesInput>::Input,
     ) {
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
 
-            write_volatile(&mut data.current_input_ptr, null());
+            write_volatile(addr_of_mut!((*data).current_input_ptr), null());
             compiler_fence(Ordering::SeqCst);
         }
     }
@@ -559,8 +571,11 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
 // TODO remove this after executor refactor and libafl qemu new executor
 /// Expose a version of the crash handler that can be called from e.g. an emulator
+///
+/// # Safety
+/// This will directly access `GLOBAL_STATE` and related data pointers
 #[cfg(any(unix, feature = "std"))]
-pub fn generic_inproc_crash_handler<E, EM, OF, Z>()
+pub unsafe fn generic_inproc_crash_handler<E, EM, OF, Z>()
 where
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
@@ -568,15 +583,15 @@ where
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
-    let data = unsafe { &mut GLOBAL_STATE };
-    let in_handler = data.set_in_handler(true);
+    let data = addr_of_mut!(GLOBAL_STATE);
+    let in_handler = (*data).set_in_handler(true);
 
-    if data.is_valid() {
-        let executor = data.executor_mut::<E>();
-        let state = data.state_mut::<E::State>();
-        let event_mgr = data.event_mgr_mut::<EM>();
-        let fuzzer = data.fuzzer_mut::<Z>();
-        let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+    if (*data).is_valid() {
+        let executor = (*data).executor_mut::<E>();
+        let state = (*data).state_mut::<E::State>();
+        let event_mgr = (*data).event_mgr_mut::<EM>();
+        let fuzzer = (*data).fuzzer_mut::<Z>();
+        let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
 
         run_observers_and_save_state::<E, EM, OF, Z>(
             executor,
@@ -588,7 +603,7 @@ where
         );
     }
 
-    data.set_in_handler(in_handler);
+    (*data).set_in_handler(in_handler);
 }
 
 #[cfg(test)]
