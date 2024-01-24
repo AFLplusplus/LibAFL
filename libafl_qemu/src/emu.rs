@@ -49,12 +49,12 @@ macro_rules! extern_c_checked {
         paste! {
             #[allow(non_camel_case_types)]
             #[allow(unused)]
-            struct [<__ $c_var:upper _STRUCT__>] { member: &'static $c_var_ty }
+            struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
 
             unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
 
             #[cfg_attr(nightly, used(linker))]
-            static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: &$c_var } };
+            static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
         }
 
         extern "C" {
@@ -68,12 +68,12 @@ macro_rules! extern_c_checked {
         paste! {
             #[allow(non_camel_case_types)]
             #[allow(unused)]
-            struct [<__ $c_var:upper _STRUCT__>] { member: &'static $c_var_ty }
+            struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
 
             unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
 
             #[cfg_attr(nightly, used(linker))]
-            static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: &$c_var } };
+            static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
         }
 
         extern "C" {

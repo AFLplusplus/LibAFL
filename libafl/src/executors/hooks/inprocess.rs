@@ -1,4 +1,6 @@
 //! The hook for `InProcessExecutor`
+#[cfg(any(unix, feature = "std"))]
+use core::ptr::addr_of_mut;
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
@@ -123,7 +125,7 @@ impl HasTimeout for InProcessHooks {
     fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool {
         #[cfg(not(target_os = "linux"))]
         {
-            return false;
+            false
         }
 
         #[cfg(target_os = "linux")]
@@ -190,10 +192,10 @@ impl ExecutorHook for InProcessHooks {
     #[allow(unused_variables)]
     fn pre_exec<EM, I, S, Z>(&mut self, fuzzer: &mut Z, state: &mut S, mgr: &mut EM, input: &I) {
         #[cfg(feature = "std")]
-        {
-            let data = unsafe { &mut GLOBAL_STATE };
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
+        unsafe {
+            let data = addr_of_mut!(GLOBAL_STATE);
+            (*data).crash_handler = self.crash_handler;
+            (*data).timeout_handler = self.timeout_handler;
         }
 
         #[cfg(feature = "std")]
@@ -209,7 +211,6 @@ impl ExecutorHook for InProcessHooks {
         _mgr: &mut EM,
         _input: &I,
     ) {
-        // let _data = unsafe { &mut GLOBAL_STATE };
         // timeout stuff
         #[cfg(feature = "std")]
         self.timer_mut().unset_timer();
@@ -230,7 +231,7 @@ impl InProcessHooks {
     {
         #[cfg_attr(miri, allow(unused_variables))]
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
             #[cfg(feature = "std")]
             unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
             #[cfg(all(not(miri), unix, feature = "std"))]
@@ -263,7 +264,7 @@ impl InProcessHooks {
         let ret;
         #[cfg(feature = "std")]
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
             crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
                 E,
                 EM,

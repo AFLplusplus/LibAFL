@@ -12,7 +12,7 @@ use core::{
 };
 
 #[cfg(all(unix, not(target_os = "linux")))]
-pub const ITIMER_REAL: core::ffi::c_int = 0;
+pub(crate) const ITIMER_REAL: core::ffi::c_int = 0;
 
 #[cfg(windows)]
 use core::sync::atomic::{compiler_fence, Ordering};
@@ -64,7 +64,7 @@ pub(crate) struct Itimerval {
 
 #[cfg(all(feature = "std", unix, not(target_os = "linux")))]
 extern "C" {
-    pub fn setitimer(
+    pub(crate) fn setitimer(
         which: libc::c_int,
         new_value: *mut Itimerval,
         old_value: *mut Itimerval,
@@ -156,6 +156,7 @@ impl TimerStruct {
 
     /// Create a `TimerStruct` with the specified timeout
     #[cfg(all(unix, not(target_os = "linux")))]
+    #[must_use]
     pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
         let it_value = Timeval {
@@ -264,11 +265,11 @@ impl TimerStruct {
     /// Set timer
     pub fn set_timer(&mut self) {
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
 
-            write_volatile(&mut data.ptp_timer, Some(*self.ptp_timer()));
+            write_volatile(addr_of_mut!((*data).ptp_timer), Some(*self.ptp_timer()));
             write_volatile(
-                &mut data.critical,
+                addr_of_mut!((*data).critical),
                 addr_of_mut!(*self.critical_mut()) as *mut c_void,
             );
             let tm: i64 = -self.milli_sec() * 10 * 1000;
@@ -281,7 +282,7 @@ impl TimerStruct {
             compiler_fence(Ordering::SeqCst);
             EnterCriticalSection(self.critical_mut());
             compiler_fence(Ordering::SeqCst);
-            data.in_target = 1;
+            (*data).in_target = 1;
             compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(self.critical_mut());
             compiler_fence(Ordering::SeqCst);
@@ -295,8 +296,11 @@ impl TimerStruct {
     pub fn set_timer(&mut self) {
         unsafe {
             if self.batch_mode {
-                let data = &mut GLOBAL_STATE;
-                write_volatile(&mut data.executor_ptr, self as *mut _ as *mut c_void);
+                let data = addr_of_mut!(GLOBAL_STATE);
+                write_volatile(
+                    addr_of_mut!((*data).executor_ptr),
+                    self as *mut _ as *mut c_void,
+                );
 
                 if self.executions == 0 {
                     libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
@@ -360,13 +364,13 @@ impl TimerStruct {
     /// Disalarm
     pub fn unset_timer(&mut self) {
         unsafe {
-            let data = &mut GLOBAL_STATE;
+            let data = addr_of_mut!(GLOBAL_STATE);
 
             compiler_fence(Ordering::SeqCst);
             EnterCriticalSection(self.critical_mut());
             compiler_fence(Ordering::SeqCst);
             // Timeout handler will do nothing after we increment in_target value.
-            data.in_target = 0;
+            (*data).in_target = 0;
             compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(self.critical_mut());
             compiler_fence(Ordering::SeqCst);
