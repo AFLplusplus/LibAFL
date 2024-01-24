@@ -156,6 +156,7 @@ impl TimerStruct {
 
     /// Create a `TimerStruct` with the specified timeout
     #[cfg(all(unix, not(target_os = "linux")))]
+    #[must_use]
     pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
         let it_value = Timeval {
