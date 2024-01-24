@@ -14,7 +14,7 @@ use clap::{Arg, ArgAction, Command};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
-    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -197,16 +197,14 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         };
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        let mut executor = TimeoutExecutor::new(
-            InProcessExecutor::new(
-                &mut harness,
-                tuple_list!(edges_observer, time_observer),
-                &mut fuzzer,
-                &mut state,
-                &mut mgr,
-            )?,
+        let mut executor = InProcessExecutor::with_timeout(
+            &mut harness,
+            tuple_list!(edges_observer, time_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
             Duration::from_millis(timeout_ms),
-        );
+        )?;
 
         // Secondary harness due to mut ownership
         let mut harness = |input: &BytesInput| {

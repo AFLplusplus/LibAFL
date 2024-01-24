@@ -1,3 +1,4 @@
+#![cfg_attr(nightly, feature(used_with_arg))]
 //! Welcome to `LibAFL` QEMU
 //!
 #![doc = include_str!("../../README.md")]
