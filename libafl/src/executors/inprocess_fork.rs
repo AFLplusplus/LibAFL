@@ -1,6 +1,4 @@
 //! The `GenericInProcessForkExecutor` to do forking before executing the harness in-processly
-#[cfg(target_os = "linux")]
-use core::ptr::addr_of_mut;
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
