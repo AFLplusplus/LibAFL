@@ -182,12 +182,6 @@ void __sanitizer_weak_hook_strcasecmp(void *called_pc, const char *s1,
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
-void __sanitizer_cov_pcs_init(const uintptr_t *pcs_beg,
-                              const uintptr_t *pcs_end) {
-  // unused
-  // TODO implement
-}
-
 void __sanitizer_cov_trace_pc_indir(uintptr_t Callee) {
   // unused
   // TODO implement
