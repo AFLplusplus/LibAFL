@@ -4,7 +4,6 @@ use alloc::boxed::Box;
 use core::{any::Any, fmt::Debug};
 
 use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
-
 pub use serdeany_registry::*;
 
 /// A (de)serializable Any trait
@@ -70,18 +69,19 @@ pub mod serdeany_registry {
     use alloc::boxed::Box;
     use core::{any::TypeId, fmt};
 
-    use crate::{
-        anymap::{pack_type_id, unpack_type_id},
-        hash_std,
-        serdeany::{DeserializeCallback, DeserializeCallbackSeed},
-        Error,
-    };
     use hashbrown::{
         hash_map::{Keys, Values, ValuesMut},
         HashMap,
     };
     use postcard;
     use serde::{Deserialize, Serialize};
+
+    use crate::{
+        anymap::{pack_type_id, unpack_type_id},
+        hash_std,
+        serdeany::{DeserializeCallback, DeserializeCallbackSeed},
+        Error,
+    };
 
     /// Visitor object used internally for the [`crate::serdeany::SerdeAny`] registry.
     #[derive(Debug)]
