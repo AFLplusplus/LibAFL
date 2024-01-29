@@ -355,7 +355,7 @@ fn fuzz(
             .parse_afl_cmdline(arguments)
             .is_persistent(true)
             .timeout(timeout * 10)
-            .signal(signal)
+            .kill_signal(signal)
             .build(tuple_list!(cmplog_observer))
             .unwrap();
 
