@@ -5,7 +5,7 @@ use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::{forkserver::ForkserverExecutorBuilder, TimeoutForkserverExecutor},
+    executors::forkserver::ForkserverExecutorBuilder,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -179,6 +179,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
                     .is_persistent(true)
                     .autotokens(&mut tokens)
                     .coverage_map_size(MAP_SIZE)
+                    .timeout(timeout)
                     .debug_child(self.debug_output)
                     .shmem_provider(&mut shmem_provider_client)
                     .build_dynamic_map(edges_observer, tuple_list!(time_observer))
@@ -189,10 +190,12 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
                     .is_persistent(true)
                     .autotokens(&mut tokens)
                     .coverage_map_size(MAP_SIZE)
+                    .timeout(timeout)
                     .debug_child(self.debug_output)
                     .build_dynamic_map(edges_observer, tuple_list!(time_observer))
             };
 
+            let mut executor = forkserver.unwrap();
             if let Some(tokens_file) = &self.tokens_file {
                 // if a token file is provided, load it into our set of tokens
                 tokens.add_from_file(tokens_file)?;
@@ -202,13 +205,6 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
                 // add any known tokens to the state
                 state.add_metadata(tokens);
             }
-
-            // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-            let mut executor = TimeoutForkserverExecutor::new(
-                forkserver.expect("Failed to create the executor."),
-                timeout,
-            )
-            .expect("Failed to create the executor.");
 
             // In case the corpus is empty (on first run), reset
             if state.must_load_initial_inputs() {
