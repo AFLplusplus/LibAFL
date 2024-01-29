@@ -242,6 +242,9 @@ struct LibfuzzerOptionsBuilder<'a> {
     ignore_crashes: bool,
     ignore_timeouts: bool,
     ignore_ooms: bool,
+    no_ignore_crashes: bool,
+    no_ignore_timeouts: bool,
+    no_ignore_ooms: bool,
     rss_limit: Option<usize>,
     malloc_limit: Option<usize>,
     ignore_remaining: bool,
@@ -314,11 +317,16 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         }
                         "ignore_crashes" => {
                             self.ignore_crashes = parse_or_bail!(name, value, u64) > 0;
+                            self.no_ignore_crashes = !self.ignore_crashes;
                         }
                         "ignore_timeouts" => {
                             self.ignore_timeouts = parse_or_bail!(name, value, u64) > 0;
+                            self.no_ignore_timeouts = !self.ignore_timeouts;
                         }
-                        "ignore_ooms" => self.ignore_ooms = parse_or_bail!(name, value, u64) > 0,
+                        "ignore_ooms" => {
+                            self.ignore_ooms = parse_or_bail!(name, value, u64) > 0;
+                            self.no_ignore_ooms = !self.ignore_ooms;
+                        }
                         "rss_limit_mb" => {
                             self.rss_limit = Some(parse_or_bail!(name, value, usize) << 20);
                         }
@@ -331,7 +339,20 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         "dedup" => self.dedup = parse_or_bail!(name, value, u64) > 0,
                         "shrink" => self.shrink = parse_or_bail!(name, value, u64) > 0,
                         "skip_tracing" => self.skip_tracing = parse_or_bail!(name, value, u64) > 0,
-                        "tui" => self.tui = parse_or_bail!(name, value, u64) > 0,
+                        "tui" => {
+                            self.tui = parse_or_bail!(name, value, u64) > 0;
+                            if self.tui {
+                                if !self.no_ignore_crashes {
+                                    self.ignore_crashes = true;
+                                }
+                                if !self.no_ignore_timeouts {
+                                    self.ignore_timeouts = true;
+                                }
+                                if !self.no_ignore_ooms {
+                                    self.ignore_ooms = true;
+                                }
+                            }
+                        }
                         "runs" => self.runs = parse_or_bail!(name, value, usize),
                         "close_fd_mask" => self.close_fd_mask = parse_or_bail!(name, value, u8),
                         _ => {
