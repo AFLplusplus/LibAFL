@@ -304,7 +304,7 @@ where
 
                 // Try to create lock file for new testcases
                 if OpenOptions::new()
-                    .create(true)
+                    .create_new(true)
                     .write(true)
                     .open(self.dir_path.join(new_lock_filename))
                     .is_err()
