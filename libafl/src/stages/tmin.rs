@@ -7,7 +7,7 @@ use ahash::RandomState;
 use libafl_bolts::{HasLen, Named};
 
 use crate::{
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusIdx, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverName},
@@ -61,8 +61,13 @@ where
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-        base_corpus_idx: CorpusId,
     ) -> Result<(), Error> {
+        let Some(base_corpus_idx) = state.current_corpus_idx()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
+
         let orig_max_size = state.max_size();
         // basically copy-pasted from mutational.rs
         let num = self.iterations(state, base_corpus_idx)?;
@@ -209,15 +214,16 @@ where
         + HasFeedback<Feedback = F1>
         + HasScheduler<Scheduler = CS>,
 {
+    type Progress = (); // TODO this stage desperately needs a resume
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        self.perform_minification(fuzzer, executor, state, manager, corpus_idx)?;
+        self.perform_minification(fuzzer, executor, state, manager)?;
 
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().finish_stage();

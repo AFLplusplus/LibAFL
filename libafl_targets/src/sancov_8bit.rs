@@ -1,5 +1,6 @@
 //! [`LLVM` `8-bit-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
+use core::ptr::addr_of_mut;
 
 use libafl_bolts::{ownedref::OwnedMutSlice, AsMutSlice, AsSlice};
 
@@ -30,7 +31,7 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
-        for existing in &mut COUNTERS_MAPS {
+        for existing in &mut *addr_of_mut!(COUNTERS_MAPS) {
             let range = existing.as_mut_slice().as_mut_ptr()
                 ..=existing
                     .as_mut_slice()
@@ -66,6 +67,7 @@ mod observers {
         fmt::Debug,
         hash::{BuildHasher, Hasher},
         iter::Flatten,
+        ptr::{addr_of, addr_of_mut},
         slice::{from_raw_parts, Iter, IterMut},
     };
 
@@ -165,7 +167,7 @@ mod observers {
             let elem = self.intervals.query(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { &COUNTERS_MAPS[*i].as_slice()[j] }
+            unsafe { &(*addr_of!(COUNTERS_MAPS[*i])).as_slice()[j] }
         }
 
         #[inline]
@@ -173,7 +175,7 @@ mod observers {
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { &mut COUNTERS_MAPS[*i].as_mut_slice()[j] }
+            unsafe { &mut (*addr_of_mut!(COUNTERS_MAPS[*i])).as_mut_slice()[j] }
         }
 
         #[inline]
@@ -184,7 +186,7 @@ mod observers {
         fn count_bytes(&self) -> u64 {
             let initial = self.initial();
             let mut res = 0;
-            for map in unsafe { &COUNTERS_MAPS } {
+            for map in unsafe { &*addr_of!(COUNTERS_MAPS) } {
                 for x in map.as_slice() {
                     if *x != initial {
                         res += 1;
@@ -196,7 +198,7 @@ mod observers {
 
         fn hash(&self) -> u64 {
             let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-            for map in unsafe { &COUNTERS_MAPS } {
+            for map in unsafe { &*addr_of!(COUNTERS_MAPS) } {
                 let slice = map.as_slice();
                 let ptr = slice.as_ptr();
                 let map_size = slice.len() / core::mem::size_of::<u8>();
@@ -209,7 +211,7 @@ mod observers {
 
         fn reset_map(&mut self) -> Result<(), Error> {
             let initial = self.initial();
-            for map in unsafe { &mut COUNTERS_MAPS } {
+            for map in unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) } {
                 for x in map.as_mut_slice() {
                     *x = initial;
                 }
@@ -250,7 +252,7 @@ mod observers {
         fn maybe_differential(name: &'static str) -> Self {
             let mut idx = 0;
             let mut intervals = IntervalTree::new();
-            for (v, x) in unsafe { &COUNTERS_MAPS }.iter().enumerate() {
+            for (v, x) in unsafe { &*addr_of!(COUNTERS_MAPS) }.iter().enumerate() {
                 let l = x.as_slice().len();
                 intervals.insert(idx..(idx + l), v);
                 idx += l;
@@ -286,12 +288,14 @@ mod observers {
             let mut idx = 0;
             let mut v = 0;
             let mut intervals = IntervalTree::new();
-            unsafe { &mut COUNTERS_MAPS }.iter_mut().for_each(|m| {
-                let l = m.as_mut_slice().len();
-                intervals.insert(idx..(idx + l), v);
-                idx += l;
-                v += 1;
-            });
+            unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) }
+                .iter_mut()
+                .for_each(|m| {
+                    let l = m.as_mut_slice().len();
+                    intervals.insert(idx..(idx + l), v);
+                    idx += l;
+                    v += 1;
+                });
             Self {
                 intervals,
                 len: idx,
@@ -325,7 +329,7 @@ mod observers {
         type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'static, u8>>>;
 
         fn into_iter(self) -> Self::IntoIter {
-            unsafe { &COUNTERS_MAPS }.iter().flatten()
+            unsafe { &*addr_of!(COUNTERS_MAPS) }.iter().flatten()
         }
     }
 
@@ -336,7 +340,9 @@ mod observers {
         type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
         fn into_iter(self) -> Self::IntoIter {
-            unsafe { &mut COUNTERS_MAPS }.iter_mut().flatten()
+            unsafe { &mut *addr_of_mut!(COUNTERS_MAPS) }
+                .iter_mut()
+                .flatten()
         }
     }
 

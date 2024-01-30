@@ -25,16 +25,8 @@
 #include <list>
 #include <string>
 #include <fstream>
-#include "llvm/Config/llvm-config.h"
 
-#if USE_NEW_PM
-  #include "llvm/Passes/PassPlugin.h"
-  #include "llvm/Passes/PassBuilder.h"
-  #include "llvm/IR/PassManager.h"
-#else
-  #include "llvm/IR/LegacyPassManager.h"
-  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#endif
+#include "common-llvm.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
@@ -63,68 +55,6 @@ static cl::opt<bool> CmplogExtended("cmplog_instructions_extended",
                                     cl::init(false), cl::NotHidden);
 namespace {
 
-/* Function that we never instrument or analyze */
-/* Note: this ignore check is also called in isInInstrumentList() */
-
-/* Function that we never instrument or analyze */
-/* Note: this ignore check is also called in isInInstrumentList() */
-bool isIgnoreFunction(const llvm::Function *F) {
-  // Starting from "LLVMFuzzer" these are functions used in libfuzzer based
-  // fuzzing campaign installations, e.g. oss-fuzz
-
-  static constexpr const char *ignoreList[] = {
-
-      "asan.",
-      "llvm.",
-      "sancov.",
-      "__ubsan",
-      "ign.",
-      "__afl",
-      "_fini",
-      "__libc_",
-      "__asan",
-      "__msan",
-      "__cmplog",
-      "__sancov",
-      "__san",
-      "__cxx_",
-      "__decide_deferred",
-      "_GLOBAL",
-      "_ZZN6__asan",
-      "_ZZN6__lsan",
-      "msan.",
-      "LLVMFuzzerM",
-      "LLVMFuzzerC",
-      "LLVMFuzzerI",
-      "maybe_duplicate_stderr",
-      "discard_output",
-      "close_stdout",
-      "dup_and_close_stderr",
-      "maybe_close_fd_mask",
-      "ExecuteFilesOnyByOne"
-
-  };
-
-  for (auto const &ignoreListFunc : ignoreList) {
-    if (F->getName().startswith(ignoreListFunc)) { return true; }
-  }
-
-  static constexpr const char *ignoreSubstringList[] = {
-
-      "__asan",       "__msan",     "__ubsan", "__lsan",
-      "__san",        "__sanitize", "__cxx",   "_GLOBAL__",
-      "DebugCounter", "DwarfDebug", "DebugLoc"
-
-  };
-
-  for (auto const &ignoreListFunc : ignoreSubstringList) {
-    // hexcoder: F->getName().contains() not avaiilable in llvm 3.8.0
-    if (StringRef::npos != F->getName().find(ignoreListFunc)) { return true; }
-  }
-
-  return false;
-}
-
 #if USE_NEW_PM
 class CmpLogInstructions : public PassInfoMixin<CmpLogInstructions> {
  public:
@@ -142,7 +72,7 @@ class CmpLogInstructions : public ModulePass {
 #if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 #else
-  bool        runOnModule(Module &M) override;
+  bool runOnModule(Module &M) override;
 
   #if LLVM_VERSION_MAJOR < 4
   const char *getPassName() const override {
@@ -168,7 +98,11 @@ llvmGetPassPluginInfo() {
   #if LLVM_VERSION_MAJOR <= 13
             using OptimizationLevel = typename PassBuilder::OptimizationLevel;
   #endif
+  #if LLVM_VERSION_MAJOR >= 16
+            PB.registerOptimizerEarlyEPCallback(
+  #else
             PB.registerOptimizerLastEPCallback(
+  #endif
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
                   MPM.addPass(CmpLogInstructions());
                 });
@@ -191,6 +125,7 @@ Iterator Unique(Iterator first, Iterator last) {
 
 bool CmpLogInstructions::hookInstrs(Module &M) {
   std::vector<Instruction *> icomps;
+  std::vector<SwitchInst *>  switches;
   LLVMContext               &C = M.getContext();
 
   Type        *VoidTy = Type::getVoidTy(C);
@@ -262,7 +197,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {
-    if (!isIgnoreFunction(&F)) continue;
+    if (isIgnoreFunction(&F)) { continue; }
 
     for (auto &BB : F) {
       for (auto &IN : BB) {
@@ -272,8 +207,16 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
         }
       }
     }
+
+    for (auto &BB : F) {
+      SwitchInst *switchInst = nullptr;
+      if ((switchInst = dyn_cast<SwitchInst>(BB.getTerminator()))) {
+        if (switchInst->getNumCases() > 1) { switches.push_back(switchInst); }
+      }
+    }
   }
 
+  switches.erase(Unique(switches.begin(), switches.end()), switches.end());
   if (icomps.size()) {
     // if (!be_quiet) errs() << "Hooking " << icomps.size() <<
     //                          " cmp instructions\n";
@@ -570,11 +513,114 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
     }
   }
 
-  if (icomps.size()) {
-    return true;
-  } else {
-    return false;
+  if (switches.size()) {
+    for (auto &SI : switches) {
+      Value        *Val = SI->getCondition();
+      unsigned int  max_size = Val->getType()->getIntegerBitWidth();
+      unsigned int  cast_size;
+      unsigned char do_cast = 0;
+
+      if (!SI->getNumCases() || max_size < 16) {
+        // skipping trivial switch
+        continue;
+      }
+
+      if (max_size % 8) {
+        max_size = (((max_size / 8) + 1) * 8);
+        do_cast = 1;
+      }
+
+      if (max_size > 128) {
+        // can't handle this
+
+        max_size = 128;
+        do_cast = 1;
+      }
+
+      IRBuilder<> IRB(SI->getParent());
+      IRB.SetInsertPoint(SI);
+
+      switch (max_size) {
+        case 8:
+        case 16:
+        case 32:
+        case 64:
+        case 128:
+          cast_size = max_size;
+          break;
+        default:
+          cast_size = 128;
+          do_cast = 1;
+      }
+
+      // The predicate of the switch clause
+      Value *CompareTo = Val;
+      if (do_cast) {
+        CompareTo =
+            IRB.CreateIntCast(CompareTo, IntegerType::get(C, cast_size), false);
+      }
+
+      for (SwitchInst::CaseIt i = SI->case_begin(), e = SI->case_end(); i != e;
+           ++i) {
+        // Who uses LLVM Major < 5?? :p
+        ConstantInt *cint = i->getCaseValue();
+
+        if (cint) {
+          std::vector<Value *> args;
+          args.push_back(CompareTo);
+
+          Value *new_param = cint;
+          if (do_cast) {
+            new_param =
+                IRB.CreateIntCast(cint, IntegerType::get(C, cast_size), false);
+          }
+
+          if (new_param) {
+            args.push_back(new_param);
+            if (CmplogExtended) {
+              ConstantInt *attribute = ConstantInt::get(Int8Ty, 1);
+              args.push_back(attribute);
+            }
+            if (cast_size != max_size) {
+              // not 8, 16, 32, 64, 128.
+              ConstantInt *bitsize =
+                  ConstantInt::get(Int8Ty, (max_size / 8) - 1);
+              args.push_back(bitsize);  // we have the arg for size in hookinsN
+            }
+
+            switch (cast_size) {
+              case 8:
+                IRB.CreateCall(cmplogHookIns1, args);
+                break;
+              case 16:
+                IRB.CreateCall(cmplogHookIns2, args);
+                break;
+              case 32:
+                IRB.CreateCall(cmplogHookIns4, args);
+                break;
+              case 64:
+                IRB.CreateCall(cmplogHookIns8, args);
+                break;
+              case 128:
+#ifdef WORD_SIZE_64
+                if (max_size == 128) {
+                  IRB.CreateCall(cmplogHookIns16, args);
+
+                } else {
+                  IRB.CreateCall(cmplogHookInsN, args);
+                }
+
+#endif
+                break;
+              default:
+                break;
+            }
+          }
+        }
+      }
+    }
   }
+  return true;
 }
 
 #if USE_NEW_PM

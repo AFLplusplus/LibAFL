@@ -19,7 +19,7 @@ use content_inspector::inspect;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -394,29 +394,24 @@ fn fuzz_binary(
     let mut tracing_harness = harness;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = TimeoutExecutor::new(
-        InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?,
+    let mut executor = InProcessExecutor::with_timeout(
+        &mut harness,
+        tuple_list!(edges_observer, time_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
         timeout,
-    );
+    )?;
 
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(TimeoutExecutor::new(
-        InProcessExecutor::new(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?,
-        // Give it more time!
+    let tracing = TracingStage::new(InProcessExecutor::with_timeout(
+        &mut tracing_harness,
+        tuple_list!(cmplog_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
         timeout * 10,
-    ));
+    )?);
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
@@ -448,7 +443,7 @@ fn fuzz_binary(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Remove target ouput (logs still survive)
+    // Remove target output (logs still survive)
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
@@ -621,29 +616,24 @@ fn fuzz_text(
     let generalization = GeneralizationStage::new(&edges_observer);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = TimeoutExecutor::new(
-        InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?,
+    let mut executor = InProcessExecutor::with_timeout(
+        &mut harness,
+        tuple_list!(edges_observer, time_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
         timeout,
-    );
-
+    )?;
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(TimeoutExecutor::new(
-        InProcessExecutor::new(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?,
+    let tracing = TracingStage::new(InProcessExecutor::with_timeout(
+        &mut tracing_harness,
+        tuple_list!(cmplog_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
         // Give it more time!
         timeout * 10,
-    ));
+    )?);
 
     // The order of the stages matter!
     let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);
@@ -675,7 +665,7 @@ fn fuzz_text(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Remove target ouput (logs still survive)
+    // Remove target output (logs still survive)
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();

@@ -105,7 +105,7 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned
     /// Compute the hash of the map
     fn hash(&self) -> u64;
 
-    /// Get the initial value for reset()
+    /// Get the initial value for `reset()`
     fn initial(&self) -> Self::Entry;
 
     /// Reset the map
@@ -540,6 +540,11 @@ where
             name,
             OwnedMutSlice::from_raw_parts_mut(map_ptr, len),
         )
+    }
+
+    /// Gets the initial value for this map, mutably
+    pub fn initial_mut(&mut self) -> &mut T {
+        &mut self.initial
     }
 
     /// Gets the backing for this map
@@ -978,7 +983,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + Serialize,
+    T: Default + Copy + 'static + Serialize + PartialEq + Bounded,
 {
     map: OwnedMutSlice<'a, T>,
     size: OwnedMutPtr<usize>,
@@ -989,7 +994,14 @@ where
 impl<'a, S, T> Observer<S> for VariableMapObserver<'a, T>
 where
     S: UsesInput,
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug
+        + Bounded
+        + PartialEq,
     Self: MapObserver,
 {
     #[inline]
@@ -1000,7 +1012,7 @@ where
 
 impl<'a, T> Named for VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Bounded + PartialEq,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -1010,7 +1022,7 @@ where
 
 impl<'a, T> HasLen for VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + PartialEq + Bounded,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -1027,7 +1039,9 @@ where
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
-        + Debug,
+        + Debug
+        + PartialEq
+        + Bounded,
 {
     type Item = T;
     type IntoIter = Iter<'it, T>;
@@ -1047,7 +1061,9 @@ where
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
-        + Debug,
+        + Debug
+        + PartialEq
+        + Bounded,
 {
     type Item = T;
     type IntoIter = IterMut<'it, T>;
@@ -1067,7 +1083,9 @@ where
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
-        + Debug,
+        + Debug
+        + PartialEq
+        + Bounded,
 {
     type Item = <Iter<'it, T> as Iterator>::Item;
     type IntoIter = Iter<'it, T>;
@@ -1087,7 +1105,9 @@ where
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
-        + Debug,
+        + Debug
+        + PartialEq
+        + Bounded,
 {
     type Item = <IterMut<'it, T> as Iterator>::Item;
     type IntoIter = IterMut<'it, T>;
@@ -1107,7 +1127,9 @@ where
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
-        + Debug,
+        + Debug
+        + PartialEq
+        + Bounded,
 {
     /// Returns an iterator over the map.
     pub fn iter(&self) -> Iter<'_, T> {
@@ -1129,7 +1151,9 @@ where
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
-        + Debug,
+        + Debug
+        + PartialEq
+        + Bounded,
 {
     type Entry = T;
 
@@ -1208,7 +1232,9 @@ where
         + 'static
         + Serialize
         + serde::de::DeserializeOwned
-        + Debug,
+        + Debug
+        + PartialEq
+        + Bounded,
 {
     type Entry = T;
     #[inline]
@@ -1219,18 +1245,26 @@ where
 }
 impl<'a, T> AsMutSlice for VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static
+        + Default
+        + Copy
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug
+        + PartialEq
+        + Bounded,
 {
     type Entry = T;
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] {
-        self.map.as_mut_slice()
+        let cnt = self.usable_count();
+        &mut self.map.as_mut_slice()[..cnt]
     }
 }
 
 impl<'a, T> VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + PartialEq + Bounded,
 {
     /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`]
     ///
@@ -1805,7 +1839,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct MultiMapObserver<'a, T, const DIFFERENTIAL: bool>
 where
-    T: Default + Copy + 'static + Serialize + Debug,
+    T: 'static + Default + Copy + Serialize + Debug,
 {
     maps: Vec<OwnedMutSlice<'a, T>>,
     intervals: IntervalTree<usize, usize>,
@@ -1818,7 +1852,7 @@ where
 impl<'a, S, T> Observer<S> for MultiMapObserver<'a, T, false>
 where
     S: UsesInput,
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
     #[inline]
@@ -1830,7 +1864,7 @@ where
 impl<'a, S, T> Observer<S> for MultiMapObserver<'a, T, true>
 where
     S: UsesInput,
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
     // in differential mode, we are *not* responsible for resetting the map!
@@ -1838,7 +1872,7 @@ where
 
 impl<'a, T, const DIFFERENTIAL: bool> Named for MultiMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -1848,7 +1882,7 @@ where
 
 impl<'a, T, const DIFFERENTIAL: bool> HasLen for MultiMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -1858,11 +1892,11 @@ where
 
 impl<'a, T, const DIFFERENTIAL: bool> MapObserver for MultiMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Bounded
+    T: 'static
+        + Bounded
         + PartialEq
         + Default
         + Copy
-        + 'static
         + Serialize
         + serde::de::DeserializeOwned
         + Debug,
@@ -1955,7 +1989,7 @@ where
 
 impl<'a, T, const DIFFERENTIAL: bool> MultiMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     /// Creates a new [`MultiMapObserver`], maybe in differential mode
     #[must_use]
@@ -1980,7 +2014,7 @@ where
 
 impl<'a, T> MultiMapObserver<'a, T, true>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     /// Creates a new [`MultiMapObserver`] in differential mode
     #[must_use]
@@ -1991,7 +2025,7 @@ where
 
 impl<'a, T> MultiMapObserver<'a, T, false>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     /// Creates a new [`MultiMapObserver`]
     #[must_use]
@@ -2028,7 +2062,7 @@ where
 
 impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIter<'it> for MultiMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
     'a: 'it,
 {
     type Item = T;
@@ -2041,7 +2075,7 @@ where
 
 impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIterMut<'it> for MultiMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
     'a: 'it,
 {
     type Item = T;
@@ -2055,7 +2089,7 @@ where
 impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator
     for &'it MultiMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Item = <Iter<'it, T> as Iterator>::Item;
     type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'a, T>>>;
@@ -2068,7 +2102,7 @@ where
 impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator
     for &'it mut MultiMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Item = <IterMut<'it, T> as Iterator>::Item;
     type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'a, T>>>;
@@ -2080,7 +2114,7 @@ where
 
 impl<'a, T, const DIFFERENTIAL: bool> MultiMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     /// Returns an iterator over the map.
     pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
@@ -2095,7 +2129,7 @@ where
 
 impl<'a, T, OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for MultiMapObserver<'a, T, true>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
     OTA: ObserversTuple<S>,
     OTB: ObserversTuple<S>,
@@ -2110,7 +2144,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize,
+    T: 'static + Default + Copy + Serialize,
 {
     map: Vec<T>,
     initial: T,
@@ -2120,7 +2154,7 @@ where
 impl<S, T> Observer<S> for OwnedMapObserver<T>
 where
     S: UsesInput,
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
     #[inline]
@@ -2131,7 +2165,7 @@ where
 
 impl<T> Named for OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -2141,7 +2175,7 @@ where
 
 impl<T> HasLen for OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -2151,7 +2185,7 @@ where
 
 impl<'it, T> AsIter<'it> for OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Item = T;
     type IntoIter = Iter<'it, T>;
@@ -2163,7 +2197,7 @@ where
 
 impl<'it, T> AsIterMut<'it> for OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Item = T;
     type IntoIter = IterMut<'it, T>;
@@ -2175,7 +2209,7 @@ where
 
 impl<'it, T> IntoIterator for &'it OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Item = <Iter<'it, T> as Iterator>::Item;
     type IntoIter = Iter<'it, T>;
@@ -2187,7 +2221,7 @@ where
 
 impl<'it, T> IntoIterator for &'it mut OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Item = <IterMut<'it, T> as Iterator>::Item;
     type IntoIter = IterMut<'it, T>;
@@ -2199,7 +2233,7 @@ where
 
 impl<T> OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     /// Returns an iterator over the map.
     pub fn iter(&self) -> Iter<'_, T> {
@@ -2214,11 +2248,11 @@ where
 
 impl<T> MapObserver for OwnedMapObserver<T>
 where
-    T: Bounded
+    T: 'static
+        + Bounded
         + PartialEq
         + Default
         + Copy
-        + 'static
         + Serialize
         + serde::de::DeserializeOwned
         + Debug,
@@ -2295,7 +2329,7 @@ where
 
 impl<T> AsSlice for OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Entry = T;
     #[must_use]
@@ -2307,7 +2341,7 @@ where
 
 impl<T> AsMutSlice for OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned + Debug,
 {
     type Entry = T;
     #[must_use]
@@ -2319,7 +2353,7 @@ where
 
 impl<T> OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: 'static + Default + Copy + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`] with an owned map
     #[must_use]

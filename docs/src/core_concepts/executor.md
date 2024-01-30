@@ -9,11 +9,9 @@ So the Executor is for instance responsible to inform the program about the inpu
 
 In our model, it can also hold a set of Observers connected with each execution.
 
-In Rust, we bind this concept to the [`Executor`](https://docs.rs/libafl/0/libafl/executors/trait.Executor.html) trait. A structure implementing this trait must implement [`HasObservers`](https://docs.rs/libafl/0/libafl/executors/trait.HasObservers.html) too if wants to hold a set of Observers.
+In Rust, we bind this concept to the [`Executor`](https://docs.rs/libafl/latest/libafl/executors/trait.Executor.html) trait. A structure implementing this trait must implement [`HasObservers`](https://docs.rs/libafl/latest/libafl/executors/trait.HasObservers.html) too if wants to hold a set of Observers.
 
-By default, we implement some commonly used Executors such as [`InProcessExecutor`](https://docs.rs/libafl/0/libafl/executors/inprocess/struct.InProcessExecutor.html) in which the target is a harness function providing in-process crash detection. Another Executor is the [`ForkserverExecutor`](https://docs.rs/libafl/0/libafl/executors/forkserver/struct.ForkserverExecutor.html) that implements an AFL-like mechanism to spawn child processes to fuzz.
-
-A common pattern when creating an Executor is wrapping an existing one, for instance [`TimeoutExecutor`](https://docs.rs/libafl/0.6.1/libafl/executors/timeout/struct.TimeoutExecutor.html) wraps an executor and installs a timeout callback before calling the original `run` function of the wrapped executor.
+By default, we implement some commonly used Executors such as [`InProcessExecutor`](https://docs.rs/libafl/latest/libafl/executors/inprocess/type.InProcessExecutor.html) in which the target is a harness function providing in-process crash detection. Another Executor is the [`ForkserverExecutor`](https://docs.rs/libafl/latest/libafl/executors/forkserver/struct.ForkserverExecutor.html) that implements an AFL-like mechanism to spawn child processes to fuzz.
 
 ## InProcessExecutor
 Let's begin with the base case; `InProcessExecutor`.
@@ -24,7 +22,7 @@ When you want to execute the harness as fast as possible, you will most probably
  One thing to note here is, when your harness is likely to have heap corruption bugs, you want to use another allocator so that corrupted heap does not affect the fuzzer itself. (For example, we adopt MiMalloc in some of our fuzzers.). Alternatively you can compile your harness with address sanitizer to make sure you can catch these heap bugs.
 
 ## ForkserverExecutor
-Next, we'll take a look at the `ForkserverExecutor`. In this case, it is `afl-cc` (from AFLplusplus/AFLplusplus) that compiles the harness code, and therefore, we can't use `EDGES_MAP` anymore. Fortunately we have [_a way_](https://github.com/AFLplusplus/AFLplusplus/blob/2e15661f184c77ac1fbb6f868c894e946cbb7f17/instrumentation/afl-compiler-rt.o.c#L270) to tell the forkserver which map to record the coverage in.
+Next, we'll take a look at the `ForkserverExecutor`. In this case, it is `afl-cc` (from AFL/AFLplusplus) that compiles the harness code, and therefore, we can't use `EDGES_MAP` anymore. Fortunately we have [_a way_](https://github.com/AFLplusplus/AFLplusplus/blob/2e15661f184c77ac1fbb6f868c894e946cbb7f17/instrumentation/afl-compiler-rt.o.c#L270) to tell the forkserver which map to record the coverage in.
 
 As you can see from the forkserver example,
 

@@ -9,7 +9,7 @@ use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
+    executors::{ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -231,8 +231,8 @@ where
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
+                    timeout,
                 )?;
-                let executor = TimeoutExecutor::new(executor, timeout);
                 let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
                 // In case the corpus is empty (on first run), reset
@@ -330,15 +330,15 @@ where
                     tuple_list!(QemuEdgeCoverageHelper::default()),
                 );
 
-                let executor = QemuExecutor::new(
+                let mut executor = QemuExecutor::new(
                     &mut hooks,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
+                    timeout,
                 )?;
-                let mut executor = TimeoutExecutor::new(executor, timeout);
 
                 // In case the corpus is empty (on first run), reset
                 if state.must_load_initial_inputs() {

@@ -7,9 +7,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mutators::Mutator,
-    schedulers::{
-        ecofuzz::EcoTestcaseScore, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
-    },
+    schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{mutational::MutatedTransform, MutationalStage, Stage},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
@@ -73,6 +71,8 @@ where
     Z: Evaluator<E, EM, State = E::State>,
     I: MutatedTransform<E::Input, E::State> + Clone,
 {
+    type Progress = (); // TODO should we resume this stage?
+
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
@@ -81,9 +81,8 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+        let ret = self.perform_mutational(fuzzer, executor, state, manager);
         ret
     }
 }
@@ -124,7 +123,3 @@ where
 /// The standard powerscheduling stage
 pub type StdPowerMutationalStage<E, EM, I, M, Z> =
     PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;
-
-/// Ecofuzz scheduling stage
-pub type EcoPowerMutationalStage<E, EM, I, M, Z> =
-    PowerMutationalStage<E, EcoTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;

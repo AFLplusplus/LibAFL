@@ -5,6 +5,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, not(miri), feature = "std"))]
+use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
@@ -41,7 +43,7 @@ use typed_builder::TypedBuilder;
 
 use super::{CustomBufEventResult, CustomBufHandlerFn};
 #[cfg(all(unix, feature = "std"))]
-use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
+use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
@@ -962,6 +964,8 @@ where
 
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        state.on_restart()?;
+
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(&(
@@ -1155,6 +1159,19 @@ where
     S: State + HasExecutions,
     MT: Monitor + Clone,
 {
+    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
+    #[inline]
+    #[allow(clippy::unused_self)]
+    fn is_shutting_down() -> bool {
+        #[cfg(unix)]
+        unsafe {
+            core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
+        }
+
+        #[cfg(windows)]
+        false
+    }
+
     /// Launch the restarting manager
     pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<S, SP>), Error> {
         // We start ourself as child process to actually fuzz
@@ -1235,7 +1252,7 @@ where
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]
-            let mut staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             #[cfg(not(unix))]
@@ -1244,21 +1261,11 @@ where
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
-            #[cfg(unix)]
-            unsafe {
-                let data = &mut SHUTDOWN_SIGHANDLER_DATA;
-                // Write the pointer to staterestorer so we can release its shmem later
-                core::ptr::write_volatile(
-                    &mut data.staterestorer_ptr,
-                    &mut staterestorer as *mut _ as *mut std::ffi::c_void,
-                );
-                data.allocator_pid = std::process::id() as usize;
-                data.shutdown_handler = shutdown_handler::<SP> as *const std::ffi::c_void;
-            }
-
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
+            if let Err(_e) =
+                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
+            {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }
@@ -1274,6 +1281,9 @@ where
                     self.shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
+                            unsafe {
+                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                            }
                             self.shmem_provider.post_fork(false)?;
                             handle.status()
                         }
@@ -1283,6 +1293,11 @@ where
                         }
                     }
                 };
+
+                #[cfg(all(unix, not(feature = "fork")))]
+                unsafe {
+                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                }
 
                 // On Windows (or in any case without fork), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]
@@ -1305,7 +1320,7 @@ where
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
 
-                if staterestorer.wants_to_exit() {
+                if staterestorer.wants_to_exit() || Self::is_shutting_down() {
                     return Err(Error::shutting_down());
                 }
 
@@ -1739,7 +1754,7 @@ mod tests {
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
+        events::llmp::{LlmpEventManager, _ENV_FUZZER_SENDER},
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
         fuzzer::Fuzzer,

@@ -331,7 +331,7 @@ impl QemuSnapshotHelper {
 
         if self.mmap_limit != 0 && total_size > self.mmap_limit {
             let mut cb = self.stop_execution.take().unwrap();
-            let emu = Emulator::new_empty();
+            let emu = Emulator::get().unwrap();
             (cb)(self, &emu);
             self.stop_execution = Some(cb);
         }
@@ -493,7 +493,7 @@ where
         QT: QemuHelperTuple<S>,
     {
         if hooks.match_helper::<QemuAsanHelper>().is_none() {
-            // The ASan helper, if present, will call the tracer hook for the snpahsot helper as opt
+            // The ASan helper, if present, will call the tracer hook for the snapshot helper as opt
             hooks.writes(
                 Hook::Empty,
                 Hook::Function(trace_write1_snapshot::<QT, S>),

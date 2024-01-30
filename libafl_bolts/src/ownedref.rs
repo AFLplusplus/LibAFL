@@ -10,7 +10,28 @@ use core::{clone::Clone, fmt::Debug, slice};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{AsMutSlice, AsSlice, IntoOwned, Truncate};
+use crate::{shmem::ShMem, AsMutSlice, AsSlice, IntoOwned, Truncate};
+
+/// Private part of the unsafe marker, making sure this cannot be initialized directly.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct UnsafeMarkerInner;
+
+/// A struct or enum containing this [`UnsafeMarker`] cannot directly be instantiated.
+/// Usually, this means you'll have to use a constructor like `unsafe { Self::new() }` or similar.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct UnsafeMarker(UnsafeMarkerInner);
+
+impl UnsafeMarker {
+    /// Return a new unsafe marker.
+    /// This usually means you're about to do something unsafe.
+    ///
+    /// # Safety
+    /// Instantiating an [`UnsafeMarker`] isn't unsafe, but the location you need it for
+    /// will likely have potential unsafety.
+    unsafe fn new() -> Self {
+        Self(UnsafeMarkerInner)
+    }
+}
 
 impl<'a, T> Truncate for &'a [T] {
     fn truncate(&mut self, len: usize) {
@@ -32,10 +53,52 @@ pub enum OwnedRef<'a, T>
 where
     T: 'a + ?Sized,
 {
+    /// A pointer to a type
+    RefRaw(*const T, UnsafeMarker),
     /// A ref to a type
     Ref(&'a T),
     /// An owned [`Box`] of a type
     Owned(Box<T>),
+}
+
+impl<'a, T> OwnedRef<'a, T>
+where
+    T: 'a + ?Sized,
+{
+    /// Returns a new [`OwnedRef`], wrapping a pointer of type `T`.
+    ///
+    /// # Safety
+    /// The pointer needs to point to a valid object of type `T`.
+    /// Any use of this [`OwnedRef`] will dereference the pointer accordingly.
+    pub unsafe fn from_ptr(ptr: *const T) -> Self {
+        assert!(
+            !ptr.is_null(),
+            "Null pointer passed to OwnedRef::ref_raw constructor!"
+        );
+        Self::RefRaw(ptr, UnsafeMarker::new())
+    }
+}
+
+impl<'a, T> OwnedRef<'a, T>
+where
+    T: Sized + 'static,
+{
+    /// Returns a new [`OwnedRef`], pointing to the given [`ShMem`].
+    ///
+    /// # Panics
+    /// Panics if the given shared mem is too small
+    ///
+    /// # Safety
+    /// The shared memory needs to start with a valid object of type `T`.
+    /// Any use of this [`OwnedRef`] will dereference a pointer to the shared memory accordingly.
+    pub unsafe fn from_shmem<S: ShMem>(shmem: &mut S) -> Self {
+        Self::from_ptr(shmem.as_mut_ptr_of().unwrap())
+    }
+
+    /// Returns a new [`OwnedRef`], owning the given value.
+    pub fn owned(val: T) -> Self {
+        Self::Owned(Box::new(val))
+    }
 }
 
 impl<'a, T> Serialize for OwnedRef<'a, T>
@@ -47,6 +110,7 @@ where
         S: Serializer,
     {
         match self {
+            OwnedRef::RefRaw(r, _) => unsafe { (*r).as_ref().unwrap() }.serialize(se),
             OwnedRef::Ref(r) => r.serialize(se),
             OwnedRef::Owned(b) => b.serialize(se),
         }
@@ -73,6 +137,7 @@ where
     #[must_use]
     fn as_ref(&self) -> &T {
         match self {
+            OwnedRef::RefRaw(r, _) => unsafe { (*r).as_ref().unwrap() },
             OwnedRef::Ref(r) => r,
             OwnedRef::Owned(v) => v.as_ref(),
         }
@@ -86,7 +151,7 @@ where
     #[must_use]
     fn is_owned(&self) -> bool {
         match self {
-            OwnedRef::Ref(_) => false,
+            OwnedRef::RefRaw(..) | OwnedRef::Ref(_) => false,
             OwnedRef::Owned(_) => true,
         }
     }
@@ -94,6 +159,9 @@ where
     #[must_use]
     fn into_owned(self) -> Self {
         match self {
+            OwnedRef::RefRaw(r, _) => {
+                OwnedRef::Owned(Box::new(unsafe { r.as_ref().unwrap().clone() }))
+            }
             OwnedRef::Ref(r) => OwnedRef::Owned(Box::new(r.clone())),
             OwnedRef::Owned(v) => OwnedRef::Owned(v),
         }
@@ -102,11 +170,59 @@ where
 
 /// Wrap a mutable reference and convert to a Box on serialize
 #[derive(Debug)]
-pub enum OwnedRefMut<'a, T: 'a + ?Sized> {
+pub enum OwnedRefMut<'a, T>
+where
+    T: 'a + ?Sized,
+{
+    /// A mutable pointer to a type
+    RefRaw(*mut T, UnsafeMarker),
     /// A mutable ref to a type
     Ref(&'a mut T),
     /// An owned [`Box`] of a type
     Owned(Box<T>),
+}
+
+impl<'a, T> OwnedRefMut<'a, T>
+where
+    T: 'a + ?Sized,
+{
+    /// Returns a new [`OwnedRefMut`], wrapping a mutable pointer.
+    ///
+    /// # Panics
+    /// Panics if the given pointer is `null`
+    ///
+    /// # Safety
+    /// The pointer needs to point to a valid object of type `T`.
+    /// Any use of this [`OwnedRefMut`] will dereference the pointer accordingly.
+    pub unsafe fn from_mut_ptr(ptr: *mut T) -> Self {
+        assert!(
+            !ptr.is_null(),
+            "Null pointer passed to OwnedRefMut::from_mut_ptr constructor!"
+        );
+        Self::RefRaw(ptr, UnsafeMarker::new())
+    }
+}
+
+impl<'a, T> OwnedRefMut<'a, T>
+where
+    T: Sized + 'static,
+{
+    /// Returns a new [`OwnedRefMut`], pointing to the given [`ShMem`].
+    ///
+    /// # Panics
+    /// Panics if the given shared mem is too small
+    ///
+    /// # Safety
+    /// The shared memory needs to start with a valid object of type `T`.
+    /// Any use of this [`OwnedRefMut`] will dereference a pointer to the shared memory accordingly.
+    pub unsafe fn from_shmem<S: ShMem>(shmem: &mut S) -> Self {
+        Self::from_mut_ptr(shmem.as_mut_ptr_of().unwrap())
+    }
+
+    /// Returns a new [`OwnedRefMut`], owning the given value.
+    pub fn owned(val: T) -> Self {
+        Self::Owned(Box::new(val))
+    }
 }
 
 impl<'a, T: 'a + ?Sized + Serialize> Serialize for OwnedRefMut<'a, T> {
@@ -116,6 +232,7 @@ impl<'a, T: 'a + ?Sized + Serialize> Serialize for OwnedRefMut<'a, T> {
     {
         match self {
             OwnedRefMut::Ref(r) => r.serialize(se),
+            OwnedRefMut::RefRaw(r, _) => unsafe { r.as_ref().unwrap().serialize(se) },
             OwnedRefMut::Owned(b) => b.serialize(se),
         }
     }
@@ -137,6 +254,7 @@ impl<'a, T: Sized> AsRef<T> for OwnedRefMut<'a, T> {
     #[must_use]
     fn as_ref(&self) -> &T {
         match self {
+            OwnedRefMut::RefRaw(r, _) => unsafe { r.as_ref().unwrap() },
             OwnedRefMut::Ref(r) => r,
             OwnedRefMut::Owned(v) => v.as_ref(),
         }
@@ -147,6 +265,7 @@ impl<'a, T: Sized> AsMut<T> for OwnedRefMut<'a, T> {
     #[must_use]
     fn as_mut(&mut self) -> &mut T {
         match self {
+            OwnedRefMut::RefRaw(r, _) => unsafe { r.as_mut().unwrap() },
             OwnedRefMut::Ref(r) => r,
             OwnedRefMut::Owned(v) => v.as_mut(),
         }
@@ -160,7 +279,7 @@ where
     #[must_use]
     fn is_owned(&self) -> bool {
         match self {
-            OwnedRefMut::Ref(_) => false,
+            OwnedRefMut::RefRaw(..) | OwnedRefMut::Ref(_) => false,
             OwnedRefMut::Owned(_) => true,
         }
     }
@@ -168,6 +287,9 @@ where
     #[must_use]
     fn into_owned(self) -> Self {
         match self {
+            OwnedRefMut::RefRaw(r, _) => unsafe {
+                OwnedRefMut::Owned(Box::new(r.as_ref().unwrap().clone()))
+            },
             OwnedRefMut::Ref(r) => OwnedRefMut::Owned(Box::new(r.clone())),
             OwnedRefMut::Owned(v) => OwnedRefMut::Owned(v),
         }
@@ -178,7 +300,7 @@ where
 #[derive(Clone, Debug)]
 enum OwnedSliceInner<'a, T: 'a + Sized> {
     /// A ref to a raw slice and length
-    RefRaw(*const T, usize),
+    RefRaw(*const T, usize, UnsafeMarker),
     /// A ref to a slice
     Ref(&'a [T]),
     /// A ref to an owned [`Vec`]
@@ -191,7 +313,7 @@ impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSliceInner<'a, T> {
         S: Serializer,
     {
         match self {
-            OwnedSliceInner::RefRaw(rr, len) => unsafe {
+            OwnedSliceInner::RefRaw(rr, len, _) => unsafe {
                 slice::from_raw_parts(*rr, *len).serialize(se)
             },
             OwnedSliceInner::Ref(r) => r.serialize(se),
@@ -239,14 +361,14 @@ impl<'a, T> OwnedSlice<'a, T> {
     #[must_use]
     pub unsafe fn from_raw_parts(ptr: *const T, len: usize) -> Self {
         Self {
-            inner: OwnedSliceInner::RefRaw(ptr, len),
+            inner: OwnedSliceInner::RefRaw(ptr, len, UnsafeMarker::new()),
         }
     }
 
     /// Truncate the inner slice or vec returning the old size on success or `None` on failure
     pub fn truncate(&mut self, new_len: usize) -> Option<usize> {
         match &mut self.inner {
-            OwnedSliceInner::RefRaw(_rr, len) => {
+            OwnedSliceInner::RefRaw(_rr, len, _) => {
                 let tmp = *len;
                 if new_len <= tmp {
                     *len = new_len;
@@ -323,7 +445,9 @@ impl<'a, T> From<OwnedMutSlice<'a, T>> for OwnedSlice<'a, T> {
     fn from(mut_slice: OwnedMutSlice<'a, T>) -> Self {
         Self {
             inner: match mut_slice.inner {
-                OwnedMutSliceInner::RefRaw(ptr, len) => OwnedSliceInner::RefRaw(ptr as _, len),
+                OwnedMutSliceInner::RefRaw(ptr, len, unsafe_marker) => {
+                    OwnedSliceInner::RefRaw(ptr as _, len, unsafe_marker)
+                }
                 OwnedMutSliceInner::Ref(r) => OwnedSliceInner::Ref(r as _),
                 OwnedMutSliceInner::Owned(v) => OwnedSliceInner::Owned(v),
             },
@@ -338,7 +462,7 @@ impl<'a, T: Sized> AsSlice for OwnedSlice<'a, T> {
     fn as_slice(&self) -> &[T] {
         match &self.inner {
             OwnedSliceInner::Ref(r) => r,
-            OwnedSliceInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts(*rr, *len) },
+            OwnedSliceInner::RefRaw(rr, len, _) => unsafe { slice::from_raw_parts(*rr, *len) },
             OwnedSliceInner::Owned(v) => v.as_slice(),
         }
     }
@@ -351,7 +475,7 @@ where
     #[must_use]
     fn is_owned(&self) -> bool {
         match self.inner {
-            OwnedSliceInner::RefRaw(_, _) | OwnedSliceInner::Ref(_) => false,
+            OwnedSliceInner::RefRaw(..) | OwnedSliceInner::Ref(_) => false,
             OwnedSliceInner::Owned(_) => true,
         }
     }
@@ -359,7 +483,7 @@ where
     #[must_use]
     fn into_owned(self) -> Self {
         match self.inner {
-            OwnedSliceInner::RefRaw(rr, len) => Self {
+            OwnedSliceInner::RefRaw(rr, len, _) => Self {
                 inner: OwnedSliceInner::Owned(unsafe { slice::from_raw_parts(rr, len).to_vec() }),
             },
             OwnedSliceInner::Ref(r) => Self {
@@ -392,7 +516,7 @@ where
 #[derive(Debug)]
 pub enum OwnedMutSliceInner<'a, T: 'a + Sized> {
     /// A raw ptr to a memory location and a length
-    RefRaw(*mut T, usize),
+    RefRaw(*mut T, usize, UnsafeMarker),
     /// A ptr to a mutable slice of the type
     Ref(&'a mut [T]),
     /// An owned [`Vec`] of the type
@@ -405,7 +529,7 @@ impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedMutSliceInner<'a, T> {
         S: Serializer,
     {
         match self {
-            OwnedMutSliceInner::RefRaw(rr, len) => {
+            OwnedMutSliceInner::RefRaw(rr, len, _) => {
                 unsafe { slice::from_raw_parts_mut(*rr, *len) }.serialize(se)
             }
             OwnedMutSliceInner::Ref(r) => r.serialize(se),
@@ -466,7 +590,7 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
             }
         } else {
             Self {
-                inner: OwnedMutSliceInner::RefRaw(ptr, len),
+                inner: OwnedMutSliceInner::RefRaw(ptr, len, UnsafeMarker::new()),
             }
         }
     }
@@ -474,7 +598,7 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
     /// Truncate the inner slice or vec returning the old size on success or `None` on failure
     pub fn truncate(&mut self, new_len: usize) -> Option<usize> {
         match &mut self.inner {
-            OwnedMutSliceInner::RefRaw(_rr, len) => {
+            OwnedMutSliceInner::RefRaw(_rr, len, _) => {
                 let tmp = *len;
                 if new_len <= tmp {
                     *len = new_len;
@@ -521,7 +645,7 @@ impl<'a, T: Sized> AsSlice for OwnedMutSlice<'a, T> {
     #[must_use]
     fn as_slice(&self) -> &[T] {
         match &self.inner {
-            OwnedMutSliceInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts(*rr, *len) },
+            OwnedMutSliceInner::RefRaw(rr, len, _) => unsafe { slice::from_raw_parts(*rr, *len) },
             OwnedMutSliceInner::Ref(r) => r,
             OwnedMutSliceInner::Owned(v) => v.as_slice(),
         }
@@ -533,7 +657,9 @@ impl<'a, T: Sized> AsMutSlice for OwnedMutSlice<'a, T> {
     #[must_use]
     fn as_mut_slice(&mut self) -> &mut [T] {
         match &mut self.inner {
-            OwnedMutSliceInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts_mut(*rr, *len) },
+            OwnedMutSliceInner::RefRaw(rr, len, _) => unsafe {
+                slice::from_raw_parts_mut(*rr, *len)
+            },
             OwnedMutSliceInner::Ref(r) => r,
             OwnedMutSliceInner::Owned(v) => v.as_mut_slice(),
         }
@@ -547,7 +673,7 @@ where
     #[must_use]
     fn is_owned(&self) -> bool {
         match self.inner {
-            OwnedMutSliceInner::RefRaw(_, _) | OwnedMutSliceInner::Ref(_) => false,
+            OwnedMutSliceInner::RefRaw(..) | OwnedMutSliceInner::Ref(_) => false,
             OwnedMutSliceInner::Owned(_) => true,
         }
     }
@@ -555,7 +681,7 @@ where
     #[must_use]
     fn into_owned(self) -> Self {
         let vec = match self.inner {
-            OwnedMutSliceInner::RefRaw(rr, len) => unsafe {
+            OwnedMutSliceInner::RefRaw(rr, len, _) => unsafe {
                 slice::from_raw_parts_mut(rr, len).to_vec()
             },
             OwnedMutSliceInner::Ref(r) => r.to_vec(),

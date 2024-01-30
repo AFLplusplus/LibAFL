@@ -24,6 +24,12 @@ script='''
 cl.exe /LD harness.cc /link /dll gdiplus.lib ole32.lib
 '''
 
+[tasks.harness_windows_cmplog_test]
+script_runner="@shell"
+script='''
+ml64 cmplog_test.asm /subsystem:windows /link /dll /def:cmplog_test.def /entry:dll_main /out:cmplog.dll
+'''
+
 # Fuzzer
 [tasks.fuzzer]
 linux_alias = "unsupported"
@@ -55,6 +61,28 @@ dependencies = [ "fuzzer", "harness" ]
 linux_alias = "unsupported"
 mac_alias = "unsupported"
 windows_alias = "test_windows"
+
+[tasks.test_cmplog]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "test_windows_cmplog"
+
+[tasks.test_windows_cmplog]
+script_runner = "@shell"
+script='''
+@echo off
+
+for %%i in (t1 t2 t3 t4 t5 t6 t7) do (
+  echo Testing %%i...
+  rmdir /s /q output_%%i
+  start "" "frida_gdiplus.exe" -H cmplog.dll -i corpus -o output_%%i --libs-to-instrument cmplog.dll -F %%i -C
+  ping -n 3 127.0.0.1>NUL && taskkill /im frida_gdiplus.exe /F
+  >nul 2>nul dir /a-d "output_%%i" && (echo Files exist) || (exit /b 1337)
+)
+
+echo All tests done
+'''
+dependencies = [ "fuzzer", "harness_windows_cmplog_test" ]
 
 [tasks.test_windows]
 script_runner = "@shell"

@@ -13,7 +13,7 @@
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::unreadable_literal
+    clippy::pub_underscore_fields
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -115,9 +115,9 @@ pub use cmps::*;
 #[cfg(feature = "std")]
 pub mod drcov;
 
-#[cfg(all(windows, feature = "std", feture = "windows_asan"))]
+#[cfg(all(windows, feature = "std", feature = "windows_asan"))]
 pub mod windows_asan;
-#[cfg(all(windows, feature = "std", feture = "windows_asan"))]
+#[cfg(all(windows, feature = "std", feature = "windows_asan"))]
 pub use windows_asan::*;
 
 #[cfg(all(unix, feature = "forkserver"))]

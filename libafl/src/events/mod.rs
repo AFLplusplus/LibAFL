@@ -18,8 +18,6 @@ pub mod tcp;
 #[cfg(feature = "scalability_introspection")]
 use alloc::string::ToString;
 use alloc::{boxed::Box, string::String, vec::Vec};
-#[cfg(all(unix, feature = "std"))]
-use core::ffi::c_void;
 use core::{
     fmt,
     hash::{BuildHasher, Hasher},
@@ -33,8 +31,6 @@ pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use libafl_bolts::{current_time, ClientId};
-#[cfg(all(unix, feature = "std"))]
-use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 pub use llmp::*;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -58,10 +54,9 @@ use crate::{
 
 /// Check if ctrl-c is sent with this struct
 #[cfg(all(unix, feature = "std"))]
-pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData {
-    allocator_pid: 0,
-    staterestorer_ptr: core::ptr::null_mut(),
-    shutdown_handler: core::ptr::null(),
+pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {
+    shutting_down: false,
+    exit_from_main: false,
 };
 
 /// A signal handler for releasing `StateRestore` `ShMem`
@@ -69,60 +64,51 @@ pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData
 #[cfg(all(unix, feature = "std"))]
 #[derive(Debug, Clone)]
 pub struct ShutdownSignalData {
-    allocator_pid: usize,
-    staterestorer_ptr: *mut c_void,
-    shutdown_handler: *const c_void,
+    shutting_down: bool,
+    exit_from_main: bool,
 }
 
-/// Type for shutdown handler
 #[cfg(all(unix, feature = "std"))]
-pub type ShutdownFuncPtr =
-    unsafe fn(Signal, &mut siginfo_t, Option<&mut ucontext_t>, data: &mut ShutdownSignalData);
+impl ShutdownSignalData {
+    /// Set the flag to true, indicating that this process has allocated shmem
+    pub fn set_exit_from_main(&mut self) {
+        unsafe {
+            core::ptr::write_volatile(core::ptr::addr_of_mut!(self.exit_from_main), true);
+        }
+    }
+}
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
-///
-/// # Safety
-///
-/// This will acceess `data` and write to the global `data.staterestorer_ptr` if it's not null.
-#[cfg(all(unix, feature = "std"))]
-#[allow(clippy::needless_pass_by_value)]
-pub unsafe fn shutdown_handler<SP>(
-    signal: Signal,
-    _info: &mut siginfo_t,
-    _context: Option<&mut ucontext_t>,
-    data: &ShutdownSignalData,
-) where
-    SP: ShMemProvider,
-{
-    log::info!(
-        "Fuzzer shutdown by Signal: {} Pid: {}",
-        signal,
-        std::process::id()
-    );
-
-    let ptr = data.staterestorer_ptr;
-    if ptr.is_null() || data.allocator_pid != std::process::id() as usize {
-        // Do nothing
-    } else {
-        // The process allocated the staterestorer map must take care of it
-        let sr = (ptr as *mut StateRestorer<SP>).as_mut().unwrap();
-        // log::trace!("{:#?}", sr);
-        std::ptr::drop_in_place(sr);
-    }
-    log::info!("Bye!");
-    libc::_exit(0);
-}
-
 #[cfg(all(unix, feature = "std"))]
 impl Handler for ShutdownSignalData {
-    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: Option<&mut ucontext_t>) {
-        unsafe {
-            let data = &mut SHUTDOWN_SIGHANDLER_DATA;
-            if !data.shutdown_handler.is_null() {
-                let func: ShutdownFuncPtr = std::mem::transmute(data.shutdown_handler);
-                (func)(signal, info, context, data);
+    fn handle(
+        &mut self,
+        _signal: Signal,
+        _info: &mut siginfo_t,
+        _context: Option<&mut ucontext_t>,
+    ) {
+        /*
+        println!(
+            "in handler! {} {}",
+            self.exit_from_main,
+            std::process::id()
+        );
+        */
+        // if this process has not allocated any shmem. then simply exit()
+        if !self.exit_from_main {
+            unsafe {
+                #[cfg(unix)]
+                libc::_exit(0);
+
+                #[cfg(windows)]
+                windows::Win32::System::Threading::ExitProcess(1);
             }
+        }
+
+        // else wait till the next is_shutting_down() is called. then the process will exit throught main().
+        unsafe {
+            core::ptr::write_volatile(core::ptr::addr_of_mut!(self.shutting_down), true);
         }
     }
 
@@ -142,7 +128,7 @@ pub struct EventManagerId(
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-use crate::{inputs::UsesInput, state::UsesState};
+use crate::{inputs::UsesInput, stages::HasCurrentStage, state::UsesState};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -562,8 +548,11 @@ where
 /// Restartable trait
 pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
+    /// You *must* ensure that [`HasCurrentStage::on_restart`] will be invoked in this method, by you
+    /// or an internal [`EventRestarter`], before the state is saved for recovery.
     #[inline]
-    fn on_restart(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        state.on_restart()?;
         self.await_restart_safe();
         Ok(())
     }
@@ -619,7 +608,7 @@ pub trait HasCustomBufHandlers: UsesState {
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug)]
 pub struct NopEventManager<S> {
     phantom: PhantomData<S>,
 }
@@ -631,6 +620,12 @@ impl<S> NopEventManager<S> {
         NopEventManager {
             phantom: PhantomData,
         }
+    }
+}
+
+impl<S> Default for NopEventManager<S> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -699,8 +694,162 @@ impl<S> HasEventManagerId for NopEventManager<S> {
     }
 }
 
+/// An [`EventManager`] type that wraps another manager, but captures a `monitor` type as well.
+/// This is useful to keep the same API between managers with and without an internal `monitor`.
+#[derive(Copy, Clone, Debug)]
+pub struct MonitorTypedEventManager<EM, M> {
+    inner: EM,
+    phantom: PhantomData<M>,
+}
+
+impl<EM, M> MonitorTypedEventManager<EM, M> {
+    /// Creates a new [`EventManager`] that wraps another manager, but captures a `monitor` type as well.
+    #[must_use]
+    pub fn new(inner: EM) -> Self {
+        MonitorTypedEventManager {
+            inner,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<EM, M> UsesState for MonitorTypedEventManager<EM, M>
+where
+    EM: UsesState,
+{
+    type State = EM::State;
+}
+
+impl<EM, M> EventFirer for MonitorTypedEventManager<EM, M>
+where
+    EM: EventFirer,
+{
+    #[inline]
+    fn fire(
+        &mut self,
+        state: &mut Self::State,
+        event: Event<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
+        self.inner.fire(state, event)
+    }
+
+    #[inline]
+    fn log(
+        &mut self,
+        state: &mut Self::State,
+        severity_level: LogSeverity,
+        message: String,
+    ) -> Result<(), Error> {
+        self.inner.log(state, severity_level, message)
+    }
+
+    #[inline]
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
+    where
+        OT: ObserversTuple<Self::State> + Serialize,
+    {
+        self.inner.serialize_observers(observers)
+    }
+
+    #[inline]
+    fn configuration(&self) -> EventConfig {
+        self.inner.configuration()
+    }
+}
+
+impl<EM, M> EventRestarter for MonitorTypedEventManager<EM, M>
+where
+    EM: EventRestarter,
+{
+    #[inline]
+    fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.inner.on_restart(state)
+    }
+
+    #[inline]
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        self.inner.send_exiting()
+    }
+
+    #[inline]
+    fn await_restart_safe(&mut self) {
+        self.inner.await_restart_safe();
+    }
+}
+
+impl<E, EM, M, Z> EventProcessor<E, Z> for MonitorTypedEventManager<EM, M>
+where
+    EM: EventProcessor<E, Z>,
+{
+    #[inline]
+    fn process(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        executor: &mut E,
+    ) -> Result<usize, Error> {
+        self.inner.process(fuzzer, state, executor)
+    }
+}
+
+impl<E, EM, M, Z> EventManager<E, Z> for MonitorTypedEventManager<EM, M>
+where
+    EM: EventManager<E, Z>,
+    EM::State: HasLastReportTime + HasExecutions + HasMetadata,
+{
+}
+
+impl<EM, M> HasCustomBufHandlers for MonitorTypedEventManager<EM, M>
+where
+    Self: UsesState,
+    EM: HasCustomBufHandlers<State = Self::State>,
+{
+    #[inline]
+    fn add_custom_buf_handler(
+        &mut self,
+        handler: Box<
+            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+        >,
+    ) {
+        self.inner.add_custom_buf_handler(handler);
+    }
+}
+
+impl<EM, M> ProgressReporter for MonitorTypedEventManager<EM, M>
+where
+    Self: UsesState,
+    EM: ProgressReporter<State = Self::State>,
+    EM::State: HasLastReportTime + HasExecutions + HasMetadata,
+{
+    #[inline]
+    fn maybe_report_progress(
+        &mut self,
+        state: &mut Self::State,
+        monitor_timeout: Duration,
+    ) -> Result<(), Error> {
+        self.inner.maybe_report_progress(state, monitor_timeout)
+    }
+
+    #[inline]
+    fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.inner.report_progress(state)
+    }
+}
+
+impl<EM, M> HasEventManagerId for MonitorTypedEventManager<EM, M>
+where
+    EM: HasEventManagerId,
+{
+    #[inline]
+    fn mgr_id(&self) -> EventManagerId {
+        self.inner.mgr_id()
+    }
+}
+
 #[cfg(test)]
 mod tests {
+
+    use core::ptr::addr_of_mut;
 
     use libafl_bolts::{current_time, tuples::tuple_list, Named};
     use tuple_list::tuple_list_type;
@@ -716,7 +865,9 @@ mod tests {
 
     #[test]
     fn test_event_serde() {
-        let obv = unsafe { StdMapObserver::new("test", &mut MAP) };
+        let obv = unsafe {
+            StdMapObserver::from_mut_ptr("test", addr_of_mut!(MAP) as *mut u32, MAP.len())
+        };
         let map = tuple_list!(obv);
         let observers_buf = postcard::to_allocvec(&map).unwrap();
 

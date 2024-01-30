@@ -18,7 +18,10 @@ fn main() {
     }
 
     if cfg!(not(any(target_os = "linux", target_os = "macos"))) {
-        unimplemented!("libafl_libfuzzer only supports linux or macos, refusing to build");
+        println!(
+            "cargo:warning=The libafl_libfuzzer runtime may only be built for linux or macos; failing fast."
+        );
+        return;
     }
 
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/src");
@@ -75,7 +78,7 @@ fn main() {
 
     assert!(
         command.status().map_or(false, |s| s.success()),
-        "Couldn't build runtime crate! Did you remember to use nightly?"
+        "Couldn't build runtime crate! Did you remember to use nightly? (`rustup default nightly` to install) Or, did you remember to install ucd-generate? (`cargo install ucd-generate` to install)"
     );
 
     let mut archive_path = custom_lib_dir.join(std::env::var_os("TARGET").unwrap());
@@ -100,7 +103,6 @@ fn main() {
         };
 
         let redefined_archive_path = custom_lib_dir.join("libFuzzer.a");
-
         let redefined_symbols = custom_lib_dir.join("redefs.txt");
 
         let mut nm_child = Command::new(nm)
@@ -146,7 +148,7 @@ fn main() {
 
         assert!(
             nm_child.wait().map_or(false, |s| s.success()),
-            "Couldn't link runtime crate! Do you have the llvm-tools component installed?"
+            "Couldn't link runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
         );
 
         let mut objcopy_command = Command::new(rust_objcopy);
@@ -189,7 +191,7 @@ fn main() {
 
         assert!(
             objcopy_command.status().map_or(false, |s| s.success()),
-            "Couldn't rename allocators in the runtime crate! Do you have the llvm-tools component installed?"
+            "Couldn't rename allocators in the runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
         );
 
         #[cfg(feature = "embed-runtime")]

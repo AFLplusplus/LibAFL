@@ -45,7 +45,7 @@ fn find_llvm_config_brew() -> Result<PathBuf, String> {
                 return Err("Empty return from brew --cellar".to_string());
             }
             let location_suffix = "*/bin/llvm-config";
-            let cellar_glob = vec![
+            let cellar_glob = [
                 // location for explicitly versioned brew formulae
                 format!("{brew_cellar_location}/llvm@*/{location_suffix}"),
                 // location for current release brew formulae
@@ -82,7 +82,15 @@ fn find_llvm_config() -> Result<String, String> {
         }
     };
 
-    #[cfg(not(target_vendor = "apple"))]
+    #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+    for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
+        let llvm_config_name: String = format!("/usr/clang/{version}.0/bin/llvm-config");
+        if Path::new(&llvm_config_name).exists() {
+            return Ok(llvm_config_name);
+        }
+    }
+
+    #[cfg(not(any(target_vendor = "apple", target_os = "solaris", target_os = "illumos")))]
     for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
         let llvm_config_name: String = format!("llvm-config-{version}");
         if which(&llvm_config_name).is_ok() {
@@ -303,12 +311,12 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
     let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(2_621_440), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
     cxxflags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={edges_map_size}"));
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
-        .map_or(Ok(65536), str::parse)
+        .map_or(Ok(65_536), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
     cxxflags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={acc_map_size}"));
 
@@ -400,7 +408,6 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",
         "cmplog-instructions-pass.cc",
-        "cmplog-switches-pass.cc",
     ] {
         build_pass(
             bindir_path,

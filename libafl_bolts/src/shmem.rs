@@ -3,11 +3,11 @@
 
 #[cfg(feature = "alloc")]
 use alloc::{rc::Rc, string::ToString};
-use core::fmt::Debug;
 #[cfg(feature = "alloc")]
 use core::fmt::Display;
 #[cfg(feature = "alloc")]
 use core::{cell::RefCell, fmt, mem::ManuallyDrop};
+use core::{fmt::Debug, mem};
 #[cfg(feature = "std")]
 use std::env;
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
@@ -204,52 +204,24 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry 
         self.len() == 0
     }
 
-    /// Convert to an owned object reference
-    ///
-    /// # Safety
-    /// This function is not safe as the object may be not initialized.
-    /// The user is responsible to initialize the object with something like
-    /// `*shmem.as_object_mut::<T>() = T::new();`
-    unsafe fn as_object<T: Sized + 'static>(&self) -> &T {
-        assert!(self.len() >= core::mem::size_of::<T>());
-        (self.as_slice().as_ptr() as *const () as *const T)
-            .as_ref()
-            .unwrap()
+    /// Convert to a ptr of a given type, checking the size.
+    /// If the map is too small, returns `None`
+    fn as_ptr_of<T: Sized>(&self) -> Option<*const T> {
+        if self.len() >= mem::size_of::<T>() {
+            Some(self.as_slice().as_ptr() as *const T)
+        } else {
+            None
+        }
     }
 
-    /// Convert to an owned object mutable reference
-    ///
-    /// # Safety
-    /// This function is not safe as the object may be not initialized.
-    /// The user is responsible to initialize the object with something like
-    /// `*shmem.as_object_mut::<T>() = T::new();`
-    unsafe fn as_object_mut<T: Sized + 'static>(&mut self) -> &mut T {
-        assert!(self.len() >= core::mem::size_of::<T>());
-        (self.as_mut_slice().as_mut_ptr() as *mut () as *mut T)
-            .as_mut()
-            .unwrap()
-    }
-
-    /// Convert to a slice of type &\[T\]
-    ///
-    /// # Safety
-    /// This function is not safe as the object may be not initialized.
-    /// The user is responsible to initialize the objects in the slice
-    unsafe fn as_objects_slice<T: Sized + 'static>(&self, len: usize) -> &[T] {
-        assert!(self.len() >= core::mem::size_of::<T>() * len);
-        let ptr = self.as_slice().as_ptr() as *const () as *const T;
-        core::slice::from_raw_parts(ptr, len)
-    }
-
-    /// Convert to a slice of type &mut \[T\]
-    ///
-    /// # Safety
-    /// This function is not safe as the object may be not initialized.
-    /// The user is responsible to initialize the objects in the slice
-    unsafe fn as_objects_slice_mut<T: Sized + 'static>(&mut self, len: usize) -> &mut [T] {
-        assert!(self.len() >= core::mem::size_of::<T>() * len);
-        let ptr = self.as_mut_slice().as_mut_ptr() as *mut () as *mut T;
-        core::slice::from_raw_parts_mut(ptr, len)
+    /// Convert to a mut ptr of a given type, checking the size.
+    /// If the map is too small, returns `None`
+    fn as_mut_ptr_of<T: Sized>(&mut self) -> Option<*mut T> {
+        if self.len() >= mem::size_of::<T>() {
+            Some(self.as_mut_slice().as_mut_ptr() as *mut T)
+        } else {
+            None
+        }
     }
 
     /// Get the description of the shared memory mapping
@@ -287,25 +259,20 @@ pub trait ShMemProvider: Clone + Default + Debug {
     /// Get a mapping given its id and size
     fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error>;
 
-    /// Create a new shared memory mapping to hold an object of the given type
-    fn new_shmem_object<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
-        self.new_shmem(core::mem::size_of::<T>())
+    /// Create a new shared memory mapping to hold an object of the given type, and initializes it with the given value.
+    fn new_on_shmem<T: Sized + 'static>(&mut self, value: T) -> Result<Self::ShMem, Error> {
+        self.uninit_on_shmem::<T>().map(|mut shmem| {
+            // # Safety
+            // The map has been created at this point in time, and is large enough.
+            // The map is fresh from the OS and, hence, the pointer should be properly aligned for any object.
+            unsafe { shmem.as_mut_ptr_of::<T>().unwrap().write_volatile(value) };
+            shmem
+        })
     }
 
-    /// Create a new shared memory mapping to hold an array of objects of the given type
-    fn new_shmem_objects_array<T: Sized + 'static>(
-        &mut self,
-        len: usize,
-    ) -> Result<Self::ShMem, Error> {
-        self.new_shmem(core::mem::size_of::<T>() * len)
-    }
-
-    /// Get a mapping given its id to hold an object of the given type
-    fn shmem_object_from_id<T: Sized + 'static>(
-        &mut self,
-        id: ShMemId,
-    ) -> Result<Self::ShMem, Error> {
-        self.shmem_from_id_and_size(id, core::mem::size_of::<T>())
+    /// Create a new shared memory mapping to hold an object of the given type, and initializes it with the given value.
+    fn uninit_on_shmem<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
+        self.new_shmem(mem::size_of::<T>())
     }
 
     /// Get a mapping given a description

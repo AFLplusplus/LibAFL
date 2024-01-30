@@ -4,13 +4,13 @@ use std::{
     fs::{rename, File},
     io::Write,
     os::fd::{AsRawFd, FromRawFd},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH}, ptr::addr_of_mut,
 };
 
 use libafl::{
     corpus::Corpus,
     events::{EventRestarter, SimpleRestartingEventManager},
-    executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
+    executors::{ExitKind, InProcessExecutor},
     feedback_and_fast, feedback_or_fast,
     feedbacks::{CrashFeedback, MinMapFeedback, TimeoutFeedback},
     inputs::{BytesInput, HasTargetBytes},
@@ -97,7 +97,7 @@ pub fn merge(
         }
     }
 
-    let edges = unsafe { core::mem::take(&mut COUNTERS_MAPS) };
+    let edges = unsafe { core::mem::take(&mut *addr_of_mut!(COUNTERS_MAPS)) };
     let edges_observer = MultiMapObserver::new("edges", edges);
 
     let time = TimeObserver::new("time");
@@ -176,10 +176,14 @@ pub fn merge(
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = TimeoutExecutor::new(
-        InProcessExecutor::new(&mut harness, observers, &mut fuzzer, &mut state, &mut mgr)?,
+    let mut executor = InProcessExecutor::with_timeout(
+        &mut harness,
+        observers,
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
         options.timeout(),
-    );
+    )?;
 
     // In case the corpus is empty (on first run) or crashed while loading, reset
     if state.must_load_initial_inputs() && !options.dirs().is_empty() {

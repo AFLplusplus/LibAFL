@@ -5,6 +5,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, feature = "std", not(miri)))]
+use core::ptr::addr_of_mut;
 use core::{
     marker::PhantomData,
     num::NonZeroUsize,
@@ -39,7 +41,7 @@ use typed_builder::TypedBuilder;
 
 use super::{CustomBufEventResult, CustomBufHandlerFn};
 #[cfg(all(unix, feature = "std"))]
-use crate::events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA};
+use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
@@ -849,6 +851,8 @@ where
 
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        state.on_restart()?;
+
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(&if self.save_state {
@@ -856,6 +860,7 @@ where
         } else {
             None
         })?;
+
         self.await_restart_safe();
         Ok(())
     }
@@ -953,7 +958,7 @@ where
 /// The kind of manager we're creating right now
 #[cfg(feature = "std")]
 #[derive(Debug, Clone, Copy)]
-pub enum ManagerKind {
+pub enum TcpManagerKind {
     /// Any kind will do
     Any,
     /// A client, getting messages from a local broker.
@@ -979,7 +984,7 @@ where
     MT: Monitor + Clone,
     S: State + HasExecutions,
 {
-    RestartingMgr::builder()
+    TcpRestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
         .monitor(Some(monitor))
         .broker_port(broker_port)
@@ -988,13 +993,13 @@ where
         .launch()
 }
 
-/// Provides a `builder` which can be used to build a [`RestartingMgr`], which is a combination of a
+/// Provides a `builder` which can be used to build a [`TcpRestartingMgr`], which is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access, clippy::ignored_unit_patterns)]
 #[derive(TypedBuilder, Debug)]
-pub struct RestartingMgr<MT, S, SP>
+pub struct TcpRestartingMgr<MT, S, SP>
 where
     S: UsesInput + DeserializeOwned,
     SP: ShMemProvider + 'static,
@@ -1016,8 +1021,8 @@ where
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
     /// The type of manager to build
-    #[builder(default = ManagerKind::Any)]
-    kind: ManagerKind,
+    #[builder(default = TcpManagerKind::Any)]
+    kind: TcpManagerKind,
     /// The amount of external clients that should have connected (not counting our own tcp client)
     /// before this broker quits _after the last client exited_.
     /// If `None`, the broker will never quit when the last client exits, but run forever.
@@ -1035,12 +1040,25 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<MT, S, SP> RestartingMgr<MT, S, SP>
+impl<MT, S, SP> TcpRestartingMgr<MT, S, SP>
 where
     SP: ShMemProvider,
     S: State + HasExecutions,
     MT: Monitor + Clone,
 {
+    /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
+    #[inline]
+    #[allow(clippy::unused_self)]
+    fn is_shutting_down() -> bool {
+        #[cfg(unix)]
+        unsafe {
+            core::ptr::read_volatile(core::ptr::addr_of!(EVENTMGR_SIGHANDLER_STATE.shutting_down))
+        }
+
+        #[cfg(windows)]
+        false
+    }
+
     /// Launch the restarting manager
     pub fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<S, SP>), Error> {
         // We start ourself as child process to actually fuzz
@@ -1057,7 +1075,7 @@ where
 
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
-                ManagerKind::Any => {
+                TcpManagerKind::Any => {
                     let connection = create_nonblocking_listener(("127.0.0.1", self.broker_port));
                     match connection {
                         Ok(listener) => {
@@ -1088,7 +1106,7 @@ where
                         }
                     }
                 }
-                ManagerKind::Broker => {
+                TcpManagerKind::Broker => {
                     let event_broker = TcpEventBroker::<S::Input, MT>::new(
                         format!("127.0.0.1:{}", self.broker_port),
                         self.monitor.take().unwrap(),
@@ -1097,7 +1115,7 @@ where
                     broker_things(event_broker, self.remote_broker_addr)?;
                     unreachable!("The broker may never return normally, only on errors or when shutting down.");
                 }
-                ManagerKind::Client { cpu_core } => {
+                TcpManagerKind::Client { cpu_core } => {
                     // We are a client
                     let mgr = TcpEventManager::<S>::on_port(self.broker_port, self.configuration)?;
 
@@ -1116,7 +1134,7 @@ where
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]
-            let mut staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             #[cfg(not(unix))]
@@ -1125,21 +1143,11 @@ where
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
-            #[cfg(unix)]
-            unsafe {
-                let data = &mut SHUTDOWN_SIGHANDLER_DATA;
-                // Write the pointer to staterestorer so we can release its shmem later
-                core::ptr::write_volatile(
-                    &mut data.staterestorer_ptr,
-                    &mut staterestorer as *mut _ as *mut std::ffi::c_void,
-                );
-                data.allocator_pid = std::process::id() as usize;
-                data.shutdown_handler = shutdown_handler::<SP> as *const std::ffi::c_void;
-            }
-
             // We setup signal handlers to clean up shmem segments used by state restorer
             #[cfg(all(unix, not(miri)))]
-            if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
+            if let Err(_e) =
+                unsafe { setup_signal_handler(addr_of_mut!(EVENTMGR_SIGHANDLER_STATE)) }
+            {
                 // We can live without a proper ctrl+c signal handler. Print and ignore.
                 log::error!("Failed to setup signal handlers: {_e}");
             }
@@ -1156,6 +1164,9 @@ where
                     self.shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
+                            unsafe {
+                                EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                            }
                             self.shmem_provider.post_fork(false)?;
                             handle.status()
                         }
@@ -1165,6 +1176,11 @@ where
                         }
                     }
                 };
+
+                #[cfg(all(unix, not(feature = "fork")))]
+                unsafe {
+                    EVENTMGR_SIGHANDLER_STATE.set_exit_from_main();
+                }
 
                 // On Windows (or in any case without fork), we spawn ourself again
                 #[cfg(any(windows, not(feature = "fork")))]
@@ -1187,7 +1203,7 @@ where
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
 
-                if staterestorer.wants_to_exit() {
+                if staterestorer.wants_to_exit() || Self::is_shutting_down() {
                     return Err(Error::shutting_down());
                 }
 

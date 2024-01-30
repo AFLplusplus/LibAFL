@@ -9,6 +9,7 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     process,
+    time::Duration,
 };
 
 use clap::{Arg, Command};
@@ -209,9 +210,7 @@ fn fuzz(
     let edges = edges_shmem.as_mut_slice();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
-    let mut cmp_shmem = shmem_provider
-        .new_shmem(core::mem::size_of::<CmpLogMap>())
-        .unwrap();
+    let mut cmp_shmem = shmem_provider.uninit_on_shmem::<CmpLogMap>().unwrap();
     let cmplog = cmp_shmem.as_mut_slice();
 
     // Beginning of a page should be properly aligned.
@@ -344,6 +343,7 @@ fn fuzz(
         &mut state,
         &mut mgr,
         shmem_provider,
+        Duration::from_millis(5000),
     )?;
 
     // Show the cmplog observer
@@ -371,7 +371,7 @@ fn fuzz(
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
-    // Remove target ouput (logs still survive)
+    // Remove target output (logs still survive)
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();

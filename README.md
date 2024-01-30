@@ -109,6 +109,8 @@ The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_lib
 
 + Blogpost on binary-only fuzzing lib libaf_qemu, [Hacking TMNF - Fuzzing the game server](https://blog.bricked.tech/posts/tmnf/part1/), by [RickdeJager](https://github.com/RickdeJager).
 
++ [A LibAFL Introductory Workshop](https://www.atredis.com/blog/2023/12/4/a-libafl-introductory-workshop), by [Jordan Whitehead](https://github.com/jordan9001)
+
 ## Contributing
 
 For bugs, feel free to open issues or contact us directly. Thank you for your support. <3
