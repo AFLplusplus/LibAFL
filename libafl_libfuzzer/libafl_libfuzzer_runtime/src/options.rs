@@ -239,12 +239,9 @@ struct LibfuzzerOptionsBuilder<'a> {
     forks: Option<usize>,
     dict: Option<&'a str>,
     dirs: Vec<&'a str>,
-    ignore_crashes: bool,
-    ignore_timeouts: bool,
-    ignore_ooms: bool,
-    no_ignore_crashes: bool,
-    no_ignore_timeouts: bool,
-    no_ignore_ooms: bool,
+    ignore_crashes: Option<bool>,
+    ignore_timeouts: Option<bool>,
+    ignore_ooms: Option<bool>,
     rss_limit: Option<usize>,
     malloc_limit: Option<usize>,
     ignore_remaining: bool,
@@ -316,16 +313,13 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                             self.forks = Some(parse_or_bail!(name, value, usize));
                         }
                         "ignore_crashes" => {
-                            self.ignore_crashes = parse_or_bail!(name, value, u64) > 0;
-                            self.no_ignore_crashes = !self.ignore_crashes;
+                            self.ignore_crashes = Some(parse_or_bail!(name, value, u64) > 0);
                         }
                         "ignore_timeouts" => {
-                            self.ignore_timeouts = parse_or_bail!(name, value, u64) > 0;
-                            self.no_ignore_timeouts = !self.ignore_timeouts;
+                            self.ignore_timeouts = Some(parse_or_bail!(name, value, u64) > 0);
                         }
                         "ignore_ooms" => {
-                            self.ignore_ooms = parse_or_bail!(name, value, u64) > 0;
-                            self.no_ignore_ooms = !self.ignore_ooms;
+                            self.ignore_ooms = Some(parse_or_bail!(name, value, u64) > 0);
                         }
                         "rss_limit_mb" => {
                             self.rss_limit = Some(parse_or_bail!(name, value, usize) << 20);
@@ -342,14 +336,14 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         "tui" => {
                             self.tui = parse_or_bail!(name, value, u64) > 0;
                             if self.tui {
-                                if !self.no_ignore_crashes {
-                                    self.ignore_crashes = true;
+                                if self.ignore_crashes.is_none() {
+                                    self.ignore_crashes = Some(true);
                                 }
-                                if !self.no_ignore_timeouts {
-                                    self.ignore_timeouts = true;
+                                if self.ignore_timeouts.is_none() {
+                                    self.ignore_timeouts = Some(true);
                                 }
-                                if !self.no_ignore_ooms {
-                                    self.ignore_ooms = true;
+                                if self.ignore_ooms.is_none() {
+                                    self.ignore_ooms = Some(true);
                                 }
                             }
                         }
@@ -383,9 +377,9 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                 Tokens::from_file(path).expect("Couldn't load tokens from specified dictionary")
             }),
             dirs: self.dirs.into_iter().map(PathBuf::from).collect(),
-            ignore_crashes: self.ignore_crashes,
-            ignore_timeouts: self.ignore_timeouts,
-            ignore_ooms: self.ignore_ooms,
+            ignore_crashes: self.ignore_crashes.unwrap_or_default(),
+            ignore_timeouts: self.ignore_timeouts.unwrap_or_default(),
+            ignore_ooms: self.ignore_ooms.unwrap_or_default(),
             rss_limit: match self.rss_limit.unwrap_or(2 << 30) {
                 0 => usize::MAX,
                 value => value,
