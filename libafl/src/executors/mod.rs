@@ -9,7 +9,7 @@ pub use combined::CombinedExecutor;
 pub use command::CommandExecutor;
 pub use differential::DiffExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
-pub use forkserver::{Forkserver, ForkserverExecutor, TimeoutForkserverExecutor};
+pub use forkserver::{Forkserver, ForkserverExecutor};
 pub use inprocess::InProcessExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub use inprocess_fork::InProcessForkExecutor;
