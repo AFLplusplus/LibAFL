@@ -85,7 +85,7 @@ pub fn fuzz() {
 
         emu.set_breakpoint(main_addr);
         unsafe {
-            emu.run();
+            emu.run().unwrap();
         }
         emu.remove_breakpoint(main_addr);
 
@@ -115,7 +115,7 @@ pub fn fuzz() {
 
                 emu.write_phys_mem(input_addr, buf);
 
-                emu.run();
+                emu.run().unwrap();
 
                 // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                 let mut pcs = (0..emu.num_cpus())
