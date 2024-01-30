@@ -67,4 +67,4 @@ libafl_nyx/packer
 # No llvm IR
 *.ll
 
-.tar.gz
+*.tar.gz

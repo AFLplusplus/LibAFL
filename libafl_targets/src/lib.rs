@@ -13,7 +13,6 @@
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::unreadable_literal,
     clippy::pub_underscore_fields
 )]
 #![cfg_attr(not(test), warn(
