@@ -102,7 +102,7 @@ impl InputFile {
         let f = OpenOptions::new()
             .read(true)
             .write(true)
-            .create(true)
+            .truncate(true)
             .open(&filename)?;
         f.set_len(0)?;
         Ok(Self {
