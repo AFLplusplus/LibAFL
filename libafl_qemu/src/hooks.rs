@@ -500,7 +500,11 @@ where
             let gen = get_raw_hook!(
                 generation_hook,
                 edge_gen_hook_wrapper::<QT, S>,
-                extern "C" fn(&mut HookState<1, EdgeHookId>, src: GuestAddr, dest: GuestAddr) -> u64
+                extern "C" fn(
+                    &mut HookState<1, EdgeHookId>,
+                    src: GuestAddr,
+                    dest: GuestAddr,
+                ) -> u64
             );
             let exec = get_raw_hook!(
                 execution_hook,
@@ -548,7 +552,11 @@ where
             let postgen = get_raw_hook!(
                 post_generation_hook,
                 block_post_gen_hook_wrapper::<QT, S>,
-                extern "C" fn(&mut HookState<1, BlockHookId>, pc: GuestAddr, block_length: GuestUsize)
+                extern "C" fn(
+                    &mut HookState<1, BlockHookId>,
+                    pc: GuestAddr,
+                    block_length: GuestUsize,
+                )
             );
             let exec = get_raw_hook!(
                 execution_hook,
@@ -614,7 +622,11 @@ where
             let gen = get_raw_hook!(
                 generation_hook,
                 read_gen_hook_wrapper::<QT, S>,
-                extern "C" fn(&mut HookState<5, ReadHookId>, pc: GuestAddr, info: MemAccessInfo) -> u64
+                extern "C" fn(
+                    &mut HookState<5, ReadHookId>,
+                    pc: GuestAddr,
+                    info: MemAccessInfo,
+                ) -> u64
             );
             let exec1 = get_raw_hook!(
                 execution_hook_1,
@@ -711,7 +723,11 @@ where
             let gen = get_raw_hook!(
                 generation_hook,
                 write_gen_hook_wrapper::<QT, S>,
-                extern "C" fn(&mut HookState<5, WriteHookId>, pc: GuestAddr, info: MemAccessInfo) -> u64
+                extern "C" fn(
+                    &mut HookState<5, WriteHookId>,
+                    pc: GuestAddr,
+                    info: MemAccessInfo,
+                ) -> u64
             );
             let exec1 = get_raw_hook!(
                 execution_hook_1,
@@ -737,7 +753,12 @@ where
             let execn = get_raw_hook!(
                 execution_hook_n,
                 write_4_exec_hook_wrapper::<QT, S>,
-                extern "C" fn(&mut HookState<5, WriteHookId>, id: u64, addr: GuestAddr, size: usize)
+                extern "C" fn(
+                    &mut HookState<5, WriteHookId>,
+                    id: u64,
+                    addr: GuestAddr,
+                    size: usize,
+                )
             );
             WRITE_HOOKS.push(HookState {
                 id: WriteHookId(0),
