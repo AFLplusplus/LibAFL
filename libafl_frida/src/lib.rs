@@ -351,21 +351,23 @@ mod tests {
     use clap::Parser;
     use frida_gum::Gum;
     use libafl::{
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         feedback_and_fast, feedback_or_fast,
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasTargetBytes},
-        mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         schedulers::StdScheduler,
-        stages::StdMutationalStage,
-        state::{HasSolutions, StdState},
-        Fuzzer, StdFuzzer,
+        state::{HasSolutions, StdState}, StdFuzzer,
     };
+
+    use libafl::Evaluator;
+
     use libafl_bolts::{
         cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
     };
+
+    use inline_c::assert_cxx;
 
     use crate::{
         asan::{
@@ -377,47 +379,96 @@ mod tests {
         helper::FridaInstrumentationHelper,
     };
 
+
+    macro_rules! frida_test {
+    
+    ($fuzz_code:expr; $helper:expr; $state:expr; $observers:expr; $feedback:expr; $objective:expr; $function_to_test:expr; $($assert:expr),*) => { 
+
+        static LIB: OnceLock<libloading::Library> = OnceLock::new();
+        
+        let lib = LIB.get_or_init(move || -> libloading::Library {
+            let compiled_lib = &$fuzz_code;
+            libloading::Library::new(compiled_lib.output_path().clone()).expect("Failed to load library")
+        });
+    //    static 
+        
+        let mut event_manager = NopEventManager::new();
+
+        let target_func: libloading::Symbol<
+                    unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
+                > = lib.get($function_to_test.as_bytes()).unwrap();
+        
+        let mut fuzzer = StdFuzzer::new(StdScheduler::new(), $feedback, $objective);
+
+        let mut harness = |input: &BytesInput| {
+            let target = input.target_bytes();
+            let buf = target.as_slice();
+            (target_func)(buf.as_ptr(), buf.len());
+            ExitKind::Ok
+        };
+
+        let mut executor = FridaInProcessExecutor::new(
+            GUM.get().expect("Gum uninitialized"),
+            InProcessExecutor::new(
+                &mut harness,
+                $observers, // tuple_list!(),
+                &mut fuzzer,
+                &mut $state,
+                &mut event_manager,
+            )
+            .unwrap(),
+            &mut $helper,
+        );
+
+        fuzzer
+        .evaluate_input(&mut $state, &mut executor, &mut event_manager, BytesInput::new(vec![0, 0, 0, 0]))
+        .unwrap_or_else(|_| panic!("Error in fuzz_one"));
+
+        $($assert;)*
+        
+    }
+}
+
+
     static GUM: OnceLock<Gum> = OnceLock::new();
 
     unsafe fn test_asan(options: &FuzzerOptions) {
+        
         // The names of the functions to run
         let tests = vec![
-            ("LLVMFuzzerTestOneInput", 0),
-            ("heap_oob_read", 1),
-            ("heap_oob_write", 1),
-            ("heap_uaf_write", 1),
-            ("heap_uaf_read", 1),
-            ("malloc_heap_oob_read", 1),
-            ("malloc_heap_oob_write", 1),
-            ("malloc_heap_uaf_write", 1),
-            ("malloc_heap_uaf_read", 1),
+                ("LLVMFuzzerTestOneInput", 0),
+                ("heap_oob_read", 1),
+                ("heap_oob_write", 1),
+                ("heap_uaf_write", 1),
+                ("heap_uaf_read", 1),
+                ("malloc_heap_oob_read", 1),
+                ("malloc_heap_oob_write", 1),
+                ("malloc_heap_uaf_write", 1),
+                ("malloc_heap_uaf_read", 1),
         ];
-
-        let lib = libloading::Library::new(options.clone().harness.unwrap()).unwrap();
 
         let coverage = CoverageRuntime::new();
         let asan = AsanRuntime::new(options);
+        let runtimes = tuple_list!(coverage, asan);
+
         let mut frida_helper = FridaInstrumentationHelper::new(
             GUM.get().expect("Gum uninitialized"),
             options,
-            tuple_list!(coverage, asan),
+            runtimes,
         );
+
+        //let compiled_lib = 
 
         // Run the tests for each function
         for test in tests {
+
+          //  let compiled_lib = assert_cxx!;
             let (function_name, err_cnt) = test;
             log::info!("Testing with harness function {}", function_name);
 
-            let mut corpus = InMemoryCorpus::<BytesInput>::new();
-
-            //TODO - make sure we use the right one
-            let testcase = Testcase::new(vec![0; 4].into());
-            corpus.add(testcase).unwrap();
-
+            let corpus = InMemoryCorpus::<BytesInput>::new();
             let rand = StdRand::with_seed(0);
-
             let mut feedback = ConstFeedback::new(false);
-
             // Feedbacks to recognize an input as solution
             let mut objective = feedback_or_fast!(
                 // true enables the AsanErrorFeedback
@@ -433,50 +484,77 @@ mod tests {
             )
             .unwrap();
 
-            let mut event_manager = NopEventManager::new();
-
-            let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
-
             let observers = tuple_list!(
                 AsanErrorsObserver::new(addr_of!(ASAN_ERRORS)) //,
             );
-
-            {
-                let target_func: libloading::Symbol<
-                    unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
-                > = lib.get(function_name.as_bytes()).unwrap();
-
-                let mut harness = |input: &BytesInput| {
-                    let target = input.target_bytes();
-                    let buf = target.as_slice();
-                    (target_func)(buf.as_ptr(), buf.len());
-                    ExitKind::Ok
-                };
-
-                let mut executor = FridaInProcessExecutor::new(
-                    GUM.get().expect("Gum uninitialized"),
-                    InProcessExecutor::new(
-                        &mut harness,
-                        observers, // tuple_list!(),
-                        &mut fuzzer,
-                        &mut state,
-                        &mut event_manager,
-                    )
-                    .unwrap(),
-                    &mut frida_helper,
-                );
-
-                let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
-                let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1));
-
-                // log::info!("Starting fuzzing!");
-                fuzzer
-                    .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
-                    .unwrap_or_else(|_| panic!("Error in fuzz_one"));
-
-                log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
-            }
-            assert_eq!(state.solutions().count(), err_cnt);
+            frida_test!(assert_cxx!{
+                #inline_c_rs SHARED
+                #include <stdint.h>
+                #include <stdlib.h>
+                #include <string>
+        
+                extern "C" int heap_uaf_read() {
+                    int *array = new int[100];
+                    delete[] array;
+                    fprintf(stdout, "%d\n", array[5]);
+                    return 0;
+                }
+        
+                extern "C" int heap_uaf_write() {
+                    int *array = new int[100];
+                    delete[] array;
+                    array[5] = 1;
+                    return 0;
+                }
+        
+                extern "C" int heap_oob_read() {
+                    int *array = new int[100];
+                    fprintf(stdout, "%d\n", array[100]);
+                    delete[] array;
+                    return 0;
+                }
+        
+                extern "C" int heap_oob_write() {
+                    int *array = new int[100];
+                    array[100] = 1;
+                    delete[] array;
+                     return 0;
+                }
+                extern "C" int malloc_heap_uaf_read() {
+                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                    free(array);
+                    fprintf(stdout, "%d\n", array[5]);
+                    return 0;
+                }
+        
+                extern "C" int malloc_heap_uaf_write() {
+                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                    free(array);
+                    array[5] = 1;
+                    return 0;
+                }
+        
+                extern "C" int malloc_heap_oob_read() {
+                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                    fprintf(stdout, "%d\n", array[100]);
+                    free(array);
+                    return 0;
+                }
+        
+                extern "C" int malloc_heap_oob_write() {
+                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                    array[100] = 1;
+                    free(array);
+                    return 0;
+                }
+        
+                extern "C" int LLVMFuzzerTestOneInput() {
+                    // abort();
+                    return 0;
+                }
+            }; frida_helper; state; observers; feedback; objective; function_name; assert_eq!(state.solutions().count(), err_cnt), assert_eq!(1, 1)); 
+            
+            //assert_eq!(state.solutions().count(), err_cnt);
         }
     }
 
@@ -498,14 +576,10 @@ mod tests {
             }
         }
 
+        
         SimpleStdoutLogger::set_logger().unwrap();
 
         // Check if the harness dynamic library is present, if not - skip the test
-        let test_harness = "test_harness.so";
-        assert!(
-            std::path::Path::new(test_harness).exists(),
-            "Skipping test, {test_harness} not found"
-        );
 
         GUM.set(unsafe { Gum::obtain() })
             .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
@@ -514,8 +588,6 @@ mod tests {
             "-A",
             "--disable-excludes",
             "--continue-on-error",
-            "-H",
-            test_harness,
         ];
         let options: FuzzerOptions = FuzzerOptions::try_parse_from(simulated_args).unwrap();
         unsafe { test_asan(&options) }
