@@ -935,6 +935,363 @@ impl AsanRuntime {
         );
     }
 
+    /*pub fn deinit_asan(&mut self, gum: &Gum){
+        let mut interceptor = Interceptor::obtain(gum); //returns the same interceptor if called again: https://github.com/frida/frida-gum/blob/621dd2065dbf26901cb793315a33b8ce61df493e/gum/guminterceptor.c#L384
+
+
+        macro_rules! unhook_func {
+            ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+                log::trace!("Unhooking {}", stringify!($name));
+                interceptor.revert(
+                    frida_gum::Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
+                );
+            }
+        }
+
+        unhook_func!(None, malloc, (size: usize), *mut c_void);
+        unhook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
+        unhook_func!(None, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
+        unhook_func!(None, free, (ptr: *mut c_void), ());
+        #[cfg(not(target_vendor = "apple"))]
+        unhook_func!(None, memalign, (size: usize, alignment: usize), *mut c_void);
+        unhook_func!(
+            None,
+            posix_memalign,
+            (pptr: *mut *mut c_void, size: usize, alignment: usize),
+            i32
+        );
+        #[cfg(not(target_vendor = "apple"))]
+        unhook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
+
+        for libname in ["libc++.so", "libc++.so.1", "libc++_shared.so"] {
+            log::info!("Hooking c++ functions in {}", libname);
+            for export in Module::enumerate_exports(libname) {
+                match &export.name[..] {
+                    "_Znam" => {
+                        unhook_func!(Some(libname), _Znam, (size: usize), *mut c_void);
+                    }
+                    "_ZnamRKSt9nothrow_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZnamRKSt9nothrow_t,
+                            (size: usize, _nothrow: *const c_void),
+                            *mut c_void
+                        );
+                    }
+                    "_ZnamSt11align_val_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZnamSt11align_val_t,
+                            (size: usize, alignment: usize),
+                            *mut c_void
+                        );
+                    }
+                    "_ZnamSt11align_val_tRKSt9nothrow_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZnamSt11align_val_tRKSt9nothrow_t,
+                            (size: usize, alignment: usize, _nothrow: *const c_void),
+                            *mut c_void
+                        );
+                    }
+                    "_Znwm" => {
+                        unhook_func!(Some(libname), _Znwm, (size: usize), *mut c_void);
+                    }
+                    "_ZnwmRKSt9nothrow_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZnwmRKSt9nothrow_t,
+                            (size: usize, _nothrow: *const c_void),
+                            *mut c_void
+                        );
+                    }
+                    "_ZnwmSt11align_val_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZnwmSt11align_val_t,
+                            (size: usize, alignment: usize),
+                            *mut c_void
+                        );
+                    }
+                    "_ZnwmSt11align_val_tRKSt9nothrow_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZnwmSt11align_val_tRKSt9nothrow_t,
+                            (size: usize, alignment: usize, _nothrow: *const c_void),
+                            *mut c_void
+                        );
+                    }
+                    "_ZdaPv" => {
+                        unhook_func!(Some(libname), _ZdaPv, (ptr: *mut c_void), ());
+                    }
+                    "_ZdaPvm" => {
+                        unhook_func!(Some(libname), _ZdaPvm, (ptr: *mut c_void, _ulong: u64), ());
+                    }
+                    "_ZdaPvmSt11align_val_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZdaPvmSt11align_val_t,
+                            (ptr: *mut c_void, _ulong: u64, _alignment: usize),
+                            ()
+                        );
+                    }
+                    "_ZdaPvRKSt9nothrow_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZdaPvRKSt9nothrow_t,
+                            (ptr: *mut c_void, _nothrow: *const c_void),
+                            ()
+                        );
+                    }
+                    "_ZdaPvSt11align_val_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZdaPvSt11align_val_t,
+                            (ptr: *mut c_void, _alignment: usize),
+                            ()
+                        );
+                    }
+                    "_ZdaPvSt11align_val_tRKSt9nothrow_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZdaPvSt11align_val_tRKSt9nothrow_t,
+                            (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
+                            ()
+                        );
+                    }
+                    "_ZdlPv" => {
+                        unhook_func!(Some(libname), _ZdlPv, (ptr: *mut c_void), ());
+                    }
+                    "_ZdlPvm" => {
+                        unhook_func!(Some(libname), _ZdlPvm, (ptr: *mut c_void, _ulong: u64), ());
+                    }
+                    "_ZdlPvmSt11align_val_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZdlPvmSt11align_val_t,
+                            (ptr: *mut c_void, _ulong: u64, _alignment: usize),
+                            ()
+                        );
+                    }
+                    "_ZdlPvRKSt9nothrow_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZdlPvRKSt9nothrow_t,
+                            (ptr: *mut c_void, _nothrow: *const c_void),
+                            ()
+                        );
+                    }
+                    "_ZdlPvSt11align_val_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZdlPvSt11align_val_t,
+                            (ptr: *mut c_void, _alignment: usize),
+                            ()
+                        );
+                    }
+                    "_ZdlPvSt11align_val_tRKSt9nothrow_t" => {
+                        unhook_func!(
+                            Some(libname),
+                            _ZdlPvSt11align_val_tRKSt9nothrow_t,
+                            (ptr: *mut c_void, _alignment: usize, _nothrow: *const c_void),
+                            ()
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        }
+        log::info!("Unhooking libc functions");
+        unhook_func!(
+            None,
+            mmap,
+            (
+                addr: *const c_void,
+                length: usize,
+                prot: i32,
+                flags: i32,
+                fd: i32,
+                offset: usize
+            ),
+            *mut c_void
+        );
+        unhook_func!(None, munmap, (addr: *const c_void, length: usize), i32);
+
+        // Hook libc functions which may access allocated memory
+        unhook_func!(
+            None,
+            write,
+            (fd: i32, buf: *const c_void, count: usize),
+            usize
+        );
+        unhook_func!(None, read, (fd: i32, buf: *mut c_void, count: usize), usize);
+        unhook_func!(
+            None,
+            fgets,
+            (s: *mut c_void, size: u32, stream: *mut c_void),
+            *mut c_void
+        );
+        unhook_func!(
+            None,
+            memcmp,
+            (s1: *const c_void, s2: *const c_void, n: usize),
+            i32
+        );
+        unhook_func!(
+            None,
+            memcpy,
+            (dest: *mut c_void, src: *const c_void, n: usize),
+            *mut c_void
+        );
+        #[cfg(not(target_vendor = "apple"))]
+        unhook_func!(
+            None,
+            mempcpy,
+            (dest: *mut c_void, src: *const c_void, n: usize),
+            *mut c_void
+        );
+        unhook_func!(
+            None,
+            memmove,
+            (dest: *mut c_void, src: *const c_void, n: usize),
+            *mut c_void
+        );
+        unhook_func!(
+            None,
+            memset,
+            (s: *mut c_void, c: i32, n: usize),
+            *mut c_void
+        );
+        unhook_func!(
+            None,
+            memchr,
+            (s: *mut c_void, c: i32, n: usize),
+            *mut c_void
+        );
+        #[cfg(not(target_vendor = "apple"))]
+        unhook_func!(
+            None,
+            memrchr,
+            (s: *mut c_void, c: i32, n: usize),
+            *mut c_void
+        );
+        unhook_func!(
+            None,
+            memmem,
+            (
+                haystack: *const c_void,
+                haystacklen: usize,
+                needle: *const c_void,
+                needlelen: usize
+            ),
+            *mut c_void
+        );
+        #[cfg(not(target_os = "android"))]
+        unhook_func!(None, bzero, (s: *mut c_void, n: usize), ());
+        #[cfg(not(any(target_os = "android", target_vendor = "apple")))]
+        uhhook_func!(None, explicit_bzero, (s: *mut c_void, n: usize), ());
+        #[cfg(not(target_os = "android"))]
+        unhook_func!(
+            None,
+            bcmp,
+            (s1: *const c_void, s2: *const c_void, n: usize),
+            i32
+        );
+        unhook_func!(None, strchr, (s: *mut c_char, c: i32), *mut c_char);
+        unhook_func!(None, strrchr, (s: *mut c_char, c: i32), *mut c_char);
+        unhook_func!(
+            None,
+            strcasecmp,
+            (s1: *const c_char, s2: *const c_char),
+            i32
+        );
+        unhook_func!(
+            None,
+            strncasecmp,
+            (s1: *const c_char, s2: *const c_char, n: usize),
+            i32
+        );
+        unhook_func!(
+            None,
+            strcat,
+            (dest: *mut c_char, src: *const c_char),
+            *mut c_char
+        );
+        unhook_func!(None, strcmp, (s1: *const c_char, s2: *const c_char), i32);
+        unhook_func!(
+            None,
+            strncmp,
+            (s1: *const c_char, s2: *const c_char, n: usize),
+            i32
+        );
+        unhook_func!(
+            None,
+            strcpy,
+            (dest: *mut c_char, src: *const c_char),
+            *mut c_char
+        );
+        unhook_func!(
+            None,
+            strncpy,
+            (dest: *mut c_char, src: *const c_char, n: usize),
+            *mut c_char
+        );
+        unhook_func!(
+            None,
+            stpcpy,
+            (dest: *mut c_char, src: *const c_char),
+            *mut c_char
+        );
+        unhook_func!(None, strdup, (s: *const c_char), *mut c_char);
+        unhook_func!(None, strlen, (s: *const c_char), usize);
+        unhook_func!(None, strnlen, (s: *const c_char, n: usize), usize);
+        unhook_func!(
+            None,
+            strstr,
+            (haystack: *const c_char, needle: *const c_char),
+            *mut c_char
+        );
+        unhook_func!(
+            None,
+            strcasestr,
+            (haystack: *const c_char, needle: *const c_char),
+            *mut c_char
+        );
+        unhook_func!(None, atoi, (nptr: *const c_char), i32);
+        unhook_func!(None, atol, (nptr: *const c_char), i32);
+        unhook_func!(None, atoll, (nptr: *const c_char), i64);
+        unhook_func!(None, wcslen, (s: *const wchar_t), usize);
+        unhook_func!(
+            None,
+            wcscpy,
+            (dest: *mut wchar_t, src: *const wchar_t),
+            *mut wchar_t
+        );
+        unhook_func!(None, wcscmp, (s1: *const wchar_t, s2: *const wchar_t), i32);
+        #[cfg(target_vendor = "apple")]
+        unhook_func!(
+            None,
+            memset_pattern4,
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
+        );
+        #[cfg(target_vendor = "apple")]
+        unhook_func!(
+            None,
+            memset_pattern8,
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
+        );
+        #[cfg(target_vendor = "apple")]
+        unhook_func!(
+            None,
+            memset_pattern16,
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
+        );
+
+    }*/
+
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::cast_sign_loss)]
     #[allow(clippy::too_many_lines)]

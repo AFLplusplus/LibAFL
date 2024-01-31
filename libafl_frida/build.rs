@@ -9,5 +9,4 @@ fn main() {
     // Force linking against libc++
     #[cfg(unix)]
     println!("cargo:rustc-link-lib=dylib=c++");
-    
 }

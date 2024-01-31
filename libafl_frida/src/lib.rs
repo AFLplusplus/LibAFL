@@ -347,10 +347,13 @@ impl Default for FridaOptions {
 
 #[cfg(test)]
 mod tests {
+
     use std::sync::OnceLock;
 
     use clap::Parser;
     use frida_gum::Gum;
+    use inline_c::assert_cxx;
+    use lazy_static::lazy_static;
     use libafl::{
         corpus::{Corpus, InMemoryCorpus},
         events::NopEventManager,
@@ -359,46 +362,50 @@ mod tests {
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasTargetBytes},
         schedulers::StdScheduler,
-        state::{HasSolutions, StdState}, StdFuzzer,
+        state::{HasSolutions, StdState},
+        Evaluator, StdFuzzer,
     };
-
-    use libafl::Evaluator;
-
     use libafl_bolts::{
         cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
     };
-
-    use inline_c::assert_cxx;
 
     use crate::{
         asan::{
             asan_rt::AsanRuntime,
             errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS},
         },
+        // cmplog_rt::CmpLogRuntime,
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
         helper::FridaInstrumentationHelper,
     };
 
+    lazy_static! {
+        static ref GUM: Gum = unsafe { Gum::obtain() };
+    }
+
+    static LOGGER: OnceLock<()> = OnceLock::new();
 
     macro_rules! frida_test {
-    
-    ($fuzz_code:expr; $helper:expr; $state:expr; $observers:expr; $feedback:expr; $objective:expr; $function_to_test:expr; $($assert:expr),*) => { 
 
-        static LIB: OnceLock<libloading::Library> = OnceLock::new();
-        
-        let lib = LIB.get_or_init(move || -> libloading::Library {
-            let compiled_lib = &$fuzz_code;
-            libloading::Library::new(compiled_lib.output_path().clone()).expect("Failed to load library")
-        });
-    //    static 
-        
+    ($fuzz_code:expr; $runtimes:expr; $options:ident; $state:expr; $observers:expr; $feedback:expr; $objective:expr; $function_to_test:expr; $($assert:expr),*) => {
+
+        let compiled_lib = &$fuzz_code;
+        let lib = libloading::Library::new(compiled_lib.output_path().clone()).expect("Failed to load library");
+        $options.harness = Some(compiled_lib.output_path().clone());
+
+        let mut frida_helper = FridaInstrumentationHelper::new(
+            &GUM,
+            &$options,
+            $runtimes,
+        );
+
         let mut event_manager = NopEventManager::new();
 
         let target_func: libloading::Symbol<
                     unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
                 > = lib.get($function_to_test.as_bytes()).unwrap();
-        
+
         let mut fuzzer = StdFuzzer::new(StdScheduler::new(), $feedback, $objective);
 
         let mut harness = |input: &BytesInput| {
@@ -409,7 +416,7 @@ mod tests {
         };
 
         let mut executor = FridaInProcessExecutor::new(
-            GUM.get().expect("Gum uninitialized"),
+            &GUM,
             InProcessExecutor::new(
                 &mut harness,
                 $observers, // tuple_list!(),
@@ -418,7 +425,7 @@ mod tests {
                 &mut event_manager,
             )
             .unwrap(),
-            &mut $helper,
+            &mut frida_helper,
         );
 
         fuzzer
@@ -426,171 +433,411 @@ mod tests {
         .unwrap_or_else(|_| panic!("Error in fuzz_one"));
 
         $($assert;)*
-        
     }
 }
-
-
-    static GUM: OnceLock<Gum> = OnceLock::new();
-
-    unsafe fn test_asan(options: &FuzzerOptions) {
-        
-        // The names of the functions to run
-        let tests = vec![
-                ("LLVMFuzzerTestOneInput", 0),
-                ("heap_oob_read", 1),
-                ("heap_oob_write", 1),
-                ("heap_uaf_write", 1),
-                ("heap_uaf_read", 1),
-                ("malloc_heap_oob_read", 1),
-                ("malloc_heap_oob_write", 1),
-                ("malloc_heap_uaf_write", 1),
-                ("malloc_heap_uaf_read", 1),
-        ];
-
-        let coverage = CoverageRuntime::new();
-        let asan = AsanRuntime::new(options);
-        let runtimes = tuple_list!(coverage, asan);
-
-        let mut frida_helper = FridaInstrumentationHelper::new(
-            GUM.get().expect("Gum uninitialized"),
-            options,
-            runtimes,
-        );
-
-        //let compiled_lib = 
-
-        // Run the tests for each function
-        for test in tests {
-
-          //  let compiled_lib = assert_cxx!;
-            let (function_name, err_cnt) = test;
-            log::info!("Testing with harness function {}", function_name);
-
-            let corpus = InMemoryCorpus::<BytesInput>::new();
-            let rand = StdRand::with_seed(0);
-            let mut feedback = ConstFeedback::new(false);
-            // Feedbacks to recognize an input as solution
-            let mut objective = feedback_or_fast!(
-                // true enables the AsanErrorFeedback
-                feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
-            );
-
-            let mut state = StdState::new(
-                rand,
-                corpus,
-                InMemoryCorpus::<BytesInput>::new(),
-                &mut feedback,
-                &mut objective,
-            )
-            .unwrap();
-
-            let observers = tuple_list!(
-                AsanErrorsObserver::new(&ASAN_ERRORS) //,
-            );
-            frida_test!(assert_cxx!{
-                #inline_c_rs SHARED
-                #include <stdint.h>
-                #include <stdlib.h>
-                #include <string>
-        
-                extern "C" int heap_uaf_read() {
-                    int *array = new int[100];
-                    delete[] array;
-                    fprintf(stdout, "%d\n", array[5]);
-                    return 0;
+    macro_rules! init_logging {
+        () => {
+            LOGGER.get_or_init(|| {
+                if let Ok(value) = std::env::var("RUST_LOG") {
+                    match value.as_str() {
+                        "off" => log::set_max_level(log::LevelFilter::Off),
+                        "error" => log::set_max_level(log::LevelFilter::Error),
+                        "warn" => log::set_max_level(log::LevelFilter::Warn),
+                        "info" => log::set_max_level(log::LevelFilter::Info),
+                        "debug" => log::set_max_level(log::LevelFilter::Debug),
+                        "trace" => log::set_max_level(log::LevelFilter::Trace),
+                        _ => panic!("Unknown RUST_LOG level: {value}"),
+                    }
                 }
-        
-                extern "C" int heap_uaf_write() {
-                    int *array = new int[100];
-                    delete[] array;
-                    array[5] = 1;
-                    return 0;
-                }
-        
-                extern "C" int heap_oob_read() {
-                    int *array = new int[100];
-                    fprintf(stdout, "%d\n", array[100]);
-                    delete[] array;
-                    return 0;
-                }
-        
-                extern "C" int heap_oob_write() {
-                    int *array = new int[100];
-                    array[100] = 1;
-                    delete[] array;
-                     return 0;
-                }
-                extern "C" int malloc_heap_uaf_read() {
-                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
-                    free(array);
-                    fprintf(stdout, "%d\n", array[5]);
-                    return 0;
-                }
-        
-                extern "C" int malloc_heap_uaf_write() {
-                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
-                    free(array);
-                    array[5] = 1;
-                    return 0;
-                }
-        
-                extern "C" int malloc_heap_oob_read() {
-                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
-                    fprintf(stdout, "%d\n", array[100]);
-                    free(array);
-                    return 0;
-                }
-        
-                extern "C" int malloc_heap_oob_write() {
-                    int *array = static_cast<int *>(malloc(100 * sizeof(int)));
-                    array[100] = 1;
-                    free(array);
-                    return 0;
-                }
-        
-                extern "C" int LLVMFuzzerTestOneInput() {
-                    // abort();
-                    return 0;
-                }
-            }; frida_helper; state; observers; feedback; objective; function_name; assert_eq!(state.solutions().count(), err_cnt), assert_eq!(1, 1)); 
-            
-            //assert_eq!(state.solutions().count(), err_cnt);
-        }
+
+                SimpleStdoutLogger::set_logger().unwrap()
+            })
+        };
     }
 
-    #[test]
-    #[cfg(unix)]
-    fn run_test_asan() {
-        // Read RUST_LOG from the environment and set the log level accordingly (not using env_logger)
-        // Note that in cargo test, the output of successfull tests is suppressed by default,
-        // both those sent to stdout and stderr. To see the output, run `cargo test -- --nocapture`.
-        if let Ok(value) = std::env::var("RUST_LOG") {
-            match value.as_str() {
-                "off" => log::set_max_level(log::LevelFilter::Off),
-                "error" => log::set_max_level(log::LevelFilter::Error),
-                "warn" => log::set_max_level(log::LevelFilter::Warn),
-                "info" => log::set_max_level(log::LevelFilter::Info),
-                "debug" => log::set_max_level(log::LevelFilter::Debug),
-                "trace" => log::set_max_level(log::LevelFilter::Trace),
-                _ => panic!("Unknown RUST_LOG level: {value}"),
-            }
-        }
-
-        
-        SimpleStdoutLogger::set_logger().unwrap();
-
-        // Check if the harness dynamic library is present, if not - skip the test
-
-        GUM.set(unsafe { Gum::obtain() })
-            .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
+    fn get_options() -> FuzzerOptions {
         let simulated_args = vec![
             "libafl_frida_test",
             "-A",
             "--disable-excludes",
             "--continue-on-error",
         ];
-        let options: FuzzerOptions = FuzzerOptions::try_parse_from(simulated_args).unwrap();
-        unsafe { test_asan(&options) }
+
+        FuzzerOptions::try_parse_from(simulated_args).unwrap()
     }
+
+    #[test]
+    fn heap_uaf_read_asan() {
+        init_logging!();
+        let mut options = get_options();
+        let runtimes = tuple_list!(CoverageRuntime::new(), AsanRuntime::new(&options));
+        let corpus = InMemoryCorpus::<BytesInput>::new();
+        let rand = StdRand::with_seed(0);
+        let mut feedback = ConstFeedback::new(false);
+        // Feedbacks to recognize an input as solution
+        let mut objective = feedback_or_fast!(
+            // true enables the AsanErrorFeedback
+            feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+        );
+
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::<BytesInput>::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
+
+        let observers = unsafe {
+            tuple_list!(
+            AsanErrorsObserver::new(&ASAN_ERRORS) //,
+        )
+        };
+
+        unsafe {
+            frida_test!(assert_cxx!{
+                #inline_c_rs SHARED
+                #include <stdint.h>
+                #include <stdlib.h>
+                #include <string>
+                extern "C" int heap_uaf_read(const uint8_t *_data, size_t _size) {
+                    int *array = new int[100];
+                    delete[] array;
+                    fprintf(stdout, "%d\n", array[5]);
+                    return 0;
+                  }
+                  
+            }; runtimes; options; state; observers; feedback; objective; "heap_uaf_read"; assert_eq!(state.solutions().count(), 1));
+        }
+    }
+  /*  #[test]
+    fn heap_uaf_write_asan() {
+        init_logging!();
+        let mut options = get_options();
+        let runtimes = tuple_list!(CoverageRuntime::new(), AsanRuntime::new(&options));
+        let corpus = InMemoryCorpus::<BytesInput>::new();
+        let rand = StdRand::with_seed(0);
+        let mut feedback = ConstFeedback::new(false);
+        // Feedbacks to recognize an input as solution
+        let mut objective = feedback_or_fast!(
+            // true enables the AsanErrorFeedback
+            feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+        );
+
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::<BytesInput>::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
+
+        let observers = unsafe {
+            tuple_list!(
+            AsanErrorsObserver::new(&ASAN_ERRORS) //,
+        )
+        };
+
+        unsafe {
+            frida_test!(assert_cxx!{
+                #inline_c_rs SHARED
+                #include <stdint.h>
+                #include <stdlib.h>
+                #include <string>
+
+                extern "C" int heap_uaf_write(const uint8_t *_data, size_t _size) {
+                    int *array = new int[100];
+                    delete[] array;
+                    array[5] = 1;
+                    return 0;
+                  }
+
+            }; runtimes; options; state; observers; feedback; objective; "heap_uaf_write"; assert_eq!(state.solutions().count(), 1));
+        }
+    }*/ 
 }
+/* #[test]
+fn heap_oob_read_asan() {
+
+    enable_logging!();
+    let mut options = get_options();
+    let runtimes = tuple_list!(CoverageRuntime::new(), AsanRuntime::new(&options));
+    let corpus = InMemoryCorpus::<BytesInput>::new();
+    let rand = StdRand::with_seed(0);
+    let mut feedback = ConstFeedback::new(false);
+        // Feedbacks to recognize an input as solution
+    let mut objective = feedback_or_fast!(
+            // true enables the AsanErrorFeedback
+        feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+    );
+
+    let mut state = StdState::new(
+        rand,
+        corpus,
+        InMemoryCorpus::<BytesInput>::new(),
+        &mut feedback,
+        &mut objective,
+    )
+    .unwrap();
+
+    let observers = unsafe { tuple_list!(
+        AsanErrorsObserver::new(&ASAN_ERRORS) //,
+    ) } ;
+
+    unsafe {
+    frida_test!(assert_cxx!{
+            #inline_c_rs SHARED
+            #include <stdint.h>
+            #include <stdlib.h>
+            #include <string>
+
+            extern "C" int heap_oob_read(const uint8_t *_data, size_t _size) {
+                int *array = new int[100];
+                fprintf(stdout, "%d\n", array[100]);
+                delete[] array;
+                return 0;
+              }
+
+    }; runtimes; options; state; observers; feedback; objective; "heap_oob_read"; assert_eq!(state.solutions().count(), 1));
+    }
+
+}
+
+#[test]
+fn heap_oob_write_asan() {
+
+    enable_logging!();
+    let mut options = get_options();
+    let runtimes = tuple_list!(CoverageRuntime::new(), AsanRuntime::new(&options));
+    let corpus = InMemoryCorpus::<BytesInput>::new();
+    let rand = StdRand::with_seed(0);
+    let mut feedback = ConstFeedback::new(false);
+        // Feedbacks to recognize an input as solution
+    let mut objective = feedback_or_fast!(
+            // true enables the AsanErrorFeedback
+        feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+    );
+
+    let mut state = StdState::new(
+        rand,
+        corpus,
+        InMemoryCorpus::<BytesInput>::new(),
+        &mut feedback,
+        &mut objective,
+    )
+    .unwrap();
+
+    let observers = unsafe { tuple_list!(
+        AsanErrorsObserver::new(&ASAN_ERRORS) //,
+    ) } ;
+
+    unsafe {
+    frida_test!(assert_cxx!{
+            #inline_c_rs SHARED
+            #include <stdint.h>
+            #include <stdlib.h>
+            #include <string>
+
+            extern "C" int heap_oob_write(const uint8_t *_data, size_t _size) {
+                int *array = new int[100];
+                array[100] = 1;
+                delete[] array;
+                return 0;
+              }
+
+    }; runtimes; options; state; observers; feedback; objective; "heap_oob_write"; assert_eq!(state.solutions().count(), 1));
+    }
+
+}
+
+#[test]
+fn malloc_heap_uaf_read_asan() {
+
+    enable_logging!();
+    let mut options = get_options();
+    let runtimes = tuple_list!(CoverageRuntime::new(), AsanRuntime::new(&options));
+    let corpus = InMemoryCorpus::<BytesInput>::new();
+    let rand = StdRand::with_seed(0);
+    let mut feedback = ConstFeedback::new(false);
+        // Feedbacks to recognize an input as solution
+    let mut objective = feedback_or_fast!(
+            // true enables the AsanErrorFeedback
+        feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+    );
+
+    let mut state = StdState::new(
+        rand,
+        corpus,
+        InMemoryCorpus::<BytesInput>::new(),
+        &mut feedback,
+        &mut objective,
+    )
+    .unwrap();
+
+    let observers = unsafe { tuple_list!(
+        AsanErrorsObserver::new(&ASAN_ERRORS) //,
+    ) } ;
+
+    unsafe {
+    frida_test!(assert_cxx!{
+            #inline_c_rs SHARED
+            #include <stdint.h>
+            #include <stdlib.h>
+            #include <string>
+
+            extern "C" int malloc_heap_uaf_read(const uint8_t *_data, size_t _size) {
+                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                free(array);
+                fprintf(stdout, "%d\n", array[5]);
+                return 0;
+              }
+
+    }; runtimes; options; state; observers; feedback; objective; "malloc_heap_uaf_read"; assert_eq!(state.solutions().count(), 1));
+    }
+
+}
+
+#[test]
+fn malloc_heap_uaf_write_asan() {
+
+    enable_logging!();
+    let mut options = get_options();
+    let runtimes = tuple_list!(CoverageRuntime::new(), AsanRuntime::new(&options));
+    let corpus = InMemoryCorpus::<BytesInput>::new();
+    let rand = StdRand::with_seed(0);
+    let mut feedback = ConstFeedback::new(false);
+        // Feedbacks to recognize an input as solution
+    let mut objective = feedback_or_fast!(
+            // true enables the AsanErrorFeedback
+        feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+    );
+
+    let mut state = StdState::new(
+        rand,
+        corpus,
+        InMemoryCorpus::<BytesInput>::new(),
+        &mut feedback,
+        &mut objective,
+    )
+    .unwrap();
+
+    let observers = unsafe { tuple_list!(
+        AsanErrorsObserver::new(&ASAN_ERRORS) //,
+    ) } ;
+
+    unsafe {
+    frida_test!(assert_cxx!{
+            #inline_c_rs SHARED
+            #include <stdint.h>
+            #include <stdlib.h>
+            #include <string>
+
+            extern "C" int malloc_heap_uaf_write(const uint8_t *_data, size_t _size) {
+                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                free(array);
+                array[5] = 1;
+                return 0;
+              }
+
+    }; runtimes; options; state; observers; feedback; objective; "malloc_heap_uaf_write"; assert_eq!(state.solutions().count(), 1));
+    }
+
+}
+
+#[test]
+fn malloc_heap_oob_read_asan() {
+
+    enable_logging!();
+    let mut options = get_options();
+    let runtimes = tuple_list!(CoverageRuntime::new(), AsanRuntime::new(&options));
+    let corpus = InMemoryCorpus::<BytesInput>::new();
+    let rand = StdRand::with_seed(0);
+    let mut feedback = ConstFeedback::new(false);
+        // Feedbacks to recognize an input as solution
+    let mut objective = feedback_or_fast!(
+            // true enables the AsanErrorFeedback
+        feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+    );
+
+    let mut state = StdState::new(
+        rand,
+        corpus,
+        InMemoryCorpus::<BytesInput>::new(),
+        &mut feedback,
+        &mut objective,
+    )
+    .unwrap();
+
+    let observers = unsafe { tuple_list!(
+        AsanErrorsObserver::new(&ASAN_ERRORS) //,
+    ) } ;
+
+    unsafe {
+    frida_test!(assert_cxx!{
+            #inline_c_rs SHARED
+            #include <stdint.h>
+            #include <stdlib.h>
+            #include <string>
+
+            extern "C" int malloc_heap_oob_read(const uint8_t *_data, size_t _size) {
+                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                fprintf(stdout, "%d\n", array[100]);
+                free(array);
+                return 0;
+              }
+
+    }; runtimes; options; state; observers; feedback; objective; "malloc_heap_oob_read"; assert_eq!(state.solutions().count(), 1));
+    }
+
+}
+
+
+
+#[test]
+fn malloc_heap_oob_write_asan() {
+
+    enable_logging!();
+    let mut options = get_options();
+    let runtimes = tuple_list!(CoverageRuntime::new(), AsanRuntime::new(&options));
+    let corpus = InMemoryCorpus::<BytesInput>::new();
+    let rand = StdRand::with_seed(0);
+    let mut feedback = ConstFeedback::new(false);
+        // Feedbacks to recognize an input as solution
+    let mut objective = feedback_or_fast!(
+            // true enables the AsanErrorFeedback
+        feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+    );
+
+    let mut state = StdState::new(
+        rand,
+        corpus,
+        InMemoryCorpus::<BytesInput>::new(),
+        &mut feedback,
+        &mut objective,
+    )
+    .unwrap();
+
+    let observers = unsafe { tuple_list!(
+        AsanErrorsObserver::new(&ASAN_ERRORS) //,
+    ) } ;
+
+    unsafe {
+    frida_test!(assert_cxx!{
+            #inline_c_rs SHARED
+            #include <stdint.h>
+            #include <stdlib.h>
+            #include <string>
+
+            extern "C" int malloc_heap_oob_write(const uint8_t *_data, size_t _size) {
+                int *array = static_cast<int *>(malloc(100 * sizeof(int)));
+                array[100] = 1;
+                free(array);
+                return 0;
+              }
+
+    }; runtimes; options; state; observers; feedback; objective; "malloc_heap_oob_write"; assert_eq!(state.solutions().count(), 1));
+    }
+
+}*/

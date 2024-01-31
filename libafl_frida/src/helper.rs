@@ -625,6 +625,12 @@ where
             .init_all(gum, ranges, module_map);
     }
 
+    pub fn deinit(&mut self, gum: &'a Gum){
+        if let Some(rt) = (*self.runtimes).borrow_mut().match_first_type_mut::<AsanRuntime>(){
+            rt.deinit_asan(gum);
+        }
+    }
+
     /// Method called before execution
     pub fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
         (*self.runtimes).borrow_mut().pre_exec_all(input)
