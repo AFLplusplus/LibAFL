@@ -12,7 +12,7 @@ use core::{
 };
 use std::{
     ffi::c_void,
-    num::NonZeroUsize,
+    // num::NonZeroUsize,
     ptr::{addr_of, write_volatile},
     rc::Rc,
 };
@@ -24,7 +24,7 @@ use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
+    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum,
     Module, ModuleDetails, ModuleMap, PageProtection, RangeDetails,
 };
 use frida_gum_sys::Insn;
@@ -94,7 +94,7 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
 #[cfg(target_arch = "aarch64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(target = "aarch64")]
 const ASAN_EH_FRAME_DWORD_COUNT: usize = 14;
 #[cfg(target_arch = "aarch64")]
 const ASAN_EH_FRAME_FDE_OFFSET: u32 = 20;
@@ -131,6 +131,7 @@ pub struct AsanRuntime {
     continue_on_error: bool,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
     pub(crate) hooks_enabled: bool,
+    pc: Option<usize>,
 
     #[cfg(target_arch = "aarch64")]
     eh_frame: [u32; ASAN_EH_FRAME_DWORD_COUNT],
@@ -531,19 +532,21 @@ impl AsanRuntime {
     }
 
     /// Gets the current instruction pointer
-    #[cfg(target_arch = "aarch64")]
     #[must_use]
     #[inline]
-    pub fn pc() -> usize {
-        Interceptor::current_invocation().cpu_context().pc() as usize
+    pub fn pc(&self) -> usize {
+        if let Some(pc) = self.pc.as_ref() {
+           *pc
+        } else {
+            0
+        }
     }
 
-    /// Gets the current instruction pointer
-    #[cfg(target_arch = "x86_64")]
-    #[must_use]
-    #[inline]
-    pub fn pc() -> usize {
-        Interceptor::current_invocation().cpu_context().rip() as usize
+    pub fn set_pc(&mut self, pc: usize) {
+        self.pc = Some(pc);
+    }
+    pub fn unset_pc(&mut self) {
+        self.pc = None;
     }
 
     pub fn register_hooks(hook_rt: &mut HookRuntime) {
@@ -558,49 +561,24 @@ impl AsanRuntime {
                     hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
                         let mut index = 0;
 
+                        let asan_rt = _asan_rt.unwrap();
+                        asan_rt.set_pc(_context.rip() as usize);
+
+                        log::trace!("hooked {} from {:x}", stringify!($name), _context.rip());
                         #[allow(trivial_numeric_casts)]
-                            #[allow(unused_assignments)]
-                        _context.set_return_value(_asan_rt.unwrap().[<hook_ $name>]($(_context.arg({
+                        #[allow(unused_assignments)]
+                        _context.set_return_value(asan_rt.[<hook_ $name>]($(_context.arg({
                             let $param = index;
                             index += 1;
                             $param
                         }) as _),*) as usize);
 
+                        asan_rt.unset_pc();
                     });
                 }
             }
         }
 
-        // macro_rules! hook_priv_func {
-        //     ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
-        //         paste::paste! {
-        //
-        //             #[allow(non_snake_case)]
-        //             unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
-        //                 let mut invocation = Interceptor::current_invocation();
-        //                 let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-        //                 let real_address = this.real_address_for_stalked(invocation.return_addr());
-        //                 if this.hooks_enabled && !this.suppressed_addresses.contains(&real_address) /*&& this.module_map.as_ref().unwrap().find(real_address as u64).is_some()*/ {
-        //                     this.hooks_enabled = false;
-        //                     let result = this.[<hook_ $name>]($($param),*);
-        //                     this.hooks_enabled = true;
-        //                     result
-        //                 } else {
-        //                 let [<hooked_ $name>] = Module::find_symbol_by_name($lib, stringify!($name)).expect("Failed to find function");
-        //                 let [<original_ $name>]: extern "system" fn($($param_type),*) -> $return_type = unsafe { std::mem::transmute([<hooked_ $name>].0) };
-        //                     ([<original_ $name>])($($param),*)
-        //                 }
-        //             }
-        //             let [<hooked_ $name>] = Module::find_symbol_by_name($lib, stringify!($name)).expect("Failed to find function");
-        //             interceptor.replace(
-        //                 [<hooked_ $name>],
-        //                 NativePointer([<replacement_ $name>] as *mut c_void),
-        //                 NativePointer(self as *mut _ as *mut c_void)
-        //             ).unwrap();
-        //         }
-        //     }
-        // }
-        //
         macro_rules! hook_func_with_check {
             ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
@@ -610,67 +588,43 @@ impl AsanRuntime {
                     let address = Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function").0 as usize;
                     log::trace!("hooking {} at {:x}", stringify!($name), address);
                     hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
+                        log::trace!("hooked {} from {:x}", stringify!($name), _context.rip());
                         let asan_rt = _asan_rt.unwrap();
                         let mut index = 0;
+                        asan_rt.set_pc(_context.rip() as usize);
                         #[allow(trivial_numeric_casts)]
-                            #[allow(unused_assignments)]
+                        #[allow(unused_assignments)]
                         let result = if asan_rt.[<hook_check_ $name>]($(_context.arg({
                             let $param = index;
                             index += 1;
                             $param
                         }) as _),*) {
-                        let mut index = 0;
-                        #[allow(trivial_numeric_casts)]
+                            let mut index = 0;
+                            #[allow(trivial_numeric_casts)]
                             #[allow(unused_assignments)]
-                asan_rt.[<hook_ $name>]($(_context.arg({
-                            let $param = index;
-                            index += 1;
-                            $param
-                        }) as _),*)
+                            asan_rt.[<hook_ $name>]($(_context.arg({
+                                let $param = index;
+                                index += 1;
+                                $param
+                            }) as _),*)
                         } else {
                             let mut index = 0;
-                        #[allow(trivial_numeric_casts)]
+                            #[allow(trivial_numeric_casts)]
                             #[allow(unused_assignments)]
-                         unsafe { $name($(_context.arg({
-                            let $param = index;
-                            index += 1;
-                            $param
-                        }) as _),*) }
+                            unsafe { $name($(_context.arg({
+                                let $param = index;
+                                index += 1;
+                                $param
+                            }) as _),*) }
                         };
                         #[allow(trivial_numeric_casts)]
                         _context.set_return_value(result as usize);
-                    });
+                        asan_rt.unset_pc();
+                    })
                 }
             }
         }
-        // macro_rules! hook_func_with_check {
-        //     ($lib:expr, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
-        //         paste::paste! {
-        //             extern "system" {
-        //                 fn $name($($param: $param_type),*) -> $return_type;
-        //             }
-        //             #[allow(non_snake_case)]
-        //             unsafe extern "system" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
-        //                 let mut invocation = Interceptor::current_invocation();
-        //                 let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-        //                 if this.[<hook_check_ $name>]($($param),*) {
-        //                     this.hooks_enabled = false;
-        //                     let result = this.[<hook_ $name>]($($param),*);
-        //                     this.hooks_enabled = true;
-        //                     result
-        //                 } else {
-        //                     $name($($param),*)
-        //                 }
-        //             }
-        //             interceptor.replace(
-        //                 Module::find_export_by_name($lib, stringify!($name)).expect("Failed to find function"),
-        //                 NativePointer([<replacement_ $name>] as *mut c_void),
-        //                 NativePointer(self as *mut _ as *mut c_void)
-        //             ).ok();
-        //         }
-        //     }
-        // }
-
+        
         // Hook the memory allocator functions
         hook_func!(None, malloc, (size: usize), *mut c_void);
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
@@ -722,48 +676,89 @@ impl AsanRuntime {
             (file: usize, file_mapping_attributes: *const c_void, protect: i32, maximum_size_high: u32, maximum_size_low: u32, name: *const c_void),
             usize
         );
+
         #[cfg(windows)]
-        hook_func!(
-            Some("ntdll"),
-            RtlAllocateHeap,
-            (handle: *mut c_void, flags: u32, size: usize),
-            *mut c_void
-        );
-        #[cfg(windows)]
-        hook_func!(
-            Some("kernel32"),
-            HeapReAlloc,
-            (
-                handle: *mut c_void,
-                flags: u32,
-                ptr: *mut c_void,
-                size: usize
-            ),
-            *mut c_void
-        );
-        #[cfg(windows)]
-        hook_func_with_check!(
-            Some("ntdll"),
-            RtlFreeHeap,
-            (handle: *mut c_void, flags: u32, ptr: *mut c_void),
-            bool
-        );
-        #[cfg(windows)]
-        hook_func_with_check!(
-            Some("ntdll"),
-            RtlSizeHeap,
-            (handle: *mut c_void, flags: u32, ptr: *mut c_void),
-            usize
-        );
-        #[cfg(windows)]
-        hook_func_with_check!(
-            // Some("kernel32"),
-            // HeapValidate,
-            Some("ntdll"),
-            RtlValidateHeap,
-            (handle: *mut c_void, flags: u32, ptr: *mut c_void),
-            bool
-        );
+        for libname in [
+            "ntdll",
+            "ucrtbase",
+            "kernelbase",
+            "kernel32",
+            "vcruntime140",
+            "api-ms-win-core-heap-l1-1-0",
+            "api-ms-win-core-heap-l2-1-0",
+            "api-ms-win-core-heap-obsolete-l1-1-0",
+        ] {
+            log::info!("Hooking allocator functions in {}", libname);
+            for export in Module::enumerate_exports(libname) {
+                // log::trace!("- {}", export.name);
+                match &export.name[..] {
+                    "HeapAlloc" | "RtlAllocateHeap" => {
+                        hook_func!(Some(libname), RtlAllocateHeap, (handle: *mut c_void, flags: u32, bytes: usize), *mut c_void);
+                    }
+                    "HeapFree" => {
+                        hook_func_with_check!(Some(libname), HeapFree, (handle: *mut c_void, flags: u32, mem: *const c_void), bool);
+                    }
+                    "RtlFreeHeap" => {
+                        hook_func_with_check!(Some(libname), RtlFreeHeap, (handle: *mut c_void, flags: u32, mem: *const c_void), usize);
+                    }
+                    "HeapSize" | "RtlSizeHeap" => {
+                        hook_func_with_check!(Some(libname), RtlSizeHeap , (handle: *mut c_void, flags: u32, mem: *const c_void), usize);
+                    }
+                    "HeapReAlloc" | "RtlReAllocateHeap" => {
+                        hook_func!(
+                            Some(libname),
+                            RtlReAllocateHeap,
+                            (
+                                handle: *mut c_void,
+                                flags: u32,
+                                ptr: *mut c_void,
+                                size: usize
+                            ),
+                            *mut c_void
+                        );
+                    }
+
+                    "GlobalAlloc" => {
+                        hook_func!(Some(libname), GlobalAlloc, (flags: u32, size: usize), *mut c_void);
+                    }
+                    "GlobalReAlloc" => {
+                        hook_func!(Some(libname), GlobalReAlloc, (mem: *mut c_void, flags: u32, size: usize), *mut c_void);
+                    }
+                    "GlobalHandle" => {
+                        hook_func_with_check!(Some(libname), GlobalHandle, (mem: *mut c_void), *mut c_void);
+                    }
+                    "GlobalLock" => {
+                        hook_func_with_check!(Some(libname), GlobalLock, (mem: *mut c_void), *mut c_void);
+                    }
+                    "GlobalUnlock" => {
+                        hook_func_with_check!(Some(libname), GlobalUnlock, (mem: *mut c_void), bool);
+                    }
+                    "GlobalSize" => {
+                        hook_func_with_check!(Some(libname), GlobalSize, (mem: *mut c_void),usize);
+                    }
+                    "GlobalFree" => {
+                        hook_func_with_check!(Some(libname), GlobalFree, (mem: *mut c_void), *mut c_void);
+                    }
+                    "memmove" => {
+                        hook_func!(
+                            Some(libname),
+                            memmove,
+                            (dest: *mut c_void, src: *const c_void, n: usize),
+                            *mut c_void
+                        );
+                    }
+                    "memcpy" => {
+                        hook_func!(
+                            Some(libname),
+                            memcpy,
+                            (dest: *mut c_void, src: *const c_void, n: usize),
+                            *mut c_void
+                        );
+                    }
+                    _ => (),
+                }
+            }
+        }
 
         #[cfg(not(windows))]
         for libname in [
@@ -2173,7 +2168,8 @@ impl AsanRuntime {
         match basereg {
             Some(reg) => match reg {
                 X86Register::Rip => {
-                    writer.put_mov_reg_address(X86Register::Rdi, true_rip + instruction_size as u64);
+                    writer
+                        .put_mov_reg_address(X86Register::Rdi, true_rip + instruction_size as u64);
                 }
                 X86Register::Rsp => {
                     // In this case rsp clobbered
@@ -2195,7 +2191,8 @@ impl AsanRuntime {
         match indexreg {
             Some(reg) => match reg {
                 X86Register::Rip => {
-                    writer.put_mov_reg_address(X86Register::Rsi, true_rip + instruction_size as u64);
+                    writer
+                        .put_mov_reg_address(X86Register::Rsi, true_rip + instruction_size as u64);
                 }
                 X86Register::Rdi => {
                     // In this case rdi is already clobbered, so we want it from the stack (we pushed rdi onto stack before!)
@@ -2516,6 +2513,7 @@ impl Default for AsanRuntime {
             hooks_enabled: false,
             #[cfg(target_arch = "aarch64")]
             eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],
+            pc: None,
         }
     }
 }
