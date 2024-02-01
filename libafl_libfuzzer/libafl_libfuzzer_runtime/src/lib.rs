@@ -156,7 +156,7 @@ macro_rules! fuzz_with {
         };
         use libafl::{
             corpus::Corpus,
-            executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
+            executors::{ExitKind, InProcessExecutor},
             feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,
             feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
             generators::RandBytesGenerator,
@@ -434,16 +434,14 @@ macro_rules! fuzz_with {
             let mut tracing_harness = harness;
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-            let mut executor = TimeoutExecutor::new(
-                InProcessExecutor::new(
+            let mut executor = InProcessExecutor::with_timeout(
                     &mut harness,
                     tuple_list!(edges_observer, size_edges_observer, time_observer, backtrace_observer, oom_observer),
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
-                )?,
-                $options.timeout(),
-            );
+                    $options.timeout(),
+                )?;
 
             // In case the corpus is empty (on first run) or crashed while loading, reset
             if state.must_load_initial_inputs() {

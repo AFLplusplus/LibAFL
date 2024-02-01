@@ -2,7 +2,7 @@
 
 use libafl::{
     events::{EventFirer, EventRestarter},
-    executors::{inprocess::windows_asan_handler::asan_death_handler, Executor, HasObservers},
+    executors::{hooks::windows::windows_asan_handler::asan_death_handler, Executor, HasObservers},
     feedbacks::Feedback,
     state::{HasCorpus, HasExecutions, HasSolutions},
     HasObjective,

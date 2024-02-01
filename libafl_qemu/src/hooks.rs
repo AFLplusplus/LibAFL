@@ -6,13 +6,10 @@ use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     mem::transmute,
-    ptr::{self, addr_of},
+    ptr::{self, addr_of, addr_of_mut},
 };
 
-use libafl::{
-    executors::{inprocess::inprocess_get_state, ExitKind},
-    inputs::UsesInput,
-};
+use libafl::{executors::hooks::inprocess::inprocess_get_state, inputs::UsesInput};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
@@ -322,7 +319,7 @@ where
 {
     unsafe {
         let hooks = get_qemu_hooks::<QT, S>();
-        for hook in &mut CRASH_HOOKS {
+        for hook in &mut (*addr_of_mut!(CRASH_HOOKS)) {
             match hook {
                 HookRepr::Function(ptr) => {
                     let func: fn(&mut QemuHooks<QT, S>, i32) = transmute(*ptr);
@@ -339,7 +336,6 @@ where
 }
 
 static mut HOOKS_IS_INITIALIZED: bool = false;
-static mut FIRST_EXEC: bool = true;
 
 pub struct QemuHooks<QT, S>
 where
@@ -466,7 +462,7 @@ where
             let fat: FatPtr = transmute(hook);
             GENERIC_HOOKS.push((InstructionHookId(0), fat));
             let id = self.emulator.set_hook(
-                &mut GENERIC_HOOKS.last_mut().unwrap().1,
+                &mut ((*addr_of_mut!(GENERIC_HOOKS)).last_mut().unwrap().1),
                 addr,
                 closure_generic_hook_wrapper::<QT, S>,
                 invalidate_block,
@@ -679,6 +675,7 @@ where
         }
     }
 
+    #[allow(clippy::similar_names)]
     pub fn writes(
         &self,
         generation_hook: Hook<
@@ -749,7 +746,6 @@ where
                 write_3_exec_hook_wrapper::<QT, S>,
                 extern "C" fn(&mut HookState<5, WriteHookId>, id: u64, addr: GuestAddr)
             );
-            #[allow(clippy::similar_names)]
             let execn = get_raw_hook!(
                 execution_hook_n,
                 write_4_exec_hook_wrapper::<QT, S>,
@@ -903,7 +899,7 @@ where
             let fat: FatPtr = transmute(hook);
             BACKDOOR_HOOKS.push((BackdoorHookId(0), fat));
             let id = self.emulator.add_backdoor_hook(
-                &mut BACKDOOR_HOOKS.last_mut().unwrap().1,
+                &mut ((*addr_of_mut!(BACKDOOR_HOOKS)).last_mut().unwrap().1),
                 closure_backdoor_hook_wrapper::<QT, S>,
             );
             BACKDOOR_HOOKS.last_mut().unwrap().0 = id;
@@ -1017,7 +1013,7 @@ where
             let fat: FatPtr = transmute(hook);
             PRE_SYSCALL_HOOKS.push((PreSyscallHookId(0), fat));
             let id = self.emulator.add_pre_syscall_hook(
-                &mut PRE_SYSCALL_HOOKS.last_mut().unwrap().1,
+                &mut ((*addr_of_mut!(PRE_SYSCALL_HOOKS)).last_mut().unwrap().1),
                 closure_pre_syscall_hook_wrapper::<QT, S>,
             );
             PRE_SYSCALL_HOOKS.last_mut().unwrap().0 = id;
@@ -1136,7 +1132,7 @@ where
             let fat: FatPtr = transmute(hook);
             POST_SYSCALL_HOOKS.push((PostSyscallHookId(0), fat));
             let id = self.emulator.add_post_syscall_hook(
-                &mut POST_SYSCALL_HOOKS.last_mut().unwrap().1,
+                &mut ((*addr_of_mut!(POST_SYSCALL_HOOKS)).last_mut().unwrap().1),
                 closure_post_syscall_hook_wrapper::<QT, S>,
             );
             POST_SYSCALL_HOOKS.last_mut().unwrap().0 = id;
@@ -1184,7 +1180,7 @@ where
             let fat: FatPtr = transmute(hook);
             NEW_THREAD_HOOKS.push((NewThreadHookId(0), fat));
             let id = self.emulator.add_new_thread_hook(
-                &mut NEW_THREAD_HOOKS.last_mut().unwrap().1,
+                &mut (*addr_of_mut!(NEW_THREAD_HOOKS)).last_mut().unwrap().1,
                 closure_new_thread_hook_wrapper::<QT, S>,
             );
             NEW_THREAD_HOOKS.last_mut().unwrap().0 = id;
