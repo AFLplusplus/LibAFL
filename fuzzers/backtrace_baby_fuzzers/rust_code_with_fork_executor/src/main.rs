@@ -117,6 +117,7 @@ pub fn main() {
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        core::time::Duration::from_millis(5000),
         shmem_provider,
     )
     .expect("Failed to create the Executor");

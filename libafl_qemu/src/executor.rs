@@ -2,8 +2,11 @@
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
+    time::Duration,
 };
 
+#[cfg(feature = "fork")]
+use libafl::inputs::UsesInput;
 #[cfg(feature = "fork")]
 use libafl::{
     events::EventManager,
@@ -13,12 +16,12 @@ use libafl::{
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
-        inprocess::{InProcessExecutor, InProcessExecutorHandlerData},
+        hooks::inprocess::InProcessExecutorHandlerData,
+        inprocess::{HasInProcessHooks, InProcessExecutor},
         Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
@@ -97,7 +100,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     context: Option<&mut ucontext_t>,
     data: &mut InProcessExecutorHandlerData,
 ) where
-    E: Executor<EM, Z> + HasObservers,
+    E: Executor<EM, Z> + HasObservers + HasInProcessHooks,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasSolutions + HasCorpus + HasExecutions,
@@ -106,7 +109,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     if BREAK_ON_TMOUT {
         qemu_system_debug_request();
     } else {
-        libafl::executors::inprocess::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
+        libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
             signal, info, context, data,
         );
     }
@@ -126,6 +129,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         event_mgr: &mut EM,
+        timeout: Duration,
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
@@ -133,21 +137,25 @@ where
         S: State + HasExecutions + HasCorpus + HasSolutions,
         Z: HasObjective<Objective = OF, State = S>,
     {
-        let mut inner = InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?;
+        let mut inner = InProcessExecutor::with_timeout(
+            harness_fn, observers, fuzzer, state, event_mgr, timeout,
+        )?;
         #[cfg(emulation_mode = "usermode")]
         {
-            inner.handlers_mut().crash_handler =
+            inner.inprocess_hooks_mut().crash_handler =
                 inproc_qemu_crash_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
                     as *const c_void;
 
             let handler = |hooks: &mut QemuHooks<QT, S>, host_sig| {
                 eprintln!("Crashed with signal {host_sig}");
-                libafl::executors::inprocess::generic_inproc_crash_handler::<
-                    InProcessExecutor<'a, H, OT, S>,
-                    EM,
-                    OF,
-                    Z,
-                >();
+                unsafe {
+                    libafl::executors::inprocess::generic_inproc_crash_handler::<
+                        InProcessExecutor<'a, H, OT, S>,
+                        EM,
+                        OF,
+                        Z,
+                    >();
+                }
                 if let Some(cpu) = hooks.emulator().current_cpu() {
                     eprint!("Context:\n{}", cpu.display_context());
                 }
@@ -157,7 +165,7 @@ where
         }
         #[cfg(emulation_mode = "systemmode")]
         {
-            inner.handlers_mut().timeout_handler =
+            inner.inprocess_hooks_mut().timeout_handler =
                 inproc_qemu_timeout_handler::<InProcessExecutor<'a, H, OT, S>, EM, OF, Z>
                     as *const c_void;
         }
@@ -315,6 +323,7 @@ where
         state: &mut S,
         event_mgr: &mut EM,
         shmem_provider: SP,
+        timeout: core::time::Duration,
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
@@ -333,6 +342,7 @@ where
                 fuzzer,
                 state,
                 event_mgr,
+                timeout,
                 shmem_provider,
             )?,
         })

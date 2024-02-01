@@ -13,7 +13,7 @@ use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
-    executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -201,21 +201,25 @@ pub extern "C" fn libafl_main() {
         };
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        let executor = InProcessExecutor::new(
+        #[cfg(target_os = "linux")]
+        let mut executor = InProcessExecutor::batched_timeouts(
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
             &mut state,
             &mut restarting_mgr,
+            opt.timeout,
         )?;
 
-        // Wrap the executor with a timeout
-        #[cfg(target_os = "linux")]
-        let mut executor = TimeoutExecutor::batch_mode(executor, opt.timeout);
-
-        // Wrap the executor with a timeout
         #[cfg(not(target_os = "linux"))]
-        let mut executor = TimeoutExecutor::new(executor, opt.timeout);
+        let mut executor = InProcessExecutor::with_timeout(
+            &mut harness,
+            tuple_list!(edges_observer, time_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut restarting_mgr,
+            opt.timeout,
+        )?;
 
         // The actual target run starts here.
         // Call LLVMFUzzerInitialize() if present.

@@ -168,6 +168,8 @@ use alloc::vec::Vec;
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::Hasher;
+#[cfg(all(unix, feature = "std"))]
+use core::ptr;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
@@ -940,7 +942,7 @@ impl SimpleFdLogger {
         // We also access a shared variable here.
         unsafe {
             LIBAFL_RAWFD_LOGGER.set_fd(log_fd);
-            log::set_logger(&LIBAFL_RAWFD_LOGGER)?;
+            log::set_logger(&*ptr::addr_of!(LIBAFL_RAWFD_LOGGER))?;
         }
         Ok(())
     }
@@ -1151,6 +1153,9 @@ pub mod pybind {
 mod tests {
 
     #[cfg(all(feature = "std", unix))]
+    use core::ptr;
+
+    #[cfg(all(feature = "std", unix))]
     use crate::LIBAFL_RAWFD_LOGGER;
 
     #[test]
@@ -1160,7 +1165,7 @@ mod tests {
 
         unsafe { LIBAFL_RAWFD_LOGGER.fd = stdout().as_raw_fd() };
         unsafe {
-            log::set_logger(&LIBAFL_RAWFD_LOGGER).unwrap();
+            log::set_logger(&*ptr::addr_of!(LIBAFL_RAWFD_LOGGER)).unwrap();
         }
         log::set_max_level(log::LevelFilter::Debug);
         log::info!("Test");

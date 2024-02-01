@@ -10,7 +10,12 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use std::{ffi::c_void, ptr::write_volatile, rc::Rc};
+use std::{
+    ffi::c_void,
+    num::NonZeroUsize,
+    ptr::{addr_of, write_volatile},
+    rc::Rc,
+};
 
 use backtrace::Backtrace;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -326,7 +331,7 @@ impl AsanRuntime {
     /// Returns the `AsanErrors` from the recent run
     #[allow(clippy::unused_self)]
     pub fn errors(&mut self) -> &Option<AsanErrors> {
-        unsafe { &ASAN_ERRORS }
+        unsafe { &*addr_of!(ASAN_ERRORS) }
     }
 
     /// Make sure the specified memory is unpoisoned

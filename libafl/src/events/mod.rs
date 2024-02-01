@@ -521,16 +521,16 @@ where
         // If we are measuring scalability stuff..
         #[cfg(feature = "scalability_introspection")]
         {
-            let received_with_observer = state.scalability_monitor().testcase_with_observers;
-            let received_without_observer = state.scalability_monitor().testcase_without_observers;
+            let imported_with_observer = state.scalability_monitor().testcase_with_observers;
+            let imported_without_observer = state.scalability_monitor().testcase_without_observers;
 
             self.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: "total received".to_string(),
+                    name: "total imported".to_string(),
                     value: UserStats::new(
                         UserStatsValue::Number(
-                            (received_with_observer + received_without_observer) as u64,
+                            (imported_with_observer + imported_without_observer) as u64,
                         ),
                         AggregatorOps::Avg,
                     ),
@@ -694,8 +694,162 @@ impl<S> HasEventManagerId for NopEventManager<S> {
     }
 }
 
+/// An [`EventManager`] type that wraps another manager, but captures a `monitor` type as well.
+/// This is useful to keep the same API between managers with and without an internal `monitor`.
+#[derive(Copy, Clone, Debug)]
+pub struct MonitorTypedEventManager<EM, M> {
+    inner: EM,
+    phantom: PhantomData<M>,
+}
+
+impl<EM, M> MonitorTypedEventManager<EM, M> {
+    /// Creates a new [`EventManager`] that wraps another manager, but captures a `monitor` type as well.
+    #[must_use]
+    pub fn new(inner: EM) -> Self {
+        MonitorTypedEventManager {
+            inner,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<EM, M> UsesState for MonitorTypedEventManager<EM, M>
+where
+    EM: UsesState,
+{
+    type State = EM::State;
+}
+
+impl<EM, M> EventFirer for MonitorTypedEventManager<EM, M>
+where
+    EM: EventFirer,
+{
+    #[inline]
+    fn fire(
+        &mut self,
+        state: &mut Self::State,
+        event: Event<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
+        self.inner.fire(state, event)
+    }
+
+    #[inline]
+    fn log(
+        &mut self,
+        state: &mut Self::State,
+        severity_level: LogSeverity,
+        message: String,
+    ) -> Result<(), Error> {
+        self.inner.log(state, severity_level, message)
+    }
+
+    #[inline]
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
+    where
+        OT: ObserversTuple<Self::State> + Serialize,
+    {
+        self.inner.serialize_observers(observers)
+    }
+
+    #[inline]
+    fn configuration(&self) -> EventConfig {
+        self.inner.configuration()
+    }
+}
+
+impl<EM, M> EventRestarter for MonitorTypedEventManager<EM, M>
+where
+    EM: EventRestarter,
+{
+    #[inline]
+    fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.inner.on_restart(state)
+    }
+
+    #[inline]
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        self.inner.send_exiting()
+    }
+
+    #[inline]
+    fn await_restart_safe(&mut self) {
+        self.inner.await_restart_safe();
+    }
+}
+
+impl<E, EM, M, Z> EventProcessor<E, Z> for MonitorTypedEventManager<EM, M>
+where
+    EM: EventProcessor<E, Z>,
+{
+    #[inline]
+    fn process(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        executor: &mut E,
+    ) -> Result<usize, Error> {
+        self.inner.process(fuzzer, state, executor)
+    }
+}
+
+impl<E, EM, M, Z> EventManager<E, Z> for MonitorTypedEventManager<EM, M>
+where
+    EM: EventManager<E, Z>,
+    EM::State: HasLastReportTime + HasExecutions + HasMetadata,
+{
+}
+
+impl<EM, M> HasCustomBufHandlers for MonitorTypedEventManager<EM, M>
+where
+    Self: UsesState,
+    EM: HasCustomBufHandlers<State = Self::State>,
+{
+    #[inline]
+    fn add_custom_buf_handler(
+        &mut self,
+        handler: Box<
+            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+        >,
+    ) {
+        self.inner.add_custom_buf_handler(handler);
+    }
+}
+
+impl<EM, M> ProgressReporter for MonitorTypedEventManager<EM, M>
+where
+    Self: UsesState,
+    EM: ProgressReporter<State = Self::State>,
+    EM::State: HasLastReportTime + HasExecutions + HasMetadata,
+{
+    #[inline]
+    fn maybe_report_progress(
+        &mut self,
+        state: &mut Self::State,
+        monitor_timeout: Duration,
+    ) -> Result<(), Error> {
+        self.inner.maybe_report_progress(state, monitor_timeout)
+    }
+
+    #[inline]
+    fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+        self.inner.report_progress(state)
+    }
+}
+
+impl<EM, M> HasEventManagerId for MonitorTypedEventManager<EM, M>
+where
+    EM: HasEventManagerId,
+{
+    #[inline]
+    fn mgr_id(&self) -> EventManagerId {
+        self.inner.mgr_id()
+    }
+}
+
 #[cfg(test)]
 mod tests {
+
+    use core::ptr::addr_of_mut;
 
     use libafl_bolts::{current_time, tuples::tuple_list, Named};
     use tuple_list::tuple_list_type;
@@ -711,7 +865,9 @@ mod tests {
 
     #[test]
     fn test_event_serde() {
-        let obv = unsafe { StdMapObserver::new("test", &mut MAP) };
+        let obv = unsafe {
+            StdMapObserver::from_mut_ptr("test", addr_of_mut!(MAP) as *mut u32, MAP.len())
+        };
         let map = tuple_list!(obv);
         let observers_buf = postcard::to_allocvec(&map).unwrap();
 

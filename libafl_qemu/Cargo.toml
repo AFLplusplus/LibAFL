@@ -17,7 +17,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["fork", "build_libqasan", "serdeany_autoreg"]
+default = ["fork", "build_libqasan", "serdeany_autoreg", "injections"]
 clippy = [] # special feature for clippy, don't use in normal projects§
 document-features = ["dep:document-features"]
 
@@ -92,6 +92,7 @@ document-features = { version = "0.2", optional = true }
 
 [build-dependencies]
 pyo3-build-config = { version = "0.18", optional = true }
+rustversion = "1.0"
 
 [lib]
 name = "libafl_qemu"

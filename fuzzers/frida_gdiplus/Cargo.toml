@@ -33,3 +33,4 @@ libloading = "0.7"
 mimalloc = { version = "*", default-features = false }
 color-backtrace = "0.5"
 env_logger = "0.10.0"
+iced-x86 = { version = "1.20.0", features = ["code_asm"] }

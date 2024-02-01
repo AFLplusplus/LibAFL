@@ -632,10 +632,11 @@ where
         state.introspection_monitor_mut().mark_manager_time();
 
         {
-            let mut testcase = state.testcase_mut(idx)?;
-            let scheduled_count = testcase.scheduled_count();
-            // increase scheduled count, this was fuzz_level in afl
-            testcase.set_scheduled_count(scheduled_count + 1);
+            if let Ok(mut testcase) = state.testcase_mut(idx) {
+                let scheduled_count = testcase.scheduled_count();
+                // increase scheduled count, this was fuzz_level in afl
+                testcase.set_scheduled_count(scheduled_count + 1);
+            }
         }
 
         state.clear_corpus_idx()?;

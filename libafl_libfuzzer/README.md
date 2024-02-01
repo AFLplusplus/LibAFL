@@ -130,6 +130,7 @@ to partial support of libfuzzer flags, `libafl_libfuzzer` offers:
 - `-fork` and `-jobs`
     - in `libafl_libfuzzer`, these are synonymous
 - `-ignore_crashes`, `-ignore_ooms`, and `-ignore_timeouts`
+    - note that setting `-tui=1` enables these flags by default, so you'll need to explicitly mention `-ignore_...=0` to disable them
 - `-rss_limit_mb` and `-malloc_limit_mb`
 - `-ignore_remaining_args`
 - `-shrink`

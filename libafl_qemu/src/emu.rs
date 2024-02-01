@@ -17,10 +17,72 @@ use std::{ffi::CString, ptr, slice::from_raw_parts, str::from_utf8_unchecked};
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
+use paste::paste;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::{GuestReg, Regs};
+
+/// Safe linking with of extern "C" functions.
+/// This macro makes sure the declared symbol is defined *at link time*, avoiding declaring non-existant symbols
+/// that could be silently ignored during linking if unused.
+///
+/// This macro relies on a nightly feature, and can only be used in this mode
+/// It is (nearly) a drop-in replacement for extern "C" { } blocks containing function and static declarations, and will have the same effect in practice.
+macro_rules! extern_c_checked {
+    () => {};
+
+    ($visibility:vis fn $c_fn:ident($($param_ident:ident : $param_ty:ty),*) $( -> $ret_ty:ty )?; $($tail:tt)*) =>  {
+        paste! {
+            #[cfg_attr(nightly, used(linker))]
+            static [<__ $c_fn:upper __>]: unsafe extern "C" fn($($param_ty),*) $( -> $ret_ty )? = $c_fn;
+        }
+
+        extern "C" {
+            $visibility fn $c_fn($($param_ident : $param_ty),*) $( -> $ret_ty )?;
+        }
+
+        extern_c_checked!($($tail)*);
+    };
+
+    ($visibility:vis static $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
+        paste! {
+            #[allow(non_camel_case_types)]
+            #[allow(unused)]
+            struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
+
+            unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
+
+            #[cfg_attr(nightly, used(linker))]
+            static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
+        }
+
+        extern "C" {
+            $visibility static $c_var: $c_var_ty;
+        }
+
+        extern_c_checked!($($tail)*);
+    };
+
+    ($visibility:vis static mut $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
+        paste! {
+            #[allow(non_camel_case_types)]
+            #[allow(unused)]
+            struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
+
+            unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
+
+            #[cfg_attr(nightly, used(linker))]
+            static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
+        }
+
+        extern "C" {
+            $visibility static mut $c_var: $c_var_ty;
+        }
+
+        extern_c_checked!($($tail)*);
+    };
+}
 
 pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
@@ -316,7 +378,7 @@ impl MapInfo {
 }
 
 #[cfg(emulation_mode = "usermode")]
-extern "C" {
+extern_c_checked! {
     fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
 
     fn libafl_qemu_run() -> i32;
@@ -339,7 +401,7 @@ extern "C" {
 }
 
 #[cfg(emulation_mode = "systemmode")]
-extern "C" {
+extern_c_checked! {
     fn qemu_init(argc: i32, argv: *const *const u8, envp: *const *const u8);
 
     fn vm_start();
@@ -348,6 +410,8 @@ extern "C" {
 
     fn libafl_save_qemu_snapshot(name: *const u8, sync: bool);
     fn libafl_load_qemu_snapshot(name: *const u8, sync: bool);
+
+    fn libafl_qemu_current_paging_id(cpu: CPUStatePtr) -> GuestPhysAddr;
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -358,7 +422,7 @@ extern "C" fn qemu_cleanup_atexit() {
 }
 
 // TODO rely completely on libafl_qemu_sys
-extern "C" {
+extern_c_checked! {
     //static libafl_page_size: GuestUsize;
     fn libafl_page_from_addr(addr: GuestAddr) -> GuestAddr;
 
@@ -387,12 +451,9 @@ extern "C" {
 
     fn libafl_qemu_add_gdb_cmd(
         callback: extern "C" fn(*const (), *const u8, usize) -> i32,
-        data: *const (),
+        data: *const ()
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
-
-    #[cfg(emulation_mode = "systemmode")]
-    fn libafl_qemu_current_paging_id(cpu: CPUStatePtr) -> GuestPhysAddr;
 }
 
 #[cfg(emulation_mode = "usermode")]
