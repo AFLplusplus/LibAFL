@@ -523,7 +523,8 @@ impl Drop for GuestMaps {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FatPtr(pub *const c_void, pub *const c_void);
 
-static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
+#[allow(clippy::vec_box)]
+static mut GDB_COMMANDS: Vec<Box<FatPtr>> = vec![];
 
 extern "C" fn gdb_cmd(data: *const (), buf: *const u8, len: usize) -> i32 {
     unsafe {
@@ -1698,11 +1699,9 @@ impl Emulator {
     #[allow(clippy::type_complexity)]
     pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
         unsafe {
-            GDB_COMMANDS.push(core::mem::transmute(callback));
-            libafl_qemu_add_gdb_cmd(
-                gdb_cmd,
-                GDB_COMMANDS.last().unwrap() as *const _ as *const (),
-            );
+            let fat: Box<FatPtr> = Box::new(transmute(callback));
+            libafl_qemu_add_gdb_cmd(gdb_cmd, &*fat as *const _ as *const ());
+            GDB_COMMANDS.push(fat);
         }
     }
 
