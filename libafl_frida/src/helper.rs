@@ -26,6 +26,7 @@ use yaxpeax_arch::Arch;
 use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
+
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
 use crate::{
