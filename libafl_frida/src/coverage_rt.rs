@@ -6,7 +6,7 @@ use std::{cell::RefCell, marker::PhantomPinned, pin::Pin, rc::Rc};
 use dynasmrt::DynasmLabelApi;
 use dynasmrt::{dynasm, DynasmApi};
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput, ModuleMap};
-use libafl_bolts::math::xxh3_rrmxmx_mixer;
+use libafl_bolts::hash_std;
 use rangemap::RangeMap;
 
 use crate::helper::FridaRuntime;
@@ -169,7 +169,9 @@ impl CoverageRuntime {
 
             // Update the previous_pc value
             ; mov rax, QWORD prev_loc_ptr as _
-            ; mov ebx, WORD (h64 >> 1) as i32
+            // ; mov ebx, WORD (h64 >> 1) as i32
+            ; mov ebx, WORD h64 as i32
+            ; ror ebx, 1
             ; mov QWORD [rax], rbx
 
             // Restore the context
@@ -186,7 +188,7 @@ impl CoverageRuntime {
     /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
-        let h64 = xxh3_rrmxmx_mixer(address);
+        let h64 = hash_std(&address.to_le_bytes());
         let writer = output.writer();
 
         // Since the AARCH64 instruction set requires that a register be used if

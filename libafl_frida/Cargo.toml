@@ -44,7 +44,8 @@ libafl = { path = "../libafl", default-features = false, version = "0.11.2", fea
 libafl_bolts = { path = "../libafl_bolts", version = "0.11.2", default-features = false, features = [
     "std",
     "derive",
-    "frida_cli"
+    "frida_cli",
+    "xxh3"
 ] }
 libafl_targets = { path = "../libafl_targets", version = "0.11.2", features = [
     "std",
