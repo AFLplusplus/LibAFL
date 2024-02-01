@@ -436,70 +436,60 @@ impl Allocator {
             return true;
         }
         let address = address as usize;
-        let shadow_size = (size + 8) / 8;
+        let shadow_size = size / 8;
 
         let shadow_addr = map_to_shadow!(self, address);
 
         // self.map_shadow_for_region(address, address + size, false);
 
-        // log::info!(
-        //     "check_shadow: {:x}, {:x}, {:x}, {:x}",
-        //     address,
-        //     shadow_size,
-        //     shadow_addr,
-        //     size
-        // );
-        if address & 0x7 > 0 {
-            let mask = !((1 << (address & 7)) - 1) as u8;
-            if unsafe { (shadow_addr as *mut u8).read() } & mask != mask {
+        log::info!(
+            "check_shadow: {:x}, {:x}, {:x}, {:x}",
+            address,
+            shadow_size,
+            shadow_addr,
+            size
+        );
+
+        let offset = address & 7;
+        // if we are not aligned to 8 bytes, we need to check the high bits of the shadow
+        if offset != 0 {
+            let val = (unsafe { (shadow_addr as *const u16).read() }) >> offset;
+            let mask = (1 << (size % 9)) -1;
+            if val & mask != mask {
                 return false;
             }
         }
 
-        if shadow_size > 0 {
+        if size >= 8 {
             let buf =
-                unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size - 1) };
-
+                unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
             let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
-
-            // log::info!(
-            //     "prefix: {:?}, aligned: {:?}, suffix: {:?}",
-            //     prefix.len(),
-            //     aligned.len(),
-            //     suffix.len()
-            // );
-            // return true;
             if prefix.iter().all(|&x| x == 0xff)
                 && suffix.iter().all(|&x| x == 0xff)
                 && aligned
                     .iter()
                     .all(|&x| x == 0xffffffffffffffffffffffffffffffffu128)
             {
-                let shadow_remainder = (size + 8) % 8;
-                if shadow_remainder > 0 {
-                    let remainder = unsafe { ((shadow_addr + shadow_size - 1) as *mut u8).read() };
-                    // log::info!("remainder: {:x}", remainder);
-                    let mask = !((1 << (8 - shadow_remainder)) - 1) as u8;
-
-                    remainder & mask == mask
-                } else {
-                    true
+                if size % 8 != 0 {
+                    let val = unsafe { ((shadow_addr + shadow_size) as *mut u8).read()};
+                    let mask = (1 << (size % 8)) - 1;
+                    if val & mask != mask {
+                        return false;
+                    }
                 }
-            } else {
-                false
+                return true;
             }
-        } else {
-            let shadow_remainder = (size + 8) % 8;
-            if shadow_remainder > 0 {
-                let remainder = unsafe { ((shadow_addr + shadow_size - 1) as *mut u8).read() };
-                // log::info!("remainder 2: {:x}", remainder);
-                let mask = !((1 << (8 - shadow_remainder)) - 1) as u8;
 
-                remainder & mask == mask
-            } else {
-                true
+
+        }
+        if size % 8 != 0 {
+            let val = unsafe { ((shadow_addr + shadow_size) as *mut u8).read()};
+            let mask = (1 << (size % 8)) - 1;
+            if val & mask != mask {
+                return false;
             }
         }
+        return true;
     }
     /// Maps the address to a shadow address
     #[inline]
@@ -690,4 +680,37 @@ impl Default for Allocator {
             current_mapping_addr: 0,
         }
     }
+}
+
+#[test]
+fn check_shadow() {
+    let mut allocator = Allocator::default();
+    allocator.init();
+
+    let allocation = unsafe { allocator.alloc(8, 8) };
+    assert!(!allocation.is_null());
+    assert!(allocator.check_shadow(allocation, 1) == true);
+    assert!(allocator.check_shadow(allocation, 2) == true);
+    assert!(allocator.check_shadow(allocation, 3) == true);
+    assert!(allocator.check_shadow(allocation, 4) == true);
+    assert!(allocator.check_shadow(allocation, 5) == true);
+    assert!(allocator.check_shadow(allocation, 6) == true);
+    assert!(allocator.check_shadow(allocation, 7) == true);
+    assert!(allocator.check_shadow(allocation, 8) == true);
+    assert!(allocator.check_shadow(allocation, 9) == false);
+    assert!(allocator.check_shadow(allocation, 10) == false);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(1) }, 7) == true);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(2) }, 6) == true);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(3) }, 5) == true);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(4) }, 4) == true);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(5) }, 3) == true);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(6) }, 2) == true);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(7) }, 1) == true);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(8) }, 0) == true);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(9) }, 1) == false);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(9) }, 8) == false);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(1) }, 9) == false);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(1) }, 8) == false);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(2) }, 8) == false);
+    assert!(allocator.check_shadow(unsafe {allocation.offset(3) }, 8) == false);
 }
