@@ -25,18 +25,18 @@ use crate::{
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Hook {
     Function(*const c_void),
-    Closure(FatPtr),
+    Closure(Box<FatPtr>),
     #[cfg(emulation_mode = "usermode")]
-    Once(FatPtr),
+    Once(Box<FatPtr>),
     Empty,
 }
 */
 
 // all kinds of hooks
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum HookRepr {
     Function(*const c_void),
-    Closure(FatPtr),
+    Closure(Box<FatPtr>),
     Empty,
 }
 
@@ -77,7 +77,7 @@ macro_rules! hook_to_repr {
     ($h:expr) => {
         match $h {
             Hook::Function(f) => HookRepr::Function(f as *const libc::c_void),
-            Hook::Closure(c) => HookRepr::Closure(transmute(c)),
+            Hook::Closure(c) => HookRepr::Closure(Box::new(transmute(c))),
             Hook::Raw(_) => HookRepr::Empty, // managed by emu
             Hook::Empty => HookRepr::Empty,
         }
@@ -242,13 +242,13 @@ macro_rules! create_exec_wrapper {
     }
 }
 
-static mut GENERIC_HOOKS: Vec<(InstructionHookId, FatPtr)> = vec![];
+static mut GENERIC_HOOKS: Vec<(InstructionHookId, Box<FatPtr>)> = vec![];
 create_wrapper!(generic, (pc: GuestAddr));
-static mut BACKDOOR_HOOKS: Vec<(BackdoorHookId, FatPtr)> = vec![];
+static mut BACKDOOR_HOOKS: Vec<(BackdoorHookId, Box<FatPtr>)> = vec![];
 create_wrapper!(backdoor, (pc: GuestAddr));
 
 #[cfg(emulation_mode = "usermode")]
-static mut PRE_SYSCALL_HOOKS: Vec<(PreSyscallHookId, FatPtr)> = vec![];
+static mut PRE_SYSCALL_HOOKS: Vec<(PreSyscallHookId, Box<FatPtr>)> = vec![];
 #[cfg(emulation_mode = "usermode")]
 create_wrapper!(pre_syscall, (sys_num: i32,
     a0: GuestAddr,
@@ -260,7 +260,7 @@ create_wrapper!(pre_syscall, (sys_num: i32,
     a6: GuestAddr,
     a7: GuestAddr), SyscallHookResult);
 #[cfg(emulation_mode = "usermode")]
-static mut POST_SYSCALL_HOOKS: Vec<(PostSyscallHookId, FatPtr)> = vec![];
+static mut POST_SYSCALL_HOOKS: Vec<(PostSyscallHookId, Box<FatPtr>)> = vec![];
 #[cfg(emulation_mode = "usermode")]
 create_wrapper!(post_syscall, (res: GuestAddr, sys_num: i32,
     a0: GuestAddr,
@@ -272,7 +272,7 @@ create_wrapper!(post_syscall, (res: GuestAddr, sys_num: i32,
     a6: GuestAddr,
     a7: GuestAddr), GuestAddr);
 #[cfg(emulation_mode = "usermode")]
-static mut NEW_THREAD_HOOKS: Vec<(NewThreadHookId, FatPtr)> = vec![];
+static mut NEW_THREAD_HOOKS: Vec<(NewThreadHookId, Box<FatPtr>)> = vec![];
 #[cfg(emulation_mode = "usermode")]
 create_wrapper!(new_thread, (tid: u32), bool);
 
@@ -459,15 +459,14 @@ where
         invalidate_block: bool,
     ) -> InstructionHookId {
         unsafe {
-            let fat: FatPtr = transmute(hook);
-            GENERIC_HOOKS.push((InstructionHookId(0), fat));
+            let mut fat: Box<FatPtr> = Box::new(transmute(hook));
             let id = self.emulator.set_hook(
-                &mut ((*addr_of_mut!(GENERIC_HOOKS)).last_mut().unwrap().1),
+                transmute::<&mut FatPtr, &mut FatPtr>(&mut *fat), //transmute satisfy the lifetime
                 addr,
                 closure_generic_hook_wrapper::<QT, S>,
                 invalidate_block,
             );
-            GENERIC_HOOKS.last_mut().unwrap().0 = id;
+            GENERIC_HOOKS.push((id, fat));
             id
         }
     }
@@ -896,13 +895,12 @@ where
         hook: Box<dyn for<'a> FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr)>,
     ) -> BackdoorHookId {
         unsafe {
-            let fat: FatPtr = transmute(hook);
-            BACKDOOR_HOOKS.push((BackdoorHookId(0), fat));
+            let mut fat: Box<FatPtr> = Box::new(transmute(hook));
             let id = self.emulator.add_backdoor_hook(
-                &mut ((*addr_of_mut!(BACKDOOR_HOOKS)).last_mut().unwrap().1),
+                transmute::<&mut FatPtr, &mut FatPtr>(&mut *fat), //transmute satisfy the lifetime
                 closure_backdoor_hook_wrapper::<QT, S>,
             );
-            BACKDOOR_HOOKS.last_mut().unwrap().0 = id;
+            BACKDOOR_HOOKS.push((id, fat));
             id
         }
     }
@@ -1010,13 +1008,12 @@ where
         >,
     ) -> PreSyscallHookId {
         unsafe {
-            let fat: FatPtr = transmute(hook);
-            PRE_SYSCALL_HOOKS.push((PreSyscallHookId(0), fat));
+            let mut fat: Box<FatPtr> = Box::new(transmute(hook));
             let id = self.emulator.add_pre_syscall_hook(
-                &mut ((*addr_of_mut!(PRE_SYSCALL_HOOKS)).last_mut().unwrap().1),
+                transmute::<&mut FatPtr, &mut FatPtr>(&mut *fat), //transmute satisfy the lifetime
                 closure_pre_syscall_hook_wrapper::<QT, S>,
             );
-            PRE_SYSCALL_HOOKS.last_mut().unwrap().0 = id;
+            PRE_SYSCALL_HOOKS.push((id, fat));
             id
         }
     }
@@ -1129,13 +1126,12 @@ where
         >,
     ) -> PostSyscallHookId {
         unsafe {
-            let fat: FatPtr = transmute(hook);
-            POST_SYSCALL_HOOKS.push((PostSyscallHookId(0), fat));
+            let mut fat: Box<FatPtr> = Box::new(transmute(hook));
             let id = self.emulator.add_post_syscall_hook(
-                &mut ((*addr_of_mut!(POST_SYSCALL_HOOKS)).last_mut().unwrap().1),
+                transmute::<&mut FatPtr, &mut FatPtr>(&mut *fat), //transmute satisfy the lifetime
                 closure_post_syscall_hook_wrapper::<QT, S>,
             );
-            POST_SYSCALL_HOOKS.last_mut().unwrap().0 = id;
+            POST_SYSCALL_HOOKS.push((id, fat));
             id
         }
     }
@@ -1177,13 +1173,12 @@ where
         hook: Box<dyn for<'a> FnMut(&'a mut Self, Option<&'a mut S>, u32) -> bool>,
     ) -> NewThreadHookId {
         unsafe {
-            let fat: FatPtr = transmute(hook);
-            NEW_THREAD_HOOKS.push((NewThreadHookId(0), fat));
+            let mut fat: Box<FatPtr> = Box::new(transmute(hook));
             let id = self.emulator.add_new_thread_hook(
-                &mut (*addr_of_mut!(NEW_THREAD_HOOKS)).last_mut().unwrap().1,
+                transmute::<&mut FatPtr, &mut FatPtr>(&mut *fat), //transmute satisfy the lifetime
                 closure_new_thread_hook_wrapper::<QT, S>,
             );
-            NEW_THREAD_HOOKS.last_mut().unwrap().0 = id;
+            NEW_THREAD_HOOKS.push((id, fat));
             id
         }
     }
@@ -1200,7 +1195,7 @@ where
     pub fn crash_closure(&self, hook: Box<dyn FnMut(&mut Self, i32)>) {
         unsafe {
             self.emulator.set_crash_hook(crash_hook_wrapper::<QT, S>);
-            CRASH_HOOKS.push(HookRepr::Closure(transmute(hook)));
+            CRASH_HOOKS.push(HookRepr::Closure(Box::new(transmute(hook))));
         }
     }
 }
