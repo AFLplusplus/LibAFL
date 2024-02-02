@@ -461,7 +461,7 @@ where
         unsafe {
             let mut fat: Box<FatPtr> = Box::new(transmute(hook));
             let id = self.emulator.set_hook(
-                transmute(&mut *fat), //transmute satisfy the lifetime
+                transmute::<&mut FatPtr, &mut FatPtr>(&mut *fat), //transmute satisfy the lifetime
                 addr,
                 closure_generic_hook_wrapper::<QT, S>,
                 invalidate_block,
@@ -897,7 +897,7 @@ where
         unsafe {
             let mut fat: Box<FatPtr> = Box::new(transmute(hook));
             let id = self.emulator.add_backdoor_hook(
-                transmute(&mut *fat), //transmute satisfy the lifetime
+                transmute::<&mut FatPtr, &mut FatPtr>(&mut *fat), //transmute satisfy the lifetime
                 closure_backdoor_hook_wrapper::<QT, S>,
             );
             BACKDOOR_HOOKS.push((id, fat));
@@ -1010,7 +1010,7 @@ where
         unsafe {
             let mut fat: Box<FatPtr> = Box::new(transmute(hook));
             let id = self.emulator.add_pre_syscall_hook(
-                transmute(&mut *fat), //transmute satisfy the lifetime
+                transmute::<&mut FatPtr, &mut FatPtr>(&mut *fat), //transmute satisfy the lifetime
                 closure_pre_syscall_hook_wrapper::<QT, S>,
             );
             PRE_SYSCALL_HOOKS.push((id, fat));
@@ -1128,7 +1128,7 @@ where
         unsafe {
             let mut fat: Box<FatPtr> = Box::new(transmute(hook));
             let id = self.emulator.add_post_syscall_hook(
-                transmute(&mut *fat), //transmute satisfy the lifetime
+                transmute::<&mut FatPtr, &mut FatPtr>(&mut *fat), //transmute satisfy the lifetime
                 closure_post_syscall_hook_wrapper::<QT, S>,
             );
             POST_SYSCALL_HOOKS.push((id, fat));
@@ -1175,7 +1175,7 @@ where
         unsafe {
             let mut fat: Box<FatPtr> = Box::new(transmute(hook));
             let id = self.emulator.add_new_thread_hook(
-                transmute(&mut *fat), //transmute satisfy the lifetime
+                transmute::<&mut FatPtr, &mut FatPtr>(&mut *fat), //transmute satisfy the lifetime
                 closure_new_thread_hook_wrapper::<QT, S>,
             );
             NEW_THREAD_HOOKS.push((id, fat));
