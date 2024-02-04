@@ -169,9 +169,7 @@ impl CoverageRuntime {
 
             // Update the previous_pc value
             ; mov rax, QWORD prev_loc_ptr as _
-            // ; mov ebx, WORD (h64 >> 1) as i32
-            ; mov ebx, WORD h64 as i32
-            ; ror ebx, 1
+            ; mov ebx, WORD (h64 >> 1) as i32
             ; mov QWORD [rax], rbx
 
             // Restore the context
