@@ -6,8 +6,8 @@ use std::{cell::RefCell, marker::PhantomPinned, pin::Pin, rc::Rc};
 use dynasmrt::DynasmLabelApi;
 use dynasmrt::{dynasm, DynasmApi};
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput, ModuleMap};
-use xxhash_rust::xxh3::xxh3_64;
 use rangemap::RangeMap;
+use xxhash_rust::xxh3::xxh3_64;
 
 use crate::helper::FridaRuntime;
 
