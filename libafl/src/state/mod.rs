@@ -556,13 +556,7 @@ impl<I, C, R, SC> HasCurrentStage for StdState<I, C, R, SC> {
     }
 
     fn clear_stage(&mut self) -> Result<(), Error> {
-        self.stage_idx_stack.pop();
-        // ensure we are in the right frame
-        if self.stage_depth != self.stage_idx_stack.len() {
-            return Err(Error::illegal_state(
-                "we somehow cleared too many or too few states!",
-            ));
-        }
+        self.stage_idx_stack.truncate(self.stage_depth);
         Ok(())
     }
 
