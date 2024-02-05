@@ -18,6 +18,7 @@ use core::marker::PhantomData;
 use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
+    time::Duration,
 };
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
@@ -496,10 +497,9 @@ where
     S: State + HasExecutions,
     SP: ShMemProvider + 'static,
 {
-    /// Launch the broker and the clients and fuzz
     #[allow(clippy::similar_names)]
     #[allow(clippy::too_many_lines)]
-    pub fn launch(&mut self) -> Result<(), Error> {
+    fn launch_internal(&mut self, client_timeout: Option<Duration>) -> Result<(), Error> {
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
                 "No cores to spawn on given, cannot launch anything.",
@@ -544,6 +544,7 @@ where
                     CentralizedLlmpEventBroker::on_port(
                         self.shmem_provider.clone(),
                         self.centralized_broker_port,
+                        client_timeout,
                     )?;
                 broker.broker_loop()?;
             }
@@ -642,5 +643,15 @@ where
         }
 
         Ok(())
+    }
+
+    /// Launch the broker and the clients and fuzz
+    pub fn launch(&mut self) -> Result<(), Error> {
+        self.launch_internal(None)
+    }
+
+    /// Launch the broker and the clients and fuzz with a given timeout for the clients
+    pub fn launch_with_client_timeout(&mut self, client_timeout: Duration) -> Result<(), Error> {
+        self.launch_internal(Some(client_timeout))
     }
 }
