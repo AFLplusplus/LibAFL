@@ -109,7 +109,7 @@ use crate::{
 
 /// The default timeout in seconds after which a client will be considered stale, and removed.
 #[cfg(feature = "std")]
-pub const DEFAULT_CLIENT_TIMEOUT_SECS: u64 = 60 * 5;
+const DEFAULT_CLIENT_TIMEOUT_SECS: u64 = 60 * 5;
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
@@ -1969,6 +1969,7 @@ where
     clients_to_remove: Vec<usize>,
     /// The ShMemProvider to use
     shmem_provider: SP,
+    #[cfg(feature = "std")]
     /// The timeout after which a client will be considered stale, and removed.
     client_timeout: Duration,
 }
@@ -2019,17 +2020,28 @@ where
     SP: ShMemProvider + 'static,
 {
     /// Create and initialize a new [`LlmpBroker`]
-    pub fn new(shmem_provider: SP, client_timeout: Option<Duration>) -> Result<Self, Error> {
+    pub fn new(
+        shmem_provider: SP,
+        #[cfg(feature = "std")] client_timeout: Option<Duration>,
+    ) -> Result<Self, Error> {
         // Broker never cleans up the pages so that new
         // clients may join at any time
-        Self::with_keep_pages(shmem_provider, true, client_timeout)
+        #[cfg(feature = "std")]
+        {
+            Self::with_keep_pages(shmem_provider, true, client_timeout)
+        }
+
+        #[cfg(not(feature = "std"))]
+        {
+            Self::with_keep_pages(shmem_provider, true)
+        }
     }
 
     /// Create and initialize a new [`LlmpBroker`] telling if it has to keep pages forever
     pub fn with_keep_pages(
         mut shmem_provider: SP,
         keep_pages_forever: bool,
-        client_timeout: Option<Duration>,
+        #[cfg(feature = "std")] client_timeout: Option<Duration>,
     ) -> Result<Self, Error> {
         Ok(LlmpBroker {
             llmp_out: LlmpSender {
@@ -2050,6 +2062,7 @@ where
             listeners: vec![],
             exit_cleanly_after: None,
             num_clients_total: 0,
+            #[cfg(feature = "std")]
             client_timeout: if let Some(to) = client_timeout {
                 to
             } else {

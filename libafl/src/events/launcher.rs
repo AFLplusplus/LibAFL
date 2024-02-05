@@ -13,13 +13,12 @@
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
 use alloc::string::ToString;
-#[cfg(feature = "std")]
-use core::marker::PhantomData;
 use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
-    time::Duration,
 };
+#[cfg(feature = "std")]
+use core::{marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
