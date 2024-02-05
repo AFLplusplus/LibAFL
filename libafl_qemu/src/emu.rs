@@ -461,7 +461,7 @@ extern_c_checked! {
 pub struct GuestMaps {
     orig_c_iter: *const c_void,
     c_iter: *const c_void,
-    first_iter : bool
+    first_iter: bool,
 }
 
 // Consider a private new only for Emulator
@@ -474,7 +474,7 @@ impl GuestMaps {
             Self {
                 orig_c_iter: maps,
                 c_iter: maps,
-                first_iter: true
+                first_iter: true,
             }
         }
     }
