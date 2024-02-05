@@ -305,7 +305,7 @@ where
     Z: UsesState<State = E::State>,
     E::State: HasNestedStageStatus,
 {
-    type Progress = ();
+    type Progress = NestedStageProgress;
 
     fn perform(
         &mut self,
