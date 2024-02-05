@@ -13,18 +13,18 @@
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
 use alloc::string::ToString;
+#[cfg(feature = "std")]
+use core::marker::PhantomData;
 use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
 };
 #[cfg(feature = "std")]
-use core::{marker::PhantomData, time::Duration};
-#[cfg(feature = "std")]
 use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use std::process::Stdio;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-use std::{fs::File, os::unix::io::AsRawFd};
+use std::{fs::File, os::unix::io::AsRawFd, time::Duration};
 
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
