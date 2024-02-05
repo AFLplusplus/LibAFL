@@ -432,7 +432,7 @@ impl Allocator {
     #[inline]
     #[must_use]
     pub fn check_shadow(&mut self, address: *const c_void, size: usize) -> bool {
-        if size == 0 {
+        if size == 0 || !self.is_managed(address as *mut c_void){
             return true;
         }
         let address = address as usize;

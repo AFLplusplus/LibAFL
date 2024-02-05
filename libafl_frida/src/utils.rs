@@ -176,9 +176,16 @@ pub fn writer_register(reg: RegSpec) -> X86Register {
 }
 
 /// Translates a frida instruction to a disassembled instruction.
-#[cfg(all(target_arch = "x86_64", unix))]
+#[cfg(all(target_arch = "x86_64"))]
 pub(crate) fn frida_to_cs(decoder: InstDecoder, frida_insn: &frida_gum_sys::Insn) -> Instruction {
-    decoder.decode_slice(frida_insn.bytes()).unwrap()
+    match decoder.decode_slice(frida_insn.bytes()) {
+        Ok(result) => return result,
+        Err(error) => {
+        log::error!("{:?}: {:x}: {:?}", error, frida_insn.address(), frida_insn.bytes());
+        panic!("FAILED");
+        }
+
+    };
 }
 
 #[cfg(target_arch = "x86_64")]

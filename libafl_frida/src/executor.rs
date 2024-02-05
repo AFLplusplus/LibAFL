@@ -1,5 +1,5 @@
 use core::fmt::{self, Debug, Formatter};
-use std::{ffi::c_void, marker::PhantomData};
+use std::{ffi::c_void, marker::PhantomData, process::abort};
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
@@ -19,7 +19,6 @@ use libafl::{
 };
 
 #[cfg(not(test))]
-#[cfg(unix)]
 use crate::asan::errors::ASAN_ERRORS;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
@@ -105,11 +104,13 @@ where
         }
 
         #[cfg(not(test))]
-        #[cfg(unix)]
         unsafe {
             if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
                 log::error!("Crashing target as it had ASAN errors");
+                #[cfg(unix)]
                 libc::raise(libc::SIGABRT);
+                #[cfg(windows)]
+                abort();
             }
         }
         self.helper.post_exec(input)?;

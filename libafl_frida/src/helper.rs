@@ -460,7 +460,7 @@ where
         let runtimes = Rc::clone(runtimes);
 
         #[cfg(target_arch = "x86_64")]
-        let decoder = InstDecoder::minimal();
+        let decoder = InstDecoder::default();
 
         #[cfg(target_arch = "aarch64")]
         let decoder = <ARMv8 as Arch>::Decoder::default();
@@ -481,11 +481,11 @@ where
         let mut basic_block_start = 0;
         let mut basic_block_size = 0;
         for instruction in basic_block {
-            let mut keep_instr = true;
             let instr = instruction.instr();
             let instr_size = instr.bytes().len();
             let address = instr.address();
-            // log::trace!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+            let mut keep_instr = true;
+            // log::trace!("x - block @ {:x} transformed to {:x}", address, output.writer().pc());
 
             if ranges.borrow().contains_key(&(address as usize)) {
                 let mut runtimes = (*runtimes_unborrowed).borrow_mut();
@@ -505,8 +505,8 @@ where
                 }
 
                 if let Some(rt) = runtimes.match_first_type_mut::<HookRuntime>() {
-                    if let Some(call_target) = rt.is_interesting(decoder, instr) {
-                        rt.emit_callout(call_target, &instruction, runtimes_unborrowed.clone());
+                    if let Some((call_target, needs_return)) = rt.is_interesting(decoder, instr) {
+                        rt.emit_callout(call_target, &instruction, needs_return, runtimes_unborrowed.clone());
                         keep_instr = false;
                     }
                 }

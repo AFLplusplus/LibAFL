@@ -50,7 +50,7 @@ use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
-    helper::FridaInstrumentationHelper,
+    helper::FridaInstrumentationHelper, hook_rt::HookRuntime,
 };
 use libafl_targets::cmplog::CmpLogObserver;
 
@@ -100,9 +100,10 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let coverage = CoverageRuntime::new();
                 let asan = AsanRuntime::new(&options);
-
+                let hooks = HookRuntime::new();
+                    
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan, hooks));
                 //
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -126,7 +127,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Feedbacks to recognize an input as solution
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
-                    TimeoutFeedback::new(),
+                    // TimeoutFeedback::new(),
                     // true enables the AsanErrorFeedback
                     feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
                 );
@@ -178,12 +179,13 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
-                    InProcessExecutor::new(
+                    InProcessExecutor::with_timeout(
                         &mut frida_harness,
                         observers,
                         &mut fuzzer,
                         &mut state,
                         &mut mgr,
+                        options.timeout,
                     )?,
                     &mut frida_helper,
                 );
@@ -210,9 +212,10 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let coverage = CoverageRuntime::new();
                 let cmplog = CmpLogRuntime::new();
+                let hooks = HookRuntime::new();
 
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog));
+                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog, hooks));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -235,7 +238,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
-                    TimeoutFeedback::new(),
+                    // TimeoutFeedback::new(),
                     feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
                 );
 
@@ -360,7 +363,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
-                    TimeoutFeedback::new(),
+                    // TimeoutFeedback::new(),
                     feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
                 );
 
@@ -412,12 +415,13 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
-                    InProcessExecutor::new(
+                    InProcessExecutor::with_timeout(
                         &mut frida_harness,
                         observers,
                         &mut fuzzer,
                         &mut state,
                         &mut mgr,
+                        options.timeout
                     )?,
                     &mut frida_helper,
                 );
@@ -434,7 +438,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr).unwrap();
 
                 Ok(())
             })(state, mgr, core_id)

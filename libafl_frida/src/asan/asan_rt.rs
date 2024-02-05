@@ -24,8 +24,8 @@ use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum,
-    Module, ModuleDetails, ModuleMap, PageProtection, RangeDetails,
+    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum, Module, ModuleDetails,
+    ModuleMap, PageProtection, RangeDetails,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
@@ -536,7 +536,7 @@ impl AsanRuntime {
     #[inline]
     pub fn pc(&self) -> usize {
         if let Some(pc) = self.pc.as_ref() {
-           *pc
+            *pc
         } else {
             0
         }
@@ -565,6 +565,34 @@ impl AsanRuntime {
                         asan_rt.set_pc(_context.rip() as usize);
 
                         log::trace!("hooked {} from {:x}", stringify!($name), _context.rip());
+                        #[allow(trivial_numeric_casts)]
+                        #[allow(unused_assignments)]
+                        _context.set_return_value(asan_rt.[<hook_ $name>]($(_context.arg({
+                            let $param = index;
+                            index += 1;
+                            $param
+                        }) as _),*) as usize);
+
+                        asan_rt.unset_pc();
+                    });
+                }
+            }
+        }
+        macro_rules! hook_func_with_alt {
+            ($lib:expr, $alt_name:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+                paste::paste! {
+                    // extern "system" {
+                    //     fn $name($($param: $param_type),*) -> $return_type;
+                    // }
+                    let address = Module::find_export_by_name($lib, stringify!($alt_name)).expect("Failed to find function").0 as usize;
+                    log::trace!("hooking {} at {:x}", stringify!($alt_name), address);
+                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
+                        let mut index = 0;
+
+                        let asan_rt = _asan_rt.unwrap();
+                        asan_rt.set_pc(_context.rip() as usize);
+
+                        log::trace!("hooked {} from {:x}", stringify!($alt_name), _context.rip());
                         #[allow(trivial_numeric_casts)]
                         #[allow(unused_assignments)]
                         _context.set_return_value(asan_rt.[<hook_ $name>]($(_context.arg({
@@ -624,7 +652,53 @@ impl AsanRuntime {
                 }
             }
         }
-        
+
+        macro_rules! hook_func_with_check_with_alt {
+            ($lib:expr, $alt_name:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+                paste::paste! {
+                    extern "system" {
+                        fn $name($($param: $param_type),*) -> $return_type;
+                    }
+                    let address = Module::find_export_by_name($lib, stringify!($alt_name)).expect("Failed to find function").0 as usize;
+                    log::trace!("hooking {} at {:x}", stringify!($alt_name), address);
+                    hook_rt.register_hook(address, move |_address, mut _context, _asan_rt| {
+                        log::trace!("hooked {} from {:x}", stringify!($alt_name), _context.rip());
+                        let asan_rt = _asan_rt.unwrap();
+                        let mut index = 0;
+                        asan_rt.set_pc(_context.rip() as usize);
+                        #[allow(trivial_numeric_casts)]
+                        #[allow(unused_assignments)]
+                        let result = if asan_rt.[<hook_check_ $name>]($(_context.arg({
+                            let $param = index;
+                            index += 1;
+                            $param
+                        }) as _),*) {
+                            let mut index = 0;
+                            #[allow(trivial_numeric_casts)]
+                            #[allow(unused_assignments)]
+                            asan_rt.[<hook_ $name>]($(_context.arg({
+                                let $param = index;
+                                index += 1;
+                                $param
+                            }) as _),*)
+                        } else {
+                            let mut index = 0;
+                            #[allow(trivial_numeric_casts)]
+                            #[allow(unused_assignments)]
+                            unsafe { $name($(_context.arg({
+                                let $param = index;
+                                index += 1;
+                                $param
+                            }) as _),*) }
+                        };
+                        #[allow(trivial_numeric_casts)]
+                        _context.set_return_value(result as usize);
+                        asan_rt.unset_pc();
+                    })
+                }
+            }
+        }
+
         // Hook the memory allocator functions
         hook_func!(None, malloc, (size: usize), *mut c_void);
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
@@ -662,28 +736,31 @@ impl AsanRuntime {
         //     (path: *const c_void, file: usize, flags: i32),
         //     usize
         // );
-        #[cfg(windows)]
-        hook_func!(
-            None,
-            CreateThread,
-            (thread_attributes: *const c_void, stack_size: usize, start_address: *const c_void, parameter: *const c_void, creation_flags: i32, thread_id: *mut i32),
-            usize
-        );
-        #[cfg(windows)]
-        hook_func!(
-            None,
-            CreateFileMappingW,
-            (file: usize, file_mapping_attributes: *const c_void, protect: i32, maximum_size_high: u32, maximum_size_low: u32, name: *const c_void),
-            usize
-        );
+        // #[cfg(windows)]
+        // hook_func!(
+        //     None,
+        //     CreateThread,
+        //     (thread_attributes: *const c_void, stack_size: usize, start_address: *const c_void, parameter: *const c_void, creation_flags: i32, thread_id: *mut i32),
+        //     usize
+        // );
+        // #[cfg(windows)]
+        // hook_func!(
+        //     None,
+        //     CreateFileMappingW,
+        //     (file: usize, file_mapping_attributes: *const c_void, protect: i32, maximum_size_high: u32, maximum_size_low: u32, name: *const c_void),
+        //     usize
+        // );
 
         #[cfg(windows)]
         for libname in [
             "ntdll",
+            "win32u",
             "ucrtbase",
             "kernelbase",
             "kernel32",
             "vcruntime140",
+            "msvcrt",
+            "api-ms-win-crt-private-l1-1-0",
             "api-ms-win-core-heap-l1-1-0",
             "api-ms-win-core-heap-l2-1-0",
             "api-ms-win-core-heap-obsolete-l1-1-0",
@@ -692,7 +769,19 @@ impl AsanRuntime {
             for export in Module::enumerate_exports(libname) {
                 // log::trace!("- {}", export.name);
                 match &export.name[..] {
-                    "HeapAlloc" | "RtlAllocateHeap" => {
+                    "NtGdiCreateCompatibleDC" => {
+                        hook_func!(Some(libname), NtGdiCreateCompatibleDC, (hdc: *const c_void), *mut c_void);
+                    }
+                    "RtlCreateHeap" => {
+                        hook_func!(Some(libname), RtlCreateHeap, (flags: u32, heap_base: *const c_void, reserve_size: usize, commit_size: usize, lock: *const c_void, parameters: *const c_void), *mut c_void);
+                    }
+                    "RtlDestroyHeap" => {
+                        hook_func!(Some(libname), RtlDestroyHeap, (handle: *const c_void), *mut c_void);
+                    }
+                    "HeapAlloc" => {
+                        hook_func_with_alt!(Some(libname), HeapAlloc, RtlAllocateHeap, (handle: *mut c_void, flags: u32, bytes: usize), *mut c_void);
+                    }
+                    "RtlAllocateHeap" => {
                         hook_func!(Some(libname), RtlAllocateHeap, (handle: *mut c_void, flags: u32, bytes: usize), *mut c_void);
                     }
                     "HeapFree" => {
@@ -701,10 +790,27 @@ impl AsanRuntime {
                     "RtlFreeHeap" => {
                         hook_func_with_check!(Some(libname), RtlFreeHeap, (handle: *mut c_void, flags: u32, mem: *const c_void), usize);
                     }
-                    "HeapSize" | "RtlSizeHeap" => {
+                    "HeapSize" => {
+                        hook_func_with_check_with_alt!(Some(libname), HeapSize, RtlSizeHeap , (handle: *mut c_void, flags: u32, mem: *const c_void), usize);
+                    }
+                    "RtlSizeHeap" => {
                         hook_func_with_check!(Some(libname), RtlSizeHeap , (handle: *mut c_void, flags: u32, mem: *const c_void), usize);
                     }
-                    "HeapReAlloc" | "RtlReAllocateHeap" => {
+                    "HeapReAlloc" => {
+                        hook_func_with_alt!(
+                            Some(libname),
+                            HeapReAlloc,
+                            RtlReAllocateHeap,
+                            (
+                                handle: *mut c_void,
+                                flags: u32,
+                                ptr: *mut c_void,
+                                size: usize
+                            ),
+                            *mut c_void
+                        );
+                    }
+                    "HeapReAlloc" => {
                         hook_func!(
                             Some(libname),
                             RtlReAllocateHeap,
@@ -718,6 +824,30 @@ impl AsanRuntime {
                         );
                     }
 
+                    "LocalAlloc" => {
+                        hook_func!(Some(libname), LocalAlloc, (flags: u32, size: usize), *mut c_void);
+                    }
+                    "LocalReAlloc" => {
+                        hook_func!(Some(libname), LocalReAlloc, (mem: *mut c_void, flags: u32, size: usize), *mut c_void);
+                    }
+                    "LocalHandle" => {
+                        hook_func_with_check!(Some(libname), LocalHandle, (mem: *mut c_void), *mut c_void);
+                    }
+                    "LocalLock" => {
+                        hook_func_with_check!(Some(libname), LocalLock, (mem: *mut c_void), *mut c_void);
+                    }
+                    "LocalUnlock" => {
+                        hook_func_with_check!(Some(libname), LocalUnlock, (mem: *mut c_void), bool);
+                    }
+                    "LocalSize" => {
+                        hook_func_with_check!(Some(libname), LocalSize, (mem: *mut c_void),usize);
+                    }
+                    "LocalFree" => {
+                        hook_func_with_check!(Some(libname), LocalFree, (mem: *mut c_void), *mut c_void);
+                    }
+                    "LocalFlags" => {
+                        hook_func_with_check!(Some(libname), LocalFlags, (mem: *mut c_void),u32);
+                    }
                     "GlobalAlloc" => {
                         hook_func!(Some(libname), GlobalAlloc, (flags: u32, size: usize), *mut c_void);
                     }
@@ -739,6 +869,9 @@ impl AsanRuntime {
                     "GlobalFree" => {
                         hook_func_with_check!(Some(libname), GlobalFree, (mem: *mut c_void), *mut c_void);
                     }
+                    "GlobalFlags" => {
+                        hook_func_with_check!(Some(libname), GlobalFlags, (mem: *mut c_void),u32);
+                    }
                     "memmove" => {
                         hook_func!(
                             Some(libname),
@@ -754,6 +887,30 @@ impl AsanRuntime {
                             (dest: *mut c_void, src: *const c_void, n: usize),
                             *mut c_void
                         );
+                    }
+                    "malloc" => {
+                        hook_func!(Some(libname), malloc, (size: usize), *mut c_void);
+                    }
+                    "_o_malloc" | "o_malloc" => {
+                        hook_func_with_alt!(Some(libname), _o_malloc, malloc, (size: usize), *mut c_void);
+                    }
+                    "calloc" => {
+                        hook_func!(Some(libname), calloc, (nmemb: usize, size: usize), *mut c_void);
+                    }
+                    "_o_calloc" | "o_calloc" => {
+                        hook_func_with_alt!(Some(libname), _o_calloc, calloc, (nmemb: usize, size: usize), *mut c_void);
+                    }
+                    "realloc" => {
+                        hook_func!(Some(libname), realloc, (ptr: *mut c_void, size: usize), *mut c_void);
+                    }
+                    "_o_realloc" | "o_realloc" => {
+                        hook_func_with_alt!(Some(libname), _o_realloc, realloc, (ptr: *mut c_void, size: usize), *mut c_void);
+                    }
+                    "free" => {
+                        hook_func_with_check!(Some(libname), free, (ptr: *mut c_void), usize);
+                    }
+                    "_o_free" | "o_free" => {
+                        hook_func_with_check_with_alt!(Some(libname), _o_free, free, (ptr: *mut c_void), usize);
                     }
                     _ => (),
                 }
@@ -1468,18 +1625,31 @@ impl AsanRuntime {
         log::info!("instrumented rip: {:x}", self.regs[16]);
         log::info!("fault address: {:x}", self.regs[17]);
         log::info!("actual rip: {:x}", self.regs[18]);
+        log::info!("stack: ");
+        for i in 0..32 {
+            log::info!("{:x}", unsafe {
+                ((self.regs[5] + i * 8) as *const u64).read()
+            });
+        }
     }
 
-    // https://godbolt.org/z/qWWae3PE1
+    // https://godbolt.org/z/EvWPzqjeK
     /*
     #include <stdio.h>
     #include <stdint.h>
     uint8_t shadow_bit = 8;
     uint8_t bit = 3;
-    uint64_t generate_shadow_check_blob(uint64_t start){
+    uint64_t result = 0;
+    void handle_trap(uint64_t true_rip);
+    uint64_t generate_shadow_check_blob(uint64_t start, uint64_t true_rip){
+        uint64_t shadow_base = (1ULL << shadow_bit);
+        if (shadow_base * 3 > start || start >= shadow_base *4)
+            return 0;
+
         uint64_t addr = 0;
         addr = addr + (start >> 3);
-        uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
+        uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;        
+
         addr = addr & mask;
         addr = addr + (1ULL << shadow_bit);
 
@@ -1488,47 +1658,52 @@ impl AsanRuntime {
         val = (val >> remainder);
 
         uint8_t mask2 = (1 << bit) - 1;
-        if((val & mask2) == mask2){
-            // success
-            return 0;
-        }
-        else{
+        if((val & mask2) != mask2){
             // failure
-            return 1;
+            handle_trap(true_rip);
         }
+        return 0;
+        
     }
     */
     #[cfg(target_arch = "x86_64")]
     #[allow(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, bit: u32) -> Box<[u8]> {
         let shadow_bit = self.allocator.shadow_bit();
-        // Rcx, Rax, Rdi, Rdx, Rsi are used, so we save them in emit_shadow_check
+        // Rcx, Rax, Rdi, Rdx, Rsi, R8 are used, so we save them in emit_shadow_check
         macro_rules! shadow_check{
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ;   .arch x64
                 // ; int3
-        ;    mov     rax, rdi
-        ;    shr     rax, 3
-        ;    mov     cl, BYTE shadow_bit as i8
-        ;    mov     rdx, -2
-        ;    shl     rdx, cl
-        ;    mov     esi, 1
-        ;    shl     rsi, cl
-        ;    not     rdx
-        ;    and     rdx, rax
-        ;    movzx   edx, WORD [rdx + rsi]
-        ;    and     dil, 7
-        ;    mov     ecx, edi
-        ;    shr     edx, cl
-        ;    mov     cl, BYTE bit as i8
-        ;    mov     eax, -1
-        ;    shl     eax, cl
-        ;    not     eax
-        ;    movzx   ecx, al
-        ;    and     edx, ecx
-        ;    xor     eax, eax
-        ;    cmp     edx, ecx
-                ;   je      >done
+                ; mov     cl, BYTE shadow_bit as i8
+                ; mov     edx, 3
+                ; shl     rdx, cl
+                ; mov     eax, 4
+                ; shl     rax, cl
+                ; cmp     rdx, rdi
+                ; ja      >done
+                ; cmp     rax, rdi
+                ; jbe     >done
+                ; mov     eax, 1
+                ; shl     rax, cl
+                ; mov     rdx, rdi
+                ; shr     rdx, 3
+                ; mov     r8d, 2
+                ; shl     r8, cl
+                ; dec     r8
+                ; and     r8, rdx
+                ; movzx   eax, WORD [r8 + rax]
+                ; and     dil, 7
+                ; mov     ecx, edi
+                ; shr     eax, cl
+                ; mov     cl, BYTE bit as i8
+                ; mov     edx, -1
+                ; shl     edx, cl
+                ; not     edx
+                ; not     eax
+                ; test    dl, al
+                ; xor     eax, eax
+                ; je      >done
                 ;   lea     rsi, [>done] // leap 10 bytes forward
                 ;   nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)
                 ;   nop
@@ -2155,6 +2330,7 @@ impl AsanRuntime {
         writer.put_push_reg(X86Register::Rcx);
         writer.put_push_reg(X86Register::Rax);
         writer.put_push_reg(X86Register::Rbp);
+        writer.put_push_reg(X86Register::R8);
         /*
         Things are a bit different when Rip is either base register or index register.
         Suppose we have an instruction like
@@ -2249,6 +2425,7 @@ impl AsanRuntime {
         writer.put_pop_reg(X86Register::Rdi);
         writer.put_pop_reg(X86Register::Rsi);
 
+        writer.put_pop_reg(X86Register::R8);
         writer.put_pop_reg(X86Register::Rbp);
         writer.put_pop_reg(X86Register::Rax);
         writer.put_pop_reg(X86Register::Rcx);
