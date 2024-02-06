@@ -10,6 +10,12 @@ const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
 const QEMU_REVISION: &str = "75d15d54f4417a4766d2dcb493982d9df0e8eac4";
 
+pub struct BuildResult {
+    pub make_done: bool,
+    pub qemu_path: PathBuf,
+    pub build_dir: PathBuf,
+}
+
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
         which(tool).unwrap_or_else(|_| panic!("Build tool {tool} not found"));
@@ -23,7 +29,8 @@ pub fn build(
     is_big_endian: bool,
     is_usermode: bool,
     jobs: Option<u32>,
-) -> (PathBuf, PathBuf) {
+) -> BuildResult {
+    let mut make_done = false;
     let mut cpu_target = cpu_target.to_string();
     // qemu-system-arm supports both big and little endian configurations and so
     // therefore the "be" feature should ignored in this configuration. Also
@@ -126,7 +133,7 @@ pub fn build(
         build_dir.join(format!("libqemu-system-{cpu_target}.so"))
     };
 
-    println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy());
+    // println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy());
 
     if !output_lib.is_file() || (custom_qemu_dir.is_some() && !custom_qemu_no_build) {
         /*drop(
@@ -312,6 +319,7 @@ pub fn build(
                 .status()
                 .expect("Make failed");
         }
+        make_done = true;
     }
 
     /*
@@ -342,116 +350,118 @@ pub fn build(
 
     let linkinfo = json::parse(compile_commands_string).expect("Failed to parse linkinfo.json");
 
-    let mut cmd = vec![];
-    for arg in linkinfo["cmd"].members() {
-        cmd.push(
-            arg.as_str()
-                .expect("linkinfo.json `cmd` values must be strings"),
-        );
+    if make_done {
+        let mut cmd = vec![];
+        for arg in linkinfo["cmd"].members() {
+            cmd.push(
+                arg.as_str()
+                    .expect("linkinfo.json `cmd` values must be strings"),
+            );
+        }
+
+        assert!(cpp_compiler
+            .to_command()
+            .current_dir(&build_dir)
+            .arg("-o")
+            .arg("libqemu-partially-linked.o")
+            .arg("-r")
+            .args(cmd)
+            .status()
+            .expect("Partial linked failure")
+            .success());
+
+        /* // Old manual linking, kept here for reference and debugging
+        if is_usermode {
+            Command::new("ld")
+                .current_dir(out_dir_path)
+                .arg("-o")
+                .arg("libqemu-partially-linked.o")
+                .arg("-r")
+                .args(objects)
+                .arg("--start-group")
+                .arg("--whole-archive")
+                .arg(format!("{}/libhwcore.fa", build_dir.display()))
+                .arg(format!("{}/libqom.fa", build_dir.display()))
+                .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
+                .arg(format!("{}/gdbstub/libgdb_user.fa", build_dir.display()))
+                .arg("--no-whole-archive")
+                .arg(format!("{}/libqemuutil.a", build_dir.display()))
+                .arg(format!("{}/libhwcore.fa", build_dir.display()))
+                .arg(format!("{}/libqom.fa", build_dir.display()))
+                .arg(format!("{}/gdbstub/libgdb_user.fa", build_dir.display()))
+                .arg(format!(
+                    "--dynamic-list={}/plugins/qemu-plugins.symbols",
+                    qemu_path.display()
+                ))
+                .arg("--end-group")
+                .status()
+                .expect("Partial linked failure");
+        } else {
+            Command::new("ld")
+                .current_dir(out_dir_path)
+                .arg("-o")
+                .arg("libqemu-partially-linked.o")
+                .arg("-r")
+                .args(objects)
+                .arg("--start-group")
+                .arg("--whole-archive")
+                .arg(format!("{}/libhwcore.fa", build_dir.display()))
+                .arg(format!("{}/libqom.fa", build_dir.display()))
+                .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
+                .arg(format!("{}/gdbstub/libgdb_softmmu.fa", build_dir.display()))
+                .arg(format!("{}/libio.fa", build_dir.display()))
+                .arg(format!("{}/libcrypto.fa", build_dir.display()))
+                .arg(format!("{}/libauthz.fa", build_dir.display()))
+                .arg(format!("{}/libblockdev.fa", build_dir.display()))
+                .arg(format!("{}/libblock.fa", build_dir.display()))
+                .arg(format!("{}/libchardev.fa", build_dir.display()))
+                .arg(format!("{}/libqmp.fa", build_dir.display()))
+                .arg("--no-whole-archive")
+                .arg(format!("{}/libqemuutil.a", build_dir.display()))
+                .arg(format!(
+                    "{}/subprojects/dtc/libfdt/libfdt.a",
+                    build_dir.display()
+                ))
+                .arg(format!(
+                    "{}/subprojects/libvhost-user/libvhost-user-glib.a",
+                    build_dir.display()
+                ))
+                .arg(format!(
+                    "{}/subprojects/libvhost-user/libvhost-user.a",
+                    build_dir.display()
+                ))
+                .arg(format!(
+                    "{}/subprojects/libvduse/libvduse.a",
+                    build_dir.display()
+                ))
+                .arg(format!("{}/libmigration.fa", build_dir.display()))
+                .arg(format!("{}/libhwcore.fa", build_dir.display()))
+                .arg(format!("{}/libqom.fa", build_dir.display()))
+                .arg(format!("{}/gdbstub/libgdb_softmmu.fa", build_dir.display()))
+                .arg(format!("{}/libio.fa", build_dir.display()))
+                .arg(format!("{}/libcrypto.fa", build_dir.display()))
+                .arg(format!("{}/libauthz.fa", build_dir.display()))
+                .arg(format!("{}/libblockdev.fa", build_dir.display()))
+                .arg(format!("{}/libblock.fa", build_dir.display()))
+                .arg(format!("{}/libchardev.fa", build_dir.display()))
+                .arg(format!("{}/libqmp.fa", build_dir.display()))
+                .arg(format!(
+                    "--dynamic-list={}/plugins/qemu-plugins.symbols",
+                    qemu_path.display()
+                ))
+                .arg("--end-group")
+                .status()
+                .expect("Partial linked failure");
+        }*/
+
+        Command::new("ar")
+            .current_dir(out_dir_path)
+            .arg("crs")
+            .arg("libqemu-partially-linked.a")
+            .arg(build_dir.join("libqemu-partially-linked.o"))
+            .status()
+            .expect("Ar creation");
     }
-
-    assert!(cpp_compiler
-        .to_command()
-        .current_dir(&build_dir)
-        .arg("-o")
-        .arg("libqemu-partially-linked.o")
-        .arg("-r")
-        .args(cmd)
-        .status()
-        .expect("Partial linked failure")
-        .success());
-
-    /* // Old manual linking, kept here for reference and debugging
-    if is_usermode {
-        Command::new("ld")
-            .current_dir(out_dir_path)
-            .arg("-o")
-            .arg("libqemu-partially-linked.o")
-            .arg("-r")
-            .args(objects)
-            .arg("--start-group")
-            .arg("--whole-archive")
-            .arg(format!("{}/libhwcore.fa", build_dir.display()))
-            .arg(format!("{}/libqom.fa", build_dir.display()))
-            .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
-            .arg(format!("{}/gdbstub/libgdb_user.fa", build_dir.display()))
-            .arg("--no-whole-archive")
-            .arg(format!("{}/libqemuutil.a", build_dir.display()))
-            .arg(format!("{}/libhwcore.fa", build_dir.display()))
-            .arg(format!("{}/libqom.fa", build_dir.display()))
-            .arg(format!("{}/gdbstub/libgdb_user.fa", build_dir.display()))
-            .arg(format!(
-                "--dynamic-list={}/plugins/qemu-plugins.symbols",
-                qemu_path.display()
-            ))
-            .arg("--end-group")
-            .status()
-            .expect("Partial linked failure");
-    } else {
-        Command::new("ld")
-            .current_dir(out_dir_path)
-            .arg("-o")
-            .arg("libqemu-partially-linked.o")
-            .arg("-r")
-            .args(objects)
-            .arg("--start-group")
-            .arg("--whole-archive")
-            .arg(format!("{}/libhwcore.fa", build_dir.display()))
-            .arg(format!("{}/libqom.fa", build_dir.display()))
-            .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
-            .arg(format!("{}/gdbstub/libgdb_softmmu.fa", build_dir.display()))
-            .arg(format!("{}/libio.fa", build_dir.display()))
-            .arg(format!("{}/libcrypto.fa", build_dir.display()))
-            .arg(format!("{}/libauthz.fa", build_dir.display()))
-            .arg(format!("{}/libblockdev.fa", build_dir.display()))
-            .arg(format!("{}/libblock.fa", build_dir.display()))
-            .arg(format!("{}/libchardev.fa", build_dir.display()))
-            .arg(format!("{}/libqmp.fa", build_dir.display()))
-            .arg("--no-whole-archive")
-            .arg(format!("{}/libqemuutil.a", build_dir.display()))
-            .arg(format!(
-                "{}/subprojects/dtc/libfdt/libfdt.a",
-                build_dir.display()
-            ))
-            .arg(format!(
-                "{}/subprojects/libvhost-user/libvhost-user-glib.a",
-                build_dir.display()
-            ))
-            .arg(format!(
-                "{}/subprojects/libvhost-user/libvhost-user.a",
-                build_dir.display()
-            ))
-            .arg(format!(
-                "{}/subprojects/libvduse/libvduse.a",
-                build_dir.display()
-            ))
-            .arg(format!("{}/libmigration.fa", build_dir.display()))
-            .arg(format!("{}/libhwcore.fa", build_dir.display()))
-            .arg(format!("{}/libqom.fa", build_dir.display()))
-            .arg(format!("{}/gdbstub/libgdb_softmmu.fa", build_dir.display()))
-            .arg(format!("{}/libio.fa", build_dir.display()))
-            .arg(format!("{}/libcrypto.fa", build_dir.display()))
-            .arg(format!("{}/libauthz.fa", build_dir.display()))
-            .arg(format!("{}/libblockdev.fa", build_dir.display()))
-            .arg(format!("{}/libblock.fa", build_dir.display()))
-            .arg(format!("{}/libchardev.fa", build_dir.display()))
-            .arg(format!("{}/libqmp.fa", build_dir.display()))
-            .arg(format!(
-                "--dynamic-list={}/plugins/qemu-plugins.symbols",
-                qemu_path.display()
-            ))
-            .arg("--end-group")
-            .status()
-            .expect("Partial linked failure");
-    }*/
-
-    Command::new("ar")
-        .current_dir(out_dir_path)
-        .arg("crs")
-        .arg("libqemu-partially-linked.a")
-        .arg(build_dir.join("libqemu-partially-linked.o"))
-        .status()
-        .expect("Ar creation");
 
     println!("cargo:rustc-link-search=native={out_dir}");
     println!("cargo:rustc-link-lib=static=qemu-partially-linked");
@@ -500,5 +510,9 @@ pub fn build(
         }
     }
 
-    (qemu_path, build_dir)
+    BuildResult {
+        make_done,
+        qemu_path,
+        build_dir,
+    }
 }

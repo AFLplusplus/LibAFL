@@ -6,7 +6,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     mem::transmute,
-    ptr::{self, addr_of, addr_of_mut},
+    ptr::{self, addr_of},
 };
 
 use libafl::{executors::hooks::inprocess::inprocess_get_state, inputs::UsesInput};
@@ -318,16 +318,20 @@ where
     QT: QemuHelperTuple<S>,
 {
     unsafe {
+        eprintln!("FFFFFFFFFFFFFF {}", CRASH_HOOKS.len());
         let hooks = get_qemu_hooks::<QT, S>();
-        for hook in &mut (*addr_of_mut!(CRASH_HOOKS)) {
-            match hook {
+        for mut hook in &mut CRASH_HOOKS {
+            match &mut hook {
                 HookRepr::Function(ptr) => {
                     let func: fn(&mut QemuHooks<QT, S>, i32) = transmute(*ptr);
                     func(hooks, target_sig);
                 }
                 HookRepr::Closure(ptr) => {
+                    eprintln!("closure");
+                    let aaa: FatPtr = **ptr;
                     let func: &mut Box<dyn FnMut(&mut QemuHooks<QT, S>, i32)> = transmute(ptr);
                     func(hooks, target_sig);
+                    eprintln!("SADSADSAD")
                 }
                 HookRepr::Empty => (),
             }
